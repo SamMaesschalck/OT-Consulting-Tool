@@ -4,7 +4,8 @@
 <link rel="stylesheet" href="../css/app.css" /></head>
 <body>
 <!--
-  The tool's version (js/version.js) has to be visible IN THE TOOL, so anyone
+  The tool's version (js/version.js, the suite version copied in from
+  shared/version.js) has to be visible IN THE TOOL, so anyone
   can say which release they are using, and recorded in the project files it
   saves. It must NEVER reach a report: the Word and Excel files are opened
   (they are zip files), every part is decompressed, and the version must not
@@ -49,6 +50,10 @@ H.test(function (ok, done) {
   ok(V.labelOf("0.3.1") === "v0.3.1" && V.labelOf("1.0.0") === "v1.0", "a patch release shows its patch number, a .0 does not");
   ok(V.compare("0.4.0", "0.3.0") === 1 && V.compare("0.3.0", "0.3.0") === 0 && V.compare("0.2.9", "0.3.0") === -1 &&
      V.compare("0.10.0", "0.9.0") === 1, "versions compare part by part, not as text");
+  // The number is the suite's (shared/version.js, copied in); the name is this
+  // module's own (js/product.js).
+  ok(V.product === "OT Cyber Assessment Tool" && A.Product && A.Product.id === "assessments",
+     "the suite version carries this module's product name", V.product + " / " + (A.Product && A.Product.id));
 
   // ---- shown in the tool ---------------------------------------------------
   // The test shell has no header brand; give it the one index.html has.

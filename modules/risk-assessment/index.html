@@ -118,7 +118,7 @@
     <div class="header">
       <div class="brand">
         <span class="brand-logo"><img src="data/AVEVASelect-LogoLockup-Landscape-Positive.png" alt="SolutionsPT - AVEVA Select UK &amp; Ireland" /></span>
-        <span class="sub">OT Cyber Risk Assessment Tool <span class="stage-badge">v0.2, 62443-3-2-aligned</span></span>
+        <span class="sub">OT Cyber Risk Assessment Tool <span id="stage-badge" class="stage-badge">62443-3-2-aligned</span></span>
       </div>
       <span id="suc-summary" class="engagement-summary"></span>
       <div class="spacer"></div>
@@ -136,6 +136,10 @@
   </div>
   <div id="toast" class="toast hidden"></div>
 
+  <!-- The suite version (js/version.js, copied in from shared/version.js) and
+       this module's product name (js/product.js). -->
+  <script src="js/version.js"></script>
+  <script src="js/product.js"></script>
   <script src="data/slt-suggestion-rules.js"></script>
   <script src="data/risk-context-interchange.js"></script>
   <script src="data/engagement-guidance.js"></script>
@@ -154,7 +158,11 @@
       "client or purpose. See LICENCE.txt for the full terms.";
     var INTERCHANGE = window.App.Data.interchange;
 
-    var TOOL_ID = "spt-risk-tool/0.2";
+    // The suite version, one number for every module (js/version.js). Shown in
+    // the header badge and on the About page, and carried as generatedBy in
+    // the risk-context file; never put in the Word or Excel deliverables.
+    var VERSION = window.App.Version;
+    var TOOL_ID = "spt-risk-tool/" + VERSION.number;
     var PROJECT_SCHEMA = "spt-risk-project/0.2";
     var ACCEPTED_PROJECT_SCHEMAS = ["spt-risk-project/0.1", "spt-risk-project/0.2"];
     var AUTOSAVE_KEY = "spt-risk-tool:autosave:v1";
@@ -1819,7 +1827,7 @@
 
     function renderAbout(main) {
       main.appendChild(h("h1", { class: "page-title", text: "About & framing" }));
-      main.appendChild(h("p", { class: "page-sub", text: "OT Cyber Risk Assessment Tool (zones & conduits) version 0.2" }));
+      main.appendChild(h("p", { class: "page-sub", text: VERSION.product + " (zones & conduits) " + VERSION.label + " (version " + VERSION.number + ")" }));
 
       main.appendChild(card("What this tool is (and is not)", null, [
         h("p", null, ["This tool implements the IEC 62443-3-2 Clause 4 workflow: define the SuC (4.1), high-level risk for zoning (4.2), a security requirements specification including tolerable risk (4.3), zones & conduits (4.4), a per-zone/conduit detailed risk assessment covering threats, vulnerabilities and likelihood × impact = unmitigated risk (4.5), comparison against tolerable risk (4.6), and countermeasures with the resulting residual risk (4.7). SL-T is assigned as a vector, one target per foundational requirement, and the asset owner signs off the tolerable risk and outcome."]),
@@ -1933,6 +1941,14 @@
       document.body.appendChild(bar);
     }
 
+    // The header badge: the suite version, then the alignment note.
+    (function () {
+      var badge = $("stage-badge");
+      if (!badge) return;
+      badge.textContent = VERSION.label + ", 62443-3-2-aligned";
+      badge.title = VERSION.product + " version " + VERSION.number;
+    })();
+
     setupThemeToggle();
     render();
     updateSaveButton();
@@ -1942,7 +1958,11 @@
     // Load the completed demo project through the normal load path so every
     // guard and normaliser runs. The boot project is empty, so no confirm
     // fires; autosave is inert (see TOUR_MODE guards above).
-    if (TOUR_MODE) {
+    // The single-file build carries the demo inline (window.SPT_TOUR_PROJECT is
+    // already set); the folder app loads it only when the tour is opened.
+    if (TOUR_MODE && window.SPT_TOUR_PROJECT) {
+      loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT));
+    } else if (TOUR_MODE) {
       var tourScript = document.createElement("script");
       tourScript.src = "data/tour-project.js";
       tourScript.onload = function () {

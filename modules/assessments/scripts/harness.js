@@ -38,6 +38,7 @@
   var CORE = [
     "data/manifest.js",
     "js/version.js",
+    "js/product.js",
     "js/logo.js",
     "js/scoring.js",
     "js/scoring-domain-letter.js",

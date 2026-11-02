@@ -2,7 +2,7 @@
 <html lang="en">
 <head><meta charset="utf-8" /><title>risk-tool tests</title></head>
 <body>
-<h1>risk-tool engine tests (v0.2 — detailed risk assessment)</h1>
+<h1>risk-tool engine tests (detailed risk assessment)</h1>
 <pre id="out">running…</pre>
 <iframe id="app" src="../index.html" style="width:10px;height:10px;visibility:hidden"></iframe>
 <script>
@@ -122,7 +122,7 @@
     ok(ctx.schema === "spt-risk-context/1.4", "export schema is 1.4", "got " + ctx.schema);
     ok(ctx.highLevelAssets.length === 1 && ctx.highLevelAssets[0].risk === "high", "high-level asset ranking exported with computed risk (serious×high=high)");
     ok(ctx.basisOfAssessment.interviews.length === 1 && ctx.basisOfAssessment.documents.length === 1 && ctx.basisOfAssessment.observations.length === 1, "basis of assessment exported (interviews/documents/observations)");
-    ok(ctx.generatedBy === "spt-risk-tool/0.2", "generatedBy stamped");
+    ok(ctx.generatedBy === "spt-risk-tool/" + w.App.Version.number && /^spt-risk-tool\/\d+\.\d+\.\d+$/.test(ctx.generatedBy), "generatedBy stamped with the suite version", ctx.generatedBy);
     ok(ctx.securityRequirements.tolerableRisk === "medium", "tolerable risk exported");
     ok(ctx.securityRequirements.knownThreats.length === 1 && ctx.securityRequirements.mandatorySecurityFunctions.length === 1, "SRS threats/functions exported");
     var ez = ctx.zones[0];

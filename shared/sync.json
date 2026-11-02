@@ -2,6 +2,7 @@
   "_note": "Where each canonical shared file and contract is copied into the modules. Edit the canonical copy (shared/ or contracts/), then run tools/sync-shared.ps1 to copy it in; tools/sync-shared.ps1 -Check fails if any module copy differs. Modules carry their own copies so each one still runs and ships standalone. After syncing a contract .json, re-run that module's scripts/build-data.ps1 to regenerate its .js wrapper.",
   "files": [
     { "from": "shared/LICENCE.txt", "to": ["LICENCE.txt", "modules/assessments/LICENCE.txt", "modules/risk-assessment/LICENCE.txt"] },
+    { "from": "shared/version.js", "to": ["modules/assessments/js/version.js", "modules/risk-assessment/js/version.js"] },
     { "from": "shared/brand/AVEVASelect-LogoLockup-Landscape-Positive.png", "to": ["modules/assessments/data/shared/AVEVASelect-LogoLockup-Landscape-Positive.png", "modules/risk-assessment/data/AVEVASelect-LogoLockup-Landscape-Positive.png"] },
     { "from": "shared/brand/logo.js", "to": ["modules/assessments/js/logo.js", "modules/risk-assessment/js/logo.js"] },
     { "from": "shared/brand/hero-asset.js", "to": ["modules/assessments/js/hero-asset.js", "modules/risk-assessment/js/hero-asset.js"] },

@@ -1,0 +1,138 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool version tests</title></head>
+<body>
+<h1>risk-tool version: in the tool, never in a report</h1>
+<!--
+  The risk tool shows the suite version (js/version.js, copied in from
+  shared/version.js) under its own product name (js/product.js): the header
+  badge and the About page. It must NEVER reach a deliverable: the Word and
+  Excel files are taken from the app's own download path, opened (they are zip
+  files), every part decompressed, and the version must not appear anywhere in
+  them, text or properties.
+-->
+<pre id="out">running...</pre>
+<iframe id="app" src="../index.html?tour=1" style="width:1280px;height:800px;visibility:hidden"></iframe>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " - " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+
+  // Minimal zip reader: every entry of a .docx/.xlsx as text.
+  function unzipText(blob) {
+    return blob.arrayBuffer().then(function (buf) {
+      var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+      for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+      if (eocd < 0) throw new Error("not a zip");
+      var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true), jobs = [];
+      for (var k = 0; k < n; k++) {
+        var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+        var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+        var local = v.getUint32(p + 42, true);
+        var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        jobs.push((function (name, method, data) {
+          var bytes = method === 0 ? Promise.resolve(data)
+            : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+          return bytes.then(function (b) { return { name: name, text: /\.(xml|rels)$/.test(name) ? new TextDecoder().decode(b) : "" }; });
+        })(name, method, data));
+        p += 46 + nlen + xlen + clen;
+      }
+      return Promise.all(jobs);
+    });
+  }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.ExcelJS || !w.docx ||
+        (w.RiskTool.state.project.suc.name || "").indexOf("Acme") !== 0) {
+      if (++tries > 300) { clearInterval(t); lines.push("FAIL app/exports/libs did not load seeded"); failures++; done(); }
+      return;
+    }
+    clearInterval(t);
+    run(w).then(done, function (e) { failures++; lines.push("FAIL threw: " + (e && e.message)); done(); });
+  }, 50);
+
+  function run(w) {
+    var A = w.App, V = A.Version, RT = w.RiskTool, RX = w.RiskExports, doc = w.document;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+
+    // ---- the suite version, under this module's name ----------------------
+    ok(V && /^\d+\.\d+\.\d+$/.test(V.number), "the suite version is loaded (" + (V && V.number) + ")");
+    ok(V.label === V.labelOf(V.number) && /^v\d/.test(V.label), "with its label (" + V.label + ")");
+    ok(V.product === "OT Cyber Risk Assessment Tool" && A.Product && A.Product.id === "risk-assessment",
+       "named for this module's product", V.product + " / " + (A.Product && A.Product.id));
+
+    // ---- shown in the tool ---------------------------------------------------
+    var badge = doc.getElementById("stage-badge");
+    ok(badge && badge.textContent === V.label + ", 62443-3-2-aligned", "the header badge shows the suite version", badge && badge.textContent);
+    ok(badge && badge.title.indexOf(V.number) !== -1 && badge.title.indexOf(V.product) === 0, "with the product and full number on hover", badge && badge.title);
+    ok(!/v0\.2\b/.test(doc.querySelector(".header").textContent) || V.label === "v0.2", "the old hardcoded v0.2 is gone from the header");
+    var about = Array.prototype.filter.call(doc.querySelectorAll("#sidebar .nav-item"), function (n) { return /About/.test(n.textContent); })[0];
+    ok(!!about, "the About page is in the sidebar");
+    if (about) about.click();
+    var mainText = doc.getElementById("main").textContent;
+    ok(mainText.indexOf(V.product + " (zones & conduits) " + V.label + " (version " + V.number + ")") !== -1,
+       "the About page names the version", (mainText.match(/.{0,60}zones & conduits\).{0,40}/) || [""])[0]);
+    ok(/Copyright and licence/.test(mainText) && /SolutionsPT/.test(mainText), "and carries the licence notice");
+    var ctx = RT.buildRiskContext(RT.state.project);
+    ok(ctx.generatedBy === "spt-risk-tool/" + V.number, "the risk-context file says which version produced it", ctx.generatedBy);
+
+    // ---- NEVER in a report ---------------------------------------------------
+    // Through the app's own download path: capture each blob it hands to the
+    // browser, and stop the browser actually downloading it.
+    var captured = [];
+    var realCreate = w.URL.createObjectURL;
+    w.URL.createObjectURL = function (b) { captured.push(b); return realCreate.call(w.URL, b); };
+    var realClick = w.HTMLAnchorElement.prototype.click;
+    w.HTMLAnchorElement.prototype.click = function () { if (!this.download) return realClick.call(this); };
+
+    var needles = [V.number, V.label, "spt-risk-tool", "savedWithVersion", "createdWithVersion"];
+    function scan(parts) {
+      var hits = [];
+      parts.forEach(function (p) { needles.forEach(function (nd) { if (p.text.indexOf(nd) !== -1) hits.push(p.name + " has " + nd); }); });
+      return hits;
+    }
+    function viaDownload(label, start) {
+      return new Promise(function (resolve) {
+        var before = captured.length;
+        start(function (err) { resolve(err ? null : captured[before] || null); });
+      }).then(function (blob) {
+        ok(!!blob && blob.size > 2000, label + ": builds through the download path", blob ? ("size " + blob.size) : "no blob");
+        return blob ? unzipText(blob) : [];
+      }).then(function (parts) {
+        ok(parts.some(function (p) { return p.name === "docProps/core.xml"; }) && parts.some(function (p) { return /Acme Petrochemicals/.test(p.text); }),
+           label + ": the file was opened and read (properties and body)");
+        var hits = scan(parts);
+        ok(hits.length === 0, label + ": no version anywhere in the file, text or properties", hits.join(" | "));
+      });
+    }
+
+    return viaDownload("Word (full report)", function (cb) { RX.downloadWord({}, cb); })
+      .then(function () { return viaDownload("Word (high-level report)", function (cb) { RX.downloadWord({ highLevelOnly: true }, cb); }); })
+      .then(function () { return viaDownload("Excel workbook", function (cb) { RX.downloadExcel(cb); }); })
+      .then(function () {
+        w.URL.createObjectURL = realCreate;
+        w.HTMLAnchorElement.prototype.click = realClick;
+        // Negative control: a version planted in the file properties (as the
+        // consultant's name, which becomes the creator) must be found.
+        var p = JSON.parse(JSON.stringify(RT.state.project));
+        p.engagement.consultant = "Planted " + V.label;
+        return RX.buildWorkbook(p).xlsx.writeBuffer();
+      })
+      .then(function (buf) { return unzipText(new Blob([buf])); })
+      .then(function (parts) {
+        var hits = scan(parts);
+        ok(hits.some(function (h) { return /^docProps\/core\.xml has /.test(h); }), "(the scan does find a version planted in the file properties)", hits.join(" | "));
+      });
+  }
+})();
+</script>
+</body>
+</html>
