@@ -135,9 +135,12 @@
     var notes = d.querySelector(".notes-card");
     var nt = notes ? notes.textContent : "";
     ok(notes && notes.querySelector("h2").textContent === "What's new in v0.5.1", "What's new shows the v0.5.1 release notes", notes && notes.querySelector("h2").textContent);
-    ok(notes && notes.querySelectorAll(".notes h3").length >= 2 && notes.querySelectorAll(".notes table tbody tr").length === 5 &&
-       notes.querySelectorAll(".notes li").length >= 5 && notes.querySelector(".notes strong") && notes.querySelector(".notes code"),
-       "rendered from Markdown: headings, the file table, bullets, bold and code", nt.slice(0, 200));
+    ok(notes && notes.querySelectorAll(".notes li").length >= 5 && notes.querySelector(".notes strong"),
+       "rendered from Markdown: bullets and bold", nt.slice(0, 200));
+    // Only the "What's new" section: which file to download, checksums and
+    // SmartScreen are for the GitHub release page, not someone in the suite.
+    ok(notes && !notes.querySelector(".notes table") && !/Which file to use|SHA256SUMS|SmartScreen/.test(nt),
+       "and only the What's new section, not the download notes", nt.slice(0, 200));
     ok(/Issue check/.test(nt) && nt.indexOf("**") === -1 && nt.indexOf("|") === -1, "with no Markdown marks left showing");
 
     // Licence

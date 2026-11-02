@@ -62,6 +62,13 @@ if (-not $notes) { throw "No release notes in docs\releases (expected v<x.y.z>.m
 $notesVersion = [regex]::Match($notes.Name, '^v(\d+\.\d+\.\d+)').Groups[1].Value
 $p = $notesVersion.Split('.')
 $notesLabel = "v" + $(if ($p[2] -eq "0") { $p[0] + "." + $p[1] } else { $notesVersion })
+# The home page shows only the "## What's new" section: the rest of a release
+# note (which file to download, checksums, SmartScreen) is for someone on the
+# GitHub release page, not someone already using the suite. A note without
+# that heading is shown whole.
+$notesText = (ReadText $notes.FullName).Replace("`r`n", "`n").TrimEnd()
+$wn = [regex]::Match($notesText, "(?ms)^## What's new[^\n]*\n(.*?)(?=^## |\z)")
+if ($wn.Success) { $notesText = $wn.Groups[1].Value.Trim() }
 
 $data = [ordered]@{
   product = [string]$suite.product
@@ -70,7 +77,7 @@ $data = [ordered]@{
   licence = (ReadText (Join-Path $platform "LICENCE.txt")).Replace("`r`n", "`n").TrimEnd()
   releaseNotes = [ordered]@{
     version = $notesVersion; label = $notesLabel; file = "docs/releases/$($notes.Name)"
-    markdown = (ReadText $notes.FullName).Replace("`r`n", "`n").TrimEnd()
+    markdown = $notesText
   }
 }
 
