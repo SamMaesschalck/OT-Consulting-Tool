@@ -70,7 +70,7 @@ New-Item -ItemType Directory -Force $appDir | Out-Null
 Copy-Item (Join-Path $here "app\*") $appDir -Recurse
 Copy-Item (Join-Path $here "build\icon-256.png") (Join-Path $appDir "splash-logo.png")   # the loading window's logo
 Copy-Item $page (Join-Path $appDir "index.html")
-Copy-Item (Join-Path $ModuleDir "module.json") (Join-Path $appDir "module.json")
+Copy-Item $ModuleManifest (Join-Path $appDir "module.json")   # the suite's is platform\suite.json
 # The app's package.json takes the module's name and the suite version. Its
 # productName also names the folder Electron keeps local storage in, so each
 # module's app keeps its own.

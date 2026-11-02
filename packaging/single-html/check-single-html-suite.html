@@ -1,0 +1,402 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Check: suite single-file build</title></head>
+<body>
+<!--
+  Proves the suite's single-file build works: it opens on its home page with
+  a card per tool, carries each tool's own single-file build unchanged (and
+  the assessment tool's tour), opens each tool in a same-origin frame with its
+  title and version, keeps a tool's work when switching away and back, shows
+  the licence and the newest release notes, records saves and loads in Recent
+  files and reopens them, builds Word and Excel inside each tool, saves inside
+  a frame (in place, and by download when the save dialog is refused), passes
+  theme changes on, and warns before closing with unsaved work. It first opens
+  the folder build (platform/index.html) to read the product and version and
+  to see a tool start there too.
+
+  Open it in Edge after running build-single-html.ps1 -Module suite (which
+  also builds each tool's single file beside it). Headless runs need
+  --allow-file-access-from-files, since it reaches into the frames and reads
+  the tools' single files to compare. Prints ALL TESTS PASSED.
+-->
+<pre id="out">running...</pre>
+<iframe id="f" style="width:1440px;height:900px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  var errors = [];
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function until(test, ms, what) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function poll() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out waiting for " + (what || "a condition")));
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+  function watch(w, label) {
+    w.addEventListener("error", function (e) { errors.push(label + " error: " + (e.message || e.type)); });
+    w.addEventListener("unhandledrejection", function (e) { errors.push(label + " rejection: " + (e.reason && e.reason.message || e.reason)); });
+    var realErr = w.console.error;
+    w.console.error = function () { errors.push(label + " console.error: " + Array.prototype.join.call(arguments, " ")); return realErr.apply(w.console, arguments); };
+  }
+  function load(url) {
+    return new Promise(function (resolve, reject) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        until(function () { return w.Suite && w.Suite.Shell && w.App && w.App.Version; }, 30000, "the suite at " + url)
+          .then(function () { resolve(w); }, reject);
+      };
+      frame.src = url;
+    });
+  }
+  function readFile(name) {
+    return new Promise(function (resolve, reject) {
+      var x = new XMLHttpRequest();
+      x.open("GET", encodeURIComponent(name));
+      x.onload = function () { resolve(x.responseText); };
+      x.onerror = function () { reject(new Error("could not read " + name)); };
+      x.send();
+    });
+  }
+  // A tool's frame in the suite, once the tool has said it has started.
+  function tool(S, key) {
+    var f = S.Suite.Shell.frames[key];
+    return until(function () { return f && f.ready && f.el.contentWindow.App && f.el.contentWindow.App.Version; }, 60000, key + " to start")
+      .then(function () { var w = f.el.contentWindow; w.confirm = function () { return true; }; w.alert = function () {}; return { f: f, w: w, d: w.document }; });
+  }
+  // A file handle as the File System Access API gives one.
+  function fakeHandle(w, name, text) {
+    var store = { text: text || null };
+    return { kind: "file", name: name, store: store,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      requestPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () { return Promise.resolve({
+        write: function (t) { store.text = String(t); return Promise.resolve(); },
+        close: function () { return Promise.resolve(); } }); },
+      getFile: function () { return Promise.resolve(new w.File([store.text || "{}"], name, { type: "application/json" })); } };
+  }
+  // Downloads hang a headless browser: catch them at the link click instead.
+  function catchDownloads(w) {
+    var got = [];
+    w.HTMLAnchorElement.prototype.click = function () { got.push(this.download || ""); };
+    return got;
+  }
+  function recent(S) { return S.Suite.Shell.readRecent(); }
+  function barText(S) { return (S.document.getElementById("suite-bar") || {}).textContent || ""; }
+
+  var product, label, number, bundleName, S;
+  var riskFile = "check-risk-project.json", assessFile = "check-assessment-project.json";
+
+  // ---- 1. The folder build: product, version, and a tool starts there ------
+  load("../../platform/index.html").then(function (w) {
+    product = w.Suite.Data.product; label = w.App.Version.label; number = w.App.Version.number;
+    ok(product === "SolutionsPT OT Cyber Suite" && w.document.title === product, "the folder build opens on its home page (" + product + " " + label + ")", w.document.title);
+    ok(!w.Suite.Shell.bundled, "the folder build frames each tool's own page");
+    var f = w.Suite.Shell.open("risk-assessment");
+    ok(f && /\.\.\/modules\/risk-assessment\/index\.html$/.test(f.el.getAttribute("src") || ""), "and opens the risk tool from ../modules/risk-assessment/index.html", f && f.el.getAttribute("src"));
+    return until(function () { return f.ready; }, 60000, "the folder risk tool").then(function () {
+      ok(f.version === label, "the tool starts in its frame and tells the suite its version (" + f.version + ")", f.version);
+      bundleName = product + " " + label + ".html";
+      try { w.localStorage.removeItem(w.Suite.Shell.RECENT_KEY); } catch (e) {}
+      return load(encodeURIComponent(bundleName));
+    });
+  })
+
+  // ---- 2. The single file: home page, cards, nothing beside it -------------
+  .then(function (w) {
+    S = w; watch(w, "suite");
+    var d = w.document;
+    ok(w.location.href.indexOf(encodeURIComponent(bundleName)) !== -1, "the single file for this version loads (" + bundleName + ")");
+    ok(d.title === product, "it opens on its home page, titled " + product, d.title);
+    ok(d.querySelectorAll("script[src],link[href],img[src]:not([src^='data:'])").length === 0, "it loads nothing from beside itself");
+    var badge = (d.querySelector("#suite-name .version-badge") || {}).textContent;
+    ok(badge === label, "the header shows the suite version (" + badge + ")", badge);
+    var cards = Array.prototype.map.call(d.querySelectorAll(".tool-card h2"), function (e) { return e.textContent; });
+    ok(cards.length === 2 && cards[0] === "OT Cyber Assessment Tool" && cards[1] === "OT Cyber Risk Assessment Tool", "the home page has a card for each tool (" + cards.join(", ") + ")", cards.join(" | "));
+    ok(d.querySelectorAll(".tool-card .tool-tour").length === 2 && d.querySelectorAll(".help-tool .help-tour").length === 2, "both tools' tours are offered, on the cards and in Getting started");
+    ok(d.querySelectorAll(".help-tool").length === 2 && /62443-3-3/.test(d.querySelector(".help-card").textContent), "Getting started says what each tool is for");
+    ok(!/developer copy/.test(d.querySelector(".help-card").textContent), "and does not carry the folder build's note about downloads");
+    ok(/appear here/.test(d.querySelector(".recent-card").textContent), "Recent files starts empty, saying what will appear");
+    ok(/© 2026 SolutionsPT/.test(d.querySelector(".home-legal").textContent) && d.querySelector(".home-legal").textContent.indexOf(product + " " + label) !== -1, "the footer carries the version and the copyright notice");
+    ok(!/[–—]/.test(d.getElementById("home").textContent), "no en or em dashes anywhere on the home page");
+
+    // What's new
+    var notes = d.querySelector(".notes-card");
+    var nt = notes ? notes.textContent : "";
+    ok(notes && notes.querySelector("h2").textContent === "What's new in v0.5.1", "What's new shows the v0.5.1 release notes", notes && notes.querySelector("h2").textContent);
+    ok(notes && notes.querySelectorAll(".notes h3").length >= 2 && notes.querySelectorAll(".notes table tbody tr").length === 5 &&
+       notes.querySelectorAll(".notes li").length >= 5 && notes.querySelector(".notes strong") && notes.querySelector(".notes code"),
+       "rendered from Markdown: headings, the file table, bullets, bold and code", nt.slice(0, 200));
+    ok(/Issue check/.test(nt) && nt.indexOf("**") === -1 && nt.indexOf("|") === -1, "with no Markdown marks left showing");
+
+    // Licence
+    d.getElementById("btn-licence").click();
+    var m = d.querySelector(".licence-modal");
+    var lt = m ? m.textContent : "";
+    ok(m && /PROPRIETARY LICENCE/.test(lt) && lt.indexOf(product + " " + label + " (version " + number + ")") !== -1, "the licence opens in a pop-up, naming the suite and its version");
+    m.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    ok(!d.querySelector(".licence-modal"), "and closes again");
+
+    // The tools it carries are the tools' own single files.
+    ok(w.Suite.Bundle && w.Suite.Bundle.payloads.join(",") === "assessments,assessments-tour,risk-assessment", "it carries both tools and the assessment tour (" + (w.Suite.Bundle && w.Suite.Bundle.payloads.join(", ")) + ")");
+    function unpack(id) { return new Promise(function (res, rej) { w.Suite.Shell.payloadHtml(id, function (e, html) { if (e) rej(e); else res(html); }); }); }
+    return Promise.all([unpack("assessments"), readFile("OT Cyber Assessment Tool " + label + ".html"),
+                        unpack("risk-assessment"), readFile("OT Cyber Risk Assessment Tool " + label + ".html"),
+                        unpack("assessments-tour")]);
+  })
+  .then(function (r) {
+    ok(r[0].length > 1000000 && r[0] === r[1], "the assessment tool inside is its own single file, byte for byte (" + r[0].length + " characters)", r[0].length + " vs " + r[1].length);
+    ok(r[2].length > 500000 && r[2] === r[3], "the risk tool inside is its own single file, byte for byte (" + r[2].length + " characters)", r[2].length + " vs " + r[3].length);
+    ok(/<title>OT Cyber Assessment Tool - demo/.test(r[4]) && /tour-sl-data\.js/.test(r[4]) && !/<script src="[^"]*"><\/script>/.test(r[4]), "the assessment tour is its tour.html, built as a single file");
+
+    // ---- 3. Open the risk tool ----------------------------------------------
+    S.Suite.Shell.open("risk-assessment");
+    return tool(S, "risk-assessment");
+  })
+  .then(function (t) {
+    var R = t.w.RiskTool;
+    watch(t.w, "risk");
+    var launch = JSON.parse(t.f.el.name.replace(/^spt-suite:/, ""));
+    ok(t.f.el.hasAttribute("srcdoc") && !t.f.el.getAttribute("src"), "the risk tool opens in a frame of its own, made from the file it carries");
+    ok(t.d.title === "OT Cyber Risk Assessment Tool" && t.w.App.Version.product === t.d.title, "with its own title (" + t.d.title + ")", t.d.title);
+    ok(t.w.App.Version.label === label && (t.d.getElementById("stage-badge") || {}).textContent === label + ", 62443-3-2-aligned", "and the suite version (" + label + ")");
+    ok(t.w.App.HostBridge.hosted && launch.module === "risk-assessment" && launch.tour === false, "it knows it is in the suite, not on its tour");
+    ok(R.supportsFilePickers(), "the frame is the suite's own origin, so the file dialogs are available in it");
+    ok(R.state.project.zones.length === 0 && !R.state.project.suc.name, "it starts on an empty project");
+    var bt = barText(S);
+    ok(S.document.getElementById("suite-bar").offsetHeight > 20 && /OT Cyber Suite/.test(bt) && /OT Cyber Risk Assessment Tool/.test(bt) && /Switch to/.test(bt) && /Assessments/.test(bt),
+       "the bar shows the suite, the tool's name and a switcher", bt);
+    ok(S.document.getElementById("home").classList.contains("hidden") && S.document.title === "OT Cyber Risk Assessment Tool - " + product, "the home page gives way to the tool", S.document.title);
+
+    // Unsaved work shows in the bar
+    R.state.project.suc.name = "Check Ltd unit 7";
+    R.touched();
+    return until(function () { return t.f.dirty; }, 10000, "the dirty signal").then(function () {
+      ok(/Unsaved changes/.test(barText(S)) && t.f.el.getAttribute("data-dirty") === "true", "an edit shows as unsaved changes in the bar");
+      var ev = new S.Event("beforeunload", { cancelable: true });
+      S.dispatchEvent(ev);
+      ok(ev.defaultPrevented, "closing the suite now would ask first");
+      return t;
+    });
+  })
+
+  // ---- 4. Switch to the assessment tool and back ------------------------------
+  .then(function (risk) {
+    var tab = S.document.querySelector(".bar-tab[data-key='assessments']");
+    ok(!!tab, "the switcher offers the assessment tool");
+    tab.click();
+    return tool(S, "assessments").then(function (t) {
+      watch(t.w, "assessments");
+      ok(t.d.title === "OT Cyber Assessment Tool" && t.w.App.Version.label === label && (t.d.querySelector(".version-badge") || {}).textContent === label,
+         "the assessment tool opens with its title and version (" + t.d.title + " " + label + ")");
+      ok(/Start an assessment/.test(t.d.getElementById("main").textContent), "on its assessment picker");
+      ok(risk.f.el.isConnected && !risk.f.el.classList.contains("active") && getComputedStyle(risk.f.el).visibility === "hidden", "the risk tool stays open, hidden");
+      var dot = S.document.querySelector(".bar-tab[data-key='risk-assessment'] .dot");
+      ok(dot && dot.classList.contains("dirty") && /unsaved/.test(S.document.querySelector(".bar-tab[data-key='risk-assessment']").title), "and the switcher marks it as having unsaved changes");
+      S.document.querySelector(".bar-tab[data-key='risk-assessment']").click();
+      ok(S.Suite.Shell.current() === "risk-assessment" && risk.f.el.contentWindow === risk.w && risk.w.RiskTool.state.project.suc.name === "Check Ltd unit 7",
+         "switching back finds the risk tool exactly as it was left");
+      return { risk: risk, as: t };
+    });
+  })
+
+  // ---- 5. Exports from inside each tool --------------------------------------
+  .then(function (o) {
+    var R = o.risk.w.RiskTool, RX = o.risk.w.RiskExports, A = o.as.w.App, E = A.Engine;
+    R.loadProjectText(JSON.stringify(o.risk.w.SPT_TOUR_PROJECT));
+    R.state.project.suc.name = "Check Ltd unit 7";
+    R.touched();
+    E.activateInstrument("iec-62443-3-3");
+    E.updateMetadata({ clientName: "Check Ltd" });
+    var inst = E.state.instrument;
+    var opts = { targetId: E.state.activeTargetId };
+    var sheets = A.ExportXLSX.build(E.state.engagement, inst, E.state.taxonomy, E.state.profile, opts).SheetNames.length;
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(E.state.engagement, inst, E.state.taxonomy, E.state.profile, E.getActiveNarrative ? E.getActiveNarrative() : null, opts,
+        function (err, blob) { res(err ? -1 : (blob ? blob.size : 0)); });
+    }).then(function (docx) {
+      ok(sheets > 0 && docx > 2000, "the assessment tool builds its Excel workbook (" + sheets + " sheets) and Word report (" + docx + " bytes) inside the suite", sheets + " / " + docx);
+      return o.risk.w.docx.Packer.toBlob(RX.buildWordDoc(R.state.project, {}));
+    }).then(function (b) {
+      var wordBytes = b.size;
+      return RX.buildWorkbook(R.state.project).xlsx.writeBuffer().then(function (buf) {
+        ok(wordBytes > 5000 && buf.byteLength > 8000, "the risk tool builds its Word report (" + wordBytes + " bytes) and Excel workbook (" + buf.byteLength + " bytes) inside the suite");
+        return o;
+      });
+    });
+  })
+
+  // ---- 6. Saving inside a frame, and Recent files ----------------------------
+  .then(function (o) {
+    var rw = o.risk.w, R = rw.RiskTool;
+    var handle = fakeHandle(rw, riskFile);
+    rw.showSaveFilePicker = function () { return Promise.resolve(handle); };
+    R.forgetProjectFile();
+    return new Promise(function (res) { R.saveProject(null, res); }).then(function (r) {
+      ok(r.ok && r.method === "file" && r.name === riskFile && /Check Ltd unit 7/.test(handle.store.text || ""), "the risk tool saves in place from inside its frame", JSON.stringify(r));
+      return until(function () { return recent(S).length >= 1 && !o.risk.f.dirty; }, 10000, "the recent entry for the risk save");
+    }).then(function () {
+      var e = recent(S)[0];
+      ok(e.module === "risk-assessment" && e.name === riskFile && e.action === "save" && e.hasHandle &&
+         e.label === R.state.project.engagement.client && /^Acme/.test(e.label) && !isNaN(Date.parse(e.when)),
+         "Recent files records the save: tool, file name, customer and when", JSON.stringify(e));
+      ok(Object.keys(e).sort().join(",") === "action,hasHandle,label,module,name,when", "and nothing of the file's contents");
+      ok(!/Unsaved changes/.test(barText(S)), "the bar no longer shows unsaved changes once saved");
+
+      // The save dialog refused (a frame the browser will not show it in):
+      // the save becomes a download, never a failure.
+      R.touched();
+      var dl = catchDownloads(rw);
+      var err = new rw.Error("Cross origin sub frames aren't allowed to show a file picker."); err.name = "SecurityError";
+      rw.showSaveFilePicker = function () { return Promise.reject(err); };
+      return new Promise(function (res) { R.saveProject({ shiftKey: true }, res); }).then(function (r) {
+        ok(r.ok && r.method === "download" && r.blocked && dl.length === 1 && dl[0] === "check-ltd-unit-7-risk-project.json", "when the save dialog is refused, the risk tool downloads the file instead", JSON.stringify(r) + " " + dl.join());
+        return until(function () { return recent(S)[0].name === dl[0]; }, 10000, "the recent entry for the download").then(function () {
+          ok(!recent(S)[0].hasHandle && recent(S)[0].action === "save", "and that save goes on Recent files too, with no file access kept");
+          return o;
+        });
+      });
+    });
+  })
+  .then(function (o) {
+    // The assessment tool, through its own Save button.
+    S.Suite.Shell.open("assessments");
+    var aw = o.as.w, ad = o.as.d;
+    var handle = fakeHandle(aw, assessFile);
+    aw.showSaveFilePicker = function () { return Promise.resolve(handle); };
+    aw.App.Storage.forgetProjectFile();
+    ad.getElementById("btn-save").click();
+    return until(function () { return handle.store.text && recent(S)[0].name === assessFile; }, 15000, "the assessment save").then(function () {
+      var e = recent(S)[0];
+      ok(e.module === "assessments" && e.action === "save" && e.hasHandle && e.label === "Check Ltd", "the assessment tool's Save writes in place and goes on Recent files, newest first", JSON.stringify(e));
+      // Refused dialog: a download.
+      var dl = catchDownloads(aw);
+      var err = new aw.Error("refused"); err.name = "SecurityError";
+      aw.showSaveFilePicker = function () { return Promise.reject(err); };
+      return new Promise(function (res) { aw.App.Storage.saveProjectToFile(aw.App.Engine.getProjectFile(), { saveAs: true }, res); }).then(function (r) {
+        ok(r.ok && r.method === "download" && r.blocked && dl.length === 1 && /\.json$/.test(dl[0]), "and downloads when the save dialog is refused", JSON.stringify(r));
+        return { o: o, assessText: handle.store.text };
+      });
+    });
+  })
+  .then(function (x) {
+    // A load through each tool's Load button goes on the list as "Opened".
+    var o = x.o, aw = o.as.w, ad = o.as.d, rw = o.risk.w;
+    var otherAssess = JSON.parse(x.assessText);
+    otherAssess.project.clientName = "Loaded Ltd";
+    otherAssess.project.projectId = "p-check-loaded";
+    var aHandle = fakeHandle(aw, "loaded-assessment.json", JSON.stringify(otherAssess));
+    aw.showOpenFilePicker = function () { return Promise.resolve([aHandle]); };
+    ad.getElementById("btn-load").click();
+    var guard = ad.querySelector(".load-guard-go"); if (guard) guard.click();
+    return until(function () { return recent(S)[0].name === "loaded-assessment.json"; }, 15000, "the assessment load").then(function () {
+      var e = recent(S)[0];
+      ok(e.module === "assessments" && e.action === "open" && e.label === "Loaded Ltd" && aw.App.Engine.getProjectFile().project.clientName === "Loaded Ltd", "loading a project in the assessment tool goes on Recent files", JSON.stringify(e));
+      S.Suite.Shell.open("risk-assessment");
+      var proj = JSON.parse(JSON.stringify(rw.RiskTool.state.project));
+      proj.suc.name = "Loaded unit 9";
+      var rHandle = fakeHandle(rw, "loaded-risk.json", JSON.stringify(proj));
+      rw.showOpenFilePicker = function () { return Promise.resolve([rHandle]); };
+      o.risk.d.getElementById("btn-load").click();
+      return until(function () { return recent(S)[0].name === "loaded-risk.json"; }, 15000, "the risk load");
+    }).then(function () {
+      var list = recent(S);
+      ok(list[0].module === "risk-assessment" && list[0].action === "open" && rw.RiskTool.state.project.suc.name === "Loaded unit 9", "and so does loading one in the risk tool");
+      ok(list.length === 5 && list.map(function (e) { return e.name; }).join(",") === "loaded-risk.json,loaded-assessment.json," + assessFile + ",check-ltd-unit-7-risk-project.json," + riskFile,
+         "the list holds each file once, newest first", list.map(function (e) { return e.name; }).join(","));
+      return o;
+    });
+  })
+
+  // ---- 7. Reopening from the home page ---------------------------------------
+  .then(function (o) {
+    S.Suite.Shell.home();
+    var rows = S.document.querySelectorAll(".recent-open");
+    ok(rows.length === 5 && /loaded-risk\.json/.test(rows[0].textContent) && /OT Cyber Risk Assessment Tool/.test(rows[0].textContent) && /Opened /.test(rows[0].textContent),
+       "the home page lists the recent files with their tool and when");
+    var rw = o.risk.w, rd = o.risk.d;
+    var proj = JSON.parse(JSON.stringify(rw.RiskTool.state.project));
+    proj.suc.name = "Reopened unit 3";
+    var h = fakeHandle(rw, riskFile, JSON.stringify(proj));
+    var asked = null;
+    rw.App.HostBridge.__setHandleLookup(function (name, cb) { asked = name; cb(h); });
+    // The entry for the risk tool's save in place.
+    Array.prototype.filter.call(rows, function (r) { return r.querySelector(".recent-name").textContent === riskFile; })[0].click();
+    return until(function () { return rd.querySelector(".spt-host-banner"); }, 10000, "the reopen offer").then(function (b) {
+      ok(S.Suite.Shell.current() === "risk-assessment" && asked === riskFile && /^Reopen check-risk-project\.json \(Acme/.test(b.textContent), "a recent file opens its tool, which offers to reopen it in one click", b.textContent);
+      b.querySelector(".btn.primary").click();
+      return until(function () { return rw.RiskTool.state.project.suc.name === "Reopened unit 3"; }, 10000, "the reopened file");
+    }).then(function () {
+      ok(!rd.querySelector(".spt-host-banner") && recent(S)[0].name === riskFile && recent(S)[0].action === "open", "the click reopens the file (and it moves to the top of the list)");
+      // Without a handle: point at Load and name the file.
+      rw.App.HostBridge.__setHandleLookup(function (name, cb) { cb(null); });
+      S.Suite.Shell.home();
+      var row = Array.prototype.filter.call(S.document.querySelectorAll(".recent-open"), function (r) { return /loaded-risk\.json/.test(r.textContent); })[0];
+      row.click();
+      return until(function () { return rd.querySelector(".spt-host-banner"); }, 10000, "the Load prompt");
+    }).then(function (b) {
+      ok(/To open loaded-risk\.json, click Load and choose the file\./.test(b.textContent) && rd.getElementById("btn-load").classList.contains("spt-host-attention"),
+         "where no access was kept, the tool points at its Load button and names the file", b.textContent);
+      b.querySelector(".spt-host-x").click();
+      ok(!rd.getElementById("btn-load").classList.contains("spt-host-attention"), "and the prompt can be dismissed");
+      return o;
+    });
+  })
+
+  // ---- 8. Theme, tours, and the unsaved-work guard ---------------------------
+  .then(function (o) {
+    S.Suite.Shell.setTheme("dark");
+    return until(function () { return o.risk.d.documentElement.getAttribute("data-theme") === "dark" && o.as.d.documentElement.getAttribute("data-theme") === "dark"; }, 5000, "dark in every tool")
+      .then(function () {
+        ok(/Light/.test(o.risk.d.getElementById("btn-theme").textContent), "a theme change in the suite reaches every open tool, buttons and all");
+        o.as.d.getElementById("btn-theme").click();   // a tool's own toggle
+        return until(function () { return S.document.documentElement.getAttribute("data-theme") === "light" && o.risk.d.documentElement.getAttribute("data-theme") === "light"; }, 5000, "light everywhere");
+      }).then(function () {
+        ok(true, "and a change in one tool reaches the suite and the other tools");
+        S.Suite.Shell.home();
+        S.document.querySelector(".tool-card[data-module='risk-assessment'] .tool-tour").click();
+        return tool(S, "risk-assessment/tour");
+      }).then(function (t) {
+        return until(function () { return /^Acme Petrochemicals/.test(t.w.RiskTool.state.project.suc.name || ""); }, 15000, "the risk tour's demo").then(function () {
+          ok(true, "the risk tool's tour opens in a frame of its own with the demo project (" + t.w.RiskTool.state.project.suc.name + ")");
+          ok(o.risk.w.RiskTool.state.project.suc.name === "Reopened unit 3", "leaving the consultant's own risk project alone");
+          ok(/Tour/.test(barText(S)), "the bar marks it as the tour");
+          S.Suite.Shell.open("assessments/tour");
+          return tool(S, "assessments/tour");
+        });
+      }).then(function (t) {
+        return until(function () { return t.w.App.Engine.state.instrument && t.w.App.Engine.state.instrument.id === "iec-62443-3-3" && /report/i.test(t.d.getElementById("main").textContent); }, 30000, "the assessment tour").then(function () {
+          ok(/demo/.test(t.d.title) && Object.keys(t.w.App.Engine.getProjectFile().assessments || {}).length >= 15, "the assessment tool's tour opens with every demo assessment");
+          ok(o.as.w.App.Engine.getProjectFile().project.clientName === "Loaded Ltd", "leaving the consultant's own assessment project alone");
+          o.as.w.App.Engine.updateMetadata({ clientName: "Unsaved Ltd" });
+          return until(function () { return o.as.f.dirty; }, 5000, "the assessment dirty signal");
+        });
+      }).then(function () {
+        S.Suite.Shell.home();
+        var chip = S.document.querySelector(".tool-card[data-module='assessments'] .chip");
+        ok(chip && /Unsaved changes/.test(chip.textContent), "the home page marks a tool with unsaved changes");
+        var ev = new S.Event("beforeunload", { cancelable: true });
+        S.dispatchEvent(ev);
+        ok(ev.defaultPrevented, "and the suite asks before closing while it has them");
+        var tev = new o.as.w.Event("beforeunload", { cancelable: true });
+        o.as.w.dispatchEvent(tev);
+        ok(tev.defaultPrevented, "as does the tool's own warning, in its frame");
+        ok(errors.length === 0, "no script or console errors in the suite or any tool", errors.join(" | "));
+        finish();
+      });
+  })
+  .catch(function (e) { ok(false, "check threw: " + (e && e.message)); if (errors.length) lines.push("errors: " + errors.join(" | ")); finish(); });
+})();
+</script>
+</body></html>

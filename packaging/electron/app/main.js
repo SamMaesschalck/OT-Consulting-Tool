@@ -1,6 +1,8 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only. */
 /* main.js - Electron shell for one module of the OT Cyber suite (the OT Cyber
- * Assessment Tool or the OT Cyber Risk Assessment Tool; test build).
+ * Assessment Tool or the OT Cyber Risk Assessment Tool; test build), or for
+ * the SolutionsPT OT Cyber Suite itself, whose page holds each tool in a
+ * frame (its manifest, platform/suite.json, is copied in as module.json).
  *
  * The app itself is the module's single-file build (index.html beside this
  * file), run unchanged. Which module it is comes from module.json beside this
@@ -112,7 +114,11 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
         defaultId: 1, cancelId: 1,
         title: "Unsaved changes",
         message: "You have unsaved changes.",
-        detail: "Changes since your last Save are not in your project file. The tool will offer its autosave copy next time it starts, but only Save updates the file itself."
+        // In the suite the warning can come from the suite page or from a
+        // tool's own frame; Electron raises this event for either.
+        detail: MODULE.id === "suite"
+          ? "A tool in the suite has changes since its last Save that are not in its project file. Each tool offers its autosave copy the next time it starts, but only Save updates the file itself."
+          : "Changes since your last Save are not in your project file. The tool will offer its autosave copy next time it starts, but only Save updates the file itself."
       });
       if (choice === 0) event.preventDefault();  // preventDefault here means "let it close"
     });

@@ -7,7 +7,13 @@
 #   .\tools\build.ps1                                        # assessment tool, html + exe
 #   .\tools\build.ps1 -Module risk-assessment -As html       # the risk tool's single HTML (+ parity check)
 #   .\tools\build.ps1 -Module risk-assessment -As exe -SelfTest
-#   .\tools\build.ps1 -Module all -As both -SelfTest         # every module
+#   .\tools\build.ps1 -Module suite -As both -SelfTest       # the SolutionsPT OT Cyber Suite, every tool inside
+#   .\tools\build.ps1 -Module all -As both -SelfTest         # every module, then the suite
+#
+# The suite (platform\, manifest platform\suite.json) builds like a module.
+# Its single HTML carries each tool's own single HTML, built first, so it is
+# "SolutionsPT OT Cyber Suite <label>.html" beside them; its check page is
+# check-single-html-suite.html and its exe self-test selftest-suite.js.
 #
 # -As html  builds packaging\single-html\<product> <label>.html, then runs the
 #           module's parity check page against the folder app (skip it with
@@ -31,7 +37,7 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 $requested = $Module   # module-info.ps1 sets $Module when dot-sourced
 . (Join-Path $repo "packaging\module-info.ps1")   # $AllModules
-$modules = if ($requested -eq "all") { $AllModules } else { @($requested) }
+$modules = if ($requested -eq "all") { @($AllModules) + "suite" } else { @($requested) }
 
 foreach ($m in $modules) {
   . (Join-Path $repo "packaging\module-info.ps1") -Module $m   # $AppProduct, $AppVersionLabel, $AppPageName, $AppExeName, $ElectronOut

@@ -4,7 +4,9 @@
 # tree, and stages it for GitHub Releases. One version for the whole suite:
 # every module is built, every file carries the same version, and the tag is
 # v<x.y.z>. Each module still ships on its own (its own single HTML and its own
-# portable exe), so a contractor can be given just the tool they need.
+# portable exe), so a contractor can be given just the tool they need; the
+# SolutionsPT OT Cyber Suite (platform\) ships beside them, with every tool in
+# one file, for internal use.
 #
 #   .\tools\release.ps1              # full run: tests, single HTML, exe, tag
 #   .\tools\release.ps1 -SkipTests   # skip the test suites (assessments alone is ~40 minutes)
@@ -12,16 +14,21 @@
 #
 # The version comes from shared\version.js (bump it, run tools\sync-shared.ps1,
 # and update the pinned numbers in modules\assessments\scripts\test-version.html,
-# in a commit first). The modules are the folders under modules\ with a
-# module.json; see packaging\module-info.ps1.
+# in a commit first). The release notes are docs\releases\v<x.y.z>.md, one
+# file per version, committed before the release: the GitHub release uses it,
+# and the suite's home page shows it as What's new. The modules are the
+# folders under modules\ with a module.json; see packaging\module-info.ps1.
 #
 # Steps, stopping at the first failure:
-#   1. the working tree is clean, the tag for this version does not exist, and
-#      every module's shared files match their canonical copies
+#   1. the working tree is clean, the tag for this version does not exist,
+#      docs\releases\v<x.y.z>.md exists, every module's shared files match
+#      their canonical copies, and the suite's home page data is current
 #   2. every module's test pages pass (unless -SkipTests)
-#   3. every module's single HTML is built and its parity check page passes
-#   4. every module's portable exe is built and its self-test passes
-#   5. all the files and a SHA256SUMS.txt are copied to dist\<label>\ (e.g. dist\v0.5\)
+#   3. every module's single HTML, then the suite's, is built and its check
+#      page passes
+#   4. every module's portable exe, then the suite's, is built and its
+#      self-test passes
+#   5. all the files and a SHA256SUMS.txt are staged in dist\<label>\ (e.g. dist\v0.5\)
 #   6. an annotated tag v<version> is created locally (unless -NoTag)
 #
 # Publishing is then two steps (printed at the end): push the tag, and create
@@ -33,16 +40,21 @@ $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
 . (Join-Path $repo "packaging\module-info.ps1")   # $AllModules, $AppVersion, $AppVersionLabel (the suite's)
 $modules = $AllModules
+$builds = @($AllModules) + "suite"   # the suite last: it carries every module's single HTML
 $tag = "v$AppVersion"
 $label = $AppVersionLabel
-Write-Output "Release $label ($AppVersion), tag $tag, modules: $($modules -join ', ')"
+$notes = Join-Path $repo "docs\releases\v$AppVersion.md"
+Write-Output "Release $label ($AppVersion), tag $tag, modules: $($modules -join ', '), and the suite"
 
-# 1. Clean tree, new tag, no shared drift
+# 1. Clean tree, new tag, release notes, no shared drift
 $dirty = git status --porcelain
 if ($dirty) { throw "The working tree has uncommitted changes. Commit or stash them first.`n$($dirty -join "`n")" }
 if (git tag --list $tag) { throw "Tag $tag already exists. Bump the version in shared\version.js first." }
+if (-not (Test-Path $notes)) { throw "No release notes for $AppVersion. Write docs\releases\v$AppVersion.md (see docs\releases\README.md) and commit it." }
 & (Join-Path $PSScriptRoot "sync-shared.ps1") -Check
 if ($LASTEXITCODE -ne 0) { throw "Shared files are out of step. Run tools\sync-shared.ps1 and commit." }
+& (Join-Path $repo "platform\scripts\build-data.ps1") -Check
+if ($LASTEXITCODE -ne 0) { throw "The suite's home page data is out of date. Run platform\scripts\build-data.ps1 and commit." }
 $commit = (git rev-parse --short HEAD).Trim()
 
 # 2. Tests, per module, with the time each module's pages need (module.json tests)
@@ -58,8 +70,13 @@ if (-not $SkipTests) {
   }
 }
 
-$files = @()
-foreach ($m in $modules) {
+# Each file is staged as soon as it has passed its check, so a later build
+# (the suite's rebuilds every module's single HTML to carry it) cannot swap
+# in a copy other than the one that was checked.
+$out = Join-Path $repo "dist\$label"
+if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+New-Item -ItemType Directory -Force $out | Out-Null
+foreach ($m in $builds) {
   . (Join-Path $repo "packaging\module-info.ps1") -Module $m   # $AppProduct, $AppPageName, $AppExeName, $ElectronOut
 
   # 3. Single HTML + parity check
@@ -71,6 +88,7 @@ foreach ($m in $modules) {
   Write-Output "Checking it against the folder app..."
   & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo "packaging\single-html\run-check.ps1") -Module $m
   if ($LASTEXITCODE -ne 0) { throw "The $m single HTML parity check did not pass. See test-results\check-single-html-$m.txt" }
+  Copy-Item $page $out
 
   # 4. Portable exe + self-test
   Write-Output "Building the $AppProduct portable exe and running its self-test..."
@@ -81,16 +99,13 @@ foreach ($m in $modules) {
   if (-not (Test-Path $selftest) -or ([IO.File]::ReadAllText($selftest) -notmatch 'ALL TESTS PASSED')) { throw "The $m exe self-test did not pass. See $selftest" }
   $exe = Join-Path $ElectronOut "dist\$AppExeName"
   if (-not (Test-Path $exe)) { throw "The built exe is not where expected, named for $label`: $exe" }
-
-  $files += $page, $exe
+  Copy-Item $exe $out
 }
 
-# 5. Stage
-$out = Join-Path $repo "dist\$label"
-if (Test-Path $out) { Remove-Item $out -Recurse -Force }
-New-Item -ItemType Directory -Force $out | Out-Null
-foreach ($f in $files) { Copy-Item $f $out }
-foreach ($f in Get-ChildItem $out -File) {
+# 5. Stage: every file named for this version, and their checksums
+$staged = @(Get-ChildItem $out -File)
+if ($staged.Count -ne 2 * $builds.Count) { throw "Expected $(2 * $builds.Count) files in $out, found $($staged.Count)" }
+foreach ($f in $staged) {
   if ($f.Name -notmatch [regex]::Escape(" $label.")) { throw "$($f.Name) is not named for $label" }
 }
 # Listed under the names GitHub gives the release assets: it replaces each
@@ -103,7 +118,7 @@ Get-ChildItem $out | Sort-Object Name | ForEach-Object { "  {0}  ({1:N1} MB)" -f
 
 # 6. Tag
 $products = @()
-foreach ($m in $modules) { . (Join-Path $repo "packaging\module-info.ps1") -Module $m; $products += $AppProduct }
+foreach ($m in $builds) { . (Join-Path $repo "packaging\module-info.ps1") -Module $m; $products += $AppProduct }
 if (-not $NoTag) {
   git tag -a $tag -m "OT Cyber suite $label ($($products -join ', '))" | Out-Null
   Write-Output "Tagged $tag at $commit."
@@ -113,8 +128,8 @@ Write-Output ""
 Write-Output "To publish:"
 Write-Output "  git push origin main $tag"
 if (Get-Command gh -ErrorAction SilentlyContinue) {
-  Write-Output "  gh release create $tag (Get-ChildItem `"$out`" -File).FullName --verify-tag --title `"OT Cyber tools $label`" --notes-file <notes.md>"
+  Write-Output "  gh release create $tag (Get-ChildItem `"$out`" -File).FullName --verify-tag --title `"SolutionsPT OT Cyber Suite $label`" --notes-file `"$notes`""
   Write-Output "  (GitHub replaces spaces in the file names with dots; SHA256SUMS.txt already uses those names.)"
 } else {
-  Write-Output "  then on GitHub: Releases > Draft a new release > choose tag $tag, and attach the files in $out"
+  Write-Output "  then on GitHub: Releases > Draft a new release > choose tag $tag, attach the files in $out, and use $notes as the notes"
 }

@@ -24,7 +24,8 @@
 # Per module, so builds never overwrite each other:
 #   %LOCALAPPDATA%\OTCAT-electron\<module>\dist\<product> v<version>.exe
 #   %LOCALAPPDATA%\OTCAT-electron\<module>\selftest-portable.txt  (-SelfTest)
-# The product comes from modules\<module>\module.json and the version from
+# The product comes from modules\<module>\module.json (platform\suite.json for
+# -Module suite, the SolutionsPT OT Cyber Suite) and the version from
 # ..\..\shared\version.js (see ..\module-info.ps1).
 #
 # Unsigned: Windows SmartScreen will warn until it is signed with a
@@ -75,7 +76,7 @@ if (-not (Test-Path (Join-Path $edist "electron.exe"))) {
 if (Test-Path $stage) { Get-ChildItem $stage -Exclude "node_modules", "package-lock.json" | Remove-Item -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item (Join-Path $here "app\main.js"), (Join-Path $here "app\$selfTestJs"), (Join-Path $here "app\splash.html") $stage
-Copy-Item (Join-Path $ModuleDir "module.json") (Join-Path $stage "module.json")   # which module this is, for main.js
+Copy-Item $ModuleManifest (Join-Path $stage "module.json")   # which module this is, for main.js (the suite's is platform\suite.json)
 Copy-Item (Join-Path $here "build\icon-256.png") (Join-Path $stage "splash-logo.png")
 # The app icon, made by build-icon.ps1 from the square "pt" mark.
 New-Item -ItemType Directory -Force (Join-Path $stage "build") | Out-Null

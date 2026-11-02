@@ -4,7 +4,9 @@ Copyright (c) 2026 SolutionsPT. All rights reserved.
 
 Desktop-app versions of each tool in the suite: the OT Cyber Assessment Tool (module `assessments`) and the OT Cyber Risk Assessment Tool (module `risk-assessment`). Each is built on its own, as its own exe, so a contractor can be given just the tool they need. Each runs its module's single-file build from `../single-html` unchanged, inside Electron's own copy of Chromium. Nothing in `../../modules` is touched.
 
-What differs between the two comes from the module's manifest, `modules/<module>/module.json`: the product name (window titles, the exe's name and file properties, the loading window), the `appId` and package name (so each exe keeps its own local storage and autosave, and the two can run side by side), and which self-test runs. The version is the suite's, from `shared/version.js` (read by `../module-info.ps1`), and the same for every module.
+The SolutionsPT OT Cyber Suite (`-Module suite`) builds the same way: its page is the suite's single-file build, which carries each tool in a frame, and its manifest is `platform/suite.json` (copied in as `module.json`). Its exe is `%LOCALAPPDATA%\OTCAT-electron\suite\dist\SolutionsPT OT Cyber Suite v<version>.exe`.
+
+What differs between them comes from the module's manifest, `modules/<module>/module.json`: the product name (window titles, the exe's name and file properties, the loading window), the `appId` and package name (so each exe keeps its own local storage and autosave, and the two can run side by side), and which self-test runs. The version is the suite's, from `shared/version.js` (read by `../module-info.ps1`), and the same for every module.
 
 The simplest way to build is the repository's one entry point:
 
@@ -53,6 +55,15 @@ The icon comes from `build/icon.ico`; re-run `build-icon.ps1` if the source logo
 - loads the demo project (carried inside the single-file build) through its normal load path, and renders every page
 - writes a real Word and a real Excel download to disk
 - lets the window close when there is unsaved work
+
+`selftest-suite.js` checks that the suite:
+
+- starts from inside the package on its home page, with the loading window behaving as below
+- shows its title, logo and version (agreeing with the exe's), a card per tool with its tour, What's new, Recent files, Getting started and the licence pop-up
+- opens each tool in its frame with the tool's title and the exe's version, and the file pickers and localStorage work inside the frame
+- writes a real Word and a real Excel download to disk from inside each tool's frame
+- keeps each tool's work when switching between tools and the home page
+- raises the unsaved-work warning from a tool's own frame (on reload) and from the suite (on close), and still lets the window close
 
 ## Folder build
 
