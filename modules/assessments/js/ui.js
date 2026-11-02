@@ -648,6 +648,10 @@ window.App.UI = (function () {
   // covers the whole session including tour pages, which do not autosave.
   var dirtySinceSave = false;
   function updateSaveButton() {
+    // The suite, when it hosts the tool, marks tools with unsaved changes in
+    // its bar and warns before it closes (js/host-bridge.js; absent or
+    // standalone, nothing happens).
+    if (window.App.HostBridge) window.App.HostBridge.setDirty(dirtySinceSave);
     var b = $("btn-save");
     if (!b) return;
     b.textContent = dirtySinceSave ? "Save*" : "Save";
@@ -656,6 +660,18 @@ window.App.UI = (function () {
   }
   function markDirty() { if (!dirtySinceSave) { dirtySinceSave = true; updateSaveButton(); } }
   function markClean() { dirtySinceSave = false; updateSaveButton(); }
+
+  // In the suite, a project file saved or opened goes on its Recent files
+  // list: the name, the customer and when, never the contents. The handle,
+  // when the browser gave one, stays in this tool's own storage (see
+  // js/host-bridge.js). Standalone, nothing happens.
+  function noteRecentFile(action, name, handle) {
+    var HB = window.App.HostBridge;
+    if (!HB || !HB.hosted || !name) return;
+    var pf = E.getProjectFile();
+    HB.recent({ action: action, name: name, handle: handle || null,
+                label: (pf && pf.project && pf.project.clientName) || "" });
+  }
 
   // ---- version ----------------------------------------------------------
   // Shown in the tool so anyone can say which release they are on. Never in a
@@ -835,8 +851,13 @@ window.App.UI = (function () {
           // this session another window set aside as offered work.
           clearAutosave();
           dropOfferedFrom(sessionId);
+          noteRecentFile("save", res.name, res.method === "file" ? STG.currentFileHandle() : null);
           if (res.method === "file") {
             toast("Saved to " + res.name + ".");
+          } else if (res.blocked) {
+            // The browser has the save dialog but would not show it here (the
+            // tool is inside another page), so the save went to Downloads.
+            toast("Downloaded " + res.name + ". Saving back into the same file is not available here, so each save downloads a new copy.", "warn", 9000);
           } else if (!noInPlaceHintShown) {
             noInPlaceHintShown = true;
             toast("Downloaded " + res.name + ". This browser can't overwrite the file from an offline page, so it adds \"(1)\", \"(2)\". For one-click overwrite of the same file, open this tool in Edge or Chrome. (In Firefox you can also turn on Settings → \"Always ask you where to save files\" and choose Replace.)", "warn", 12000);
@@ -894,9 +915,9 @@ window.App.UI = (function () {
     // a confirm() used it up, so a consultant who paused before pressing OK got
     // a "must be handling a user gesture" error, or no dialog at all. The
     // button in this panel is a fresh click, however long they read for.
-    function askBeforeLoad(go) {
+    function askBeforeLoad(go, goLabel) {
       closeModal();
-      var goBtn = h("button", { class: "btn primary load-guard-go", text: "Choose a file" });
+      var goBtn = h("button", { class: "btn primary load-guard-go", text: goLabel || "Choose a file" });
       var modal = h("div", { class: "modal-backdrop load-guard-modal" }, [
         h("div", { class: "modal", role: "dialog", "aria-modal": "true" }, [
           h("div", { class: "modal-h" }, [h("h2", { text: "Load another project?" })]),
@@ -927,7 +948,10 @@ window.App.UI = (function () {
           // Belt and braces for the gesture rule above: say what to do, not
           // what the browser said.
           if (res.needsGesture) { toast("The file dialog did not open. Click Load again to choose the file.", "warn"); return; }
-          if (applyLoadedProject(res)) STG.adoptProjectFile(res.handle, (E.state.project || {}).projectId);
+          if (applyLoadedProject(res)) {
+            STG.adoptProjectFile(res.handle, (E.state.project || {}).projectId);
+            noteRecentFile("open", res.fileName, res.handle);
+          }
         });
       } else {
         $("file-input").click();
@@ -939,10 +963,36 @@ window.App.UI = (function () {
       STG.loadProjectFromFile(file, function (res) {
         // A plain file input yields no handle: forget any previous one so Save
         // can't overwrite a DIFFERENT project's file with this one's content.
-        if (applyLoadedProject(res)) STG.forgetProjectFile();
+        if (applyLoadedProject(res)) { STG.forgetProjectFile(); noteRecentFile("open", file.name, null); }
       });
       ev.target.value = "";
     });
+    // In the suite: reopening a file from its Recent files list. The bridge
+    // hands over the file the consultant chose to reopen (and its handle,
+    // when the browser kept one, so Save writes back to it); it goes through
+    // the same checks as Load.
+    if (window.App.HostBridge && window.App.HostBridge.hosted) {
+      window.App.HostBridge.register({
+        loadButton: "btn-load",
+        applyTheme: applyTheme,
+        openFile: function (file, handle) {
+          function go() {
+            STG.loadProjectFromFile(file, function (res) {
+              if (res.ok) {
+                if (res.data && res.data.project && typeof res.data.project === "object") STG.ensureProjectId(res.data.project);
+                res.fileName = file.name;
+              }
+              if (!applyLoadedProject(res)) return;
+              if (handle) STG.adoptProjectFile(handle, (E.state.project || {}).projectId);
+              else STG.forgetProjectFile();
+              noteRecentFile("open", file.name, handle);
+            });
+          }
+          if (dirtySinceSave && projectHasContent(E.getProjectFile())) askBeforeLoad(go, "Open " + file.name);
+          else go();
+        }
+      });
+    }
     $("btn-engagement").addEventListener("click", openEngagementModal);
     // Excel / Word exports go through the export-scope flow: with several
     // sites/products a chooser asks which to include (default all); with one

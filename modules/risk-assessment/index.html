@@ -137,9 +137,12 @@
   <div id="toast" class="toast hidden"></div>
 
   <!-- The suite version (js/version.js, copied in from shared/version.js) and
-       this module's product name (js/product.js). -->
+       this module's product name (js/product.js). js/host-bridge.js (copied
+       in from shared/) lets the suite host the tool; standalone it does
+       nothing, and the tool runs the same without it. -->
   <script src="js/version.js"></script>
   <script src="js/product.js"></script>
+  <script src="js/host-bridge.js"></script>
   <script src="data/slt-suggestion-rules.js"></script>
   <script src="data/risk-context-interchange.js"></script>
   <script src="data/engagement-guidance.js"></script>
@@ -171,8 +174,11 @@
     // made inert, so the demo can neither overwrite nor clear a consultant's
     // real unsaved-work snapshot. An iframe-based tour is not possible on
     // plain file:// (cross-window access between file pages is blocked unless
-    // the browser runs with --allow-file-access-from-files).
-    var TOUR_MODE = /[?&]tour(=|&|$)/.test(location.search);
+    // the browser runs with --allow-file-access-from-files). The suite opens
+    // the tour by launching the tool with { tour: true } (js/host-bridge.js),
+    // since a page it builds in memory can carry no query string.
+    var TOUR_MODE = /[?&]tour(=|&|$)/.test(location.search) ||
+      !!(window.App.HostBridge && window.App.HostBridge.launch.tour);
 
     var FRS = RULES.foundationalRequirements;           // [{id,fr,name}]
     var FR_IDS = FRS.map(function (f) { return f.id; });
@@ -353,6 +359,10 @@
     var dirty = false, autosaveTimer = null, autosaveBroken = false;
 
     function updateSaveButton() {
+      // The suite, when it hosts the tool, marks tools with unsaved changes
+      // in its bar and warns before it closes (js/host-bridge.js; absent or
+      // standalone, nothing happens).
+      if (window.App.HostBridge) window.App.HostBridge.setDirty(dirty);
       var b = document.getElementById("btn-save");
       if (!b) return;
       if (dirty) { b.textContent = "Save*"; b.classList.add("btn-unsaved"); b.title = "Unsaved changes: Save overwrites the project's file in place (Shift+click: Save as…)"; }
@@ -425,7 +435,28 @@
     var projectHandle = null;
     var IDB_NAME = "spt-risk-files", IDB_STORE = "handles", IDB_KEY = "project";
 
-    function supportsFilePickers() { return typeof window.showSaveFilePicker === "function"; }
+    // The browser refuses the file dialogs to a page framed by a page of
+    // another origin (the suite's folder build frames this file:// page, and
+    // the browser counts every file:// page as an origin of its own). There
+    // Save downloads and Load uses the file input, as in a browser without
+    // the dialogs. Standalone, or framed by a page of the same origin (the
+    // suite's single-file build), the dialogs are used as normal.
+    function inForeignFrame() {
+      try { return window.top !== window.self && !window.top.location.href; } catch (e) { return true; }
+    }
+    function supportsFilePickers() { return typeof window.showSaveFilePicker === "function" && !inForeignFrame(); }
+
+    // In the suite, a project file saved or opened goes on its Recent files
+    // list: the name, the customer and when, never the contents. The handle,
+    // when the browser gave one, stays in this tool's own storage (see
+    // js/host-bridge.js). Standalone, nothing happens.
+    function noteRecentFile(action, name, handle) {
+      var HB = window.App.HostBridge;
+      if (!HB || !HB.hosted || !name) return;
+      var p = state.project || {};
+      HB.recent({ action: action, name: name, handle: handle || null,
+                  label: ((p.engagement && p.engagement.client) || (p.suc && p.suc.name) || "") });
+    }
 
     // Handle persistence is a convenience, never a dependency: all failures
     // (no IndexedDB, non-cloneable handle, private mode) are swallowed.
@@ -483,19 +514,26 @@
       var text = JSON.stringify(state.project, null, 2);
       var suggested = slug(state.project.suc.name) + "-risk-project.json";
 
-      if (!supportsFilePickers()) {
+      function download(blocked) {
         downloadBlob(text, suggested);
         markClean();
-        toast("Risk project saved (downloaded).");
-        onDone({ ok: true, method: "download" });
-        return;
+        toast(blocked ? "Risk project saved (downloaded as " + suggested + "). Saving back into the same file is not available here, so each save downloads a new copy."
+                      : "Risk project saved (downloaded).");
+        noteRecentFile("save", suggested, null);
+        onDone({ ok: true, method: "download", name: suggested, blocked: !!blocked });
       }
+
+      if (!supportsFilePickers()) { download(inForeignFrame()); return; }
 
       function pick() {
         window.showSaveFilePicker({
           suggestedName: suggested,
           types: [{ description: "OT risk project", accept: { "application/json": [".json"] } }]
         }).then(function (h) { writeTo(h, false); }, function (e) {
+          // Refused for a security reason (a frame the browser will not show
+          // the dialog in, or the click that asked for it has expired): the
+          // work still has to reach a file, so it downloads instead.
+          if (e && e.name === "SecurityError") { download(true); return; }
           if (!(e && e.name === "AbortError")) toast("Save failed: " + ((e && e.message) || "save dialog failed"), "err");
           onDone({ ok: false, aborted: !!(e && e.name === "AbortError") });
         });
@@ -517,6 +555,7 @@
             persistHandle(handle);
             markClean();
             toast("Saved to " + handle.name + ".");
+            noteRecentFile("save", handle.name, handle);
             onDone({ ok: true, method: "file", name: handle.name });
           }).catch(function (e) {
             if (canFallback) pick();
@@ -541,7 +580,7 @@
         handle.getFile().then(function (f) {
           var reader = new FileReader();
           reader.onload = function () {
-            if (loadProjectText(String(reader.result))) { projectHandle = handle; persistHandle(handle); }
+            if (loadProjectText(String(reader.result))) { projectHandle = handle; persistHandle(handle); noteRecentFile("open", handle.name, handle); }
           };
           reader.onerror = function () { toast("Could not read the file.", "err"); };
           reader.readAsText(f);
@@ -1908,11 +1947,31 @@
       reader.onload = function () {
         // A plain file input yields no handle: forget any previous one so Save
         // can't overwrite a DIFFERENT project's file with this one's content.
-        if (loadProjectText(String(reader.result))) forgetProjectFile();
+        if (loadProjectText(String(reader.result))) { forgetProjectFile(); noteRecentFile("open", file.name, null); }
       };
       reader.onerror = function () { toast("Could not read the file.", "err"); };
       reader.readAsText(file); ev.target.value = "";
     });
+    // In the suite: reopening a file from its Recent files list. The bridge
+    // hands over the file the consultant chose to reopen (and its handle,
+    // when the browser kept one, so Save writes back to it); it goes through
+    // the same checks as Load.
+    if (window.App.HostBridge && window.App.HostBridge.hosted) {
+      window.App.HostBridge.register({
+        loadButton: "btn-load",
+        applyTheme: applyTheme,
+        openFile: function (file, handle) {
+          var reader = new FileReader();
+          reader.onload = function () {
+            if (!loadProjectText(String(reader.result))) return;
+            if (handle) { projectHandle = handle; persistHandle(handle); } else forgetProjectFile();
+            noteRecentFile("open", file.name, handle);
+          };
+          reader.onerror = function () { toast("Could not read the file.", "err"); };
+          reader.readAsText(file);
+        }
+      });
+    }
 
     // Warn before leaving with unsaved work, and flush the crash-net first so a
     // confirmed leave (or a tab crash) can still be recovered on next open.
