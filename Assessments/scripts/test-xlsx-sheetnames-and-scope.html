@@ -1,0 +1,166 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Workbook sheet names, plurals and scope</title></head>
+<body>
+<!--
+  Follow-ups to the workbook fixes for multi-site posture, the
+  organisation-wide workbook, NIS2 guidance and attribution:
+
+  1. A tab name built from a label longer than 31 characters, with an
+     apostrophe at the cut, ended on that apostrophe and Excel refused it
+     (the edge apostrophes were trimmed before the cut, not after).
+  2. A tab named from instrument data could take a name a fixed tab is
+     appended under later (a CAF principle noun of "Outcome" made the
+     principles tab "Outcomes"), and the fixed append then threw.
+  3. A label alternative that is a phrase ending in a plural
+     ("product with digital elements") was made "...elementses".
+  4. The posture and supplier workbook reports every supplier, but its
+     Progress sheet compares one of them only and did not say which.
+  5. The NIS2 quick gap check's Read me described its IEC 62443 guidance
+     column as filled when no row maps any of its measures.
+  6. An attribution given as an object printed in key order in the workbook
+     but text-first on screen.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, tours: ["sl", "nis2", "nis2-quick"] }); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.on("instrument-changed", function (inst) {
+    if (inst && inst.id === "iec-62443-3-3") A.TourSL.apply(E);
+    if (inst && inst.id === "nis2-assessment") A.TourNIS2.apply(E);
+    if (inst && inst.id === "nis2-quick-gap") A.TourNIS2Quick.apply(E);
+  });
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  var BAD = /[:\\\/?*\[\]]/;
+  function namesValid(id, names) {
+    var bad = names.filter(function (n) { return !n || n.length > 31 || BAD.test(n) || /^'|'$/.test(n); });
+    ok(bad.length === 0, id + ": every sheet name is one Excel accepts", bad.join(" | ") || names.join(", "));
+    var seen = {}, dup = [];
+    names.forEach(function (n) { var k = n.toLowerCase(); if (seen[k]) dup.push(n); seen[k] = true; });
+    ok(dup.length === 0, id + ": every sheet name is unique", dup.join(", "));
+  }
+  // Cell text in reading order (row by row), as the ExcelJS layer writes it.
+  function rowsText(ws) {
+    if (!ws || !ws["!ref"]) return [];
+    var rg = XLSX.utils.decode_range(ws["!ref"]), out = [];
+    for (var r = 0; r <= rg.e.r; r++) {
+      for (var c = 0; c <= rg.e.c; c++) {
+        var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+        if (cell && cell.v != null && String(cell.v) !== "") out.push(String(cell.v));
+      }
+    }
+    return out;
+  }
+  function tryBuild(eng, inst, opts) {
+    try { return { wb: A.ExportXLSX.build(eng, inst, E.state.taxonomy, E.state.profile, opts || {}) }; }
+    catch (e) { return { err: e }; }
+  }
+
+  // ---- 1. capability-sl tab from a long label with an apostrophe at the cut
+  E.activateInstrument("iec-62443-3-3");
+  ok(E.state.engagement.targets.length > 1, "the 3-3 demo has several zones, so it has a per-zone tab");
+  var sl = clone(E.state.instrument);
+  sl.targetDimensionLabel = "Abcdefghijklmnopqrstuvwxyz abc'defgh";
+  delete sl.targetDimensionLabelPlural;
+  var r1 = tryBuild(E.state.engagement, sl, { targetId: E.state.activeTargetId });
+  ok(!r1.err && r1.wb, "a 31-character cut landing after an apostrophe still builds", r1.err && r1.err.message);
+  if (r1.wb) {
+    namesValid("3-3 long label", r1.wb.SheetNames);
+    ok(r1.wb.SheetNames.indexOf("Abcdefghijklmnopqrstuvwxyz abc") !== -1, "the tab is the label cut at 31 characters, apostrophe dropped",
+       r1.wb.SheetNames.join(", "));
+  }
+
+  // ---- 2. a CAF principle noun that collides with a later fixed tab -------
+  E.activateInstrument("ncsc-caf");
+  var cafOpts = {
+    targetId: E.state.activeTargetId,
+    cafProfileRegistry: E.getCAFProfileRegistry(), cafProfileId: E.getActiveCAFProfileId(),
+    cafProfile: E.getActiveCAFProfile(), cafOverlay: E.getActiveCAFOverlay()
+  };
+  ["Outcome", "Roadmap", "Achieved"].forEach(function (noun) {
+    var caf = clone(E.state.instrument);
+    caf.display = Object.assign({}, caf.display || {}, { principleNoun: noun });
+    var r2 = tryBuild(E.state.engagement, caf, cafOpts);
+    ok(!r2.err && r2.wb, "a principle noun of '" + noun + "' does not take a fixed tab's name", r2.err && r2.err.message);
+    if (r2.wb) {
+      namesValid("CAF noun " + noun, r2.wb.SheetNames);
+      ok(["Outcomes", "Achieved", "Roadmap", "Read me"].every(function (n) { return r2.wb.SheetNames.indexOf(n) !== -1; }),
+         "the fixed tabs keep their names", r2.wb.SheetNames.join(", "));
+    }
+  });
+
+  // ---- 3. a phrase alternative ending in a plural ------------------------
+  E.activateInstrument("general-ot-posture");
+  var pos = clone(E.state.instrument);
+  pos.targetDimensionLabel = "Manufacturer / product with digital elements";
+  delete pos.targetDimensionLabelPlural;
+  var r3 = tryBuild(E.state.engagement, pos, {
+    orgWide: true,
+    siteEntries: [{ id: "a", name: "Plant A", responses: [] }, { id: "b", name: "Plant B", responses: [] }]
+  });
+  ok(!r3.err && r3.wb, "the organisation-wide workbook builds with a phrase label", r3.err && r3.err.message);
+  if (r3.wb) {
+    var front = rowsText(r3.wb.Sheets["Front"]).join("\n").toLowerCase();
+    ok(front.indexOf("elementses") === -1, "a phrase already ending in a plural is not pluralised again");
+    ok(front.indexOf("manufacturers / products with digital elements") !== -1, "the head noun of each alternative is made plural",
+       front.split("\n").slice(0, 6).join(" | "));
+  }
+
+  // ---- 4. the Progress sheet in a two-supplier workbook names its supplier
+  E.activateInstrument("supplier-screener");
+  var sup = E.state.instrument;
+  var alphaId = E.state.activeTargetId;
+  E.renameTarget(alphaId, "Alpha");
+  E.addTarget("Bravo");
+  ok(E.state.engagement.targets.length === 2, "two suppliers in one engagement");
+  var progress = {
+    sourceLine: "previous-visit.json", targetName: "Alpha", baselineTargetName: "Alpha",
+    summary: { improved: 0, regressed: 0, unchanged: 0, newlyAssessed: 0, noLongerAssessed: 0 }, movements: []
+  };
+  var r4 = tryBuild(E.state.engagement, sup, { targetId: alphaId, progress: progress });
+  ok(!r4.err && r4.wb && r4.wb.Sheets["Progress"], "the two-supplier workbook has a Progress sheet", r4.err && r4.err.message);
+  if (r4.wb) {
+    var prog = rowsText(r4.wb.Sheets["Progress"]);
+    var at = prog.indexOf("Supplier");
+    ok(at !== -1 && prog[at + 1] === "Alpha", "it names the supplier it compares", prog.slice(0, 8).join(" | "));
+    ok(prog.some(function (t) { return /covers Alpha only/.test(t) && /suppliers in this workbook/.test(t); }),
+       "and says the other suppliers are not compared there");
+  }
+  var single = Object.assign({}, E.state.engagement, {
+    targets: E.state.engagement.targets.filter(function (t) { return t.id === alphaId; })
+  });
+  var r4b = tryBuild(single, sup, { targetId: alphaId, progress: progress });
+  if (r4b.wb) {
+    var prog1 = rowsText(r4b.wb.Sheets["Progress"]);
+    ok(!prog1.some(function (t) { return /covers Alpha only/.test(t); }), "a one-supplier workbook needs no such note");
+  }
+
+  // ---- 5. NIS2 Read me describes the guidance column as it is -------------
+  E.activateInstrument("nis2-assessment");
+  var rf = tryBuild(E.state.engagement, E.state.instrument, { targetId: E.state.activeTargetId });
+  var rfText = rf.wb ? rowsText(rf.wb.Sheets["Read me"]).join("\n") : "";
+  ok(/Relevant IEC 62443 guidance suggests related requirements/.test(rfText), "the full NIS2 Read me explains the filled guidance column");
+  E.activateInstrument("nis2-quick-gap");
+  var rq = tryBuild(E.state.engagement, E.state.instrument, { targetId: E.state.activeTargetId });
+  var rqText = rq.wb ? rowsText(rq.wb.Sheets["Read me"]).join("\n") : "";
+  ok(!/Relevant IEC 62443 guidance suggests related requirements/.test(rqText), "the quick gap Read me does not promise suggestions it lacks");
+  ok(/Relevant IEC 62443 guidance is left blank here/.test(rqText), "and says why its guidance column is blank");
+  ok(!/[–—]/.test(rfText + rqText), "no en or em dash in either Read me");
+
+  // ---- 6. an object attribution prints in the screen's order --------------
+  E.activateInstrument("general-ot-posture");
+  var att = clone(E.state.instrument);
+  att.attribution = { licence: "Licence line for the probe.", text: "Text line for the probe." };
+  var r6 = tryBuild(E.state.engagement, att, { targetId: E.state.activeTargetId });
+  var rm = r6.wb ? rowsText(r6.wb.Sheets["Read me"]) : [];
+  var iT = rm.indexOf("Text line for the probe."), iL = rm.indexOf("Licence line for the probe.");
+  ok(iT !== -1 && iL !== -1 && iT < iL, "the attribution's text comes first, then the rest, as on screen", iT + " / " + iL);
+  var screen = A.Report.attributionLines(att);
+  ok(screen[0] === rm[iT] && screen[1] === rm[iL], "the same lines in the same order as the screen report");
+});
+</script>
+</body></html>

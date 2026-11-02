@@ -1,0 +1,1701 @@
+{
+    "id":  "nist-800-82",
+    "title":  "NIST SP 800-82 Rev 3 OT Overlay Assessment",
+    "framework":  "NIST SP 800-82",
+    "edition":  "Revision 3",
+    "contentVersion":  "1.0.0",
+    "scoringFamily":  "caf-achieved",
+    "scoringProfileRef":  "caf-achieved",
+    "targetDimension":  "site",
+    "targetDimensionLabel":  "Site",
+    "framing":  "A control-by-control gap assessment against the OT Overlay in NIST SP 800-82 Revision 3 (Appendix F). The overlay tailors the NIST SP 800-53 Rev 5 control catalog for operational technology, allocating controls to Low, Moderate and High baselines and adding OT-specific discussion. Each control is determined Satisfied or Other Than Satisfied (per NIST SP 800-53A), with the verbatim OT Discussion shown per control and the OT-overlay Low/Moderate/High baselines available as target profiles. Control enhancements are excluded from this version (base controls only).",
+    "sourceNote":  "Control identifiers, names, Low/Moderate/High baseline allocation (including controls the overlay adds beyond NIST SP 800-53B), the per-control OT Discussion text, and the per-family Tailoring Considerations are transcribed from the OT Overlay in NIST SP 800-82 Rev 3, Appendix F (Table 22 and the Detailed Overlay Control Specifications). The overlay is built on the NIST SP 800-53 Rev 5 control catalog; the base control requirement text itself lives in SP 800-53 Rev 5 and is not reproduced here (this instrument carries the OT-specific overlay content). Privacy-only controls and control enhancements are excluded from this version. NIST SP 800-82 is a work of the U.S. Government and is not subject to copyright.",
+    "attribution":  "NIST Special Publications are works of the U.S. Government and are not subject to copyright in the United States. Source: NIST SP 800-82 Rev 3 (Guide to Operational Technology (OT) Security), Appendix F - OT Overlay; control catalog NIST SP 800-53 Rev 5.",
+    "display":  {
+                    "subtitle":  "Control-by-control gap assessment against the NIST SP 800-82 Rev 3 OT Overlay (Appendix F, base controls). Capture engagement details, pick the OT baseline below, then work through the control families from the sidebar.",
+                    "reportSubline":  "NIST SP 800-82 Rev 3 OT Overlay assessment",
+                    "reportDescription":  "NIST SP 800-82 Rev 3 OT Overlay gap analysis",
+                    "profileTitle":  "Baseline",
+                    "profileStep1Label":  "Baseline",
+                    "objectiveTitle":  "Control families",
+                    "outcomesTitle":  "Controls",
+                    "gettingStarted":  {
+                                           "cardTitle":  "NIST SP 800-82 Rev 3 OT Overlay: how this instrument works",
+                                           "intro":  "This is a control-by-control gap assessment against the OT Overlay in NIST SP 800-82 Rev 3 (Appendix F): the NIST SP 800-53 Rev 5 controls tailored for operational technology. Each control is determined Satisfied or Other Than Satisfied, following the assessment model of NIST SP 800-53A. It is an alignment and gap tool, not a formal assessment or authorization.",
+                                           "profileHeading":  "Baseline (sets which controls are expected)",
+                                           "bullets":  [
+                                                           "The unit of capture is the control: base controls across 19 families (AC...SR), grouped as Technical, Operational and Management.",
+                                                           "Record each control as Satisfied or Other Than Satisfied: the binary determination used by SP 800-53A. Unknown reduces confidence; Not applicable drops the control.",
+                                                           "The OT baseline above (Low, Moderate or High from the SP 800-82 Rev 3 overlay) sets which controls are expected. \u0027Added by overlay\u0027 marks controls the OT overlay adds beyond the standard NIST SP 800-53B baseline. Choose Full overlay to assess every overlay control with no baseline target.",
+                                                           "Each control shows its verbatim OT Discussion (where the overlay provides it) in the \u0027What this control requires\u0027 expander, and each family opens with the overlay\u0027s Tailoring Considerations. The base control requirement text is in NIST SP 800-53 Rev 5. Control enhancements are out of scope in this version.",
+                                                           "No single score is produced. The report is a profile of Satisfied / Other Than Satisfied counts by family, plus the roadmap of controls that are Other Than Satisfied."
+                                                       ],
+                                           "profilesHeading":  "Available baselines"
+                                       }
+                },
+    "states":  [
+                   {
+                       "value":  "achieved",
+                       "label":  "Satisfied",
+                       "colour":  "met"
+                   },
+                   {
+                       "value":  "not",
+                       "label":  "Other Than Satisfied",
+                       "colour":  "gap"
+                   },
+                   {
+                       "value":  "unknown",
+                       "label":  "Unknown",
+                       "effect":  "coverage+confidence, not scored"
+                   },
+                   {
+                       "value":  "na",
+                       "label":  "Not applicable",
+                       "effect":  "excluded"
+                   }
+               ],
+    "taxonomy":  {
+                     "objectives":  [
+                                        {
+                                            "id":  "T",
+                                            "name":  "Technical"
+                                        },
+                                        {
+                                            "id":  "O",
+                                            "name":  "Operational"
+                                        },
+                                        {
+                                            "id":  "M",
+                                            "name":  "Management"
+                                        }
+                                    ],
+                     "principles":  [
+                                        {
+                                            "id":  "AC",
+                                            "name":  "Access Control",
+                                            "objectiveId":  "T",
+                                            "otLens":  {
+                                                           "framing":  "Before implementing controls in the AC family, consider the trade-offs among security, privacy, latency, performance, throughput, and reliability. For example, the organization considers whether latency induced from the use of confidentiality and integrity mechanisms that employ cryptographic mechanisms would adversely impact the operational performance of the OT.\n\nWhen the OT cannot support the specific access control requirements of a control, the organization employs compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "AT",
+                                            "name":  "Awareness and Training",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "AU",
+                                            "name":  "Audit and Accountability",
+                                            "objectiveId":  "T",
+                                            "otLens":  {
+                                                           "framing":  "In general, security audit information and audit tools are not available on legacy OT. When OT cannot support the specific audit and accountability requirements of a control, the organization employs compensating controls in accordance with the general tailoring guidance. For example, organizations may want to consider whether security audit information is available from separate systems or system components (e.g., the historian, firewall logs, physical security systems). Additional examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "CA",
+                                            "name":  "Assessment, Authorization, and Monitoring",
+                                            "objectiveId":  "M",
+                                            "otLens":  {
+                                                           "framing":  "When the OT cannot support the specific assessment, authorization, and monitoring requirements of a control, the organization employs compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "CM",
+                                            "name":  "Configuration Management",
+                                            "objectiveId":  "O",
+                                            "otLens":  {
+                                                           "framing":  "When the OT cannot be configured to restrict the use of unnecessary functions or cannot support the use of automated mechanisms to implement configuration management functions, the organization employs nonautomated mechanisms or procedures as compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "CP",
+                                            "name":  "Contingency Planning",
+                                            "objectiveId":  "O",
+                                            "otLens":  {
+                                                           "framing":  "OT systems often contain a physical component at a fixed location that may not be relocated logically, and some replacement components may not be readily available. The continuance of essential mission and business functions with little or no loss of operational continuity may not be possible. When the organization cannot provide necessary essential services, support, or automated mechanisms during contingency operations, it should provide nonautomated mechanisms or predetermined procedures as compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "IA",
+                                            "name":  "Identification and Authentication",
+                                            "objectiveId":  "T",
+                                            "otLens":  {
+                                                           "framing":  "Before implementing controls in the IA family, consider the trade-offs among security, privacy, latency, performance, and throughput. For example, the organization considers whether latency induced from the use of authentication mechanisms that employ cryptography would adversely impact the operational performance of the OT.\n\nWhen the OT cannot support the specific identification and authentication requirements of a control, the organization employs compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "IR",
+                                            "name":  "Incident Response",
+                                            "objectiveId":  "O",
+                                            "otLens":  {
+                                                           "framing":  "The automated mechanisms used to support the tracking of security incidents are typically not part of or connected to the OT.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "MA",
+                                            "name":  "Maintenance",
+                                            "objectiveId":  "O",
+                                            "otLens":  {
+                                                           "framing":  "The automated mechanisms used to schedule, conduct, and document maintenance and repairs are not necessarily part of or connected to the OT.\n\nWhen the OT cannot support the specific maintenance requirements of a control, the organization employs compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "MP",
+                                            "name":  "Media Protection",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "PE",
+                                            "name":  "Physical and Environmental Protection",
+                                            "objectiveId":  "O",
+                                            "otLens":  {
+                                                           "framing":  "Physical and environmental protections are often used as a compensating control for many OT systems, so physical and environmental protection controls are especially important. Any selected compensating control mitigates risk to an acceptable level.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "PL",
+                                            "name":  "Planning",
+                                            "objectiveId":  "M"
+                                        },
+                                        {
+                                            "id":  "PM",
+                                            "name":  "Program Management",
+                                            "objectiveId":  "M",
+                                            "otLens":  {
+                                                           "framing":  "Organization-wide information security program management controls are deployed to support the information security program. They are not associated with control baselines and are independent of any system impact level.\n\nProgram management controls should specifically address the unique properties and requirements of OT, the relationship to non-OT systems, and the relationship to other programs concerned with the operational characteristics of OT (e.g., safety, efficiency, reliability, resilience). To achieve this, the security program should utilize interdisciplinary teams that can help reconcile and balance conflicting equities, objectives, and responsibilities, such as capability, adaptability, resilience, safety, security, usability, and efficiency.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "PS",
+                                            "name":  "Personnel Security",
+                                            "objectiveId":  "O",
+                                            "otLens":  {
+                                                           "framing":  "Personnel security controls require collaboration between OT, IT, security, and HR personnel.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "RA",
+                                            "name":  "Risk Assessment",
+                                            "objectiveId":  "M",
+                                            "otLens":  {
+                                                           "framing":  "Many OT organizations have well-established risk assessment programs that can be leveraged for cybersecurity risk analysis.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "SA",
+                                            "name":  "System and Services Acquisition",
+                                            "objectiveId":  "M",
+                                            "otLens":  {
+                                                           "framing":  "In situations where the OT cannot support the specific system and services acquisition requirements of a control, the organization employs compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "SC",
+                                            "name":  "System and Communications Protection",
+                                            "objectiveId":  "T",
+                                            "otLens":  {
+                                                           "framing":  "The use of cryptography is determined after careful consideration of the security needs and the potential ramifications on system performance. For example, the organization considers whether latency induced from the use of cryptography would adversely impact the operational performance of the OT. While the legacy devices commonly found within OT often lack direct support for cryptographic functions, compensating controls (e.g., encapsulations) may be used to meet the intent of the control. When the OT cannot support the specific system and communications protection requirements of a control, the organization employs compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "SI",
+                                            "name":  "System and Information Integrity",
+                                            "objectiveId":  "O",
+                                            "otLens":  {
+                                                           "framing":  "When the OT cannot support the specific system and information integrity requirements of a control, the organization employs compensating controls in accordance with the general tailoring guidance. Examples of compensating controls are given with each control as appropriate.",
+                                                           "relatedSRs":  [
+
+                                                                          ],
+                                                           "related80082":  [
+
+                                                                            ],
+                                                           "gotchas":  ""
+                                                       }
+                                        },
+                                        {
+                                            "id":  "SR",
+                                            "name":  "Supply Chain Risk Management",
+                                            "objectiveId":  "M"
+                                        }
+                                    ]
+                 },
+    "outcomes":  [
+                     {
+                         "id":  "AC-1",
+                         "principleId":  "AC",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems. OT access by vendors and maintenance staff can occur over a large facility footprint or geographic area and into unobserved spaces, such as mechanical or electrical rooms, ceilings, floors, field substations, switch and valve vaults, and pump stations.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-2",
+                         "principleId":  "AC",
+                         "title":  "Account Management",
+                         "controlText":  "In OT systems, physical security, personnel security, intrusion detection, or auditing measures may support this control objective.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-3",
+                         "principleId":  "AC",
+                         "title":  "Access Enforcement",
+                         "controlText":  "The organization ensures that access enforcement mechanisms do not adversely impact the operational performance of the OT. Example compensating controls include encapsulation. The policy for logical access control to non-addressable and non-routable system resources and the associated information is made explicit. Access control mechanisms include hardware, firmware, and software that control the device or have device access, such as device drivers and communications controllers. Physical access control may serve as a compensating control for logical access control. However, it may not provide sufficient granularity when users require access to different functions.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-4",
+                         "principleId":  "AC",
+                         "title":  "Information Flow Enforcement",
+                         "controlText":  "Information flow policy may be achieved using a combination of logical and physical flow restriction techniques. The inspection of message content may enforce information flow policy. For example, industrial OT protocols may be restricted using inbound and outbound traffic rules on a network control device between OT and IT networks. For non-routable communication, such as serial connections, devices may be configured to limit commands to and from specific tags within the OT device. The information flow policy may be supported by labeling or coloring physical connectors to aid in connecting networks. Devices that do not have a business need to communicate should not be connected (i.e., air gapped).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-5",
+                         "principleId":  "AC",
+                         "title":  "Separation of Duties",
+                         "controlText":  "Example compensating controls include providing increased personnel security and auditing. The organization carefully considers the appropriateness of a single individual performing multiple critical roles.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-6",
+                         "principleId":  "AC",
+                         "title":  "Least Privilege",
+                         "controlText":  "Example compensating controls include providing increased personnel security and auditing. The organization carefully considers the appropriateness of a single individual having multiple critical privileges. System privilege models may be tailored to enforce integrity and availability (e.g., lower privileges include read access, and higher privileges include write access).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-7",
+                         "principleId":  "AC",
+                         "title":  "Unsuccessful Logon Attempts",
+                         "controlText":  "Many OT systems remain in continuous operation, and operators remain logged onto the system at all times. A \"log-over\" capability may be employed. Example compensating controls include logging or recording all unsuccessful logon attempts and alerting OT security personnel through alarms or other means when the number of organization-defined consecutive invalid access attempts is exceeded. Unsuccessful logon attempt limits are enforced for accounts (e.g., administrator) or systems (e.g., engineering workstations) that are not required for continuous operation.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-8",
+                         "principleId":  "AC",
+                         "title":  "System Use Notification",
+                         "controlText":  "Many OT systems must remain in continuous operation, and system use notification may not be supported or effective. Example compensating controls include posting physical notices in OT facilities or providing recurring training on system use prior to permitting access.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-10",
+                         "principleId":  "AC",
+                         "title":  "Concurrent Session Control",
+                         "controlText":  "The number, account type, and privileges of concurrent sessions consider the roles and responsibilities of the affected individuals. Example compensating controls include providing increased auditing measures.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-11",
+                         "principleId":  "AC",
+                         "title":  "Device Lock",
+                         "controlText":  "This control assumes a staffed environment where users interact with system displays. This control may be tailored appropriately where systems do not have displays configured, systems are placed in an access-controlled facility or locked enclosure, or immediate operator response is required in emergency situations. Example compensating controls include locating the display in an area with physical access controls that limit access to individuals with permission and need-to-know for the displayed information.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-12",
+                         "principleId":  "AC",
+                         "title":  "Session Termination",
+                         "controlText":  "Example compensating controls include providing increased auditing measures or limiting remote access privileges to key personnel.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-14",
+                         "principleId":  "AC",
+                         "title":  "Permitted Actions without Identification or Authentication",
+                         "controlText":  "No OT Discussion for this control.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-17",
+                         "principleId":  "AC",
+                         "title":  "Remote Access",
+                         "controlText":  "When the OT cannot implement any or all of the components of this control, the organization employs other mechanisms or procedures as compensating controls in accordance with the general tailoring guidance.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-18",
+                         "principleId":  "AC",
+                         "title":  "Wireless Access",
+                         "controlText":  "When OT cannot implement any or all of the components of this control, the organization employs other mechanisms or procedures as compensating controls in accordance with the general tailoring guidance.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-19",
+                         "principleId":  "AC",
+                         "title":  "Access Control for Mobile Devices",
+                         "controlText":  "No OT Discussion for this control.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-20",
+                         "principleId":  "AC",
+                         "title":  "Use of External Systems",
+                         "controlText":  "Organizations refine the definition of \"external\" to reflect lines of authority and responsibility, the granularity of an organization entity, and their relationships. An organization may consider a system to be external if that system performs different functions, implements different policies, falls under different management authorities, or does not provide sufficient visibility into the implementation of controls to allow the establishment of a satisfactory trust relationship. For example, an OT system and a business data processing system may be considered external to each other depending on the organization\u0027s system boundaries.\n\nAccess to an OT for support by a business partner, such as a vendor or support contractor, is another common example. The definition and trustworthiness of external systems is reexamined with respect to OT functions, purposes, technology, and limitations to establish a clearly documented technical or business case for use and an acceptance of the risk inherent in the use of an external system.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AC-21",
+                         "principleId":  "AC",
+                         "title":  "Information Sharing"
+                     },
+                     {
+                         "id":  "AC-22",
+                         "principleId":  "AC",
+                         "title":  "Publicly Accessible Content",
+                         "controlText":  "Generally, public access to OT systems is not permitted. Select information may be transferred to a publicly accessible system, possibly with added controls. The organization should review what information is being made accessible prior to publication.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AT-1",
+                         "principleId":  "AT",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AT-2",
+                         "principleId":  "AT",
+                         "title":  "Literacy Training and Awareness",
+                         "controlText":  "Security awareness training includes initial and periodic review of OT-specific policies, standard operating procedures, security trends, and vulnerabilities. The OT security awareness program is consistent with the requirements of the security awareness and training policy established by the organization.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AT-3",
+                         "principleId":  "AT",
+                         "title":  "Role-Based Training",
+                         "controlText":  "Security training includes initial and periodic review of OT-specific policies, standard operating procedures, security trends, and vulnerabilities. The OT security training program is consistent with the requirements of the security awareness and training policy established by the organization. The training may be customized for specific OT roles, which could include operators, maintainers, engineers, supervisors, and administrators.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AT-4",
+                         "principleId":  "AT",
+                         "title":  "Training Records"
+                     },
+                     {
+                         "id":  "AU-1",
+                         "principleId":  "AU",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AU-2",
+                         "principleId":  "AU",
+                         "title":  "Event Logging",
+                         "controlText":  "Organizations may want to include relevant OT events (e.g., alerts, alarms, configuration and status changes, operator actions) in their event logging, which may be designated as audit events.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AU-3",
+                         "principleId":  "AU",
+                         "title":  "Content of Audit Records"
+                     },
+                     {
+                         "id":  "AU-4",
+                         "principleId":  "AU",
+                         "title":  "Audit Log Storage Capacity"
+                     },
+                     {
+                         "id":  "AU-5",
+                         "principleId":  "AU",
+                         "title":  "Response to Audit Logging Process Failures"
+                     },
+                     {
+                         "id":  "AU-6",
+                         "principleId":  "AU",
+                         "title":  "Audit Record Review, Analysis, and Reporting"
+                     },
+                     {
+                         "id":  "AU-7",
+                         "principleId":  "AU",
+                         "title":  "Audit Record Reduction and Report Generation"
+                     },
+                     {
+                         "id":  "AU-8",
+                         "principleId":  "AU",
+                         "title":  "Time Stamps",
+                         "controlText":  "Example compensating controls include using a separate system designated as an authoritative time source. See related control SC-45.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AU-9",
+                         "principleId":  "AU",
+                         "title":  "Protection of Audit Information"
+                     },
+                     {
+                         "id":  "AU-10",
+                         "principleId":  "AU",
+                         "title":  "Non-repudiation",
+                         "controlText":  "OT devices may not enforce non-repudiation of audit records and may require compensating controls. Example compensating controls include physical security systems, cameras to monitor user access, or a separate device for log collection.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "AU-11",
+                         "principleId":  "AU",
+                         "title":  "Audit Record Retention"
+                     },
+                     {
+                         "id":  "AU-12",
+                         "principleId":  "AU",
+                         "title":  "Audit Generation"
+                     },
+                     {
+                         "id":  "CA-1",
+                         "principleId":  "CA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CA-2",
+                         "principleId":  "CA",
+                         "title":  "Control Assessments",
+                         "controlText":  "Assessments are performed and documented by qualified assessors (i.e., experienced in assessing OT) authorized by the organization. The individual or group conducting the assessment fully understands the organizational information security policies and procedures, the OT security policies and procedures, and the specific health, safety, and environmental risks associated with a particular facility and/or process. The organization ensures that the assessment does not affect system operation or result in unintentional system modification. If assessment activities must be performed on the production OT, it may need to be taken offline before an assessment can be conducted, or the assessment should be scheduled to occur during planned OT outages whenever possible.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CA-3",
+                         "principleId":  "CA",
+                         "title":  "Information Exchange",
+                         "controlText":  "Organizations perform risk-benefit analysis to determine whether an OT should be connected to other systems. The authorizing official (AO) fully understands the organizational information security policies and procedures; the OT security policies and procedures; the risks to organizational operations and assets, individuals, other organizations, and the Nation associated with the connection to other systems; the individuals and organizations that operate and maintain the systems, including maintenance contractors or service providers; and the specific health, safety, and environmental risks associated with a particular interconnection. Connections from the OT environment to other security zones may cross the authorization boundary such that two different authorizing officials may be required to approve the connection. Decisions to accept risk are documented.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CA-5",
+                         "principleId":  "CA",
+                         "title":  "Plan of Action and Milestones",
+                         "controlText":  "Corrective actions identified in assessments may not be immediately actionable in an OT environment. Therefore, short-term mitigations may be implemented to reduce risk as part of the gap closure plan or plan of action and milestones.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CA-6",
+                         "principleId":  "CA",
+                         "title":  "Authorization"
+                     },
+                     {
+                         "id":  "CA-7",
+                         "principleId":  "CA",
+                         "title":  "Continuous Monitoring",
+                         "controlText":  "Continuous monitoring programs for OT are designed, documented, and implemented with input from OT personnel. The organization ensures that continuous monitoring does not interfere with OT functions. The individual or group designing and conducting the continuous monitoring for the OT systems implements a monitoring program that is consistent with the organizational information security policies and procedures, the OT security policies and procedures, and the specific health, safety, and environmental risks associated with a particular facility and/or process. Continuous monitoring can be automated or manual at a frequency sufficient to support risk-based decisions. For example, the organization may monitor event logs manually on a specified frequency less often for lower-risk, isolated systems than for higher-risk, networked systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CA-8",
+                         "principleId":  "CA",
+                         "title":  "Penetration Testing",
+                         "controlText":  "Penetration testing is used with care on OT networks to ensure that OT functions are not adversely impacted by the testing process. In general, OT systems are highly sensitive to timing constraints and have limited resources. Example compensating controls include employing a replicated, virtualized, or simulated system to conduct penetration testing. Production OT may need to be taken offline before testing can be conducted. If OT systems are taken offline for testing, tests are scheduled to occur during planned OT outages whenever possible. If penetration testing is performed on non-OT networks, extra care is taken to ensure that tests do not propagate into the OT network.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CA-9",
+                         "principleId":  "CA",
+                         "title":  "Internal System Connections",
+                         "controlText":  "Organizations perform risk-benefit analysis to determine whether OT equipment should be connected to other internal system components and then document those connections. The AO fully understands the potential risks associated with approving individual connections or approving a class of components to be connected. For example, the AO may broadly approve the connection of any sensors limited to 4 to 20 milliamp (mA) communication, while other connection types (e.g., serial or Ethernet) require individual approval. Decisions to accept risk are documented.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CM-1",
+                         "principleId":  "CM",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CM-2",
+                         "principleId":  "CM",
+                         "title":  "Baseline Configuration"
+                     },
+                     {
+                         "id":  "CM-3",
+                         "principleId":  "CM",
+                         "title":  "Configuration Change Control",
+                         "controlText":  "Configuration change control procedures should align with the organization\u0027s management of change practices.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CM-4",
+                         "principleId":  "CM",
+                         "title":  "Impact Analysis",
+                         "controlText":  "The organization considers OT safety and security interdependencies. OT security and safety personnel are included in change process management if the change to the system may impact safety or security.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CM-5",
+                         "principleId":  "CM",
+                         "title":  "Access Restrictions for Change",
+                         "controlText":  "Some OT devices allow for the configuration and use of mode change switches. Where available, these should be used to prevent unauthorized changes. For example, many PLCs have key switches that allow the device to be placed in a programming mode or a running mode. Those PLCs should be placed in a running or remote mode to prevent unauthorized programming changes, and the key should be removed from the key switch and managed appropriately.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CM-6",
+                         "principleId":  "CM",
+                         "title":  "Configuration Settings"
+                     },
+                     {
+                         "id":  "CM-7",
+                         "principleId":  "CM",
+                         "title":  "Least Functionality",
+                         "controlText":  "The organization implements least functionality by allowing only the specified functions, protocols, and/or services required for OT operations. For non-routable protocols, such as serial communications, interrupts could be disabled or set points could be made read-only except for privileged users to limit functionality. Ports are part of the address space in network protocols and are often associated with specific protocols or functions. For routable protocols, ports can be disabled on many networking devices to limit functionality to the minimum required for operation.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CM-8",
+                         "principleId":  "CM",
+                         "title":  "System Component Inventory"
+                     },
+                     {
+                         "id":  "CM-9",
+                         "principleId":  "CM",
+                         "title":  "Configuration Management Plan",
+                         "controlText":  "Configuration management plans apply to the internal and external (e.g., contractors, integrators) resources responsible for device configuration.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CM-10",
+                         "principleId":  "CM",
+                         "title":  "Software Usage Restrictions"
+                     },
+                     {
+                         "id":  "CM-11",
+                         "principleId":  "CM",
+                         "title":  "User-Installed Software"
+                     },
+                     {
+                         "id":  "CM-12",
+                         "principleId":  "CM",
+                         "title":  "Information Location",
+                         "controlText":  "Organizations identify specific information types or components to track where information is being processed and stored. Information to consider in the OT environment may include shared account passwords, PLC backup files, detailed network drawings, and risk assessments that identify specific threats with the environment.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CP-1",
+                         "principleId":  "CP",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CP-2",
+                         "principleId":  "CP",
+                         "title":  "Contingency Plan",
+                         "controlText":  "The organization defines contingency plans for categories of disruptions or failures. In the case of a contingency, the OT equipment executes preprogrammed functions, such as alerting the operator of the failure and then doing nothing, alerting the operator and then safely shutting down the industrial process, or alerting the operator and then maintaining the last operational setting prior to failure. Contingency plans for widespread disruption may involve specialized organizations (e.g., FEMA, emergency services, regulatory authorities).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CP-3",
+                         "principleId":  "CP",
+                         "title":  "Contingency Training"
+                     },
+                     {
+                         "id":  "CP-4",
+                         "principleId":  "CP",
+                         "title":  "Contingency Plan Testing"
+                     },
+                     {
+                         "id":  "CP-6",
+                         "principleId":  "CP",
+                         "title":  "Alternate Storage Site"
+                     },
+                     {
+                         "id":  "CP-7",
+                         "principleId":  "CP",
+                         "title":  "Alternate Processing Site",
+                         "controlText":  "Many site-wide supervisory or optimization servers (i.e., Level 3 and above of the Purdue model) can be supported from an alternate processing site. It is likely not feasible for control systems or field devices, such as sensors or final elements (i.e., Level 1 and 0 of the Purdue model), to be made available from an alternate processing site.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CP-8",
+                         "principleId":  "CP",
+                         "title":  "Telecommunications Services",
+                         "controlText":  "Quality of service factors for OT include latency and throughput.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CP-9",
+                         "principleId":  "CP",
+                         "title":  "System Backup"
+                     },
+                     {
+                         "id":  "CP-10",
+                         "principleId":  "CP",
+                         "title":  "System Recovery and Reconstitution",
+                         "controlText":  "Reconstitution of the OT includes considering whether system state variables should be restored to initial values or the values before disruption (e.g., are valves restored to full open, full closed, or settings prior to disruption). Restoring system state variables may be disruptive to ongoing physical processes (e.g., valves initially closed may adversely affect system cooling).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "CP-12",
+                         "principleId":  "CP",
+                         "title":  "Safe Mode"
+                     },
+                     {
+                         "id":  "IA-1",
+                         "principleId":  "IA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IA-2",
+                         "principleId":  "IA",
+                         "title":  "Identification and Authentication (Organizational Users)",
+                         "controlText":  "When shared accounts are required, compensating controls include providing increased physical security, personnel security, and auditing measures. For certain OT, the capability for immediate operator interaction is critical. Local emergency actions for OT are not hampered by identification or authentication requirements. Access to these systems may be restricted by appropriate physical controls.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IA-3",
+                         "principleId":  "IA",
+                         "title":  "Device Identification and Authentication",
+                         "controlText":  "OT devices may not inherently support device authentication. If devices are local to one another, physical security measures that prevent unauthorized communication between devices can be used as compensating controls. For remote communication, additional hardware may be required to meet authentication requirements.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IA-4",
+                         "principleId":  "IA",
+                         "title":  "Identifier Management"
+                     },
+                     {
+                         "id":  "IA-5",
+                         "principleId":  "IA",
+                         "title":  "Authenticator Management",
+                         "controlText":  "Example compensating controls include physical access control and encapsulating the OT to provide authentication external to the OT.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IA-6",
+                         "principleId":  "IA",
+                         "title":  "Authentication Feedback",
+                         "controlText":  "This control assumes a visual interface that provides feedback about authentication information during the authentication process. When OT authentication uses an interface that does not support visual feedback (e.g., protocol-based authentication), this control may be tailored out.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IA-7",
+                         "principleId":  "IA",
+                         "title":  "Cryptographic Module Authentication"
+                     },
+                     {
+                         "id":  "IA-8",
+                         "principleId":  "IA",
+                         "title":  "Identification and Authentication (Non-Organizational Users)",
+                         "controlText":  "The OT Discussion for IA-2, Identification and Authentication (Organizational Users) is applicable for non-organizational users.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IA-11",
+                         "principleId":  "IA",
+                         "title":  "Re-authentication"
+                     },
+                     {
+                         "id":  "IA-12",
+                         "principleId":  "IA",
+                         "title":  "Identity Proofing",
+                         "controlText":  "Identity proofing is likely performed by different departments within the organization. Existing organizational systems (e.g., HR or IT processes) should be leveraged to perform this control.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IR-1",
+                         "principleId":  "IR",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IR-2",
+                         "principleId":  "IR",
+                         "title":  "Incident Response Training"
+                     },
+                     {
+                         "id":  "IR-3",
+                         "principleId":  "IR",
+                         "title":  "Incident Response Testing"
+                     },
+                     {
+                         "id":  "IR-4",
+                         "principleId":  "IR",
+                         "title":  "Incident Handling",
+                         "controlText":  "As part of the incident handling capability, the organization coordinates with external vendors, integrators, or suppliers as necessary to ensure that they have the capability to address events that are specific to embedded components and devices.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IR-5",
+                         "principleId":  "IR",
+                         "title":  "Incident Monitoring"
+                     },
+                     {
+                         "id":  "IR-6",
+                         "principleId":  "IR",
+                         "title":  "Incident Reporting",
+                         "controlText":  "The organization should report incidents on a timely basis. CISA collaborates with international and private-sector computer emergency response teams (CERTs) to share control systems-related security incidents and mitigation measures.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "IR-7",
+                         "principleId":  "IR",
+                         "title":  "Incident Response Assistance"
+                     },
+                     {
+                         "id":  "IR-8",
+                         "principleId":  "IR",
+                         "title":  "Incident Response Plan"
+                     },
+                     {
+                         "id":  "MA-1",
+                         "principleId":  "MA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "MA-2",
+                         "principleId":  "MA",
+                         "title":  "Controlled Maintenance"
+                     },
+                     {
+                         "id":  "MA-3",
+                         "principleId":  "MA",
+                         "title":  "Maintenance Tools"
+                     },
+                     {
+                         "id":  "MA-4",
+                         "principleId":  "MA",
+                         "title":  "Nonlocal Maintenance"
+                     },
+                     {
+                         "id":  "MA-5",
+                         "principleId":  "MA",
+                         "title":  "Maintenance Personnel"
+                     },
+                     {
+                         "id":  "MA-6",
+                         "principleId":  "MA",
+                         "title":  "Timely Maintenance"
+                     },
+                     {
+                         "id":  "MA-7",
+                         "principleId":  "MA",
+                         "title":  "Field Maintenance",
+                         "controlText":  "Organizations identify OT systems and system components with specific calibration, maintenance, or other requirements and limit maintenance to specific facilities. Some examples may include safety-critical systems or systems involved in custody transfer where accuracy tolerances are limited and additional quality control checks are required.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "MP-1",
+                         "principleId":  "MP",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "MP-2",
+                         "principleId":  "MP",
+                         "title":  "Media Access"
+                     },
+                     {
+                         "id":  "MP-3",
+                         "principleId":  "MP",
+                         "title":  "Media Marking"
+                     },
+                     {
+                         "id":  "MP-4",
+                         "principleId":  "MP",
+                         "title":  "Media Storage"
+                     },
+                     {
+                         "id":  "MP-5",
+                         "principleId":  "MP",
+                         "title":  "Media Transport"
+                     },
+                     {
+                         "id":  "MP-6",
+                         "principleId":  "MP",
+                         "title":  "Media Sanitization"
+                     },
+                     {
+                         "id":  "MP-7",
+                         "principleId":  "MP",
+                         "title":  "Media Use"
+                     },
+                     {
+                         "id":  "PE-1",
+                         "principleId":  "PE",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems. The OT components can be distributed over a large facility footprint or geographic area and can be an entry point into the entire organizational network OT. Regulatory controls may also apply.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PE-2",
+                         "principleId":  "PE",
+                         "title":  "Physical Access Authorizations"
+                     },
+                     {
+                         "id":  "PE-3",
+                         "principleId":  "PE",
+                         "title":  "Physical Access Control",
+                         "controlText":  "The organization considers OT safety and security interdependencies and access requirements in emergency situations. During an emergency, the organization may restrict access to OT facilities and assets to authorized individuals only. OT systems are often constructed of devices that do not have or cannot use comprehensive access control capabilities due to time-restrictive safety constraints. Physical access controls and defense-in-depth measures are used by the organization when necessary and possible to supplement OT security when electronic mechanisms are unable to fulfill the security requirements of the organization\u0027s security plan.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PE-4",
+                         "principleId":  "PE",
+                         "title":  "Access Control for Transmission"
+                     },
+                     {
+                         "id":  "PE-5",
+                         "principleId":  "PE",
+                         "title":  "Access Control for Output Devices"
+                     },
+                     {
+                         "id":  "PE-6",
+                         "principleId":  "PE",
+                         "title":  "Monitoring Physical Access"
+                     },
+                     {
+                         "id":  "PE-8",
+                         "principleId":  "PE",
+                         "title":  "Visitor Access Records"
+                     },
+                     {
+                         "id":  "PE-9",
+                         "principleId":  "PE",
+                         "title":  "Power Equipment and Cabling"
+                     },
+                     {
+                         "id":  "PE-10",
+                         "principleId":  "PE",
+                         "title":  "Emergency Shutoff",
+                         "controlText":  "It may not be possible or advisable to shut off power to some OT. The organizational-defined parameters for this control should be implemented in consultation with safety and operational personnel. Example compensating controls include failing to a known state and emergency procedures.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PE-11",
+                         "principleId":  "PE",
+                         "title":  "Emergency Power"
+                     },
+                     {
+                         "id":  "PE-12",
+                         "principleId":  "PE",
+                         "title":  "Emergency Lighting"
+                     },
+                     {
+                         "id":  "PE-13",
+                         "principleId":  "PE",
+                         "title":  "Fire Protection",
+                         "controlText":  "Fire suppression mechanisms should take the OT environment into account (e.g., water sprinkler systems could be hazardous in specific environments).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PE-14",
+                         "principleId":  "PE",
+                         "title":  "Environmental Controls",
+                         "controlText":  "Temperature and humidity controls are typically components of other OT systems (e.g., HVAC, process, or lighting systems) or can be a stand-alone and unique OT system. OT can operate in extreme environments and both interior and exterior locations. For a specific OT, the temperature and humidity design and operational parameters dictate the performance specifications. Power circuits, distribution closets, routers, and switches that support fire protection and life safety systems must be maintained at the proper temperature and humidity. When environmental controls cannot be implemented, use hardware that is engineered to withstand the OT\u0027s unique environmental hazards.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PE-15",
+                         "principleId":  "PE",
+                         "title":  "Water Damage Protection",
+                         "controlText":  "Water damage protection and the use of shutoff and isolation valves are procedural actions and specific types of OT. OT used in the manufacturing, hydropower, transportation/navigation, water, and wastewater industries rely on the movement of water and are specifically designed to manage the quantity, flow, and pressure of water. Power circuits, distribution closets, routers, and switches that support fire protection and life safety systems should ensure that water will not disable the system (e.g., a fire that activates the sprinkler system does not spray onto the fire control servers, routers, or switches or short out the alarms, egress systems, emergency lighting, or suppression systems).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PE-16",
+                         "principleId":  "PE",
+                         "title":  "Delivery and Removal"
+                     },
+                     {
+                         "id":  "PE-17",
+                         "principleId":  "PE",
+                         "title":  "Alternate Work Site"
+                     },
+                     {
+                         "id":  "PE-18",
+                         "principleId":  "PE",
+                         "title":  "Location of System Components"
+                     },
+                     {
+                         "id":  "PE-21",
+                         "principleId":  "PE",
+                         "title":  "Electromagnetic Pulse Protection",
+                         "controlText":  "Organizations that manage OT equipment may choose to utilize EMP protection to prevent adversarial or environmental electromagnetic threats. Organizations may select to follow National Coordinating Center for Communications (NCC) guidelines on EM pulse protection.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PE-22",
+                         "principleId":  "PE",
+                         "title":  "Component Marking",
+                         "controlText":  "Hardware components are marked or labeled to indicate information that is processed, stored, or transmitted. Component markings can be useful for differentiating between safety and control systems, OT and IT equipment, and internally and externally connected systems. Marking components reduces the probability of mismanaging the system or performing maintenance on an incorrect device.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PL-1",
+                         "principleId":  "PL",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PL-2",
+                         "principleId":  "PL",
+                         "title":  "System Security and Privacy Plans",
+                         "controlText":  "When systems are highly interconnected, coordinated planning is essential. A low-impact system could adversely affect a higher-impact system.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PL-4",
+                         "principleId":  "PL",
+                         "title":  "Rules of Behavior"
+                     },
+                     {
+                         "id":  "PL-7",
+                         "principleId":  "PL",
+                         "title":  "Concept of Operations",
+                         "controlText":  "Organizations need to consider documenting known operational procedures and exploring how they relate to the combination of IT and OT technologies within the environment.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PL-8",
+                         "principleId":  "PL",
+                         "title":  "Security and Privacy Architecture"
+                     },
+                     {
+                         "id":  "PL-9",
+                         "principleId":  "PL",
+                         "title":  "Central Management",
+                         "controlText":  "If the architecture allows for it, consider centrally managing flaw remediation, malicious code protection, logging, and incident detection.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PL-10",
+                         "principleId":  "PL",
+                         "title":  "Baseline Selection"
+                     },
+                     {
+                         "id":  "PL-11",
+                         "principleId":  "PL",
+                         "title":  "Baseline Tailoring"
+                     },
+                     {
+                         "id":  "PM-1",
+                         "principleId":  "PM",
+                         "title":  "Information Security Program Plan"
+                     },
+                     {
+                         "id":  "PM-2",
+                         "principleId":  "PM",
+                         "title":  "Information Security Program Leadership Role"
+                     },
+                     {
+                         "id":  "PM-3",
+                         "principleId":  "PM",
+                         "title":  "Information Security and Privacy Resources"
+                     },
+                     {
+                         "id":  "PM-4",
+                         "principleId":  "PM",
+                         "title":  "Plan of Action and Milestones Process"
+                     },
+                     {
+                         "id":  "PM-5",
+                         "principleId":  "PM",
+                         "title":  "System Inventory"
+                     },
+                     {
+                         "id":  "PM-6",
+                         "principleId":  "PM",
+                         "title":  "Measures of Performance"
+                     },
+                     {
+                         "id":  "PM-7",
+                         "principleId":  "PM",
+                         "title":  "Enterprise Architecture"
+                     },
+                     {
+                         "id":  "PM-8",
+                         "principleId":  "PM",
+                         "title":  "Critical Infrastructure Plan",
+                         "controlText":  "Organizations should be familiar with the protection requirements and guidance defined by Executive Orders, government sector-specific agencies (SSAs), and industry trade organizations.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PM-9",
+                         "principleId":  "PM",
+                         "title":  "Risk Management Strategy"
+                     },
+                     {
+                         "id":  "PM-10",
+                         "principleId":  "PM",
+                         "title":  "Authorization Process"
+                     },
+                     {
+                         "id":  "PM-11",
+                         "principleId":  "PM",
+                         "title":  "Mission and Business Process Definition"
+                     },
+                     {
+                         "id":  "PM-12",
+                         "principleId":  "PM",
+                         "title":  "Insider Threat Program"
+                     },
+                     {
+                         "id":  "PM-13",
+                         "principleId":  "PM",
+                         "title":  "Security and Privacy Workforce"
+                     },
+                     {
+                         "id":  "PM-14",
+                         "principleId":  "PM",
+                         "title":  "Testing, Training, and Monitoring"
+                     },
+                     {
+                         "id":  "PM-15",
+                         "principleId":  "PM",
+                         "title":  "Security and Privacy Groups and Associations",
+                         "controlText":  "Organizations should be familiar with relevant security-focused and industry-specific groups or associations, including government sector-specific agencies (SSAs), Information Sharing and Analysis Centers (ISACs), and industry trade organizations.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PM-16",
+                         "principleId":  "PM",
+                         "title":  "Threat Awareness Program",
+                         "controlText":  "The organization should collaborate and share information about potential incidents on a timely basis. CISA serves as a centralized location where operational elements involved in cybersecurity and communications reliance are coordinated and integrated. Organizations should consider having both an unclassified and classified information sharing capability.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PM-17",
+                         "principleId":  "PM",
+                         "title":  "Protecting Controlled Unclassified Information on External Systems",
+                         "controlText":  "This control applies to federal agencies and other organizations that support the Government and process controlled unclassified information (CUI).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PM-18",
+                         "principleId":  "PM",
+                         "title":  "Privacy Program Plan"
+                     },
+                     {
+                         "id":  "PM-19",
+                         "principleId":  "PM",
+                         "title":  "Privacy Program Leadership Role"
+                     },
+                     {
+                         "id":  "PM-20",
+                         "principleId":  "PM",
+                         "title":  "Dissemination of Privacy Program Information"
+                     },
+                     {
+                         "id":  "PM-21",
+                         "principleId":  "PM",
+                         "title":  "Accounting of Disclosures"
+                     },
+                     {
+                         "id":  "PM-22",
+                         "principleId":  "PM",
+                         "title":  "Personally Identifiable Information Quality Management"
+                     },
+                     {
+                         "id":  "PM-23",
+                         "principleId":  "PM",
+                         "title":  "Data Governance Body"
+                     },
+                     {
+                         "id":  "PM-24",
+                         "principleId":  "PM",
+                         "title":  "Data Integrity Board"
+                     },
+                     {
+                         "id":  "PM-25",
+                         "principleId":  "PM",
+                         "title":  "Minimization of Personally Identifiable Information Used in Testing, Training, and Research"
+                     },
+                     {
+                         "id":  "PM-26",
+                         "principleId":  "PM",
+                         "title":  "Complaint Management"
+                     },
+                     {
+                         "id":  "PM-27",
+                         "principleId":  "PM",
+                         "title":  "Privacy Reporting"
+                     },
+                     {
+                         "id":  "PM-28",
+                         "principleId":  "PM",
+                         "title":  "Risk Framing"
+                     },
+                     {
+                         "id":  "PM-29",
+                         "principleId":  "PM",
+                         "title":  "Risk Management Program Leadership Roles"
+                     },
+                     {
+                         "id":  "PM-30",
+                         "principleId":  "PM",
+                         "title":  "Supply Chain Risk Management Strategy"
+                     },
+                     {
+                         "id":  "PM-31",
+                         "principleId":  "PM",
+                         "title":  "Continuous Monitoring Strategy"
+                     },
+                     {
+                         "id":  "PM-32",
+                         "principleId":  "PM",
+                         "title":  "Purposing"
+                     },
+                     {
+                         "id":  "PS-1",
+                         "principleId":  "PS",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PS-2",
+                         "principleId":  "PS",
+                         "title":  "Position Risk Designation",
+                         "controlText":  "Private organizations should utilize existing sector-specific regulations, laws, policy, and guidance for determining appropriate risk designations for positions.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "PS-3",
+                         "principleId":  "PS",
+                         "title":  "Personnel Screening"
+                     },
+                     {
+                         "id":  "PS-4",
+                         "principleId":  "PS",
+                         "title":  "Personnel Termination"
+                     },
+                     {
+                         "id":  "PS-5",
+                         "principleId":  "PS",
+                         "title":  "Personnel Transfer"
+                     },
+                     {
+                         "id":  "PS-6",
+                         "principleId":  "PS",
+                         "title":  "Access Agreements"
+                     },
+                     {
+                         "id":  "PS-7",
+                         "principleId":  "PS",
+                         "title":  "External Personnel Security"
+                     },
+                     {
+                         "id":  "PS-8",
+                         "principleId":  "PS",
+                         "title":  "Personnel Sanctions"
+                     },
+                     {
+                         "id":  "PS-9",
+                         "principleId":  "PS",
+                         "title":  "Position Descriptions"
+                     },
+                     {
+                         "id":  "RA-1",
+                         "principleId":  "RA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "RA-2",
+                         "principleId":  "RA",
+                         "title":  "Security Categorization",
+                         "controlText":  "PHA, functional safety assessments, and other organization-established risk assessments can be referenced to identify the impact level of the OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "RA-3",
+                         "principleId":  "RA",
+                         "title":  "Risk Assessment"
+                     },
+                     {
+                         "id":  "RA-5",
+                         "principleId":  "RA",
+                         "title":  "Vulnerability Monitoring and Scanning",
+                         "controlText":  "The organization makes a risk-based determination of how to monitor or scan for vulnerabilities on their system. This may include active scanning, passive monitoring, or compensating controls, depending on the system being scanned. For example, vulnerability examination may be performed using passive monitoring and manual visual inspection to maintain an up-to-date inventory of assets. That inventory can be cross-referenced against a list of known vulnerabilities (e.g., CISA advisories, NIST NVD). Production may need to be taken offline before active scans can be conducted. Scans are scheduled to occur during planned OT outages whenever possible. If vulnerability scanning tools are used on adjacent non-OT networks, extra care is taken to ensure that they do not mistakenly scan the OT network. Automated network scanning is not applicable to non-routable communications, such as serial networks. Compensating controls include providing a replicated or simulated system for conducting scans or host-based vulnerability applications.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "RA-7",
+                         "principleId":  "RA",
+                         "title":  "Risk Response"
+                     },
+                     {
+                         "id":  "RA-9",
+                         "principleId":  "RA",
+                         "title":  "Criticality Analysis"
+                     },
+                     {
+                         "id":  "SA-1",
+                         "principleId":  "SA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SA-2",
+                         "principleId":  "SA",
+                         "title":  "Allocation of Resources"
+                     },
+                     {
+                         "id":  "SA-3",
+                         "principleId":  "SA",
+                         "title":  "System Development Life Cycle"
+                     },
+                     {
+                         "id":  "SA-4",
+                         "principleId":  "SA",
+                         "title":  "Acquisition Process",
+                         "controlText":  "Organizations engage with OT suppliers to raise awareness of cybersecurity needs. The SCADA/Control Systems Procurement Project provides example cybersecurity procurement language for OT.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SA-5",
+                         "principleId":  "SA",
+                         "title":  "System Documentation"
+                     },
+                     {
+                         "id":  "SA-8",
+                         "principleId":  "SA",
+                         "title":  "Security and Privacy Engineering Principles"
+                     },
+                     {
+                         "id":  "SA-9",
+                         "principleId":  "SA",
+                         "title":  "External System Services"
+                     },
+                     {
+                         "id":  "SA-10",
+                         "principleId":  "SA",
+                         "title":  "Developer Configuration Management",
+                         "controlText":  "Personnel with knowledge about security and privacy requirements are included in the change management process for the developer.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SA-11",
+                         "principleId":  "SA",
+                         "title":  "Developer Testing and Evaluation"
+                     },
+                     {
+                         "id":  "SA-15",
+                         "principleId":  "SA",
+                         "title":  "Development Process, Standards, and Tools"
+                     },
+                     {
+                         "id":  "SA-16",
+                         "principleId":  "SA",
+                         "title":  "Developer-Provided Training"
+                     },
+                     {
+                         "id":  "SA-17",
+                         "principleId":  "SA",
+                         "title":  "Developer Security Architecture and Design"
+                     },
+                     {
+                         "id":  "SA-21",
+                         "principleId":  "SA",
+                         "title":  "Developer Screening"
+                     },
+                     {
+                         "id":  "SA-22",
+                         "principleId":  "SA",
+                         "title":  "Unsupported System Components"
+                     },
+                     {
+                         "id":  "SC-1",
+                         "principleId":  "SC",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-2",
+                         "principleId":  "SC",
+                         "title":  "Separation of System and User Functionality",
+                         "controlText":  "Physical separation includes using separate systems for managing the OT and for operating OT components. Logical separation includes the use of different user accounts for administrative and operator privileges. Example compensating controls include providing increased auditing measures.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-3",
+                         "principleId":  "SC",
+                         "title":  "Security Function Isolation",
+                         "controlText":  "Organizations consider implementing this control when designing new architectures or updating existing components. An example compensating control includes access controls.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-4",
+                         "principleId":  "SC",
+                         "title":  "Information in System Shared Resources",
+                         "controlText":  "This control is especially relevant for OT systems that process confidential data. Example compensating controls include engineering the use of the OT to prevent sharing system resources.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-5",
+                         "principleId":  "SC",
+                         "title":  "Denial-of-Service Protection",
+                         "controlText":  "Some OT equipment may be more susceptible to DoS attacks due to the time criticality of some OT applications. Risk-based analysis informs the prioritization of DoS protection and the establishment of policy and procedure.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-7",
+                         "principleId":  "SC",
+                         "title":  "Boundary Protection"
+                     },
+                     {
+                         "id":  "SC-8",
+                         "principleId":  "SC",
+                         "title":  "Transmission Confidentiality and Integrity"
+                     },
+                     {
+                         "id":  "SC-10",
+                         "principleId":  "SC",
+                         "title":  "Network Disconnect"
+                     },
+                     {
+                         "id":  "SC-12",
+                         "principleId":  "SC",
+                         "title":  "Cryptographic Key Establishment and Management"
+                     },
+                     {
+                         "id":  "SC-13",
+                         "principleId":  "SC",
+                         "title":  "Cryptographic Protection"
+                     },
+                     {
+                         "id":  "SC-15",
+                         "principleId":  "SC",
+                         "title":  "Collaborative Computing Devices and Applications"
+                     },
+                     {
+                         "id":  "SC-17",
+                         "principleId":  "SC",
+                         "title":  "Public Key Infrastructure Certificates"
+                     },
+                     {
+                         "id":  "SC-18",
+                         "principleId":  "SC",
+                         "title":  "Mobile Code"
+                     },
+                     {
+                         "id":  "SC-20",
+                         "principleId":  "SC",
+                         "title":  "Secure Name /Address Resolution Service (Authoritative Source)",
+                         "controlText":  "Secure name/address resolution services should only be used after careful consideration and verification that they do not adversely impact the operational performance of the OT.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-21",
+                         "principleId":  "SC",
+                         "title":  "Secure Name /Address Resolution Service (Recursive or Caching Resolver)",
+                         "controlText":  "Secure name/address resolution services should only be used after careful consideration and verification that they do not adversely impact the operational performance of the OT.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-22",
+                         "principleId":  "SC",
+                         "title":  "Architecture and Provisioning for Name/Address Resolution Service",
+                         "controlText":  "Secure name/address resolution services should only be used after careful consideration and verification that they do not adversely impact the operational performance of the OT.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-23",
+                         "principleId":  "SC",
+                         "title":  "Session Authenticity",
+                         "controlText":  "Example compensating controls include auditing measures.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-24",
+                         "principleId":  "SC",
+                         "title":  "Fail in Known State",
+                         "controlText":  "The organization selects an appropriate failure state. Preserving OT state information includes consistency among OT state variables and the physical state that the OT represents (e.g., whether valves are open or closed, communication permitted or blocked, continue operations).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-28",
+                         "principleId":  "SC",
+                         "title":  "Protection of Information at Rest",
+                         "controlText":  "Cryptographic mechanisms are implemented only after careful consideration and verification that they do not adversely impact the operational performance of the OT. When cryptographic mechanisms are not feasible on certain OT devices, compensating controls may include relocating the data to a location that does support cryptographic mechanisms.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-39",
+                         "principleId":  "SC",
+                         "title":  "Process Isolation",
+                         "controlText":  "Example compensating controls include partition processes to separate platforms.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-41",
+                         "principleId":  "SC",
+                         "title":  "Port and I/O Device Access"
+                     },
+                     {
+                         "id":  "SC-45",
+                         "principleId":  "SC",
+                         "title":  "System Time Synchronization",
+                         "controlText":  "Organizations coordinate time synchronization on OT to allow for accurate troubleshooting and forensics.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-47",
+                         "principleId":  "SC",
+                         "title":  "Alternate Communications Path",
+                         "controlText":  "Organizations consider which systems require alternate communication paths to ensure that a loss of communication does not lead to an unacceptable loss of view or control or to a safety event.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SC-51",
+                         "principleId":  "SC",
+                         "title":  "Hardware-Based Protection",
+                         "controlText":  "Some OT systems support write-protection by implementing physical key switches or write-protect switches. Organizations define the systems for which write-protection will be enabled and develop a process for how to take the system out of write-protect mode.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-1",
+                         "principleId":  "SI",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "The policy specifically addresses the unique properties and requirements of OT and the relationship to non-OT systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-2",
+                         "principleId":  "SI",
+                         "title":  "Flaw Remediation",
+                         "controlText":  "Flaw remediation, or patching, is complicated since many OT employ OSs and other software that are no longer maintained by the vendors. OT operators may also not have the resources or capability to test patches and are dependent on vendors to validate the operability of a patch. Sometimes, the organization has no choice but to accept additional risk if no vendor patch is available, if patching requires additional time to complete validation or testing, or if deployment requires an unacceptable operations shutdown. In these situations, compensating controls should be implemented (e.g., limiting the exposure of the vulnerable system, restricting vulnerable services, implementing virtual patching). Other compensating controls that do not decrease the residual risk but increase the ability to respond may be desirable (e.g., provide a timely response in case of an incident, devise a plan to ensure that the OT can identify exploitation of the flaw). Testing flaw remediation in an OT may exceed the organization\u0027s available resources.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-3",
+                         "principleId":  "SI",
+                         "title":  "Malicious Code Protection",
+                         "controlText":  "Malicious code protection should only be deployed after careful consideration and verification that it does not adversely impact the operation of the OT. Malicious code protection tools should be configured to minimize their potential impact on the OT (e.g., employ notification rather than quarantine). Example compensating controls include increased traffic monitoring and auditing.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-4",
+                         "principleId":  "SI",
+                         "title":  "System Monitoring",
+                         "controlText":  "The organization ensures that the use of monitoring tools and techniques does not adversely impact the operational performance of the OT. Example compensating controls include deploying sufficient network, process, and physical monitoring.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-5",
+                         "principleId":  "SI",
+                         "title":  "Security Alerts, Advisories, and Directives",
+                         "controlText":  "CISA generates security alerts and advisories relative to OT at https://www.cisa.gov/uscert/ics. Industry-specific ISACs often provide tailored advisories and alerts, which can be found at https://www.nationalisacs.org/.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-6",
+                         "principleId":  "SI",
+                         "title":  "Security and Privacy Function Verification",
+                         "controlText":  "Shutting down and restarting the OT may not always be feasible upon the identification of an anomaly. These actions should be scheduled according to OT operational requirements.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-7",
+                         "principleId":  "SI",
+                         "title":  "Software, Firmware, and Information Integrity",
+                         "controlText":  "The organization determines whether the use of integrity verification applications would adversely impact operation of the ICS and employs compensating controls (e.g., manual integrity verifications that do not affect performance).",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-8",
+                         "principleId":  "SI",
+                         "title":  "Spam Protection",
+                         "controlText":  "OT organizations implement spam protection by removing spam transport mechanisms, functions, and services (e.g., electronic mail, web browsing) from the OT.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-10",
+                         "principleId":  "SI",
+                         "title":  "Information Input Validation"
+                     },
+                     {
+                         "id":  "SI-11",
+                         "principleId":  "SI",
+                         "title":  "Error Handling"
+                     },
+                     {
+                         "id":  "SI-12",
+                         "principleId":  "SI",
+                         "title":  "Information Handling and Retention"
+                     },
+                     {
+                         "id":  "SI-13",
+                         "principleId":  "SI",
+                         "title":  "Predictable Failure Prevention"
+                     },
+                     {
+                         "id":  "SI-16",
+                         "principleId":  "SI",
+                         "title":  "Memory Protection"
+                     },
+                     {
+                         "id":  "SI-17",
+                         "principleId":  "SI",
+                         "title":  "Fail-Safe Procedures",
+                         "controlText":  "The selected failure conditions and corresponding procedures may vary among baselines. The same failure event may trigger different responses, depending on the impact level. Mechanical and analog systems can be used to provide mechanisms to ensure fail-safe procedures. Fail-safe states should incorporate potential impacts to human safety, physical systems, and the environment. A related controls is CP-6.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SI-22",
+                         "principleId":  "SI",
+                         "title":  "Information Diversity",
+                         "controlText":  "Many OT systems use information diversity in their design to achieve reliability requirements. Some examples of information diversity for an OT system include sensor voting and state estimation.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SR-1",
+                         "principleId":  "SR",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "Supply chain policies and procedures for OT should consider both components received and components produced. Many OT systems use legacy components that cannot meet modern supply chain expectations. Appropriate compensating controls should be developed to achieve organizational supply chain expectations for legacy systems.",
+                         "controlTextLabel":  "OT Discussion (NIST SP 800-82 Rev 3, Appendix F)"
+                     },
+                     {
+                         "id":  "SR-2",
+                         "principleId":  "SR",
+                         "title":  "Supply Chain Risk Management Plan"
+                     },
+                     {
+                         "id":  "SR-3",
+                         "principleId":  "SR",
+                         "title":  "Supply Chain Controls and Processes"
+                     },
+                     {
+                         "id":  "SR-5",
+                         "principleId":  "SR",
+                         "title":  "Acquisition Strategies, Tools, and Methods"
+                     },
+                     {
+                         "id":  "SR-6",
+                         "principleId":  "SR",
+                         "title":  "Supplier Assessments and Reviews"
+                     },
+                     {
+                         "id":  "SR-8",
+                         "principleId":  "SR",
+                         "title":  "Notification Agreements"
+                     },
+                     {
+                         "id":  "SR-9",
+                         "principleId":  "SR",
+                         "title":  "Tamper Resistance and Detection"
+                     },
+                     {
+                         "id":  "SR-10",
+                         "principleId":  "SR",
+                         "title":  "Inspection of Systems or Components"
+                     },
+                     {
+                         "id":  "SR-11",
+                         "principleId":  "SR",
+                         "title":  "Component Authenticity"
+                     },
+                     {
+                         "id":  "SR-12",
+                         "principleId":  "SR",
+                         "title":  "Component Disposal"
+                     }
+                 ],
+    "targetDimensionLabelPlural":  "Sites"
+}

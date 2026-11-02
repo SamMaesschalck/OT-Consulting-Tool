@@ -1,0 +1,109 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Report prose style, every narrative pack</title></head>
+<body>
+<!--
+  Every narrative pack is client-facing prose: it goes into the Word reports
+  verbatim or through templates. House style is plain, human prose: no em or
+  en dashes (an ordinary spaced hyphen is fine), none of the stock phrases
+  that mark text as machine-written, and no capitals used for emphasis.
+  test-risk-appetite-narrative.html applies the same rules (plus a ban on
+  words about the tool) to the risk-appetite pack and its Word document; this
+  page holds every pack to the base rules. Authoring notes (keys starting "_")
+  never reach a report and are not checked.
+-->
+<script src="harness.js"></script>
+<script>H.app();</script>
+<script>
+H.test(function (ok) {
+  var A = window.App;
+
+  var DASHES = [ [/—/, "em dash"], [/–/, "en dash"], [/\S -- \S/, "double hyphen used as a dash"] ];
+  var TELLS = ["delve", "tapestry", "landscape", "leverage", "leveraging", "robust", "seamless", "seamlessly",
+    "navigate", "navigating", "pivotal", "crucial", "holistic", "foster", "realm", "testament", "underscore",
+    "underscores", "moreover", "furthermore", "additionally", "ultimately", "embark", "unlock", "empower",
+    "journey", "cutting-edge", "game-changer", "in today's", "it is important to note", "it's important to note",
+    "not only", "not merely", "not just", "in conclusion", "a myriad", "plethora", "paramount", "meticulous",
+    "synergy", "addressable", "designed to show", "in plain terms"];
+  // Whole words in capitals, used to shout a point. Acronyms are fine.
+  var SHOUTING = /\b(NOT|NEVER|ONLY|MUST|ALWAYS|NO)\b/;
+
+  function problems(text) {
+    var s = String(text || ""), found = [];
+    DASHES.forEach(function (d) { if (d[0].test(s)) found.push(d[1]); });
+    TELLS.forEach(function (w) {
+      var re = new RegExp("(^|[^a-z])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z]|$)", "i");
+      if (re.test(s)) found.push("'" + w + "'");
+    });
+    var shout = s.match(SHOUTING);
+    if (shout) found.push("capitals for emphasis (" + shout[0] + ")");
+    return found;
+  }
+  function strings(obj, path, out) {
+    out = out || [];
+    if (typeof obj === "string") { out.push({ path: path, text: obj }); return out; }
+    if (Array.isArray(obj)) { obj.forEach(function (v, i) { strings(v, path + "[" + i + "]", out); }); return out; }
+    if (obj && typeof obj === "object") {
+      Object.keys(obj).forEach(function (k) { if (k.charAt(0) !== "_") strings(obj[k], path ? path + "." + k : k, out); });
+    }
+    return out;
+  }
+
+  // The rules must be able to fail, or every pass below means nothing.
+  var bad = problems("It is NOT a grade, and it is not only robust — it is addressable.");
+  ok(bad.length >= 5, "the rules catch a deliberately bad sentence", bad.join(", "));
+  ok(problems("{rank}. {domainName}: {domainGrade}").length === 0 && problems("ISA/IEC 62443-3-3 at SL 2, per OT/ICS practice.").length === 0,
+     "and leave ordinary text, hyphenated words and acronyms alone");
+  ok(problems("Board summary - one page").length === 0 && problems("Board summary – one page").length === 1,
+     "a normal spaced hyphen is allowed; an en dash is not");
+
+  // Every pack the app loads.
+  var insts = A.Data.instruments || {}, packs = 0;
+  Object.keys(insts).sort().forEach(function (id) {
+    var pack = insts[id] && insts[id].narrative;
+    if (!pack) return;
+    packs++;
+    var all = strings(pack, "", []);
+    var faults = all.map(function (s) { return { path: s.path, p: problems(s.text) }; }).filter(function (x) { return x.p.length; });
+    ok(faults.length === 0, id + ": " + all.length + " client-facing strings follow the house style",
+       faults.slice(0, 5).map(function (x) { return x.path + ": " + x.p.join(", "); }).join(" | "));
+  });
+  ok(packs >= 18, "every narrative pack was checked (" + packs + ")", String(packs));
+
+  // ---- the instruments' own wording, shown on screen and in reports -------
+  // Questions, prompts, rationale, titles, layer labels and guidance are ours,
+  // so the same punctuation rule holds. Quoted standards text is the
+  // publisher's and stays exactly as published, so it is skipped. Garbled
+  // characters (text read in the wrong encoding at build time) fail anywhere.
+  var VERBATIM = { verbatimText: 1, controlText: 1, igps: 1, attribution: 1, otDiscussion: 1, discussion: 1,
+                   indicators: 1, tailoring: 1, tailoringConsiderations: 1, narrative: 1 };
+  var MOJIBAKE = /â€|Â[ -¿]/;
+  function walk(obj, path, out) {
+    if (typeof obj === "string") { out.push({ path: path, text: obj }); return out; }
+    if (Array.isArray(obj)) { obj.forEach(function (v, i) { walk(v, path + "[" + i + "]", out); }); return out; }
+    if (obj && typeof obj === "object") {
+      Object.keys(obj).forEach(function (k) {
+        if (k.charAt(0) === "_" || VERBATIM[k]) return;
+        walk(obj[k], path ? path + "." + k : k, out);
+      });
+    }
+    return out;
+  }
+  ok(MOJIBAKE.test("Enterpriseâ€™s") && !MOJIBAKE.test("Enterprise's ® ·"),
+     "the garbled-character check catches mis-encoded text and leaves real symbols alone");
+  var instCount = 0;
+  Object.keys(insts).sort().forEach(function (id) {
+    var all = walk(insts[id], "", []);
+    if (!all.length) return;
+    instCount++;
+    var dash = all.filter(function (s) { return /[—–]/.test(s.text); });
+    ok(dash.length === 0, id + ": the instrument's own wording uses no dashes",
+       dash.slice(0, 4).map(function (x) { return x.path + ": " + x.text.slice(0, 80); }).join(" | "));
+    var garbled = all.concat(strings(insts[id].narrative || {}, "narrative", [])).filter(function (s) { return MOJIBAKE.test(s.text); });
+    ok(garbled.length === 0, id + ": no garbled characters",
+       garbled.slice(0, 3).map(function (x) { return x.path + ": " + x.text.slice(0, 80); }).join(" | "));
+  });
+  ok(instCount >= 18, "every instrument's wording was checked (" + instCount + ")");
+});
+</script>
+</body></html>

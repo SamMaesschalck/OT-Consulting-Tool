@@ -1,0 +1,151 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 multi-zone executive summary verdict</title></head>
+<body>
+<!--
+  The multi-zone 62443-3-3 Word report composes its executive summary from one
+  "lead" zone. It used to pick the zone with the lowest absolute achieved SL
+  in its weakest FR, which is not the zone furthest from where it needs to be:
+  a DMZ held to SL 1 and meeting it everywhere outranked a BPCS held to SL 3
+  and sitting at SL 2, so the summary was written from the DMZ and told the
+  client the system "meets the target Security Level across all assessed
+  Foundational Requirements" while the BPCS had a long roadmap.
+
+  This builds exactly that two-zone engagement and checks the summary does not
+  say the target is met, names the failing zone, and that the scope figures
+  are the failing zone's. A control builds the same engagement with the BPCS
+  brought up to SL 3, where the met wording is true and must still be used.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true }); H.dom();</script>
+<script>
+function docXml(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function textOf(el) { return Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); }
+function sections(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null;
+  Array.prototype.forEach.call(body.children, function (el) {
+    var st = el.localName === "p" && el.getElementsByTagNameNS(W, "pStyle")[0];
+    var val = st ? st.getAttribute("w:val") : "";
+    if (/^Heading1$/i.test(val)) { cur = { title: textOf(el).trim(), text: "" }; out.push(cur); return; }
+    if (!cur) return;
+    cur.text += " " + textOf(el);
+  });
+  return out;
+}
+
+// One response per requirement, every item first selected at or below `upTo`
+// met and every item above it not met.
+function responsesFor(inst, targetId, upTo) {
+  var S = window.App.Scoring;
+  return (inst.requirements || []).map(function (req) {
+    var comps = {};
+    (S.requirementItems ? S.requirementItems(req) : []).forEach(function (it) {
+      comps[it.componentId] = { state: it.firstSL <= upTo ? "met" : "not-met" };
+    });
+    return { targetId: targetId, requirementId: req.id, components: comps };
+  });
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.activateInstrument("iec-62443-3-3");
+  var inst = E.state.instrument, tax = E.state.taxonomy, prof = E.state.profile, narr = E.getActiveNarrative();
+  ok(typeof A.Scoring.requirementItems === "function", "the item model is reachable to build the answers");
+  var MET = narr.executiveSummary.templates.verdictPhrases.met;
+
+  function engagementWith(bpcsUpTo) {
+    var eng = JSON.parse(JSON.stringify(E.state.engagement));
+    eng.engagement = Object.assign({}, eng.engagement || {}, { clientName: "Acme Water" });
+    eng.targets = [ { id: "z-dmz", name: "Plant DMZ" }, { id: "z-bpcs", name: "BPCS" } ];
+    eng.targetProfile = { defaultTargetSL: 2, perFR: {},
+                          perZone: { "z-dmz": { default: 1 }, "z-bpcs": { default: 3 } } };
+    eng.responses = responsesFor(inst, "z-dmz", 1).concat(responsesFor(inst, "z-bpcs", bpcsUpTo));
+    eng.reportCustom = {};
+    return eng;
+  }
+  function build(eng) {
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(eng, inst, tax, prof, narr, { targetId: "z-dmz" }, function (err, blob) { res(err ? null : blob); });
+    }).then(function (blob) { return blob ? docXml(blob).then(sections) : null; });
+  }
+
+  // The engagement as the issue describes it.
+  var eng = engagementWith(2);
+  var all = A.Scoring.scoreEngagement(eng, inst, tax, prof);
+  var dmz = all.perTarget[0].result, bpcs = all.perTarget[1].result;
+  ok(dmz.overallTargetMet === true && dmz.weakestFR.conformantAchievedSL === 1,
+     "set-up: the DMZ meets its SL 1 target everywhere, at SL 1");
+  ok(bpcs.overallTargetMet === false && bpcs.weakestFR.conformantAchievedSL === 2 && (bpcs.roadmap || []).length > 5,
+     "set-up: the BPCS sits at SL 2 against SL 3 with a long roadmap (" + (bpcs.roadmap || []).length + " items)");
+  ok(all.systemRollup.zonesShort.join() === "BPCS", "set-up: the system rollup has the BPCS short", all.systemRollup.zonesShort.join());
+
+  build(eng).then(function (list) {
+    ok(!!list, "the two-zone Word report builds");
+    list = list || [];
+    var es = list.filter(function (x) { return /Executive summary$/.test(x.title); })[0];
+    ok(!!es, "it opens with the executive summary", list.map(function (x) { return x.title; }).join(" | "));
+    var t = es ? es.text : "";
+    ok(t.indexOf(MET) === -1, "the summary does not say the target is met while a zone falls short");
+    ok(t.indexOf(narr.executiveSummary.templates.verdictPhrases.short) >= 0 ||
+       t.indexOf(narr.executiveSummary.templates.verdictPhrases.close) >= 0,
+       "it says the system falls short of, or is approaching, the target", t.slice(0, 300));
+    ok(/BPCS/.test(t), "it names the zone that falls short");
+    // Counts and the lead zone only: "Results across the system" names each
+    // zone in each state, and the summary saying it first was said twice.
+    ok(/1 of the 2 zones and conduits in scope falls short of its target Security Level\./.test(t) &&
+       /figures in this summary are for BPCS, the zone or conduit furthest below its target/.test(t),
+       "and says 1 of 2 falls short, and the figures are the BPCS's, the zone furthest below its target", t.slice(0, 900));
+    ok(t.indexOf("Plant DMZ") === -1 || t.indexOf("figures in this summary are for Plant DMZ") === -1,
+       "the summary is not composed from the zone that meets its target");
+
+    // The rest of the front matter follows the same zone: the BPCS roadmap
+    // carries the top priorities, and the scope FR count is the BPCS's.
+    var bpcsTop = (bpcs.roadmap || [])[0];
+    ok(bpcsTop && t.indexOf(bpcsTop.code + " " + bpcsTop.title) >= 0,
+       "the priority hint comes from the BPCS roadmap", bpcsTop && bpcsTop.code);
+    var glance = list.filter(function (x) { return /Results across the system/.test(x.title); })[0];
+    // Chosen across every zone, and labelled as what it is: the FR furthest
+    // below its target, which need not be the lowest level in the system.
+    ok(glance && /Furthest below target \(BPCS, target SL 3\)/.test(glance.text), "the at-a-glance tile is the BPCS's FR furthest below target",
+       glance && (glance.text.match(/.{0,30}(Furthest|Weakest).{0,40}/) || [""])[0]);
+    ok(glance && /1 of 2/.test(glance.text), "and the tiles say 1 of 2 zones meet their target");
+
+    // Control: bring the BPCS up to SL 3, and the met wording is true again.
+    return build(engagementWith(3));
+  }).then(function (list) {
+    list = list || [];
+    var es = list.filter(function (x) { return /Executive summary$/.test(x.title); })[0];
+    var t = es ? es.text : "";
+    ok(t.indexOf(MET) >= 0, "control: with both zones at target, the summary says the target is met", t.slice(0, 300));
+    ok(/Both zones and conduits meet their target Security Level/.test(t),
+       "control: and says both zones meet their own target", t.slice(0, 900));
+    ok(!/—|–/.test(t), "the summary carries no em or en dash");
+  }).then(done, function (e) { ok(false, "threw: " + (e && e.message)); done(); });
+});
+</script>
+</body></html>

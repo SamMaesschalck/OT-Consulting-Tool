@@ -1,0 +1,144 @@
+{
+  "schema": "risk-appetite-sector-baselines/1.0",
+  "_note": "Baseline INHERENT-EXPOSURE starting points by sector, as a scaffold for the assessor. Grounded in the risk framing of NIST SP 800-82, the NIST CSF, and the consequence-driven approach of IEC 62443-3-2, plus practitioner judgement. These are starting points the assessor confirms or overrides, NOT determinations. Geopolitical/threat modifiers are applied on top by the assessor.",
+  "baselineBands": [
+    "limited",
+    "moderate",
+    "high",
+    "severe"
+  ],
+  "sectors": [
+    {
+      "id": "water",
+      "name": "Water / wastewater",
+      "baseline": "high",
+      "note": "Essential service, safety-relevant (treatment chemistry), increasingly targeted; consequence can be public-health."
+    },
+    {
+      "id": "energy-grid",
+      "name": "Electricity transmission / distribution",
+      "baseline": "severe",
+      "note": "CNI, credible state-level targeting (Industroyer, etc.), systemic and safety consequence."
+    },
+    {
+      "id": "oil-gas",
+      "name": "Oil & gas",
+      "baseline": "severe",
+      "note": "CNI, safety-critical (process safety), high-value target incl. state actors."
+    },
+    {
+      "id": "nuclear",
+      "name": "Nuclear",
+      "baseline": "severe",
+      "note": "Safety-critical to the highest degree, heavy regulation, credible advanced targeting."
+    },
+    {
+      "id": "manufacturing-discrete",
+      "name": "Discrete manufacturing",
+      "baseline": "moderate",
+      "note": "Consequence mainly operational/financial; targeted risk varies with product and IP; ransomware-exposed."
+    },
+    {
+      "id": "manufacturing-process",
+      "name": "Process manufacturing (chemicals, etc.)",
+      "baseline": "high",
+      "note": "Process-safety consequence raises this above discrete manufacturing."
+    },
+    {
+      "id": "food-bev",
+      "name": "Food & beverage",
+      "baseline": "moderate",
+      "note": "Consequence mainly operational and supply-continuity; some safety; heavily ransomware-targeted."
+    },
+    {
+      "id": "transport-rail",
+      "name": "Rail",
+      "baseline": "high",
+      "note": "Essential service, safety-relevant, regulated (NIS/CAF); consequence operational and safety."
+    },
+    {
+      "id": "transport-aviation",
+      "name": "Aviation",
+      "baseline": "high",
+      "note": "Safety-critical, regulated (CAA/CAF for Aviation), targeted interest."
+    },
+    {
+      "id": "maritime-ports",
+      "name": "Maritime / ports",
+      "baseline": "high",
+      "note": "Essential service, economic-systemic consequence, growing targeted interest."
+    },
+    {
+      "id": "health",
+      "name": "Healthcare / medical",
+      "baseline": "high",
+      "note": "Safety-of-life, heavily targeted (ransomware), regulated."
+    },
+    {
+      "id": "pharma",
+      "name": "Pharmaceutical manufacturing",
+      "baseline": "high",
+      "note": "Process safety plus high-value IP; targeted and ransomware-exposed."
+    },
+    {
+      "id": "datacentre-digital",
+      "name": "Data centre / digital infrastructure",
+      "baseline": "high",
+      "note": "Systemic dependency for many others; NIS2 in scope; high availability consequence."
+    },
+    {
+      "id": "building-mgmt",
+      "name": "Building management / smart building",
+      "baseline": "moderate",
+      "note": "Consequence usually operational/comfort; can rise where life-safety systems integrated."
+    },
+    {
+      "id": "other",
+      "name": "Other / not listed",
+      "baseline": "moderate",
+      "note": "Neutral starting point; assessor sets from criticality and consequence."
+    }
+  ],
+  "exposureModifiers": [
+    {
+      "id": "state-targeting",
+      "label": "Credible state-level or advanced-actor targeting",
+      "effect": "+1 band consideration"
+    },
+    {
+      "id": "geopolitical",
+      "label": "Operates in or serves a geopolitically exposed region or contested sector",
+      "effect": "+1 band consideration"
+    },
+    {
+      "id": "safety-critical",
+      "label": "Compromise has direct safety-of-life or major environmental consequence",
+      "effect": "floor at 'high'; consider 'severe'"
+    },
+    {
+      "id": "cni-designated",
+      "label": "Designated CNI / essential service / NIS2 essential entity",
+      "effect": "floor at 'high'"
+    },
+    {
+      "id": "systemic",
+      "label": "Many others depend on this organisation (single point of systemic failure)",
+      "effect": "+1 band consideration"
+    },
+    {
+      "id": "high-interconnection",
+      "label": "Highly interconnected / large external attack surface",
+      "effect": "consider +1"
+    },
+    {
+      "id": "low-consequence",
+      "label": "Compromise consequence genuinely contained and non-safety",
+      "effect": "consider -1"
+    }
+  ],
+  "hardRules": [
+    "Baselines and modifiers scaffold the assessor's judgement; the assessor sets and can override the final exposure band.",
+    "Geopolitical judgements are the assessor's to make and record; the tool prompts but never asserts a geopolitical position on its own.",
+    "Safety-of-life consequence should not sit below 'high' without an explicit, recorded justification."
+  ]
+}

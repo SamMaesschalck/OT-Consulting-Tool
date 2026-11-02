@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>62443 zone cards for a partial override</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  A 62443-3-3 zone takes the shared answer PER ITEM. A zone that overrode one
+  enhancement is still scored on the shared base item, evidence and plan, and
+  the report prints them for it. Link, unlink and zone delete now copy exactly
+  that down. The zone cards worked from the link list instead, which leaves
+  such a zone out, so the screen disagreed with the outcome:
+
+    - the zone's card showed no recommendation where the report printed the
+      shared one (inheritedPlan asked linkedTargets);
+    - "Editing this changes it for all N" counted only the link, not every
+      zone reading the text;
+    - the link chooser previewed only a zone's OWN answer, while the link
+      lifts the whole answer the card shows. A partial overrider read
+      "Evidence: nothing recorded" with the inherited evidence about to be
+      shared anyway, and a zone inheriting everything read "not answered
+      here", so the default source flipped to the other zone and its answer
+      replaced what the consultant was looking at.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script src="harness.js"></script>
+<script>H.app({}); H.dom();</script>
+<script>
+H.test(function (ok) {
+  var A = window.App, E = A.Engine;
+  var SH = E.SHARED_TARGET_ID;
+  window.confirm = function () { return true; };
+  var EVIDENCE = "One corporate directory serves the zones it reaches.";
+
+  function main() { return document.getElementById("main"); }
+  function card(reqId) { return main().querySelector('.req[data-req-id="' + reqId + '"]'); }
+  function btn(root, txt) {
+    return [].slice.call((root || main()).querySelectorAll("button")).filter(function (b) {
+      return b.textContent.trim() === txt;
+    })[0] || null;
+  }
+
+  E.loadCatalog();
+  A.UI.init({ autosave: false });
+  E.newProject();
+  E.activateInstrument("iec-62443-3-3");
+  var z = [E.getActiveTarget().id];
+  E.renameTarget(z[0], "Z1");
+  z.push(E.addTarget("Z2").id, E.addTarget("Z3").id, E.addTarget("Z4").id);
+  E.setDefaultTargetSL(3);
+
+  // The shared answer reaches Z1 to Z3. Z3 overrides only RE1; Z4 is outside
+  // the reach and holds an answer of its own.
+  E.setItemState(SH, "SR1.1", "base", "met");
+  E.setItemState(SH, "SR1.1", "RE1", "met");
+  E.setResponse(SH, "SR1.1", {
+    evidence: EVIDENCE,
+    owner: "IT/OT Network Team", action: "Enforce multifactor authentication.",
+    impact: "One stolen credential reaches every zone.", priorityRank: 2, priorityBand: "High"
+  });
+  E.setRequirementCoverage("SR1.1", [z[0], z[1], z[2]]);
+  E.setItemState(z[2], "SR1.1", "RE1", "not-met");
+  E.setRequirementSL(z[3], "SR1.1", 1, 3);
+  E.setResponse(z[3], "SR1.1", { evidence: "Zone 4 uses local accounts." });
+
+  // (the scorer's view, which is what the report prints)
+  var sc = E.scoreAllTargets().perTarget.filter(function (p) { return p.target.id === z[2]; })[0];
+  var r3 = sc.result.perRequirement.filter(function (r) { return r.requirementId === "SR1.1"; })[0];
+  ok(r3.action === "Enforce multifactor authentication." && r3.evidence === EVIDENCE,
+     "(the partial overrider is scored on the shared plan and evidence)");
+  ok(E.linkedTargets("SR1.1").indexOf(z[2]) === -1, "(and is not in the link list)");
+
+  // ---- the card shows what the report prints ---------------------------
+  E.setActiveTarget(z[2]);
+  A.UI.go("fr", "FR1");
+  var c = card("SR1.1");
+  ok(!!c, "the SR 1.1 card renders for Z3");
+  ok(!!btn(c, "Edit shared recommendation"),
+     "Z3's card shows the shared recommendation it is scored and reported on",
+     "it offered an empty plan instead, which would fork the shared one");
+  var evEdit = c && c.querySelector(".inherited-evidence .inherited-edit");
+  ok(evEdit && /all 3 /.test(evEdit.getAttribute("title") || ""),
+     "editing the shared evidence says it reaches all three zones reading it, Z3 included",
+     evEdit && evEdit.getAttribute("title"));
+
+  // ---- the link chooser previews the answer that will be shared ---------
+  c.querySelector(".sl-link-toggle").click();
+  c = card("SR1.1");
+  var rows = [].slice.call(c.querySelectorAll(".sl-coverage-zone"));
+  var z4row = rows.filter(function (r) { return /Z4/.test(r.textContent); })[0];
+  ok(!!z4row, "(Z4 is offered to link with)");
+  z4row.querySelector("input").click();
+  c = card("SR1.1");
+  var cards = [].slice.call(c.querySelectorAll(".sl-link-card"));
+  var mine = cards.filter(function (k) { return /\(this one\)/.test(k.textContent); })[0];
+  ok(!!mine, "Z3's own card is offered as a source");
+  ok(mine && mine.textContent.indexOf(EVIDENCE) !== -1,
+     "it shows the evidence Z3 reads, which is what the link would share",
+     mine && mine.textContent);
+  ok(mine && !/nothing recorded/.test(mine.textContent),
+     "rather than \"nothing recorded\"", mine && mine.textContent);
+  // Cancel.
+  btn(c, "Cancel").click();
+
+  // ---- a zone that inherits everything keeps the default ----------------
+  E.setActiveTarget(z[1]);
+  A.UI.go("fr", "FR1");
+  c = card("SR1.1");
+  // The panel remembers it was open for this requirement; open it if not.
+  if (!c.querySelector(".sl-coverage-zone")) c.querySelector(".sl-link-toggle").click();
+  c = card("SR1.1");
+  rows = [].slice.call(c.querySelectorAll(".sl-coverage-zone"));
+  z4row = rows.filter(function (r) { return /Z4/.test(r.textContent); })[0];
+  z4row.querySelector("input").click();
+  c = card("SR1.1");
+  cards = [].slice.call(c.querySelectorAll(".sl-link-card"));
+  mine = cards.filter(function (k) { return /\(this one\)/.test(k.textContent); })[0];
+  ok(mine && !/not answered here/.test(mine.textContent),
+     "Z2, which inherits everything, is not shown as unanswered", mine && mine.textContent);
+  var chosen = cards.filter(function (k) { return k.querySelector("input[type=radio]").checked; })[0];
+  ok(chosen === mine,
+     "and the answer on screen stays the default source, not Z4's",
+     chosen ? chosen.textContent : "(none chosen)");
+  btn(c, "Cancel").click();
+});
+</script>
+</body></html>

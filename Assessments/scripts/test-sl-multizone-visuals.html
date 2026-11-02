@@ -1,0 +1,118 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 multi-zone Word report visuals</title></head>
+<body>
+<!--
+  The multi-zone 62443-3-3 Word report used to follow its executive summary
+  with prose and tables only, and passed no radar to the per-zone scorecards,
+  so the document carried no chart at all. Every other report opens its body
+  with an at-a-glance block. This builds the real document from the 3-3 demo
+  (three zones) and checks the at-a-glance tiles and the zone-by-FR grid open
+  section 2, that each assessed zone carries its FR radar, and that the
+  caveat box is kept on one page. The single-zone report is built as the
+  control: one radar, as before.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["sl"] }); H.dom();</script>
+<script>
+function docXml(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function textOf(el) { return Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); }
+// Top-level body elements grouped under each Heading 1, with the Heading 2s
+// and the text of each section kept for the checks below.
+function sections(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null;
+  Array.prototype.forEach.call(body.children, function (el) {
+    var st = el.localName === "p" && el.getElementsByTagNameNS(W, "pStyle")[0];
+    var val = st ? st.getAttribute("w:val") : "";
+    if (/^Heading1$/i.test(val)) { cur = { title: textOf(el).trim(), img: 0, h2: [], text: "", els: [] }; out.push(cur); return; }
+    if (!cur) return;
+    if (/^Heading2$/i.test(val)) cur.h2.push(textOf(el).trim());
+    cur.img += el.getElementsByTagNameNS(W, "drawing").length;
+    cur.text += " " + textOf(el);
+    cur.els.push(el);
+  });
+  return { list: out, doc: doc };
+}
+function build(A, E, opts) {
+  return new Promise(function (res) {
+    A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+      E.getActiveNarrative(), opts, function (err, blob) { res(err ? null : blob); });
+  });
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.on("instrument-changed", function (inst) { if (inst && inst.id === "iec-62443-3-3") A.TourSL.apply(E); });
+  E.activateInstrument("iec-62443-3-3");
+  var zones = (E.state.engagement.targets || []);
+  ok(zones.length >= 2, "the demo assesses more than one zone (" + zones.length + ")");
+
+  build(A, E, { targetId: E.state.activeTargetId }).then(function (blob) {
+    ok(!!blob, "the multi-zone Word report builds");
+    return docXml(blob);
+  }).then(function (xml) {
+    var s = sections(xml), list = s.list;
+    var sec2 = list.filter(function (x) { return /^2\s*Results across the system/.test(x.title); })[0];
+    ok(!!sec2, "section 2 'Results across the system' follows the executive summary");
+    if (!sec2) return;
+    var first = sec2.els[0];
+    ok(first && first.localName === "tbl" && /meeting target/.test(textOf(first)) && /Floor findings/.test(textOf(first)),
+       "section 2 opens with the headline tiles", first ? textOf(first).slice(0, 120) : "nothing");
+    ok(/Weakest FR/.test(sec2.text) && /short in every/.test(sec2.text), "the tiles name the weakest FR and the FRs short everywhere");
+    ok(sec2.h2[0] && /^Achieved Security Level by /.test(sec2.h2[0]), "the zone-by-FR grid comes before the prose rollup", sec2.h2.join(" | "));
+    var grid = sec2.els.filter(function (el) { return el.localName === "tbl" && /Foundational Requirement/.test(textOf(el)) && /target SL/.test(textOf(el)); })[0];
+    var rows = grid ? grid.getElementsByTagNameNS(W, "tr") : [];
+    ok(grid && rows.length === 1 + 7, "the grid has a header plus one row per FR (" + rows.length + ")");
+    var head = rows[0] ? textOf(rows[0]) : "";
+    ok(zones.every(function (z) { return head.indexOf(z.name) >= 0; }), "the grid has a column for every zone", head);
+    var fills = grid ? Array.prototype.map.call(grid.getElementsByTagNameNS(W, "shd"), function (x) { return x.getAttribute("w:fill"); }).filter(Boolean) : [];
+    ok(new Set(fills).size >= 3, "the grid cells are coloured by position against target (" + new Set(fills).size + " fills)");
+    ok(/two or more below/.test(sec2.text), "the grid has its colour legend");
+
+    var images = list.reduce(function (a, x) { return a + x.img; }, 0);
+    ok(images === zones.length, "one FR radar per assessed zone (" + images + " images for " + zones.length + " zones)");
+    var zoneSecs = list.filter(function (x) { return zones.some(function (z) { return x.title.indexOf(z.name) >= 0; }); });
+    ok(zoneSecs.length === zones.length && zoneSecs.every(function (x) { return x.img === 1 && x.h2.indexOf("FR achievement vs target") >= 0; }),
+       "each zone's own section carries its radar", zoneSecs.map(function (x) { return x.title + ":" + x.img; }).join(" | "));
+
+    var caveatRow = Array.prototype.filter.call(s.doc.getElementsByTagNameNS(W, "tr"), function (tr) { return /not a certification/.test(textOf(tr)); })[0];
+    ok(caveatRow && caveatRow.getElementsByTagNameNS(W, "cantSplit").length === 1, "the caveat box is kept on one page");
+
+    // Control: the single-zone report still carries exactly one radar.
+    return build(A, E, { targetId: E.state.activeTargetId, singleSite: true }).then(function (blob) {
+      return blob ? docXml(blob) : "";
+    }).then(function (xml2) {
+      var l2 = sections(xml2).list, img2 = l2.reduce(function (a, x) { return a + x.img; }, 0);
+      ok(img2 === 1, "control: the single-zone report has its one radar (" + img2 + ")");
+      ok(!l2.some(function (x) { return x.h2.some(function (h) { return /^Achieved Security Level by /.test(h); }); }),
+         "control: the single-zone report has no cross-zone grid");
+    });
+  }).then(done, function (e) { ok(false, "threw: " + (e && e.message)); done(); });
+});
+</script>
+</body></html>

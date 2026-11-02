@@ -1,0 +1,139 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>CRA guided wizard</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style>
+</head>
+<body>
+<h1>CRA guided wizard (org / product tracks)</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock", tours: ["cra"] }); H.dom();</script>
+<script>
+// Minimal docx mock (ui.js references window.docx only in export flows, but the
+// module loads; keep a stub so nothing is undefined).
+window.docx = { Document:function(){}, Paragraph:function(){}, TextRun:function(){}, TableCell:function(){}, TableRow:function(){}, Table:function(){}, ImageRun:function(){}, PageBreak:function(){}, Header:function(){}, Footer:function(){}, HeadingLevel:{}, AlignmentType:{}, WidthType:{}, ShadingType:{}, TableLayoutType:{}, PageOrientation:{}, HeightRule:{}, PageNumber:{}, Packer:{ toBlob:function(){ return Promise.resolve(new Blob()); } } };
+</script>
+<script>
+(function () {
+  window.confirm = function () { return true; };
+  var A = window.App, E = A.Engine, CRA = A.ScoringCRA;
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function finish() {
+    var s = document.getElementById("summary");
+    s.className = "sum " + (fail === 0 ? "ok" : "bad");
+    s.textContent = fail === 0 ? "ALL TESTS PASSED (" + pass + ")" : pass + " passed, " + fail + " FAILED";
+  }
+  function main() { return document.getElementById("main"); }
+  function btnByText(root, txt) {
+    var b = [].slice.call(root.querySelectorAll("button")).filter(function (x) { return x.textContent.trim() === txt; });
+    return b[0];
+  }
+  function wizItemCode() {
+    var el = main().querySelector(".wizard-answer .req-code");
+    return el ? el.textContent : null;
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+    E.activateInstrument("eu-cra");
+    A.TourCRA.apply(E);
+    var inst = E.state.instrument;
+    var tidA = E.state.activeTargetId;
+
+    // Nav offers the wizard.
+    var navWiz = [].slice.call(document.querySelectorAll("#sidebar .nav-item")).filter(function (n) { return /Guided wizard/.test(n.textContent); })[0];
+    check("sidebar offers a CRA Guided wizard nav item", !!navWiz);
+
+    // Enter the wizard (defaults to org mode).
+    A.UI.go("cra-wizard");
+    check("wizard renders with a mode toggle (Organisation-wide / By product)", !!btnByText(main(), "Organisation-wide") && !!btnByText(main(), "By product"));
+    check("org mode is the default and highlighted", (btnByText(main(), "Organisation-wide").className.indexOf("primary") >= 0));
+    check("org mode shows NO product switcher", !main().querySelector(".sites-bar"));
+
+    // Org track = every organisation-scoped item (all P2 + C.7 + C.9 = 10).
+    var orgCount = (inst.items || []).filter(function (it) { return CRA.itemScope(inst, it) === "organisation"; }).length;
+    check("org track covers exactly the organisation-scoped items (10)", orgCount === 10);
+    check("org wizard opens on a P2 item", /^CRA-P2/.test(wizItemCode() || ""));
+    check("org stepper has P2 then P3 sections", (function () {
+      var steps = [].slice.call(main().querySelectorAll(".wizard-step")).map(function (s) { return s.textContent; });
+      return steps.join(",") === "P2,P3";
+    })());
+
+    // Answer the current org item; it persists and fans out to every product.
+    E.addTarget("Second Product"); var tidB = E.state.activeTargetId;
+    E.setActiveTarget(tidA);
+    A.UI.go("cra-wizard"); // re-render on product A, org mode
+    var firstOrgCode = wizItemCode();
+    var firstOrgItem = (inst.items || []).filter(function (it) { return it.code === firstOrgCode; })[0];
+    btnByText(main().querySelector(".wizard-answer"), "Partially in place").click();
+    var rA = E.findResponse(tidA, firstOrgItem.id), rB = E.findResponse(tidB, firstOrgItem.id);
+    check("answering an org item in the wizard persists", rA && rA.state === "partially");
+    check("the org answer fans out to the other product", rB && rB.state === "partially");
+
+    // Walk to the P3 org section via the stepper; it should land on an org P3 item.
+    var p3step = [].slice.call(main().querySelectorAll(".wizard-step")).filter(function (s) { return s.textContent === "P3"; })[0];
+    p3step.click();
+    check("stepping to the P3 section lands on an organisation-scoped P3 item", CRA.itemScope(inst, (inst.items || []).filter(function (it) { return it.code === wizItemCode(); })[0]) === "organisation");
+    check("org P3 item is C.7 or C.9", ["CRA-C.7", "CRA-C.9"].indexOf(wizItemCode()) >= 0);
+
+    // Switch to product mode.
+    btnByText(main(), "By product").click();
+    check("by-product mode shows the product switcher", !!main().querySelector(".sites-bar"));
+    check("by-product mode names the product being assessed", /Assessing product:/.test(main().textContent));
+    var prodCount = (inst.items || []).filter(function (it) { return CRA.itemScope(inst, it) !== "organisation"; }).length;
+    check("product track covers the per-product items (20)", prodCount === 20);
+    check("product wizard opens on a P1 item", /^CRA-P1/.test(wizItemCode() || ""));
+    check("product stepper has P1 then P3 sections", (function () {
+      var steps = [].slice.call(main().querySelectorAll(".wizard-step")).map(function (s) { return s.textContent; });
+      return steps.join(",") === "P1,P3";
+    })());
+
+    // Product answers are per product: answer a P1 item on A, it must NOT appear on B.
+    var p1code = wizItemCode();
+    var p1item = (inst.items || []).filter(function (it) { return it.code === p1code; })[0];
+    // ensure we're on product A
+    if (E.state.activeTargetId !== tidA) { E.setActiveTarget(tidA); A.UI.go("cra-wizard"); btnByText(main(), "By product").click(); }
+    btnByText(main().querySelector(".wizard-answer"), "Not in place").click();
+    check("answering a P1 item persists for the active product", (E.findResponse(tidA, p1item.id) || {}).state === "not-in-place");
+    check("the P1 answer does NOT fan out to the other product", !E.findResponse(tidB, p1item.id) || E.findResponse(tidB, p1item.id).state !== "not-in-place");
+
+    // 'Assess products' appears at the end of the org track.
+    btnByText(main(), "Organisation-wide").click(); // back into org mode at idx 0
+    // jump to last org item
+    (function () {
+      // click Next until disabled/at end - simpler: click the P3 step then Next to the last
+      var steps = [].slice.call(main().querySelectorAll(".wizard-step"));
+      steps.filter(function (s) { return s.textContent === "P3"; })[0].click();
+      var guard = 0;
+      while (guard++ < 20) {
+        var nx = btnByText(main(), "Next ›");
+        if (!nx || nx.hasAttribute("disabled")) break;
+        nx.click();
+      }
+    })();
+    check("end of org track offers an 'Assess products' action", !!btnByText(main(), "Assess products ›"));
+    btnByText(main(), "Assess products ›").click();
+    check("'Assess products' switches the wizard into by-product mode", craCurrentModeIsProduct());
+
+    function craCurrentModeIsProduct() {
+      var byp = btnByText(main(), "By product");
+      return byp && byp.className.indexOf("primary") >= 0;
+    }
+  } catch (e) {
+    check("harness threw: " + (e && e.message), false);
+    if (e && e.stack) { var d = document.createElement("div"); d.className = "row"; d.textContent = e.stack; out.appendChild(d); }
+  }
+  finish();
+})();
+</script>
+</body></html>

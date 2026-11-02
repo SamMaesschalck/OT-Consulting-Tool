@@ -1,0 +1,361 @@
+{
+    "id":  "iec-62443-2-1-2010",
+    "title":  "ISA/IEC 62443-2-1:2010 CSMS Assessment",
+    "framework":  "ISA/IEC 62443-2-1",
+    "edition":  "2010 (BS IEC 62443-2-1:2011)",
+    "family":  "iec-62443",
+    "contentVersion":  "1.0.0",
+    "scoringFamily":  "csms-conformance",
+    "scoringProfileRef":  "csms-conformance",
+    "targetDimension":  "site",
+    "targetDimensionLabel":  "Site",
+    "status":  "active-skeleton",
+    "framing":  "ISA/IEC 62443-2-1:2010 defines the elements of a Cyber Security Management System (CSMS) for industrial automation and control systems, organised into three categories (Risk analysis; Addressing risk with the CSMS; Monitoring and improving the CSMS) with element groups and elements. It is the older edition, still in active use where existing programmes were built against it; the 2024 edition restructures this into a maturity-based Security Program. Assessed as element-level conformance, not maturity.",
+    "sourceNote":  "Category / element-group / element structure extracted and verified from BS IEC 62443-2-1:2011 held in the project. Element titles are verified; assessor framing is paraphrased; \u0027verbatimText\u0027 and \u0027otLens\u0027 slots are empty for the licence holder to populate. Source: BS IEC 62443-2-1:2011 (copyright IEC/BSI).",
+    "categories":  [
+                       {
+                           "id":  "CAT-RA",
+                           "name":  "Risk analysis",
+                           "summary":  "Understanding the business case for security and identifying, classifying and assessing the risks to the IACS, which together justify and shape the CSMS."
+                       },
+                       {
+                           "id":  "CAT-ADDR",
+                           "name":  "Addressing risk with the CSMS",
+                           "summary":  "The substance of the CSMS: the security policy and organisation, the selected security countermeasures, and their implementation."
+                       },
+                       {
+                           "id":  "CAT-MON",
+                           "name":  "Monitoring and improving the CSMS",
+                           "summary":  "Keeping the CSMS effective over time through conformance checking and periodic review, improvement and maintenance."
+                       }
+                   ],
+    "elementGroups":  [
+                          {
+                              "id":  "EG-POL",
+                              "categoryId":  "CAT-ADDR",
+                              "name":  "Security policy, organization and awareness",
+                              "summary":  "The organisational foundation: CSMS scope, how security is organised, training and awareness, business continuity, and the policies and procedures themselves."
+                          },
+                          {
+                              "id":  "EG-CM",
+                              "categoryId":  "CAT-ADDR",
+                              "name":  "Selected security countermeasures",
+                              "summary":  "The protective controls: personnel security, physical and environmental security, network segmentation, and access control (administration, authentication, authorization)."
+                          },
+                          {
+                              "id":  "EG-IMPL",
+                              "categoryId":  "CAT-ADDR",
+                              "name":  "Implementation",
+                              "summary":  "Putting the CSMS into practice: risk management and implementation, system development and maintenance, information and document management, and incident planning and response."
+                          }
+                      ],
+    "requirements":  [
+                         {
+                             "id":  "E422",
+                             "code":  "4.2.2",
+                             "title":  "Business rationale",
+                             "categoryId":  "CAT-RA",
+                             "elementGroupId":  null,
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Establish the business case for the CSMS: why security matters to this organisation and what is at stake, so the programme has a rationale beyond compliance.",
+                             "rationale":  "A CSMS without a clear business rationale struggles for funding and priority and is the first thing cut under pressure. Articulating why security matters to the business is what gives the whole programme its mandate."
+                         },
+                         {
+                             "id":  "E423",
+                             "code":  "4.2.3",
+                             "title":  "Risk identification, classification and assessment",
+                             "categoryId":  "CAT-RA",
+                             "elementGroupId":  null,
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Identify, classify and assess the risks to the IACS, forming the risk picture the rest of the CSMS responds to.",
+                             "rationale":  "You cannot address risks you have not identified, and effort spent without a risk picture goes wherever the loudest voice points. Risk assessment is the foundation that justifies and shapes every control the CSMS selects."
+                         },
+                         {
+                             "id":  "E4322",
+                             "code":  "4.3.2.2",
+                             "title":  "CSMS scope",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-POL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Define the scope of the CSMS: which systems, sites and assets it covers.",
+                             "rationale":  "An undefined CSMS scope leaves gaps where systems are assumed to be someone else\u0027s responsibility. Defining scope ensures the programme covers what it should and nothing critical falls outside it by default."
+                         },
+                         {
+                             "id":  "E4323",
+                             "code":  "4.3.2.3",
+                             "title":  "Organizing for security",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-POL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Organise for security: assign roles, responsibilities and accountability for the CSMS.",
+                             "rationale":  "Security with no defined organisation falls into the gap between IT and engineering, the most common OT weakness. Organising for security gives the CSMS named owners so its tasks are actually carried out."
+                         },
+                         {
+                             "id":  "E4324",
+                             "code":  "4.3.2.4",
+                             "title":  "Staff training and security awareness",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-POL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Provide staff training and security awareness appropriate to roles and the OT environment.",
+                             "rationale":  "Controls depend on people doing the right thing, and OT staff need awareness framed around their environment rather than generic IT material. Training is what converts policy into the behaviour that actually protects the system."
+                         },
+                         {
+                             "id":  "E4325",
+                             "code":  "4.3.2.5",
+                             "title":  "Business continuity plan",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-POL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Maintain a business continuity plan so essential operations can continue or recover through disruption.",
+                             "rationale":  "Continuity planning is what lets essential operations survive disruption rather than improvising during a crisis. In OT, where the disruption may be physical, having planned ahead is the difference between a contained event and a serious one."
+                         },
+                         {
+                             "id":  "E4326",
+                             "code":  "4.3.2.6",
+                             "title":  "Security policies and procedures",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-POL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Establish the security policies and procedures that direct how security is actually done.",
+                             "rationale":  "Policies and procedures are where the organisation decides, in advance and consistently, how it will protect the IACS. Without them, protection depends on individual memory and varies by person and shift."
+                         },
+                         {
+                             "id":  "E4332",
+                             "code":  "4.3.3.2",
+                             "title":  "Personnel security",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-CM",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Manage personnel security, including vetting and handling of people in security-relevant roles.",
+                             "rationale":  "People in security-relevant roles hold trust that can be abused, and contractors and vendors often hold deep OT access. Personnel security gives assurance that those granted sensitive access have been suitably handled."
+                         },
+                         {
+                             "id":  "E4333",
+                             "code":  "4.3.3.3",
+                             "title":  "Physical and environmental security",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-CM",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Provide physical and environmental security for IACS equipment and locations.",
+                             "rationale":  "Physical access frequently bypasses technical controls entirely; someone at the cabinet can do what no network control would allow. Physical and environmental security underpins much of the rest of the CSMS."
+                         },
+                         {
+                             "id":  "E4334",
+                             "code":  "4.3.3.4",
+                             "title":  "Network segmentation",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-CM",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Segment the network to separate the IACS from other networks and limit how far compromise can spread.",
+                             "rationale":  "Network segmentation limits how far a compromise spreads from the routes attackers usually arrive by, and is among the most effective OT controls. A flat network lets a single foothold reach the entire environment."
+                         },
+                         {
+                             "id":  "E4335",
+                             "code":  "4.3.3.5",
+                             "title":  "Access control: Account administration",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-CM",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Administer accounts: their creation, change and removal across the lifecycle.",
+                             "rationale":  "Accounts created and never managed accumulate into standing risk, with dormant and departed-staff logins lingering for years. Disciplined account administration keeps who-can-log-in aligned with who should."
+                         },
+                         {
+                             "id":  "E4336",
+                             "code":  "4.3.3.6",
+                             "title":  "Access control: Authentication",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-CM",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Authenticate users and devices before granting access.",
+                             "rationale":  "Authentication is what establishes that a user or device is who it claims to be, and shared logins, common in OT, undermine it. Sound authentication is the gate the rest of access control depends on."
+                         },
+                         {
+                             "id":  "E4337",
+                             "code":  "4.3.3.7",
+                             "title":  "Access control: Authorization",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-CM",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Authorize access so that authenticated parties can only do what their role permits.",
+                             "rationale":  "Authentication establishes identity; authorization governs what that identity may do. Enforcing it stops a valid or compromised account acting beyond what its role legitimately needs."
+                         },
+                         {
+                             "id":  "E4342",
+                             "code":  "4.3.4.2",
+                             "title":  "Risk management and implementation",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-IMPL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Manage and implement risk treatment: turning the risk assessment into deployed controls.",
+                             "rationale":  "A risk assessment that never turns into deployed controls protects nothing. Risk management and implementation is the step that converts the analysis into actual protection."
+                         },
+                         {
+                             "id":  "E4343",
+                             "code":  "4.3.4.3",
+                             "title":  "System development and maintenance",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-IMPL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Apply security through system development and maintenance, so change does not erode the CSMS.",
+                             "rationale":  "Uncontrolled change to systems erodes the CSMS over time, reintroducing weaknesses the programme had closed. Applying security through development and maintenance keeps the protection intact as the system evolves."
+                         },
+                         {
+                             "id":  "E4344",
+                             "code":  "4.3.4.4",
+                             "title":  "Information and document management",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-IMPL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Manage information and documents securely, including their classification, handling and retention.",
+                             "rationale":  "Information about the IACS, configuration, designs, credentials, aids an attacker if mishandled. Managing documents and information securely limits both exposure and the loss of control over sensitive material."
+                         },
+                         {
+                             "id":  "E4345",
+                             "code":  "4.3.4.5",
+                             "title":  "Incident planning and response",
+                             "categoryId":  "CAT-ADDR",
+                             "elementGroupId":  "EG-IMPL",
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Plan for and respond to incidents through a defined capability.",
+                             "rationale":  "Incidents are inevitable, and an organisation without a planned response improvises under pressure when there is least time to think. A defined incident capability is what allows fast, coordinated action, including the OT-specific decisions an IT plan omits."
+                         },
+                         {
+                             "id":  "E442",
+                             "code":  "4.4.2",
+                             "title":  "Conformance",
+                             "categoryId":  "CAT-MON",
+                             "elementGroupId":  null,
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Check conformance: confirm the CSMS is being followed as intended.",
+                             "rationale":  "A CSMS assumed to be working but never checked drifts out of conformance unnoticed. Checking conformance is what confirms the programme is actually being followed rather than merely documented."
+                         },
+                         {
+                             "id":  "E443",
+                             "code":  "4.4.3",
+                             "title":  "Review, improve and maintain the CSMS",
+                             "categoryId":  "CAT-MON",
+                             "elementGroupId":  null,
+                             "evidencePrompt":  "Record the documented policy/procedure, evidence of practice, and the basis for the conformance judgement.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Review, improve and maintain the CSMS so it stays effective as the organisation and threats change.",
+                             "rationale":  "A CSMS never reviewed decays as the organisation and threats change around it. Ongoing review, improvement and maintenance is what keeps it effective rather than a snapshot of how things once were."
+                         }
+                     ],
+    "_contentNote":  "19 CSMS elements across 3 categories and 3 element groups, verified from BS IEC 62443-2-1:2011. Conformance scoring (csms-conformance), not maturity. Paraphrased hint (what it is) and rationale (why it matters) on each; verbatimText and otLens empty for population from the licensed standard.",
+    "_editionNote":  "PEER instrument to iec-62443-2-1-2024, not an edition toggle. An engagement uses one edition or the other. 2010 = CSMS element conformance; 2024 = Security Program maturity (SPRs, ML1-4).",
+    "targetDimensionLabelPlural":  "Sites"
+}

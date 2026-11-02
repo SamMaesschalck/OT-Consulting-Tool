@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>capability-SL item model</title></head>
+<body><pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script src="harness.js"></script>
+<script>H.app();</script>
+<script>
+// The capability-SL model: items (base + REs) derived from slGuidance, SL-T
+// scopes them, SL-A is the highest fully-satisfied level, not-assessed blocks,
+// unjustified N/A does not exclude, and compensating measures give a second
+// vector. Closeness survives as context only.
+(function () {
+  var S = window.App.Scoring, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+
+  // A requirement whose base applies at SL1, RE1 at SL2, RE2 at SL3.
+  var REQ = {
+    id: "SR1.1", frId: "FR1", code: "SR 1.1", title: "Human user identification",
+    slGuidance: {
+      "1": { required: true,  components: ["base"],              reTitle: "Base" },
+      "2": { required: true,  components: ["base", "RE1"],       reTitle: "Unique identification" },
+      "3": { required: true,  components: ["base", "RE1", "RE2"], reTitle: "Multifactor" },
+      "4": { required: true,  components: ["base", "RE1", "RE2"], reTitle: "Multifactor" }
+    }
+  };
+  // Defined but selected at no SL (4-2 CR 2.3 / CR 7.5 shape).
+  var NEVER = { id: "CR2.3", frId: "FR1", code: "CR 2.3", title: "Never selected",
+    slGuidance: { "1": { required: false, components: [] }, "2": { required: false, components: [] },
+                  "3": { required: false, components: [] }, "4": { required: false, components: [] } } };
+
+  var TAX = { frs: [{ id: "FR1", name: "Identification and authentication control", abbr: "IAC" }] };
+  var PROFILE = { partialCreditWeight: 0.5 };
+  function inst(reqs) { return { id: "t", title: "T", requirements: reqs }; }
+  function score(reqs, responses, tp) {
+    return S.scoreSite(inst(reqs), TAX, PROFILE, tp, responses, "z1");
+  }
+  function resp(components) { return [{ targetId: "z1", requirementId: "SR1.1", components: components }]; }
+  function st(s, note) { return note === undefined ? { state: s } : { state: s, note: note }; }
+
+  // ---- item derivation -------------------------------------------------
+  var items = S.requirementItems(REQ);
+  ok(items.length === 3, "three items derived from slGuidance", String(items.length));
+  ok(items[0].componentId === "base" && items[0].firstSL === 1, "base first applies at SL1");
+  ok(items[1].componentId === "RE1" && items[1].firstSL === 2, "RE1 first applies at SL2");
+  ok(items[2].componentId === "RE2" && items[2].firstSL === 3, "RE2 first applies at SL3");
+  ok(S.requirementItems(NEVER).length === 0, "a requirement selected at no SL yields no items");
+
+  // ---- the level a requirement is SHOWN as reaching ---------------------
+  //
+  // `itemsAchieved` credits every level a requirement does not constrain, which
+  // is right for the roll-up (a requirement asking nothing at SL 3 does not cap
+  // the FR there) and wrong to print. `achievedShown` is the reader's figure.
+  //
+  // Two shapes that get this wrong without it: a requirement selecting only a
+  // base (14 of the 51 in 62443-3-3) and one that selects nothing until SL 2.
+  var BASE_ONLY = { id: "SR1.1", frId: "FR1", code: "SR 1.4", title: "Base only",
+    slGuidance: { "1": { required: true, components: ["base"], reTitle: "Base" },
+                  "2": { required: true, components: ["base"], reTitle: "Base" },
+                  "3": { required: true, components: ["base"], reTitle: "Base" },
+                  "4": { required: true, components: ["base"], reTitle: "Base" } } };
+  var STARTS_AT_2 = { id: "SR1.1", frId: "FR1", code: "SR 1.8", title: "Starts at SL 2",
+    slGuidance: { "1": { required: false, components: [] },
+                  "2": { required: true,  components: ["base"], reTitle: "PKI" },
+                  "3": { required: true,  components: ["base"], reTitle: "PKI" },
+                  "4": { required: true,  components: ["base"], reTitle: "PKI" } } };
+  function reqOf(scored) { return scored.perRequirement[0]; }
+
+  ok(S.definedLevels(S.requirementItems(BASE_ONLY)).join(",") === "1",
+     "a base-only requirement defines one level");
+  ok(S.definedLevels(S.requirementItems(REQ)).join(",") === "1,2,3",
+     "and a three-item one defines three", S.definedLevels(S.requirementItems(REQ)).join(","));
+
+  var bMet = reqOf(score([BASE_ONLY], resp({ base: st("met") }), { defaultTargetSL: 2 }));
+  ok(bMet.itemsAchieved === 4, "the roll-up figure runs to SL 4: this requirement caps no level",
+     String(bMet.itemsAchieved));
+  ok(bMet.achievedShown === 2, "but it is SHOWN as reaching its SL 2 target, not SL 4",
+     String(bMet.achievedShown));
+  var bUnmet = reqOf(score([BASE_ONLY], resp({ base: st("not-met") }), { defaultTargetSL: 2 }));
+  ok(bUnmet.achievedShown === 0, "unmet, it is shown as SL 0", String(bUnmet.achievedShown));
+
+  var sUnmet = reqOf(score([STARTS_AT_2], resp({ base: st("not-met") }), { defaultTargetSL: 2 }));
+  ok(sUnmet.itemsAchieved === 1, "a requirement selecting nothing at SL 1 leaves SL 1 unconstrained",
+     String(sUnmet.itemsAchieved));
+  ok(sUnmet.achievedShown === 0,
+     "but unmet it is shown as SL 0, never as an SL 1 it did nothing to earn",
+     String(sUnmet.achievedShown));
+  var sMet = reqOf(score([STARTS_AT_2], resp({ base: st("met") }), { defaultTargetSL: 2 }));
+  ok(sMet.achievedShown === 2, "met, it is shown at its target", String(sMet.achievedShown));
+
+  // Above the target, the shown figure still follows the evidence.
+  var above = reqOf(score([REQ], resp({ base: st("met"), RE1: st("met"), RE2: st("met") }),
+                          { defaultTargetSL: 2 }));
+  ok(above.achievedShown === 3, "assessed above the target, the shown figure rises to where the items stop",
+     String(above.achievedShown));
+
+  // ---- the level the consultant picked ---------------------------------
+  //
+  // Where several levels write identical items, which one was chosen cannot be
+  // read back off them, so it is stored. Every level stays selectable and the
+  // one pressed is the one that lights.
+  function chose(reqs, components, sl, tp) {
+    return reqOf(S.scoreSite(inst(reqs), TAX, PROFILE, tp,
+      [{ targetId: "z1", requirementId: "SR1.1", components: components, slChoice: sl }], "z1"));
+  }
+  var pick3 = chose([BASE_ONLY], { base: st("met") }, 3, { defaultTargetSL: 2 });
+  ok(pick3.chosenSL === 3, "a level whose items match is remembered as chosen", String(pick3.chosenSL));
+  ok(pick3.achievedShown === 3,
+     "and an explicit choice above the automatic figure is recorded as headroom",
+     String(pick3.achievedShown));
+  var pick1 = chose([BASE_ONLY], { base: st("met") }, 1, { defaultTargetSL: 2 });
+  ok(pick1.chosenSL === 1, "a lower equivalent level is remembered just the same");
+  ok(pick1.achievedShown === 2 && pick1.met === true,
+     "but never drags the reported figure below the target it meets - that would read as a shortfall",
+     pick1.achievedShown + "/" + pick1.met);
+  var stale = chose([REQ], { base: st("met"), RE1: st("partial") }, 2, { defaultTargetSL: 2 });
+  ok(stale.chosenSL === null,
+     "a choice the items no longer match is dropped rather than shown as the answer",
+     String(stale.chosenSL));
+  ok(stale.matchesCleanSL === false, "and the requirement reports itself as set per item");
+  var noChoice = reqOf(score([REQ], resp({ base: st("met"), RE1: st("met") }), { defaultTargetSL: 2 }));
+  ok(noChoice.chosenSL === null && noChoice.achievedShown === 2,
+     "a project saved before choices were kept still reports its computed level",
+     noChoice.chosenSL + "/" + noChoice.achievedShown);
+
+  // ---- an outlier ruled out of an otherwise ordinary answer -------------
+  //
+  // "This SR is SL 2 here, except that one item, which does not apply." A
+  // justified exclusion is a normal part of answering at a level, not evidence
+  // the answer was assembled item by item.
+  var outlier = chose([REQ], { base: st("met"), RE1: st("na", "No shared identities exist on this zone.") },
+                      2, { defaultTargetSL: 2 });
+  ok(outlier.chosenSL === 2, "the picked level survives a justified exclusion", String(outlier.chosenSL));
+  ok(outlier.matchesCleanSL === true,
+     "and the requirement is not reported as set per item because of it");
+  ok(outlier.met === true && outlier.excludedCount === 1,
+     "the level still stands, with the outlier excluded rather than counted",
+     outlier.met + "/" + outlier.excludedCount);
+  // Unjustified is the opposite: it blocks, and must not be hidden behind a
+  // level that reads as answered.
+  var bare = chose([REQ], { base: st("met"), RE1: st("na") }, 2, { defaultTargetSL: 2 });
+  ok(bare.chosenSL === null && bare.matchesCleanSL === false,
+     "an unjustified exclusion still drops the picked level",
+     bare.chosenSL + "/" + bare.matchesCleanSL);
+  ok(bare.met === false, "and still blocks the requirement rather than being excluded");
+
+  // ---- SL-T scopes the work -------------------------------------------
+  var t1 = score([REQ], resp({}), { defaultTargetSL: 1 });
+  ok(t1.totalInScopeItems === 1, "SL-T 1 puts only the base item in scope", String(t1.totalInScopeItems));
+  var t3 = score([REQ], resp({}), { defaultTargetSL: 3 });
+  ok(t3.totalInScopeItems === 3, "SL-T 3 puts all three in scope", String(t3.totalInScopeItems));
+  var t0 = score([REQ], resp({}), { defaultTargetSL: 0 });
+  ok(t0.totalInScopeItems === 0, "SL-T 0 takes the FR out of scope entirely", String(t0.totalInScopeItems));
+  ok(t0.perFR[0].inScope === false, "SL-T 0 marks the FR out of scope");
+  ok(t0.outOfScopeFRs.length === 1, "out-of-scope FRs are reported separately");
+
+  // ---- not assessed BLOCKS --------------------------------------------
+  var none = score([REQ], resp({}), { defaultTargetSL: 2 });
+  ok(none.perFR[0].conformantAchievedSL === 0, "nothing assessed -> SL-A 0, not a free pass",
+     String(none.perFR[0].conformantAchievedSL));
+  var baseOnly = score([REQ], resp({ base: st("met") }), { defaultTargetSL: 2 });
+  ok(baseOnly.perFR[0].conformantAchievedSL === 1, "base met, RE1 unassessed -> SL-A 1",
+     String(baseOnly.perFR[0].conformantAchievedSL));
+
+  // ---- highest fully-satisfied level ----------------------------------
+  var both = score([REQ], resp({ base: st("met"), RE1: st("met") }), { defaultTargetSL: 2 });
+  ok(both.perFR[0].conformantAchievedSL === 2, "base + RE1 met -> SL-A 2");
+  ok(both.perFR[0].frTargetMet === true, "SL-A 2 meets SL-T 2");
+  var notMet = score([REQ], resp({ base: st("not-met"), RE1: st("met") }), { defaultTargetSL: 2 });
+  ok(notMet.perFR[0].conformantAchievedSL === 0, "a failed level-1 item caps SL-A at 0 even with RE1 met",
+     String(notMet.perFR[0].conformantAchievedSL));
+
+  // ---- partial never counts toward a level ----------------------------
+  var part = score([REQ], resp({ base: st("partial"), RE1: st("met") }), { defaultTargetSL: 2 });
+  ok(part.perFR[0].conformantAchievedSL === 0, "partial does not satisfy a level");
+  ok(part.perFR[0].closeness > 0 && part.perFR[0].closeness < 1,
+     "partial still earns closeness as context", String(part.perFR[0].closeness));
+
+  // ---- N/A needs a justification --------------------------------------
+  var naBare = score([REQ], resp({ base: st("na"), RE1: st("met") }), { defaultTargetSL: 2 });
+  ok(naBare.perFR[0].conformantAchievedSL === 0, "unjustified N/A blocks rather than excludes");
+  var naJust = score([REQ], resp({ base: st("na", "No human users on this device."), RE1: st("met") }), { defaultTargetSL: 2 });
+  ok(naJust.perFR[0].conformantAchievedSL === 2, "justified N/A is excluded, level still claimable",
+     String(naJust.perFR[0].conformantAchievedSL));
+  ok(naJust.perFR[0].excludedCount === 1, "the justified N/A is counted as excluded");
+
+  // ---- compensating measures give a second vector ----------------------
+  var comp = score([REQ], resp({ base: st("met-compensating"), RE1: st("met") }), { defaultTargetSL: 2 });
+  ok(comp.perFR[0].conformantAchievedSL === 2, "compensating measure satisfies the level");
+  ok(comp.perFR[0].achievedSLStrict === 0, "stripped of compensating measures the level falls to 0",
+     String(comp.perFR[0].achievedSLStrict));
+  ok(comp.perFR[0].propUpByCompensating === true, "the FR is flagged as propped up by a compensating measure");
+  var native = score([REQ], resp({ base: st("met"), RE1: st("met") }), { defaultTargetSL: 2 });
+  ok(native.perFR[0].achievedSLStrict === 2 && native.perFR[0].propUpByCompensating === false,
+     "natively met -> both vectors agree, no fragility flag");
+
+  // ---- blocking items are the remediation list -------------------------
+  var blocked = score([REQ], resp({ base: st("met"), RE1: st("not-met") }), { defaultTargetSL: 3 });
+  var bi = blocked.perFR[0].blockingItems;
+  ok(blocked.perFR[0].conformantAchievedSL === 1, "SL-A 1 against SL-T 3");
+  ok(bi.length === 1 && bi[0].componentId === "RE1",
+     "the blocking item is exactly the one capping the level",
+     bi.map(function (i) { return i.componentId; }).join(","));
+  ok(blocked.blockingItems.length === 1 && blocked.blockingItems[0].frId === "FR1",
+     "blocking items are collected per FR at the top level");
+
+  // ---- closeness is context, never a level -----------------------------
+  // SL-T 3 puts base, RE1 and RE2 in scope: base met, RE1 not met, RE2 unassessed.
+  ok(Math.abs(blocked.perFR[0].closeness - (1 / 3)) < 1e-9,
+     "closeness is the satisfied share of in-scope items (1 of 3)",
+     String(blocked.perFR[0].closeness));
+  ok(blocked.perFR[0].frTargetMet === false, "high closeness never lifts target-met");
+
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+})();
+</script>
+</body></html>

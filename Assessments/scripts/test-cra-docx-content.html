@@ -1,0 +1,147 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Verify CRA Word content</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sec{padding:12px 0 4px;font-weight:600;font-size:17px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style>
+</head>
+<body>
+<h1>EU CRA Word document content verification</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<!-- Deliberately NOT loading vendor/docx.umd.js: a mock records the document
+     tree so the test can walk paragraph text (same approach as
+     test-docx-content.html, extended with every constructor export-docx uses). -->
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock", tours: ["cra"] });</script>
+<script>
+window.docx = (function () {
+  function TextRun(opts) {
+    if (typeof opts === "string") opts = { text: opts };
+    this.__type = "TextRun";
+    this.text = opts.text != null ? opts.text : (Array.isArray(opts.children) ? opts.children.join("") : "");
+    this.bold = !!opts.bold; this.italics = !!opts.italics;
+    this.color = opts.color || null; this.size = opts.size || null;
+  }
+  function Paragraph(opts) {
+    opts = opts || {};
+    this.__type = "Paragraph";
+    this.children = opts.children || [];
+    this.style = opts.style || null; this.heading = opts.heading || null;
+    this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join("");
+    this.runs = this.children;
+  }
+  function TableCell(opts) { this.__type = "TableCell"; this.children = (opts && opts.children) || []; this.shading = (opts && opts.shading) || null; }
+  function TableRow(opts)  { this.__type = "TableRow"; this.children = (opts && opts.children) || []; }
+  function Table(opts)     { this.__type = "Table"; this.rows = (opts && opts.rows) || []; }
+  function ImageRun(opts)  { this.__type = "ImageRun"; this.text = ""; }
+  function PageBreak()     { this.__type = "PageBreak"; this.text = ""; }
+  function Header(opts)    { this.__type = "Header"; this.children = (opts && opts.children) || []; }
+  function Footer(opts)    { this.__type = "Footer"; this.children = (opts && opts.children) || []; }
+  function Document(opts)  { this.__type = "Document"; this.sections = (opts && opts.sections) || []; }
+  return {
+    Document: Document, Paragraph: Paragraph, TextRun: TextRun,
+    TableCell: TableCell, TableRow: TableRow, Table: Table,
+    ImageRun: ImageRun, PageBreak: PageBreak, Header: Header, Footer: Footer,
+    HeadingLevel: { TITLE: "Title", HEADING_1: "Heading1", HEADING_2: "Heading2", HEADING_3: "Heading3" },
+    AlignmentType: { LEFT: "left", CENTER: "center", RIGHT: "right", BOTH: "both" },
+    WidthType: { PERCENTAGE: "pct", DXA: "dxa" },
+    ShadingType: { SOLID: "solid" },
+    TableLayoutType: { FIXED: "fixed" },
+    PageOrientation: { PORTRAIT: "portrait", LANDSCAPE: "landscape" },
+    HeightRule: { EXACT: "exact", ATLEAST: "atLeast" },
+    PageNumber: { CURRENT: "current" },
+    Packer: { toBlob: function (doc) { window.__capturedDoc = doc; return Promise.resolve(new Blob(["dummy"])); } }
+  };
+})();
+</script>
+<script>
+(function () {
+  var A = window.App, E = A.Engine;
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function section(t) { var d = document.createElement("div"); d.className = "sec"; d.textContent = t; out.appendChild(d); }
+  function finish() {
+    var s = document.getElementById("summary");
+    s.className = "sum " + (fail === 0 ? "ok" : "bad");
+    s.textContent = fail === 0 ? "ALL TESTS PASSED (" + pass + ")" : pass + " passed, " + fail + " FAILED";
+  }
+
+  E.loadCatalog();
+  E.activateInstrument("eu-cra");
+  A.TourCRA.apply(E);
+  var inst = E.state.instrument;
+  var tid = E.state.activeTargetId;
+
+  A.ExportDOCX.buildAsync(E.state.engagement, inst, null, E.state.profile, null,
+    { targetId: tid, craSetup: E.getCRASetupRaw ? E.getCRASetupRaw() : null },
+    function (err) {
+      if (err) { check("buildAsync succeeded - " + (err.message || err), false); finish(); return; }
+      var doc = window.__capturedDoc;
+      var paras = [];
+      function walk(node) {
+        if (!node) return;
+        if (node.__type === "Paragraph") { paras.push(node); return; }
+        if (node.__type === "Table") { node.rows.forEach(walk); return; }
+        if (node.__type === "TableRow") { node.children.forEach(walk); return; }
+        if (node.__type === "TableCell") { node.children.forEach(walk); return; }
+        if (Array.isArray(node)) node.forEach(walk);
+      }
+      doc.sections.forEach(function (s) { walk(s.children); });
+      var allText = paras.map(function (p) { return p.text; }).join("\n");
+
+      section("Executive summary is a real narrative");
+      check("names the client and the product", allText.indexOf("Ferrovia Controls") !== -1 && allText.indexOf("commissioned a gap assessment of SentinelEdge IDS-2200") !== -1);
+      check("states the class and conformity route", allText.indexOf("Important - Class II") !== -1);
+      check("characterises each layer (strong / developing / substantial gaps)", allText.indexOf("a strong position") !== -1 && allText.indexOf("substantial gaps") !== -1);
+      check("names the conformity layer as the blocker", allText.indexOf("The conformity layer is currently the blocker") !== -1);
+      check("states the Article 14 / full-obligation dates", allText.indexOf("11 September 2026") !== -1 && allText.indexOf("11 December 2027") !== -1);
+      check("names the immediate priorities from the roadmap", allText.indexOf("The immediate priorities are") !== -1);
+      // The tour dataset fills the consultant narrative slots, so the demo
+      // report must carry the prose and show NO red placeholders; an empty
+      // engagement would show the placeholders instead (covered below).
+      check("consultant sequencing narrative is carried into the exec summary", allText.indexOf("notified-body lead times are the critical path to CE marking") !== -1);
+      check("consultant exposure narrative is carried into the exec summary", allText.indexOf("highest-volume EU product") !== -1);
+      var consultantSlots = paras.filter(function (p) { return p.style === "PlaceholderText" && /Consultant:/.test(p.text); });
+      check("no red to-be-completed placeholders remain in the demo report", consultantSlots.length === 0);
+      check("closes with the not-a-determination statement", allText.indexOf("informs conformity; it does not determine or certify it") !== -1);
+
+      section("Critical caveats as a shaded block");
+      check("caveat block heading present", allText.indexOf("Critical caveats: read before using this report") !== -1);
+      check("no-harmonised-standard caveat present", allText.indexOf("harmonised standard") !== -1);
+
+      section("Scorecard page");
+      check("'CRA readiness at a glance' page present", allText.indexOf("CRA readiness at a glance") !== -1);
+      check("per-layer stacked profile present", allText.indexOf("Conformance profile by layer") !== -1);
+      check("'Where to focus first' cards present", allText.indexOf("Where to focus first") !== -1);
+      check("top focus card is the top-ranked gap (CRA-C.3 notified body)", allText.indexOf("CRA-C.3") !== -1);
+
+      section("Structured sections and tables");
+      check("About / how-to-read present", allText.indexOf("How to read this report") !== -1);
+      check("numbered Scope section present", allText.indexOf("Scope of this assessment") !== -1);
+      check("Results by layer present", allText.indexOf("Results by layer") !== -1);
+      check("register includes judgement + evidence columns", allText.indexOf("Judgement") !== -1 && allText.indexOf("Evidence captured") !== -1);
+      check("register carries captured evidence text", allText.indexOf("No known exploitable vulnerabilities open at release") !== -1);
+
+      section("Recommendations (prose roadmap)");
+      check("Recommendations section present", allText.indexOf("Recommendations: conformance gap roadmap") !== -1);
+      check("entries carry the paraphrased requirement", allText.indexOf("Requirement (paraphrased):") !== -1);
+      check("entries carry why-it-matters rationale", allText.indexOf("Why this matters:") !== -1);
+      check("entries carry impact, action and owner", allText.indexOf("Business impact:") !== -1 && allText.indexOf("Recommended action:") !== -1 && allText.indexOf("Owner:") !== -1);
+      check("not-in-place entries flagged as floor findings", allText.indexOf("floor finding") !== -1);
+      check("roadmap leads with the consultant's top priority (CRA-C.3)", /P1\s+CRA-C\.3/.test(allText));
+
+      section("Old thin layout gone");
+      check("old bare 'Conformance gap roadmap (all layers)' heading removed", allText.indexOf("Conformance gap roadmap (all layers)") === -1);
+      check("method and limitations present", allText.indexOf("Method and limitations") !== -1);
+
+      finish();
+    });
+})();
+</script>
+</body></html>

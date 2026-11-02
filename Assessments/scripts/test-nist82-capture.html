@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>NIST 800-82 ICS Overlay check</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+  try {
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });
+    A.Engine.activateInstrument("nist-800-82");
+    var inst = A.Engine.state.instrument;
+    ok(inst && inst.id === "nist-800-82", "nist-800-82 activates");
+    ok(A.Engine.state.scoringFamily === "caf-achieved", "uses the caf-achieved scoring family");
+
+    ok(A.Engine.getCAFObjectives().length === 3, "3 objective groups");
+    ok(A.Engine.getCAFPrinciples().length === 19, "19 control families (Rev-5 incl SR)", String(A.Engine.getCAFPrinciples().length));
+    var outs = inst.outcomes || [];
+    ok(outs.length === 233, "233 base controls (Rev-3 OT overlay)", String(outs.length));
+    ok(inst.edition === "Revision 3", "edition is Revision 3", inst.edition);
+    ok(inst.attribution && /U\.S\. Government/.test(inst.attribution), "carries NIST public-domain attribution");
+    ok(inst.framework === "NIST SP 800-82", "framework is NIST SP 800-82");
+    ok(/Rev\.?\s*5/.test(inst.sourceNote) && /Appendix F/.test(inst.sourceNote), "sourceNote cites 800-53 Rev 5 + Appendix F");
+
+    // default baseline = OT moderate
+    ok(A.Engine.getActiveCAFProfileId() === "ics-moderate", "default is OT Moderate", A.Engine.getActiveCAFProfileId());
+    var reg = A.Engine.getCAFProfileRegistry();
+    ok(reg && reg.profiles.length === 4, "4 OT baselines (full/low/mod/high)");
+
+    // overlay nesting: applicable(Low) < applicable(Moderate); PM always in
+    function appCount() { var ov = A.Engine.getActiveCAFOverlay(); var n=0; for (var k in ov) if (ov[k] && ov[k].applicable) n++; return n; }
+    A.Engine.setCAFProfile("ics-low"); var lowN = appCount(); var ovLow = A.Engine.getActiveCAFOverlay();
+    A.Engine.setCAFProfile("ics-moderate"); var modN = appCount();
+    A.Engine.setCAFProfile("ics-high"); var highN = appCount();
+    ok(lowN < modN && modN <= highN, "ICS baselines nest (low<mod<=high)", lowN + " " + modN + " " + highN);
+    ok(ovLow["PM-1"] && ovLow["PM-1"].applicable === true, "PM controls expected in every ICS baseline");
+
+    // ---- control titles are the verbatim NIST SP 800-53 Rev 5 names (from Table 22) ----
+    function titleOf(id) { var o = outs.filter(function (x) { return x.id === id; })[0]; return o && o.title; }
+    ok(titleOf("AT-2") === "Literacy Training and Awareness", "AT-2 uses the Rev-5 name", titleOf("AT-2"));
+    ok(titleOf("AU-2") === "Event Logging", "AU-2 uses the Rev-5 name", titleOf("AU-2"));
+    ok(titleOf("SR-11") === "Component Authenticity", "SR family present with Rev-5 names", titleOf("SR-11"));
+
+    // ---- encoding: OT Discussion text is clean UTF-8, no double-encoded quotes ----
+    var anyText = outs.filter(function (o) { return o.controlText; });
+    var mojibake = anyText.filter(function (o) { return o.controlText.indexOf("â€") !== -1; });
+    ok(mojibake.length === 0, "no mojibake in any OT Discussion text", mojibake.length + " affected");
+
+    // ---- overlaySource records the OT overlay's Added delta (Rev 3 Table 22) ----
+    ok(ovLow["SI-17"] && ovLow["SI-17"].overlaySource === "added", "SI-17 is 'added' under OT Low", ovLow["SI-17"] && ovLow["SI-17"].overlaySource);
+    ok(ovLow["CP-12"] && ovLow["CP-12"].overlaySource === "added", "CP-12 is 'added' under OT Low");
+    ok(ovLow["AC-1"] && ovLow["AC-1"].overlaySource === "selected", "AC-1 is 'selected' under OT Low");
+    var lowAdded = 0; for (var kk in ovLow) if (ovLow[kk] && ovLow[kk].overlaySource === "added") lowAdded++;
+    ok(lowAdded === 6, "OT Low marks exactly 6 Added controls", String(lowAdded));
+
+    // ---- no-baseline overlay controls: assessable only under Full overlay ----
+    ok(ovLow["PL-7"] && ovLow["PL-7"].applicable === false, "PL-7 (no baseline) not applicable under OT Low");
+    A.Engine.setCAFProfile("ics-full");
+    var ovFull = A.Engine.getActiveCAFOverlay();
+    ok(ovFull["PL-7"] && ovFull["PL-7"].applicable === true, "PL-7 is applicable under the Full overlay");
+    A.Engine.setCAFProfile("ics-low");
+
+    // the capture row surfaces the Added flag (honours the getting-started claim)
+    A.UI.go("caf-principle", "CP");
+    var cpLow = document.getElementById("main");
+    var added12 = cpLow.querySelector('[data-req-id="CP-12"]');
+    ok(added12 && /Added by overlay/.test(added12.textContent), "CP-12 capture row shows the 'Added by overlay' badge under OT Low");
+    A.UI.go("caf-principle", "AC");
+    var sel1 = document.getElementById("main").querySelector('[data-req-id="AC-1"]');
+    ok(sel1 && !/Added by overlay/.test(sel1.textContent), "AC-1 (selected) shows no Added badge");
+    A.Engine.setCAFProfile("ics-moderate");
+
+    // control text = verbatim OT Discussion (Rev 3, Appendix F)
+    var withGuid = outs.filter(function (o) { return o.controlText; });
+    ok(withGuid.length >= 100, "controls carry OT Discussion text", withGuid.length + "/" + outs.length);
+    ok(withGuid[0].controlTextLabel && /OT Discussion/.test(withGuid[0].controlTextLabel) && /Rev 3/.test(withGuid[0].controlTextLabel), "guidance is labelled as OT Discussion (Rev 3)", withGuid[0].controlTextLabel);
+
+    // getting-started + engagement page wording
+    A.UI.go("engagement");
+    var m = document.getElementById("main").textContent;
+    ok(m.indexOf("OT Overlay") !== -1 && m.indexOf("800-82") !== -1, "getting-started shows the OT Overlay wording");
+    ok(m.indexOf("Rev 3") !== -1, "getting-started names Rev 3");
+    ok(m.indexOf("NCSC CAF 4.0") === -1, "no leftover CAF wording");
+    ok(m.indexOf("Baseline") !== -1, "baseline picker present");
+
+    // family page: AC has tailoring -> OT lens card; AT has none
+    A.UI.go("caf-principle", "AC");
+    var acm = document.getElementById("main");
+    ok(acm.textContent.indexOf("OT lens - Access Control") !== -1, "AC family shows the Tailoring Considerations as the family OT lens");
+    ok(acm.querySelectorAll(".caf-state-btn").length >= 2, "control rows render with state buttons");
+    var acPrin = A.Engine.getCAFPrinciples().filter(function (p) { return p.id === "AC"; })[0];
+    var atPrin = A.Engine.getCAFPrinciples().filter(function (p) { return p.id === "AT"; })[0];
+    ok(acPrin && acPrin.otLens && acPrin.otLens.framing, "AC family carries an OT lens (has tailoring text)");
+    ok(atPrin && !atPrin.otLens, "AT family has no OT lens (no tailoring paragraph in Appendix F)");
+
+    // a control with OT Discussion shows the expander
+    var famWith = withGuid[0].principleId;
+    A.UI.go("caf-principle", famWith);
+    var fm = document.getElementById("main");
+    var tog = fm.querySelector(".sl-row-bar .sl-guidance-toggle");
+    ok(!!tog && /What this control requires/.test(tog.textContent), "controls with OT Discussion get a 'What this control requires' expander", tog && tog.textContent);
+
+    // capture + scoring + report render
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "AC-1", { applicable: true, state: "achieved" });
+    var scored = A.Engine.scoreActiveTarget();
+    ok(scored && scored.byPrinciple, "scoring runs");
+    var container = document.createElement("div");
+    window.App.Report.render(container, {
+      engagement: A.Engine.state.engagement, instrument: inst, taxonomy: A.Engine.state.taxonomy, profile: A.Engine.state.profile,
+      narrative: A.Engine.getActiveNarrative ? A.Engine.getActiveNarrative() : null,
+      scored: scored, scoredAll: A.Engine.scoreAllTargets(), activeTarget: A.Engine.getActiveTarget(),
+      cafProfileRegistry: reg, cafProfileId: A.Engine.getActiveCAFProfileId(), cafProfile: A.Engine.getActiveCAFProfile ? A.Engine.getActiveCAFProfile() : null
+    });
+    ok(container.textContent.length > 100 && container.textContent.indexOf("Access Control") !== -1, "report renders and references families");
+
+    // guided wizard works for this caf-achieved instrument too
+    A.UI.go("caf-wizard");
+    var wm = document.getElementById("main");
+    ok(!!wm.querySelector(".wizard") && wm.querySelectorAll(".wizard-stepper .wizard-step").length === 3, "guided wizard renders with the 3 T/O/M objective steps");
+    ok(/Control\s+1\s+of\s+233/.test(wm.textContent), "wizard counter reads 'Control 1 of 233'", wm.querySelector(".wizard-topmeta") && wm.querySelector(".wizard-topmeta").textContent);
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

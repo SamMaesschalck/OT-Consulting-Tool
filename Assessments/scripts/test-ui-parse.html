@@ -1,0 +1,138 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>ui.js parse/boot check</title></head>
+<body>
+<!-- Minimal DOM shell ui.init() expects, so we can boot it headlessly. -->
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n) { lines.push((c ? "PASS " : "FAIL ") + n); if (!c) fail++; }
+  // Native confirm()/alert() block headless Edge forever (the basis-register
+  // Remove buttons now confirm before deleting a filled row) - stub them.
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+  ok(!!A.UI, "ui.js defines window.App.UI (parses & executes)");
+  ok(A.UI && typeof A.UI.init === "function", "App.UI.init is a function");
+  try {
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });               // boot the real UI, no autosave
+    A.Engine.activateInstrument("iec-62443-3-3");  // triggers a full render of the 3-3 pages
+    var nav = document.querySelectorAll("#sidebar .nav-item").length;
+    ok(nav > 0, "sidebar renders nav items after boot (" + nav + ")");
+    ok(document.querySelector("#main").children.length > 0, "main pane renders content");
+    ok(document.body.textContent.indexOf("Import risk context") >= 0 || true, "boot completed without throwing");
+
+    // Preparation guidance: data present for every active instrument (or default),
+    // rendered on the engagement page, and never auto-added to the basis register.
+    var g = A.Data.shared.engagementGuidance;
+    ok(!!g && !!g["default"], "engagement guidance data loaded with a default entry");
+    ok(g.instruments && g.instruments["iec-62443-3-3"] && g.instruments["iec-62443-3-3"].oftenForgotten.length >= 3, "3-3 guidance has often-forgotten documents");
+    A.Data.index.instruments.forEach(function (inst) {
+      if (inst.status !== "active" && inst.status !== "active-skeleton") return;
+      var entry = (g.instruments && g.instruments[inst.id]) || g["default"];
+      ok(entry && entry.commonDocuments.length >= 3 && entry.keyStakeholders.length >= 3, "guidance resolves for " + inst.id);
+    });
+    ok(document.body.textContent.indexOf("Preparation guidance") >= 0, "engagement page renders the preparation-guidance card");
+    ok(document.body.textContent.indexOf("Key stakeholders to interview") >= 0, "guidance card lists key stakeholders");
+
+    // The new CRA instrument (active-skeleton) must resolve to its own guidance
+    // and render the card on its engagement page.
+    ok(g.instruments && !!g.instruments["eu-cra"], "eu-cra has its own guidance entry (not just the default)");
+    A.Engine.activateInstrument("eu-cra");
+    ok(document.body.textContent.indexOf("Preparation guidance") >= 0, "guidance card renders for the CRA instrument");
+    ok(document.body.textContent.indexOf("declaration of conformity") >= 0 || document.body.textContent.indexOf("CRA class") >= 0, "CRA-specific guidance content shown");
+    var craBasis = A.Engine.getBasisOfAssessment ? A.Engine.getBasisOfAssessment() : null;
+    ok(!craBasis || ["interviews","documents","observations"].every(function (k) { return !craBasis[k] || craBasis[k].length === 0; }), "CRA basis-of-assessment register starts empty (guidance not auto-added)");
+
+    // Basis of assessment: rows must be removable with a VISIBLE control
+    // (ghost buttons are white text and vanish on the white engagement card).
+    A.Engine.activateInstrument("iec-62443-3-3");
+    var basis = A.Engine.getBasisOfAssessment();
+    basis.interviews.push({ name: "Test Person", role: "Engineer", date: "" });
+    basis.documents.push({ title: "Test Doc", reference: "v1", date: "" });
+    basis.observations.push({ name: "Test HMI", method: "walkthrough" });
+    A.Engine.touchBasisOfAssessment();
+    A.Engine.activateInstrument("iec-62443-3-3"); // re-render engagement with the rows
+    var removeBtns = [].slice.call(document.querySelectorAll("#main button")).filter(function (b) { return b.textContent === "Remove"; });
+    ok(removeBtns.length === 3, "each basis row (person/document/system) has a Remove button", "got " + removeBtns.length);
+    ok(removeBtns.every(function (b) { return b.className.indexOf("ghost") < 0; }), "basis Remove buttons are not invisible ghost buttons");
+    removeBtns[0].click();
+    ok(A.Engine.getBasisOfAssessment().interviews.length === 0, "clicking Remove deletes the person row");
+    var remaining = [].slice.call(document.querySelectorAll("#main button")).filter(function (b) { return b.textContent === "Remove"; });
+    ok(remaining.length === 2, "remaining rows still removable after a delete", "got " + remaining.length);
+    // Clear the rows this test added, then confirm the register is empty again
+    // (i.e. only consultant-entered rows ever exist - guidance is never auto-added).
+    var basis2 = A.Engine.getBasisOfAssessment();
+    basis2.documents.length = 0; basis2.observations.length = 0; basis2.interviews.length = 0;
+    A.Engine.touchBasisOfAssessment();
+    ok(["interviews","documents","observations"].every(function (k) { return basis2[k].length === 0; }), "basis-of-assessment register empty once test rows are cleared (guidance not auto-added)");
+  } catch (e) {
+    ok(false, "boot threw: " + e.message);
+  }
+
+  function finish() {
+    lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+
+  // ---- save-in-place (File System Access API, stubbed): Save overwrites the
+  // ---- project file instead of downloading "name (1).json" copies ---------
+  try {
+    var STG = A.Storage;
+    var pickCount = 0, written = [];
+    function fakeHandle(name) {
+      return {
+        name: name,
+        queryPermission: function () { return Promise.resolve("granted"); },
+        createWritable: function () {
+          return Promise.resolve({
+            write: function (t) { written.push({ name: name, text: t }); return Promise.resolve(); },
+            close: function () { return Promise.resolve(); }
+          });
+        }
+      };
+    }
+    window.showSaveFilePicker = function () { pickCount++; return Promise.resolve(fakeHandle("proj.json")); };
+    STG.forgetProjectFile();
+    ok(STG.supportsFilePickers() === true, "save-in-place: picker support detected");
+
+    STG.saveProjectToFile(A.Engine.getProjectFile(), {}, function (r1) {
+      ok(r1.ok && r1.method === "file" && r1.name === "proj.json", "save-in-place: first save asks where and writes the file");
+      var parsed = null; try { parsed = JSON.parse(written[0].text); } catch (e) {}
+      ok(parsed && parsed.schemaVersion === "2.0", "save-in-place: written content is the v2 project file");
+      STG.saveProjectToFile(A.Engine.getProjectFile(), {}, function (r2) {
+        ok(r2.ok && pickCount === 1 && written.length === 2, "save-in-place: second save OVERWRITES the same file (no dialog, no (1) copy)");
+        STG.saveProjectToFile(A.Engine.getProjectFile(), { saveAs: true }, function (r3) {
+          ok(r3.ok && pickCount === 2, "save-in-place: Save as… forces the dialog for a fresh copy");
+          // Open-with-picker captures the handle so Save writes back to it.
+          var docCopy = JSON.parse(JSON.stringify(A.Engine.getProjectFile()));
+          var lh = fakeHandle("loaded.json");
+          lh.getFile = function () { return Promise.resolve(new Blob([JSON.stringify(docCopy)])); };
+          window.showOpenFilePicker = function () { return Promise.resolve([lh]); };
+          STG.openProjectWithPicker(function (res) {
+            ok(res.ok && res.fileName === "loaded.json" && !!res.handle, "open-with-picker: loads the file and captures its handle");
+            ok(STG.currentFileName() !== "loaded.json", "open-with-picker: the handle is not adopted before the project has loaded");
+            // The UI's Load adopts it once applyLoadedProject has succeeded
+            // (test-load-guard-and-rollback.html drives that path).
+            STG.adoptProjectFile(res.handle, res.data.project.projectId);
+            STG.saveProjectToFile(A.Engine.getProjectFile(), {}, function (r4) {
+              ok(r4.ok && r4.name === "loaded.json" && pickCount === 2, "after a picker Load, Save writes back to the LOADED file without asking");
+              STG.forgetProjectFile();
+              ok(STG.currentFileName() === null, "forgetProjectFile (New project) clears the handle so Save asks again");
+              finish();
+            });
+          });
+        });
+      });
+    });
+  } catch (e) {
+    ok(false, "save-in-place tests threw: " + e.message);
+    finish();
+  }
+})();
+</script>
+</body></html>

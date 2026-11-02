@@ -1,0 +1,918 @@
+{
+    "id":  "iec-62443-4-1",
+    "title":  "ISA/IEC 62443-4-1 Secure Product Development Lifecycle Assessment",
+    "display":  {
+                    "standardRef":  "ISA/IEC 62443-4-1",
+                    "elementNoun":  "practice",
+                    "elementNounTitle":  "Practice",
+                    "elementNounPlural":  "practices",
+                    "requirementNoun":  "requirement",
+                    "programmeNoun":  "secure product development lifecycle"
+                },
+    "framework":  "ISA/IEC 62443-4-1",
+    "edition":  "2018",
+    "family":  "iec-62443",
+    "contentVersion":  "1.0.0",
+    "scoringFamily":  "program-maturity-ml",
+    "scoringProfileRef":  "program-maturity-ml",
+    "targetDimension":  "supplier",
+    "targetDimensionLabel":  "Supplier / product developer (development organisation or product line)",
+    "status":  "active-skeleton",
+    "framing":  "ISA/IEC 62443-4-1 defines the process requirements for the secure development of products used in industrial automation and control systems. It is assessed against a SUPPLIER\u0027s product development practices, not an asset owner\u0027s environment. Requirements are grouped into eight practices and assessed at maturity levels (ML1-ML4), the same maturity model as 62443-2-1:2024.",
+    "sourceNote":  "Practice structure and requirement list extracted and verified from the 62443-4-1 document held in the project. Requirement titles are verified; assessor framing is paraphrased; \u0027verbatimText\u0027 and \u0027otLens\u0027 slots are empty for the licence holder to populate. ML anchors are paraphrased. Source: ISA/IEC 62443-4-1 (copyright IEC/ISA).",
+    "maturityNote":  "Reuses the program-maturity-ml scoring family (ML1 Initial / ML2 Managed / ML3 Defined-Practiced / ML4 Improving) defined for 62443-2-1:2024. 4-1 itself uses a maturity model for these practices, so this is the natural fit.",
+    "maturityModel":  {
+                          "basis":  "CMMI-SVC; MLs apply independently per requirement; documentation required from ML2 upward",
+                          "levels":  [
+                                         {
+                                             "id":  "ML1",
+                                             "name":  "Initial",
+                                             "anchor":  "Process is performed but ad hoc and often undocumented or not fully documented; consistency over time is hard to demonstrate.",
+                                             "shortAnchor":  "Performed but ad hoc, not (fully) documented."
+                                         },
+                                         {
+                                             "id":  "ML2",
+                                             "name":  "Managed",
+                                             "anchor":  "Documentation exists describing how to manage and perform the capability (written procedures or training); practices are repeatable and managed to documented plans. Documentation begins at ML2.",
+                                             "shortAnchor":  "Documented procedures/training; repeatable, managed to plan."
+                                         },
+                                         {
+                                             "id":  "ML3",
+                                             "name":  "Defined / Practiced",
+                                             "anchor":  "An ML2 process that is actively practised in product development, with performance shown to be repeatable over time.",
+                                             "shortAnchor":  "Documented process actively practised, repeatable over time."
+                                         },
+                                         {
+                                             "id":  "ML4",
+                                             "name":  "Improving",
+                                             "anchor":  "Using process metrics, effectiveness or performance improvement of the process is demonstrated; the supplier improves the process through technological, procedural or management changes.",
+                                             "shortAnchor":  "Measured with metrics; process is improved over time."
+                                         }
+                                     ],
+                          "_display":  "Show these full definitions ONCE in a help/reference panel, not inline on every requirement. The per-requirement selector uses achievedScale.ordered[].short labels only."
+                      },
+    "themeNames":  {
+                       "sdl":  "Secure product development lifecycle"
+                   },
+    "elements":  [
+                     {
+                         "id":  "SM",
+                         "name":  "Practice 1: Security management",
+                         "summary":  "The supplier\u0027s overall process for managing secure product development: ownership, scope, expertise, environment security and continuous improvement."
+                     },
+                     {
+                         "id":  "SR",
+                         "name":  "Practice 2: Specification of security requirements",
+                         "summary":  "Capturing the product\u0027s security context and threat model and deriving documented, reviewed security requirements."
+                     },
+                     {
+                         "id":  "SD",
+                         "name":  "Practice 3: Secure by design",
+                         "summary":  "Applying secure design principles and defence in depth, with design review, so security is built in rather than added later."
+                     },
+                     {
+                         "id":  "SI",
+                         "name":  "Practice 4: Secure implementation",
+                         "summary":  "Implementing the design securely, with secure coding standards and implementation review to catch weaknesses as code is written."
+                     },
+                     {
+                         "id":  "SVV",
+                         "name":  "Practice 5: Security verification and validation testing",
+                         "summary":  "Testing that security requirements are met and threats mitigated, including vulnerability and penetration testing by suitably independent testers."
+                     },
+                     {
+                         "id":  "DM",
+                         "name":  "Practice 6: Management of security-related issues",
+                         "summary":  "Receiving, reviewing, assessing, addressing and disclosing security issues found in the product after development."
+                     },
+                     {
+                         "id":  "SUM",
+                         "name":  "Practice 7: Security update management",
+                         "summary":  "Qualifying, documenting and delivering security updates and patches in a timely, dependable way."
+                     },
+                     {
+                         "id":  "SG",
+                         "name":  "Practice 8: Security guidelines",
+                         "summary":  "Providing the documentation users need to deploy, harden, operate and dispose of the product securely."
+                     }
+                 ],
+    "requirements":  [
+                         {
+                             "id":  "SM1",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-1",
+                             "title":  "Development process",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Maintain a defined, documented secure development process covering the product\u0027s lifecycle, rather than relying on ad hoc practice.",
+                             "rationale":  "A documented process is what makes secure development repeatable rather than dependent on whoever happens to be on the team. Without it, security quality varies product to product and cannot be assured to a customer or regulator."
+                         },
+                         {
+                             "id":  "SM2",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-2",
+                             "title":  "Identification of responsibilities",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Assign clear responsibilities for security within the development organisation so ownership is explicit, not assumed.",
+                             "rationale":  "Security with no named owner is security no one maintains. Clear responsibilities stop secure-development tasks falling through the gaps between engineering, QA and product management."
+                         },
+                         {
+                             "id":  "SM3",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-3",
+                             "title":  "Identification of applicability",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Identify which parts of the process apply to which products and components, so scope is deliberate.",
+                             "rationale":  "Applying the full process to everything is wasteful; applying it to nothing is dangerous. Defining applicability ensures effort lands where the product risk actually warrants it."
+                         },
+                         {
+                             "id":  "SM4",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-4",
+                             "title":  "Security expertise",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Ensure the people doing the work have the security expertise the process needs, through training or hiring.",
+                             "rationale":  "A secure-development process run by people without security skills produces the appearance of rigour without the substance. Expertise is what makes the process find real weaknesses rather than tick boxes."
+                         },
+                         {
+                             "id":  "SM5",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-5",
+                             "title":  "Process scoping",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Define the scope of the development process: what products, versions and components it covers.",
+                             "rationale":  "Undefined scope leads to gaps where parts of a product are assumed to be someone else\u0027s problem. Explicit scoping ensures the whole product is covered and nothing falls outside the process by default."
+                         },
+                         {
+                             "id":  "SM6",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-6",
+                             "title":  "File integrity",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Protect the integrity of files and artefacts in development so they cannot be tampered with undetected.",
+                             "rationale":  "If development artefacts can be altered undetected, an attacker can inject weaknesses upstream of every later control. File integrity protects the supply chain from the inside, where tampering is hardest to spot later."
+                         },
+                         {
+                             "id":  "SM7",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-7",
+                             "title":  "Development environment security",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Secure the development environment itself (tools, build systems, repositories) against compromise.",
+                             "rationale":  "A compromised build system or repository can poison every product that passes through it, the most damaging form of supply-chain attack. Securing the development environment protects everything built in it."
+                         },
+                         {
+                             "id":  "SM8",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-8",
+                             "title":  "Controls for private keys",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Control the private keys used for signing and protection so they cannot be misused or stolen.",
+                             "rationale":  "Signing keys are what let users trust that a product or update is genuine; stolen keys let an attacker sign malware as legitimate. Controlling private keys protects the trust the whole update mechanism depends on."
+                         },
+                         {
+                             "id":  "SM9",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-9",
+                             "title":  "Security requirements for externally provided components",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Apply security requirements to externally provided components, not just to code developed in-house.",
+                             "rationale":  "Third-party and open-source components carry their own vulnerabilities straight into the product. Applying security requirements to them stops the developer\u0027s good practice being undone by what they didn\u0027t write."
+                         },
+                         {
+                             "id":  "SM10",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-10",
+                             "title":  "Custom developed components from third-party suppliers",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Manage the security of custom components built by third-party suppliers on the developer\u0027s behalf.",
+                             "rationale":  "Work outsourced to third-party suppliers can reintroduce the very risks the process exists to control. Managing their security ensures custom-built components meet the same bar as in-house code."
+                         },
+                         {
+                             "id":  "SM11",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-11",
+                             "title":  "Assessing and addressing security-related issues",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Have a route to assess and address security issues discovered during development.",
+                             "rationale":  "Issues found during development are cheapest to fix then and most dangerous if shipped. A defined route to assess and address them stops known problems reaching the customer."
+                         },
+                         {
+                             "id":  "SM12",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-12",
+                             "title":  "Process verification",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Verify that the development process is actually being followed, not just documented.",
+                             "rationale":  "A process that is documented but not followed gives false assurance. Verifying that it is actually applied is what makes the documentation mean something."
+                         },
+                         {
+                             "id":  "SM13",
+                             "elementId":  "SM",
+                             "theme":  "sdl",
+                             "code":  "SM-13",
+                             "title":  "Continuous improvement",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Continuously improve the development process using what is learned over time.",
+                             "rationale":  "Threats and techniques change, so a development process frozen in time steadily loses ground. Continuous improvement keeps it matched to the risks the product will actually face."
+                         },
+                         {
+                             "id":  "SR1",
+                             "elementId":  "SR",
+                             "theme":  "sdl",
+                             "code":  "SR-1",
+                             "title":  "Product security context",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Establish the product\u0027s security context: how and where it will be used, and the assumptions that follow.",
+                             "rationale":  "Security requirements only make sense against how and where the product will be used; the same product needs different protection in different contexts. Establishing the security context is the foundation the requirements are built on."
+                         },
+                         {
+                             "id":  "SR2",
+                             "elementId":  "SR",
+                             "theme":  "sdl",
+                             "code":  "SR-2",
+                             "title":  "Threat model",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Develop and maintain a threat model for the product to drive its security requirements.",
+                             "rationale":  "You cannot require protection against threats you have not identified. A threat model is what makes the security requirements address real attack paths rather than a generic checklist."
+                         },
+                         {
+                             "id":  "SR3",
+                             "elementId":  "SR",
+                             "theme":  "sdl",
+                             "code":  "SR-3",
+                             "title":  "Product security requirements",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Derive documented product security requirements from the context and threat model.",
+                             "rationale":  "Undocumented security expectations are not requirements; they are hopes. Deriving explicit requirements from the threat model is what makes security something the product can be designed and tested against."
+                         },
+                         {
+                             "id":  "SR4",
+                             "elementId":  "SR",
+                             "theme":  "sdl",
+                             "code":  "SR-4",
+                             "title":  "Product security requirements content",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Ensure the security requirements have sufficient content and detail to be implementable and testable.",
+                             "rationale":  "Requirements too vague to implement or test achieve nothing. Sufficient content is what lets designers build to them and testers verify them, rather than interpret them differently."
+                         },
+                         {
+                             "id":  "SR5",
+                             "elementId":  "SR",
+                             "theme":  "sdl",
+                             "code":  "SR-5",
+                             "title":  "Security requirements review",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Review the security requirements to confirm they are complete, correct and consistent.",
+                             "rationale":  "Requirements written once and never reviewed carry gaps and contradictions into the design. Review catches those while they are still cheap to fix, before they are built in."
+                         },
+                         {
+                             "id":  "SD1",
+                             "elementId":  "SD",
+                             "theme":  "sdl",
+                             "code":  "SD-1",
+                             "title":  "Secure design principles",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Apply established secure design principles when designing the product.",
+                             "rationale":  "Security designed in from the start is far cheaper and more effective than security retrofitted later. Applying secure design principles shapes the product\u0027s resilience at the point where it is easiest to influence."
+                         },
+                         {
+                             "id":  "SD2",
+                             "elementId":  "SD",
+                             "theme":  "sdl",
+                             "code":  "SD-2",
+                             "title":  "Defense in depth design",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Design defence in depth so the product does not rely on a single protective measure.",
+                             "rationale":  "A product that relies on one protective measure fails completely when that measure is defeated. Defence in depth ensures a single bypass does not mean total compromise."
+                         },
+                         {
+                             "id":  "SD3",
+                             "elementId":  "SD",
+                             "theme":  "sdl",
+                             "code":  "SD-3",
+                             "title":  "Security design review",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Review the design for security before implementation, to catch flaws early.",
+                             "rationale":  "Design flaws found after implementation are expensive to fix and often shipped anyway. Reviewing the design for security catches the most structural weaknesses at the cheapest point to address them."
+                         },
+                         {
+                             "id":  "SD4",
+                             "elementId":  "SD",
+                             "theme":  "sdl",
+                             "code":  "SD-4",
+                             "title":  "Secure design best practices",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Follow secure design best practices appropriate to the product and its technologies.",
+                             "rationale":  "Established best practices encode lessons learned from others\u0027 failures. Following them avoids repeating well-known design mistakes in a new product."
+                         },
+                         {
+                             "id":  "SI1",
+                             "elementId":  "SI",
+                             "theme":  "sdl",
+                             "code":  "SI-1",
+                             "title":  "Security implementation review",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Review the implementation for security, checking that the secure design is correctly realised in code.",
+                             "rationale":  "A secure design can be undone by insecure implementation. Reviewing the implementation confirms the code actually realises the design\u0027s security intent rather than quietly departing from it."
+                         },
+                         {
+                             "id":  "SI2",
+                             "elementId":  "SI",
+                             "theme":  "sdl",
+                             "code":  "SI-2",
+                             "title":  "Secure coding standards",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Implement against secure coding standards to avoid known classes of vulnerability.",
+                             "rationale":  "Most code-level vulnerabilities come from a known set of mistakes. Secure coding standards steer developers away from those classes before the weaknesses are ever written."
+                         },
+                         {
+                             "id":  "SVV1",
+                             "elementId":  "SVV",
+                             "theme":  "sdl",
+                             "code":  "SVV-1",
+                             "title":  "Security requirements testing",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Test that the product\u0027s security requirements are actually met.",
+                             "rationale":  "A security requirement never tested is a requirement that may not be met. Testing against the requirements is what turns intended security into demonstrated security."
+                         },
+                         {
+                             "id":  "SVV2",
+                             "elementId":  "SVV",
+                             "theme":  "sdl",
+                             "code":  "SVV-2",
+                             "title":  "Threat mitigation testing",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Test that the threats identified in the threat model are mitigated.",
+                             "rationale":  "The threat model only protects the product if its threats are actually mitigated in the finished article. Threat-mitigation testing confirms the defences work against the attacks they were designed for."
+                         },
+                         {
+                             "id":  "SVV3",
+                             "elementId":  "SVV",
+                             "theme":  "sdl",
+                             "code":  "SVV-3",
+                             "title":  "Vulnerability testing",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Test for vulnerabilities, including with automated tooling.",
+                             "rationale":  "Vulnerabilities the developer does not find, an attacker will. Vulnerability testing, including with tooling, surfaces weaknesses before release rather than after exploitation."
+                         },
+                         {
+                             "id":  "SVV4",
+                             "elementId":  "SVV",
+                             "theme":  "sdl",
+                             "code":  "SVV-4",
+                             "title":  "Penetration testing",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Carry out penetration testing of the product.",
+                             "rationale":  "Penetration testing probes the product as an attacker would, finding what requirement-by-requirement testing misses. It is the adversarial check that the product holds up in practice, not just on paper."
+                         },
+                         {
+                             "id":  "SVV5",
+                             "elementId":  "SVV",
+                             "theme":  "sdl",
+                             "code":  "SVV-5",
+                             "title":  "Independence of testers",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Ensure the testers are sufficiently independent of the developers for the testing to be credible.",
+                             "rationale":  "Developers testing only their own work miss what they were blind to when building it. Independent testers provide the fresh adversarial perspective that makes the testing credible."
+                         },
+                         {
+                             "id":  "DM1",
+                             "elementId":  "DM",
+                             "theme":  "sdl",
+                             "code":  "DM-1",
+                             "title":  "Receiving notifications of security-related issues",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Have a defined way to receive notifications of security issues from any source.",
+                             "rationale":  "Issues you never hear about, you cannot fix. A defined channel to receive notifications ensures vulnerabilities reported by researchers, customers or others actually reach the people who can act."
+                         },
+                         {
+                             "id":  "DM2",
+                             "elementId":  "DM",
+                             "theme":  "sdl",
+                             "code":  "DM-2",
+                             "title":  "Reviewing security-related issues",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Review reported security issues to understand them.",
+                             "rationale":  "Reports that are received but not reviewed pile up unaddressed. Reviewing them is the step that turns an inbox of reports into understood issues."
+                         },
+                         {
+                             "id":  "DM3",
+                             "elementId":  "DM",
+                             "theme":  "sdl",
+                             "code":  "DM-3",
+                             "title":  "Assessing security-related issues",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Assess the severity and impact of security issues.",
+                             "rationale":  "Not every issue is equally serious, and treating them all the same wastes effort or misses the critical one. Assessment is what prioritises the issues that genuinely matter."
+                         },
+                         {
+                             "id":  "DM4",
+                             "elementId":  "DM",
+                             "theme":  "sdl",
+                             "code":  "DM-4",
+                             "title":  "Addressing security-related issues",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Address security issues through fixes or mitigations.",
+                             "rationale":  "An assessed issue left unfixed is a known vulnerability shipped to every user. Addressing them through fixes or mitigations is the point of the whole defect-management practice."
+                         },
+                         {
+                             "id":  "DM5",
+                             "elementId":  "DM",
+                             "theme":  "sdl",
+                             "code":  "DM-5",
+                             "title":  "Disclosing security-related issues",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Disclose security issues responsibly to those who need to know.",
+                             "rationale":  "How an issue is disclosed affects whether users can protect themselves before attackers exploit it. Responsible disclosure balances warning users against arming adversaries."
+                         },
+                         {
+                             "id":  "DM6",
+                             "elementId":  "DM",
+                             "theme":  "sdl",
+                             "code":  "DM-6",
+                             "title":  "Periodic review of security defect management practices",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Periodically review the defect-management practice itself to keep it effective.",
+                             "rationale":  "A defect-management practice that is never reviewed drifts and decays like any other process. Periodic review keeps it effective as the product and threat landscape change."
+                         },
+                         {
+                             "id":  "SUM1",
+                             "elementId":  "SUM",
+                             "theme":  "sdl",
+                             "code":  "SUM-1",
+                             "title":  "Security update qualification",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Qualify security updates so they are known to work and not introduce new problems.",
+                             "rationale":  "An update that breaks the product or introduces new flaws can be worse than the vulnerability it fixes. Qualifying updates ensures the fix is safe to apply, which matters especially in OT where stability is critical."
+                         },
+                         {
+                             "id":  "SUM2",
+                             "elementId":  "SUM",
+                             "theme":  "sdl",
+                             "code":  "SUM-2",
+                             "title":  "Security update documentation",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Document security updates so users understand what they fix and how to apply them.",
+                             "rationale":  "Users cannot apply an update sensibly if they do not know what it changes. Documentation is what lets an operator assess and schedule a patch rather than fear it."
+                         },
+                         {
+                             "id":  "SUM3",
+                             "elementId":  "SUM",
+                             "theme":  "sdl",
+                             "code":  "SUM-3",
+                             "title":  "Dependent component or operating system security update",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Account for updates to dependent components and operating systems, not just the product\u0027s own code.",
+                             "rationale":  "A product is only as secure as its dependencies and underlying OS, which have their own vulnerabilities. Accounting for their updates stops the product being exposed through components the developer did not write."
+                         },
+                         {
+                             "id":  "SUM4",
+                             "elementId":  "SUM",
+                             "theme":  "sdl",
+                             "code":  "SUM-4",
+                             "title":  "Security update delivery",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Deliver security updates to users through a dependable mechanism.",
+                             "rationale":  "A fix that cannot be delivered reliably protects no one. A dependable delivery mechanism is what gets the patch from the developer to the deployed product."
+                         },
+                         {
+                             "id":  "SUM5",
+                             "elementId":  "SUM",
+                             "theme":  "sdl",
+                             "code":  "SUM-5",
+                             "title":  "Timely delivery of security patches",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Deliver security patches in a timely way relative to the risk they address.",
+                             "rationale":  "A patch that arrives long after the risk is known leaves a window attackers exploit. Timely delivery relative to severity is what keeps the protection ahead of the threat, balanced against OT\u0027s need to test before applying."
+                         },
+                         {
+                             "id":  "SG1",
+                             "elementId":  "SG",
+                             "theme":  "sdl",
+                             "code":  "SG-1",
+                             "title":  "Product defense in depth",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Provide guidance on the product\u0027s own defence-in-depth features.",
+                             "rationale":  "Users cannot use protective features they do not know exist. Documenting the product\u0027s own defence-in-depth helps operators actually deploy the security that was built in."
+                         },
+                         {
+                             "id":  "SG2",
+                             "elementId":  "SG",
+                             "theme":  "sdl",
+                             "code":  "SG-2",
+                             "title":  "Defense in depth measures expected in the environment",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Document the defence-in-depth measures the product expects the operating environment to provide.",
+                             "rationale":  "A product makes assumptions about what the surrounding environment will protect; if users do not know them, those protections may be absent. Stating the expected environmental measures closes the gap between the product\u0027s assumptions and the operator\u0027s reality."
+                         },
+                         {
+                             "id":  "SG3",
+                             "elementId":  "SG",
+                             "theme":  "sdl",
+                             "code":  "SG-3",
+                             "title":  "Security hardening guidelines",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Provide hardening guidelines so users can configure the product securely.",
+                             "rationale":  "A product shipped in its default state is rarely in its most secure one. Hardening guidelines are what let an operator close that gap, which for OT is often the main feasible security improvement."
+                         },
+                         {
+                             "id":  "SG4",
+                             "elementId":  "SG",
+                             "theme":  "sdl",
+                             "code":  "SG-4",
+                             "title":  "Secure disposal guidelines",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Provide secure disposal guidance so the product can be retired without leaking sensitive data.",
+                             "rationale":  "Equipment retired without proper disposal still holds configuration, credentials and data useful to an attacker. Disposal guidance ensures decommissioned product does not become a leak."
+                         },
+                         {
+                             "id":  "SG5",
+                             "elementId":  "SG",
+                             "theme":  "sdl",
+                             "code":  "SG-5",
+                             "title":  "Secure operation guidelines",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Provide secure operation guidance for running the product safely in service.",
+                             "rationale":  "Securely built products can still be operated insecurely. Secure operation guidance is what helps the operator keep the product safe in day-to-day service, not just at deployment."
+                         },
+                         {
+                             "id":  "SG6",
+                             "elementId":  "SG",
+                             "theme":  "sdl",
+                             "code":  "SG-6",
+                             "title":  "Account management guidelines",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Provide account management guidance for the product\u0027s users and roles.",
+                             "rationale":  "Default and unmanaged accounts are a common way into otherwise sound products. Account management guidance helps operators avoid the shared and standing credentials that plague OT."
+                         },
+                         {
+                             "id":  "SG7",
+                             "elementId":  "SG",
+                             "theme":  "sdl",
+                             "code":  "SG-7",
+                             "title":  "Documentation review",
+                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true,
+                             "hint":  "Review the user documentation to confirm the security guidance is accurate and complete.",
+                             "rationale":  "Security guidance that is wrong or incomplete misleads the very users trying to do the right thing. Reviewing the documentation ensures the guidance an operator relies on is actually accurate."
+                         }
+                     ],
+    "achievedScale":  {
+                          "_note":  "ONE control per requirement. Consultant picks one value. \u0027not-met\u0027 is the bottom of the scale; ML1-4 are increasing maturity; \u0027unknown\u0027 and \u0027na\u0027 are non-scoring states shown alongside.",
+                          "ordered":  [
+                                          {
+                                              "value":  "not-met",
+                                              "label":  "Not met",
+                                              "short":  "Not met",
+                                              "scored":  true,
+                                              "rank":  0
+                                          },
+                                          {
+                                              "value":  "ML1",
+                                              "label":  "ML1",
+                                              "short":  "ML1 · ad hoc",
+                                              "scored":  true,
+                                              "rank":  1
+                                          },
+                                          {
+                                              "value":  "ML2",
+                                              "label":  "ML2",
+                                              "short":  "ML2 · documented",
+                                              "scored":  true,
+                                              "rank":  2
+                                          },
+                                          {
+                                              "value":  "ML3",
+                                              "label":  "ML3",
+                                              "short":  "ML3 · practised",
+                                              "scored":  true,
+                                              "rank":  3
+                                          },
+                                          {
+                                              "value":  "ML4",
+                                              "label":  "ML4",
+                                              "short":  "ML4 · improving",
+                                              "scored":  true,
+                                              "rank":  4
+                                          }
+                                      ],
+                          "nonScoring":  [
+                                             {
+                                                 "value":  "unknown",
+                                                 "label":  "Unknown",
+                                                 "effect":  "reduces coverage + confidence; not scored"
+                                             },
+                                             {
+                                                 "value":  "na",
+                                                 "label":  "N/A",
+                                                 "effect":  "excluded from score and coverage"
+                                             }
+                                         ]
+                      },
+    "targetOverlay":  {
+                          "enabled":  false,
+                          "_note":  "Optional. Off by default. When enabled, each requirement gains an optional target ML. When off, the report shows the achieved-ML profile only.",
+                          "targetScale":  [
+                                              "ML1",
+                                              "ML2",
+                                              "ML3",
+                                              "ML4"
+                                          ]
+                      },
+    "_contentNote":  "47 requirements across 8 practices, verified from the standard. Paraphrased hint (what it is) and rationale (why it matters) on each; verbatimText and otLens empty for population from the licensed standard. Supplier-side instrument; pairs with the supplier-advisory references.",
+    "_relatedWork":  "Designed to sit alongside the supplier discovery references and question banks as the scored core of the supplier-evaluation toolkit. Also the authoritative target for \u0027secure development\u0027 cross-references currently pointing loosely at 2-1 ORG 2.3 (CAF A4.b, NIS2 measure (e)).",
+    "seriesContext":  "ISA/IEC 62443 is a series of standards rather than a single document, divided by who is responsible for what. This part, 62443-4-1, addresses the PRODUCT SUPPLIER: the development process behind a product. Its companion 62443-4-2 addresses the security capability of the product itself, and the 3-x parts address the system built from those products."
+}

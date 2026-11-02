@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Offered unsaved work is kept until dealt with</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Code review: the unsaved-work backup was destroyed while it was still being
+  offered. One localStorage key held both the copy the "Unsaved work found" bar
+  was offering and the live backup of the session now running, so while the
+  bar was up:
+    - the first edit overwrote it with the new session,
+    - New and Load deleted it,
+  and the dismiss button's promise ("keeps the unsaved work and offers it again
+  next time") was only true if the consultant did nothing at all. Restore also
+  replaced unsaved work on screen without asking, and Load deleted the replaced
+  session's own backup.
+
+  Now an offered copy is moved to a key of its own, where only Restore or
+  Discard can remove it (or the window that wrote it, once that work is
+  saved: see test-autosave-offer-limits.html).
+
+  Round 2 (verification): the questions said "will be lost" while Load, New
+  and Restore all kept the replaced work. Load and Restore keep it and now say
+  so. Searches for the work look in every autosave key, so these assertions
+  mean "can the consultant still get it back", not "is it under a given key
+  name".
+
+  Round 3: New keeps the replaced session's unsaved work too, as Load does,
+  and its question says so (section 4). With nothing unsaved it still asks,
+  but says the saved file is not changed; declining changes nothing (section
+  9). Each session now has a live key of its own (otcat:autosave:live:v2:<id>;
+  see test-autosave-offer-limits.html for two windows and the previous
+  release's single key).
+
+  NOTE: this page enables autosave, so it uses the SAME keys as the real app
+  (one file:// origin). It saves what is there first and puts it back at the
+  end; the headless runner uses a throwaway browser profile anyway.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  var A = window.App, E = A.Engine, STG = A.Storage;
+  var PREFIX = "otcat:autosave:live:v2:", OFFERED = "otcat:autosave:offered:v2";
+  var EARLIER = PREFIX + "s-earlier-session";
+
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function put(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  // Every autosave key, whatever session wrote it: set aside now, put back at
+  // the end.
+  function autosaveKeys() {
+    var out = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf("otcat:autosave") === 0) out.push(k);
+    }
+    return out;
+  }
+  var kept = {};
+  autosaveKeys().forEach(function (k) { kept[k] = get(k); put(k, null); });
+  function finish() {
+    autosaveKeys().forEach(function (k) { put(k, null); });
+    Object.keys(kept).forEach(function (k) { put(k, kept[k]); });
+    done();
+  }
+
+  var confirms = [], confirmAnswer = true;
+  window.confirm = function (msg) { confirms.push(String(msg)); return confirmAnswer; };
+  window.alert = function () {};
+
+  // Load goes through the plain file input: no picker in this "browser".
+  window.showSaveFilePicker = undefined;
+  var fileInput = document.getElementById("file-input");
+  fileInput.click = function () {};
+
+  // Every project the browser is holding, wherever it is held.
+  function stored() {
+    var out = [];
+    autosaveKeys().forEach(function (k) {
+      if (k === OFFERED || k.indexOf(":owner:") !== -1) return;
+      try { var live = get(k); if (live) out.push(JSON.parse(live)); } catch (e) {}
+    });
+    try {
+      var list = JSON.parse(get(OFFERED) || "[]");
+      (Array.isArray(list) ? list : []).forEach(function (b) { if (b && b.file) out.push(b.file); });
+    } catch (e) {}
+    return out;
+  }
+  function recoverable(client) {
+    return stored().some(function (pf) { return ((pf && pf.project) || {}).clientName === client; });
+  }
+  function offeredNames() {
+    return (AS.offered() || []).map(function (b) { return ((b.file || {}).project || {}).clientName; });
+  }
+  function client() { return (E.getProjectFile().project || {}).clientName; }
+  function bar() { return document.getElementById("autosave-bar"); }
+  function btnIn(root, re) {
+    return [].slice.call((root || document).querySelectorAll("button")).filter(function (b) {
+      return re.test(b.textContent);
+    })[0];
+  }
+  function toastText() { return document.getElementById("toast").textContent || ""; }
+  function waitFor(cond, then, tries) {
+    tries = tries == null ? 100 : tries;
+    if (cond() || tries <= 0) { then(); return; }
+    setTimeout(function () { waitFor(cond, then, tries - 1); }, 30);
+  }
+  function fileFor(name, when) {
+    var p = STG.defaultProject();
+    p.clientName = name;
+    return { schemaVersion: "2.0", project: p, assessments: {}, activeAssessmentId: null, updatedAt: when };
+  }
+
+  try {
+    E.loadCatalog();
+    // A previous session closed with unsaved work still on the live key.
+    put(EARLIER, JSON.stringify(fileFor("Earlier Customer", "2026-08-24T09:57:56.000Z")));
+    A.UI.init({ autosave: true });
+    var AS = A.UI.__autosave;
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+    finish();
+    return;
+  }
+  // init() clears the unsaved flag once more on a zero timeout (tour pages set
+  // it while applying their data). In the app that has happened long before
+  // anyone types; here it would land in the middle of the steps below.
+  setTimeout(function () {
+  try {
+    // ---- 1. offered at start-up ------------------------------------------
+    ok(!!bar() && /Unsaved work found/.test(bar().textContent), "the earlier session's unsaved work is offered");
+    ok(get(EARLIER) === null, "and it is moved off the ended session's live key");
+    ok(offeredNames().join() === "Earlier Customer", "into the offered list, where nothing can overwrite it", offeredNames().join(", "));
+    ok(AS.liveKey().indexOf(PREFIX) === 0 && AS.liveKey() !== EARLIER && get(AS.liveKey()) === null,
+       "the session now starting has a key of its own, empty until there is unsaved work", AS.liveKey());
+
+    // ---- 2. an edit while the offer is pending ---------------------------
+    E.activateInstrument("ncsc-caf");
+    E.updateMetadata({ clientName: "Today Customer" });
+    AS.write();                                  // what the debounced autosave does
+    ok(recoverable("Today Customer"), "today's edit is backed up as usual");
+    ok(recoverable("Earlier Customer"),
+       "and the offered work is still recoverable after it",
+       "the first edit used to overwrite the only copy");
+    ok(!!bar(), "an edit does not take the offer away");
+
+    // ---- 3. Restore over unsaved work asks first --------------------------
+    confirms = []; confirmAnswer = false;
+    btnIn(bar(), /Restore/).click();
+    ok(confirms.length === 1 && /Restore the unsaved work/.test(confirms[0]),
+       "restoring over unsaved work asks first", confirms.join(" | "));
+    // Round 2: the question said the work on screen "will be lost" while the
+    // code kept it and offered it at the next start. The words match now.
+    ok(/kept in this browser and offered the next time/.test(confirms[0] || "") && !/will be lost/.test(confirms[0] || ""),
+       "and says the unsaved work it replaces is kept, which is what happens", confirms[0]);
+    ok(client() === "Today Customer", "declining keeps the work on screen", client());
+    ok(recoverable("Earlier Customer") && !!bar(), "and the offer still stands");
+
+    // ---- 4. New while the offer is pending -------------------------------
+    // Round 3: New used to throw the unsaved work away ("will be lost"). It
+    // keeps it now, as Load does, and the question says so.
+    var todayKey = AS.liveKey();
+    E.updateMetadata({ clientName: "Today Customer Ltd" });   // typed, not yet autosaved
+    confirms = []; confirmAnswer = true;
+    document.getElementById("btn-new").click();
+    ok(confirms.length === 1, "New asks, as it always has");
+    ok(/kept in this browser and offered the next time the app starts/.test(confirms[0] || "") &&
+       /Cancel and Save first/.test(confirms[0] || "") && !/will be lost/.test(confirms[0] || ""),
+       "and says the unsaved changes are kept in this browser until restored or discarded", confirms[0]);
+    ok(confirms[0] && confirms[0].indexOf(String.fromCharCode(0x2014)) === -1, "(no em dashes in the question)");
+    ok(!client(), "New starts an empty project", String(client()));
+    ok(!bar(), "the bar goes with the session it was shown in");
+    ok(recoverable("Earlier Customer"),
+       "the offered work survives New",
+       "New used to delete it");
+    ok(offeredNames()[0] === "Today Customer Ltd",
+       "the replaced work is set aside as offered work, with the edit made just before New",
+       "offered: " + offeredNames().join(", "));
+    ok(!recoverable("Today Customer"), "(only the latest copy of it, not the stale one as well)");
+    ok(get(todayKey) === null, "the replaced session's live key is free");
+    ok(AS.liveKey() !== todayKey && get(AS.liveKey()) === null,
+       "the new, empty project is a new session, with no backup of its own yet");
+
+    // ---- 5. the next start offers everything kept ------------------------
+    AS.startup();
+    ok(!!bar(), "the next start offers the kept work again");
+    ok(/1 more copy/.test(bar() ? bar().textContent : ""),
+       "both copies: the work New replaced and the earlier one", bar() && bar().textContent);
+
+    // ---- 6. Load while the offer is pending ------------------------------
+    var thirdKey = AS.liveKey();
+    E.activateInstrument("ncsc-caf");
+    E.updateMetadata({ clientName: "Third Customer" });
+    ok(AS.isDirty(), "(unsaved work on screen before the load)");
+    confirms = []; confirmAnswer = true;
+    document.getElementById("btn-load").click();
+    // Asked in the page (see test-load-guard-and-rollback.html for why not
+    // with confirm()), and the chooser opens from its "Choose a file" button.
+    var q = document.querySelector(".load-guard-modal");
+    ok(!!q && /Load another project/.test(q.textContent), "Load asks before opening the chooser");
+    if (q) q.querySelector(".load-guard-go").click();
+    var dt = new DataTransfer();
+    var loaded = fileFor("Loaded Customer", "2026-10-01T10:00:00.000Z");
+    dt.items.add(new File([JSON.stringify(loaded)], "loaded.json", { type: "application/json" }));
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event("change"));
+    waitFor(function () { return /Project loaded/.test(toastText()) || /could not be loaded/.test(toastText()); }, function () {
+      try {
+        ok(client() === "Loaded Customer", "the chosen file is loaded", client() + " / " + toastText());
+        ok(!bar(), "the bar goes with the session it was shown in");
+        ok(recoverable("Earlier Customer"),
+           "the offered work survives Load",
+           "Load used to delete it");
+        ok(recoverable("Third Customer"),
+           "and so does the unsaved work the load replaced: Load does not delete the backup, as its question said");
+        ok(get(thirdKey) === null && get(AS.liveKey()) === null,
+           "the replaced session's key is free, and the freshly loaded project has nothing unsaved to back up");
+
+        // ---- 7. dismiss keeps; Discard removes only the copy shown ---------
+        AS.startup();
+        ok(/2 more copies/.test(bar() ? bar().textContent : ""), "all three kept copies are offered", bar() && bar().textContent);
+        bar().querySelector(".autosave-dismiss").click();
+        ok(!bar(), "dismiss closes the bar");
+        ok(recoverable("Third Customer") && recoverable("Today Customer Ltd") && recoverable("Earlier Customer"),
+           "and keeps every copy, as its tooltip promises");
+        AS.startup();
+        confirmAnswer = true;
+        btnIn(bar(), /Discard/).click();
+        ok(!recoverable("Third Customer"), "Discard removes the copy it was showing");
+        ok(recoverable("Today Customer Ltd") && recoverable("Earlier Customer"), "and only that one");
+        ok(!!bar() && /Unsaved work found/.test(bar().textContent) && /1 more copy/.test(bar().textContent),
+           "the next copy is offered straight away", bar() && bar().textContent);
+
+        // ---- 8. Restore with nothing unsaved on screen ---------------------
+        ok(!AS.isDirty(), "(the loaded project is clean)");
+        confirms = [];
+        btnIn(bar(), /Restore/).click();
+        ok(confirms.length === 0, "nothing unsaved on screen, so Restore does not ask", confirms.join(" | "));
+        ok(client() === "Today Customer Ltd", "Restore brings back the work New replaced", client());
+        ok(AS.isDirty(), "marked unsaved, because it is still only in the browser");
+        ok(!bar(), "the bar closes");
+        ok(offeredNames().join() === "Earlier Customer", "the restored copy leaves the offered list", offeredNames().join(", "));
+        ok(/Today Customer Ltd/.test(get(AS.liveKey()) || ""), "because it is this session's live backup again");
+
+        // ---- 9. New: declining, and with nothing unsaved -------------------
+        var liveBefore = get(AS.liveKey()), offeredBefore = get(OFFERED), keyBefore = AS.liveKey();
+        confirms = []; confirmAnswer = false;
+        document.getElementById("btn-new").click();
+        ok(confirms.length === 1 && /kept in this browser/.test(confirms[0] || ""), "(New asks, with unsaved work on screen)");
+        ok(client() === "Today Customer Ltd" && AS.isDirty(), "declining New keeps the project on screen, still unsaved");
+        ok(AS.liveKey() === keyBefore && get(AS.liveKey()) === liveBefore && get(OFFERED) === offeredBefore,
+           "and changes nothing in the browser: same session, same backup, same offered list");
+
+        STG.saveProjectToFile = function (pf, opts, cb) { cb({ ok: true, method: "file", name: "today.json" }); };
+        document.getElementById("btn-save").click();
+        ok(!AS.isDirty() && get(AS.liveKey()) === null, "(saved: nothing unsaved, no backup)");
+        confirms = []; confirmAnswer = false;
+        document.getElementById("btn-new").click();
+        ok(confirms.length === 1, "with a saved project on screen New still asks", confirms.join(" | "));
+        ok(/saved file is not changed/.test(confirms[0] || "") && !/kept in this browser/.test(confirms[0] || ""),
+           "and says the saved file is not changed, not that unsaved work is kept", confirms[0]);
+        ok(client() === "Today Customer Ltd", "declining keeps it on screen");
+        confirmAnswer = true;
+        document.getElementById("btn-new").click();
+        ok(!client(), "accepting starts an empty project");
+        ok(offeredNames().join() === "Earlier Customer",
+           "and sets nothing aside: there was nothing unsaved to keep", offeredNames().join(", "));
+        // New with an assessment open gives it an empty assessment on the
+        // default CAF profile, which counts as a choice made; one more New
+        // (no assessment open now) leaves nothing at all.
+        document.getElementById("btn-new").click();
+        confirms = [];
+        document.getElementById("btn-new").click();
+        ok(confirms.length === 0, "an empty project is replaced without a question", confirms.join(" | "));
+      } catch (e) {
+        ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+      }
+      finish();
+    });
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+    finish();
+  }
+  }, 20);
+});
+</script>
+</body></html>

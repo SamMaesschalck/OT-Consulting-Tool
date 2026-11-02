@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>CIS Controls v8.1.2 instrument check</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+  try {
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });
+    A.Engine.activateInstrument("cis-controls-v8");
+    var inst = A.Engine.state.instrument;
+    ok(inst && inst.id === "cis-controls-v8", "cis-controls-v8 activates");
+    ok(A.Engine.state.scoringFamily === "caf-achieved", "uses the caf-achieved scoring family");
+    ok(inst.framework === "CIS Controls" && inst.edition === "Version 8.1.2", "framework + edition", inst.framework + " / " + inst.edition);
+
+    // ---- structure ----
+    ok(A.Engine.getCAFObjectives().length === 1, "single CIS objective group", String(A.Engine.getCAFObjectives().length));
+    ok(A.Engine.getCAFPrinciples().length === 18, "18 CIS Controls (principles)", String(A.Engine.getCAFPrinciples().length));
+    var outs = inst.outcomes || [];
+    ok(outs.length === 153, "153 Safeguards (outcomes)", String(outs.length));
+    ok(inst.attribution && /Center for Internet Security/.test(inst.attribution), "carries CIS attribution");
+
+    // ---- 3-band state model ----
+    var sub = (inst.states || []).filter(function (s) { return s.value !== "unknown" && s.value !== "na"; });
+    ok(sub.length === 3 && sub.map(function (s) { return s.label; }).join(",") === "Implemented,Partially Implemented,Not Implemented", "3 bands: Implemented / Partially Implemented / Not Implemented", sub.map(function (s) { return s.label; }).join(","));
+
+    // ---- safeguard numbering (reconstructed; beats the xlsx float collision) ----
+    ok(outs.filter(function (o) { return o.id === "4.12"; }).length === 1, "double-digit safeguard 4.12 exists");
+    ok(outs.filter(function (o) { return o.principleId === "4"; }).length === 12, "Control 4 has 12 safeguards");
+    ok(outs.filter(function (o) { return o.principleId === "3"; }).length === 14, "Control 3 has 14 safeguards");
+
+    // ---- safeguard metadata ----
+    var sg = outs.filter(function (o) { return o.id === "1.1"; })[0];
+    ok(sg && sg.controlText && /accurate, detailed/.test(sg.controlText), "1.1 carries the Safeguard description");
+    ok(sg && sg.securityFunction === "Identify" && sg.assetClass === "Devices", "1.1 carries Security Function + Asset Class", sg && (sg.securityFunction + "/" + sg.assetClass));
+    ok(sg && sg.controlTextLabel && /CIS Safeguard/.test(sg.controlTextLabel), "description labelled 'CIS Safeguard'");
+
+    // ---- default profile + IG nesting ----
+    ok(A.Engine.getActiveCAFProfileId() === "cis-ig1", "default is IG1", A.Engine.getActiveCAFProfileId());
+    var reg = A.Engine.getCAFProfileRegistry();
+    ok(reg && reg.profiles.length === 4, "4 profiles (full + IG1/2/3)");
+    function appCount() { var ov = A.Engine.getActiveCAFOverlay(); var n = 0; for (var k in ov) if (ov[k] && ov[k].applicable) n++; return n; }
+    A.Engine.setCAFProfile("cis-ig1"); var i1 = appCount();
+    A.Engine.setCAFProfile("cis-ig2"); var i2 = appCount();
+    A.Engine.setCAFProfile("cis-ig3"); var i3 = appCount();
+    ok(i1 === 56 && i2 === 130 && i3 === 153, "IG nesting: IG1 56, IG2 130, IG3 153", i1 + "/" + i2 + "/" + i3);
+    var ov1 = (A.Engine.setCAFProfile("cis-ig1"), A.Engine.getActiveCAFOverlay());
+    ok(ov1["1.1"] && ov1["1.1"].applicable === true && ov1["1.1"].expectedState === "achieved", "1.1 expected under IG1");
+
+    // ---- getting-started wording ----
+    A.UI.go("engagement");
+    var m = document.getElementById("main").textContent;
+    ok(m.indexOf("CIS Critical Security Controls") !== -1 && m.indexOf("Implementation Group") !== -1, "getting-started shows CIS + Implementation Group wording");
+    ok(m.indexOf("NCSC CAF 4.0") === -1, "no leftover CAF wording");
+
+    // ---- family (Control) page: safeguards + expander + metadata line ----
+    A.UI.go("caf-principle", "1");
+    var cm = document.getElementById("main");
+    ok(cm.querySelectorAll(".caf-state-btn").length >= 3, "safeguard rows render with 3 state buttons");
+    var tog = cm.querySelector(".sl-row-bar .sl-guidance-toggle");
+    ok(!!tog && /What this safeguard requires/.test(tog.textContent), "expander toggle reads 'What this safeguard requires'", tog && tog.textContent);
+    ok(cm.textContent.indexOf("Security function:") !== -1 && cm.textContent.indexOf("Asset class:") !== -1, "safeguard row shows Asset class + Security function");
+    var sgPill = cm.querySelector('[data-req-id="1.1"]');
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "1.1", { applicable: true, state: "achieved" });
+    A.UI.go("caf-principle", "1"); cm = document.getElementById("main");
+    var r11 = cm.querySelector('[data-req-id="1.1"] .req-meta');
+    ok(r11 && /Implemented/.test(r11.textContent), "1.1 pill reads 'Implemented'", r11 && r11.textContent);
+
+    // ---- scoring + report ----
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "1.2", { applicable: true, state: "not" });
+    var scored = A.Engine.scoreActiveTarget();
+    ok(scored && scored.byPrinciple, "scoring runs (by Control)");
+    var c1 = scored.byPrinciple.filter(function (x) { return x.principleId === "1"; })[0];
+    ok(c1 && c1.counts.achieved >= 1 && c1.counts.not >= 1, "Control 1 counts reflect captured states");
+
+    // ---- Unknown is a finding for CIS (cannot verify / not tracked) ----
+    // 5.1 (Inventory of Accounts) is an IG1 safeguard, so it is in scope.
+    ok(inst.unknownIsFinding === true, "instrument flags Unknown as a finding");
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "5.1", { applicable: true, state: "unknown" });
+    var scored2 = A.Engine.scoreActiveTarget();
+    var u51 = scored2.perOutcome.filter(function (o) { return o.outcomeId === "5.1"; })[0];
+    ok(u51 && u51.state === "unknown" && u51.isUnknownFinding === true && u51.meetsExpected === false, "5.1 Unknown is a finding, below expected", u51 && (u51.state + "/" + u51.isUnknownFinding + "/" + u51.meetsExpected));
+    ok((scored2.roadmap || []).some(function (it) { return it.outcomeId === "5.1"; }), "the Unknown safeguard 5.1 appears on the roadmap");
+    var c5 = scored2.byPrinciple.filter(function (x) { return x.principleId === "5"; })[0];
+    ok(c5 && c5.below >= 1, "Control 5 'below' count includes the Unknown finding", c5 && String(c5.below));
+    ok(c5 && c5.counts.unknown >= 1 && c5.answered < c5.total, "Unknown still lowers coverage (not counted as answered)", c5 && ("unknown=" + c5.counts.unknown + " answered=" + c5.answered + "/" + c5.total));
+
+    // ---- Above-baseline: implemented but not required (no score effect) ----
+    // 1.3 is NOT an IG1 safeguard (Control 1 has required IG1 safeguards too).
+    // 13.1 is in Control 13, which has NO IG1 safeguards - so Control 13 is
+    // entirely above-baseline and exercises the "x / -" meeting-expected path.
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "1.3", { applicable: true, state: "achieved" });
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "13.1", { applicable: true, state: "achieved" });
+    var scored3 = A.Engine.scoreActiveTarget();
+    var ab = scored3.perOutcome.filter(function (o) { return o.outcomeId === "1.3"; })[0];
+    ok(ab && ab.aboveBaseline === true && ab.aboveBaselineState === "achieved", "1.3 (not in IG1) marked implemented is 'above baseline'", ab && (ab.aboveBaseline + "/" + ab.aboveBaselineState));
+    ok((scored3.aboveBaseline || []).some(function (it) { return it.outcomeId === "1.3"; }), "1.3 appears in the aboveBaseline list");
+    ok(!(scored3.roadmap || []).some(function (it) { return it.outcomeId === "1.3"; }), "above-baseline item is NOT on the roadmap");
+    ok(scored3.overall.total === scored2.overall.total, "above-baseline does not change the in-scope total (no score effect)", scored2.overall.total + " -> " + scored3.overall.total);
+    ok(scored3.overall.counts.aboveBaseline >= 1, "above-baseline counted separately (not as N/A)", String(scored3.overall.counts.aboveBaseline));
+    var container = document.createElement("div");
+    window.App.Report.render(container, {
+      engagement: A.Engine.state.engagement, instrument: inst, taxonomy: A.Engine.state.taxonomy, profile: A.Engine.state.profile,
+      narrative: A.Engine.getActiveNarrative ? A.Engine.getActiveNarrative() : null,
+      scored: scored3, scoredAll: A.Engine.scoreAllTargets(), activeTarget: A.Engine.getActiveTarget(),
+      cafProfileRegistry: reg, cafProfileId: A.Engine.getActiveCAFProfileId(), cafProfile: A.Engine.getActiveCAFProfile ? A.Engine.getActiveCAFProfile() : null
+    });
+    var abCards = Array.prototype.filter.call(container.querySelectorAll(".card"), function (c) { return /Additional controls implemented beyond/.test(c.textContent); });
+    ok(abCards.length === 1, "report shows the 'Additional controls implemented beyond the baseline' card");
+    ok(abCards.length === 1 && /1\.3/.test(abCards[0].textContent), "the above-baseline card lists safeguard 1.3");
+    // bar/table now also show non-required (above-baseline) results
+    var c13 = scored3.byPrinciple.filter(function (x) { return x.principleId === "13"; })[0];
+    ok(c13 && c13.counts.aboveBaseline >= 1 && (c13.meeting + c13.below) === 0, "Control 13 (no IG1 safeguards) is entirely above-baseline", c13 && (c13.counts.aboveBaseline + " ab, compared=" + (c13.meeting + c13.below)));
+    ok(container.textContent.indexOf("Above baseline") !== -1, "results table/legend show an 'Above baseline' column/key");
+    ok(container.querySelectorAll(".above").length >= 1, "above-baseline results render with the 'above' colour", String(container.querySelectorAll(".above").length));
+    var slashDash = Array.prototype.some.call(container.querySelectorAll("td.above"), function (td) { return /\/\s*-/.test(td.textContent); });
+    ok(slashDash, "a control implemented only above baseline shows 'x / -' for Meeting expected");
+    // results tables carry a bold totals row summing the Control rows
+    var foots = container.querySelectorAll(".tbl tfoot tr");
+    ok(foots.length >= 1, "results table has a totals row (tfoot)", String(foots.length));
+    var totalFoot = Array.prototype.filter.call(foots, function (tr) { return /Total/.test(tr.textContent); })[0];
+    ok(!!totalFoot, "totals row is labelled 'Total'");
+    // The by-Control table spends its second-to-last column on N/A rather than
+    // the applicable total, because the applicable total is already the
+    // denominator of the Meeting-expected column beside it.
+    var totalCells = Array.prototype.map.call(totalFoot.querySelectorAll("td"), function (td) { return td.textContent.trim(); });
+    var naSum = scored3.byPrinciple.reduce(function (a, p) { return a + (p.counts.na || 0); }, 0);
+    ok(totalCells[totalCells.length - 2] === String(naSum),
+       "totals row includes the summed N/A count", totalCells[totalCells.length - 2] + " vs expected " + naSum);
+    // ...and the applicable total is still readable, as that denominator.
+    var appSum = scored3.byPrinciple.reduce(function (a, p) { return a + p.total; }, 0);
+    var comparedSum = scored3.byPrinciple.reduce(function (a, p) { return a + p.meeting + p.below; }, 0);
+    ok(/\d+\s*\/\s*\d+/.test(totalCells[totalCells.length - 1]) || comparedSum === 0,
+       "totals row still exposes the applicable denominator via Meeting expected",
+       totalCells[totalCells.length - 1] + " (applicable=" + appSum + ")");
+    ok(container.textContent.length > 100 && /Inventory and Control of Enterprise Assets/.test(container.textContent), "report renders and references the Controls");
+    ok(/by control/i.test(container.textContent), "report uses the 'Control' principle noun (not 'principle')");
+    // single objective: the useless 1-bar 'Results by objective' card is dropped;
+    // the bar chart moves onto the 'Results by control' card (one bar per Control).
+    ok(container.textContent.indexOf("Results by objective") === -1, "no 'Results by objective' card for the single-objective CIS");
+    ok(container.querySelectorAll("svg").length >= 1, "report includes a bar chart (by Control)", String(container.querySelectorAll("svg").length));
+    // Unknown is the most severe finding: rendered with the 'severe' treatment
+    ok(container.querySelectorAll(".severe").length >= 1, "Unknown finding renders with the severe treatment (pill/legend/cell)", String(container.querySelectorAll(".severe").length));
+    var sevPill = container.querySelector(".pill.severe");
+    ok(sevPill && /Unknown/i.test(sevPill.textContent), "the Unknown roadmap item carries a severe pill labelled Unknown", sevPill && sevPill.textContent);
+
+    // ---- guided wizard works ----
+    A.UI.go("caf-wizard");
+    var wm = document.getElementById("main");
+    ok(!!wm.querySelector(".wizard"), "guided wizard renders for CIS");
+    ok(/1\s+of\s+153/.test(wm.textContent), "wizard counter counts to 153 safeguards", wm.querySelector(".wizard-topmeta") && wm.querySelector(".wizard-topmeta").textContent);
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

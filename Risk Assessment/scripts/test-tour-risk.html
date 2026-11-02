@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool tour tests</title></head>
+<body>
+<h1>risk-tool tour tests — ?tour mode with the completed 62443-3-2 demo</h1>
+<pre id="out">running…</pre>
+<iframe id="app" src="../index.html?tour=1" style="width:10px;height:10px;visibility:hidden"></iframe>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+
+  // Plant a "consultant's real unsaved work" sentinel BEFORE the tour boots:
+  // file:// pages share one storage origin in Chromium, so the parent page and
+  // the iframe see the same localStorage. The tour must leave it untouched.
+  var KEY = "spt-risk-tool:autosave:v1";
+  var SENTINEL = JSON.stringify({ savedOn: "2026-01-01T00:00:00.000Z", stage: "suc", project: { schema: "spt-risk-project/0.2", suc: { name: "REAL WORK - DO NOT LOSE" }, srs: { highLevelAssets: [] }, zones: [], conduits: [] } });
+  try { localStorage.setItem(KEY, SENTINEL); } catch (e) {}
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    // Wait for the app AND for the tour seed to have applied (async script load).
+    if (!w || !w.RiskTool || (w.RiskTool.state.project.suc.name || "").indexOf("Acme") !== 0) {
+      if (++tries > 200) { clearInterval(t); lines.push("FAIL tour did not seed the demo project"); failures++; done(); }
+      return;
+    }
+    clearInterval(t);
+    try { run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    done();
+  }, 50);
+
+  function run(w) {
+    var RT = w.RiskTool;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var p = RT.state.project;
+
+    // ---- tour mode boots seeded, without touching real work ----
+    ok(p.suc.name.indexOf("Acme Petrochemicals") === 0, "?tour boots with the demo project loaded");
+    ok(w.localStorage.getItem(KEY) === SENTINEL, "the consultant's autosave snapshot survives the tour boot untouched");
+    ok(!w.document.querySelector(".autosave-bar"), "no restore offer is shown in tour mode");
+    // Autosave stays inert even when the demo is edited.
+    RT.touched();
+    RT.flushAutosave();
+    ok(w.localStorage.getItem(KEY) === SENTINEL, "editing the demo never writes the autosave snapshot");
+
+    // ---- completeness of the demo ----
+    ok(p.srs.highLevelAssets.length === 6, "high-level ranking has 6 systems");
+    ok(p.zones.length === 4 && p.conduits.length === 3, "4 zones and 3 conduits");
+    ok(p.zones.every(function (z) { return z.name && z.description; }), "every zone named and described");
+    var promoted = p.zones.filter(function (z) { return z.fromHLA; }).map(function (z) { return z.fromHLA; }).join(",");
+    ok(promoted === "A1,A2,A3,A4", "the four high-ranked systems are promoted zones", promoted);
+    var threatCount = 0;
+    p.zones.concat(p.conduits).forEach(function (o) { threatCount += o.threats.length; });
+    ok(threatCount === 9, "9 threats registered across zones and conduits", String(threatCount));
+    ok(p.zones.concat(p.conduits).every(function (o) {
+      return o.threats.every(function (th) { return th.statement && th.likelihood && th.impact && th.affectedFR.length; });
+    }), "every threat has a statement, likelihood, impact and affected FRs");
+    ok(p.basisOfAssessment.interviews.length === 4 && p.basisOfAssessment.documents.length === 4 && p.basisOfAssessment.observations.length === 3, "basis of assessment is populated");
+    ok(p.approval.approved === true && !!p.approval.statement && p.approval.name === "R. Calder", "asset-owner sign-off recorded");
+
+    // ---- risk maths & dispositions tell the intended story ----
+    var z1 = p.zones[0], z2 = p.zones[1], z4 = p.zones[3];
+    ok(RT.threatRisk(z1.threats[0]) === "high", "Z1 T1 vendor-path risk is High");
+    ok(RT.threatDisposition(z1, z1.threats[0]) === "mitigated", "Z1 T1 mitigated: countermeasures bring residual to Medium (tolerable)", RT.threatDisposition(z1, z1.threats[0]));
+    ok(RT.threatDisposition(z1, z1.threats[1]) === "countermeasure", "Z1 T2 covered by existing allow-listing", RT.threatDisposition(z1, z1.threats[1]));
+    ok(RT.threatDisposition(z2, z2.threats[0]) === "countermeasure", "Z2 T4 covered by the hardwired keyswitch", RT.threatDisposition(z2, z2.threats[0]));
+    ok(RT.threatDisposition(z4, z4.threats[1]) === "accepted", "Z4 T8 carries a recorded risk acceptance", RT.threatDisposition(z4, z4.threats[1]));
+    ok(RT.threatDisposition(p.conduits[1], p.conduits[1].threats[0]) === "mitigated", "C2 T9 mitigated by the session controls");
+    var undispositioned = [];
+    p.zones.concat(p.conduits).forEach(function (o) {
+      o.threats.forEach(function (th) {
+        var risk = RT.threatRisk(th);
+        if (risk && RT.exceedsTolerable(risk, p.srs.tolerableRisk) && !RT.threatDisposition(o, th)) undispositioned.push(th.id);
+      });
+    });
+    ok(undispositioned.length === 0, "no above-tolerable threat is left without a disposition", undispositioned.join(","));
+
+    // ---- SL-T vectors ----
+    ok(RT.suggestZone(z2, p).byFR.RA.sl === 3, "SIS floor suggests SL3 on Z2");
+    ok(RT.FR_IDS.every(function (fr) { return z2.slTargetByFR[fr] === 3; }), "Z2 SL-T vector is SL3 across all FRs");
+    ok(z1.slTargetByFR.IAC === 3 && z1.slTargetByFR.RDF === 3 && z1.slTargetByFR.DC === 1, "Z1 vector matches the High risks (IAC/RDF 3, DC 1)");
+    ok(p.zones.concat(p.conduits).every(function (o) {
+      var hasTarget = RT.FR_IDS.some(function (fr) { return o.slTargetByFR[fr] != null; });
+      return !hasTarget || !!(o.justification || "").trim();
+    }), "every zone/conduit with an SL-T carries a written justification");
+
+    // ---- export chain: report guard + 3-3 risk context ----
+    var problems = RT.exportProblems(p);
+    ok(Array.isArray(problems) && problems.length === 0, "export guard reports no problems on the demo project", (problems || []).join(" | "));
+    var ctx = RT.buildRiskContext(p);
+    ok(ctx && /spt-risk-context/.test(ctx.schema || ""), "risk-context export builds", ctx && ctx.schema);
+    ok((ctx.zones || []).length === 4 && (ctx.conduits || []).length === 3, "context carries the zones and conduits");
+    var zc = (ctx.zones || [])[1] || {};
+    ok(zc.slTarget === 3 && zc.slTargetByFR && zc.slTargetByFR.IAC === 3, "SIS zone exports SL-T 3 (scalar + per-FR)");
+
+    // ---- the demo actually renders (not just state) ----
+    ok(w.document.body.textContent.indexOf("Acme Petrochemicals") !== -1, "the rendered page shows the demo SuC");
+  }
+})();
+</script>
+</body>
+</html>

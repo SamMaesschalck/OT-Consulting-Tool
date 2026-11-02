@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Posture demo - a report that uses everything the tool offers</title></head>
+<body><div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script>
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ o=o||{}; this.__type="Paragraph"; this.children=o.children||[]; this.heading=o.heading||null;
+    this.style=o.style||null; this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ o=o||{}; this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ o=o||{}; this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ o=o||{}; this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text=""; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.sections=o.sections||[]; window.__doc=this; }
+  var Packer={ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } };
+  return { Document:Document,Paragraph:Paragraph,TextRun:TextRun,TableCell:TableCell,TableRow:TableRow,
+    Table:Table,ImageRun:ImageRun,PageBreak:PageBreak,Header:Header,Footer:Footer,
+    PageNumber:{CURRENT:"CURRENT",TOTAL_PAGES:"TOTAL_PAGES"},
+    PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"Heading1",HEADING_2:"Heading2",HEADING_3:"Heading3"},
+    AlignmentType:{LEFT:"left",CENTER:"center",RIGHT:"right"},
+    WidthType:{PERCENTAGE:"pct"}, ShadingType:{SOLID:"solid"}, Packer:Packer };
+})();
+</script>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["posture"] });</script>
+<script>
+// The General OT Security Posture demo is the reference for a report that uses
+// EVERYTHING the tool offers. Capabilities kept landing after it was written
+// and it quietly stopped demonstrating them - it had no basis of assessment, no
+// advice on anything that already met its target, and no consultant glossary
+// terms, long after all three shipped. Each is pinned here, so a demo that goes
+// thin fails a test rather than just looking finished.
+(function () {
+  var A = window.App, E = A.Engine, R = A.Report, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    document.getElementById("out").textContent =
+      out.join("\n") + "\n\n" + (fail ? fail + " FAILED" : "ALL TESTS PASSED (" + out.length + ")");
+  }
+  function screenText() { return document.getElementById("main").textContent; }
+  function docText() {
+    var t = [];
+    (function walk(n) {
+      if (!n) return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      if (n.__type === "Paragraph") { t.push(n.text || ""); return; }
+      if (n.__type === "Table") { walk(n.rows); return; }
+      if (n.__type === "TableRow" || n.__type === "TableCell") { walk(n.children); return; }
+    })((window.__doc.sections || []).map(function (s) { return s.children; }));
+    return t.join("\n");
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+    E.activateInstrument("general-ot-posture");
+    A.TourPosture.apply(E);
+
+    var eng = E.state.engagement;
+    var scored = E.scoreActiveTarget();
+    var tid = E.getActiveTarget().id;
+
+    // ---- the previous review ---------------------------------------------
+    // The same customer file holds the 2024 posture review, so the demo shows
+    // the re-assessment story rather than a single point in time.
+    var TP = A.TourPosture;
+    var all = E.assessmentsFor("general-ot-posture");
+    ok(all.length === 4,
+       "the demo file holds four posture reviews: the 2024 archive, this year's organisation read, and one per plant",
+       String(all.length));
+    ok(all[0].engagementMeta.dateOfVisit === TP.prior.dateOfVisit,
+       "the earliest is the 2024 review", all[0].engagementMeta.dateOfVisit);
+    ok(E.state.activeAssessmentId === all[1].id,
+       "the tour opens on this year's organisation-wide review, not a plant");
+
+    // A site is an ASSESSMENT: two plants means two assessments, each naming
+    // its own site. That is what the roll-up and the exports read.
+    var plants = all.filter(function (a) {
+      return /Teesside|Immingham/.test((a.engagementMeta || {}).siteName || "");
+    });
+    ok(plants.length === 2, "two of them are per-plant assessments",
+       plants.map(function (p) { return (p.engagementMeta || {}).siteName; }).join(", "));
+    ok(plants.every(function (p) { return (p.responses || []).length > 0; }),
+       "and both carry answers");
+    ok(plants.every(function (p) { return (p.targets || []).length === 1; }),
+       "each with a single target, because the site is the assessment, not a target");
+
+    // The point of the roll-up is the rows where the plants disagree.
+    var roll = A.Compare.rollUpSites({
+      instrument: E.state.instrument, taxonomy: E.state.taxonomy, profile: E.state.profile,
+      family: E.state.scoringFamily,
+      entries: plants.map(function (p) {
+        return { id: p.id, name: (p.engagementMeta || {}).siteName, responses: p.responses };
+      })
+    });
+    ok(roll.summary.differing > 0,
+       "the two plants genuinely differ, so the roll-up has something to report",
+       JSON.stringify(roll.summary));
+    ok(roll.divergent.every(function (i) { return i.worstSites.length > 0; }),
+       "and every differing row names the plant that sets it");
+
+    // The site moved from the customer file onto the assessment, so the thing
+    // to prove is that a per-plant report still says which plant it is - on
+    // screen, in Word and in Excel.
+    var teesside = plants.filter(function (p) {
+      return /Teesside/.test((p.engagementMeta || {}).siteName || "");
+    })[0];
+    ok(!!teesside, "the Teesside assessment is there to report on");
+    if (teesside) {
+      E.activateAssessment(teesside.id);
+      ok((E.state.engagement.engagement || {}).siteName === "Plant A - Teesside",
+         "activating it puts its own site on the engagement the reports read",
+         (E.state.engagement.engagement || {}).siteName);
+
+      A.UI.go("report");
+      var screen = document.getElementById("main").textContent;
+      ok(/Teesside/.test(screen), "the on-screen report names that site");
+      // The preview also carries the organisation-wide roll-up card, which
+      // names every site on purpose - that is the cross-site view, and it is
+      // screen-only. The per-site DOCUMENT is checked separately below.
+      ok(/Organisation-wide position/.test(screen) && /Immingham/.test(screen),
+         "alongside the organisation-wide card, which names the other plants");
+
+      var built = null, err = null;
+      window.__capturedDoc = null;
+      A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy,
+        E.state.profile, E.getActiveNarrative(), {},
+        function (e2) { err = e2; built = window.__capturedDoc; });
+      ok(!err, "its Word report builds", err ? err.message : "");
+      if (built) {
+        var txt = [];
+        (function walk(n) {
+          if (!n) return;
+          if (n.__type === "Paragraph") { txt.push(n.text || ""); return; }
+          if (n.__type === "Table") { (n.rows || []).forEach(walk); return; }
+          if (n.__type === "TableRow" || n.__type === "TableCell") { (n.children || []).forEach(walk); return; }
+          if (Array.isArray(n)) n.forEach(walk);
+        })((built.sections || []).map(function (s) { return s.children || []; }));
+        var docText = txt.join("\n");
+        ok(/Teesside/.test(docText),
+           "and the document carries the site it was assessed at");
+        // A client report for one plant must not discuss another. The roll-up
+        // is a separate, deliberately-chosen organisation-wide document.
+        ok(!/Immingham/.test(docText),
+           "and does NOT name the other plant, whose assessment is its own report");
+      }
+
+      var wbk = A.ExportXLSX.build(E.state.engagement, E.state.instrument,
+        E.state.taxonomy, E.state.profile, {});
+      ok(!!wbk && (wbk.SheetNames || []).length > 0, "its workbook builds",
+         wbk ? (wbk.SheetNames || []).join(",") : "none");
+      E.activateAssessment(all[1].id);   // back to the organisation-wide read
+    }
+
+    // The 2024 archive is a prior read, not a peer site, so it must not be
+    // rolled in beside this year's plants.
+    var sibs = E.siblingSiteAssessments("general-ot-posture");
+    ok(sibs.every(function (a) {
+         return (a.engagementMeta || {}).dateOfVisit !== TP.prior.dateOfVisit;
+       }), "the 2024 archive is excluded from the sites to roll up",
+       sibs.map(function (a) { return (a.engagementMeta || {}).dateOfVisit; }).join(", "));
+    ok(all[0].label === TP.prior.label,
+       "the archive is labelled, so the picker reads as a history", all[0].label);
+    ok(all[0].engagementMeta.opportunityId !== all[1].engagementMeta.opportunityId,
+       "each review carries its own opportunity id");
+
+    // A delta naming a question that does not exist would silently do nothing
+    // and the demo would show no progress at all.
+    var rowIds = {};
+    TP.rows.forEach(function (r) { rowIds[r.id] = true; });
+    ok(TP.prior.deltas.every(function (d) { return rowIds[d.id]; }),
+       "every 2024 delta names a question the demo actually answers",
+       TP.prior.deltas.filter(function (d) { return !rowIds[d.id]; }).map(function (d) { return d.id; }).join(","));
+    ok(TP.prior.deltas.every(function (d) {
+         var now = TP.rows.filter(function (r) { return r.id === d.id; })[0];
+         return now && typeof now.band === "number" && d.band < now.band;
+       }), "and each scored LOWER in 2024 than it does now");
+
+    var bl = all[1].baseline;
+    ok(!!bl && (bl.responses || []).length > 0, "this year's review carries the 2024 baseline");
+    ok(bl && bl.responses !== all[0].responses,
+       "the baseline is a copy, so editing the archive cannot rewrite history");
+
+    var diff = A.Compare.compare({
+      instrument: E.state.instrument, taxonomy: E.state.taxonomy, profile: E.state.profile,
+      family: E.state.scoringFamily,
+      baselineResponses: bl.responses, currentResponses: E.state.engagement.responses
+    });
+    ok(diff.summary.improved >= TP.prior.deltas.length,
+       "the comparison reports an improvement for every authored delta",
+       diff.summary.improved + " improved of " + TP.prior.deltas.length);
+    ok(diff.summary.regressed === 0, "and nothing regressed", String(diff.summary.regressed));
+
+    // ---- the assessment is finished, not half-captured ----
+    var answered = (eng.responses || []).filter(function (r) { return r.band != null; }).length;
+    ok(answered >= 25, "every scored question is answered", String(answered));
+    var noEvidence = (eng.responses || []).filter(function (r) {
+      return r.band != null && !String(r.evidence || "").trim();
+    }).length;
+    ok(noEvidence === 0, "every answer carries evidence", noEvidence + " without");
+
+    // ---- the questions added in content version 1.1.0 ----
+    // Two on privileged access (separate admin accounts, and where privileged
+    // accounts may log on) plus change management, awareness, supplier
+    // expectations and legacy systems. A new question that the demo does not
+    // answer shows up as an unanswered gap in every screenshot of the tool.
+    var NEW_Q = ["access.5", "access.6", "gov.6", "gov.7", "gov.8", "protect.6",
+                 "monitor.4", "monitor.5", "protect.7", "respond.5"];
+    var qById = {};
+    (E.state.instrument.questions || []).forEach(function (q) { qById[q.id] = q; });
+    var missingQ = NEW_Q.filter(function (id) { return !qById[id]; });
+    ok(missingQ.length === 0, "the instrument carries the new posture questions", missingQ.join(", "));
+
+    var unanswered = NEW_Q.filter(function (id) {
+      var r = (eng.responses || []).filter(function (x) { return x.requirementId === id; })[0];
+      return !r || typeof r.band !== "number" || !String(r.evidence || "").trim();
+    });
+    ok(unanswered.length === 0, "and the demo answers every one of them, with evidence",
+       unanswered.join(", "));
+
+    // The capture field on access.6 is a separate store from the band, so it
+    // needs writing separately - it silently did not save until the tour's
+    // applier learned to.
+    var a6 = (eng.responses || []).filter(function (x) { return x.requirementId === "access.6"; })[0];
+    ok(a6 && a6.capture && a6.capture.authn === "Same domain as corporate IT",
+       "access.6 records how OT authenticates, not just the band",
+       a6 && a6.capture ? JSON.stringify(a6.capture) : "none");
+
+    // Priority bands are stored in the form the dropdown, the report and the
+    // Word colour coding all read. The demo used to write "High"/"Medium"/"Low",
+    // which matched nothing: the band showed blank on screen and printed empty.
+    var badBand = (eng.responses || []).filter(function (r) {
+      return r.priorityBand && ["high", "medium", "low"].indexOf(r.priorityBand) === -1;
+    }).map(function (r) { return r.requirementId + "=" + r.priorityBand; });
+    ok(badBand.length === 0, "every priority band is stored in the form the tool reads",
+       badBand.join(", "));
+
+    // ---- the whole range of answer types ----
+    ok((eng.responses || []).some(function (r) { return r.unknown; }),
+       "an Unknown answer is included, so coverage and confidence are exercised");
+    ok((eng.responses || []).some(function (r) { return r.applicable && r.band == null && !r.unknown && r.notes; }),
+       "a context-only answer is included");
+
+    // ---- improvement plans on the gaps ----
+    var gapsWithPlan = (scored.roadmap || []).filter(function (r) {
+      return String(r.action || "").trim() && String(r.owner || "").trim();
+    }).length;
+    ok((scored.roadmap || []).length > 0 && gapsWithPlan === scored.roadmap.length,
+       "every gap on the roadmap has an owner and a recommended action",
+       gapsWithPlan + " of " + (scored.roadmap || []).length);
+
+    // ---- advice on something that already MEETS its target ----
+    var further = R.furtherRecommendations({
+      scored: scored, instrument: E.state.instrument, engagement: eng, activeTarget: E.getActiveTarget()
+    });
+    ok(further.length >= 1, "advice is recorded on at least one top-band answer", String(further.length));
+    var onRoadmap = {};
+    (scored.roadmap || []).forEach(function (r) { onRoadmap[r.itemId || r.requirementId] = true; });
+    ok(further.every(function (f) { return !onRoadmap[f.id]; }),
+       "...and none of it is counted as outstanding work on the roadmap");
+
+    // ---- basis of assessment ----
+    var basis = E.getBasisOfAssessment();
+    ok((basis.interviews || []).length >= 3, "the basis names who was interviewed", String((basis.interviews||[]).length));
+    ok((basis.documents || []).length >= 3, "...what was reviewed", String((basis.documents||[]).length));
+    ok((basis.observations || []).length >= 2, "...and what was seen", String((basis.observations||[]).length));
+    ok((basis.documents || []).every(function (d) { return d.reference && d.date; }),
+       "every document carries a reference and a date, so the read is repeatable");
+
+    // ---- consultant's own report content ----
+    var rn = E.getReportNarrative();
+    ok(String(rn.nextSteps || "").trim() !== "", "the proposed next steps are written");
+    ok(!R.nextStepsLines(eng, {}).some(R.nextStepsIsPrompt),
+       "...with no [bracketed] prompts left unanswered");
+    ok(String(rn.topPriorities || "").trim() && String(rn.regulatoryExposure || "").trim(),
+       "both executive-summary blocks are supplied");
+    ok(R.consultantTerms(eng).length >= 2, "site vocabulary is added to the glossary",
+       String(R.consultantTerms(eng).length));
+    ok(String((E.getReportSection("method-and-limitations") || {}).prose || "").trim() !== "",
+       "the standing method text is rewritten for this engagement");
+
+    // ---- the headline exercises the capped-mean rule ----
+    ok(scored.capBinding === true,
+       "the headline is DECIDED by the weakest-domain ceiling, so the 'held down' prose fires",
+       "grade=" + scored.headlineGrade + " mean=" + scored.headlineMeanGrade +
+       " ceiling=" + scored.capCeilingGrade + " reason=" + scored.capReason);
+    ok(scored.headlineGrade !== (scored.weakestDomain || {}).grade,
+       "...and the headline is NOT simply the weakest domain's grade",
+       scored.headlineGrade + " vs " + (scored.weakestDomain || {}).grade);
+
+    // ---- it all reaches the screen ----
+    A.UI.go("report");
+    var s = screenText();
+    ok(s.indexOf("R. Hendry") !== -1, "screen: the basis of assessment is shown");
+    ok(s.indexOf("Further recommendations") !== -1 && s.indexOf("Review the standing vendor accounts") !== -1,
+       "screen: advice on a met answer is shown, under its own heading");
+    ok(s.indexOf("Beeston control room") !== -1 && s.indexOf("Other terms used in this report") !== -1,
+       "screen: the site glossary terms are shown");
+    ok(s.indexOf("Re-assess in six months") !== -1, "screen: the next steps are shown");
+
+    // An Unknown is a finding in its own right: the reader has to be able to
+    // see WHICH point is unseen, not just how many there are.
+    ok(/Could not be established in this domain/.test(s),
+       "screen: findings by domain names what could not be established");
+    ok(/could not be confirmed during the interview/.test(s),
+       "screen: ...with the consultant's reason beside it");
+    ok(!/Lowest-scoring points[\s\S]{0,400}Fully in place/.test(s),
+       "screen: 'lowest-scoring points' never lists a top-band answer");
+
+    // ---- every domain tied at the lowest grade is named, not just one ----
+    (E.state.instrument.questions || []).forEach(function (q) {
+      if (/^respond\./.test(q.id)) E.setResponse(tid, q.id, { applicable: true, band: 0 });
+    });
+    var tied = E.scoreActiveTarget();
+    ok((tied.weakestDomains || []).length === 2, "a tie at the lowest grade is detected",
+       (tied.weakestDomains || []).map(function (d) { return d.name; }).join(" | "));
+    A.UI.go("report");
+    var st = screenText();
+    ok(/Weakest areas/.test(st) && /Response and recovery/.test(st) && /Monitoring and detection/.test(st),
+       "screen: the headline card names BOTH tied domains");
+    var tiedSteps = R.defaultNextSteps({ instrument: E.state.instrument, scored: tied });
+    ok(tiedSteps.some(function (x) { return /response and recovery/.test(x) && /monitoring and detection/.test(x); }),
+       "the next-steps scaffold names both, so neither goes unaddressed",
+       tiedSteps.filter(function (x) { return /weakest/.test(x); })[0] || "(none)");
+
+    // ---- and the Word document ----
+    A.ExportDOCX.buildAsync(eng, E.state.instrument, E.state.taxonomy, E.state.profile,
+      E.getActiveNarrative(), { targetId: tid }, function (err) {
+        try {
+          if (err) { ok(false, "Word build - " + (err.message || err)); return flush(); }
+          var t = docText();
+          ok(t.indexOf("R. Hendry") !== -1 && t.indexOf("OT-SEC-POL v3.0") !== -1,
+             "Word: the basis of assessment prints");
+          ok(t.indexOf("Beeston control room and engineering workstations") !== -1,
+             "Word: the systems observed print");
+          ok(t.indexOf("Review the standing vendor accounts") !== -1,
+             "Word: advice on a met answer prints");
+          ok(t.indexOf("Beeston control room") !== -1, "Word: the site glossary terms print");
+          ok(t.indexOf("Re-assess in six months") !== -1, "Word: the next steps print");
+          ok(/held down|could not have been higher/.test(t),
+             "Word: the report explains why the headline is where it is");
+          ok(t.indexOf("walkthrough of the control room") !== -1,
+             "Word: the rewritten method describes how THIS session was run");
+          ok(t.indexOf("It does not verify controls in technical depth") !== -1,
+             "Word: ...and the limitations paragraph is not lost in the rewrite");
+          ok(t.indexOf("[Consultant to") === -1,
+             "Word: nothing is left for the consultant to fill in - the demo is finished",
+             (t.match(/\[Consultant to[^\]]*\]/) || [""])[0]);
+          ok(/points that could not be established/i.test(t),
+             "Word: findings by domain names what could not be established");
+          ok(/Why: /.test(t), "Word: ...with the consultant's reason beside it");
+          ok(/Weakest domains, all at F: /.test(t),
+             "Word: both tied domains are named on the scorecard",
+             (t.match(/Weakest domains?[^.]*\./) || ["(none)"])[0]);
+          ok((t.match(/Yes, holds the grade down/g) || []).length === 2,
+             "Word: both tied domains are flagged in the results table",
+             String((t.match(/Yes, holds the grade down/g) || []).length));
+          flush();
+        } catch (e) { ok(false, "threw: " + e.message); flush(); }
+      });
+  } catch (e) { ok(false, "threw: " + (e && e.message)); flush(); }
+})();
+</script>
+</body></html>

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Cross-family report consistency</title></head>
+<!-- NOTE: this page builds a full Word document for 12 instruments, each with
+     chart rasterisation, so it needs a generous headless budget:
+       msedge --headless=new --virtual-time-budget=180000 --dump-dom ...
+     At a smaller budget it stops part-way. It always ends with
+     "ALL TESTS PASSED" or "<n> FAILED" - if neither is present the run was
+     truncated and the pass count means nothing. -->
+<body><pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script>
+// Structure-only docx mock.
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ o=o||{}; this.__type="Paragraph"; this.children=o.children||[]; this.heading=o.heading||null;
+    this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ o=o||{}; this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ o=o||{}; this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ o=o||{}; this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text=""; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.sections=o.sections||[]; window.__doc=this; }
+  var Packer={ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } };
+  return { Document:Document,Paragraph:Paragraph,TextRun:TextRun,TableCell:TableCell,TableRow:TableRow,
+    Table:Table,ImageRun:ImageRun,PageBreak:PageBreak,Header:Header,Footer:Footer,
+    PageNumber:{CURRENT:"CURRENT",TOTAL_PAGES:"TOTAL_PAGES"},
+    PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"Heading1",HEADING_2:"Heading2",HEADING_3:"Heading3"},
+    AlignmentType:{LEFT:"left",CENTER:"center",RIGHT:"right"},
+    WidthType:{PERCENTAGE:"pct"}, ShadingType:{SOLID:"solid"}, Packer:Packer };
+})();
+</script>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["41", "42", "caf", "cis", "cra", "csms", "ml", "nis2", "nist", "posture", "sl", "supplier"] });</script>
+<script>
+// Every family's Word report must carry BOTH a "Method and limitations"
+// section and an "Appendix: scoring methodology" describing ITS OWN rules.
+// Before this, only capability-sl had an appendix, and the Excel "Read me"
+// sheet printed the capability-SL rules into every workbook.
+(function () {
+  var A = window.App, E = A.Engine, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() { document.getElementById("out").textContent = out.join("\n"); }
+
+  E.loadCatalog();
+  var SEED = {
+    "iec-62443-3-3": A.TourSL, "iec-62443-4-2": A.Tour42, "ncsc-caf": A.TourCAF,
+    "general-ot-posture": A.TourPosture, "iec-62443-2-1-2024": A.TourML,
+    "nis2-assessment": A.TourNIS2, "iec-62443-4-1": A.Tour41,
+    "iec-62443-2-1-2010": A.TourCSMS, "eu-cra": A.TourCRA,
+    "supplier-screener": A.TourSupplier, "nist-800-53": A.TourNIST, "cis-controls-v8": A.TourCIS
+  };
+  // One representative per scoring family, plus the two domain-letter ones.
+  var CASES = ["iec-62443-3-3", "iec-62443-4-2", "ncsc-caf", "nist-800-53", "cis-controls-v8",
+               "general-ot-posture", "supplier-screener", "iec-62443-2-1-2024", "iec-62443-4-1",
+               "nis2-assessment", "iec-62443-2-1-2010", "eu-cra"];
+
+  // A phrase unique to the capability-SL methodology. If it turns up in another
+  // family's appendix, that family is describing the wrong scoring model.
+  var SL_ONLY = /target Security Level \(default SL 2\)|weakest-link aggregation/;
+
+  function headingsOf(doc) {
+    var hs = [];
+    (doc.sections || []).forEach(function (sec) {
+      (sec.children || []).forEach(function (n) {
+        if (n && n.__type === "Paragraph" && n.heading) hs.push({ lvl: n.heading, text: (n.text || "").trim() });
+      });
+    });
+    return hs;
+  }
+  // Flat list of body nodes in document order, so we can check what sits
+  // immediately before a heading.
+  function flatNodes(doc) {
+    var ns = [];
+    (doc.sections || []).forEach(function (sec) {
+      (sec.children || []).forEach(function (n) { if (n) ns.push(n); });
+    });
+    return ns;
+  }
+  function isPageBreak(n) {
+    return !!n && n.__type === "Paragraph" &&
+      (n.children || []).some(function (c) { return c && c.__type === "PageBreak"; });
+  }
+
+  function allText(doc) {
+    var t = [];
+    (doc.sections || []).forEach(function (sec) {
+      (sec.children || []).forEach(function (n) {
+        if (!n) return;
+        if (n.__type === "Paragraph") t.push(n.text || "");
+      });
+    });
+    return t.join("\n");
+  }
+
+  function next(i) {
+    flush();
+    if (i >= CASES.length) {
+      out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"); flush(); return;
+    }
+    var id = CASES[i];
+    E.activateInstrument(id);
+    var inst = E.state.instrument;
+    var mod = SEED[id];
+    if (mod && mod.apply) mod.apply(E);
+    window.__doc = null;
+    A.ExportDOCX.buildAsync(E.state.engagement, inst, E.state.taxonomy, E.state.profile,
+      E.getActiveNarrative(), { targetId: E.state.activeTargetId }, function (err) {
+        if (err) { ok(false, id + ": Word build - " + err.message); return next(i + 1); }
+        var hs = headingsOf(window.__doc);
+        var h1s = hs.filter(function (h) { return h.lvl === "Heading1"; }).map(function (h) { return h.text; });
+        ok(h1s.indexOf("Method and limitations") !== -1, id + ": has 'Method and limitations'", h1s.join(" | "));
+        ok(h1s.indexOf("Appendix: scoring methodology") !== -1, id + ": has a scoring-methodology appendix");
+
+        // The appendix must open a new page, and must not do it by leaving a
+        // blank one (two breaks back to back, or a break as the first node of
+        // a Word section that already starts on a fresh page).
+        var nodes = flatNodes(window.__doc);
+        var apIdx = -1;
+        for (var k = 0; k < nodes.length; k++) {
+          if (nodes[k].__type === "Paragraph" && nodes[k].heading === "Heading1" &&
+              (nodes[k].text || "").trim() === "Appendix: scoring methodology") { apIdx = k; break; }
+        }
+        ok(apIdx > 0, id + ": appendix heading found in the body", String(apIdx));
+        if (apIdx > 0) {
+          ok(isPageBreak(nodes[apIdx - 1]), id + ": appendix starts on a new page");
+          ok(!isPageBreak(nodes[apIdx - 2]), id + ": no doubled page break before the appendix");
+        }
+
+        var txt = allText(window.__doc);
+        if (inst.scoringFamily !== "capability-sl") {
+          ok(!SL_ONLY.test(txt), id + ": does not describe capability-SL scoring rules");
+        }
+        // The appendix must actually say something structured.
+        var lines = A.ExportDOCX.methodologyLinesFor(inst);
+        ok(lines && lines.length >= 6, id + ": methodology has real content", lines ? String(lines.length) : "none");
+        ok(lines.some(function (l) { return l.kind === "head"; }) && lines.some(function (l) { return l.kind === "bullet"; }),
+           id + ": methodology is structured (heads + bullets)");
+
+        // Every family closes with the consultant's proposed next steps, and
+        // every demo dataset fills them, so no red placeholder should survive.
+        ok(h1s.indexOf("Proposed next steps") !== -1, id + ": has 'Proposed next steps'", h1s.join(" | "));
+        var steps = A.Report.nextStepsLines(E.state.engagement);
+        ok(steps.length > 0, id + ": the demo supplies next steps", String(steps.length));
+        if (steps.length) ok(txt.indexOf(steps[0]) !== -1, id + ": the first next step prints", steps[0]);
+
+        // domain-letter: roadmap headings must be code + short title, not the
+        // whole question sentence.
+        if (inst.scoringFamily === "domain-letter") {
+          var h2s = hs.filter(function (h) { return h.lvl === "Heading2" && /^P\d+\s/.test(h.text); })
+                      .map(function (h) { return h.text; });
+          ok(h2s.length > 0, id + ": roadmap has priority headings", String(h2s.length));
+          var longest = h2s.reduce(function (a, b) { return b.length > a.length ? b : a; }, "");
+          ok(longest.length <= 60, id + ": roadmap headings are short", "longest: " + longest);
+          ok(!h2s.some(function (t) { return /\?$/.test(t); }), id + ": no roadmap heading is a question", longest);
+        }
+        next(i + 1);
+      });
+  }
+
+  // Excel "Read me" must describe the active family, not always capability-SL.
+  try {
+    E.activateInstrument("ncsc-caf");
+    var cafLines = A.ExportDOCX.methodologyLinesFor(E.state.instrument);
+    E.activateInstrument("iec-62443-3-3");
+    var slLines = A.ExportDOCX.methodologyLinesFor(E.state.instrument);
+    ok(cafLines !== slLines, "methodologyLinesFor returns a different set per family");
+    ok(!cafLines.some(function (l) { return SL_ONLY.test(l.text); }),
+       "CAF methodology does not mention SL target scoring");
+  } catch (e) { ok(false, "family methodology lookup threw: " + e.message); }
+
+  next(0);
+})();
+</script>
+</body></html>

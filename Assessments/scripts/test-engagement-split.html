@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Engagement details - customer shared, engagement per assessment</title></head>
+<body><div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock" });</script>
+<script>
+// One save file per customer, but a customer has more than one engagement: a
+// 62443-3-3 in May under one opportunity, an 800-82 in September under another.
+// So the metadata splits - the customer belongs to the FILE, the opportunity /
+// who / when / document control belong to the ASSESSMENT.
+(function () {
+  var A = window.App, E = A.Engine, STG = A.Storage, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    document.getElementById("out").textContent =
+      out.join("\n") + "\n\n" + (fail ? fail + " FAILED" : "ALL TESTS PASSED (" + out.length + ")");
+  }
+  function meta() { return E.state.engagement.engagement; }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // ---- the split is declared, not guessed at ----
+    // Only the CUSTOMER is shared by the file. A site is a facility or location
+    // of that customer - Manchester and Birmingham are two sites of one company,
+    // and each gets its own assessment - so the site travels with the
+    // assessment, not with the file.
+    ok(STG.SHARED_META_KEYS.join(",") === "clientName",
+       "the customer half is the client, and only the client", STG.SHARED_META_KEYS.join(","));
+    ok(["siteName", "siteAddress", "siteContact"].every(function (k) {
+         return STG.ASSESSMENT_META_KEYS.indexOf(k) !== -1;
+       }), "the site belongs to the assessment");
+    ok(STG.ASSESSMENT_META_KEYS.indexOf("opportunityId") !== -1 &&
+       STG.ASSESSMENT_META_KEYS.indexOf("consultant") !== -1 &&
+       STG.ASSESSMENT_META_KEYS.indexOf("dateOfVisit") !== -1 &&
+       STG.ASSESSMENT_META_KEYS.indexOf("documentRevision") !== -1,
+       "the engagement half carries the opportunity, who, when and the revision");
+    ok(STG.SHARED_META_KEYS.every(function (k) { return STG.ASSESSMENT_META_KEYS.indexOf(k) === -1; }),
+       "no field is in both halves");
+
+    // ---- assessment one: the 62443-3-3, done in May ----
+    E.activateInstrument("iec-62443-3-3");
+    E.updateMetadata({
+      clientName: "Acme Petrochemicals", siteName: "Plant A",
+      siteAddress: "Bootle Road", siteContact: "G. Whitcombe",
+      opportunityId: "OPP-4471", consultant: "S. Maesschalck",
+      dateOfVisit: "2026-05-21", documentRevision: "1.0"
+    });
+    ok(meta().opportunityId === "OPP-4471" && meta().clientName === "Acme Petrochemicals",
+       "one patch can carry both halves and both land");
+    ok(E.state.project.clientName === "Acme Petrochemicals", "the customer went to the project record");
+    ok(E.state.project.opportunityId === undefined,
+       "the opportunity did NOT go to the project record", String(E.state.project.opportunityId));
+    ok(E.getAssessmentMeta().opportunityId === "OPP-4471",
+       "...it went to the assessment");
+
+    // ---- assessment two: the 800-82, done in September, same customer ----
+    E.activateInstrument("nist-800-82");
+    ok(meta().clientName === "Acme Petrochemicals",
+       "the customer carries across to the next assessment");
+    ok(!meta().siteName && !meta().siteAddress,
+       "but the SITE does not: this one may be at a different facility",
+       meta().siteName + " / " + meta().siteAddress);
+    ok(!meta().opportunityId && !meta().dateOfVisit && !meta().consultant,
+       "the first engagement's opportunity, date and consultant do NOT",
+       [meta().opportunityId, meta().dateOfVisit, meta().consultant].join(" | "));
+
+    E.updateMetadata({ opportunityId: "OPP-5023", consultant: "R. Hendry",
+                       dateOfVisit: "2026-09-02", documentRevision: "0.3" });
+    ok(meta().opportunityId === "OPP-5023", "the second engagement records its own opportunity");
+
+    E.activateInstrument("iec-62443-3-3");
+    ok(meta().opportunityId === "OPP-4471" && meta().dateOfVisit === "2026-05-21" &&
+       meta().documentRevision === "1.0",
+       "switching back, the first engagement still has its own details",
+       meta().opportunityId + " / " + meta().dateOfVisit + " / " + meta().documentRevision);
+
+    // ---- changing the customer reaches every assessment ----
+    E.updateMetadata({ clientName: "Acme Petrochemicals Ltd" });
+    E.activateInstrument("nist-800-82");
+    ok(meta().clientName === "Acme Petrochemicals Ltd",
+       "renaming the customer updates every assessment in the file");
+    ok(meta().opportunityId === "OPP-5023", "...without disturbing its own engagement details");
+
+    // ---- the merged block keeps its identity, so exporters holding a ----
+    // ---- reference to it never go stale                              ----
+    var ref = meta();
+    E.updateMetadata({ siteContact: "P. Ridley" });
+    ok(meta() === ref, "the merged block is refreshed in place, not replaced");
+    ok(ref.siteContact === "P. Ridley", "...so a held reference sees the new value");
+
+    // ---- save and load ----
+    var file = E.getProjectFile();
+    ok(STG.findAssessment(file, "iec-62443-3-3").engagementMeta.opportunityId === "OPP-4471" &&
+       STG.findAssessment(file, "nist-800-82").engagementMeta.opportunityId === "OPP-5023",
+       "each assessment saves its own engagement block");
+    ok(file.project.opportunityId === undefined,
+       "the project record saves only the customer");
+
+    var round = JSON.parse(JSON.stringify(file));
+    E.loadProjectFile(round);
+    E.activateInstrument("iec-62443-3-3");
+    ok(meta().opportunityId === "OPP-4471" && meta().consultant === "S. Maesschalck",
+       "after a save/load the 3-3 engagement details are intact");
+    E.activateInstrument("nist-800-82");
+    ok(meta().opportunityId === "OPP-5023" && meta().consultant === "R. Hendry",
+       "...and so are the 800-82's");
+    ok(meta().clientName === "Acme Petrochemicals Ltd", "...with the customer still shared");
+
+    // ---- an OLD file, where all 13 fields sat on the project ----
+    // Dropping them would silently blank a saved report's consultant, dates and
+    // revision, so they migrate down onto every assessment that was written
+    // against them.
+    var legacy = JSON.parse(JSON.stringify(round));
+    Object.keys(legacy.assessments).forEach(function (k) { delete legacy.assessments[k].engagementMeta; });
+    legacy.project.opportunityId = "OPP-LEGACY";
+    legacy.project.consultant = "A. Former";
+    legacy.project.dateOfVisit = "2025-01-09";
+    legacy.project.documentRevision = "2.1";
+    E.loadProjectFile(legacy);
+    E.activateInstrument("iec-62443-3-3");
+    ok(meta().opportunityId === "OPP-LEGACY" && meta().consultant === "A. Former" &&
+       meta().dateOfVisit === "2025-01-09" && meta().documentRevision === "2.1",
+       "a pre-split file keeps the values it was saved with",
+       meta().opportunityId + " / " + meta().consultant);
+    E.activateInstrument("nist-800-82");
+    ok(meta().consultant === "A. Former",
+       "...on every assessment in it, since that is what they were written against");
+    E.updateMetadata({ consultant: "R. Hendry" });
+    E.activateInstrument("iec-62443-3-3");
+    ok(meta().consultant === "A. Former",
+       "...and they can then be told apart", meta().consultant);
+
+    // ---- the filename still works, now that the date lives per assessment ----
+    var f2 = E.getProjectFile();
+    var name = STG.suggestedProjectFilename(f2);
+    ok(name.indexOf("Acme-Petrochemicals") !== -1, "the filename is the customer's", name);
+    ok(/\d{4}-\d{2}-\d{2}/.test(name), "...with a date from the assessments", name);
+
+    // ---- the modal groups the two halves ----
+    A.UI.go("report");
+    document.getElementById("btn-engagement").click();
+    var modal = document.querySelector(".modal");
+    ok(!!modal, "the engagement modal opens");
+    if (modal) {
+      var t = modal.textContent;
+      ok(/Customer and site/.test(t) && /shared by every assessment/.test(t),
+         "it labels the shared half");
+      ok(/This assessment/.test(t), "and the per-assessment half");
+      var pos = t.indexOf("This assessment");
+      ok(t.indexOf("Client name") < pos && t.indexOf("Opportunity ID") > pos,
+         "with each field under the right heading");
+      [].slice.call(modal.querySelectorAll("button"))
+        .filter(function (b) { return b.textContent === "Cancel"; })[0].click();
+    }
+    // ---- the case the split exists for: one customer, two sites ----------
+    // Manchester and Birmingham are two facilities of the same company, each
+    // with its own 62443-3-3, in one customer file.
+    E.newProject();
+    E.activateInstrument("iec-62443-3-3");
+    E.updateMetadata({ clientName: "Northbridge Manufacturing", siteName: "Manchester",
+                       siteAddress: "Trafford Park", opportunityId: "OPP-9001" });
+    var manId = E.activeAssessment().id;
+    var brm = E.newAssessment("iec-62443-3-3", { label: "Birmingham 62443-3-3" });
+    E.updateMetadata({ siteName: "Birmingham", siteAddress: "Tyseley", opportunityId: "OPP-9002" });
+
+    ok(E.state.assessments[manId].engagementMeta.siteName === "Manchester" &&
+       E.state.assessments[brm.id].engagementMeta.siteName === "Birmingham",
+       "two sites of one customer, each on its own assessment",
+       E.state.assessments[manId].engagementMeta.siteName + " / " +
+       E.state.assessments[brm.id].engagementMeta.siteName);
+    ok(E.state.project.clientName === "Northbridge Manufacturing",
+       "with one customer name over both");
+    ok(E.state.project.siteName === undefined,
+       "and no site left on the project record", String(E.state.project.siteName));
+    ok(meta().siteName === "Birmingham",
+       "the active assessment reports its own site", meta().siteName);
+
+    // ---- an older file, where the site was recorded once for the customer --
+    var legacy = {
+      schemaVersion: "2.0",
+      project: { clientName: "Legacy Ltd", siteName: "Old Works", siteAddress: "Canal Street" },
+      activeAssessmentId: "a1",
+      assessments: {
+        a1: { id: "a1", instrumentId: "iec-62443-3-3", targets: [{ id: "t1", name: "Zone 1" }],
+              responses: [], engagementMeta: { opportunityId: "OPP-1", dateOfVisit: "2024-01-01" } },
+        a2: { id: "a2", instrumentId: "general-ot-posture", targets: [{ id: "t2", name: "Site 1" }],
+              responses: [], engagementMeta: { opportunityId: "OPP-2", dateOfVisit: "2024-06-01" } }
+      }
+    };
+    E.loadProjectFile(legacy);
+    ok(E.state.assessments.a1.engagementMeta.siteName === "Old Works" &&
+       E.state.assessments.a2.engagementMeta.siteName === "Old Works",
+       "loading an older file copies its single site down onto every assessment",
+       E.state.assessments.a1.engagementMeta.siteName + " / " +
+       E.state.assessments.a2.engagementMeta.siteName);
+    ok(E.state.assessments.a1.engagementMeta.siteAddress === "Canal Street",
+       "including the address");
+    ok(E.state.project.siteName === undefined,
+       "and clears it from the project, so a site is recorded in one place only",
+       String(E.state.project.siteName));
+    ok(E.state.assessments.a1.engagementMeta.opportunityId === "OPP-1",
+       "without disturbing what each assessment already carried");
+
+    flush();
+  } catch (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); flush(); }
+})();
+</script>
+</body></html>

@@ -1,0 +1,192 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Domain-letter grades on an exact band edge</title></head>
+<body>
+<!--
+  The posture and supplier grades compare a score against decimal band edges
+  (0.25, 0.40, 0.55, 0.70, 0.85). The domain score used to be built by adding
+  the per-question fractions (band / 3) and dividing by the count, and those
+  fractions do not add exactly: answers 3,2,1,0,0 came to 0.39999999999999997
+  instead of 6/15 = 0.40, so the domain graded E instead of D. With every other
+  domain at A the cap then pulled the headline from B to C. The headline mean
+  of the domain scores had the same problem one level up.
+
+  This page puts every ordering of every boundary answer set (4, 5 and 8
+  questions) through scoreSite and checks the score lands on the edge and
+  takes the edge's letter, then checks the headline cap case from the review
+  and two headline means that sit exactly on an edge.
+-->
+<script src="harness.js"></script>
+<script>H.app({}); H.dom();</script>
+<script>
+H.test(function (ok) {
+  var A = window.App, S = A.ScoringDomainLetter;
+  var prof = A.Data.shared.scoringProfiles["posture-domain-letter"];
+  var bands = prof.letterBands;
+  function gradeAt(minScore) { return bands.filter(function (b) { return b.minScore === minScore; })[0].grade; }
+  function lowerGrade(minScore) {
+    var sorted = bands.slice().sort(function (a, b) { return b.minScore - a.minScore; });
+    for (var i = 0; i < sorted.length; i++) if (sorted[i].minScore < minScore) return sorted[i].grade;
+    return null;
+  }
+
+  // Every distinct ordering of a multiset of answers.
+  function orderings(vals) {
+    if (vals.length <= 1) return [vals.slice()];
+    var out = [], seen = {};
+    for (var i = 0; i < vals.length; i++) {
+      if (seen[vals[i]]) continue;
+      seen[vals[i]] = true;
+      var rest = vals.slice(0, i).concat(vals.slice(i + 1));
+      orderings(rest).forEach(function (o) { out.push([vals[i]].concat(o)); });
+    }
+    return out;
+  }
+  // Every multiset of n answers on the 0-3 scale that adds up to `sum`.
+  function answerSets(n, sum) {
+    var out = [];
+    (function walk(left, min, acc, total) {
+      if (left === 0) { if (total === sum) out.push(acc); return; }
+      for (var b = min; b <= 3; b++) walk(left - 1, b, acc.concat([b]), total + b);
+    })(n, 0, [], 0);
+    return out;
+  }
+
+  // A one-domain instrument with n scored questions, so the domain score is
+  // exactly the answers' mean and nothing else feeds it.
+  function oneDomain(n) {
+    var qs = [];
+    for (var i = 1; i <= n; i++) qs.push({ id: "d." + i, domainId: "d", prompt: "Question " + i });
+    return { id: "edge-test", title: "Edge test", domains: [{ id: "d", name: "Domain" }], questions: qs };
+  }
+  function scoreAnswers(inst, answers) {
+    var r = answers.map(function (b, i) { return { requirementId: inst.questions[i].id, band: b, applicable: true }; });
+    return S.scoreSite(inst, prof, r).perDomain[0];
+  }
+
+  // --- 1. Every ordering of every answer set that sits on an edge ----------
+  // For each question count, the edges reachable are the ones where
+  // edge * 3n is a whole number of band points.
+  var expectEdge = { 4: [0.25], 5: [0.4], 8: [0.25] };
+  [4, 5, 8].forEach(function (n) {
+    var inst = oneDomain(n);
+    var edges = bands.map(function (b) { return b.minScore; }).filter(function (m) {
+      var pts = m * 3 * n;
+      return m > 0 && Math.abs(pts - Math.round(pts)) < 1e-9;
+    });
+    ok(JSON.stringify(edges) === JSON.stringify(expectEdge[n]),
+       n + " questions can land exactly on the " + expectEdge[n].join(", ") + " edge", JSON.stringify(edges));
+
+    edges.forEach(function (edge) {
+      var pts = Math.round(edge * 3 * n), want = gradeAt(edge);
+      var sets = answerSets(n, pts), runs = 0, misses = [];
+      sets.forEach(function (set) {
+        orderings(set).forEach(function (ord) {
+          runs++;
+          var d = scoreAnswers(inst, ord);
+          if (d.score !== edge || d.grade !== want) misses.push(ord.join(",") + " -> " + d.score + " " + d.grade);
+        });
+      });
+      ok(runs > 0 && misses.length === 0,
+         n + " questions, " + pts + " of " + (3 * n) + " points: all " + runs + " orderings of " + sets.length +
+         " answer sets score exactly " + edge + " and grade " + want,
+         misses.length + " missed, e.g. " + misses.slice(0, 3).join("; "));
+
+      // One point under the edge is a genuinely lower score and must keep the
+      // lower letter: the rounding only snaps float noise, never a real gap.
+      var below = answerSets(n, pts - 1), lower = lowerGrade(edge), lifted = [];
+      below.forEach(function (set) {
+        orderings(set).forEach(function (ord) {
+          var d = scoreAnswers(inst, ord);
+          if (!(d.score < edge) || d.grade !== lower) lifted.push(ord.join(",") + " -> " + d.score + " " + d.grade);
+        });
+      });
+      ok(below.length > 0 && lifted.length === 0,
+         n + " questions, one point under the edge still grades " + lower,
+         lifted.slice(0, 3).join("; "));
+    });
+  });
+
+  // The two letters the review named, said plainly.
+  ok(scoreAnswers(oneDomain(5), [3, 2, 1, 0, 0]).grade === "D", "answers 3,2,1,0,0 grade D (6/15 = 0.40), not E");
+  ok(scoreAnswers(oneDomain(8), [0, 0, 1, 1, 1, 1, 1, 1]).grade === "E", "answers 0,0,1,1,1,1,1,1 grade E (6/24 = 0.25), not F");
+
+  // --- 2. The headline cap case from the review ----------------------------
+  // The real posture instrument: architecture answered 3,2,1,0,0 in question
+  // order, every other scored question at the top band. Architecture is a D,
+  // so the cap (two grades above the weakest) is B and the not-unanimous
+  // ceiling is also B. The float miss made it an E, which capped at C.
+  var post = A.Data.instruments["general-ot-posture"].instrument;
+  function scoredIds(domId) {
+    return post.questions.filter(function (q) { return q.domainId === domId && q.scored !== false; })
+      .map(function (q) { return q.id; });
+  }
+  var archIds = scoredIds("arch");
+  ok(archIds.length === 5, "the architecture domain has five scored questions", String(archIds.length));
+
+  function postureWith(archAnswers) {
+    var r = [];
+    post.questions.forEach(function (q) {
+      if (q.scored === false) return;
+      var i = archIds.indexOf(q.id);
+      r.push({ requirementId: q.id, band: i >= 0 ? archAnswers[i] : 3, applicable: true });
+    });
+    return S.scoreSite(post, prof, r);
+  }
+  var res = postureWith([3, 2, 1, 0, 0]);
+  var arch = res.perDomain.filter(function (d) { return d.domainId === "arch"; })[0];
+  ok(arch.score === 0.4, "architecture scores exactly 0.40", String(arch.score));
+  ok(arch.grade === "D", "architecture grades D", String(arch.grade));
+  ok(res.weakestDomain && res.weakestDomain.domainId === "arch", "architecture is the weakest domain");
+  ok(res.capCeilingGrade === "B", "the ceiling is B", String(res.capCeilingGrade));
+  ok(res.headlineGrade === "B", "the headline is B, not C", String(res.headlineGrade));
+
+  var badHeadline = [];
+  orderings([3, 2, 1, 0, 0]).forEach(function (ord) {
+    var x = postureWith(ord);
+    if (x.headlineGrade !== "B") badHeadline.push(ord.join(",") + " -> " + x.headlineGrade);
+  });
+  ok(badHeadline.length === 0, "every ordering of the architecture answers gives a B headline",
+     badHeadline.length + " gave another letter, e.g. " + badHeadline.slice(0, 3).join("; "));
+
+  // --- 3. A headline mean sitting exactly on an edge -----------------------
+  // Band points per domain (each domain filled top band first). The domain
+  // grades are the same before and after the fix; only the mean of seven
+  // fractions with different denominators sits on the edge, and its float sum
+  // falls under it even when each domain score is a single exact division, so
+  // these cases need the mean itself rounded, not just the domain scores.
+  function postureWithPoints(points) {
+    var r = [];
+    post.domains.forEach(function (d) {
+      var left = points[d.id];
+      scoredIds(d.id).forEach(function (qid) {
+        var b = Math.min(3, left); left -= b;
+        r.push({ requirementId: qid, band: b, applicable: true });
+      });
+    });
+    return S.scoreSite(post, prof, r);
+  }
+  [
+    // Weakest is the F in assets, so the cap is D and the mean decides.
+    { points: { gov: 7, assets: 0, arch: 14, access: 6, protect: 7, monitor: 7, respond: 6 }, edge: 0.4,
+      why: "7/21, 0/12, 14/15, 6/18, 7/21, 7/15 and 6/15 average exactly 0.40" },
+    // Weakest is a D, so the cap is B and the mean decides.
+    { points: { gov: 9, assets: 5, arch: 13, access: 9, protect: 12, monitor: 6, respond: 10 }, edge: 0.55,
+      why: "9/21, 5/12, 13/15, 9/18, 12/21, 6/15 and 10/15 average exactly 0.55" }
+  ].forEach(function (c) {
+    var x = postureWithPoints(c.points), want = gradeAt(c.edge);
+    // The mean of the exact per-domain fractions, added in domain order the
+    // way the headline adds them, without any rounding.
+    var rawMean = post.domains.reduce(function (a, d) {
+      return a + c.points[d.id] / (3 * scoredIds(d.id).length);
+    }, 0) / post.domains.length;
+    ok(x.gradedDomainCount === 7, "every domain graded (" + c.edge + " case)", String(x.gradedDomainCount));
+    ok(rawMean < c.edge, "precondition: the unrounded float mean falls under " + c.edge, String(rawMean));
+    ok(x.headlineMeanScore === c.edge, c.why + " and the headline mean says so", String(x.headlineMeanScore));
+    ok(x.headlineMeanGrade === want, "the mean grades " + want, String(x.headlineMeanGrade));
+    ok(x.headlineGrade === want, "and the headline is " + want, String(x.headlineGrade));
+  });
+});
+</script>
+</body>
+</html>

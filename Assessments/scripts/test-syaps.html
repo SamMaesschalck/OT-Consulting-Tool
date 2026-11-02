@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>ONR SyAPs instruments check</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true }); H.dom();</script>
+<script>
+(function () {
+  var lines = [], fail = 0, captured = {};
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() { lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+
+  A.Engine.loadCatalog();
+  A.UI.init({ autosave: false });
+
+  // ---------- structure: Management (FSyP 1-5 + SyDP 7.1) ----------
+  A.Engine.activateInstrument("onr-syaps-management");
+  var mi = A.Engine.state.instrument;
+  ok(!!mi && mi.id === "onr-syaps-management", "management instrument activates");
+  ok(A.Engine.state.scoringFamily === "caf-achieved", "uses caf-achieved family", A.Engine.state.scoringFamily);
+  ok(A.Engine.getCAFObjectives().length === 6, "6 FSyP objectives (1-5 + 7)", String(A.Engine.getCAFObjectives().length));
+  ok(A.Engine.getCAFPrinciples().length === 18, "18 SyDP principles", String(A.Engine.getCAFPrinciples().length));
+  ok((mi.outcomes || []).length === 175, "175 expectations", String((mi.outcomes || []).length));
+  // FSyP 7 is present but ONLY via SyDP 7.1 (cyber risk management); 7.2-7.5 stay in the Cyber instrument.
+  var f7 = A.Engine.getCAFPrinciples().filter(function (p) { return p.objectiveId === "7"; }).map(function (p) { return p.id; });
+  ok(f7.length === 1 && f7[0] === "7.1", "FSyP 7 present only as SyDP 7.1", f7.join(","));
+  ok(A.Engine.getCAFPrinciples().filter(function (p) { return /^7\.[2-5]$/.test(p.id); }).length === 0, "SyDP 7.2-7.5 are NOT in the Management instrument");
+  var sub = (mi.states || []).filter(function (s) { return s.value !== "unknown" && s.value !== "na"; });
+  ok(sub.length === 3 && sub.map(function (s) { return s.label; }).join(",") === "Achieved,Partially achieved,Not achieved", "3 SyAPs bands", sub.map(function (s) { return s.label; }).join(","));
+  ok(!mi.unknownIsFinding, "unknown is coverage-only (not a finding) for SyAPs");
+  ok((mi.criticalCaveats || []).length >= 3, "carries critical caveats", String((mi.criticalCaveats || []).length));
+  ok(/Open Government Licence/.test(mi.attribution || ""), "OGL attribution present");
+  // an expectation carries verbatim ONR text + prompt-question lines
+  var o71ish = (mi.outcomes || []).filter(function (o) { return o.principleId === "1.1"; });
+  ok(o71ish.length >= 6, "SyDP 1.1 has multiple expectations", String(o71ish.length));
+  ok(/SyDP 1\.1 expectation/.test(o71ish[0].controlTextLabel || ""), "outcome label references the SyDP + source", o71ish[0].controlTextLabel);
+
+  // ---------- profiles ----------
+  var reg = A.Engine.getCAFProfileRegistry();
+  ok(reg && reg.default === "syaps-mgmt-full", "default profile = Full dutyholder", reg && reg.default);
+  ok(reg && reg.profiles.length === 2, "two dutyholder profiles (full + smaller)", reg && String(reg.profiles.length));
+  A.Engine.setCAFProfile("syaps-mgmt-smaller");
+  var ovS = A.Engine.getActiveCAFOverlay();
+  var anyId = (mi.outcomes || [])[0].id;
+  ok(ovS[anyId] && ovS[anyId].applicable === true && /proportion/i.test(ovS[anyId].supplementaryGuidance || ""), "smaller-dutyholder overlay keeps items applicable with proportionate guidance");
+  A.Engine.setCAFProfile("syaps-mgmt-full");
+
+  // ---------- capture + score ----------
+  var tid = A.Engine.state.activeTargetId;
+  A.Engine.setResponse(tid, "1.1.1", { applicable: true, state: "achieved" });
+  A.Engine.setResponse(tid, "1.1.2", { applicable: true, state: "partially" });
+  A.Engine.setResponse(tid, "2.1.1", { applicable: true, state: "not" });
+  A.Engine.setResponse(tid, "5.1.1", { applicable: true, state: "unknown" });
+  var scored = A.Engine.scoreActiveTarget();
+  ok(scored && scored.byObjective.length === 6, "scored: 6 objective rollups", scored && String(scored.byObjective.length));
+  ok(scored.roadmap.some(function (r) { return r.outcomeId === "2.1.1"; }), "a 'not achieved' expectation is on the roadmap");
+  ok(!scored.roadmap.some(function (r) { return r.outcomeId === "5.1.1"; }), "unknown is NOT on the roadmap (coverage-only, contrast to CIS)");
+
+  // ---------- capture page renders ----------
+  A.UI.go("caf-principle", "1.1");
+  var cm = document.getElementById("main");
+  ok(cm.querySelectorAll(".caf-state-btn").length >= 3, "expectation rows render state buttons");
+  ok(/What this expectation requires/.test(cm.textContent), "expander uses the 'expectation' unit noun");
+
+  // ---------- report renders: about card, caveats, totals ----------
+  var container = document.createElement("div");
+  A.UI.go("engagement");
+  var engMain = document.getElementById("main");
+  ok(/About this assessment/.test(engMain.textContent), "engagement page shows About card");
+  ok(/Critical caveats/i.test(engMain.textContent), "engagement page shows the critical caveats callout");
+  ok(/Full dutyholder/.test(engMain.textContent) && /Active/.test(engMain.textContent), "profiles table shows the active profile");
+  ok(!/Profile selected/.test(engMain.textContent), "no redundant 'Profile selected' note for the loaded profile");
+  A.Engine.getActiveNarrative();
+  window.App.Report.render(container, {
+    engagement: A.Engine.state.engagement, instrument: mi, taxonomy: A.Engine.state.taxonomy, profile: A.Engine.state.profile,
+    narrative: A.Engine.getActiveNarrative(), scored: scored, scoredAll: A.Engine.scoreAllTargets(), activeTarget: A.Engine.getActiveTarget(),
+    cafProfileRegistry: reg, cafProfileId: A.Engine.getActiveCAFProfileId(), cafProfile: A.Engine.getActiveCAFProfile ? A.Engine.getActiveCAFProfile() : null
+  });
+  ok(container.querySelectorAll(".tbl tfoot tr").length >= 1, "report results table has a totals row");
+  ok(/Results by fundamental security principle/i.test(container.textContent) || /Results by objective/i.test(container.textContent), "report groups by FSyP");
+
+  // ---------- Cyber (FSyP 7) ----------
+  A.Engine.activateInstrument("onr-syaps-cyber");
+  var ci = A.Engine.state.instrument;
+  ok(A.Engine.getCAFObjectives().length === 1 && A.Engine.getCAFPrinciples().length === 5, "cyber: 1 FSyP objective / 5 SyDPs", A.Engine.getCAFObjectives().length + "/" + A.Engine.getCAFPrinciples().length);
+  ok((ci.outcomes || []).length === 32, "cyber: 32 expectations", String((ci.outcomes || []).length));
+
+  // ---------- Full posture (all 10 FSyP) ----------
+  A.Engine.activateInstrument("onr-syaps-full");
+  var fi = A.Engine.state.instrument;
+  ok(A.Engine.getCAFObjectives().length === 10, "full: 10 FSyP objectives", String(A.Engine.getCAFObjectives().length));
+  ok(A.Engine.getCAFPrinciples().length === 38, "full: 38 SyDP principles", String(A.Engine.getCAFPrinciples().length));
+  ok((fi.outcomes || []).length === 267, "full: 267 expectations", String((fi.outcomes || []).length));
+  var prinIds = A.Engine.getCAFPrinciples().map(function (p) { return p.id; });
+  ok(prinIds.indexOf("6.4") !== -1 && prinIds.indexOf("9.1") !== -1 && prinIds.indexOf("10.2") !== -1, "full spans physical / policing / emergency SyDPs");
+  ok(prinIds.indexOf("7.1") !== -1 && prinIds.indexOf("1.1") !== -1, "full also includes the management + cyber SyDPs");
+  var fReg = A.Engine.getCAFProfileRegistry();
+  ok(fReg && fReg.default === "syaps-full-full", "full: default profile = Full dutyholder", fReg && fReg.default);
+  // a physical-protection expectation exists with verbatim ONR text
+  var pps = (fi.outcomes || []).filter(function (o) { return o.principleId === "6.3"; });
+  ok(pps.length >= 1 && /defence in depth|physical protection system/i.test(pps.map(function(o){return o.controlText;}).join(" ")), "full carries the PPS design expectations");
+
+  // ---------- exports build (both libs) ----------
+  A.Storage.downloadBlob = function (blob, name) { captured[String(name).replace(/^.*\./, "")] = blob; return blob; };
+  A.Engine.activateInstrument("onr-syaps-management");
+  A.Engine.setCAFProfile("syaps-mgmt-full");
+  var tid2 = A.Engine.state.activeTargetId;
+  A.Engine.setResponse(tid2, "1.1.1", { applicable: true, state: "achieved" });
+  A.Engine.setResponse(tid2, "3.2.1", { applicable: true, state: "partially" });
+  A.Engine.setResponse(tid2, "4.2.1", { applicable: true, state: "not" });
+  var inst = A.Engine.state.instrument, tax = A.Engine.state.taxonomy, prof = A.Engine.state.profile;
+  var engagement = A.Engine.state.engagement, narrative = A.Engine.getActiveNarrative();
+  var opts = { cafProfileRegistry: A.Engine.getCAFProfileRegistry(), cafProfileId: A.Engine.getActiveCAFProfileId(),
+    cafProfile: A.Engine.getActiveCAFProfile ? A.Engine.getActiveCAFProfile() : null, cafOverlay: A.Engine.getActiveCAFOverlay(), targetId: tid2 };
+  var xp;
+  try { xp = A.ExportXLSX.download(engagement, inst, tax, prof, opts); } catch (e) { ok(false, "xlsx threw: " + e.message); }
+  var docxDone = new Promise(function (resolve) {
+    var o2 = {}; for (var k in opts) o2[k] = opts[k];
+    o2.onDone = function (err) { ok(!err, "Word export completes", err && err.message); resolve(); };
+    try { A.ExportDOCX.download(engagement, inst, tax, prof, narrative, o2); }
+    catch (e) { ok(false, "docx threw: " + e.message); resolve(); }
+  });
+  Promise.all([ (xp && xp.then ? xp : Promise.resolve()), docxDone ]).then(function () {
+    ok(captured["docx"] && captured["docx"].size > 3000, "Word .docx produced", captured["docx"] && ("size " + captured["docx"].size));
+    ok(captured["xlsx"] && captured["xlsx"].size > 3000, "Excel .xlsx produced", captured["xlsx"] && ("size " + captured["xlsx"].size));
+    finish();
+  });
+})();
+</script>
+</body></html>

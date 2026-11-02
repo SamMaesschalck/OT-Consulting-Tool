@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>ONR SyAPs tour datasets</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app({ tours: ["cra", "syaps"] }); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"])); };
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+    ok(!!A.TourSyAPS && A.TourSyAPS.gaps.length === 20, "shared SyAPs gap set exposed (20 gaps)", A.TourSyAPS && String(A.TourSyAPS.gaps.length));
+
+    var CASES = [
+      { id: "onr-syaps-management", tour: A.TourSyAPS.management, name: "SyAPs Management" },
+      { id: "onr-syaps-cyber",      tour: A.TourSyAPS.cyber,      name: "SyAPs Cyber" },
+      { id: "onr-syaps-full",       tour: A.TourSyAPS.full,       name: "SyAPs Full" }
+    ];
+
+    // Reproduce the exact bleed scenario the user reported: apply the CRA tour
+    // first (it records the "SentinelEdge" documents), THEN check the ONR tours.
+    E.activateInstrument("eu-cra");
+    if (A.TourCRA && A.TourCRA.apply) A.TourCRA.apply(E);
+    var craDocs = E.getBasisOfAssessment().documents.map(function (d) { return d.title; }).join(" | ");
+    ok(/SentinelEdge/.test(craDocs), "CRA tour records its own SentinelEdge documents (baseline)", craDocs.slice(0, 60));
+
+    var counts = {};
+    CASES.forEach(function (c) {
+      ok(!!c.tour && typeof c.tour.apply === "function", c.name + ": tour applier exposed");
+      E.activateInstrument(c.id);
+      c.tour.apply(E);
+      var inst = E.state.instrument, tid = E.state.activeTargetId;
+
+      ok((E.state.engagement.engagement || {}).clientName === "Fenwick Nuclear Services Ltd", c.name + ": client metadata set", (E.state.engagement.engagement || {}).clientName);
+
+      // basis of assessment is this instrument's OWN nuclear register - no CRA bleed
+      var basis = E.getBasisOfAssessment();
+      var docTitles = basis.documents.map(function (d) { return d.title; }).join(" | ");
+      ok(!/SentinelEdge/.test(docTitles), c.name + ": basis has NO SentinelEdge bleed from the CRA tour", docTitles.slice(0, 70));
+      ok(basis.documents.length > 0 && basis.interviews.length > 0, c.name + ": has its own basis register (docs + interviews)", basis.documents.length + " docs / " + basis.interviews.length + " interviews");
+      c._docTitles = docTitles;
+
+      // every in-scope outcome answered (finished assessment)
+      var overlay = E.getActiveCAFOverlay() || {};
+      var present = {}; inst.outcomes.forEach(function (o) { present[o.id] = true; });
+      var unanswered = [], inScope = 0;
+      inst.outcomes.forEach(function (o) {
+        var ov = overlay[o.id];
+        if (!ov || ov.applicable === false) return;
+        inScope++;
+        var r = E.findResponse(tid, o.id);
+        if (!r || !r.state) unanswered.push(o.id);
+      });
+      ok(inScope > 25, c.name + ": substantial in-scope set (" + inScope + ")", String(inScope));
+      ok(unanswered.length === 0, c.name + ": every in-scope item answered (finished)", unanswered.slice(0, 8).join(","));
+
+      // roadmap == the shared gaps that actually exist in THIS instrument
+      var expectedGaps = A.TourSyAPS.gaps.filter(function (g) { return present[g.id]; });
+      counts[c.id] = expectedGaps.length;
+      var scored = E.scoreActiveTarget();
+      ok((scored.roadmap || []).length === expectedGaps.length, c.name + ": roadmap == in-scope curated gaps (" + expectedGaps.length + ")", String((scored.roadmap || []).length));
+      var gapsNoPlan = (scored.roadmap || []).filter(function (it) { return !(it.owner && it.action && it.impact && it.priorityBand); });
+      ok(gapsNoPlan.length === 0, c.name + ": every roadmap item carries a full remediation plan", gapsNoPlan.map(function (it) { return it.outcomeId; }).join(","));
+
+      var rn = E.getReportNarrative ? E.getReportNarrative() : null;
+      ok(rn && rn.regulatoryExposure && rn.topPriorities, c.name + ": consultant exec narrative set");
+
+      var container = document.createElement("div");
+      A.Report.render(container, {
+        engagement: E.state.engagement, instrument: inst, taxonomy: E.state.taxonomy, profile: E.state.profile,
+        narrative: E.getActiveNarrative ? E.getActiveNarrative() : null,
+        scored: scored, scoredAll: E.scoreAllTargets(), activeTarget: E.getActiveTarget(),
+        cafProfileRegistry: E.getCAFProfileRegistry(), cafProfileId: E.getActiveCAFProfileId(),
+        cafProfile: E.getActiveCAFProfile ? E.getActiveCAFProfile() : null
+      });
+      ok(container.textContent.length > 200, c.name + ": report renders content");
+    });
+
+    // sanity: full carries more gaps than either focused instrument, and
+    // management + cyber gaps are subsets that sum toward the full set.
+    ok(counts["onr-syaps-full"] === 20, "full applies all 20 gaps", String(counts["onr-syaps-full"]));
+    ok(counts["onr-syaps-management"] === 11 && counts["onr-syaps-cyber"] === 3, "management=11 (FSyP 1-5 + SyDP 7.1 gap), cyber=3 in-scope gaps", counts["onr-syaps-management"] + "/" + counts["onr-syaps-cyber"]);
+
+    // the three ONR registers are DIFFERENT from each other (per-assessment)
+    var mgmtDocs = CASES[0]._docTitles, cyberDocs = CASES[1]._docTitles;
+    ok(/GOV-TOR|governance/i.test(mgmtDocs) && !/OT asset register/i.test(mgmtDocs), "management register is governance/management-flavoured", mgmtDocs.slice(0, 70));
+    ok(/OT asset register|CSIRP|incident/i.test(cyberDocs) && !/governance terms/i.test(cyberDocs), "cyber register is CS&IA-flavoured and differs from management", cyberDocs.slice(0, 70));
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

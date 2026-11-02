@@ -1,0 +1,173 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Supplier Cyber Exposure Screener</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style>
+</head>
+<body>
+<h1>Supplier Cyber Exposure Screener - end-to-end</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock" }); H.dom();</script>
+<script>
+window.docx = (function () {
+  function TextRun(opts) {
+    if (typeof opts === "string") opts = { text: opts };
+    this.__type = "TextRun";
+    this.text = opts.text != null ? opts.text : (Array.isArray(opts.children) ? opts.children.join("") : "");
+    this.bold = !!opts.bold; this.italics = !!opts.italics;
+    this.color = opts.color || null; this.size = opts.size || null;
+  }
+  function Paragraph(opts) {
+    opts = opts || {};
+    this.__type = "Paragraph";
+    this.children = opts.children || [];
+    this.style = opts.style || null; this.heading = opts.heading || null;
+    this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join("");
+    this.runs = this.children;
+  }
+  function TableCell(opts) { this.__type = "TableCell"; this.children = (opts && opts.children) || []; this.shading = (opts && opts.shading) || null; }
+  function TableRow(opts)  { this.__type = "TableRow"; this.children = (opts && opts.children) || []; }
+  function Table(opts)     { this.__type = "Table"; this.rows = (opts && opts.rows) || []; }
+  function ImageRun(opts)  { this.__type = "ImageRun"; this.text = ""; }
+  function PageBreak()     { this.__type = "PageBreak"; this.text = ""; }
+  function Header(opts)    { this.__type = "Header"; this.children = (opts && opts.children) || []; }
+  function Footer(opts)    { this.__type = "Footer"; this.children = (opts && opts.children) || []; }
+  function Document(opts)  { this.__type = "Document"; this.sections = (opts && opts.sections) || []; }
+  return {
+    Document: Document, Paragraph: Paragraph, TextRun: TextRun,
+    TableCell: TableCell, TableRow: TableRow, Table: Table,
+    ImageRun: ImageRun, PageBreak: PageBreak, Header: Header, Footer: Footer,
+    HeadingLevel: { TITLE: "Title", HEADING_1: "Heading1", HEADING_2: "Heading2", HEADING_3: "Heading3" },
+    AlignmentType: { LEFT: "left", CENTER: "center", RIGHT: "right", BOTH: "both" },
+    WidthType: { PERCENTAGE: "pct", DXA: "dxa" },
+    ShadingType: { SOLID: "solid" },
+    TableLayoutType: { FIXED: "fixed" },
+    PageOrientation: { PORTRAIT: "portrait", LANDSCAPE: "landscape" },
+    HeightRule: { EXACT: "exact", ATLEAST: "atLeast" },
+    PageNumber: { CURRENT: "current" },
+    Packer: { toBlob: function (doc) { window.__capturedDoc = doc; return Promise.resolve(new Blob(["dummy"])); } }
+  };
+})();
+</script>
+<script>
+(function () {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  // Chart rasterisation is flaky under headless file://; stub it so the
+  // posture-doc pipeline runs deterministically (the mock ImageRun ignores it).
+  A.Charts.svgToPngBlob = function (svg, scale, cb) { cb(new Blob(["png"])); };
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond, detail) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label + (!cond && detail ? " — " + detail : "");
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function finish() {
+    var s = document.getElementById("summary");
+    s.className = "sum " + (fail === 0 ? "ok" : "bad");
+    s.textContent = fail === 0 ? "ALL TESTS PASSED (" + pass + ")" : pass + " passed, " + fail + " FAILED";
+  }
+  function main() { return document.getElementById("main"); }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+    E.activateInstrument("supplier-screener");
+    var inst = E.state.instrument;
+    var tid = E.state.activeTargetId;
+    E.renameTarget(tid, "Vektra Drives GmbH");
+    E.state.engagement.engagement.clientName = "Vektra Drives GmbH";
+
+    // ---- shape & activation ----
+    check("activates as a domain-letter instrument", E.state.scoringFamily === "domain-letter" && inst.status === "active");
+    check("6 domains, 18 questions (3 per domain)",
+      inst.domains.length === 6 && inst.questions.length === 18 &&
+      inst.domains.every(function (d) { return inst.questions.filter(function (q) { return q.domainId === d.id; }).length === 3; }));
+    check("target noun is Supplier", inst.targetDimensionLabel === "Supplier");
+    check("narrative pack loaded", !!E.getActiveNarrative() && !!E.getActiveNarrative().templates);
+
+    // ---- answer the screening: strong corp/vuln/chain, weak dev/reg, mid prod ----
+    var bands = {
+      "corp.1": 3, "corp.2": 3, "corp.3": 3,
+      "dev.1": 1,  "dev.2": 1,  "dev.3": 0,
+      "prod.1": 2, "prod.2": 2, "prod.3": 2,
+      "vuln.1": 3, "vuln.2": 2, "vuln.3": 3,
+      "reg.1": 1,  "reg.2": 0,  "reg.3": 1,
+      "chain.1": 2, "chain.2": 3, "chain.3": 2
+    };
+    Object.keys(bands).forEach(function (qid) {
+      E.setResponse(tid, qid, { band: bands[qid], notes: "Screening note for " + qid });
+    });
+    E.setResponse(tid, "reg.2", { band: 0, owner: "Procurement lead", action: "Require the supplier's dated conformity roadmap as a condition of the next framework renewal.", impact: "Products may become unsupplyable from 2027.", priorityBand: "high" });
+
+    var scored = E.scoreActiveTarget();
+    var byDom = {}; scored.perDomain.forEach(function (d) { byDom[d.domainId] = d; });
+    check("domain grades: corp A, dev F, prod C, vuln A, reg F, chain B",
+      byDom.corp.grade === "A" && byDom.dev.grade === "F" && byDom.prod.grade === "C" &&
+      byDom.vuln.grade === "A" && byDom.reg.grade === "F" && byDom.chain.grade === "B",
+      scored.perDomain.map(function (d) { return d.domainId + "=" + d.grade; }).join(","));
+    check("headline held two grades above the weakest (D)", scored.headlineGrade === "D", String(scored.headlineGrade));
+    check("roadmap lists every below-top question", (scored.roadmap || []).length === 12, String((scored.roadmap || []).length));
+
+    // ---- follow-up routing ----
+    var res = A.Report.triggeredFollowUpRoutes(inst, scored);
+    check("routing evaluates from instrument data", !!res && res.triggered.length === 3);
+    var routeDoms = res.triggered.map(function (t) { return t.route.domainId; }).join(",");
+    check("weak dev/prod/reg trigger their deep-dive routes (vuln A does not)", routeDoms === "dev,prod,reg", routeDoms);
+
+    // ---- on-screen report ----
+    A.UI.go("report");
+    var t = main().textContent;
+    check("report shows the Where to go deeper card", t.indexOf("Where to go deeper") !== -1);
+    check("routes name the deep assessments", t.indexOf("62443-4-1 Secure Product Development Lifecycle Assessment") !== -1 && t.indexOf("EU CRA Gap Assessment / EU Machinery Regulation Gap Assessment") !== -1);
+    check("untriggered vuln route is not shown", t.indexOf("defect & update management") === -1);
+    check("roadmap carries the in-tool remediation", t.indexOf("Procurement lead") !== -1 && t.indexOf("framework renewal") !== -1);
+
+    // ---- wizard (shared posture wizard) ----
+    A.UI.go("wizard");
+    check("guided wizard renders for the screener", !!main().querySelector(".wizard-answer"));
+
+    // ---- engagement guidance ----
+    A.UI.go("engagement");
+    check("engagement guidance shows the supplier prep list", main().textContent.indexOf("Sub-supplier / fourth-party dependencies") !== -1);
+
+    // ---- Word export ----
+    A.ExportDOCX.buildAsync(E.state.engagement, inst, null, E.state.profile, E.getActiveNarrative(),
+      { targetId: tid },
+      function (err) {
+        try {
+          if (err) { check("screener Word report builds - " + (err.message || err), false); finish(); return; }
+          var doc = window.__capturedDoc, paras = [];
+          function walk(node) {
+            if (!node) return;
+            if (node.__type === "Paragraph") { paras.push(node); return; }
+            if (node.__type === "Table") { node.rows.forEach(walk); return; }
+            if (node.__type === "TableRow" || node.__type === "TableCell") { node.children.forEach(walk); return; }
+            if (Array.isArray(node)) node.forEach(walk);
+          }
+          doc.sections.forEach(function (s) { walk(s.children); });
+          var allText = paras.map(function (p) { return p.text; }).join("\n");
+
+          check("doc builds", true);
+          check("cover is the screener's own title", allText.indexOf("Supplier Cyber") !== -1 && allText.indexOf("Exposure Screener") !== -1 && allText.indexOf("General OT Security") === -1);
+          check("exec summary uses supplier wording with the D grade", allText.indexOf("indicative supplier cyber exposure grade of D") !== -1);
+          check("Where to go deeper section present with triggered routes", allText.indexOf("Where to go deeper") !== -1 && allText.indexOf("Secure development practice (graded F)") !== -1);
+          check("regulatory route named in the doc", allText.indexOf("EU CRA Gap Assessment / EU Machinery Regulation Gap Assessment") !== -1);
+          check("roadmap remediation flows to the doc", allText.indexOf("framework renewal") !== -1);
+          check("supplier limitations wording present", allText.indexOf("the deep assessments it points to") !== -1);
+        } catch (e) { check("doc assertions threw: " + e.message, false); }
+        finish();
+      });
+  } catch (e) {
+    check("harness threw: " + (e && e.message), false);
+    if (e && e.stack) { var d = document.createElement("div"); d.className = "row"; d.textContent = e.stack; out.appendChild(d); }
+    finish();
+  }
+})();
+</script>
+</body></html>

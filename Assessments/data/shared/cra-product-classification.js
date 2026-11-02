@@ -1,0 +1,138 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/shared/cra-product-classification.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.shared = window.App.Data.shared || {};
+window.App.Data.shared.craProductClassification = {
+  "schema": "cra-product-classification/1.0",
+  "_note": "Product classification lookup for the CRA instrument, verified from Annex III (important products, Class I and II) and Annex IV (critical products). The consultant matches the product under assessment to a category; the tool derives the class and drives the P3 conformity route. If no category matches, the product is Default. Category text paraphrased from the annexes; verbatim not reproduced.",
+  "deriveClass": {
+    "none-match": "default",
+    "annex-iii-class-i": "important-class-i",
+    "annex-iii-class-ii": "important-class-ii",
+    "annex-iv": "critical"
+  },
+  "routeByClass": {
+    "default": "Internal control (Module A, Annex VIII Part I): manufacturer self-assessment. No notified body required.",
+    "important-class-i": "May self-assess ONLY if harmonised standards / common specs / a substantial-level EU certification scheme are applied in full; otherwise EU-type examination (Module B) + conformity to type (Module C), or full quality assurance (Module H).",
+    "important-class-ii": "Notified-body route required: EU-type examination (Module B) + Module C, or full quality assurance (Module H). Self-assessment not available.",
+    "critical": "As Class II, and may also be required to obtain a European cybersecurity certificate under an EU scheme where a delegated act so specifies."
+  },
+  "categories": {
+    "annex-iii-class-i": [
+      {
+        "id": "1",
+        "text": "Identity management systems and privileged access management software and hardware, including authentication and access control readers (including biometric readers)"
+      },
+      {
+        "id": "2",
+        "text": "Standalone and embedded browsers"
+      },
+      {
+        "id": "3",
+        "text": "Password managers"
+      },
+      {
+        "id": "4",
+        "text": "Software that searches for, removes or quarantines malicious software"
+      },
+      {
+        "id": "5",
+        "text": "Products with the function of a virtual private network (VPN)"
+      },
+      {
+        "id": "6",
+        "text": "Network management systems"
+      },
+      {
+        "id": "7",
+        "text": "Security information and event management (SIEM) systems"
+      },
+      {
+        "id": "8",
+        "text": "Boot managers"
+      },
+      {
+        "id": "9",
+        "text": "Public key infrastructure and digital certificate issuance software"
+      },
+      {
+        "id": "10",
+        "text": "Physical and virtual network interfaces"
+      },
+      {
+        "id": "11",
+        "text": "Operating systems"
+      },
+      {
+        "id": "12",
+        "text": "Routers, modems intended for connection to the internet, and switches"
+      },
+      {
+        "id": "13",
+        "text": "Microprocessors with security-related functionalities"
+      },
+      {
+        "id": "14",
+        "text": "Microcontrollers with security-related functionalities"
+      },
+      {
+        "id": "15",
+        "text": "ASICs and FPGAs with security-related functionalities"
+      },
+      {
+        "id": "16",
+        "text": "Smart home general purpose virtual assistants"
+      },
+      {
+        "id": "17",
+        "text": "Smart home products with security functionalities (smart door locks, security cameras, baby monitoring, alarm systems)"
+      },
+      {
+        "id": "18",
+        "text": "Internet-connected toys with social interactive features or location tracking"
+      },
+      {
+        "id": "19",
+        "text": "Personal wearable health-monitoring products outside the EU medical device regulations, or wearables intended for children"
+      }
+    ],
+    "annex-iii-class-ii": [
+      {
+        "id": "1",
+        "text": "Hypervisors and container runtime systems supporting virtualised execution of operating systems"
+      },
+      {
+        "id": "2",
+        "text": "Firewalls, intrusion detection and prevention systems"
+      },
+      {
+        "id": "3",
+        "text": "Tamper-resistant microprocessors"
+      },
+      {
+        "id": "4",
+        "text": "Tamper-resistant microcontrollers"
+      }
+    ],
+    "annex-iv": [
+      {
+        "id": "1",
+        "text": "Hardware devices with security boxes"
+      },
+      {
+        "id": "2",
+        "text": "Smart meter gateways within smart metering systems, and other devices for advanced security purposes including secure cryptoprocessing"
+      },
+      {
+        "id": "3",
+        "text": "Smartcards or similar devices, including secure elements"
+      }
+    ]
+  },
+  "classifierFlags": [
+    "If the product matches BOTH a Class I/II and an Annex IV category, the higher (critical) classification governs.",
+    "Flag explicitly where a product the manufacturer assumed was Default appears in Annex III or IV: a common and consequential misclassification that changes the conformity route.",
+    "A component integrated into a larger product may itself be an important/critical product; classify the product being placed on the market."
+  ]
+};

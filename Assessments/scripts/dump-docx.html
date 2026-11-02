@@ -1,0 +1,157 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Dump the Word document as text</title>
+<style>
+ body{font:12px Consolas,monospace;padding:14px;margin:0}
+ #bar{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;padding:8px 0;margin-bottom:10px}
+ #out{white-space:pre-wrap}
+ .h1{font-weight:700;color:#173267}
+ .h2{font-weight:700;color:#0F5FA6}
+ .tbl{color:#5A6B7B}
+ .pb{color:#B23A33}
+</style>
+</head><body>
+<!--
+  Reads the generated Word document as text, so the structure and prose can be
+  checked without downloading and opening it. Driven by the tour datasets, which
+  are the only realistic complete assessments in the repo - a hand-built fixture
+  here went stale the moment the scoring model changed.
+-->
+<div id="bar">
+  <label>Dataset
+    <select id="which">
+      <option value="tour-multi">62443-3-3 tour - all zones (multi-zone report)</option>
+      <option value="tour-single">62443-3-3 tour - one zone only (single-zone report)</option>
+      <option value="tour-42">62443-4-2 tour (component report)</option>
+    </select>
+  </label>
+  <span id="note" style="color:#5A6B7B"></span>
+</div>
+<div id="out">loading...</div>
+
+<script src="../vendor/xlsx.full.min.js"></script>
+<script src="../vendor/exceljs.min.js"></script>
+<script>
+// Mock the docx library so the document can be read as text. Structure and
+// content only; styling is not exercised here.
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ this.__type="Paragraph"; this.children=o.children||[]; this.style=o.style||null;
+    this.heading=o.heading||null; this.pageBreakBefore=!!o.pageBreakBefore;
+    this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text="[image]"; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.styles=o.styles||null; this.sections=o.sections||[]; }
+  return { Document:Document, Paragraph:Paragraph, TextRun:TextRun, TableCell:TableCell, TableRow:TableRow,
+    Table:Table, ImageRun:ImageRun, PageBreak:PageBreak, Header:Header, Footer:Footer,
+    PageNumber:{CURRENT:"C",TOTAL_PAGES:"T"}, PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"H1",HEADING_2:"H2",HEADING_3:"H3"},
+    AlignmentType:{LEFT:"l",CENTER:"c",RIGHT:"r"}, WidthType:{PERCENTAGE:"pct",DXA:"dxa"},
+    ShadingType:{SOLID:"solid"},
+    Packer:{ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } } };
+})();
+</script>
+<script src="../data/manifest.js"></script>
+<script src="../js/version.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/scoring.js"></script>
+<script src="../js/scoring-domain-letter.js"></script>
+<script src="../js/scoring-caf-achieved.js"></script>
+<script src="../js/scoring-program-ml.js"></script>
+<script src="../js/scoring-nis2.js"></script>
+<script src="../js/scoring-csms.js"></script>
+<script src="../js/scoring-cra.js"></script>
+<script src="../js/scoring-risk-appetite.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/compare.js"></script>
+<script src="../js/charts.js"></script>
+<script src="../js/report.js"></script>
+<script src="../js/export-xlsx.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../js/export-docx.js"></script>
+<script src="../js/engine.js"></script>
+<script src="../js/tour-sl-data.js"></script>
+<script src="../js/tour-42-data.js"></script>
+<script>
+(function () {
+  var A = window.App, E = A.Engine;
+  var out = document.getElementById("out");
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+  function build(which) {
+    out.textContent = "building...";
+    E.loadCatalog();
+    E.newProject();
+    var id = which === "tour-42" ? "iec-62443-4-2" : "iec-62443-3-3";
+    E.activateInstrument(id);
+    if (which === "tour-42") {
+      A.Tour42.apply(E);
+    } else {
+      A.TourSL.apply(E);
+      if (which === "tour-single") {
+        var ts = E.state.engagement.targets.slice();
+        for (var i = ts.length - 1; i >= 1; i--) E.removeTarget(ts[i].id);
+      }
+    }
+    var slot = A.Data.instruments[id];
+    var tax  = A.Data.shared.taxonomies[slot.instrument.taxonomyRef] || A.Data.shared.taxonomies["fr-7"];
+    var prof = A.Data.shared.scoringProfiles[slot.instrument.scoringProfileRef] ||
+               A.Data.shared.scoringProfiles["sl-target-closeness"];
+    A.ExportDOCX.buildAsync(E.state.engagement, slot.instrument, tax, prof, slot.narrative,
+      { targetId: E.state.activeTargetId, companionInstrumentIds: E.answeredInstrumentIds() },
+      function (err) {
+        if (err) { out.textContent = "ERROR " + err.message + "\n" + (err.stack || ""); return; }
+        var html = [];
+        function walk(n) {
+          if (!n) return;
+          if (n.__type === "Paragraph") {
+            if (n.pageBreakBefore) html.push('<span class="pb">---- page break ----</span>');
+            if (!n.text) return;
+            var cls = n.heading === "H1" ? "h1" : (n.heading === "H2" ? "h2" : "");
+            html.push(cls ? '<span class="' + cls + '">' + esc(n.text) + "</span>" : esc(n.text));
+            return;
+          }
+          if (n.__type === "Table") {
+            html.push('<span class="tbl">[table, ' + n.rows.length + " rows]</span>");
+            n.rows.forEach(walk);
+            return;
+          }
+          if (n.__type === "TableRow") {
+            var cells = n.children.map(function (c) {
+              var bits = [];
+              c.children.forEach(function (p) {
+                if (p.__type === "Paragraph") bits.push(p.text);
+                else if (p.__type === "Table") bits.push("[nested table]");
+              });
+              return bits.join(" / ");
+            });
+            html.push('<span class="tbl">  | ' + esc(cells.join(" | ")) + "</span>");
+            return;
+          }
+          if (Array.isArray(n)) n.forEach(walk);
+        }
+        window.__doc.sections.forEach(function (s, i) {
+          html.push('<span class="h1">======== section ' + i + " ========</span>");
+          s.children.forEach(walk);
+        });
+        out.innerHTML = html.join("\n");
+        document.getElementById("note").textContent =
+          "  " + html.length + " blocks. Dark blue = heading 1, blue = heading 2.";
+      });
+  }
+
+  function safeBuild(which) {
+    try { build(which); }
+    catch (e) { out.textContent = "THREW " + e.message + "\n" + (e.stack || ""); }
+  }
+  var pick = document.getElementById("which");
+  pick.addEventListener("change", function () { safeBuild(pick.value); });
+  safeBuild(pick.value);
+})();
+</script>
+</body></html>

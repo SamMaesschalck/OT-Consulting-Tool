@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Load asks first, and a refused file changes nothing</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Two code-review findings about Load.
+
+  1. Load discarded unsaved work without asking. New had a guard; Load did not,
+     on either path (the file picker, or the plain file input where the browser
+     has no picker). The question has to come BEFORE the file dialog opens.
+
+  2. A file that failed to load left a half-replaced session. loadProjectFile
+     swapped in the file's project and assessments, then threw when it reached
+     an instrument this build does not have (or targets that were not a list).
+     The screen still showed the old assessment, edits went to objects nothing
+     would save, getProjectFile() returned the other file, the toast said "The
+     current session is unchanged" - and because the picker had already adopted
+     the file's handle, the next Save wrote over the file the consultant had
+     only tried to open.
+
+  The File System Access API is stubbed so the picker path and the in-place
+  save can be observed without touching the disk.
+
+  Round 2 (verification): the question was a confirm(). Chromium opens a file
+  dialog only within about five seconds of the click that asked for it, and
+  reading a confirm() spends that time, so a consultant who paused got a raw
+  "must be handling a user gesture" toast, or no dialog at all. The question
+  is now asked in the page, and the dialog opens from the click on its
+  "Choose a file" button. Headless clicks cannot show the expiry itself; what
+  is pinned here is that no confirm() is used and the picker is called inside
+  the button's own click.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  var A = window.App, E = A.Engine, STG = A.Storage;
+
+  var confirms = [], confirmAnswer = true;
+  window.confirm = function (msg) { confirms.push(String(msg)); return confirmAnswer; };
+  window.alert = function () {};
+
+  // ---- a stub file system -------------------------------------------------
+  var disk = {}, savePicks = 0, openPicks = 0, nextOpen = null;
+  function fakeHandle(name, content) {
+    return {
+      name: name,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      getFile: function () { return Promise.resolve(new File([content || ""], name, { type: "application/json" })); },
+      createWritable: function () {
+        return Promise.resolve({
+          write: function (t) { disk[name] = t; return Promise.resolve(); },
+          close: function () { return Promise.resolve(); }
+        });
+      }
+    };
+  }
+  var realSavePicker = function () { savePicks++; return Promise.resolve(fakeHandle("asked.json")); };
+  window.showSaveFilePicker = realSavePicker;
+  window.showOpenFilePicker = function () {
+    openPicks++;
+    if (nextOpen) { var h = nextOpen; nextOpen = null; return Promise.resolve([h]); }
+    var e = new Error("aborted"); e.name = "AbortError"; return Promise.reject(e);
+  };
+  // Nothing persisted: keeps every save off IndexedDB, which never settles in
+  // the headless runner.
+  STG.__setRestoredForTests(false);
+
+  var fileInput = document.getElementById("file-input");
+  var fileInputClicks = 0;
+  fileInput.click = function () { fileInputClicks++; };   // never open a real chooser headless
+
+  // The in-page question Load asks over unsaved work.
+  function loadQuestion() { return document.querySelector(".load-guard-modal"); }
+  function answerLoad(go) {
+    var m = loadQuestion();
+    if (!m) return false;
+    m.querySelector(go ? ".load-guard-go" : ".load-guard-cancel").click();
+    return true;
+  }
+  function toastText() { return document.getElementById("toast").textContent || ""; }
+  function clearToast() { document.getElementById("toast").textContent = ""; }
+  function waitFor(cond, then, tries) {
+    tries = tries == null ? 100 : tries;
+    if (cond() || tries <= 0) { then(); return; }
+    setTimeout(function () { waitFor(cond, then, tries - 1); }, 30);
+  }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function feedFileInput(obj, name) {
+    var dt = new DataTransfer();
+    dt.items.add(new File([typeof obj === "string" ? obj : JSON.stringify(obj)], name, { type: "application/json" }));
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event("change"));
+  }
+
+  // Everything a load could disturb, by identity where identity matters: the
+  // UI and the exporters hold references to these objects.
+  function sessionNow() {
+    var pf = E.getProjectFile();
+    delete pf.updatedAt;                    // stamped afresh on every call
+    return {
+      json: JSON.stringify(pf),
+      project: E.state.project, assessments: E.state.assessments,
+      activeAssessmentId: E.state.activeAssessmentId, instrument: E.state.instrument,
+      scoringFamily: E.state.scoringFamily, taxonomy: E.state.taxonomy, profile: E.state.profile,
+      engagement: E.state.engagement, activeTargetId: E.state.activeTargetId,
+      createdAt: E.state.createdAt, createdWithVersion: E.state.createdWithVersion,
+      savedWithVersion: E.state.savedWithVersion,
+      fileName: STG.currentFileName()
+    };
+  }
+  function changed(before) {
+    var now = sessionNow();
+    return Object.keys(before).filter(function (k) { return before[k] !== now[k]; });
+  }
+
+  E.loadCatalog();
+  A.UI.init({ autosave: false });
+
+  // The file the session starts from, opened through the picker so Save has a
+  // file of its own to write back to.
+  E.activateInstrument("iec-62443-3-3");
+  E.updateMetadata({ clientName: "Current Customer", consultant: "A. Consultant" });
+  var currentFile = clone(E.getProjectFile());
+  var activeId = currentFile.activeAssessmentId;
+  E.newProject();
+
+  var steps = [
+    // ---- 0. a normal picker load adopts the file -------------------------
+    function (next) {
+      nextOpen = fakeHandle("current.json", JSON.stringify(currentFile));
+      clearToast();
+      document.getElementById("btn-load").click();
+      waitFor(function () { return /Project loaded/.test(toastText()); }, function () {
+        ok(E.getProjectFile().project.clientName === "Current Customer", "a picker load opens the file");
+        ok(STG.currentFileName() === "current.json", "and, having succeeded, makes it the file Save writes to",
+           String(STG.currentFileName()));
+        next();
+      });
+    },
+
+    // ---- 1. Load asks before the picker opens -----------------------------
+    function (next) {
+      E.updateMetadata({ clientName: "Current Customer Ltd" });       // unsaved work
+      ok(A.UI.__autosave.isDirty() === true, "an edit leaves unsaved work (Save*)");
+      confirms = []; confirmAnswer = false; openPicks = 0;
+      document.getElementById("btn-load").click();
+      var q = loadQuestion();
+      ok(!!q, "Load with unsaved work asks first");
+      ok(confirms.length === 0, "in the page, not with confirm(), which used up the click the file dialog needs",
+         confirms.join(" | "));
+      ok(q && /Load another project\?/.test(q.textContent) && /unsaved changes/.test(q.textContent),
+         "asking whether to load another project over the unsaved changes", q && q.textContent);
+      ok(q && /kept in this browser and offered the next time/.test(q.textContent),
+         "and saying truthfully what happens to them: they are kept, not lost", q && q.textContent);
+      ok(openPicks === 0, "nothing opens while the question is up", String(openPicks));
+      answerLoad(false);
+      ok(!loadQuestion(), "Cancel closes it");
+      ok(openPicks === 0, "and declining never opens the file picker", String(openPicks));
+      ok(E.getProjectFile().project.clientName === "Current Customer Ltd", "the work on screen stays");
+
+      // Agreeing opens the picker from inside that button's own click: a
+      // fresh gesture however long the consultant spent reading.
+      document.getElementById("btn-load").click();
+      var calledInsideClick = null;
+      var goBtn = loadQuestion() && loadQuestion().querySelector(".load-guard-go");
+      if (goBtn) goBtn.addEventListener("click", function () { calledInsideClick = openPicks; });
+      answerLoad(true);
+      ok(openPicks === 1 && calledInsideClick === 1,
+         "\"Choose a file\" opens the picker synchronously within its own click",
+         "picks " + openPicks + ", during the click " + calledInsideClick);
+      setTimeout(next, 30);    // let the stubbed picker's cancel settle
+    },
+
+    // ---- 2. the plain file-input path asks too ---------------------------
+    function (next) {
+      window.showSaveFilePicker = undefined;        // a browser without pickers
+      ok(STG.supportsFilePickers() === false, "(no picker support, so Load uses the file input)");
+      confirms = []; confirmAnswer = false; fileInputClicks = 0;
+      document.getElementById("btn-load").click();
+      ok(!!loadQuestion() && confirms.length === 0, "the file-input path asks as well, in the page");
+      ok(fileInputClicks === 0, "nothing opens while it is up", String(fileInputClicks));
+      answerLoad(false);
+      ok(fileInputClicks === 0, "and declining never opens the file chooser", String(fileInputClicks));
+      document.getElementById("btn-load").click();
+      answerLoad(true);
+      ok(fileInputClicks === 1, "agreeing opens it, from the click on \"Choose a file\"", String(fileInputClicks));
+      window.showSaveFilePicker = realSavePicker;
+      next();
+    },
+
+    // ---- 3. nothing unsaved, nothing asked --------------------------------
+    function (next) {
+      clearToast();
+      document.getElementById("btn-save").click();
+      waitFor(function () { return /Saved to/.test(toastText()); }, function () {
+        ok(/Saved to current\.json/.test(toastText()), "Save writes back to the opened file", toastText());
+        ok(A.UI.__autosave.isDirty() === false, "and the session is clean");
+        confirms = []; confirmAnswer = false; openPicks = 0;
+        document.getElementById("btn-load").click();
+        ok(confirms.length === 0 && !loadQuestion(), "with nothing unsaved, Load does not ask", String(confirms.length));
+        ok(openPicks === 1, "it goes straight to the picker", String(openPicks));
+        setTimeout(next, 30);    // let the stubbed picker's cancel settle
+      });
+    },
+
+    // ---- 4. a file naming an instrument this copy does not have ----------
+    function (next) {
+      E.updateMetadata({ clientName: "Current Customer Ltd" });
+      confirmAnswer = true;
+      var before = sessionNow();
+      var newer = clone(currentFile);
+      newer.project.projectId = "p-from-a-newer-release";
+      newer.project.clientName = "Newer Customer";
+      newer.savedWithVersion = "9.0.0";
+      newer.assessments["iec-62443-9-9~a1"] = { id: "iec-62443-9-9~a1", instrumentId: "iec-62443-9-9",
+        targets: [{ id: "t1", name: "Zone 1" }], responses: [] };
+      newer.activeAssessmentId = "iec-62443-9-9~a1";
+      nextOpen = fakeHandle("newer.json", JSON.stringify(newer));
+      clearToast();
+      document.getElementById("btn-load").click();
+      ok(answerLoad(true), "(unsaved work on screen, so Load asks; agreed)");
+      waitFor(function () { return /could not be loaded/.test(toastText()); }, function () {
+        var t = toastText();
+        ok(/could not be loaded/.test(t), "the file is refused", t);
+        ok(t.indexOf("iec-62443-9-9") >= 0, "naming the instrument this copy does not have", t);
+        ok(/SolutionsPT contact for the current version/.test(t), "and suggesting a newer version of the tool", t);
+        ok(/saved with v9\.0, newer than this copy/.test(t), "it says which version saved the file", t);
+        ok(/current session is unchanged/.test(t), "and that the session is unchanged", t);
+        var diff = changed(before);
+        ok(diff.length === 0, "which is true: project, assessments, active assessment, instrument and projection are all as they were",
+           "changed: " + diff.join(", "));
+        ok(E.getProjectFile().project.clientName === "Current Customer Ltd",
+           "getProjectFile() still returns the session on screen", E.getProjectFile().project.clientName);
+        ok(STG.currentFileName() === "current.json",
+           "and the refused file did not become the file Save writes to", String(STG.currentFileName()));
+
+        // The reported consequence: the next Save overwrote the refused file.
+        var picksBefore = savePicks;
+        clearToast();
+        document.getElementById("btn-save").click();
+        waitFor(function () { return /Saved to|Save failed/.test(toastText()); }, function () {
+          ok(/Saved to current\.json/.test(toastText()), "Save goes back to the session's own file", toastText());
+          ok(savePicks === picksBefore, "without asking where");
+          ok(!("newer.json" in disk), "the file that was refused is never written to");
+          ok(/Current Customer Ltd/.test(disk["current.json"] || "") && !/Newer Customer/.test(disk["current.json"] || ""),
+             "and the session's own file holds the session's own work");
+          next();
+        });
+      });
+    },
+
+    // ---- 5. the engine refuses the same way, whichever assessment it is ---
+    function (next) {
+      var before = sessionNow();
+      function refused(file, label) {
+        var err = null;
+        try { E.loadProjectFile(file); } catch (e) { err = e; }
+        ok(!!err, label + ": refused", err ? "" : "it loaded");
+        var diff = changed(before);
+        ok(diff.length === 0, label + ": the session is untouched", "changed: " + diff.join(", "));
+        return err;
+      }
+      // The active assessment is fine; a second one is not. A partial load
+      // would drop that assessment's answers on the next save.
+      var second = clone(currentFile);
+      second.assessments["nist-csf-3~a2"] = { id: "nist-csf-3~a2", instrumentId: "nist-csf-3",
+        targets: [{ id: "t1", name: "Site 1" }], responses: [{ targetId: "t1", requirementId: "GV.OC-01", state: "achieved" }] };
+      var e1 = refused(second, "an unknown instrument behind a known active one");
+      ok(e1 && e1.code === "unknown-instrument" && (e1.instruments || []).indexOf("nist-csf-3") >= 0,
+         "the error says which instrument", e1 && JSON.stringify([e1.code, e1.instruments]));
+
+      // A placeholder is listed in this build but has nothing to capture against.
+      var ph = A.Engine.state.instruments.filter(function (i) { return i.status === "placeholder"; })[0];
+      if (ph) {
+        var withPh = clone(currentFile);
+        withPh.assessments["ph~a3"] = { id: "ph~a3", instrumentId: ph.id, targets: [{ id: "t1", name: "Site 1" }], responses: [] };
+        var e2 = refused(withPh, "an assessment of a placeholder instrument (" + ph.id + ")");
+        ok(e2 && e2.code === "unknown-instrument", "is refused for the same reason", e2 && e2.code);
+      }
+
+      // ---- malformed files ----
+      var notList = clone(currentFile); notList.assessments[activeId].targets = { t1: { id: "t1", name: "Site 1" } };
+      var e3 = refused(notList, "targets that are not a list");
+      ok(e3 && e3.code === "malformed", "reported as unreadable, not as a crash", e3 && (e3.code + " " + e3.message));
+      var title33 = (E.state.instruments.filter(function (i) { return i.id === "iec-62443-3-3"; })[0] || {}).title || "";
+      ok(e3 && title33 && e3.message.indexOf(title33) >= 0 && e3.message.indexOf("iec-62443-3-3") === -1,
+         "naming the assessment by its title, not its internal id", e3 && e3.message);
+      // A shape the checks do not look for, which only shows up while the new
+      // session is being built: still a refusal in words, not a script error.
+      var basisStr = clone(currentFile); basisStr.project.basisOfAssessment = { interviews: "abc" };
+      var e5 = refused(basisStr, "an old evidence register that is not a list");
+      ok(e5 && e5.code === "malformed" && !/is not a function/.test(e5.message),
+         "reported as unreadable in words, not as the script error behind it", e5 && e5.message);
+      var respObj = clone(currentFile); respObj.assessments[activeId].responses = { r1: {} };
+      refused(respObj, "responses that are not a list");
+      var respNull = clone(currentFile); respNull.assessments[activeId].responses = [null];
+      refused(respNull, "a response that is not a record");
+      var assArray = clone(currentFile); assArray.assessments = [currentFile.assessments[activeId]];
+      refused(assArray, "assessments held as a list");
+      var projStr = clone(currentFile); projStr.project = "Acme";
+      refused(projStr, "a customer record that is not a record");
+      var tpStr = clone(currentFile); tpStr.assessments[activeId].targetProfile = "SL2";
+      refused(tpStr, "a target profile that is not a record");
+      refused(null, "no project at all");
+
+      // ---- a failure inside the commit is undone as well ----
+      // Nothing in the checks catches a listener that throws while the new
+      // session is being put on screen; the snapshot has to.
+      var boom = 1;
+      E.on("project-changed", function () { if (boom > 0) { boom--; throw new Error("listener failed"); } });
+      var good = clone(currentFile); good.project.clientName = "Someone Else";
+      var e4 = refused(good, "a valid file whose commit fails part way");
+      ok(e4 && /listener failed/.test(e4.message), "the original error is the one reported", e4 && e4.message);
+      ok(E.getProjectFile().project.clientName === "Current Customer Ltd", "and the session is the one that was open");
+      next();
+    },
+
+    // ---- 6. a malformed file through the plain file input -----------------
+    function (next) {
+      var before = sessionNow();
+      var bad = clone(currentFile);
+      bad.project.clientName = "Broken Customer";
+      bad.assessments[activeId].targets = { t1: { id: "t1" } };
+      clearToast();
+      feedFileInput(bad, "broken.json");
+      waitFor(function () { return /could not be loaded/.test(toastText()); }, function () {
+        ok(/could not be loaded/.test(toastText()) && /current session is unchanged/.test(toastText()),
+           "the file input reports the refusal", toastText());
+        var diff = changed(before);
+        ok(diff.length === 0, "and the session is untouched", "changed: " + diff.join(", "));
+        ok(STG.currentFileName() === "current.json", "the save handle is untouched too", String(STG.currentFileName()));
+        next();
+      });
+    },
+
+    // ---- 6b. a refusal through the UI leaves the page where it was --------
+    // The commit redraws the screen for the new file before a later step
+    // fails; putting the data back alone sent the consultant to the
+    // engagement page under a toast saying nothing had changed.
+    function (next) {
+      A.UI.go("report");
+      var dirtyBefore = A.UI.__autosave.isDirty();
+      var before = sessionNow();
+      var trip = 1;
+      E.on("project-changed", function (p, info) {
+        if (trip > 0 && !(info && info.restored)) { trip--; throw new Error("listener failed"); }
+      });
+      var good = clone(currentFile); good.project.clientName = "Someone Else";
+      clearToast();
+      feedFileInput(good, "someone.json");
+      waitFor(function () { return /could not be loaded/.test(toastText()); }, function () {
+        ok(/current session is unchanged/.test(toastText()), "a commit that fails part way is refused", toastText());
+        ok(changed(before).length === 0, "the session is untouched", "changed: " + changed(before).join(", "));
+        ok(A.UI.__currentView() === "report", "and the consultant is still on the page they were on",
+           A.UI.__currentView());
+        ok(A.UI.__autosave.isDirty() === dirtyBefore, "with the unsaved flag as it was");
+        next();
+      });
+    },
+
+    // ---- 7. a good file through the file input still loads ----------------
+    function (next) {
+      var other = clone(currentFile);
+      other.project.projectId = "p-second-customer";
+      other.project.clientName = "Second Customer";
+      confirms = []; confirmAnswer = true;
+      clearToast();
+      feedFileInput(other, "second.json");
+      waitFor(function () { return /Project loaded/.test(toastText()); }, function () {
+        ok(E.getProjectFile().project.clientName === "Second Customer", "a good file loads through the file input");
+        ok(STG.currentFileName() === null,
+           "and, having no handle, forgets the previous file so Save cannot overwrite it", String(STG.currentFileName()));
+        ok(A.UI.__autosave.isDirty() === false, "the loaded project starts clean");
+
+        // ---- 8. project-level edits count as unsaved work ----------------
+        // Creating, renaming or deleting an assessment reached no listener
+        // that set the unsaved flag, so a 2028 re-assessment created a moment
+        // ago was replaced by Load without a question.
+        var ra = E.newAssessment("iec-62443-3-3", { label: "2028 re-assessment" });
+        ok(A.UI.__autosave.isDirty() === true, "creating a re-assessment is unsaved work (Save*)");
+        openPicks = 0; fileInputClicks = 0;
+        document.getElementById("btn-load").click();
+        ok(!!loadQuestion(), "so Load asks before replacing it");
+        answerLoad(false);
+        ok(openPicks === 0 && fileInputClicks === 0, "and declining opens nothing");
+        clearToast();
+        document.getElementById("btn-save").click();
+        waitFor(function () { return /Saved to|Downloaded|Save failed/.test(toastText()); }, function () {
+          ok(A.UI.__autosave.isDirty() === false, "(saved)");
+          E.renameAssessment(ra.id, "2028 visit");
+          ok(A.UI.__autosave.isDirty() === true, "renaming an assessment is unsaved work too");
+          next();
+        });
+      });
+    }
+  ];
+
+  (function run(i) {
+    if (i >= steps.length) { STG.__setRestoredForTests(undefined); done(); return; }
+    try { steps[i](function () { run(i + 1); }); }
+    catch (e) { ok(false, "step " + i + " threw: " + e.message + "\n" + (e.stack || "")); STG.__setRestoredForTests(undefined); done(); }
+  })(0);
+});
+</script>
+</body></html>

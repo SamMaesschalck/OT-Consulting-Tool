@@ -1,0 +1,37 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/engagement-guidance.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.engagementGuidance = {
+  "id": "engagement-guidance",
+  "_note": "Preparation guidance for a 62443-3-2 zones-and-conduits risk assessment: the documents a consultant most commonly needs, the ones clients often forget, and the stakeholders worth interviewing. ADVISORY ONLY, not a fixed checklist, and it must never pre-populate the basis-of-assessment register; the consultant records what was actually reviewed/observed there.",
+  "commonDocuments": [
+    "Network architecture diagrams (current, not as-designed)",
+    "Asset inventory for the systems in scope",
+    "P&IDs / process descriptions for the operations the SuC controls",
+    "PHA / HAZOP results (the usual source for worst-credible impact)",
+    "Existing segmentation or zone/conduit documentation, if any",
+    "The client's corporate risk matrix and tolerable-risk criteria",
+    "Remote access register: routes, vendors, standing tunnels",
+    "Interface / dataflow lists between OT, DMZ and corporate IT"
+  ],
+  "oftenForgotten": [
+    "Safety requirements specification for the SIS (drives the safety-zone decisions)",
+    "Vendor connection contracts: what access was contractually promised",
+    "Wireless site survey / list of wireless links into the estate",
+    "Portable and mobile device practice (engineering laptops, USB): 3-2 expects them zoned separately",
+    "Regulatory or insurance constraints that set risk criteria",
+    "Previous cyber risk assessments and what happened to their actions",
+    "Who owns the tolerable-risk decision: it is the asset owner's, not the consultant's"
+  ],
+  "keyStakeholders": [
+    "Asset owner senior management (they own tolerable risk and SL-T sign-off)",
+    "Process safety engineer (consequence severity, SIS context)",
+    "Control systems engineer (how the system actually works)",
+    "SIS / functional safety engineer",
+    "OT / plant network engineer (and corporate network counterpart)",
+    "Operations manager (essential functions and worst-case framing)",
+    "System integrator or key vendor representative",
+    "IT security / SOC lead (threat context, monitoring reality)"
+  ]
+};

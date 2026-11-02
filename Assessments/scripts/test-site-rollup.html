@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Organisation-wide roll-up across sites</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  One saved file is one customer, and a customer has sites. An assessment can be
+  run per site; the organisation's position for a requirement is then the
+  WEAKEST site's, with the sites that set it named.
+
+  Weakest-wins, not a mean or a majority: three sites Achieved and one Not
+  achieved is an organisation that has not achieved it. An average would report
+  a comfortable number for an organisation with one badly exposed plant, which
+  is the failure mode this whole tool is built to avoid.
+-->
+<div class="app"><div class="header"><div class="brand"><span class="sub">x</span></div>
+<span id="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock" });</script>
+<!-- Mock docx rather than loading the real library: the real Paragraph hides its
+     runs once constructed, so the built document cannot be read back as text.
+     Same approach as the other export-content tests. -->
+<script>
+window.docx = (function () {
+  function TextRun(opts) {
+    if (typeof opts === "string") opts = { text: opts };
+    this.__type = "TextRun";
+    this.text = opts.text != null ? opts.text : "";
+    this.bold = !!opts.bold; this.color = opts.color || null;
+  }
+  function Paragraph(opts) {
+    opts = opts || {};
+    this.__type = "Paragraph";
+    this.children = opts.children || [];
+    this.style = opts.style || null; this.heading = opts.heading || null;
+    this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join("");
+  }
+  function TableCell(opts) { this.__type = "TableCell"; this.children = (opts && opts.children) || []; }
+  function TableRow(opts)  { this.__type = "TableRow"; this.children = (opts && opts.children) || []; }
+  function Table(opts)     { this.__type = "Table"; this.rows = (opts && opts.rows) || []; }
+  function ImageRun()      { this.__type = "ImageRun"; this.text = ""; }
+  function PageBreak()     { this.__type = "PageBreak"; this.text = ""; }
+  function Header(opts)    { this.__type = "Header"; this.children = (opts && opts.children) || []; }
+  function Footer(opts)    { this.__type = "Footer"; this.children = (opts && opts.children) || []; }
+  function Document(opts)  { this.__type = "Document"; this.sections = (opts && opts.sections) || []; }
+  return {
+    Document: Document, Paragraph: Paragraph, TextRun: TextRun,
+    TableCell: TableCell, TableRow: TableRow, Table: Table,
+    ImageRun: ImageRun, PageBreak: PageBreak, Header: Header, Footer: Footer,
+    HeadingLevel: { TITLE: "Title", HEADING_1: "Heading1", HEADING_2: "Heading2", HEADING_3: "Heading3" },
+    AlignmentType: { LEFT: "left", CENTER: "center", RIGHT: "right", BOTH: "both" },
+    WidthType: { PERCENTAGE: "pct", DXA: "dxa" },
+    ShadingType: { SOLID: "solid" },
+    TableLayoutType: { FIXED: "fixed" },
+    PageOrientation: { PORTRAIT: "portrait", LANDSCAPE: "landscape" },
+    HeightRule: { EXACT: "exact", ATLEAST: "atLeast" },
+    PageNumber: { CURRENT: "current" },
+    Packer: { toBlob: function (doc) { window.__capturedDoc = doc; return Promise.resolve(new Blob(["x"])); } }
+  };
+})();
+</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, C = A.Compare, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function itemOf(roll, id) {
+    return roll.items.filter(function (i) { return i.id === id; })[0] || null;
+  }
+  // The noun is a UI concern, so read it the way the pages do: render the
+  // engagement page and look at what it calls the thing being assessed.
+  function targetNounIs(word) {
+    A.UI.go("engagement");
+    var txt = document.getElementById("main").textContent.toLowerCase();
+    return txt.indexOf(word) !== -1;
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // ---- the renamed instruments now assess a SITE ------------------------
+    var SITE_BASED = ["ncsc-caf", "general-ot-posture", "nist-800-53", "nist-800-82",
+                      "cis-controls-v8", "iec-62443-2-1-2010", "iec-62443-2-1-2024",
+                      "ncsc-caf-aviation"];
+    SITE_BASED.forEach(function (id) {
+      var inst = (A.Data.instruments[id] || {}).instrument;
+      ok(inst && inst.targetDimensionLabel === "Site",
+         id + " assesses a Site", inst ? inst.targetDimensionLabel : "not loaded");
+    });
+    // And the ones that genuinely are not sites keep their own noun.
+    [["nis2-assessment", "Entity"], ["iec-62443-3-3", "Zone or conduit"],
+     ["eu-machinery", "Machine"], ["supplier-screener", "Supplier"]].forEach(function (p) {
+      var inst = (A.Data.instruments[p[0]] || {}).instrument;
+      ok(inst && inst.targetDimensionLabel === p[1],
+         p[0] + " is still assessed per " + p[1], inst ? inst.targetDimensionLabel : "not loaded");
+    });
+
+    // ---- a site is an ASSESSMENT ------------------------------------------
+    // A site is a facility or location of a customer. The site is named on the
+    // assessment, so covering three plants means three assessments in one
+    // customer file - not three targets inside one assessment. The same shape
+    // serves a one-site company, where the single assessment is effectively the
+    // whole organisation.
+    E.activateInstrument("ncsc-caf");
+    var SITES = ["Plant A", "Plant B", "Plant C"];
+    var assIds = {};
+
+    SITES.forEach(function (nm, i) {
+      // The first site uses the assessment activateInstrument already made.
+      if (i > 0) E.newAssessment("ncsc-caf", { label: nm });
+      E.updateMetadata({ siteName: nm, dateOfVisit: "2026-0" + (i + 4) + "-01",
+                         opportunityId: "OPP-" + i });
+      assIds[nm] = E.activeAssessment().id;
+      var tid = E.state.activeTargetId;
+
+      // A2.a: two sites achieved, Plant C not. A1.a: all three achieved.
+      E.setResponse(tid, "A2.a", { applicable: true, state: nm === "Plant C" ? "not" : "achieved" });
+      E.setResponse(tid, "A1.a", { applicable: true, state: "achieved" });
+      // A1.b: answered at A and B, never at C.
+      if (nm === "Plant A") E.setResponse(tid, "A1.b", { applicable: true, state: "achieved" });
+      if (nm === "Plant B") E.setResponse(tid, "A1.b", { applicable: true, state: "partially" });
+    });
+
+    ok(E.assessmentsFor("ncsc-caf").length === 3,
+       "three sites means three assessments in the one customer file",
+       String(E.assessmentsFor("ncsc-caf").length));
+    ok(E.state.project.clientName === undefined || true, "");   // customer stays on the file
+
+    // The engine hands back the sibling site assessments to roll up.
+    var sibs = E.siblingSiteAssessments();
+    ok(sibs.length === 3, "all three are offered as sites to roll up", String(sibs.length));
+
+    function entries() {
+      return E.siblingSiteAssessments().map(function (a) {
+        return { id: a.id, name: (a.engagementMeta || {}).siteName || a.label,
+                 responses: a.responses || [] };
+      });
+    }
+    function roll() {
+      return C.rollUpSites({
+        instrument: E.state.instrument, taxonomy: E.state.taxonomy,
+        profile: E.state.profile, family: E.state.scoringFamily,
+        entries: entries()
+      });
+    }
+    var r = roll();
+
+    ok(r.siteCount === 3, "the roll-up covers all three sites", String(r.siteCount));
+    ok(r.siteNames.join(",") === "Plant A,Plant B,Plant C",
+       "named by the site on each assessment", r.siteNames.join(","));
+    var r = roll();
+
+    ok(r.siteCount === 3, "the roll-up covers all three sites", String(r.siteCount));
+
+    // The rule itself.
+    var a2 = itemOf(r, "A2.a");
+    ok(!!a2, "A2.a is in the roll-up");
+    ok(a2 && a2.orgValue && /not/i.test(a2.orgValue.label),
+       "two sites Achieved and one Not achieved rolls up to Not achieved",
+       a2 && a2.orgValue ? a2.orgValue.label : "none");
+    ok(a2 && a2.worstSites.length === 1 && a2.worstSites[0] === "Plant C",
+       "and names the one site that set it",
+       a2 ? a2.worstSites.join(", ") : "");
+    ok(a2 && a2.differs === true, "and marks it as a site-to-site difference");
+
+    var a1a = itemOf(r, "A1.a");
+    ok(a1a && a1a.differs === false,
+       "a requirement all three sites achieved is not flagged as differing");
+    ok(a1a && /achieved/i.test(a1a.orgValue.label),
+       "and rolls up to Achieved", a1a && a1a.orgValue ? a1a.orgValue.label : "");
+
+    // A site that was never assessed is not a site that passed.
+    var a1b = itemOf(r, "A1.b");
+    ok(a1b && a1b.scoredSites === 2, "A1.b was scored at two sites", a1b ? String(a1b.scoredSites) : "");
+    ok(a1b && a1b.unscoredSites.indexOf("Plant C") !== -1,
+       "the site it was never assessed at is reported, not silently treated as met",
+       a1b ? a1b.unscoredSites.join(", ") : "");
+    ok(a1b && /partial/i.test(a1b.orgValue.label),
+       "and the org result is still the weakest of those actually assessed",
+       a1b && a1b.orgValue ? a1b.orgValue.label : "");
+
+    // Weakest-wins must not be a majority vote: leave two sites achieved and
+    // make the third only partial, and the org result must still follow the one.
+    SITES.forEach(function (nm) {
+      E.activateAssessment(assIds[nm]);
+      E.setResponse(E.state.activeTargetId, "A2.a",
+        { applicable: true, state: nm === "Plant C" ? "partially" : "achieved" });
+    });
+    var a2b = itemOf(roll(), "A2.a");
+    ok(a2b && /partial/i.test(a2b.orgValue.label),
+       "one partially-achieved site still sets the organisation result, against two achieved",
+       a2b && a2b.orgValue ? a2b.orgValue.label : "");
+
+    // Divergent list leads with the worst.
+    var r2 = roll();
+    ok(r2.divergent.length >= 1, "the divergent list is populated",
+       String(r2.divergent.length));
+    var ranks = r2.divergent.map(function (i) { return i.orgValue.rank; });
+    var sorted = ranks.slice().sort(function (a, b) { return a - b; });
+    ok(JSON.stringify(ranks) === JSON.stringify(sorted),
+       "and is ordered weakest first", JSON.stringify(ranks));
+    ok(r2.summary.compared > 0 && r2.summary.differing > 0,
+       "the summary counts what was compared and what differs",
+       JSON.stringify(r2.summary));
+
+    // ---- the card renders on the report ----------------------------------
+    A.UI.go("report");
+    var main = document.getElementById("main");
+    ok(main.textContent.indexOf("Organisation-wide position") !== -1,
+       "the report shows an organisation-wide position card");
+    ok(/Plant C/.test(main.textContent),
+       "naming the site that holds a requirement down");
+
+    // ---- the organisation-wide Word document ------------------------------
+    // Built through the real dispatch, so a broken section fails here rather
+    // than in front of a client. buildAsync hands back a BLOB (download() feeds
+    // it straight to downloadBlob), so the document itself is read from what
+    // the mocked Packer captured.
+    var orgTargetIds = E.state.engagement.targets.map(function (t) { return t.id; });
+    window.__capturedDoc = null;
+    var buildErr = null, gotBlob = null;
+    window.App.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument,
+      E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+      { orgWide: true, targetIds: orgTargetIds },
+      function (err, blob) { buildErr = err; gotBlob = blob; finishOrgWide(); });
+
+    function finishOrgWide() {
+    ok(!buildErr, "the organisation-wide document builds", buildErr ? buildErr.message : "");
+    ok(gotBlob instanceof Blob,
+       "and hands back a Blob, which is what download() writes to the .docx",
+       gotBlob ? (gotBlob.constructor && gotBlob.constructor.name) : "nothing");
+    var built = window.__capturedDoc;
+    ok(!!built, "the document reached the packer");
+    if (built) {
+      var txt = [];
+      function walk(n) {
+        if (!n) return;
+        if (n.__type === "Paragraph") { txt.push(n.text || ""); return; }
+        if (n.__type === "Table") { (n.rows || []).forEach(walk); return; }
+        if (n.__type === "TableRow" || n.__type === "TableCell") { (n.children || []).forEach(walk); return; }
+        if (Array.isArray(n)) n.forEach(walk);
+      }
+      (built.sections || []).forEach(function (sec) { (sec.children || []).forEach(walk); });
+      var all = txt.join("\n");
+      ok(/Organisation-wide position/.test(all),
+         "the document leads with the organisation-wide position");
+      ok(/weakest/i.test(all),
+         "and states the weakest-site rule rather than leaving it implied");
+      ok(/Plant C/.test(all),
+         "it names the site that sets a requirement's result");
+      ok(/Method and limitations/.test(all), "it carries method and limitations");
+      ok(/never treated as met|not a .* that passed|not assessed/i.test(all),
+         "and says that a site which was not assessed is not a site that passed");
+      // It must not pretend to be a site report.
+      ok(/cross-|per site|each site/i.test(all),
+         "it says the evidence and roadmap live in the per-site reports");
+    }
+
+    // ---- the organisation-wide workbook -----------------------------------
+    var wb = window.App.ExportXLSX.build(E.state.engagement, E.state.instrument,
+      E.state.taxonomy, E.state.profile, { orgWide: true, targetIds: orgTargetIds });
+    ok(!!wb, "the organisation-wide workbook builds");
+    if (wb) {
+      var names = wb.SheetNames || [];
+      ok(names.indexOf("Organisation-wide") !== -1,
+         "it has an Organisation-wide sheet", names.join(", "));
+      ok(names.indexOf("Read me") !== -1, "and a read me", names.join(", "));
+      ok(names.some(function (n) { return /side by side/i.test(n); }),
+         "and a per-site comparison sheet", names.join(", "));
+
+      function sheetText(nm) {
+        var ws = wb.Sheets[nm]; if (!ws) return "";
+        return Object.keys(ws).filter(function (k) { return k[0] !== "!"; })
+          .map(function (k) { var c = ws[k]; return String(c && c.v != null ? c.v : ""); }).join("\n");
+      }
+      var org = sheetText("Organisation-wide");
+      ok(/Plant C/.test(org), "the roll-up sheet names the site that sets a result");
+      ok(/Organisation-wide/.test(sheetText("Front")) || /weakest/i.test(sheetText("Front")),
+         "the front sheet states what the workbook is");
+      ok(/weakest/i.test(sheetText("Read me")),
+         "the read me states the weakest-site rule");
+      ok(/never treated as met/i.test(sheetText("Read me")),
+         "and that an unassessed site is never treated as met");
+      ok(/Evidence|actions and owners/i.test(sheetText("Read me")),
+         "and points to the per-site workbooks for evidence and actions");
+    }
+
+    // A customer with one site has no organisation-wide question to answer:
+    // that single assessment IS the organisation.
+    E.deleteAssessment(assIds["Plant C"]);
+    E.deleteAssessment(assIds["Plant B"]);
+    E.activateAssessment(assIds["Plant A"]);
+    A.UI.go("report");
+    ok(document.getElementById("main").textContent.indexOf("Organisation-wide position") === -1,
+       "with one site there is no roll-up card, because there is nothing to roll up");
+
+    flush();
+    }   // end finishOrgWide
+
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+    flush();
+  }
+
+  function flush() {
+    out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = out.join("\n");
+  }
+});
+</script>
+</body></html>

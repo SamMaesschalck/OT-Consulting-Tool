@@ -1,0 +1,97 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Word report visuals, every demo</title></head>
+<body>
+<!--
+  Builds the real Word report for every demo dataset (as tour.html seeds them)
+  and lists the opening sections of each document with the number of chart
+  images and tables under each, so a report whose executive summary is not
+  followed by its at-a-glance visuals stands out. An audit, not a test: it
+  prints a table and AUDIT-DONE.
+-->
+<pre id="out">running…</pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["41", "42", "caf", "caf-aviation", "cis", "cra", "csms", "machinery", "ml", "nis2", "nis2-quick", "nist", "nist82", "posture", "risk-appetite", "sl", "supplier", "syaps"] }); H.dom();</script>
+<script>
+function unzipDoc(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function sections(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null;
+  Array.prototype.forEach.call(body.children, function (el) {
+    var style = el.getElementsByTagNameNS(W, "pStyle")[0];
+    var isH1 = el.localName === "p" && style && /^Heading1$/i.test(style.getAttributeNS(W, "val") || style.getAttribute("w:val"));
+    if (isH1) {
+      cur = { title: Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join("").trim(), img: 0, tbl: 0 };
+      out.push(cur); return;
+    }
+    if (!cur) return;
+    cur.img += el.getElementsByTagNameNS(W, "drawing").length;
+    if (el.localName === "tbl") cur.tbl++;
+  });
+  return out;
+}
+(function () {
+  var out = document.getElementById("out"), lines = [];
+  var A = window.App, E = A.Engine;
+  window.confirm = function () { return true; }; window.alert = function () {};
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = {
+    "iec-62443-3-3": A.TourSL, "iec-62443-4-2": A.Tour42, "ncsc-caf": A.TourCAF, "general-ot-posture": A.TourPosture,
+    "iec-62443-2-1-2024": A.TourML, "nis2-assessment": A.TourNIS2, "nis2-quick-gap": A.TourNIS2Quick, "iec-62443-4-1": A.Tour41,
+    "iec-62443-2-1-2010": A.TourCSMS, "ncsc-caf-aviation": A.TourCAFAviation, "eu-cra": A.TourCRA, "eu-machinery": A.TourMachinery,
+    "supplier-screener": A.TourSupplier, "risk-appetite": A.TourRiskAppetite, "nist-800-53": A.TourNIST, "nist-800-82": A.TourNIST82,
+    "cis-controls-v8": A.TourCIS, "onr-syaps-management": A.TourSyAPS.management, "onr-syaps-cyber": A.TourSyAPS.cyber, "onr-syaps-full": A.TourSyAPS.full
+  };
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply) m.apply(E); });
+  var ids = Object.keys(SEED), chain = Promise.resolve();
+  ids.forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      var opts = {
+        cafProfileRegistry: E.getCAFProfileRegistry ? E.getCAFProfileRegistry() : null,
+        cafProfileId: E.getActiveCAFProfileId ? E.getActiveCAFProfileId() : null,
+        cafProfile: E.getActiveCAFProfile ? E.getActiveCAFProfile() : null,
+        cafOverlay: E.getActiveCAFOverlay ? E.getActiveCAFOverlay() : null,
+        targetId: E.state.activeTargetId,
+        riskAppetiteSetup: E.state.scoringFamily === "risk-appetite-coherence" ? E.getRiskAppetiteSetup() : null
+      };
+      return new Promise(function (res) {
+        A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+          E.getActiveNarrative ? E.getActiveNarrative() : null, opts, function (err, blob) { res(err ? { err: err } : { blob: blob }); });
+      }).then(function (r) {
+        if (r.err) { lines.push(id + ": BUILD ERROR " + (r.err.message || r.err)); return; }
+        return unzipDoc(r.blob).then(function (xml) {
+          var secs = sections(xml), total = secs.reduce(function (a, s) { return a + s.img; }, 0);
+          lines.push("== " + id + "  (" + (E.state.engagement.targets || []).length + " targets, " + total + " images in document)");
+          secs.slice(0, 6).forEach(function (s) { lines.push("     " + s.title.slice(0, 60) + "   [img " + s.img + ", tbl " + s.tbl + "]"); });
+        });
+      });
+    });
+  });
+  chain.then(function () { out.textContent = lines.join("\n") + "\nAUDIT-DONE"; },
+             function (e) { out.textContent = lines.join("\n") + "\nthrew: " + (e && e.message) + "\nAUDIT-DONE"; });
+})();
+</script>
+</body></html>

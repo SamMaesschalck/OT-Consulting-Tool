@@ -1,0 +1,53 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/cis-controls-v8/narrative.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["cis-controls-v8"] = window.App.Data.instruments["cis-controls-v8"] || {};
+window.App.Data.instruments["cis-controls-v8"].narrative = {
+    "_note":  "CIS Controls v8.1.2 gap-analysis narrative. The executiveSummary block drives the expanded Word exec summary; single objective, so the docx gap-shape falls back to the 18 Controls (principle level). 3-band Implemented / Partially / Not Implemented.",
+    "boilerplate":  {
+                        "report_intro":  "This report is a safeguard-by-safeguard gap assessment against the CIS Critical Security Controls Version 8.1.2, published by the Center for Internet Security. For each Safeguard it records whether it is Implemented, Partially Implemented or Not Implemented, measured against the selected CIS Implementation Group. It then sets out an evidence-based roadmap towards the Safeguards that are not yet implemented or could not be verified.",
+                        "not_formal_caveat":  "This is an alignment and gap analysis intended to support improvement. It is not a certified CIS Controls assessment and does not constitute a CIS SecureSuite or Controls Self Assessment Tool (CSAT) result. The judgements here are the consultant's, made against the CIS Safeguard descriptions, and should be confirmed through the enterprise's own validation where required.",
+                        "how_to_read":  "Each Safeguard is assessed as Implemented, Partially Implemented or Not Implemented, and the results are reported as a profile by CIS Control instead of a single score. A Safeguard that could not be verified, or that no one tracks, is marked Unknown. Being unable to demonstrate a Safeguard is reported as a finding, so Unknown is treated as below the expected state and appears on the roadmap. It also lowers confidence. The selected Implementation Group (IG1, IG2 or IG3, or the full set with no target) sets which Safeguards are expected, and the roadmap lists every in-scope Safeguard that is not yet implemented or could not be verified.",
+                        "series_context":  "The CIS Critical Security Controls are published by the Center for Internet Security. They are a prioritised set of safeguards drawn from observed attack patterns, and they are not a regulation. The Controls are arranged in Implementation Groups so that a smaller organisation can start with the highest-priority safeguards. This report is an alignment and gap analysis against them. It is not a certified CIS assessment."
+                    },
+    "templates":  {
+                      "profile_line":  "{objName} ({objId}): {achievedCount} implemented, {notCount} not implemented, of {totalCount} Safeguards.",
+                      "outcome_result":  "{code} {title}: {stateLabel}.",
+                      "roadmap_item":  "{code} {title}: currently {stateLabel}. Recommended actions below.",
+                      "unknown_finding":  "{unknownCount} Safeguards could not be established and are marked unknown; confidence is {confidenceLabel}."
+                  },
+    "executiveSummary":  {
+                             "_note":  "Composed by slot-substitution only. Single objective, so the docx gap-shape uses the 18 Controls; 3-band Implemented / Partially / Not Implemented.",
+                             "templates":  {
+                                               "exec_verdict":  "This assessment finds that {clientName} {verdictPhrase} against {profileName} of the CIS Critical Security Controls v8.1.2, with the weakest coverage in {weakestObjectiveName}. The Safeguards that are not yet implemented are the focus of the roadmap in this report.",
+                                               "exec_verdict_nogaps":  "This assessment finds that {clientName} {verdictPhrase} against {profileName} of the CIS Critical Security Controls v8.1.2, with every in-scope Safeguard assessed as Implemented.",
+                                               "exec_scope":  "The assessment covered {applicableCount} applicable Safeguards across the 18 CIS Controls, judged against {profileName}.",
+                                               "exec_profile":  "Of these, {achievedCount} were assessed as Implemented, {partiallyCount} as Partially Implemented and {notAchievedCount} as Not Implemented, with {unknownCount} that could not be verified (Unknown). An unverifiable Safeguard counts as a finding, so the {belowCount} Safeguard(s) below the expected state (Partially Implemented, Not Implemented or Unknown) together make up the roadmap for the group.",
+                                               "exec_gap_shape":  "The gaps are not evenly spread. {gapConcentrationSentence} The weakest Control is {weakestObjectiveName}, where {weakestObjectiveDetail}.",
+                                               "exec_path_forward":  "This report sets out a prioritised roadmap for addressing the {belowCount} Safeguards below the expected state.",
+                                               "exec_confidence":  "This picture is based on {coveragePct} of applicable Safeguards being answerable ({confidenceLabel}). The result is the profile of Implemented, Partially Implemented and Not Implemented Safeguards by Control, with no single grade or pass mark.",
+                                               "verdictPhrases":  {
+                                                                      "foundations":  "demonstrates strong implementation of the selected Implementation Group",
+                                                                      "recognised":  "shows implementation that is recognised but not yet fully in place",
+                                                                      "substantial":  "has substantial gaps against the selected Implementation Group"
+                                                                  },
+                                               "gapConcentrationFragments":  {
+                                                                                 "partialClause":  "Safeguards are partly in place",
+                                                                                 "absentClause":  "the Safeguards are not yet implemented"
+                                                                             }
+                                           },
+                             "boilerplate":  {
+                                                 "exec_partial_vs_absent":  "A Safeguard marked Partially Implemented is recognised and some of its elements are in place but others are not, so the remaining work extends what has already begun. A Safeguard marked Not Implemented is not yet in place and needs to be established. The two differ in cost and effort, because the first builds on what exists and the second starts from new.",
+                                                 "regulatory_stakes":  "The CIS Critical Security Controls are a widely used, prioritised set of safeguards. The chosen Implementation Group reflects the enterprise's risk profile, and IG1 is the baseline of essential cyber hygiene expected of every organisation. Safeguards below the expected state are the points a cyber-insurance review, a payment-card assessment (PCI DSS) or a customer security questionnaire would focus on. This report is an alignment and gap analysis to support improvement. It is not a certified CIS assessment.",
+                                                 "not_determination":  "This is an alignment and gap analysis against the CIS Safeguard descriptions. It is not a certified CIS Controls assessment or a CSAT result. The judgements here are the consultant's and should be confirmed through the enterprise's own validation where required."
+                                             },
+                             "consultantBlocks":  {
+                                                      "consultant_exposure_seed":  "For {clientName}, the weakest Control is {weakestObjectiveName}.",
+                                                      "consultant_exposure":  "[Consultant to add a short, client-specific note on the drivers for this assessment (cyber insurance, PCI DSS, customer requirements) and any specific exposure arising from the weakest Controls identified.]",
+                                                      "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",
+                                                      "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this organisation.]"
+                                                  }
+                         }
+};

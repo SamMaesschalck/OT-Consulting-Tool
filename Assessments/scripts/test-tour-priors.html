@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Tour datasets: previous assessments</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Three demo datasets now carry a PREVIOUS assessment alongside this year's, so
+  the tour shows what the tool is actually for: one customer file holding every
+  visit, and this year's report able to say what has changed.
+
+  The invariants are the same for all three, so they are asserted in one place
+  rather than once per tour - a fourth tour gaining a prior only has to be added
+  to the table below.
+-->
+<div class="app"><div class="header"><div class="brand"><span class="sub">x</span></div>
+<span id="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["caf", "posture", "sl"] });</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+
+  // Each tour states how a row's score is read, since the three families store
+  // it differently: a Security Level, a band, an achievement state.
+  var STATES = { not: 0, partially: 1, achieved: 2 };
+  var CASES = [
+    { id: "iec-62443-3-3",     mod: "TourSL",      what: "62443-3-3",
+      rank: function (r) { return r.sl; } },
+    { id: "general-ot-posture", mod: "TourPosture", what: "OT posture",
+      rank: function (r) { return r.band; } },
+    { id: "ncsc-caf",           mod: "TourCAF",     what: "NCSC CAF",
+      rank: function (r) { return STATES[r.state]; } }
+  ];
+
+  try {
+    A.UI.init({ autosave: false });
+
+    CASES.forEach(function (c) {
+      var m = A[c.mod];
+      var tag = c.what + ": ";
+      E.activateInstrument(c.id);
+      m.apply(E);
+
+      // Applying the dataset again must change nothing. tour.html re-seeds on
+      // every instrument-changed and activates 62443-3-3 a second time to land
+      // on its report, so this genuinely happens - and it used to leave the
+      // demo showing two 2024 assessments and a doubled set of zones.
+      var zonesAfterFirst = E.state.engagement.targets.length;
+      m.apply(E);
+      m.apply(E);
+      ok(E.state.engagement.targets.length === zonesAfterFirst,
+         tag + "re-applying the dataset does not add the zones again",
+         zonesAfterFirst + " then " + E.state.engagement.targets.length);
+
+      // Identify the prior/current PAIR by visit date, not by position: a tour
+      // may ship further sibling assessments (posture also has a site-by-site
+      // demo), and this page is about the prior-assessment wiring.
+      var all = E.assessmentsFor(c.id);
+      ok(all.length >= 2, tag + "the demo file holds a prior and a current assessment",
+         String(all.length));
+      function byDate(d) {
+        return all.filter(function (a) { return (a.engagementMeta || {}).dateOfVisit === d; })[0] || null;
+      }
+      var older = byDate(m.prior.dateOfVisit), newer = byDate(m.metadata.dateOfVisit);
+      ok(!!older && !!newer, tag + "both are identifiable by their visit date",
+         all.map(function (a) { return (a.engagementMeta || {}).dateOfVisit; }).join(", "));
+      if (!older || !newer) return;
+
+      // Both are labelled, so the picker reads as a history rather than two
+      // rows distinguished only by date.
+      ok(older.label === m.prior.label, tag + "the archive is labelled", older.label);
+      ok(newer.label === "2026 reassessment", tag + "and this year's is the reassessment",
+         newer.label);
+
+      ok(older.engagementMeta.dateOfVisit === m.prior.dateOfVisit,
+         tag + "the earlier one is the previous visit", older.engagementMeta.dateOfVisit);
+      ok(newer.engagementMeta.dateOfVisit === m.metadata.dateOfVisit,
+         tag + "the later one is this year's", newer.engagementMeta.dateOfVisit);
+      ok(older.engagementMeta.dateOfVisit < newer.engagementMeta.dateOfVisit,
+         tag + "and it really is earlier, so the story reads forwards");
+      ok(E.state.activeAssessmentId === newer.id,
+         tag + "the tour opens on this year's, not the archive");
+
+      // Each visit is its own engagement. Sharing the record is precisely what
+      // the metadata split was made to prevent.
+      ok(older.engagementMeta !== newer.engagementMeta,
+         tag + "each visit holds its own engagement record");
+      ok(older.engagementMeta.opportunityId !== newer.engagementMeta.opportunityId,
+         tag + "with its own opportunity id",
+         older.engagementMeta.opportunityId + " vs " + newer.engagementMeta.opportunityId);
+
+      // Answers must not be shared between the two. A shared array would let an
+      // edit to this year's assessment silently rewrite last year's report.
+      ok(older.responses !== newer.responses,
+         tag + "the two sets of answers are separate objects");
+
+      // A delta naming an id that is not in the dataset would silently do
+      // nothing, and the demo would show no progress at all while looking fine.
+      var rowIds = {};
+      m.rows.forEach(function (r) { rowIds[r.id] = true; });
+      var stray = m.prior.deltas.filter(function (d) { return !rowIds[d.id]; });
+      ok(stray.length === 0, tag + "every delta names a question the demo answers",
+         stray.map(function (d) { return d.id; }).join(","));
+
+      // Every delta has to be WEAKER than today, or the demo would show a
+      // regression where it means to show progress.
+      var wrongWay = m.prior.deltas.filter(function (d) {
+        var now = m.rows.filter(function (r) { return r.id === d.id; })[0];
+        return !now || !(c.rank(d) < c.rank(now));
+      });
+      ok(wrongWay.length === 0, tag + "and was found weaker then than it is now",
+         wrongWay.map(function (d) { return d.id; }).join(","));
+
+      // The archive must not carry this year's remediation plan: those owners,
+      // ranks and target dates were written for the report being produced now.
+      var withPlan = m.priorRows().filter(function (r) { return r.rem || r.adv; });
+      ok(withPlan.length === 0, tag + "the archived visit carries no remediation plan",
+         String(withPlan.length));
+      ok(m.priorRows().length === m.rows.length,
+         tag + "but it is a full assessment, not just the deltas",
+         m.priorRows().length + " of " + m.rows.length);
+
+      // The comparison baseline is wired from the sibling, so the progress card
+      // works from this one file with no second file to load.
+      var bl = newer.baseline;
+      ok(!!bl && (bl.responses || []).length > 0,
+         tag + "this year's assessment carries the previous one as its baseline",
+         bl ? String((bl.responses || []).length) : "none");
+      if (!bl) return;
+      ok(bl.source.dateOfVisit === m.prior.dateOfVisit,
+         tag + "the baseline is dated, so the report can say what it compares against",
+         bl.source.dateOfVisit);
+      ok(bl.responses !== older.responses,
+         tag + "the baseline is a copy - editing the archive cannot rewrite history");
+
+      // And the point of all of it: a scored difference the report can state.
+      // Scoped exactly as the report scopes it, so a zone reads the answers it
+      // inherits from the system-wide layer as well as its own overrides.
+      var t = E.getActiveTarget();
+      var btid = A.Compare.baselineTargetIdFor(bl, t);
+      var diff = A.Compare.compare({
+        instrument: E.state.instrument, taxonomy: E.state.taxonomy, profile: E.state.profile,
+        family: E.state.scoringFamily,
+        baselineResponses: A.Compare.scopeResponses(bl.responses, btid),
+        currentResponses: A.Compare.scopeResponses(newer.responses, t.id),
+        targetProfile: E.state.engagement.targetProfile
+      });
+      // Per delta, not a count: a total says "one of these did not move" and
+      // leaves you guessing which. The detail names it and says what the
+      // comparison made of it instead.
+      var itemById = {};
+      diff.items.forEach(function (it) { itemById[it.id] = it; });
+      var notMoved = m.prior.deltas.filter(function (d) {
+        var it = itemById[d.id];
+        return !it || it.change !== "improved";
+      });
+      ok(notMoved.length === 0,
+         tag + "the comparison reports an improvement for every authored delta",
+         notMoved.map(function (d) {
+           var it = itemById[d.id];
+           return d.id + " -> " + (it ? it.change + " (" + it.prev.label + " to " + it.curr.label + ")" : "absent");
+         }).join(", "));
+      ok(diff.summary.regressed === 0, tag + "and nothing has gone backwards",
+         String(diff.summary.regressed));
+
+      // The whole assessment is compared, not just what the zone overrides.
+      // Before the shared layer was resolved here, a 3-3 zone compared four
+      // requirements out of fifty-one and the card reported near-zero movement.
+      var compared = diff.summary.improved + diff.summary.regressed + diff.summary.unchanged;
+      ok(compared >= Math.round(m.rows.length * 0.8),
+         tag + "and it compares the whole assessment, not just the overrides",
+         compared + " compared of " + m.rows.length + " answered");
+    });
+
+    // Re-entrancy. Creating this year's assessment re-activates the instrument,
+    // which fires instrument-changed; a host that seeds on that event used to
+    // re-enter apply() until the stack ran out. Seeding through the event is
+    // what the multi-instrument test pages do, so it is asserted here directly.
+    E.newProject();
+    var seeded = 0;
+    E.on("instrument-changed", function (inst) {
+      var c = CASES.filter(function (x) { return x.id === inst.id; })[0];
+      if (c) { seeded++; A[c.mod].apply(E); }
+    });
+    var threw = "";
+    try {
+      CASES.forEach(function (c) { E.activateInstrument(c.id); });
+    } catch (e) { threw = e.message; }
+    ok(threw === "", "seeding from an instrument-changed handler does not recurse", threw);
+    // Each tour ships a fixed number of assessments; seeding through the event
+    // must produce that number once, not a set per activation.
+    var EXPECTED = { "iec-62443-3-3": 2, "general-ot-posture": 4, "ncsc-caf": 2 };
+    CASES.forEach(function (c) {
+      ok(E.assessmentsFor(c.id).length === EXPECTED[c.id],
+         c.what + ": seeding through the event does not multiply the assessments",
+         E.assessmentsFor(c.id).length + ", expected " + EXPECTED[c.id]);
+    });
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+});
+</script>
+</body></html>

@@ -1,0 +1,2284 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/nist-800-53/instrument.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["nist-800-53"] = window.App.Data.instruments["nist-800-53"] || {};
+window.App.Data.instruments["nist-800-53"].instrument = {
+    "id":  "nist-800-53",
+    "title":  "NIST SP 800-53 Rev 5 Control Assessment",
+    "framework":  "NIST SP 800-53",
+    "edition":  "Revision 5 (Release 5.2.0)",
+    "contentVersion":  "1.0.0",
+    "scoringFamily":  "caf-achieved",
+    "scoringProfileRef":  "caf-achieved",
+    "targetDimension":  "site",
+    "targetDimensionLabel":  "Site",
+    "framing":  "A control-by-control gap assessment against the NIST SP 800-53 Revision 5 security and privacy control catalog, suitable for enterprise IT and other information systems. This version covers the base controls only (control enhancements are a planned addition). The Low, Moderate and High baselines come from NIST SP 800-53B.",
+    "sourceNote":  "Control identifiers, titles and Low/Moderate/High baseline membership are transcribed from NIST SP 800-53B (Control Baselines for Information Systems and Organizations). The 20-family structure and the verbatim per-control \u0027Control:\u0027 statement text (all 300 base controls) are transcribed from NIST SP 800-53 Rev 5, Release 5.2.0; IA-13 (Identity Providers and Authorization Servers) and SA-24 (Design for Cyber Resiliency) were added in Release 5.2.0 and are not yet allocated to a baseline (assessable under the Full catalog profile); the control statement is shown in the \u0027What this control requires\u0027 expander on every control. Withdrawn controls and control enhancements are excluded from this version.",
+    "attribution":  "NIST Special Publications are works of the U.S. Government and are not subject to copyright in the United States. Sources: NIST SP 800-53 Rev 5 (Release 5.2.0) and NIST SP 800-53B (National Institute of Standards and Technology).",
+    "display":  {
+                    "subtitle":  "Control-by-control gap assessment against NIST SP 800-53 Rev 5 (base controls). Capture engagement details, pick the baseline below, then work through the control families from the sidebar.",
+                    "reportSubline":  "NIST SP 800-53 Rev 5 control assessment",
+                    "reportDescription":  "NIST SP 800-53 Rev 5 control gap analysis",
+                    "profileTitle":  "Baseline",
+                    "profileStep1Label":  "Baseline",
+                    "objectiveTitle":  "Control families",
+                    "outcomesTitle":  "Controls",
+                    "gettingStarted":  {
+                                           "cardTitle":  "NIST SP 800-53 control assessment: how this instrument works",
+                                           "intro":  "This is a control-by-control gap assessment against the NIST SP 800-53 Rev 5 catalog (Release 5.2.0), for enterprise IT and other information systems. Each control is determined Satisfied or Other Than Satisfied, following the assessment model of NIST SP 800-53A. It is an alignment and gap tool, not a formal assessment or an authorization package.",
+                                           "profileHeading":  "Baseline (sets which controls are expected)",
+                                           "bullets":  [
+                                                           "The unit of capture is the control: 300 base controls across 20 families, grouped as Technical, Operational and Management.",
+                                                           "Record each control as Satisfied or Other Than Satisfied: the binary determination used by SP 800-53A. Unknown reduces confidence; Not applicable drops the control.",
+                                                           "The baseline above (Low, Moderate or High, from NIST SP 800-53B) sets which controls are expected. Choose Full catalog to assess every control with no baseline target. Program Management (PM) controls are expected in every baseline.",
+                                                           "No single score is produced. The report is a profile of Satisfied / Other Than Satisfied counts by family, plus the roadmap of controls that are Other Than Satisfied. Control enhancements are out of scope in this version."
+                                                       ],
+                                           "profilesHeading":  "Available baselines"
+                                       }
+                },
+    "states":  [
+                   {
+                       "value":  "achieved",
+                       "label":  "Satisfied",
+                       "colour":  "met"
+                   },
+                   {
+                       "value":  "not",
+                       "label":  "Other Than Satisfied",
+                       "colour":  "gap"
+                   },
+                   {
+                       "value":  "unknown",
+                       "label":  "Unknown",
+                       "effect":  "coverage+confidence, not scored"
+                   },
+                   {
+                       "value":  "na",
+                       "label":  "Not applicable",
+                       "effect":  "excluded"
+                   }
+               ],
+    "taxonomy":  {
+                     "objectives":  [
+                                        {
+                                            "id":  "T",
+                                            "name":  "Technical"
+                                        },
+                                        {
+                                            "id":  "O",
+                                            "name":  "Operational"
+                                        },
+                                        {
+                                            "id":  "M",
+                                            "name":  "Management"
+                                        }
+                                    ],
+                     "principles":  [
+                                        {
+                                            "id":  "AC",
+                                            "name":  "Access Control",
+                                            "objectiveId":  "T"
+                                        },
+                                        {
+                                            "id":  "AT",
+                                            "name":  "Awareness and Training",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "AU",
+                                            "name":  "Audit and Accountability",
+                                            "objectiveId":  "T"
+                                        },
+                                        {
+                                            "id":  "CA",
+                                            "name":  "Assessment, Authorization, and Monitoring",
+                                            "objectiveId":  "M"
+                                        },
+                                        {
+                                            "id":  "CM",
+                                            "name":  "Configuration Management",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "CP",
+                                            "name":  "Contingency Planning",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "IA",
+                                            "name":  "Identification and Authentication",
+                                            "objectiveId":  "T"
+                                        },
+                                        {
+                                            "id":  "IR",
+                                            "name":  "Incident Response",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "MA",
+                                            "name":  "Maintenance",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "MP",
+                                            "name":  "Media Protection",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "PE",
+                                            "name":  "Physical and Environmental Protection",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "PL",
+                                            "name":  "Planning",
+                                            "objectiveId":  "M"
+                                        },
+                                        {
+                                            "id":  "PM",
+                                            "name":  "Program Management",
+                                            "objectiveId":  "M"
+                                        },
+                                        {
+                                            "id":  "PS",
+                                            "name":  "Personnel Security",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "PT",
+                                            "name":  "PII Processing and Transparency",
+                                            "objectiveId":  "M"
+                                        },
+                                        {
+                                            "id":  "RA",
+                                            "name":  "Risk Assessment",
+                                            "objectiveId":  "M"
+                                        },
+                                        {
+                                            "id":  "SA",
+                                            "name":  "System and Services Acquisition",
+                                            "objectiveId":  "M"
+                                        },
+                                        {
+                                            "id":  "SC",
+                                            "name":  "System and Communications Protection",
+                                            "objectiveId":  "T"
+                                        },
+                                        {
+                                            "id":  "SI",
+                                            "name":  "System and Information Integrity",
+                                            "objectiveId":  "O"
+                                        },
+                                        {
+                                            "id":  "SR",
+                                            "name":  "Supply Chain Risk Management",
+                                            "objectiveId":  "M"
+                                        }
+                                    ]
+                 },
+    "outcomes":  [
+                     {
+                         "id":  "AC-1",
+                         "principleId":  "AC",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] access control policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the access control policy and the associated access controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the access control policy and procedures; and\nc. Review and update the current access control:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-2",
+                         "principleId":  "AC",
+                         "title":  "Account Management",
+                         "controlText":  "a. Define and document the types of accounts allowed and specifically prohibited for use within the system;\nb. Assign account managers;\nc. Require [Assignment: organization-defined prerequisites and criteria] for group and role membership;\nd. Specify:\n1. Authorized users of the system;\n2. Group and role membership; and\n3. Access authorizations (i.e., privileges) and [Assignment: organization-defined attributes (as required)] for each account;\ne. Require approvals by [Assignment: organization-defined personnel or roles] for requests to create accounts;\nf. Create, enable, modify, disable, and remove accounts in accordance with [Assignment: organization-defined policy, procedures, prerequisites, and criteria];\ng. Monitor the use of accounts;\nh. Notify account managers and [Assignment: organization-defined personnel or roles] within:\n1. [Assignment: organization-defined time period] when accounts are no longer required;\n2. [Assignment: organization-defined time period] when users are terminated or transferred; and\n3. [Assignment: organization-defined time period] when system usage or need-to-know changes for an individual;\ni. Authorize access to the system based on:\n1. A valid access authorization;\n2. Intended system usage; and\n3. [Assignment: organization-defined attributes (as required)];\nj. Review accounts for compliance with account management requirements [Assignment: organization-defined frequency];\nk. Establish and implement a process for changing shared or group account authenticators (if deployed) when individuals are removed from the group; and\nl. Align account management processes with personnel termination and transfer processes.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-3",
+                         "principleId":  "AC",
+                         "title":  "Access Enforcement",
+                         "controlText":  "Enforce approved authorizations for logical access to information and system resources in accordance with applicable access control policies.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-4",
+                         "principleId":  "AC",
+                         "title":  "Information Flow Enforcement",
+                         "controlText":  "Enforce approved authorizations for controlling the flow of information within the system and between connected systems based on [Assignment: organization-defined information flow control policies].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-5",
+                         "principleId":  "AC",
+                         "title":  "Separation of Duties",
+                         "controlText":  "a. Identify and document [Assignment: organization-defined duties of individuals requiring separation]; and\nb. Define system access authorizations to support separation of duties.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-6",
+                         "principleId":  "AC",
+                         "title":  "Least Privilege",
+                         "controlText":  "Employ the principle of least privilege, allowing only authorized accesses for users (or processes acting on behalf of users) that are necessary to accomplish assigned organizational tasks.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-7",
+                         "principleId":  "AC",
+                         "title":  "Unsuccessful Logon Attempts",
+                         "controlText":  "a. Enforce a limit of [Assignment: organization-defined number] consecutive invalid logon attempts by a user during a [Assignment: organization-defined time period]; and\nb. Automatically [Selection (one or more): lock the account or node for an [Assignment: organization-defined time period]; lock the account or node until released by an administrator; delay next logon prompt per [Assignment: organization-defined delay algorithm]; notify system administrator; take other [Assignment: organization-defined action]] when the maximum number of unsuccessful attempts is exceeded.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-8",
+                         "principleId":  "AC",
+                         "title":  "System Use Notification",
+                         "controlText":  "a. Display [Assignment: organization-defined system use notification message or banner] to users before granting access to the system that provides privacy and security notices consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines and state that:\n1. Users are accessing a U.S. Government system;\n2. System usage may be monitored, recorded, and subject to audit;\n3. Unauthorized use of the system is prohibited and subject to criminal and civil penalties; and\n4. Use of the system indicates consent to monitoring and recording;\nb. Retain the notification message or banner on the screen until users acknowledge the usage conditions and take explicit actions to log on to or further access the system; and\nc. For publicly accessible systems:\n1. Display system use information [Assignment: organization-defined conditions], before granting further access to the publicly accessible system;\n2. Display references, if any, to monitoring, recording, or auditing that are consistent with privacy accommodations for such systems that generally prohibit those activities; and\n3. Include a description of the authorized uses of the system.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-9",
+                         "principleId":  "AC",
+                         "title":  "Previous Logon Notification",
+                         "controlText":  "Notify the user, upon successful logon to the system, of the date and time of the last logon.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-10",
+                         "principleId":  "AC",
+                         "title":  "Concurrent Session Control",
+                         "controlText":  "Limit the number of concurrent sessions for each [Assignment: organization-defined account and/or account type] to [Assignment: organization-defined number].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-11",
+                         "principleId":  "AC",
+                         "title":  "Device Lock",
+                         "controlText":  "a. Prevent further access to the system by [Selection (one or more): initiating a device lock after [Assignment: organization-defined time period] of inactivity; requiring the user to initiate a device lock before leaving the system unattended]; and\nb. Retain the device lock until the user reestablishes access using established identification and authentication procedures.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-12",
+                         "principleId":  "AC",
+                         "title":  "Session Termination",
+                         "controlText":  "Automatically terminate a user session after [Assignment: organization-defined conditions or trigger events requiring session disconnect].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-14",
+                         "principleId":  "AC",
+                         "title":  "Permitted Actions without Identification or Authentication",
+                         "controlText":  "a. Identify [Assignment: organization-defined user actions] that can be performed on the system without identification or authentication consistent with organizational mission and business functions; and\nb. Document and provide supporting rationale in the security plan for the system, user actions not requiring identification or authentication.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-16",
+                         "principleId":  "AC",
+                         "title":  "Security and Privacy Attributes",
+                         "controlText":  "a. Provide the means to associate [Assignment: organization-defined types of security and privacy attributes] with [Assignment: organization-defined security and privacy attribute values] for information in storage, in process, and/or in transmission;\nb. Ensure that the attribute associations are made and retained with the information;\nc. Establish the following permitted security and privacy attributes from the attributes defined in AC-16a for [Assignment: organization-defined systems]: [Assignment: organization-defined security and privacy attributes];\nd. Determine the following permitted attribute values or ranges for each of the established attributes: [Assignment: organization-defined attribute values or ranges for established attributes];\ne. Audit changes to attributes; and\nf. Review [Assignment: organization-defined security and privacy attributes] for applicability [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-17",
+                         "principleId":  "AC",
+                         "title":  "Remote Access",
+                         "controlText":  "a. Establish and document usage restrictions, configuration/connection requirements, and implementation guidance for each type of remote access allowed; and\nb. Authorize each type of remote access to the system prior to allowing such connections.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-18",
+                         "principleId":  "AC",
+                         "title":  "Wireless Access",
+                         "controlText":  "a. Establish configuration requirements, connection requirements, and implementation guidance for each type of wireless access; and\nb. Authorize each type of wireless access to the system prior to allowing such connections.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-19",
+                         "principleId":  "AC",
+                         "title":  "Access Control for Mobile Devices",
+                         "controlText":  "a. Establish configuration requirements, connection requirements, and implementation guidance for organization-controlled mobile devices, to include when such devices are outside of controlled areas; and\nb. Authorize the connection of mobile devices to organizational systems.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-20",
+                         "principleId":  "AC",
+                         "title":  "Use of External Systems",
+                         "controlText":  "a. [Selection (one or more): Establish [Assignment: organization-defined terms and conditions]; Identify [Assignment: organization-defined controls asserted to be implemented on external systems]], consistent with the trust relationships established with other organizations owning, operating, and/or maintaining external systems, allowing authorized individuals to:\n1. Access the system from external systems; and\n2. Process, store, or transmit organization-controlled information using external systems; or\nb. Prohibit the use of [Assignment: organizationally-defined types of external systems].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-21",
+                         "principleId":  "AC",
+                         "title":  "Information Sharing",
+                         "controlText":  "a. Enable authorized users to determine whether access authorizations assigned to a sharing partner match the information\u0027s access and use restrictions for [Assignment: organization-defined information sharing circumstances where user discretion is required]; and\nb. Employ [Assignment: organization-defined automated mechanisms or manual processes] to assist users in making information sharing and collaboration decisions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-22",
+                         "principleId":  "AC",
+                         "title":  "Publicly Accessible Content",
+                         "controlText":  "a. Designate individuals authorized to make information publicly accessible;\nb. Train authorized individuals to ensure that publicly accessible information does not contain nonpublic information;\nc. Review the proposed content of information prior to posting onto the publicly accessible system to ensure that nonpublic information is not included; and\nd. Review the content on the publicly accessible system for nonpublic information [Assignment: organization-defined frequency] and remove such information, if discovered.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-23",
+                         "principleId":  "AC",
+                         "title":  "Data Mining Protection",
+                         "controlText":  "Employ [Assignment: organization-defined data mining prevention and detection techniques] for [Assignment: organization-defined data storage objects] to detect and protect against unauthorized data mining.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-24",
+                         "principleId":  "AC",
+                         "title":  "Access Control Decisions",
+                         "controlText":  "[Selection: Establish procedures; Implement mechanisms] to ensure [Assignment: organization-defined access control decisions] are applied to each access request prior to access enforcement.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AC-25",
+                         "principleId":  "AC",
+                         "title":  "Reference Monitor",
+                         "controlText":  "Implement a reference monitor for [Assignment: organization-defined access control policies] that is tamperproof, always invoked, and small enough to be subject to analysis and testing, the completeness of which can be assured.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AT-1",
+                         "principleId":  "AT",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] awareness and training policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the awareness and training policy and the associated awareness and training controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the awareness and training policy and procedures; and\nc. Review and update the current awareness and training:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AT-2",
+                         "principleId":  "AT",
+                         "title":  "Literacy Training and Awareness",
+                         "controlText":  "a. Provide security and privacy literacy training to system users (including managers, senior executives, and contractors):\n1. As part of initial training for new users and [Assignment: organization-defined frequency] thereafter; and\n2. When required by system changes or following [Assignment: organization-defined events];\nb. Employ the following techniques to increase the security and privacy awareness of system users [Assignment: organization-defined awareness techniques];\nc. Update literacy training and awareness content [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\nd. Incorporate lessons learned from internal or external security incidents or breaches into literacy training and awareness techniques.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AT-3",
+                         "principleId":  "AT",
+                         "title":  "Role-Based Training",
+                         "controlText":  "a. Provide role-based security and privacy training to personnel with the following roles and responsibilities: [Assignment: organization-defined roles and responsibilities]:\n1. Before authorizing access to the system, information, or performing assigned duties, and [Assignment: organization-defined frequency] thereafter; and\n2. When required by system changes;\nb. Update role-based training content [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\nc. Incorporate lessons learned from internal or external security incidents or breaches into role-based training.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AT-4",
+                         "principleId":  "AT",
+                         "title":  "Training Records",
+                         "controlText":  "a. Document and monitor information security and privacy training activities, including security and privacy awareness training and specific role-based security and privacy training; and\nb. Retain individual training records for [Assignment: organization-defined time period].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AT-6",
+                         "principleId":  "AT",
+                         "title":  "Training Feedback",
+                         "controlText":  "Provide feedback on organizational training results to the following personnel [Assignment: organization-defined frequency]: [Assignment: organization-defined personnel].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-1",
+                         "principleId":  "AU",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] audit and accountability policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the audit and accountability policy and the associated audit and accountability controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the audit and accountability policy and procedures; and\nc. Review and update the current audit and accountability:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-2",
+                         "principleId":  "AU",
+                         "title":  "Event Logging",
+                         "controlText":  "a. Identify the types of events that the system is capable of logging in support of the audit function: [Assignment: organization-defined event types that the system is capable of logging];\nb. Coordinate the event logging function with other organizational entities requiring audit-related information to guide and inform the selection criteria for events to be logged;\nc. Specify the following event types for logging within the system: [Assignment: organization-defined event types (subset of the event types defined in AU-2a.) along with the frequency of (or situation requiring) logging for each identified event type];\nd. Provide a rationale for why the event types selected for logging are deemed to be adequate to support after-the-fact investigations of incidents; and\ne. Review and update the event types selected for logging [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-3",
+                         "principleId":  "AU",
+                         "title":  "Content of Audit Records",
+                         "controlText":  "Ensure that audit records contain information that establishes the following:\na. What type of event occurred;\nb. When the event occurred;\nc. Where the event occurred;\nd. Source of the event;\ne. Outcome of the event; and\nf. Identity of any individuals, subjects, or objects/entities associated with the event.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-4",
+                         "principleId":  "AU",
+                         "title":  "Audit Log Storage Capacity",
+                         "controlText":  "Allocate audit log storage capacity to accommodate [Assignment: organization-defined audit log retention requirements].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-5",
+                         "principleId":  "AU",
+                         "title":  "Response to Audit Logging Process Failures",
+                         "controlText":  "a. Alert [Assignment: organization-defined personnel or roles] within [Assignment: organization-defined time period] in the event of an audit logging process failure; and\nb. Take the following additional actions: [Assignment: organization-defined additional actions].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-6",
+                         "principleId":  "AU",
+                         "title":  "Audit Record Review, Analysis, and Reporting",
+                         "controlText":  "a. Review and analyze system audit records [Assignment: organization-defined frequency] for indications of [Assignment: organization-defined inappropriate or unusual activity] and the potential impact of the inappropriate or unusual activity;\nb. Report findings to [Assignment: organization-defined personnel or roles]; and\nc. Adjust the level of audit record review, analysis, and reporting within the system when there is a change in risk based on law enforcement information, intelligence information, or other credible sources of information.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-7",
+                         "principleId":  "AU",
+                         "title":  "Audit Record Reduction and Report Generation",
+                         "controlText":  "Provide and implement an audit record reduction and report generation capability that:\na. Supports on-demand audit record review, analysis, and reporting requirements and after-the-fact investigations of incidents; and\nb. Does not alter the original content or time ordering of audit records.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-8",
+                         "principleId":  "AU",
+                         "title":  "Time Stamps",
+                         "controlText":  "a. Use internal system clocks to generate time stamps for audit records; and\nb. Record time stamps for audit records that meet [Assignment: organization-defined granularity of time measurement] and that use Coordinated Universal Time, have a fixed local time offset from Coordinated Universal Time, or that include the local time offset as part of the time stamp.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-9",
+                         "principleId":  "AU",
+                         "title":  "Protection of Audit Information",
+                         "controlText":  "a. Protect audit information and audit logging tools from unauthorized access, modification, and deletion; and\nb. Alert [Assignment: organization-defined personnel or roles] upon detection of unauthorized access, modification, or deletion of audit information.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-10",
+                         "principleId":  "AU",
+                         "title":  "Non-repudiation",
+                         "controlText":  "Provide irrefutable evidence that an individual (or process acting on behalf of an individual) has performed [Assignment: organization-defined actions to be covered by non-repudiation].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-11",
+                         "principleId":  "AU",
+                         "title":  "Audit Record Retention",
+                         "controlText":  "Retain audit records for [Assignment: organization-defined time period consistent with records retention policy] to provide support for after-the-fact investigations of incidents and to meet regulatory and organizational information retention requirements.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-12",
+                         "principleId":  "AU",
+                         "title":  "Audit Record Generation",
+                         "controlText":  "a. Provide audit record generation capability for the event types the system is capable of auditing as defined in AU-2a on [Assignment: organization-defined system components];\nb. Allow [Assignment: organization-defined personnel or roles] to select the event types that are to be logged by specific components of the system; and\nc. Generate audit records for the event types defined in AU-2c that include the audit record content defined in AU-3.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-13",
+                         "principleId":  "AU",
+                         "title":  "Monitoring for Information Disclosure",
+                         "controlText":  "a. Monitor [Assignment: organization-defined open-source information and/or information sites] [Assignment: organization-defined frequency] for evidence of unauthorized disclosure of organizational information; and\nb. If an information disclosure is discovered:\n1. Notify [Assignment: organization-defined personnel or roles]; and\n2. Take the following additional actions: [Assignment: organization-defined additional actions].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-14",
+                         "principleId":  "AU",
+                         "title":  "Session Audit",
+                         "controlText":  "a. Provide and implement the capability for [Assignment: organization-defined users or roles] to [Selection (one or more): record; view; hear; log] the content of a user session under [Assignment: organization-defined circumstances]; and\nb. Develop, integrate, and use session auditing activities in consultation with legal counsel and in accordance with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "AU-16",
+                         "principleId":  "AU",
+                         "title":  "Cross-Organizational Audit Logging",
+                         "controlText":  "Employ [Assignment: organization-defined methods] for coordinating [Assignment: organization-defined audit information] among external organizations when audit information is transmitted across organizational boundaries.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CA-1",
+                         "principleId":  "CA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] assessment, authorization, and monitoring policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the assessment, authorization, and monitoring policy and the associated assessment, authorization, and monitoring controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the assessment, authorization, and monitoring policy and procedures; and\nc. Review and update the current assessment, authorization, and monitoring:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CA-2",
+                         "principleId":  "CA",
+                         "title":  "Control Assessments",
+                         "controlText":  "a. Select the appropriate assessor or assessment team for the type of assessment to be conducted;\nb. Develop a control assessment plan that describes the scope of the assessment including:\n1. Controls and control enhancements under assessment;\n2. Assessment procedures to be used to determine control effectiveness; and\n3. Assessment environment, assessment team, and assessment roles and responsibilities;\nc. Ensure the control assessment plan is reviewed and approved by the authorizing official or designated representative prior to conducting the assessment;\nd. Assess the controls in the system and its environment of operation [Assignment: organization-defined frequency] to determine the extent to which the controls are implemented correctly, operating as intended, and producing the desired outcome with respect to meeting established security and privacy requirements;\ne. Produce a control assessment report that document the results of the assessment; and\nf. Provide the results of the control assessment to [Assignment: organization-defined individuals or roles].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CA-3",
+                         "principleId":  "CA",
+                         "title":  "Information Exchange",
+                         "controlText":  "a. Approve and manage the exchange of information between the system and other systems using [Selection (one or more): interconnection security agreements; information exchange security agreements; memoranda of understanding or agreement; service level agreements; user agreements; nondisclosure agreements; [Assignment: organization-defined type of agreement]];\nb. Document, as part of each exchange agreement, the interface characteristics, security and privacy requirements, controls, and responsibilities for each system, and the impact level of the information communicated; and\nc. Review and update the agreements [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CA-5",
+                         "principleId":  "CA",
+                         "title":  "Plan of Action and Milestones",
+                         "controlText":  "a. Develop a plan of action and milestones for the system to document the planned remediation actions of the organization to correct weaknesses or deficiencies noted during the assessment of the controls and to reduce or eliminate known vulnerabilities in the system; and\nb. Update existing plan of action and milestones [Assignment: organization-defined frequency] based on the findings from control assessments, independent audits or reviews, and continuous monitoring activities.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CA-6",
+                         "principleId":  "CA",
+                         "title":  "Authorization",
+                         "controlText":  "a. Assign a senior official as the authorizing official for the system;\nb. Assign a senior official as the authorizing official for common controls available for inheritance by organizational systems;\nc. Ensure that the authorizing official for the system, before commencing operations:\n1. Accepts the use of common controls inherited by the system; and\n2. Authorizes the system to operate;\nd. Ensure that the authorizing official for common controls authorizes the use of those controls for inheritance by organizational systems;\ne. Update the authorizations [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CA-7",
+                         "principleId":  "CA",
+                         "title":  "Continuous Monitoring",
+                         "controlText":  "Develop a system-level continuous monitoring strategy and implement continuous monitoring in accordance with the organization-level continuous monitoring strategy that includes:\na. Establishing the following system-level metrics to be monitored: [Assignment: organization-defined system-level metrics];\nb. Establishing [Assignment: organization-defined frequencies] for monitoring and [Assignment: organization-defined frequencies] for assessment of control effectiveness;\nc. Ongoing control assessments in accordance with the continuous monitoring strategy;\nd. Ongoing monitoring of system and organization-defined metrics in accordance with the continuous monitoring strategy;\ne. Correlation and analysis of information generated by control assessments and monitoring;\nf. Response actions to address results of the analysis of control assessment and monitoring information; and\ng. Reporting the security and privacy status of the system to [Assignment: organization-defined personnel or roles] [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CA-8",
+                         "principleId":  "CA",
+                         "title":  "Penetration Testing",
+                         "controlText":  "Conduct penetration testing [Assignment: organization-defined frequency] on [Assignment: organization-defined systems or system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CA-9",
+                         "principleId":  "CA",
+                         "title":  "Internal System Connections",
+                         "controlText":  "a. Authorize internal connections of [Assignment: organization-defined system components or classes of components] to the system;\nb. Document, for each internal connection, the interface characteristics, security and privacy requirements, and the nature of the information communicated;\nc. Terminate internal system connections after [Assignment: organization-defined conditions]; and\nd. Review [Assignment: organization-defined frequency] the continued need for each internal connection.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-1",
+                         "principleId":  "CM",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] configuration management policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the configuration management policy and the associated configuration management controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the configuration management policy and procedures; and\nc. Review and update the current configuration management:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-2",
+                         "principleId":  "CM",
+                         "title":  "Baseline Configuration",
+                         "controlText":  "a. Develop, document, and maintain under configuration control, a current baseline configuration of the system; and\nb. Review and update the baseline configuration of the system:\n1. [Assignment: organization-defined frequency];\n2. When required due to [Assignment: organization-defined circumstances]; and\n3. When system components are installed or upgraded.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-3",
+                         "principleId":  "CM",
+                         "title":  "Configuration Change Control",
+                         "controlText":  "a. Determine and document the types of changes to the system that are configuration-controlled;\nb. Review proposed configuration-controlled changes to the system and approve or disapprove such changes with explicit consideration for security and privacy impact analyses;\nc. Document configuration change decisions associated with the system;\nd. Implement approved configuration-controlled changes to the system;\ne. Retain records of configuration-controlled changes to the system for [Assignment: organization-defined time period];\nf. Monitor and review activities associated with configuration-controlled changes to the system; and\ng. Coordinate and provide oversight for configuration change control activities through [Assignment: organization-defined configuration change control element] that convenes [Selection (one or more): [Assignment: organization-defined frequency]; when [Assignment: organization-defined configuration change conditions]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-4",
+                         "principleId":  "CM",
+                         "title":  "Impact Analyses",
+                         "controlText":  "Analyze changes to the system to determine potential security and privacy impacts prior to change implementation.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-5",
+                         "principleId":  "CM",
+                         "title":  "Access Restrictions for Change",
+                         "controlText":  "Define, document, approve, and enforce physical and logical access restrictions associated with changes to the system.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-6",
+                         "principleId":  "CM",
+                         "title":  "Configuration Settings",
+                         "controlText":  "a. Establish and document configuration settings for components employed within the system that reflect the most restrictive mode consistent with operational requirements using [Assignment: organization-defined common secure configurations];\nb. Implement the configuration settings;\nc. Identify, document, and approve any deviations from established configuration settings for [Assignment: organization-defined system components] based on [Assignment: organization-defined operational requirements]; and\nd. Monitor and control changes to the configuration settings in accordance with organizational policies and procedures.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-7",
+                         "principleId":  "CM",
+                         "title":  "Least Functionality",
+                         "controlText":  "a. Configure the system to provide only [Assignment: organization-defined mission essential capabilities]; and\nb. Prohibit or restrict the use of the following functions, ports, protocols, software, and/or services: [Assignment: organization-defined prohibited or restricted functions, system ports, protocols, software, and/or services].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-8",
+                         "principleId":  "CM",
+                         "title":  "System Component Inventory",
+                         "controlText":  "a. Develop and document an inventory of system components that:\n1. Accurately reflects the system;\n2. Includes all components within the system;\n3. Does not include duplicate accounting of components or components assigned to any other system;\n4. Is at the level of granularity deemed necessary for tracking and reporting; and\n5. Includes the following information to achieve system component accountability: [Assignment: organization-defined information deemed necessary to achieve effective system component accountability]; and\nb. Review and update the system component inventory [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-9",
+                         "principleId":  "CM",
+                         "title":  "Configuration Management Plan",
+                         "controlText":  "Develop, document, and implement a configuration management plan for the system that:\na. Addresses roles, responsibilities, and configuration management processes and procedures;\nb. Establishes a process for identifying configuration items throughout the system development life cycle and for managing the configuration of the configuration items;\nc. Defines the configuration items for the system and places the configuration items under configuration management;\nd. Is reviewed and approved by [Assignment: organization-defined personnel or roles]; and\ne. Protects the configuration management plan from unauthorized disclosure and modification.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-10",
+                         "principleId":  "CM",
+                         "title":  "Software Usage Restrictions",
+                         "controlText":  "a. Use software and associated documentation in accordance with contract agreements and copyright laws;\nb. Track the use of software and associated documentation protected by quantity licenses to control copying and distribution; and\nc. Control and document the use of peer-to-peer file sharing technology to ensure that this capability is not used for the unauthorized distribution, display, performance, or reproduction of copyrighted work.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-11",
+                         "principleId":  "CM",
+                         "title":  "User-Installed Software",
+                         "controlText":  "a. Establish [Assignment: organization-defined policies] governing the installation of software by users;\nb. Enforce software installation policies through the following methods: [Assignment: organization-defined methods]; and\nc. Monitor policy compliance [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-12",
+                         "principleId":  "CM",
+                         "title":  "Information Location",
+                         "controlText":  "a. Identify and document the location of [Assignment: organization-defined information] and the specific system components on which the information is processed and stored;\nb. Identify and document the users who have access to the system and system components where the information is processed and stored; and\nc. Document changes to the location (i.e., system or system components) where the information is processed and stored.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-13",
+                         "principleId":  "CM",
+                         "title":  "Data Action Mapping",
+                         "controlText":  "Develop and document a map of system data actions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CM-14",
+                         "principleId":  "CM",
+                         "title":  "Signed Components",
+                         "controlText":  "Prevent the installation of [Assignment: organization-defined software and firmware components] without verification that the component has been digitally signed using a certificate that is recognized and approved by the organization.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-1",
+                         "principleId":  "CP",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] contingency planning policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the contingency planning policy and the associated contingency planning controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the contingency planning policy and procedures; and\nc. Review and update the current contingency planning:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-2",
+                         "principleId":  "CP",
+                         "title":  "Contingency Plan",
+                         "controlText":  "a. Develop a contingency plan for the system that:\n1. Identifies essential mission and business functions and associated contingency requirements;\n2. Provides recovery objectives, restoration priorities, and metrics;\n3. Addresses contingency roles, responsibilities, assigned individuals with contact information;\n4. Addresses maintaining essential mission and business functions despite a system disruption, compromise, or failure;\n5. Addresses eventual, full system restoration without deterioration of the controls originally planned and implemented;\n6. Addresses the sharing of contingency information; and\n7. Is reviewed and approved by [Assignment: organization-defined personnel or roles];\nb. Distribute copies of the contingency plan to [Assignment: organization-defined key contingency personnel (identified by name and/or by role) and organizational elements];\nc. Coordinate contingency planning activities with incident handling activities;\nd. Review the contingency plan for the system [Assignment: organization-defined frequency];\ne. Update the contingency plan to address changes to the organization, system, or environment of operation and problems encountered during contingency plan implementation, execution, or testing;\nf. Communicate contingency plan changes to [Assignment: organization-defined key contingency personnel (identified by name and/or by role) and organizational elements];\ng. Incorporate lessons learned from contingency plan testing, training, or actual contingency activities into contingency testing and training; and\nh. Protect the contingency plan from unauthorized disclosure and modification.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-3",
+                         "principleId":  "CP",
+                         "title":  "Contingency Training",
+                         "controlText":  "a. Provide contingency training to system users consistent with assigned roles and responsibilities:\n1. Within [Assignment: organization-defined time period] of assuming a contingency role or responsibility;\n2. When required by system changes; and\n3. [Assignment: organization-defined frequency] thereafter; and\nb. Review and update contingency training content [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-4",
+                         "principleId":  "CP",
+                         "title":  "Contingency Plan Testing",
+                         "controlText":  "a. Test the contingency plan for the system [Assignment: organization-defined frequency] using the following tests to determine the effectiveness of the plan and the readiness to execute the plan: [Assignment: organization-defined tests].\nb. Review the contingency plan test results; and\nc. Initiate corrective actions, if needed.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-6",
+                         "principleId":  "CP",
+                         "title":  "Alternate Storage Site",
+                         "controlText":  "a. Establish an alternate storage site, including necessary agreements to permit the storage and retrieval of system backup information; and\nb. Ensure that the alternate storage site provides controls equivalent to that of the primary site.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-7",
+                         "principleId":  "CP",
+                         "title":  "Alternate Processing Site",
+                         "controlText":  "a. Establish an alternate processing site, including necessary agreements to permit the transfer and resumption of [Assignment: organization-defined system operations] for essential mission and business functions within [Assignment: organization-defined time period consistent with recovery time and recovery point objectives] when the primary processing capabilities are unavailable;\nb. Make available at the alternate processing site, the equipment and supplies required to transfer and resume operations or put contracts in place to support delivery to the site within the organization-defined time period for transfer and resumption; and\nc. Provide controls at the alternate processing site that are equivalent to those at the primary site.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-8",
+                         "principleId":  "CP",
+                         "title":  "Telecommunications Services",
+                         "controlText":  "Establish alternate telecommunications services, including necessary agreements to permit the resumption of [Assignment: organization-defined system operations] for essential mission and business functions within [Assignment: organization-defined time period] when the primary telecommunications capabilities are unavailable at either the primary or alternate processing or storage sites.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-9",
+                         "principleId":  "CP",
+                         "title":  "System Backup",
+                         "controlText":  "a. Conduct backups of user-level information contained in [Assignment: organization-defined system components] [Assignment: organization-defined frequency consistent with recovery time and recovery point objectives];\nb. Conduct backups of system-level information contained in the system [Assignment: organization-defined frequency consistent with recovery time and recovery point objectives];\nc. Conduct backups of system documentation, including security- and privacy-related documentation [Assignment: organization-defined frequency consistent with recovery time and recovery point objectives]; and\nd. Protect the confidentiality, integrity, and availability of backup information.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-10",
+                         "principleId":  "CP",
+                         "title":  "System Recovery and Reconstitution",
+                         "controlText":  "Provide for the recovery and reconstitution of the system to a known state within [Assignment: organization-defined time period consistent with recovery time and recovery point objectives] after a disruption, compromise, or failure.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-11",
+                         "principleId":  "CP",
+                         "title":  "Alternate Communications Protocols",
+                         "controlText":  "Provide the capability to employ [Assignment: organization-defined alternative communications protocols] in support of maintaining continuity of operations.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-12",
+                         "principleId":  "CP",
+                         "title":  "Safe Mode",
+                         "controlText":  "When [Assignment: organization-defined conditions] are detected, enter a safe mode of operation with [Assignment: organization-defined restrictions of safe mode of operation].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "CP-13",
+                         "principleId":  "CP",
+                         "title":  "Alternative Security Mechanisms",
+                         "controlText":  "Employ [Assignment: organization-defined alternative or supplemental security mechanisms] for satisfying [Assignment: organization-defined security functions] when the primary means of implementing the security function is unavailable or compromised.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-1",
+                         "principleId":  "IA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] identification and authentication policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the identification and authentication policy and the associated identification and authentication controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the identification and authentication policy and procedures; and\nc. Review and update the current identification and authentication:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-2",
+                         "principleId":  "IA",
+                         "title":  "Identification and Authentication (Organizational Users)",
+                         "controlText":  "Uniquely identify and authenticate organizational users and associate that unique identification with processes acting on behalf of those users.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-3",
+                         "principleId":  "IA",
+                         "title":  "Device Identification and Authentication",
+                         "controlText":  "Uniquely identify and authenticate [Assignment: organization-defined devices and/or types of devices] before establishing a [Selection (one or more): local; remote; network] connection.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-4",
+                         "principleId":  "IA",
+                         "title":  "Identifier Management",
+                         "controlText":  "Manage system identifiers by:\na. Receiving authorization from [Assignment: organization-defined personnel or roles] to assign an individual, group, role, service, or device identifier;\nb. Selecting an identifier that identifies an individual, group, role, service, or device;\nc. Assigning the identifier to the intended individual, group, role, service, or device; and\nd. Preventing reuse of identifiers for [Assignment: organization-defined time period].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-5",
+                         "principleId":  "IA",
+                         "title":  "Authenticator Management",
+                         "controlText":  "Manage system authenticators by:\na. Verifying, as part of the initial authenticator distribution, the identity of the individual, group, role, service, or device receiving the authenticator;\nb. Establishing initial authenticator content for any authenticators issued by the organization;\nc. Ensuring that authenticators have sufficient strength of mechanism for their intended use;\nd. Establishing and implementing administrative procedures for initial authenticator distribution, for lost or compromised or damaged authenticators, and for revoking authenticators;\ne. Changing default authenticators prior to first use;\nf. Changing or refreshing authenticators [Assignment: organization-defined time period by authenticator type] or when [Assignment: organization-defined events] occur;\ng. Protecting authenticator content from unauthorized disclosure and modification;\nh. Requiring individuals to take, and having devices implement, specific controls to protect authenticators; and\ni. Changing authenticators for group or role accounts when membership to those accounts changes.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-6",
+                         "principleId":  "IA",
+                         "title":  "Authentication Feedback",
+                         "controlText":  "Obscure feedback of authentication information during the authentication process to protect the information from possible exploitation and use by unauthorized individuals.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-7",
+                         "principleId":  "IA",
+                         "title":  "Cryptographic Module Authentication",
+                         "controlText":  "Implement mechanisms for authentication to a cryptographic module that meet the requirements of applicable laws, executive orders, directives, policies, regulations, standards, and guidelines for such authentication.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-8",
+                         "principleId":  "IA",
+                         "title":  "Identification and Authentication (Non-Organizational Users)",
+                         "controlText":  "Uniquely identify and authenticate non-organizational users or processes acting on behalf of non-organizational users.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-9",
+                         "principleId":  "IA",
+                         "title":  "Service Identification and Authentication",
+                         "controlText":  "Uniquely identify and authenticate [Assignment: organization-defined system services and applications] before establishing communications with devices, users, or other services or applications.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-10",
+                         "principleId":  "IA",
+                         "title":  "Adaptive Authentication",
+                         "controlText":  "Require individuals accessing the system to employ [Assignment: organization-defined supplemental authentication techniques or mechanisms] under specific [Assignment: organization-defined circumstances or situations].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-11",
+                         "principleId":  "IA",
+                         "title":  "Re-authentication",
+                         "controlText":  "Require users to re-authenticate when [Assignment: organization-defined circumstances or situations requiring re-authentication].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-12",
+                         "principleId":  "IA",
+                         "title":  "Identity Proofing",
+                         "controlText":  "a. Identity proof users that require accounts for logical access to systems based on appropriate identity assurance level requirements as specified in applicable standards and guidelines;\nb. Resolve user identities to a unique individual; and\nc. Collect, validate, and verify identity evidence.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IA-13",
+                         "principleId":  "IA",
+                         "title":  "Identity Providers and Authorization Servers",
+                         "controlText":  "Employ identity providers and authorization servers to manage user, device, and non-person entity (NPE) identities, attributes, and access rights supporting authentication and authorization decisions in accordance with [Assignment: organization-defined identification and authentication policy] using [Assignment: organization-defined mechanisms].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-1",
+                         "principleId":  "IR",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] incident response policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the incident response policy and the associated incident response controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the incident response policy and procedures; and\nc. Review and update the current incident response:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-2",
+                         "principleId":  "IR",
+                         "title":  "Incident Response Training",
+                         "controlText":  "a. Provide incident response training to system users consistent with assigned roles and responsibilities:\n1. Within [Assignment: organization-defined time period] of assuming an incident response role or responsibility or acquiring system access;\n2. When required by system changes; and\n3. [Assignment: organization-defined frequency] thereafter; and\nb. Review and update incident response training content [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-3",
+                         "principleId":  "IR",
+                         "title":  "Incident Response Testing",
+                         "controlText":  "Test the effectiveness of the incident response capability for the system [Assignment: organization-defined frequency] using the following tests: [Assignment: organization-defined tests].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-4",
+                         "principleId":  "IR",
+                         "title":  "Incident Handling",
+                         "controlText":  "a. Implement an incident handling capability for incidents that is consistent with the incident response plan and includes preparation, detection and analysis, containment, eradication, and recovery;\nb. Coordinate incident handling activities with contingency planning activities;\nc. Incorporate lessons learned from ongoing incident handling activities into incident response procedures, training, and testing, and implement the resulting changes accordingly; and\nd. Ensure the rigor, intensity, scope, and results of incident handling activities are comparable and predictable across the organization.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-5",
+                         "principleId":  "IR",
+                         "title":  "Incident Monitoring",
+                         "controlText":  "Track and document incidents.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-6",
+                         "principleId":  "IR",
+                         "title":  "Incident Reporting",
+                         "controlText":  "a. Require personnel to report suspected incidents to the organizational incident response capability within [Assignment: organization-defined time period]; and\nb. Report incident information to [Assignment: organization-defined authorities].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-7",
+                         "principleId":  "IR",
+                         "title":  "Incident Response Assistance",
+                         "controlText":  "Provide an incident response support resource, integral to the organizational incident response capability, that offers advice and assistance to users of the system for the handling and reporting of incidents.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-8",
+                         "principleId":  "IR",
+                         "title":  "Incident Response Plan",
+                         "controlText":  "a. Develop an incident response plan that:\n1. Provides the organization with a roadmap for implementing its incident response capability;\n2. Describes the structure and organization of the incident response capability;\n3. Provides a high-level approach for how the incident response capability fits into the overall organization;\n4. Meets the unique requirements of the organization, which relate to mission, size, structure, and functions;\n5. Defines reportable incidents;\n6. Provides metrics for measuring the incident response capability within the organization;\n7. Defines the resources and management support needed to effectively maintain and mature an incident response capability;\n8. Addresses the sharing of incident information;\n9. Is reviewed and approved by [Assignment: organization-defined personnel or roles] [Assignment: organization-defined frequency]; and\n10. Explicitly designates responsibility for incident response to [Assignment: organization-defined entities, personnel, or roles].\nb. Distribute copies of the incident response plan to [Assignment: organization-defined incident response personnel (identified by name and/or by role) and organizational elements];\nc. Update the incident response plan to address system and organizational changes or problems encountered during plan implementation, execution, or testing;\nd. Communicate incident response plan changes to [Assignment: organization-defined incident response personnel (identified by name and/or by role) and organizational elements]; and\ne. Protect the incident response plan from unauthorized disclosure and modification.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "IR-9",
+                         "principleId":  "IR",
+                         "title":  "Information Spillage Response",
+                         "controlText":  "Respond to information spills by:\na. Assigning [Assignment: organization-defined personnel or roles] with responsibility for responding to information spills;\nb. Identifying the specific information involved in the system contamination;\nc. Alerting [Assignment: organization-defined personnel or roles] of the information spill using a method of communication not associated with the spill;\nd. Isolating the contaminated system or system component;\ne. Eradicating the information from the contaminated system or component;\nf. Identifying other systems or system components that may have been subsequently contaminated; and\ng. Performing the following additional actions: [Assignment: organization-defined actions].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MA-1",
+                         "principleId":  "MA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] maintenance policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the maintenance policy and the associated maintenance controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the maintenance policy and procedures; and\nc. Review and update the current maintenance:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MA-2",
+                         "principleId":  "MA",
+                         "title":  "Controlled Maintenance",
+                         "controlText":  "a. Schedule, document, and review records of maintenance, repair, and replacement on system components in accordance with manufacturer or vendor specifications and/or organizational requirements;\nb. Approve and monitor all maintenance activities, whether performed on site or remotely and whether the system or system components are serviced on site or removed to another location;\nc. Require that [Assignment: organization-defined personnel or roles] explicitly approve the removal of the system or system components from organizational facilities for off-site maintenance, repair, or replacement;\nd. Sanitize equipment to remove the following information from associated media prior to removal from organizational facilities for off-site maintenance, repair, or replacement: [Assignment: organization-defined information];\ne. Check all potentially impacted controls to verify that the controls are still functioning properly following maintenance, repair, or replacement actions; and\nf. Include the following information in organizational maintenance records: [Assignment: organization-defined information].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MA-3",
+                         "principleId":  "MA",
+                         "title":  "Maintenance Tools",
+                         "controlText":  "a. Approve, control, and monitor the use of system maintenance tools; and\nb. Review previously approved system maintenance tools [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MA-4",
+                         "principleId":  "MA",
+                         "title":  "Nonlocal Maintenance",
+                         "controlText":  "a. Approve and monitor nonlocal maintenance and diagnostic activities;\nb. Allow the use of nonlocal maintenance and diagnostic tools only as consistent with organizational policy and documented in the security plan for the system;\nc. Employ strong authentication in the establishment of nonlocal maintenance and diagnostic sessions;\nd. Maintain records for nonlocal maintenance and diagnostic activities; and\ne. Terminate session and network connections when nonlocal maintenance is completed.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MA-5",
+                         "principleId":  "MA",
+                         "title":  "Maintenance Personnel",
+                         "controlText":  "a. Establish a process for maintenance personnel authorization and maintain a list of authorized maintenance organizations or personnel;\nb. Verify that non-escorted personnel performing maintenance on the system possess the required access authorizations; and\nc. Designate organizational personnel with required access authorizations and technical competence to supervise the maintenance activities of personnel who do not possess the required access authorizations.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MA-6",
+                         "principleId":  "MA",
+                         "title":  "Timely Maintenance",
+                         "controlText":  "Obtain maintenance support and/or spare parts for [Assignment: organization-defined system components] within [Assignment: organization-defined time period] of failure.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MA-7",
+                         "principleId":  "MA",
+                         "title":  "Field Maintenance",
+                         "controlText":  "Restrict or prohibit field maintenance on [Assignment: organization-defined systems or system components] to [Assignment: organization-defined trusted maintenance facilities].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MP-1",
+                         "principleId":  "MP",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] media protection policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the media protection policy and the associated media protection controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the media protection policy and procedures; and\nc. Review and update the current media protection:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MP-2",
+                         "principleId":  "MP",
+                         "title":  "Media Access",
+                         "controlText":  "Restrict access to [Assignment: organization-defined types of digital and/or non-digital media] to [Assignment: organization-defined personnel or roles].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MP-3",
+                         "principleId":  "MP",
+                         "title":  "Media Marking",
+                         "controlText":  "a. Mark system media indicating the distribution limitations, handling caveats, and applicable security markings (if any) of the information; and\nb. Exempt [Assignment: organization-defined types of system media] from marking if the media remain within [Assignment: organization-defined controlled areas].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MP-4",
+                         "principleId":  "MP",
+                         "title":  "Media Storage",
+                         "controlText":  "a. Physically control and securely store [Assignment: organization-defined types of digital and/or non-digital media] within [Assignment: organization-defined controlled areas]; and\nb. Protect system media types defined in MP-4a until the media are destroyed or sanitized using approved equipment, techniques, and procedures.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MP-5",
+                         "principleId":  "MP",
+                         "title":  "Media Transport",
+                         "controlText":  "a. Protect and control [Assignment: organization-defined types of system media] during transport outside of controlled areas using [Assignment: organization-defined controls];\nb. Maintain accountability for system media during transport outside of controlled areas;\nc. Document activities associated with the transport of system media; and\nd. Restrict the activities associated with the transport of system media to authorized personnel.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MP-6",
+                         "principleId":  "MP",
+                         "title":  "Media Sanitization",
+                         "controlText":  "a. Sanitize [Assignment: organization-defined system media] prior to disposal, release out of organizational control, or release for reuse using [Assignment: organization-defined sanitization techniques and procedures]; and\nb. Employ sanitization mechanisms with the strength and integrity commensurate with the security category or classification of the information.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MP-7",
+                         "principleId":  "MP",
+                         "title":  "Media Use",
+                         "controlText":  "a. [Selection: Restrict; Prohibit] the use of [Assignment: organization-defined types of system media] on [Assignment: organization-defined systems or system components] using [Assignment: organization-defined controls]; and\nb. Prohibit the use of portable storage devices in organizational systems when such devices have no identifiable owner.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "MP-8",
+                         "principleId":  "MP",
+                         "title":  "Media Downgrading",
+                         "controlText":  "a. Establish [Assignment: organization-defined system media downgrading process] that includes employing downgrading mechanisms with strength and integrity commensurate with the security category or classification of the information;\nb. Verify that the system media downgrading process is commensurate with the security category and/or classification level of the information to be removed and the access authorizations of the potential recipients of the downgraded information;\nc. Identify [Assignment: organization-defined system media requiring downgrading]; and\nd. Downgrade the identified system media using the established process.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-1",
+                         "principleId":  "PE",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] physical and environmental protection policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the physical and environmental protection policy and the associated physical and environmental protection controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the physical and environmental protection policy and procedures; and\nc. Review and update the current physical and environmental protection:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-2",
+                         "principleId":  "PE",
+                         "title":  "Physical Access Authorizations",
+                         "controlText":  "a. Develop, approve, and maintain a list of individuals with authorized access to the facility where the system resides;\nb. Issue authorization credentials for facility access;\nc. Review the access list detailing authorized facility access by individuals [Assignment: organization-defined frequency]; and\nd. Remove individuals from the facility access list when access is no longer required.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-3",
+                         "principleId":  "PE",
+                         "title":  "Physical Access Control",
+                         "controlText":  "a. Enforce physical access authorizations at [Assignment: organization-defined entry and exit points to the facility where the system resides] by:\n1. Verifying individual access authorizations before granting access to the facility; and\n2. Controlling ingress and egress to the facility using [Selection (one or more): [Assignment: organization-defined physical access control systems or devices]; guards];\nb. Maintain physical access audit logs for [Assignment: organization-defined entry or exit points];\nc. Control access to areas within the facility designated as publicly accessible by implementing the following controls: [Assignment: organization-defined physical access controls];\nd. Escort visitors and control visitor activity [Assignment: organization-defined circumstances requiring visitor escorts and control of visitor activity];\ne. Secure keys, combinations, and other physical access devices;\nf. Inventory [Assignment: organization-defined physical access devices] every [Assignment: organization-defined frequency]; and\ng. Change combinations and keys [Assignment: organization-defined frequency] and/or when keys are lost, combinations are compromised, or when individuals possessing the keys or combinations are transferred or terminated.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-4",
+                         "principleId":  "PE",
+                         "title":  "Access Control for Transmission",
+                         "controlText":  "Control physical access to [Assignment: organization-defined system distribution and transmission lines] within organizational facilities using [Assignment: organization-defined security controls].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-5",
+                         "principleId":  "PE",
+                         "title":  "Access Control for Output Devices",
+                         "controlText":  "Control physical access to output from [Assignment: organization-defined output devices] to prevent unauthorized individuals from obtaining the output.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-6",
+                         "principleId":  "PE",
+                         "title":  "Monitoring Physical Access",
+                         "controlText":  "a. Monitor physical access to the facility where the system resides to detect and respond to physical security incidents;\nb. Review physical access logs [Assignment: organization-defined frequency] and upon occurrence of [Assignment: organization-defined events or potential indications of events]; and\nc. Coordinate results of reviews and investigations with the organizational incident response capability.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-8",
+                         "principleId":  "PE",
+                         "title":  "Visitor Access Records",
+                         "controlText":  "a. Maintain visitor access records to the facility where the system resides for [Assignment: organization-defined time period];\nb. Review visitor access records [Assignment: organization-defined frequency]; and\nc. Report anomalies in visitor access records to [Assignment: organization-defined personnel].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-9",
+                         "principleId":  "PE",
+                         "title":  "Power Equipment and Cabling",
+                         "controlText":  "Protect power equipment and power cabling for the system from damage and destruction.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-10",
+                         "principleId":  "PE",
+                         "title":  "Emergency Shutoff",
+                         "controlText":  "a. Provide the capability of shutting off power to [Assignment: organization-defined system or individual system components] in emergency situations;\nb. Place emergency shutoff switches or devices in [Assignment: organization-defined location by system or system component] to facilitate access for authorized personnel; and\nc. Protect emergency power shutoff capability from unauthorized activation.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-11",
+                         "principleId":  "PE",
+                         "title":  "Emergency Power",
+                         "controlText":  "Provide an uninterruptible power supply to facilitate [Selection (one or more): an orderly shutdown of the system; transition of the system to long-term alternate power] in the event of a primary power source loss.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-12",
+                         "principleId":  "PE",
+                         "title":  "Emergency Lighting",
+                         "controlText":  "Employ and maintain automatic emergency lighting for the system that activates in the event of a power outage or disruption and that covers emergency exits and evacuation routes within the facility.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-13",
+                         "principleId":  "PE",
+                         "title":  "Fire Protection",
+                         "controlText":  "Employ and maintain fire detection and suppression systems that are supported by an independent energy source.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-14",
+                         "principleId":  "PE",
+                         "title":  "Environmental Controls",
+                         "controlText":  "a. Maintain [Selection (one or more): temperature; humidity; pressure; radiation; [Assignment: organization-defined environmental control]] levels within the facility where the system resides at [Assignment: organization-defined acceptable levels]; and\nb. Monitor environmental control levels [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-15",
+                         "principleId":  "PE",
+                         "title":  "Water Damage Protection",
+                         "controlText":  "Protect the system from damage resulting from water leakage by providing master shutoff or isolation valves that are accessible, working properly, and known to key personnel.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-16",
+                         "principleId":  "PE",
+                         "title":  "Delivery and Removal",
+                         "controlText":  "a. Authorize and control [Assignment: organization-defined types of system components] entering and exiting the facility; and\nb. Maintain records of the system components.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-17",
+                         "principleId":  "PE",
+                         "title":  "Alternate Work Site",
+                         "controlText":  "a. Determine and document the [Assignment: organization-defined alternate work sites] allowed for use by employees;\nb. Employ the following controls at alternate work sites: [Assignment: organization-defined controls];\nc. Assess the effectiveness of controls at alternate work sites; and\nd. Provide a means for employees to communicate with information security and privacy personnel in case of incidents.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-18",
+                         "principleId":  "PE",
+                         "title":  "Location of System Components",
+                         "controlText":  "Position system components within the facility to minimize potential damage from [Assignment: organization-defined physical and environmental hazards] and to minimize the opportunity for unauthorized access.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-19",
+                         "principleId":  "PE",
+                         "title":  "Information Leakage",
+                         "controlText":  "Protect the system from information leakage due to electromagnetic signals emanations.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-20",
+                         "principleId":  "PE",
+                         "title":  "Asset Monitoring and Tracking",
+                         "controlText":  "Employ [Assignment: organization-defined asset location technologies] to track and monitor the location and movement of [Assignment: organization-defined assets] within [Assignment: organization-defined controlled areas].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-21",
+                         "principleId":  "PE",
+                         "title":  "Electromagnetic Pulse Protection",
+                         "controlText":  "Employ [Assignment: organization-defined protective measures] against electromagnetic pulse damage for [Assignment: organization-defined systems and system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-22",
+                         "principleId":  "PE",
+                         "title":  "Component Marking",
+                         "controlText":  "Mark [Assignment: organization-defined system hardware components] indicating the impact level or classification level of the information permitted to be processed, stored, or transmitted by the hardware component.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PE-23",
+                         "principleId":  "PE",
+                         "title":  "Facility Location",
+                         "controlText":  "a. Plan the location or site of the facility where the system resides considering physical and environmental hazards; and\nb. For existing facilities, consider the physical and environmental hazards in the organizational risk management strategy.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PL-1",
+                         "principleId":  "PL",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] planning policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the planning policy and the associated planning controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the planning policy and procedures; and\nc. Review and update the current planning:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PL-2",
+                         "principleId":  "PL",
+                         "title":  "System Security and Privacy Plans",
+                         "controlText":  "a. Develop security and privacy plans for the system that:\n1. Are consistent with the organization\u0027s enterprise architecture;\n2. Explicitly define the constituent system components;\n3. Describe the operational context of the system in terms of mission and business processes;\n4. Identify the individuals that fulfill system roles and responsibilities;\n5. Identify the information types processed, stored, and transmitted by the system;\n6. Provide the security categorization of the system, including supporting rationale;\n7. Describe any specific threats to the system that are of concern to the organization;\n8. Provide the results of a privacy risk assessment for systems processing personally identifiable information;\n9. Describe the operational environment for the system and any dependencies on or connections to other systems or system components;\n10. Provide an overview of the security and privacy requirements for the system;\n11. Identify any relevant control baselines or overlays, if applicable;\n12. Describe the controls in place or planned for meeting the security and privacy requirements, including a rationale for any tailoring decisions;\n13. Include risk determinations for security and privacy architecture and design decisions;\n14. Include security- and privacy-related activities affecting the system that require planning and coordination with [Assignment: organization-defined individuals or groups]; and\n15. Are reviewed and approved by the authorizing official or designated representative prior to plan implementation.\nb. Distribute copies of the plans and communicate subsequent changes to the plans to [Assignment: organization-defined personnel or roles];\nc. Review the plans [Assignment: organization-defined frequency];\nd. Update the plans to address changes to the system and environment of operation or problems identified during plan implementation or control assessments; and\ne. Protect the plans from unauthorized disclosure and modification.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PL-4",
+                         "principleId":  "PL",
+                         "title":  "Rules of Behavior",
+                         "controlText":  "a. Establish and provide to individuals requiring access to the system, the rules that describe their responsibilities and expected behavior for information and system usage, security, and privacy;\nb. Receive a documented acknowledgment from such individuals, indicating that they have read, understand, and agree to abide by the rules of behavior, before authorizing access to information and the system;\nc. Review and update the rules of behavior [Assignment: organization-defined frequency]; and\nd. Require individuals who have acknowledged a previous version of the rules of behavior to read and re-acknowledge [Selection (one or more): [Assignment: organization-defined frequency]; when the rules are revised or updated].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PL-7",
+                         "principleId":  "PL",
+                         "title":  "Concept of Operations",
+                         "controlText":  "a. Develop a Concept of Operations (CONOPS) for the system describing how the organization intends to operate the system from the perspective of information security and privacy; and\nb. Review and update the CONOPS [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PL-8",
+                         "principleId":  "PL",
+                         "title":  "Security and Privacy Architectures",
+                         "controlText":  "a. Develop security and privacy architectures for the system that:\n1. Describe the requirements and approach to be taken for protecting the confidentiality, integrity, and availability of organizational information;\n2. Describe the requirements and approach to be taken for processing personally identifiable information to minimize privacy risk to individuals;\n3. Describe how the architectures are integrated into and support the enterprise architecture; and\n4. Describe any assumptions about, and dependencies on, external systems and services;\nb. Review and update the architectures [Assignment: organization-defined frequency] to reflect changes in the enterprise architecture; and\nc. Reflect planned architecture changes in security and privacy plans, Concept of Operations (CONOPS), criticality analysis, organizational procedures, and procurements and acquisitions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PL-9",
+                         "principleId":  "PL",
+                         "title":  "Central Management",
+                         "controlText":  "Centrally manage [Assignment: organization-defined controls and related processes].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PL-10",
+                         "principleId":  "PL",
+                         "title":  "Baseline Selection",
+                         "controlText":  "Select a control baseline for the system.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PL-11",
+                         "principleId":  "PL",
+                         "title":  "Baseline Tailoring",
+                         "controlText":  "Tailor the selected control baseline by applying specified tailoring actions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-1",
+                         "principleId":  "PM",
+                         "title":  "Information Security Program Plan",
+                         "controlText":  "a. Develop and disseminate an organization-wide information security program plan that:\n1. Provides an overview of the requirements for the security program and a description of the security program management controls and common controls in place or planned for meeting those requirements;\n2. Includes the identification and assignment of roles, responsibilities, management commitment, coordination among organizational entities, and compliance;\n3. Reflects the coordination among organizational entities responsible for information security; and\n4. Is approved by a senior official with responsibility and accountability for the risk being incurred to organizational operations (including mission, functions, image, and reputation), organizational assets, individuals, other organizations, and the Nation;\nb. Review and update the organization-wide information security program plan [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\nc. Protect the information security program plan from unauthorized disclosure and modification.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-2",
+                         "principleId":  "PM",
+                         "title":  "Information Security Program Leadership Role",
+                         "controlText":  "Appoint a senior agency information security officer with the mission and resources to coordinate, develop, implement, and maintain an organization-wide information security program.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-3",
+                         "principleId":  "PM",
+                         "title":  "Information Security and Privacy Resources",
+                         "controlText":  "a. Include the resources needed to implement the information security and privacy programs in capital planning and investment requests and document all exceptions to this requirement;\nb. Prepare documentation required for addressing information security and privacy programs in capital planning and investment requests in accordance with applicable laws, executive orders, directives, policies, regulations, standards; and\nc. Make available for expenditure, the planned information security and privacy resources.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-4",
+                         "principleId":  "PM",
+                         "title":  "Plan of Action and Milestones Process",
+                         "controlText":  "a. Implement a process to ensure that plans of action and milestones for the information security, privacy, and supply chain risk management programs and associated organizational systems:\n1. Are developed and maintained;\n2. Document the remedial information security, privacy, and supply chain risk management actions to adequately respond to risk to organizational operations and assets, individuals, other organizations, and the Nation; and\n3. Are reported in accordance with established reporting requirements.\nb. Review plans of action and milestones for consistency with the organizational risk management strategy and organization-wide priorities for risk response actions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-5",
+                         "principleId":  "PM",
+                         "title":  "System Inventory",
+                         "controlText":  "Develop and update [Assignment: organization-defined frequency] an inventory of organizational systems.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-6",
+                         "principleId":  "PM",
+                         "title":  "Measures of Performance",
+                         "controlText":  "Develop, monitor, and report on the results of information security and privacy measures of performance.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-7",
+                         "principleId":  "PM",
+                         "title":  "Enterprise Architecture",
+                         "controlText":  "Develop and maintain an enterprise architecture with consideration for information security, privacy, and the resulting risk to organizational operations and assets, individuals, other organizations, and the Nation.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-8",
+                         "principleId":  "PM",
+                         "title":  "Critical Infrastructure Plan",
+                         "controlText":  "Address information security and privacy issues in the development, documentation, and updating of a critical infrastructure and key resources protection plan.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-9",
+                         "principleId":  "PM",
+                         "title":  "Risk Management Strategy",
+                         "controlText":  "a. Develops a comprehensive strategy to manage:\n1. Security risk to organizational operations and assets, individuals, other organizations, and the Nation associated with the operation and use of organizational systems; and\n2. Privacy risk to individuals resulting from the authorized processing of personally identifiable information;\nb. Implement the risk management strategy consistently across the organization; and\nc. Review and update the risk management strategy [Assignment: organization-defined frequency] or as required, to address organizational changes.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-10",
+                         "principleId":  "PM",
+                         "title":  "Authorization Process",
+                         "controlText":  "a. Manage the security and privacy state of organizational systems and the environments in which those systems operate through authorization processes;\nb. Designate individuals to fulfill specific roles and responsibilities within the organizational risk management process; and\nc. Integrate the authorization processes into an organization-wide risk management program.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-11",
+                         "principleId":  "PM",
+                         "title":  "Mission and Business Process Definition",
+                         "controlText":  "a. Define organizational mission and business processes with consideration for information security and privacy and the resulting risk to organizational operations, organizational assets, individuals, other organizations, and the Nation; and\nb. Determine information protection and personally identifiable information processing needs arising from the defined mission and business processes; and\nc. Review and revise the mission and business processes [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-12",
+                         "principleId":  "PM",
+                         "title":  "Insider Threat Program",
+                         "controlText":  "Implement an insider threat program that includes a cross-discipline insider threat incident handling team.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-13",
+                         "principleId":  "PM",
+                         "title":  "Security and Privacy Workforce",
+                         "controlText":  "Establish a security and privacy workforce development and improvement program.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-14",
+                         "principleId":  "PM",
+                         "title":  "Testing, Training, and Monitoring",
+                         "controlText":  "a. Implement a process for ensuring that organizational plans for conducting security and privacy testing, training, and monitoring activities associated with organizational systems:\n1. Are developed and maintained; and\n2. Continue to be executed; and\nb. Review testing, training, and monitoring plans for consistency with the organizational risk management strategy and organization-wide priorities for risk response actions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-15",
+                         "principleId":  "PM",
+                         "title":  "Security and Privacy Groups and Associations",
+                         "controlText":  "Establish and institutionalize contact with selected groups and associations within the security and privacy communities:\na. To facilitate ongoing security and privacy education and training for organizational personnel;\nb. To maintain currency with recommended security and privacy practices, techniques, and technologies; and\nc. To share current security and privacy information, including threats, vulnerabilities, and incidents.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-16",
+                         "principleId":  "PM",
+                         "title":  "Threat Awareness Program",
+                         "controlText":  "Implement a threat awareness program that includes a cross-organization information-sharing capability for threat intelligence.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-17",
+                         "principleId":  "PM",
+                         "title":  "Protecting Controlled Unclassified Information on External Systems",
+                         "controlText":  "a. Establish policy and procedures to ensure that requirements for the protection of controlled unclassified information that is processed, stored or transmitted on external systems, are implemented in accordance with applicable laws, executive orders, directives, policies, regulations, and standards; and\nb. Review and update the policy and procedures [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-18",
+                         "principleId":  "PM",
+                         "title":  "Privacy Program Plan",
+                         "controlText":  "a. Develop and disseminate an organization-wide privacy program plan that provides an overview of the agency's privacy program, and:\n1. Includes a description of the structure of the privacy program and the resources dedicated to the privacy program;\n2. Provides an overview of the requirements for the privacy program and a description of the privacy program management controls and common controls in place or planned for meeting those requirements;\n3. Includes the role of the senior agency official for privacy and the identification and assignment of roles of other privacy officials and staff and their responsibilities;\n4. Describes management commitment, compliance, and the strategic goals and objectives of the privacy program;\n5. Reflects coordination among organizational entities responsible for the different aspects of privacy; and\n6. Is approved by a senior official with responsibility and accountability for the privacy risk being incurred to organizational operations (including mission, functions, image, and reputation), organizational assets, individuals, other organizations, and the Nation; and\nb. Update the plan [Assignment: organization-defined frequency] and to address changes in federal privacy laws and policy and organizational changes and problems identified during plan implementation or privacy control assessments.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-19",
+                         "principleId":  "PM",
+                         "title":  "Privacy Program Leadership Role",
+                         "controlText":  "Appoint a senior agency official for privacy with the authority, mission, accountability, and resources to coordinate, develop, and implement, applicable privacy requirements and manage privacy risks through the organization-wide privacy program.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-20",
+                         "principleId":  "PM",
+                         "title":  "Dissemination of Privacy Program Information",
+                         "controlText":  "Maintain a central resource webpage on the organization's principal public website that serves as a central source of information about the organization's privacy program and that:\na. Ensures that the public has access to information about organizational privacy activities and can communicate with its senior agency official for privacy;\nb. Ensures that organizational privacy practices and reports are publicly available; and\nc. Employs publicly facing email addresses and/or phone lines to enable the public to provide feedback and/or direct questions to privacy offices regarding privacy practices.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-21",
+                         "principleId":  "PM",
+                         "title":  "Accounting of Disclosures",
+                         "controlText":  "a. Develop and maintain an accurate accounting of disclosures of personally identifiable information, including:\n1. Date, nature, and purpose of each disclosure; and\n2. Name and address, or other contact information of the individual or organization to which the disclosure was made;\nb. Retain the accounting of disclosures for the length of the time the personally identifiable information is maintained or five years after the disclosure is made, whichever is longer; and\nc. Make the accounting of disclosures available to the individual to whom the personally identifiable information relates upon request.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-22",
+                         "principleId":  "PM",
+                         "title":  "Personally Identifiable Information Quality Management",
+                         "controlText":  "Develop and document organization-wide policies and procedures for:\na. Reviewing for the accuracy, relevance, timeliness, and completeness of personally identifiable information across the information life cycle;\nb. Correcting or deleting inaccurate or outdated personally identifiable information;\nc. Disseminating notice of corrected or deleted personally identifiable information to individuals or other appropriate entities; and\nd. Appeals of adverse decisions on correction or deletion requests.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-23",
+                         "principleId":  "PM",
+                         "title":  "Data Governance Body",
+                         "controlText":  "Establish a Data Governance Body consisting of [Assignment: organization-defined roles] with [Assignment: organization-defined responsibilities].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-24",
+                         "principleId":  "PM",
+                         "title":  "Data Integrity Board",
+                         "controlText":  "Establish a Data Integrity Board to:\na. Review proposals to conduct or participate in a matching program; and\nb. Conduct an annual review of all matching programs in which the agency has participated.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-25",
+                         "principleId":  "PM",
+                         "title":  "Minimization of Personally Identifiable Information Used in Testing, Training, and Research",
+                         "controlText":  "a. Develop, document, and implement policies and procedures that address the use of personally identifiable information for internal testing, training, and research;\nb. Limit or minimize the amount of personally identifiable information used for internal testing, training, and research purposes;\nc. Authorize the use of personally identifiable information when such information is required for internal testing, training, and research; and\nd. Review and update policies and procedures [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-26",
+                         "principleId":  "PM",
+                         "title":  "Complaint Management",
+                         "controlText":  "Implement a process for receiving and responding to complaints, concerns, or questions from individuals about the organizational security and privacy practices that includes:\na. Mechanisms that are easy to use and readily accessible by the public;\nb. All information necessary for successfully filing complaints;\nc. Tracking mechanisms to ensure all complaints received are reviewed and addressed within [Assignment: organization-defined time period];\nd. Acknowledgement of receipt of complaints, concerns, or questions from individuals within [Assignment: organization-defined time period]; and\ne. Response to complaints, concerns, or questions from individuals within [Assignment: organization-defined time period].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-27",
+                         "principleId":  "PM",
+                         "title":  "Privacy Reporting",
+                         "controlText":  "a. Develop [Assignment: organization-defined privacy reports] and disseminate to:\n1. [Assignment: organization-defined oversight bodies] to demonstrate accountability with statutory, regulatory, and policy privacy mandates; and\n2. [Assignment: organization-defined officials] and other personnel with responsibility for monitoring privacy program compliance; and\nb. Review and update privacy reports [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-28",
+                         "principleId":  "PM",
+                         "title":  "Risk Framing",
+                         "controlText":  "a. Identify and document:\n1. Assumptions affecting risk assessments, risk responses, and risk monitoring;\n2. Constraints affecting risk assessments, risk responses, and risk monitoring;\n3. Priorities and trade-offs considered by the organization for managing risk; and\n4. Organizational risk tolerance;\nb. Distribute the results of risk framing activities to [Assignment: organization-defined personnel]; and\nc. Review and update risk framing considerations [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-29",
+                         "principleId":  "PM",
+                         "title":  "Risk Management Program Leadership Roles",
+                         "controlText":  "a. Appoint a Senior Accountable Official for Risk Management to align organizational information security and privacy management processes with strategic, operational, and budgetary planning processes; and\nb. Establish a Risk Executive (function) to view and analyze risk from an organization-wide perspective and ensure management of risk is consistent across the organization.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-30",
+                         "principleId":  "PM",
+                         "title":  "Supply Chain Risk Management Strategy",
+                         "controlText":  "a. Develop an organization-wide strategy for managing supply chain risks associated with the development, acquisition, maintenance, and disposal of systems, system components, and system services;\nb. Implement the supply chain risk management strategy consistently across the organization; and\nc. Review and update the supply chain risk management strategy on [Assignment: organization-defined frequency] or as required, to address organizational changes.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-31",
+                         "principleId":  "PM",
+                         "title":  "Continuous Monitoring Strategy",
+                         "controlText":  "Develop an organization-wide continuous monitoring strategy and implement continuous monitoring programs that include:\na. Establishing the following organization-wide metrics to be monitored: [Assignment: organization-defined metrics];\nb. Establishing [Assignment: organization-defined frequencies] for monitoring and [Assignment: organization-defined frequencies] for assessment of control effectiveness;\nc. Ongoing monitoring of organizationally-defined metrics in accordance with the continuous monitoring strategy;\nd. Correlation and analysis of information generated by control assessments and monitoring;\ne. Response actions to address results of the analysis of control assessment and monitoring information; and\nf. Reporting the security and privacy status of organizational systems to [Assignment: organization-defined personnel or roles] [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PM-32",
+                         "principleId":  "PM",
+                         "title":  "Purposing",
+                         "controlText":  "Analyze [Assignment: organization-defined systems or systems components] supporting mission essential services or functions to ensure that the information resources are being used consistent with their intended purpose.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-1",
+                         "principleId":  "PS",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] personnel security policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the personnel security policy and the associated personnel security controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the personnel security policy and procedures; and\nc. Review and update the current personnel security:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-2",
+                         "principleId":  "PS",
+                         "title":  "Position Risk Designation",
+                         "controlText":  "a. Assign a risk designation to all organizational positions;\nb. Establish screening criteria for individuals filling those positions; and\nc. Review and update position risk designations [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-3",
+                         "principleId":  "PS",
+                         "title":  "Personnel Screening",
+                         "controlText":  "a. Screen individuals prior to authorizing access to the system; and\nb. Rescreen individuals in accordance with [Assignment: organization-defined conditions requiring rescreening and, where rescreening is so indicated, the frequency of rescreening].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-4",
+                         "principleId":  "PS",
+                         "title":  "Personnel Termination",
+                         "controlText":  "Upon termination of individual employment:\na. Disable system access within [Assignment: organization-defined time period];\nb. Terminate or revoke any authenticators and credentials associated with the individual;\nc. Conduct exit interviews that include a discussion of [Assignment: organization-defined information security topics];\nd. Retrieve all security-related organizational system-related property; and\ne. Retain access to organizational information and systems formerly controlled by terminated individual.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-5",
+                         "principleId":  "PS",
+                         "title":  "Personnel Transfer",
+                         "controlText":  "a. Review and confirm ongoing operational need for current logical and physical access authorizations to systems and facilities when individuals are reassigned or transferred to other positions within the organization;\nb. Initiate [Assignment: organization-defined transfer or reassignment actions] within [Assignment: organization-defined time period following the formal transfer action];\nc. Modify access authorization as needed to correspond with any changes in operational need due to reassignment or transfer; and\nd. Notify [Assignment: organization-defined personnel or roles] within [Assignment: organization-defined time period].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-6",
+                         "principleId":  "PS",
+                         "title":  "Access Agreements",
+                         "controlText":  "a. Develop and document access agreements for organizational systems;\nb. Review and update the access agreements [Assignment: organization-defined frequency]; and\nc. Verify that individuals requiring access to organizational information and systems:\n1. Sign appropriate access agreements prior to being granted access; and\n2. Re-sign access agreements to maintain access to organizational systems when access agreements have been updated or [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-7",
+                         "principleId":  "PS",
+                         "title":  "External Personnel Security",
+                         "controlText":  "a. Establish personnel security requirements, including security roles and responsibilities for external providers;\nb. Require external providers to comply with personnel security policies and procedures established by the organization;\nc. Document personnel security requirements;\nd. Require external providers to notify [Assignment: organization-defined personnel or roles] of any personnel transfers or terminations of external personnel who possess organizational credentials and/or badges, or who have system privileges within [Assignment: organization-defined time period]; and\ne. Monitor provider compliance with personnel security requirements.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-8",
+                         "principleId":  "PS",
+                         "title":  "Personnel Sanctions",
+                         "controlText":  "a. Employ a formal sanctions process for individuals failing to comply with established information security and privacy policies and procedures; and\nb. Notify [Assignment: organization-defined personnel or roles] within [Assignment: organization-defined time period] when a formal employee sanctions process is initiated, identifying the individual sanctioned and the reason for the sanction.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PS-9",
+                         "principleId":  "PS",
+                         "title":  "Position Descriptions",
+                         "controlText":  "Incorporate security and privacy roles and responsibilities into organizational position descriptions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PT-1",
+                         "principleId":  "PT",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] personally identifiable information processing and transparency policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the personally identifiable information processing and transparency policy and the associated personally identifiable information processing and transparency controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the personally identifiable information processing and transparency policy and procedures; and\nc. Review and update the current personally identifiable information processing and transparency:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PT-2",
+                         "principleId":  "PT",
+                         "title":  "Authority to Process Personally Identifiable Information",
+                         "controlText":  "a. Determine and document the [Assignment: organization-defined authority] that permits the [Assignment: organization-defined processing] of personally identifiable information; and\nb. Restrict the [Assignment: organization-defined processing] of personally identifiable information to only that which is authorized.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PT-3",
+                         "principleId":  "PT",
+                         "title":  "Personally Identifiable Information Processing Purposes",
+                         "controlText":  "a. Identify and document the [Assignment: organization-defined purpose(s)] for processing personally identifiable information;\nb. Describe the purpose(s) in the public privacy notices and policies of the organization;\nc. Restrict the [Assignment: organization-defined processing] of personally identifiable information to only that which is compatible with the identified purpose(s); and\nd. Monitor changes in processing personally identifiable information and implement [Assignment: organization-defined mechanisms] to ensure that any changes are made in accordance with [Assignment: organization-defined requirements].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PT-4",
+                         "principleId":  "PT",
+                         "title":  "Consent",
+                         "controlText":  "Implement [Assignment: organization-defined tools or mechanisms] for individuals to consent to the processing of their personally identifiable information prior to its collection that facilitate individuals\u0027 informed decision-making.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PT-5",
+                         "principleId":  "PT",
+                         "title":  "Privacy Notice",
+                         "controlText":  "Provide notice to individuals about the processing of personally identifiable information that:\na. Is available to individuals upon first interacting with an organization, and subsequently at [Assignment: organization-defined frequency];\nb. Is clear and easy-to-understand, expressing information about personally identifiable information processing in plain language;\nc. Identifies the authority that authorizes the processing of personally identifiable information;\nd. Identifies the purposes for which personally identifiable information is to be processed; and\ne. Includes [Assignment: organization-defined information].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PT-6",
+                         "principleId":  "PT",
+                         "title":  "System of Records Notice",
+                         "controlText":  "For systems that process information that will be maintained in a Privacy Act system of records:\na. Draft system of records notices in accordance with OMB guidance and submit new and significantly modified system of records notices to the OMB and appropriate congressional committees for advance review;\nb. Publish system of records notices in the Federal Register; and\nc. Keep system of records notices accurate, up-to-date, and scoped in accordance with policy.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PT-7",
+                         "principleId":  "PT",
+                         "title":  "Specific Categories of Personally Identifiable Information",
+                         "controlText":  "Apply [Assignment: organization-defined processing conditions] for specific categories of personally identifiable information.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "PT-8",
+                         "principleId":  "PT",
+                         "title":  "Computer Matching Requirements",
+                         "controlText":  "When a system or organization processes information for the purpose of conducting a matching program:\na. Obtain approval from the Data Integrity Board to conduct the matching program;\nb. Develop and enter into a computer matching agreement;\nc. Publish a matching notice in the Federal Register;\nd. Independently verify the information produced by the matching program before taking adverse action against an individual, if required; and\ne. Provide individuals with notice and an opportunity to contest the findings before taking adverse action against an individual.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-1",
+                         "principleId":  "RA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] risk assessment policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the risk assessment policy and the associated risk assessment controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the risk assessment policy and procedures; and\nc. Review and update the current risk assessment:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-2",
+                         "principleId":  "RA",
+                         "title":  "Security Categorization",
+                         "controlText":  "a. Categorize the system and information it processes, stores, and transmits;\nb. Document the security categorization results, including supporting rationale, in the security plan for the system; and\nc. Verify that the authorizing official or authorizing official designated representative reviews and approves the security categorization decision.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-3",
+                         "principleId":  "RA",
+                         "title":  "Risk Assessment",
+                         "controlText":  "a. Conduct a risk assessment, including:\n1. Identifying threats to and vulnerabilities in the system;\n2. Determining the likelihood and magnitude of harm from unauthorized access, use, disclosure, disruption, modification, or destruction of the system, the information it processes, stores, or transmits, and any related information; and\n3. Determining the likelihood and impact of adverse effects on individuals arising from the processing of personally identifiable information;\nb. Integrate risk assessment results and risk management decisions from the organization and mission or business process perspectives with system-level risk assessments;\nc. Document risk assessment results in [Selection: security and privacy plans; risk assessment report; [Assignment: organization-defined document]];\nd. Review risk assessment results [Assignment: organization-defined frequency];\ne. Disseminate risk assessment results to [Assignment: organization-defined personnel or roles]; and\nf. Update the risk assessment [Assignment: organization-defined frequency] or when there are significant changes to the system, its environment of operation, or other conditions that may impact the security or privacy state of the system.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-5",
+                         "principleId":  "RA",
+                         "title":  "Vulnerability Monitoring and Scanning",
+                         "controlText":  "a. Monitor and scan for vulnerabilities in the system and hosted applications [Assignment: organization-defined frequency and/or randomly in accordance with organization-defined process] and when new vulnerabilities potentially affecting the system are identified and reported;\nb. Employ vulnerability monitoring tools and techniques that facilitate interoperability among tools and automate parts of the vulnerability management process by using standards for:\n1. Enumerating platforms, software flaws, and improper configurations;\n2. Formatting checklists and test procedures; and\n3. Measuring vulnerability impact;\nc. Analyze vulnerability scan reports and results from vulnerability monitoring;\nd. Remediate legitimate vulnerabilities [Assignment: organization-defined response times] in accordance with an organizational assessment of risk;\ne. Share information obtained from the vulnerability monitoring process and control assessments with [Assignment: organization-defined personnel or roles] to help eliminate similar vulnerabilities in other systems; and\nf. Employ vulnerability monitoring tools that include the capability to readily update the vulnerabilities to be scanned.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-6",
+                         "principleId":  "RA",
+                         "title":  "Technical Surveillance Countermeasures Survey",
+                         "controlText":  "Employ a technical surveillance countermeasures survey at [Assignment: organization-defined locations] [Selection (one or more): [Assignment: organization-defined frequency]; when the following events or indicators occur: [Assignment: organization-defined events or indicators]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-7",
+                         "principleId":  "RA",
+                         "title":  "Risk Response",
+                         "controlText":  "Respond to findings from security and privacy assessments, monitoring, and audits in accordance with organizational risk tolerance.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-8",
+                         "principleId":  "RA",
+                         "title":  "Privacy Impact Assessments",
+                         "controlText":  "Conduct privacy impact assessments for systems, programs, or other activities before:\na. Developing or procuring information technology that processes personally identifiable information; and\nb. Initiating a new collection of personally identifiable information that:\n1. Will be processed using information technology; and\n2. Includes personally identifiable information permitting the physical or virtual (online) contacting of a specific individual, if identical questions have been posed to, or identical reporting requirements imposed on, ten or more individuals, other than agencies, instrumentalities, or employees of the federal government.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-9",
+                         "principleId":  "RA",
+                         "title":  "Criticality Analysis",
+                         "controlText":  "Identify critical system components and functions by performing a criticality analysis for [Assignment: organization-defined systems, system components, or system services] at [Assignment: organization-defined decision points in the system development life cycle].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "RA-10",
+                         "principleId":  "RA",
+                         "title":  "Threat Hunting",
+                         "controlText":  "a. Establish and maintain a cyber threat hunting capability to:\n1. Search for indicators of compromise in organizational systems; and\n2. Detect, track, and disrupt threats that evade existing controls; and\nb. Employ the threat hunting capability [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-1",
+                         "principleId":  "SA",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] system and services acquisition policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the system and services acquisition policy and the associated system and services acquisition controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the system and services acquisition policy and procedures; and\nc. Review and update the current system and services acquisition:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-2",
+                         "principleId":  "SA",
+                         "title":  "Allocation of Resources",
+                         "controlText":  "a. Determine the high-level information security and privacy requirements for the system or system service in mission and business process planning;\nb. Determine, document, and allocate the resources required to protect the system or system service as part of the organizational capital planning and investment control process; and\nc. Establish a discrete line item for information security and privacy in organizational programming and budgeting documentation.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-3",
+                         "principleId":  "SA",
+                         "title":  "System Development Life Cycle",
+                         "controlText":  "a. Acquire, develop, and manage the system using [Assignment: organization-defined system development life cycle] that incorporates information security and privacy considerations;\nb. Define and document information security and privacy roles and responsibilities throughout the system development life cycle;\nc. Identify individuals having information security and privacy roles and responsibilities; and\nd. Integrate the organizational information security and privacy risk management process into system development life cycle activities.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-4",
+                         "principleId":  "SA",
+                         "title":  "Acquisition Process",
+                         "controlText":  "Include the following requirements, descriptions, and criteria, explicitly or by reference, using [Selection (one or more): standardized contract language; [Assignment: organization-defined contract language]] in the acquisition contract for the system, system component, or system service:\na. Security and privacy functional requirements;\nb. Strength of mechanism requirements;\nc. Security and privacy assurance requirements;\nd. Controls needed to satisfy the security and privacy requirements.\ne. Security and privacy documentation requirements;\nf. Requirements for protecting security and privacy documentation;\ng. Description of the system development environment and environment in which the system is intended to operate;\nh. Allocation of responsibility or identification of parties responsible for information security, privacy, and supply chain risk management; and\ni. Acceptance criteria.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-5",
+                         "principleId":  "SA",
+                         "title":  "System Documentation",
+                         "controlText":  "a. Obtain or develop administrator documentation for the system, system component, or system service that describes:\n1. Secure configuration, installation, and operation of the system, component, or service;\n2. Effective use and maintenance of security and privacy functions and mechanisms; and\n3. Known vulnerabilities regarding configuration and use of administrative or privileged functions;\nb. Obtain or develop user documentation for the system, system component, or system service that describes:\n1. User-accessible security and privacy functions and mechanisms and how to effectively use those functions and mechanisms;\n2. Methods for user interaction, which enables individuals to use the system, component, or service in a more secure manner and protect individual privacy; and\n3. User responsibilities in maintaining the security of the system, component, or service and privacy of individuals;\nc. Document attempts to obtain system, system component, or system service documentation when such documentation is either unavailable or nonexistent and take [Assignment: organization-defined actions] in response; and\nd. Distribute documentation to [Assignment: organization-defined personnel or roles].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-8",
+                         "principleId":  "SA",
+                         "title":  "Security and Privacy Engineering Principles",
+                         "controlText":  "Apply the following systems security and privacy engineering principles in the specification, design, development, implementation, and modification of the system and system components: [Assignment: organization-defined systems security and privacy engineering principles].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-9",
+                         "principleId":  "SA",
+                         "title":  "External System Services",
+                         "controlText":  "a. Require that providers of external system services comply with organizational security and privacy requirements and employ the following controls: [Assignment: organization-defined controls];\nb. Define and document organizational oversight and user roles and responsibilities with regard to external system services; and\nc. Employ the following processes, methods, and techniques to monitor control compliance by external service providers on an ongoing basis: [Assignment: organization-defined processes, methods, and techniques].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-10",
+                         "principleId":  "SA",
+                         "title":  "Developer Configuration Management",
+                         "controlText":  "Require the developer of the system, system component, or system service to:\na. Perform configuration management during system, component, or service [Selection (one or more): design; development; implementation; operation; disposal];\nb. Document, manage, and control the integrity of changes to [Assignment: organization-defined configuration items under configuration management];\nc. Implement only organization-approved changes to the system, component, or service;\nd. Document approved changes to the system, component, or service and the potential security and privacy impacts of such changes; and\ne. Track security flaws and flaw resolution within the system, component, or service and report findings to [Assignment: organization-defined personnel].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-11",
+                         "principleId":  "SA",
+                         "title":  "Developer Testing and Evaluation",
+                         "controlText":  "Require the developer of the system, system component, or system service, at all post-design stages of the system development life cycle, to:\na. Develop and implement a plan for ongoing security and privacy control assessments;\nb. Perform [Selection (one or more): unit; integration; system; regression] testing/evaluation [Assignment: organization-defined frequency] at [Assignment: organization-defined depth and coverage];\nc. Produce evidence of the execution of the assessment plan and the results of the testing and evaluation;\nd. Implement a verifiable flaw remediation process; and\ne. Correct flaws identified during testing and evaluation.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-15",
+                         "principleId":  "SA",
+                         "title":  "Development Process, Standards, and Tools",
+                         "controlText":  "a. Require the developer of the system, system component, or system service to follow a documented development process that:\n1. Explicitly addresses security and privacy requirements;\n2. Identifies the standards and tools used in the development process;\n3. Documents the specific tool options and tool configurations used in the development process; and\n4. Documents, manages, and ensures the integrity of changes to the process and/or tools used in development; and\nb. Review the development process, standards, tools, tool options, and tool configurations [Assignment: organization-defined frequency] to determine if the process, standards, tools, tool options and tool configurations selected and employed can satisfy the following security and privacy requirements: [Assignment: organization-defined security and privacy requirements].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-16",
+                         "principleId":  "SA",
+                         "title":  "Developer-Provided Training",
+                         "controlText":  "Require the developer of the system, system component, or system service to provide the following training on the correct use and operation of the implemented security and privacy functions, controls, and/or mechanisms: [Assignment: organization-defined training].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-17",
+                         "principleId":  "SA",
+                         "title":  "Developer Security and Privacy Architecture and Design",
+                         "controlText":  "Require the developer of the system, system component, or system service to produce a design specification and security and privacy architecture that:\na. Is consistent with the organization\u0027s security and privacy architecture that is an integral part the organization\u0027s enterprise architecture;\nb. Accurately and completely describes the required security and privacy functionality, and the allocation of controls among physical and logical components; and\nc. Expresses how individual security and privacy functions, mechanisms, and services work together to provide required security and privacy capabilities and a unified approach to protection.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-20",
+                         "principleId":  "SA",
+                         "title":  "Customized Development of Critical Components",
+                         "controlText":  "Reimplement or custom develop the following critical system components: [Assignment: organization-defined critical system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-21",
+                         "principleId":  "SA",
+                         "title":  "Developer Screening",
+                         "controlText":  "Require that the developer of [Assignment: organization-defined system, system component, or system service]:\na. Has appropriate access authorizations as determined by assigned [Assignment: organization-defined official government duties]; and\nb. Satisfies the following additional personnel screening criteria: [Assignment: organization-defined additional personnel screening criteria].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-22",
+                         "principleId":  "SA",
+                         "title":  "Unsupported System Components",
+                         "controlText":  "a. Replace system components when support for the components is no longer available from the developer, vendor, or manufacturer; or\nb. Provide the following options for alternative sources for continued support for unsupported components [Selection (one or more): in-house support; [Assignment: organization-defined support from external providers]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-23",
+                         "principleId":  "SA",
+                         "title":  "Specialization",
+                         "controlText":  "Employ [Selection (one or more): design; modification; augmentation; reconfiguration] on [Assignment: organization-defined systems or system components] supporting mission essential services or functions to increase the trustworthiness in those systems or components.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SA-24",
+                         "principleId":  "SA",
+                         "title":  "Design for Cyber Resiliency",
+                         "controlText":  "a.  Design organizational systems, system components, or system services to achieve cyber resiliency by:\n1.  Defining the following cyber resiliency goals: [Assignment: organization-defined cyber resiliency goals].\n2.  Defining the following cyber resiliency objectives: [Assignment: organization-defined cyber resiliency objectives].\n3.  Defining the following cyber resiliency techniques: [Assignment: organization-defined cyber resiliency techniques].\n4.  Defining the following cyber resiliency implementation approaches: [Assignment: organization-defined cyber resiliency implementation approaches].\n5.  Defining the following cyber resiliency design principles: [Assignment: organization-defined cyber resiliency design principles].\nb.  Implement and review the selected cyber resiliency goals, objectives, techniques, implementation approaches, and design principles as part of an organizational risk management process or systems security engineering process.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-1",
+                         "principleId":  "SC",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] system and communications protection policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the system and communications protection policy and the associated system and communications protection controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the system and communications protection policy and procedures; and\nc. Review and update the current system and communications protection:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-2",
+                         "principleId":  "SC",
+                         "title":  "Separation of System and User Functionality",
+                         "controlText":  "Separate user functionality, including user interface services, from system management functionality.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-3",
+                         "principleId":  "SC",
+                         "title":  "Security Function Isolation",
+                         "controlText":  "Isolate security functions from nonsecurity functions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-4",
+                         "principleId":  "SC",
+                         "title":  "Information in Shared System Resources",
+                         "controlText":  "Prevent unauthorized and unintended information transfer via shared system resources.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-5",
+                         "principleId":  "SC",
+                         "title":  "Denial-of-Service Protection",
+                         "controlText":  "a. [Selection: Protect against; Limit] the effects of the following types of denial-of-service events: [Assignment: organization-defined types of denial-of-service events]; and\nb. Employ the following controls to achieve the denial-of-service objective: [Assignment: organization-defined controls by type of denial-of-service event].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-6",
+                         "principleId":  "SC",
+                         "title":  "Resource Availability",
+                         "controlText":  "Protect the availability of resources by allocating [Assignment: organization-defined resources] by [Selection (one or more): priority; quota; [Assignment: organization-defined controls]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-7",
+                         "principleId":  "SC",
+                         "title":  "Boundary Protection",
+                         "controlText":  "a. Monitor and control communications at the external managed interfaces to the system and at key internal managed interfaces within the system;\nb. Implement subnetworks for publicly accessible system components that are [Selection: physically; logically] separated from internal organizational networks; and\nc. Connect to external networks or systems only through managed interfaces consisting of boundary protection devices arranged in accordance with an organizational security and privacy architecture.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-8",
+                         "principleId":  "SC",
+                         "title":  "Transmission Confidentiality and Integrity",
+                         "controlText":  "Protect the [Selection (one or more): confidentiality; integrity] of transmitted information.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-10",
+                         "principleId":  "SC",
+                         "title":  "Network Disconnect",
+                         "controlText":  "Terminate the network connection associated with a communications session at the end of the session or after [Assignment: organization-defined time period] of inactivity.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-11",
+                         "principleId":  "SC",
+                         "title":  "Trusted Path",
+                         "controlText":  "a. Provide a [Selection: physically; logically] isolated trusted communications path for communications between the user and the trusted components of the system; and\nb. Permit users to invoke the trusted communications path for communications between the user and the following security functions of the system, including at a minimum, authentication and re-authentication: [Assignment: organization-defined security functions].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-12",
+                         "principleId":  "SC",
+                         "title":  "Cryptographic Key Establishment and Management",
+                         "controlText":  "Establish and manage cryptographic keys when cryptography is employed within the system in accordance with the following key management requirements: [Assignment: organization-defined requirements for key generation, distribution, storage, access, and destruction].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-13",
+                         "principleId":  "SC",
+                         "title":  "Cryptographic Protection",
+                         "controlText":  "a. Determine the [Assignment: organization-defined cryptographic uses]; and\nb. Implement the following types of cryptography required for each specified cryptographic use: [Assignment: organization-defined types of cryptography for each specified cryptographic use].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-15",
+                         "principleId":  "SC",
+                         "title":  "Collaborative Computing Devices and Applications",
+                         "controlText":  "a. Prohibit remote activation of collaborative computing devices and applications with the following exceptions: [Assignment: organization-defined exceptions where remote activation is to be allowed]; and\nb. Provide an explicit indication of use to users physically present at the devices.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-16",
+                         "principleId":  "SC",
+                         "title":  "Transmission of Security and Privacy Attributes",
+                         "controlText":  "Associate [Assignment: organization-defined security and privacy attributes] with information exchanged between systems and between system components.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-17",
+                         "principleId":  "SC",
+                         "title":  "Public Key Infrastructure Certificates",
+                         "controlText":  "a. Issue public key certificates under an [Assignment: organization-defined certificate policy] or obtain public key certificates from an approved service provider; and\nb. Include only approved trust anchors in trust stores or certificate stores managed by the organization.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-18",
+                         "principleId":  "SC",
+                         "title":  "Mobile Code",
+                         "controlText":  "a. Define acceptable and unacceptable mobile code and mobile code technologies; and\nb. Authorize, monitor, and control the use of mobile code within the system.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-20",
+                         "principleId":  "SC",
+                         "title":  "Secure Name/Address Resolution Service (Authoritative Source)",
+                         "controlText":  "a. Provide additional data origin authentication and integrity verification artifacts along with the authoritative name resolution data the system returns in response to external name/address resolution queries; and\nb. Provide the means to indicate the security status of child zones and (if the child supports secure resolution services) to enable verification of a chain of trust among parent and child domains, when operating as part of a distributed, hierarchical namespace.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-21",
+                         "principleId":  "SC",
+                         "title":  "Secure Name/Address Resolution Service (Recursive or Caching Resolver)",
+                         "controlText":  "Request and perform data origin authentication and data integrity verification on the name/address resolution responses the system receives from authoritative sources.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-22",
+                         "principleId":  "SC",
+                         "title":  "Architecture and Provisioning for Name/Address Resolution Service",
+                         "controlText":  "Ensure the systems that collectively provide name/address resolution service for an organization are fault-tolerant and implement internal and external role separation.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-23",
+                         "principleId":  "SC",
+                         "title":  "Session Authenticity",
+                         "controlText":  "Protect the authenticity of communications sessions.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-24",
+                         "principleId":  "SC",
+                         "title":  "Fail in Known State",
+                         "controlText":  "Fail to a [Assignment: organization-defined known system state] for the following failures on the indicated components while preserving [Assignment: organization-defined system state information] in failure: [Assignment: list of organization-defined types of system failures on organization-defined system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-25",
+                         "principleId":  "SC",
+                         "title":  "Thin Nodes",
+                         "controlText":  "Employ minimal functionality and information storage on the following system components: [Assignment: organization-defined system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-26",
+                         "principleId":  "SC",
+                         "title":  "Decoys",
+                         "controlText":  "Include components within organizational systems specifically designed to be the target of malicious attacks for detecting, deflecting, and analyzing such attacks.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-27",
+                         "principleId":  "SC",
+                         "title":  "Platform-Independent Applications",
+                         "controlText":  "Include within organizational systems the following platform independent applications: [Assignment: organization-defined platform-independent applications].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-28",
+                         "principleId":  "SC",
+                         "title":  "Protection of Information at Rest",
+                         "controlText":  "Protect the [Selection (one or more): confidentiality; integrity] of the following information at rest: [Assignment: organization-defined information at rest].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-29",
+                         "principleId":  "SC",
+                         "title":  "Heterogeneity",
+                         "controlText":  "Employ a diverse set of information technologies for the following system components in the implementation of the system: [Assignment: organization-defined system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-30",
+                         "principleId":  "SC",
+                         "title":  "Concealment and Misdirection",
+                         "controlText":  "Employ the following concealment and misdirection techniques for [Assignment: organization-defined systems] at [Assignment: organization-defined time periods] to confuse and mislead adversaries: [Assignment: organization-defined concealment and misdirection techniques].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-31",
+                         "principleId":  "SC",
+                         "title":  "Covert Channel Analysis",
+                         "controlText":  "a. Perform a covert channel analysis to identify those aspects of communications within the system that are potential avenues for covert [Selection (one or more): storage; timing] channels; and\nb. Estimate the maximum bandwidth of those channels.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-32",
+                         "principleId":  "SC",
+                         "title":  "System Partitioning",
+                         "controlText":  "Partition the system into [Assignment: organization-defined system components] residing in separate [Selection: physical; logical] domains or environments based on [Assignment: organization-defined circumstances for physical or logical separation of components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-34",
+                         "principleId":  "SC",
+                         "title":  "Non-Modifiable Executable Programs",
+                         "controlText":  "For [Assignment: organization-defined system components], load and execute:\na. The operating environment from hardware-enforced, read-only media; and\nb. The following applications from hardware-enforced, read-only media: [Assignment: organization-defined applications].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-35",
+                         "principleId":  "SC",
+                         "title":  "External Malicious Code Identification",
+                         "controlText":  "Include system components that proactively seek to identify network-based malicious code or malicious websites.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-36",
+                         "principleId":  "SC",
+                         "title":  "Distributed Processing and Storage",
+                         "controlText":  "Distribute the following processing and storage components across multiple [Selection: physical locations; logical domains]: [Assignment: organization-defined processing and storage components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-37",
+                         "principleId":  "SC",
+                         "title":  "Out-of-Band Channels",
+                         "controlText":  "Employ the following out-of-band channels for the physical delivery or electronic transmission of [Assignment: organization-defined information, system components, or devices] to [Assignment: organization-defined individuals or systems]: [Assignment: organization-defined out-of-band channels].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-38",
+                         "principleId":  "SC",
+                         "title":  "Operations Security",
+                         "controlText":  "Employ the following operations security controls to protect key organizational information throughout the system development life cycle: [Assignment: organization-defined operations security controls].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-39",
+                         "principleId":  "SC",
+                         "title":  "Process Isolation",
+                         "controlText":  "Maintain a separate execution domain for each executing system process.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-40",
+                         "principleId":  "SC",
+                         "title":  "Wireless Link Protection",
+                         "controlText":  "Protect external and internal [Assignment: organization-defined wireless links] from the following signal parameter attacks: [Assignment: organization-defined types of signal parameter attacks or references to sources for such attacks].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-41",
+                         "principleId":  "SC",
+                         "title":  "Port and I/O Device Access",
+                         "controlText":  "[Selection: Physically; Logically] disable or remove [Assignment: organization-defined connection ports or input/output devices] on the following systems or system components: [Assignment: organization-defined systems or system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-42",
+                         "principleId":  "SC",
+                         "title":  "Sensor Capability and Data",
+                         "controlText":  "a. Prohibit [Selection (one or more): the use of devices possessing [Assignment: organization-defined environmental sensing capabilities] in [Assignment: organization-defined facilities, areas, or systems]; the remote activation of environmental sensing capabilities on organizational systems or system components with the following exceptions: [Assignment: organization-defined exceptions where remote activation of sensors is allowed]]; and\nb. Provide an explicit indication of sensor use to [Assignment: organization-defined group of users].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-43",
+                         "principleId":  "SC",
+                         "title":  "Usage Restrictions",
+                         "controlText":  "a. Establish usage restrictions and implementation guidelines for the following system components: [Assignment: organization-defined system components]; and\nb. Authorize, monitor, and control the use of such components within the system.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-44",
+                         "principleId":  "SC",
+                         "title":  "Detonation Chambers",
+                         "controlText":  "Employ a detonation chamber capability within [Assignment: organization-defined system, system component, or location].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-45",
+                         "principleId":  "SC",
+                         "title":  "System Time Synchronization",
+                         "controlText":  "Synchronize system clocks within and between systems and system components.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-46",
+                         "principleId":  "SC",
+                         "title":  "Cross Domain Policy Enforcement",
+                         "controlText":  "Implement a policy enforcement mechanism [Selection: physically; logically] between the physical and/or network interfaces for the connecting security domains.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-47",
+                         "principleId":  "SC",
+                         "title":  "Alternate Communications Paths",
+                         "controlText":  "Establish [Assignment: organization-defined alternate communications paths] for system operations organizational command and control.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-48",
+                         "principleId":  "SC",
+                         "title":  "Sensor Relocation",
+                         "controlText":  "Relocate [Assignment: organization-defined sensors and monitoring capabilities] to [Assignment: organization-defined locations] under the following conditions or circumstances: [Assignment: organization-defined conditions or circumstances].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-49",
+                         "principleId":  "SC",
+                         "title":  "Hardware-Enforced Separation and Policy Enforcement",
+                         "controlText":  "Implement hardware-enforced separation and policy enforcement mechanisms between [Assignment: organization-defined security domains].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-50",
+                         "principleId":  "SC",
+                         "title":  "Software-Enforced Separation and Policy Enforcement",
+                         "controlText":  "Implement software-enforced separation and policy enforcement mechanisms between [Assignment: organization-defined security domains].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SC-51",
+                         "principleId":  "SC",
+                         "title":  "Hardware-Based Protection",
+                         "controlText":  "a. Employ hardware-based, write-protect for [Assignment: organization-defined system firmware components]; and\nb. Implement specific procedures for [Assignment: organization-defined authorized individuals] to manually disable hardware write-protect for firmware modifications and re-enable the write-protect prior to returning to operational mode.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-1",
+                         "principleId":  "SI",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] system and information integrity policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the system and information integrity policy and the associated system and information integrity controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the system and information integrity policy and procedures; and\nc. Review and update the current system and information integrity:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-2",
+                         "principleId":  "SI",
+                         "title":  "Flaw Remediation",
+                         "controlText":  "a. Identify, report, and correct system flaws;\nb. Test software and firmware updates related to flaw remediation for effectiveness and potential side effects before installation;\nc. Install security-relevant software and firmware updates within [Assignment: organization-defined time period] of the release of the updates; and\nd. Incorporate flaw remediation into the organizational configuration management process.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-3",
+                         "principleId":  "SI",
+                         "title":  "Malicious Code Protection",
+                         "controlText":  "a. Implement [Selection (one or more): signature based; non-signature based] malicious code protection mechanisms at system entry and exit points to detect and eradicate malicious code;\nb. Automatically update malicious code protection mechanisms as new releases are available in accordance with organizational configuration management policy and procedures;\nc. Configure malicious code protection mechanisms to:\n1. Perform periodic scans of the system [Assignment: organization-defined frequency] and real-time scans of files from external sources at [Selection (one or more): endpoint; network entry and exit points] as the files are downloaded, opened, or executed in accordance with organizational policy; and\n2. [Selection (one or more): block malicious code; quarantine malicious code; take [Assignment: organization-defined action]]; and send alert to [Assignment: organization-defined personnel or roles] in response to malicious code detection; and\nd. Address the receipt of false positives during malicious code detection and eradication and the resulting potential impact on the availability of the system.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-4",
+                         "principleId":  "SI",
+                         "title":  "System Monitoring",
+                         "controlText":  "a. Monitor the system to detect:\n1. Attacks and indicators of potential attacks in accordance with the following monitoring objectives: [Assignment: organization-defined monitoring objectives]; and\n2. Unauthorized local, network, and remote connections;\nb. Identify unauthorized use of the system through the following techniques and methods: [Assignment: organization-defined techniques and methods];\nc. Invoke internal monitoring capabilities or deploy monitoring devices:\n1. Strategically within the system to collect organization-determined essential information; and\n2. At ad hoc locations within the system to track specific types of transactions of interest to the organization;\nd. Analyze detected events and anomalies;\ne. Adjust the level of system monitoring activity when there is a change in risk to organizational operations and assets, individuals, other organizations, or the Nation;\nf. Obtain legal opinion regarding system monitoring activities; and\ng. Provide [Assignment: organization-defined system monitoring information] to [Assignment: organization-defined personnel or roles] [Selection (one or more): as needed; [Assignment: organization-defined frequency]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-5",
+                         "principleId":  "SI",
+                         "title":  "Security Alerts, Advisories, and Directives",
+                         "controlText":  "a. Receive system security alerts, advisories, and directives from [Assignment: organization-defined external organizations] on an ongoing basis;\nb. Generate internal security alerts, advisories, and directives as deemed necessary;\nc. Disseminate security alerts, advisories, and directives to: [Selection (one or more): [Assignment: organization-defined personnel or roles]; [Assignment: organization-defined elements within the organization]; [Assignment: organization-defined external organizations]]; and\nd. Implement security directives in accordance with established time frames, or notify the issuing organization of the degree of noncompliance.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-6",
+                         "principleId":  "SI",
+                         "title":  "Security and Privacy Function Verification",
+                         "controlText":  "a. Verify the correct operation of [Assignment: organization-defined security and privacy functions];\nb. Perform the verification of the functions specified in SI-6a [Selection (one or more): [Assignment: organization-defined system transitional states]; upon command by user with appropriate privilege; [Assignment: organization-defined frequency]];\nc. Alert [Assignment: organization-defined personnel or roles] to failed security and privacy verification tests; and\nd. [Selection (one or more): Shut the system down; Restart the system; [Assignment: organization-defined alternative action(s)]] when anomalies are discovered.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-7",
+                         "principleId":  "SI",
+                         "title":  "Software, Firmware, and Information Integrity",
+                         "controlText":  "a. Employ integrity verification tools to detect unauthorized changes to the following software, firmware, and information: [Assignment: organization-defined software, firmware, and information]; and\nb. Take the following actions when unauthorized changes to the software, firmware, and information are detected: [Assignment: organization-defined actions].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-8",
+                         "principleId":  "SI",
+                         "title":  "Spam Protection",
+                         "controlText":  "a. Employ spam protection mechanisms at system entry and exit points to detect and act on unsolicited messages; and\nb. Update spam protection mechanisms when new releases are available in accordance with organizational configuration management policy and procedures.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-10",
+                         "principleId":  "SI",
+                         "title":  "Information Input Validation",
+                         "controlText":  "Check the validity of the following information inputs: [Assignment: organization-defined information inputs to the system].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-11",
+                         "principleId":  "SI",
+                         "title":  "Error Handling",
+                         "controlText":  "a. Generate error messages that provide information necessary for corrective actions without revealing information that could be exploited; and\nb. Reveal error messages only to [Assignment: organization-defined personnel or roles].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-12",
+                         "principleId":  "SI",
+                         "title":  "Information Management and Retention",
+                         "controlText":  "Manage and retain information within the system and information output from the system in accordance with applicable laws, executive orders, directives, regulations, policies, standards, guidelines and operational requirements.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-13",
+                         "principleId":  "SI",
+                         "title":  "Predictable Failure Prevention",
+                         "controlText":  "a. Determine mean time to failure (MTTF) for the following system components in specific environments of operation: [Assignment: organization-defined system components]; and\nb. Provide substitute system components and a means to exchange active and standby components in accordance with the following criteria: [Assignment: organization-defined MTTF substitution criteria].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-14",
+                         "principleId":  "SI",
+                         "title":  "Non-Persistence",
+                         "controlText":  "Implement non-persistent [Assignment: organization-defined system components and services] that are initiated in a known state and terminated [Selection (one or more): upon end of session of use; periodically at [Assignment: organization-defined frequency]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-15",
+                         "principleId":  "SI",
+                         "title":  "Information Output Filtering",
+                         "controlText":  "Validate information output from the following software programs and/or applications to ensure that the information is consistent with the expected content: [Assignment: organization-defined software programs and/or applications].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-16",
+                         "principleId":  "SI",
+                         "title":  "Memory Protection",
+                         "controlText":  "Implement the following controls to protect the system memory from unauthorized code execution: [Assignment: organization-defined controls].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-17",
+                         "principleId":  "SI",
+                         "title":  "Fail-Safe Procedures",
+                         "controlText":  "Implement the indicated fail-safe procedures when the indicated failures occur: [Assignment: organization-defined list of failure conditions and associated fail-safe procedures].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-18",
+                         "principleId":  "SI",
+                         "title":  "Personally Identifiable Information Quality Operations",
+                         "controlText":  "a. Check the accuracy, relevance, timeliness, and completeness of personally identifiable information across the information life cycle [Assignment: organization-defined frequency]; and\nb. Correct or delete inaccurate or outdated personally identifiable information.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-19",
+                         "principleId":  "SI",
+                         "title":  "De-identification",
+                         "controlText":  "a. Remove the following elements of personally identifiable information from datasets: [Assignment: organization-defined elements of personally identifiable information]; and\nb. Evaluate [Assignment: organization-defined frequency] for effectiveness of de-identification.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-20",
+                         "principleId":  "SI",
+                         "title":  "Tainting",
+                         "controlText":  "Embed data or capabilities in the following systems or system components to determine if organizational data has been exfiltrated or improperly removed from the organization: [Assignment: organization-defined systems or system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-21",
+                         "principleId":  "SI",
+                         "title":  "Information Refresh",
+                         "controlText":  "Refresh [Assignment: organization-defined information] at [Assignment: organization-defined frequencies] or generate the information on demand and delete the information when no longer needed.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-22",
+                         "principleId":  "SI",
+                         "title":  "Information Diversity",
+                         "controlText":  "a. Identify the following alternative sources of information for [Assignment: organization-defined essential functions and services]: [Assignment: organization-defined alternative information sources]; and\nb. Use an alternative information source for the execution of essential functions or services on [Assignment: organization-defined systems or system components] when the primary source of information is corrupted or unavailable.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SI-23",
+                         "principleId":  "SI",
+                         "title":  "Information Fragmentation",
+                         "controlText":  "Based on [Assignment: organization-defined circumstances]:\na. Fragment the following information: [Assignment: organization-defined information]; and\nb. Distribute the fragmented information across the following systems or system components: [Assignment organization-defined systems or system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-1",
+                         "principleId":  "SR",
+                         "title":  "Policy and Procedures",
+                         "controlText":  "a. Develop, document, and disseminate to [Assignment: organization-defined personnel or roles]:\n1. [Selection (one or more): Organization-level; Mission/business process-level; System-level] supply chain risk management policy that:\n(a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and\n(b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and\n2. Procedures to facilitate the implementation of the supply chain risk management policy and the associated supply chain risk management controls;\nb. Designate an [Assignment: organization-defined official] to manage the development, documentation, and dissemination of the supply chain risk management policy and procedures; and\nc. Review and update the current supply chain risk management:\n1. Policy [Assignment: organization-defined frequency] and following [Assignment: organization-defined events]; and\n2. Procedures [Assignment: organization-defined frequency] and following [Assignment: organization-defined events].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-2",
+                         "principleId":  "SR",
+                         "title":  "Supply Chain Risk Management Plan",
+                         "controlText":  "a. Develop a plan for managing supply chain risks associated with the research and development, design, manufacturing, acquisition, delivery, integration, operations and maintenance, and disposal of the following systems, system components or system services: [Assignment: organization-defined systems, system components, or system services];\nb. Review and update the supply chain risk management plan [Assignment: organization-defined frequency] or as required, to address threat, organizational or environmental changes; and\nc. Protect the supply chain risk management plan from unauthorized disclosure and modification.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-3",
+                         "principleId":  "SR",
+                         "title":  "Supply Chain Controls and Processes",
+                         "controlText":  "a. Establish a process or processes to identify and address weaknesses or deficiencies in the supply chain elements and processes of [Assignment: organization-defined system or system component] in coordination with [Assignment: organization-defined supply chain personnel];\nb. Employ the following controls to protect against supply chain risks to the system, system component, or system service and to limit the harm or consequences from supply chain-related events: [Assignment: organization-defined supply chain controls]; and\nc. Document the selected and implemented supply chain processes and controls in [Selection: security and privacy plans; supply chain risk management plan; [Assignment: organization-defined document]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-4",
+                         "principleId":  "SR",
+                         "title":  "Provenance",
+                         "controlText":  "Document, monitor, and maintain valid provenance of the following systems, system components, and associated data: [Assignment: organization-defined systems, system components, and associated data].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-5",
+                         "principleId":  "SR",
+                         "title":  "Acquisition Strategies, Tools, and Methods",
+                         "controlText":  "Employ the following acquisition strategies, contract tools, and procurement methods to protect against, identify, and mitigate supply chain risks: [Assignment: organization-defined acquisition strategies, contract tools, and procurement methods].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-6",
+                         "principleId":  "SR",
+                         "title":  "Supplier Assessments and Reviews",
+                         "controlText":  "Assess and review the supply chain-related risks associated with suppliers or contractors and the system, system component, or system service they provide [Assignment: organization-defined frequency].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-7",
+                         "principleId":  "SR",
+                         "title":  "Supply Chain Operations Security",
+                         "controlText":  "Employ the following Operations Security (OPSEC) controls to protect supply chain-related information for the system, system component, or system service: [Assignment: organization-defined Operations Security (OPSEC) controls].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-8",
+                         "principleId":  "SR",
+                         "title":  "Notification Agreements",
+                         "controlText":  "Establish agreements and procedures with entities involved in the supply chain for the system, system component, or system service for the [Selection (one or more): notification of supply chain compromises; results of assessments or audits; [Assignment: organization-defined information]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-9",
+                         "principleId":  "SR",
+                         "title":  "Tamper Resistance and Detection",
+                         "controlText":  "Implement a tamper protection program for the system, system component, or system service.",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-10",
+                         "principleId":  "SR",
+                         "title":  "Inspection of Systems or Components",
+                         "controlText":  "Inspect the following systems or system components [Selection (one or more): at random; at [Assignment: organization-defined frequency], upon [Assignment: organization-defined indications of need for inspection]] to detect tampering: [Assignment: organization-defined systems or system components].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-11",
+                         "principleId":  "SR",
+                         "title":  "Component Authenticity",
+                         "controlText":  "a. Develop and implement anti-counterfeit policy and procedures that include the means to detect and prevent counterfeit components from entering the system; and\nb. Report counterfeit system components to [Selection (one or more): source of counterfeit component; [Assignment: organization-defined external reporting organizations]; [Assignment: organization-defined personnel or roles]].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     },
+                     {
+                         "id":  "SR-12",
+                         "principleId":  "SR",
+                         "title":  "Component Disposal",
+                         "controlText":  "Dispose of [Assignment: organization-defined data, documentation, tools, or system components] using the following techniques and methods: [Assignment: organization-defined techniques and methods].",
+                         "controlTextLabel":  "Control (verbatim, NIST SP 800-53 Rev 5)"
+                     }
+                 ],
+    "targetDimensionLabelPlural":  "Sites"
+};

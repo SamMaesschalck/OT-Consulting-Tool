@@ -1,0 +1,15 @@
+# Store every file exactly as it is. The tree mixes LF and CRLF line endings
+# (and some files contain both), and vendor/docx.umd.js is hand-patched, so
+# git must never rewrite line endings on commit or checkout.
+* -text
+
+# Binary, for diff purposes.
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.bmp  binary
+*.exe  binary
+*.zip  binary
+*.docx binary
+*.xlsx binary
+*.pdf  binary

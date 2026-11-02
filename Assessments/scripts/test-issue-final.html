@@ -1,0 +1,232 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Issue check: draft and final Word files</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  A Word report goes out as a draft or a final. Built for real and unzipped:
+    final  Status Final in document control, read-only protection with
+           enforcement and no password, marked as final (_MarkAsFinal), no red
+           prompt anywhere, no DRAFT watermark, the plain file name; refused
+           outright while anything would still print red;
+    draft  a DRAFT watermark in every header and on the cover, Status Draft,
+           no protection, no mark, "-draft" in the file name.
+  Neither carries the tool's version, and every XML part still parses. Then
+  the export dialog: Final is shut while the check finds anything, opens once
+  it is all written, writes a final file, and is remembered for next time;
+  Excel is not asked.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, xlsx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function part(parts, name) { var p = parts.filter(function (x) { return x.name === name; })[0]; return p ? p.text : ""; }
+// The document-control row for a label, as its cell texts.
+function rowFor(xml, label) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml"), hit = null;
+  Array.prototype.forEach.call(doc.getElementsByTagNameNS(W, "tr"), function (tr) {
+    if (hit) return;
+    var cells = Array.prototype.map.call(tr.getElementsByTagNameNS(W, "tc"), function (tc) { return tc.textContent.trim(); });
+    if (cells[0] === label) hit = cells;
+  });
+  return hit;
+}
+function wellFormed(parts) {
+  return parts.filter(function (p) { return /\.xml$/.test(p.name) && p.text; }).filter(function (p) {
+    return new DOMParser().parseFromString(p.text, "application/xml").getElementsByTagName("parsererror").length > 0;
+  }).map(function (p) { return p.name; });
+}
+function poll(test, cb, n) {
+  n = n == null ? 400 : n;
+  if (test() || n <= 0) { cb(); return; }
+  setTimeout(function () { poll(test, cb, n - 1); }, 50);
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, X = A.ExportDOCX, V = A.Version, I;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  I = A.UI.__issue;
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  var saved = [];
+  A.Storage.downloadBlob = function (blob, name) { saved.push({ blob: blob, name: name }); };
+  var xlsxCalls = 0;
+  A.ExportXLSX.download = function () { xlsxCalls++; return Promise.resolve(); };
+
+  function ids() { return E.state.engagement.targets.map(function (t) { return t.id; }); }
+  function check() {
+    return new Promise(function (res) { I.run(I.jobs(ids(), "per"), function (err, list) { res(err ? null : list); }); });
+  }
+  // Settles every prompt the way a consultant would, in the field it names.
+  function fill(list) {
+    list.forEach(function (p) {
+      var w = p.where;
+      if (w.kind === "narrative") { var pt = {}; pt[w.field] = "Written in the tool for " + w.field + "."; E.setReportNarrative(pt); }
+      else if (w.kind === "nextSteps") E.setReportNarrative({ nextSteps: "Agree the owners and dates for the roadmap with the client" });
+      else if (w.kind === "item") { var f = {}; f[w.field] = "Written in the tool."; E.setResponse(p.targetId, w.itemId, f); }
+      else if (w.kind === "basis") { E.getBasisOfAssessment().interviews.push({ name: "A. Engineer", role: "Control systems lead", date: "2026-10-01" }); E.touchBasisOfAssessment(); }
+      else if (w.kind === "raVerdict") E.updateRiskAppetiteSetup({ verdictRationale: "Written in the tool." });
+    });
+  }
+  function build(status) {
+    var job = I.jobs(ids(), "per")[0];
+    return new Promise(function (res) {
+      X.buildAsync(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+        Object.assign({}, job.opts, { issueStatus: status }), function (err, blob) { res(err ? { err: err } : { blob: blob }); });
+    });
+  }
+  var needles = [V.number, V.label, "createdWithVersion", "savedWithVersion"];
+  function versionHits(parts) {
+    var hits = [];
+    parts.forEach(function (p) { needles.forEach(function (nd) { if (p.text.indexOf(nd) !== -1) hits.push(p.name + " has " + nd); }); });
+    return hits;
+  }
+
+  var CASES = ["iec-62443-3-3", "general-ot-posture", "ncsc-caf", "nis2-assessment", "eu-cra", "risk-appetite", "iec-62443-2-1-2024"];
+  var chain = Promise.resolve();
+  CASES.forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      return check();
+    }).then(function (list) {
+      fill(list || []);
+      return check();
+    }).then(function (list) {
+      ok(list && list.length === 0, id + ": with everything written in the tool, nothing is left to write", JSON.stringify((list || []).slice(0, 3)));
+      return build("final");
+    }).then(function (r) {
+      ok(!!r.blob, id + ": a final builds", r.err && r.err.message);
+      return r.blob ? H.unzipText(r.blob) : [];
+    }).then(function (parts) {
+      var settings = part(parts, "word/settings.xml"), custom = part(parts, "docProps/custom.xml"), docx = part(parts, "word/document.xml");
+      ok(/<w:documentProtection w:edit="readOnly" w:enforcement="1"\/>/.test(settings), id + " final: opens read-only, enforced");
+      ok(settings.indexOf("<w:documentProtection") < settings.indexOf("<w:evenAndOddHeaders") && settings.indexOf("<w:documentProtection") > 0,
+         id + " final: protection sits where Word expects it in settings.xml");
+      ok(!/w:hash|w:cryptProviderType|w:salt/.test(settings), id + " final: with no password");
+      ok(/<property [^>]*name="_MarkAsFinal"[^>]*><vt:bool>true<\/vt:bool><\/property>/.test(custom), id + " final: marked as final");
+      var st = rowFor(docx, "Status");
+      ok(st && st[1] === "Final", id + " final: Status Final in document control", JSON.stringify(st));
+      ok(!/E00000/i.test(docx) && !/w:val="PlaceholderText"/.test(docx), id + " final: no red prompt anywhere in the body");
+      ok(!parts.some(function (p) { return /string="DRAFT"/.test(p.text); }), id + " final: no DRAFT marking");
+      ok(wellFormed(parts).length === 0, id + " final: every XML part parses", wellFormed(parts).join(", "));
+      ok(versionHits(parts).length === 0, id + " final: no tool version anywhere", versionHits(parts).join(" | "));
+      return build("draft");
+    }).then(function (r) {
+      ok(!!r.blob, id + ": a draft builds", r.err && r.err.message);
+      return r.blob ? H.unzipText(r.blob) : [];
+    }).then(function (parts) {
+      var headers = parts.filter(function (p) { return /^word\/header\d*\.xml$/.test(p.name); });
+      var docx = part(parts, "word/document.xml");
+      ok(headers.length > 0 && headers.every(function (p) { return /<v:textpath [^>]*string="DRAFT"/.test(p.text); }),
+         id + " draft: every page header carries the DRAFT watermark (" + headers.length + " headers)");
+      ok(/<v:textpath [^>]*string="DRAFT"/.test(docx), id + " draft: and so does the cover");
+      var st = rowFor(docx, "Status");
+      ok(st && st[1] === "Draft", id + " draft: Status Draft in document control", JSON.stringify(st));
+      ok(!/documentProtection/.test(part(parts, "word/settings.xml")) && !/_MarkAsFinal/.test(part(parts, "docProps/custom.xml")),
+         id + " draft: neither protected nor marked as final");
+      ok(wellFormed(parts).length === 0, id + " draft: every XML part parses", wellFormed(parts).join(", "));
+      ok(versionHits(parts).length === 0, id + " draft: no tool version anywhere", versionHits(parts).join(" | "));
+      // Take one thing away again: a final is refused, a draft is not.
+      E.setReportNarrative({ nextSteps: "" });
+      return build("final");
+    }).then(function (r) {
+      ok(!!r.err && !r.blob && /cannot be issued as final/.test(r.err.message), id + ": with something still to write a final is refused", r.err && r.err.message);
+      return build("draft");
+    }).then(function (r) {
+      ok(!!r.blob, id + ": while a draft still builds");
+    });
+  });
+
+  // ---- file names ----
+  chain = chain.then(function () {
+    E.activateInstrument("general-ot-posture");
+    var job = I.jobs(ids(), "per")[0];
+    saved = [];
+    return new Promise(function (res) {
+      X.download(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+        Object.assign({}, job.opts, { issueStatus: "draft", onDone: function () { res(); } }));
+    }).then(function () {
+      ok(saved.length === 1 && /-draft\.docx$/.test(saved[0].name), "a draft's file name says so", saved[0] && saved[0].name);
+      return check();
+    }).then(function (list) {
+      fill(list); saved = [];
+      return new Promise(function (res) {
+        X.download(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+          Object.assign({}, job.opts, { issueStatus: "final", onDone: function () { res(); } }));
+      });
+    }).then(function () {
+      ok(saved.length === 1 && /\.docx$/.test(saved[0].name) && !/draft/i.test(saved[0].name), "a final's does not", saved[0] && saved[0].name);
+    });
+  });
+
+  // ---- the export dialog ----
+  function dialog() { return document.querySelector(".export-modal"); }
+  function finalBtn() { return dialog() && dialog().querySelector('[data-issue="final"]'); }
+  function draftBtn() { return dialog() && dialog().querySelector('[data-issue="draft"]'); }
+  function noteText() { var n = dialog() && dialog().querySelector(".export-issue-note"); return n ? n.textContent : ""; }
+  function checked() { return !/Checking/.test(noteText()) && noteText() !== ""; }
+  function cancel() {
+    var b = dialog() && Array.prototype.filter.call(dialog().querySelectorAll("button"), function (x) { return x.textContent === "Cancel"; })[0];
+    if (b) b.click();
+  }
+  function wait(test) { return new Promise(function (res) { poll(test, res); }); }
+
+  chain = chain.then(function () {
+    E.activateInstrument("general-ot-posture");
+    E.setReportNarrative({ regulatoryExposure: "" });
+    A.UI.go("report");
+    I.beginExport("docx");
+    ok(!!dialog(), "Word always asks: the export dialog opens even for a single target");
+    ok(finalBtn() && finalBtn().hasAttribute("disabled") && /active/.test(draftBtn().className), "Final starts shut and Draft chosen, until the check has run");
+    return wait(checked);
+  }).then(function () {
+    ok(finalBtn().hasAttribute("disabled"), "with something still to write, Final stays shut");
+    ok(/Final is not available yet: 1 thing is still to write/.test(noteText()), "and the dialog says why", noteText());
+    var link = Array.prototype.filter.call(dialog().querySelectorAll("button"), function (b) { return b.textContent === "See what is left"; })[0];
+    ok(!!link, "with a link to the check");
+    link.click();
+    ok(!dialog() && A.UI.__currentView() === "report", "which closes the dialog on the report page");
+    var card = document.querySelector('[data-check-anchor="issue-check"]');
+    ok(card && card.classList.contains("check-flash"), "and points at the issue check");
+    E.setReportNarrative({ regulatoryExposure: "The exposure, written in the tool." });
+    I.beginExport("docx");
+    return wait(checked);
+  }).then(function () {
+    ok(!finalBtn().hasAttribute("disabled"), "once it is all written, Final opens", noteText());
+    ok(/Nothing is left to write/.test(noteText()), "and says so", noteText());
+    finalBtn().click();
+    ok(/active/.test(finalBtn().className), "Final can be chosen");
+    saved = [];
+    var exp = Array.prototype.filter.call(dialog().querySelectorAll("button"), function (b) { return b.textContent === "Export"; })[0];
+    exp.click();
+    return wait(function () { return saved.length > 0; });
+  }).then(function () {
+    ok(saved.length === 1 && !/draft/i.test(saved[0].name), "the export writes the final file", saved[0] && saved[0].name);
+    ok(E.getReportNarrative().issueAs === "final", "and the choice is remembered on the assessment");
+    return H.unzipText(saved[0].blob);
+  }).then(function (parts) {
+    ok(/_MarkAsFinal/.test(part(parts, "docProps/custom.xml")), "that file is the locked final");
+    I.beginExport("docx");
+    return wait(checked);
+  }).then(function () {
+    ok(/active/.test(finalBtn().className), "next time the dialog opens on Final");
+    cancel();
+    E.setReportNarrative({ nextSteps: "" });
+    I.beginExport("docx");
+    return wait(checked);
+  }).then(function () {
+    ok(finalBtn().hasAttribute("disabled") && /active/.test(draftBtn().className), "but falls back to Draft while something is left to write");
+    cancel();
+    // Excel is a working file: no draft or final, and a single target still
+    // exports straight away.
+    xlsxCalls = 0;
+    I.beginExport("xlsx");
+    ok(!document.querySelector(".modal-backdrop") && xlsxCalls === 1, "Excel is not asked");
+  });
+
+  chain.then(done, function (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+});
+</script>
+</body></html>

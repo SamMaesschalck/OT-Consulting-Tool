@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Guided wizards for SL / ML / CSMS</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+
+  function btnByText(root, rx) {
+    return Array.prototype.filter.call(root.querySelectorAll("button"), function (b) { return rx.test((b.textContent || "").trim()); })[0];
+  }
+  function click(el) { el.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+
+  try {
+    E.loadCatalog(); A.UI.init({ autosave: false });
+    var main = document.getElementById("main"), side = document.getElementById("sidebar");
+
+    var CASES = [
+      { id: "iec-62443-3-3", view: "sl-wizard", listView: "fr",
+        firstItem: function () { return E.getRequirementsByFR(E.state.taxonomy.frs[0].id)[0].id; },
+        itemCount: function () { var n = 0; E.state.taxonomy.frs.forEach(function (f) { n += E.getRequirementsByFR(f.id).length; }); return n; },
+        // capability-sl is answered by Security Level, which the engine
+        // expands into per-item states - so the button is an SL and what lands
+        // on the response is the item detail behind it.
+        answerRx: /^SL 2$/, recorded: function (r) {
+          return !!(r.components && r.components.base && r.components.base.state === "met");
+        }, name: "capability-sl (62443-3-3)" },
+      { id: "iec-62443-2-1-2024", view: "ml-wizard", listView: "ml-element",
+        firstItem: function () { return E.getMLRequirementsByElement(E.getMLElements()[0].id)[0].id; },
+        itemCount: function () { var n = 0; E.getMLElements().forEach(function (e) { n += E.getMLRequirementsByElement(e.id).length; }); return n; },
+        answerRx: /^ML2/, field: "ml", expect: "ML2", name: "program-ml (62443-2-1:2024)" },
+      { id: "iec-62443-2-1-2010", view: "csms-wizard", listView: "csms-category",
+        firstItem: function () { return E.getCSMSElementsByCategory(E.getCSMSCategories()[0].id)[0].id; },
+        itemCount: function () { var n = 0; E.getCSMSCategories().forEach(function (c) { n += E.getCSMSElementsByCategory(c.id).length; }); return n; },
+        answerRx: /^In place$/, field: "state", expect: "in-place", name: "csms (62443-2-1:2010)" },
+      // The interview-led one. Its answer is a BAND on the section's axis, and
+      // the technical layer is off by default, so only the 13 core items are
+      // in the wizard.
+      { id: "risk-appetite", view: "ra-wizard", listView: "ra-section",
+        firstItem: function () { return E.getRiskAppetiteItems(E.getRiskAppetiteSections()[0].id)[0].id; },
+        itemCount: function () {
+          var n = 0;
+          E.getRiskAppetiteSections().forEach(function (s) { n += E.getRiskAppetiteItems(s.id).length; });
+          return n;
+        },
+        answerRx: /^Severe$/, field: "band", expect: "severe", name: "risk-appetite (coherence)" }
+    ];
+
+    CASES.forEach(function (c) {
+      E.activateInstrument(c.id);
+      var tid = E.state.activeTargetId;
+      var firstId = c.firstItem();
+      var total = c.itemCount();
+
+      // sidebar has a "Guided wizard" nav entry
+      ok(/Guided wizard/.test(side.textContent), c.name + ": sidebar shows a Guided wizard entry");
+
+      // enter the wizard
+      A.UI.go(c.view);
+      ok(!!main.querySelector(".wizard"), c.name + ": wizard renders");
+      var meta = main.querySelector(".wizard-topmeta");
+      ok(meta && new RegExp("of\\s+" + total + "\\b").test(meta.textContent), c.name + ": step meta counts all items (of " + total + ")", meta && meta.textContent.trim());
+
+      // answer the current (first) item by clicking the wizard button
+      var btn = btnByText(main.querySelector(".wizard-answer"), c.answerRx);
+      ok(!!btn, c.name + ": answer button present in wizard", c.answerRx.toString());
+      if (btn) {
+        click(btn);
+        var r = E.findResponse(tid, firstId) || {};
+        var recorded = c.recorded ? c.recorded(r) : (r[c.field] === c.expect && r.applicable !== false);
+        ok(recorded, c.name + ": clicking in the wizard records the answer on the engine",
+           c.field ? (c.field + "=" + r[c.field]) : JSON.stringify(r.components || {}));
+        // the same answer is visible in the LIST view (shared response store)
+        A.UI.go(c.listView, null);
+        var active = Array.prototype.some.call(document.getElementById("main").querySelectorAll("button.active"), function (b) { return c.answerRx.test((b.textContent || "").trim()); });
+        ok(active, c.name + ": the list view shows the same answer active (shared store)");
+      }
+
+      // Next advances the step counter
+      A.UI.go(c.view);
+      var meta0 = (main.textContent.match(/of\s+\d+/) || [""])[0];
+      var nextBtn = btnByText(main, /Next ›/);
+      ok(!!nextBtn, c.name + ": Next button present");
+      if (nextBtn) {
+        var before = (main.querySelector(".wizard-topmeta") || {}).textContent || "";
+        click(nextBtn);
+        var after = (main.querySelector(".wizard-topmeta") || {}).textContent || "";
+        ok(/\b1\b/.test(before) && /\b2\b/.test(after), c.name + ": Next advances to item 2", before + " -> " + after);
+      }
+    });
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

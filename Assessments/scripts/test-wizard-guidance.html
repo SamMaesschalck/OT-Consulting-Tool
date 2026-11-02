@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Wizard reference-guidance parity check</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<div class="app"><div class="header"><div class="brand"><span class="sub">OT Cyber Assessment Tool</span></div>
+<span id="engagement-summary" class="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme" class="btn ghost"></button><button id="btn-new" class="btn ghost">New</button>
+<button id="btn-engagement" class="btn ghost">Engagement</button><button id="btn-load" class="btn ghost">Load</button>
+<button id="btn-save" class="btn ghost">Save</button><button id="btn-xlsx" class="btn ghost">Excel</button>
+<button id="btn-docx" class="btn primary">Word</button><input id="file-input" type="file" class="hidden"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["42", "sl"] });</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  var which = (location.hash || "#42").replace(/^#/, "").split("|")[0];
+  var shot = (location.hash || "").indexOf("shot") !== -1;
+  try {
+    A.UI.init();
+    if (which === "33") { E.activateInstrument("iec-62443-3-3"); A.TourSL.apply(E); }
+    else { E.activateInstrument("iec-62443-4-2"); A.Tour42.apply(E); }
+    A.UI.go("sl-wizard");
+    var main = document.getElementById("main");
+
+    ok(!!main.querySelector(".wizard-card"), "wizard renders");
+    ok(!!main.querySelector(".sl-items-toggle"), "wizard offers the 'What each level requires' control");
+    // Collapsed by default, the same as the list view. Open it and assert on
+    // what it contains - the panel is the point, it just should not be in the
+    // way of the evidence box before anyone asks for it.
+    ok(!main.querySelector(".sl-levels"), "the level panel starts collapsed in the wizard");
+    // Screenshot mode captures the page as the consultant first sees it, so it
+    // stops here - before anything is clicked open.
+    if (shot) { throw { __shot: true }; }
+    main.querySelector(".sl-items-toggle").click();
+    main = document.getElementById("main");
+    ok(!!main.querySelector(".sl-levels"), "and opens on the first click");
+    var rows = main.querySelectorAll(".sl-level");
+    ok(rows.length >= 1 && rows.length <= 4, "panel shows one block per level", "got " + rows.length);
+    ok(!!main.querySelector(".sl-level.is-target"), "target level is marked");
+    // Every level either introduces items (with their own controls, where in
+    // scope) or says nothing further is required. Both shapes must appear
+    // somewhere across the corpus, and never both in one level.
+    Array.prototype.forEach.call(rows, function (r) {
+      ok(!(r.querySelector(".sl-level-items") && r.querySelector(".sl-level-none")),
+         "a level says either what it adds or that it adds nothing, never both");
+    });
+    ok(!!main.querySelector(".sl-level-items .sl-item"),
+       "the items introduced at a level carry their own controls");
+    ok(main.querySelectorAll(".wizard-context .sl-levels").length === 0,
+       "panel sits in the answer column, not the 322px context rail");
+
+    // Toggling closed must persist, and be honoured by the list view too.
+    // Scoped to the requirement actually toggled: a requirement whose items no
+    // longer match a single level forces its own panel open wherever it appears.
+    var wizCode = main.querySelector(".req-code").textContent;
+    main.querySelector(".sl-items-toggle").click();
+    ok(!document.getElementById("main").querySelector(".sl-levels"), "toggling closes it");
+    A.UI.go("fr", "FR1");
+    var cards = document.getElementById("main").querySelectorAll(".req");
+    var card = null;
+    Array.prototype.forEach.call(cards, function (c) {
+      var code = c.querySelector(".req-code");
+      if (code && code.textContent === wizCode) card = c;
+    });
+    ok(!!card, "the toggled requirement appears in the list view", wizCode);
+    if (card) ok(!card.querySelector(".sl-levels"), "list view honours the closed state");
+    // and the list view still offers it per requirement
+    var toggles = document.getElementById("main").querySelectorAll(".sl-items-toggle");
+    ok(toggles.length > 1, "list view still offers the control per requirement", String(toggles.length));
+    A.UI.go("sl-wizard");
+
+    // The CSMS wizard had the same class of gap: its list view's Guidance
+    // expander carries a conformance hint and OT framing that the wizard did
+    // not show.
+    E.activateInstrument("iec-62443-2-1-2010");
+    A.UI.go("csms-wizard");
+    var cm = document.getElementById("main");
+    var els = E.getCSMSCategories && E.getCSMSElementsByCategory(E.getCSMSCategories()[0].id);
+    var first = els && els[0];
+    var ctx = cm.querySelector(".wizard-context");
+    ok(!!ctx, "CSMS wizard renders a context column");
+    if (first && first.hint) {
+      ok(ctx.textContent.indexOf("What good conformance looks like") !== -1,
+         "CSMS wizard shows the conformance hint");
+    }
+    if (first && first.otLens && first.otLens.framing) {
+      ok(ctx.textContent.indexOf("OT context") !== -1, "CSMS wizard shows the OT framing");
+    }
+    ok(ctx.textContent.indexOf("Reference") !== -1, "CSMS wizard still ends with the Reference block");
+  } catch (e) { if (!e || !e.__shot) ok(false, "threw: " + e.message + "\n" + (e.stack || "")); }
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+  if (shot) document.getElementById("out").style.display = "none";
+});
+</script>
+</body></html>
+

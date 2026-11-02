@@ -1,0 +1,147 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Version: in the tool, never in a report</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  The tool's version (js/version.js) has to be visible IN THE TOOL, so anyone
+  can say which release they are using, and recorded in the project files it
+  saves. It must NEVER reach a report: the Word and Excel files are opened
+  (they are zip files), every part is decompressed, and the version must not
+  appear anywhere in them, text or properties.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true }); H.dom();</script>
+<script>
+// Minimal zip reader: every entry of a .docx/.xlsx as text.
+function unzipText(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    if (eocd < 0) throw new Error("not a zip");
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true), jobs = [];
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+      var data = u8.subarray(start, start + csize);
+      jobs.push((function (name, method, data) {
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+        return bytes.then(function (b) { return { name: name, text: /\.(xml|rels)$/.test(name) ? new TextDecoder().decode(b) : "" }; });
+      })(name, method, data));
+      p += 46 + nlen + xlen + clen;
+    }
+    return Promise.all(jobs);
+  });
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, V = A.Version;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"])); };
+
+  // ---- the one source ------------------------------------------------------
+  ok(V && V.number === "0.5.0", "the tool is version 0.5.0", V && V.number);
+  ok(V.label === "v0.5", "shown as v0.5 (a .0 patch is dropped)", V.label);
+  ok(V.labelOf("0.3.1") === "v0.3.1" && V.labelOf("1.0.0") === "v1.0", "a patch release shows its patch number, a .0 does not");
+  ok(V.compare("0.4.0", "0.3.0") === 1 && V.compare("0.3.0", "0.3.0") === 0 && V.compare("0.2.9", "0.3.0") === -1 &&
+     V.compare("0.10.0", "0.9.0") === 1, "versions compare part by part, not as text");
+
+  // ---- shown in the tool ---------------------------------------------------
+  // The test shell has no header brand; give it the one index.html has.
+  document.querySelector(".header").insertAdjacentHTML("afterbegin",
+    '<div class="brand"><span class="sub">OT Cyber Assessment Tool</span></div>');
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var badge = document.querySelector(".header .brand .version-badge");
+  ok(badge && badge.textContent === "v0.5", "the header shows the version", badge && badge.textContent);
+  ok(/0\.5\.0/.test(badge.title), "with the full number on hover", badge.title);
+  var legal = document.querySelector(".sidebar-legal");
+  ok(/OT Cyber Assessment Tool v0\.5\b/.test(legal.textContent), "the sidebar notice names the version", legal.textContent);
+  A.UI.openLicence();
+  ok(/OT Cyber Assessment Tool v0\.5 \(version 0\.5\.0\)/.test(document.querySelector(".licence-modal").textContent),
+     "and so does the licence pop-up");
+  document.querySelector(".licence-modal").click();
+  A.UI.init({ autosave: false });
+  ok(document.querySelectorAll(".version-badge").length === 1, "starting the UI again does not add a second badge");
+
+  // ---- instrument content versions, printed on every report ----------------
+  // A plain release number. Suffixes such as "-draft", "-skeleton-guided" or
+  // "-paraphrased" were internal notes, and they printed in the document
+  // control table of client deliverables.
+  var odd = E.state.instruments.filter(function (i) { return i.status === "active"; })
+    .filter(function (i) { return !/^\d+\.\d+\.\d+$/.test(String(i.contentVersion || "")); })
+    .map(function (i) { return i.id + "=" + i.contentVersion; });
+  ok(odd.length === 0, "every instrument's content version is a plain number, with no draft or other suffix", odd.join(", "));
+  ok(!/^\d+\.\d+\.\d+$/.test("1.0.0-draft"), "and the check rejects a draft suffix");
+
+  // ---- recorded in project files ------------------------------------------
+  E.newProject && E.newProject();
+  var pf1 = E.getProjectFile(), pf2 = E.getProjectFile();
+  ok(pf1.createdWithVersion === "0.5.0" && pf1.savedWithVersion === "0.5.0",
+     "a new project records the version it was created and saved with", JSON.stringify([pf1.createdWithVersion, pf1.savedWithVersion]));
+  ok(pf1.createdAt && pf1.createdAt === pf2.createdAt, "and keeps its creation date from one save to the next (it used to be re-stamped)");
+
+  E.loadProjectFile({ schemaVersion: A.Storage.SCHEMA_VERSION, project: A.Storage.defaultProject(), assessments: {},
+                      createdAt: "2024-01-01T00:00:00.000Z" });
+  var legacy = E.getProjectFile();
+  ok(!("createdWithVersion" in legacy), "a file from before versions were recorded is not given one it never had");
+  ok(legacy.savedWithVersion === "0.5.0", "but records the version that saves it now");
+  ok(legacy.createdAt === "2024-01-01T00:00:00.000Z", "and keeps its original creation date");
+
+  E.loadProjectFile({ schemaVersion: A.Storage.SCHEMA_VERSION, project: A.Storage.defaultProject(), assessments: {},
+                      createdAt: "2025-06-01T00:00:00.000Z", createdWithVersion: "0.2.0", savedWithVersion: "0.2.0" });
+  ok(E.getProjectFile().createdWithVersion === "0.2.0", "a file made with an earlier version keeps saying so");
+
+  var warnNew = A.UI.__newerFileWarning({ savedWithVersion: "0.6.0" });
+  ok(/saved with v0\.6 of the tool, newer than this copy \(v0\.5\)/.test(warnNew),
+     "opening a project from a newer release warns", warnNew);
+  ok(A.UI.__newerFileWarning({ savedWithVersion: "0.5.0" }) === "" && A.UI.__newerFileWarning({ savedWithVersion: "0.4.1" }) === "" &&
+     A.UI.__newerFileWarning({}) === "", "the same, an older or an unrecorded version does not");
+
+  // ---- NEVER in a report ---------------------------------------------------
+  var needles = [V.number, V.label, "createdWithVersion", "savedWithVersion"];
+  function scan(parts) {
+    var hits = [];
+    parts.forEach(function (p) { needles.forEach(function (nd) { if (p.text.indexOf(nd) !== -1) hits.push(p.name + " has " + nd); }); });
+    return hits;
+  }
+  // Excel exports through the app's own download path.
+  var captured = null;
+  A.Storage.downloadBlob = function (blob) { captured = blob; };
+  var cases = ["iec-62443-3-3", "risk-appetite", "ncsc-caf"];
+  var chain = Promise.resolve();
+  cases.forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      E.updateMetadata({ clientName: "Version Test Ltd" });
+      var opts = { targetId: E.state.activeTargetId };
+      return new Promise(function (res) {
+        A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+          E.getActiveNarrative(), opts, function (err, blob) { res(err ? null : blob); });
+      }).then(function (docx) {
+        ok(!!docx, id + ": the Word document builds");
+        return docx ? unzipText(docx) : [];
+      }).then(function (parts) {
+        ok(parts.some(function (p) { return p.name === "docProps/core.xml"; }) && parts.some(function (p) { return /Version Test Ltd/.test(p.text); }),
+           id + ": the Word file was opened and read (properties and body)");
+        var hits = scan(parts);
+        ok(hits.length === 0, id + ": no version anywhere in the Word file, text or properties", hits.join(" | "));
+        captured = null;
+        return Promise.resolve(A.ExportXLSX.download(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, opts));
+      }).then(function () {
+        ok(!!captured, id + ": the Excel workbook builds");
+        return captured ? unzipText(captured) : [];
+      }).then(function (parts) {
+        ok(parts.some(function (p) { return p.name === "docProps/core.xml"; }) && parts.length > 3, id + ": the Excel file was opened and read");
+        var hits = scan(parts);
+        ok(hits.length === 0, id + ": no version anywhere in the Excel file, cells or properties", hits.join(" | "));
+      });
+    });
+  });
+  chain.then(done, function (e) { ok(false, "threw: " + (e && e.message)); done(); });
+});
+</script>
+</body></html>

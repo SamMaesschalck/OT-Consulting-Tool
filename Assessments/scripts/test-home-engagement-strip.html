@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Home engagement strip</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  The strip on the assessment picker asks "Who is this engagement for?" with
+  four fields: client, site, consultant, date. Filling one used to collapse the
+  whole row to its read-only summary, because the shape was decided from live
+  state on every render and committing a field re-renders the page. You could
+  type the client name and then had to open Edit details to reach the other
+  three. The shape is now decided once per visit to the screen.
+
+  Committing is deferred a tick so focus lands before the re-render, so every
+  step here waits a tick too.
+-->
+<div class="app"><div class="header"><div class="brand"><span class="sub">x</span></div>
+<span id="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true });</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = out.join("\n");
+  }
+  function main() { return document.getElementById("main"); }
+  function field(key) { return main().querySelector('input[data-strip-field="' + key + '"]'); }
+  function fields() { return main().querySelectorAll("input[data-strip-field]"); }
+  function strip() { return main().querySelector(".home-strip"); }
+  function tick(fn) { setTimeout(fn, 0); }
+
+  // Type into a field and commit it the way a real tab does: the value changes,
+  // `change` fires as the field blurs, and focus lands on the NEXT field before
+  // the deferred commit re-renders. `nextKey` is that next field - passing it is
+  // what reproduces focus being stolen, so it must not be dropped.
+  function commit(key, value, nextKey, then) {
+    var el = field(key);
+    if (!el) { ok(false, "field " + key + " is on screen to type into"); return then(); }
+    el.value = value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    var nxt = nextKey ? field(nextKey) : null;
+    if (nxt) { try { nxt.focus(); } catch (e) {} }
+    tick(function () { tick(function () { tick(then); }); });
+  }
+  function focusedField() {
+    var a = document.activeElement;
+    return (a && a.getAttribute) ? a.getAttribute("data-strip-field") : null;
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+    A.UI.go("home");
+
+    ok(!!strip(), "the picker shows the engagement strip");
+    ok(fields().length === 4, "an empty project offers all four fields",
+       String(fields().length));
+    ok(!strip().classList.contains("filled"), "and is not in its collapsed form");
+
+    // The bug: committing the client name collapsed the row.
+    commit("clientName", "Acme Petrochemicals", "siteName", function () {
+      ok(!!strip(), "after entering the client name the strip is still there");
+      ok(fields().length === 4,
+         "and still offers all four fields, so site, consultant and date can be typed next",
+         String(fields().length));
+      ok(!(strip().classList.contains("filled")),
+         "it has not collapsed to the read-only line");
+      ok((field("clientName") || {}).value === "Acme Petrochemicals",
+         "the client name that was typed is still shown",
+         (field("clientName") || {}).value);
+      ok((E.state.project || {}).clientName === "Acme Petrochemicals",
+         "and it reached the project", (E.state.project || {}).clientName);
+
+      // The caret must still be where the tab put it. The filter box used to
+      // grab it back on every render of this page, so entering the client name
+      // bounced focus out of the row and into the search field.
+      ok(focusedField() === "siteName",
+         "the caret stays on the field tabbed into, not stolen by the filter box",
+         String(focusedField()) + " (search focused: " +
+         (document.activeElement && document.activeElement.id === "home-filter") + ")");
+
+      // The rest of the row must be usable without reopening anything.
+      commit("siteName", "Plant A", "consultant", function () {
+        ok(fields().length === 4, "the row survives a second field too");
+        ok(focusedField() === "consultant", "and the caret keeps moving along it",
+           String(focusedField()));
+        commit("consultant", "A. Consultant", "dateOfVisit", function () {
+          commit("dateOfVisit", "2026-08-04", null, function () {
+            var p = E.state.project || {};
+            ok(p.siteName === "Plant A" && p.consultant === "A. Consultant" &&
+               p.dateOfVisit === "2026-08-04",
+               "all four fields were captured in one pass, without opening Edit details",
+               JSON.stringify([p.clientName, p.siteName, p.consultant, p.dateOfVisit]));
+
+            // Consultant and date of visit belong to an ASSESSMENT, and on the
+            // picker there is not one yet. They used to be dropped on the floor.
+            // They are held on the project and seeded into the first assessment.
+            E.activateInstrument("general-ot-posture");
+            var meta = (E.activeAssessment() || {}).engagementMeta || {};
+            ok(meta.consultant === "A. Consultant",
+               "the consultant typed before choosing a framework reaches the first assessment",
+               String(meta.consultant));
+            ok(meta.dateOfVisit === "2026-08-04",
+               "and so does the date of visit", String(meta.dateOfVisit));
+            ok((E.state.engagement.engagement || {}).clientName === "Acme Petrochemicals",
+               "with the shared customer details alongside them");
+            A.UI.go("home");
+
+            // Leaving and coming back is what collapses it: at that point the
+            // engagement really is recorded and the row is just context.
+            A.UI.go("engagement");
+            A.UI.go("home");
+            ok(!!strip(), "returning to the picker still shows a strip");
+            ok(strip().classList.contains("filled"),
+               "and now it is the collapsed context line");
+            ok(fields().length === 0, "with no input fields", String(fields().length));
+            ok(/Acme Petrochemicals/.test(strip().textContent),
+               "naming the engagement it belongs to");
+            ok(/Edit details/.test(strip().textContent),
+               "and offering Edit details for the rest");
+
+            // A new project empties the metadata; the collapsed line would have
+            // nothing to show, so the fields must come back.
+            E.newProject();
+            A.UI.go("home");
+            ok(fields().length === 4,
+               "starting a new project brings the four fields back",
+               String(fields().length));
+            ok(!(strip().classList.contains("filled")),
+               "rather than an empty collapsed line");
+            flush();
+          });
+        });
+      });
+    });
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+    flush();
+  }
+});
+</script>
+</body></html>

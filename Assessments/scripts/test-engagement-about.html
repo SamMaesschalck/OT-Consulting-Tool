@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Engagement "About this assessment" check</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() { lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+  var main = document.getElementById("main");
+
+  function aboutCard() {
+    return Array.prototype.filter.call(main.querySelectorAll(".card"), function (c) {
+      var h2 = c.querySelector(".card-h h2");
+      return h2 && h2.textContent === "About this assessment";
+    })[0];
+  }
+
+  try {
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // Case 1: CIS (caf-achieved)
+    A.Engine.activateInstrument("cis-controls-v8");
+    A.UI.go("engagement");
+    var card = aboutCard();
+    ok(!!card, "About-this-assessment card renders on the engagement page (CIS)");
+    var txt = card ? card.textContent : "";
+    ok(/alignment and gap analysis/i.test(txt), "CIS about text describes an alignment & gap analysis");
+    ok(txt.indexOf(A.Engine.state.instrument.title) !== -1, "CIS about text names the instrument", A.Engine.state.instrument.title);
+    ok(/not a formal audit or certification/i.test(txt), "CIS about text carries the advisory caveat");
+    ok(txt.length > 120 && txt.length < 700, "about text is a small paragraph", String(txt.length));
+
+    // Case 2: first instrument (IEC 62443-3-3, capability-sl)
+    var firstId = A.Engine.state.instruments[0].id;
+    A.Engine.activateInstrument(firstId);
+    A.UI.go("engagement");
+    var fam = A.Engine.state.scoringFamily;
+    var card2 = aboutCard();
+    ok(!!card2, "About card renders for the first instrument (" + fam + ")");
+    var txt2 = card2 ? card2.textContent : "";
+    if (fam === "capability-sl") {
+      ok(/security capability/i.test(txt2), "capability-sl about text mentions security capability");
+    } else {
+      ok(txt2.length > 60, "about text present for family " + fam);
+    }
+    ok(card2 && txt2.indexOf(A.Engine.state.instrument.title) !== -1, "about text names the instrument title", A.Engine.state.instrument.title);
+
+    // Override: display.about wins verbatim when present.
+    var saved = A.Engine.state.instrument.display;
+    A.Engine.state.instrument.display = Object.assign({}, saved || {}, { about: "OVERRIDE-ABOUT-TEXT-XYZ" });
+    A.UI.go("engagement"); // re-render without reloading the instrument
+    var card3 = aboutCard();
+    ok(card3 && /OVERRIDE-ABOUT-TEXT-XYZ/.test(card3.textContent), "display.about overrides the default copy verbatim");
+    A.Engine.state.instrument.display = saved;
+  } catch (e) {
+    ok(false, "threw: " + (e && e.message), e && e.stack);
+  }
+  finish();
+})();
+</script>
+</body></html>

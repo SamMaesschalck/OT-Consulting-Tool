@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 readiness</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<div class="app"><div class="header"><div class="brand"><span class="sub">x</span></div>
+<span id="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true });</script>
+<script>
+// Readiness checks for the instrument that matters most: the states a real
+// engagement passes through, not just the happy path. Every one of these is a
+// situation a consultant can reach on site.
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, S = A.Scoring, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function fresh() {
+    E.newProject();
+    E.activateInstrument("iec-62443-3-3");
+    return E.state.activeTargetId;
+  }
+  function renders(scored, label) {
+    var host = document.createElement("div");
+    A.Report.render(host, { engagement: E.state.engagement, instrument: E.state.instrument,
+      taxonomy: E.state.taxonomy, profile: E.state.profile, narrative: E.getActiveNarrative(),
+      scored: scored, scoredAll: E.scoreAllTargets(), activeTarget: E.getActiveTarget(),
+      targetProfile: E.state.engagement.targetProfile });
+    ok(host.textContent.length > 500, label, String(host.textContent.length));
+    return host;
+  }
+  function allReqs() { return E.state.instrument.requirements; }
+
+  try {
+    A.UI.init({ autosave: false });
+
+    // ---- 1. an untouched assessment ------------------------------------
+    var tid = fresh();
+    var s = E.scoreActiveTarget();
+    ok(s.totalAnswered === 0, "nothing answered reports nothing answered", String(s.totalAnswered));
+    ok(s.overallTargetMet === false, "an untouched assessment does not claim the target is met");
+    ok(s.weakestFR === null, "and names no weakest FR", s.weakestFR ? s.weakestFR.frId : "null");
+    ok(s.floorFlagCount === 0, "and raises no floor flags", String(s.floorFlagCount));
+    ok(s.roadmap.length === 0, "and produces an empty roadmap", String(s.roadmap.length));
+    ok(s.overallCloseness === null, "closeness is undefined rather than 0%", String(s.overallCloseness));
+    var host0 = renders(s, "the report renders with nothing answered");
+    ok(host0.textContent.indexOf("NaN") === -1 && host0.textContent.indexOf("undefined") === -1,
+       "the empty report contains no NaN or undefined");
+    ok(/not been assessed|Not assessed|no requirements have been answered|0 of/i.test(host0.textContent),
+       "the empty report says the assessment has not been carried out");
+
+    // ---- 2. every requirement met at the target -------------------------
+    tid = fresh();
+    allReqs().forEach(function (r) {
+      S.requirementItems(r).forEach(function (i) {
+        if (i.firstSL <= 2) E.setItemState(tid, r.id, i.componentId, "met");
+      });
+    });
+    s = E.scoreActiveTarget();
+    ok(s.overallTargetMet === true, "everything met at SL 2 meets the target");
+    var vec = A.Report.slVectorParts(s, E.state.taxonomy).map(function (p) { return p.achieved; });
+    ok(vec.join(",") === "2,2,2,2,2,2,2", "and produces the vector { 2 2 2 2 2 2 2 }", vec.join(","));
+    ok(s.roadmap.length === 0, "with nothing on the roadmap", String(s.roadmap.length));
+    ok(s.blockingItems.length === 0, "and nothing blocking", String(s.blockingItems.length));
+
+    // Raising the target afterwards must expose the SL 3 items rather than
+    // silently keeping the old verdict.
+    E.setDefaultTargetSL(3);
+    s = E.scoreActiveTarget();
+    ok(s.overallTargetMet === false, "raising the target to SL 3 exposes the unanswered SL 3 items");
+    var unassessed = s.perFR.reduce(function (a, f) { return a + f.unassessedCount; }, 0);
+    ok(unassessed > 0, "which are counted as unassessed, not assumed met", String(unassessed));
+    E.setDefaultTargetSL(2);
+
+    // ---- 3. N/A handling -----------------------------------------------
+    tid = fresh();
+    var r16 = allReqs().filter(function (r) { return r.code === "SR 1.6"; })[0];
+    S.requirementItems(r16).forEach(function (i) {
+      E.setItemState(tid, r16.id, i.componentId, "na", "No wireless is deployed anywhere in the control system.");
+    });
+    s = E.scoreActiveTarget();
+    var sr16 = s.perRequirement.filter(function (r) { return r.requirementId === r16.id; })[0];
+    ok(sr16.applicable === false, "a fully justified N/A drops the requirement from the score");
+    ok(sr16.exclusionReason === "judged-na", "and records that it was an assessor judgement", sr16.exclusionReason);
+    ok(s.totalNotApplicable >= 1, "and counts toward the not-applicable total");
+
+    // The same, unjustified: must block rather than quietly excuse.
+    tid = fresh();
+    S.requirementItems(r16).forEach(function (i) {
+      E.setItemState(tid, r16.id, i.componentId, "na", "");
+    });
+    s = E.scoreActiveTarget();
+    sr16 = s.perRequirement.filter(function (r) { return r.requirementId === r16.id; })[0];
+    ok(sr16.unassessedCount > 0, "an N/A with no justification is treated as unassessed");
+    ok(sr16.applicable === true, "and stays in the score rather than being excluded");
+
+    // A whole FR excluded: the FR must not read as a failure.
+    tid = fresh();
+    allReqs().filter(function (r) { return r.frId === "FR4"; }).forEach(function (r) {
+      S.requirementItems(r).forEach(function (i) {
+        E.setItemState(tid, r.id, i.componentId, "na", "No confidential process data is held in this zone.");
+      });
+    });
+    s = E.scoreActiveTarget();
+    var fr4 = s.perFR.filter(function (f) { return f.frId === "FR4"; })[0];
+    ok(fr4.countedCount === 0, "an FR excluded in full counts nothing", String(fr4.countedCount));
+    ok(s.weakestFRs.every(function (f) { return f.frId !== "FR4"; }),
+       "and is not named as a weakest area");
+
+    // ---- 4. SL-T 0 takes an FR out of scope ------------------------------
+    tid = fresh();
+    E.setFRTarget("FR4", 0);
+    s = E.scoreActiveTarget();
+    fr4 = s.perFR.filter(function (f) { return f.frId === "FR4"; })[0];
+    ok(fr4.inScope === false, "SL-T 0 takes the FR out of scope");
+    ok(fr4.conformantAchievedSL === null, "with no achieved level rather than 0", String(fr4.conformantAchievedSL));
+    ok(s.outOfScopeFRs.length === 1, "and it is reported as a scoping decision", String(s.outOfScopeFRs.length));
+    var host4 = renders(s, "the report renders with an FR out of scope");
+    ok(/out of scope|SL 0/i.test(host4.textContent), "and says so");
+    E.setFRTarget("FR4", null);
+
+    // ---- 5. partial and compensating -------------------------------------
+    tid = fresh();
+    var r11 = allReqs().filter(function (r) { return r.code === "SR 1.1"; })[0];
+    E.setItemState(tid, r11.id, "base", "partial");
+    s = E.scoreActiveTarget();
+    var sr11 = s.perRequirement.filter(function (r) { return r.requirementId === r11.id; })[0];
+    ok(sr11.itemsAchieved === 0, "a partial item never satisfies a Security Level", String(sr11.itemsAchieved));
+    ok(sr11.score > 0, "but does earn closeness as context", String(sr11.score));
+
+    E.setItemState(tid, r11.id, "base", "met-compensating");
+    E.setItemState(tid, r11.id, "RE1", "met");
+    s = E.scoreActiveTarget();
+    var fr1 = s.perFR.filter(function (f) { return f.frId === "FR1"; })[0];
+    ok(fr1.compensatingCount === 1, "a compensating measure is counted separately", String(fr1.compensatingCount));
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === r11.id; })[0];
+    ok(sr11.itemsAchieved === 2 && sr11.itemsAchievedStrict === 0,
+       "it satisfies the level, and the strict figure shows what happens without it",
+       sr11.itemsAchieved + "/" + sr11.itemsAchievedStrict);
+
+    // ---- 5a. answering by Security Level ---------------------------------
+    //
+    // The consultant answers in the standard's vocabulary; the tool expands
+    // that into the item states everything downstream depends on. The two must
+    // agree in both directions, or the picker is lying about what was recorded.
+    tid = fresh();
+    var rq11 = allReqs().filter(function (r) { return r.code === "SR 1.1"; })[0];
+    E.setRequirementSL(tid, rq11.id, 1, 2);
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === rq11.id; })[0];
+    ok(sr11.itemsAchieved === 1, "setting SL 1 records a requirement that achieves SL 1", String(sr11.itemsAchieved));
+    ok(sr11.matchesCleanSL === true, "and the items agree with that single level");
+    var base11 = sr11.items.filter(function (i) { return i.isBase; })[0];
+    var re11 = sr11.items.filter(function (i) { return i.componentId === "RE1"; })[0];
+    ok(base11.state === "met" && re11.state === "not-met",
+       "expanding SL 1 means the base is met and the SL 2 enhancement is not",
+       base11.state + "/" + re11.state);
+    ok(sr11.answered === true, "the requirement is fully answered in one click");
+
+    E.setRequirementSL(tid, rq11.id, 2, 2);
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === rq11.id; })[0];
+    ok(sr11.met === true && sr11.itemsAchieved === 2, "moving it to SL 2 meets the target");
+
+    // Nothing is written above the target: those items are out of scope, so an
+    // answer there would land on a card the consultant never saw.
+    ok(sr11.items.filter(function (i) { return i.firstSL > 2; }).every(function (i) { return i.state === null; }),
+       "and nothing is recorded above the target Security Level");
+
+    // The case a single level cannot state: the enhancement rests on a
+    // compensating measure. The picker has to stop claiming a clean level.
+    E.setItemState(tid, rq11.id, "RE1", "met-compensating");
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === rq11.id; })[0];
+    ok(sr11.itemsAchieved === 2 && sr11.matchesCleanSL === false,
+       "an item set by hand marks the requirement as no longer a plain Security Level",
+       sr11.itemsAchieved + "/" + sr11.matchesCleanSL);
+    ok(sr11.itemsAchievedStrict === 1,
+       "and the detail the level would have hidden survives", String(sr11.itemsAchievedStrict));
+
+    // Re-picking a level takes ownership back and clears the adjustment.
+    E.setRequirementSL(tid, rq11.id, 2, 2);
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === rq11.id; })[0];
+    ok(sr11.matchesCleanSL === true && sr11.compensatingCount === 0,
+       "re-picking the level resets the items to what that level means");
+
+    // N/A and Clear, from the same control.
+    E.setRequirementSL(tid, rq11.id, "na", 2, "No human users access this zone.");
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === rq11.id; })[0];
+    ok(sr11.applicable === false && sr11.exclusionReason === "judged-na",
+       "N/A excludes the requirement, with the justification carried to every item");
+    E.setRequirementSL(tid, rq11.id, null, 2);
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === rq11.id; })[0];
+    ok(sr11.touched === false && sr11.unassessedCount === sr11.countedCount,
+       "and Clear returns it to not assessed");
+
+    // ---- 5a-ii. exceeding the target -------------------------------------
+    //
+    // A system can be better than it needs to be, and that has to be
+    // recordable: it is where raising a target is cheapest.
+    tid = fresh();
+    E.setRequirementSL(tid, rq11.id, 3, 3);      // target is 2; record SL 3
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === rq11.id; })[0];
+    ok(sr11.itemsAchieved === 3, "a requirement can be recorded above its target",
+       String(sr11.itemsAchieved));
+    ok(sr11.aboveTargetCount === 1, "the above-target item is counted separately",
+       String(sr11.aboveTargetCount));
+    ok(sr11.unassessedCount === 0 && sr11.countedCount === 2,
+       "and it does not enlarge the required set or the coverage figures",
+       sr11.countedCount + " counted / " + sr11.unassessedCount + " unassessed");
+    ok(sr11.met === true && sr11.floor === false, "it is not a gap");
+    ok(sr11.matchesCleanSL === true, "and it still reads as a single clean level");
+
+    // Dropping back down has to retract it, or the requirement keeps claiming
+    // a level the consultant has just taken away.
+    E.setRequirementSL(tid, rq11.id, 2, 2);
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === rq11.id; })[0];
+    ok(sr11.itemsAchieved === 2, "dropping back to the target retracts the higher item",
+       String(sr11.itemsAchieved));
+
+    // At FR level it only shows when EVERY requirement in the FR reaches the
+    // higher level - including any the target had left out of scope entirely.
+    tid = fresh();
+    var fr4reqs = allReqs().filter(function (r) { return r.frId === "FR4"; });
+    fr4reqs.forEach(function (r) {
+      S.requirementItems(r).forEach(function (i) {
+        if (i.firstSL <= 3) E.setItemState(tid, r.id, i.componentId, "met");
+      });
+    });
+    s = E.scoreActiveTarget();
+    var fr4x = s.perFR.filter(function (f) { return f.frId === "FR4"; })[0];
+    ok(fr4x.conformantAchievedSL === 3 && fr4x.exceedsTarget === true,
+       "an FR assessed to SL 3 against a target of SL 2 reports that it exceeds",
+       fr4x.conformantAchievedSL + "/" + fr4x.exceedsTarget);
+    ok(fr4x.frTargetMet === true, "and still counts as meeting the target");
+    ok(fr4x.blockingItems.length === 0, "with nothing blocking");
+    var partsX = A.Report.slVectorParts(s, E.state.taxonomy);
+    ok(partsX.filter(function (p) { return p.frId === "FR4"; })[0].achieved === 3,
+       "the vector shows the level actually reached, not the target");
+
+    // One requirement left short of the higher level pulls the FR back down:
+    // exceeding is a whole-FR statement, like every other achieved level.
+    E.setItemState(tid, fr4reqs[0].id,
+      S.requirementItems(fr4reqs[0]).filter(function (i) { return i.firstSL === 3; }).map(function (i) { return i.componentId; })[0] || "base",
+      "not-met");
+    s = E.scoreActiveTarget();
+    fr4x = s.perFR.filter(function (f) { return f.frId === "FR4"; })[0];
+    ok(fr4x.exceedsTarget === false,
+       "one requirement short of the higher level stops the FR exceeding",
+       String(fr4x.conformantAchievedSL));
+
+    // ---- 5b. floor flags -------------------------------------------------
+    //
+    // The report calls floor findings out as priorities and sorts the roadmap
+    // by them, so they have to actually be set.
+    tid = fresh();
+    var r12 = allReqs().filter(function (r) { return r.code === "SR 1.2"; })[0];
+    // SR 1.2's base is first selected above SL 1, so at target SL 2 an unmet
+    // base means nothing of the requirement is in place: that is a floor.
+    S.requirementItems(r12).forEach(function (i) {
+      if (i.firstSL <= 2) E.setItemState(tid, r12.id, i.componentId, "not-met");
+    });
+    // SR 1.1 base met, enhancement not: one level below, NOT a floor.
+    E.setItemState(tid, r11.id, "base", "met");
+    E.setItemState(tid, r11.id, "RE1", "not-met");
+    s = E.scoreActiveTarget();
+    var sr12 = s.perRequirement.filter(function (r) { return r.requirementId === r12.id; })[0];
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === r11.id; })[0];
+    ok(sr12.floor === true, "an unmet base item floor-flags the requirement");
+    ok(sr11.floor === false, "a requirement one level below target is not floor-flagged");
+    fr1 = s.perFR.filter(function (f) { return f.frId === "FR1"; })[0];
+    ok(fr1.floorFlagCount === 1, "the FR counts floor-flagged requirements", String(fr1.floorFlagCount));
+    ok(s.floorFlagCount === 1, "and so does the headline", String(s.floorFlagCount));
+    ok((s.roadmap[0] || {}).requirementId === r12.id,
+       "the roadmap puts the floor finding first",
+       (s.roadmap[0] || {}).code);
+    // Two levels below target also floors, even with the base in place.
+    tid = fresh();
+    E.setDefaultTargetSL(3);
+    E.setItemState(tid, r11.id, "base", "met");
+    E.setItemState(tid, r11.id, "RE1", "not-met");
+    E.setItemState(tid, r11.id, "RE2", "not-met");
+    s = E.scoreActiveTarget();
+    sr11 = s.perRequirement.filter(function (r) { return r.requirementId === r11.id; })[0];
+    ok(true, "-- N/A justification is asked once, not once per item --");
+    (function () {
+      var t = E.getActiveTarget().id;
+      E.setRequirementSL(t, "SR1.2", "na", 2, "");
+      A.UI.openSLGuidance("SR1.2");
+      A.UI.go("fr", "FR1");
+      var card = document.getElementById("main").querySelector('.req[data-req-id="SR1.2"]');
+      ok(!!card, "the requirement card renders");
+      ok(card.querySelectorAll(".sl-item-note").length === 1,
+         "a requirement marked N/A as a whole asks for one justification, not one per item",
+         String(card.querySelectorAll(".sl-item-note").length));
+      // One outlier inside an ordinary answer keeps its own box, and is
+      // visible on the card without opening anything.
+      E.setRequirementSL(t, "SR1.2", 2, 2);
+      E.setItemState(t, "SR1.2", "base", "na", "No software processes authenticate here.");
+      A.UI.go("fr", "FR1");
+      card = document.getElementById("main").querySelector('.req[data-req-id="SR1.2"]');
+      var pills = Array.prototype.map.call(card.querySelectorAll(".sl-answer-aside .pill"),
+                                           function (p) { return p.textContent; }).join(" ");
+      ok(/item N\/A/.test(pills), "an excluded outlier is named on the card itself", pills);
+      ok(!/Set per item/.test(pills),
+         "and is not reported as an answer assembled item by item", pills);
+      E.setRequirementSL(t, "SR1.2", null, 2);
+    })();
+
+    ok(sr11.itemsAchieved === 1 && sr11.floor === true,
+       "SL 1 against a target of SL 3 is two levels below, so it floors",
+       sr11.itemsAchieved + "/" + sr11.floor);
+    E.setDefaultTargetSL(2);
+
+    // ---- 6. per-zone SL-T vectors ----------------------------------------
+    tid = fresh();
+    var z2 = E.addTarget("Zone 2").id;
+    E.setZoneTarget(z2, 3);
+    E.setZoneFRTarget(z2, "FR5", 1);
+    var tp = E.state.engagement.targetProfile;
+    ok(S.effectiveTargetSL(tp, "FR1", z2) === 3, "a zone default applies across its FRs",
+       String(S.effectiveTargetSL(tp, "FR1", z2)));
+    ok(S.effectiveTargetSL(tp, "FR5", z2) === 1, "a zone per-FR override beats the zone default",
+       String(S.effectiveTargetSL(tp, "FR5", z2)));
+    ok(S.effectiveTargetSL(tp, "FR1", tid) === 2, "and does not leak to another zone",
+       String(S.effectiveTargetSL(tp, "FR1", tid)));
+    E.setFRTarget("FR1", 4);
+    ok(S.effectiveTargetSL(tp, "FR1", z2) === 3,
+       "an engagement-wide per-FR setting does not override a zone's own target",
+       String(S.effectiveTargetSL(tp, "FR1", z2)));
+    E.setFRTarget("FR1", null);
+
+    // ---- 7. exports survive every one of those states --------------------
+    tid = fresh();
+    var built = true, err = "";
+    try {
+      A.ExportXLSX.build(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, { targetId: tid });
+    } catch (e) { built = false; err = e.message; }
+    ok(built, "the workbook builds for an untouched assessment", err);
+
+    E.setFRTarget("FR4", 0);
+    allReqs().filter(function (r) { return r.frId === "FR6"; }).forEach(function (r) {
+      S.requirementItems(r).forEach(function (i) {
+        E.setItemState(tid, r.id, i.componentId, "na", "Out of scope for this zone.");
+      });
+    });
+    built = true; err = "";
+    try {
+      A.ExportXLSX.build(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, { targetId: tid });
+    } catch (e) { built = false; err = e.message; }
+    ok(built, "and with an out-of-scope FR and a fully excluded FR", err);
+
+    // ---- 8. the scope accounting adds up ---------------------------------
+    tid = fresh();
+    allReqs().forEach(function (r, idx) {
+      S.requirementItems(r).forEach(function (i) {
+        if (i.firstSL > 2) return;
+        E.setItemState(tid, r.id, i.componentId, idx % 4 === 0 ? "not-met" : "met");
+      });
+    });
+    // exclude a couple by judgement, and take one FR out by target
+    S.requirementItems(r16).forEach(function (i) {
+      E.setItemState(tid, r16.id, i.componentId, "na", "No wireless anywhere.");
+    });
+    s = E.scoreActiveTarget();
+    var total = s.totalApplicable + s.totalNotApplicable;
+    ok(total === s.totalRequirements,
+       "assessed + excluded accounts for every requirement in the instrument",
+       s.totalApplicable + " + " + s.totalNotApplicable + " = " + total + " of " + s.totalRequirements);
+    var itemsum = s.totalCountedItems + s.totalExcludedItems;
+    ok(itemsum === s.totalInScopeItems,
+       "counted + excluded items accounts for every in-scope item",
+       s.totalCountedItems + " + " + s.totalExcludedItems + " = " + itemsum + " of " + s.totalInScopeItems);
+
+    // ---- 9. the vector never contradicts the per-FR table ----------------
+    var parts = A.Report.slVectorParts(s, E.state.taxonomy);
+    var mismatch = parts.filter(function (p) {
+      var f = s.perFR.filter(function (x) { return x.frId === p.frId; })[0];
+      return f.answeredCount > 0 && p.achieved !== f.conformantAchievedSL;
+    });
+    ok(mismatch.length === 0, "the SL-A vector agrees with the per-FR results",
+       mismatch.map(function (m) { return m.frId; }).join(","));
+
+    // ---- 9b. the glossary ------------------------------------------------
+    //
+    // The report is read by people who have never opened the standard, so
+    // every piece of vocabulary it relies on has to be defined somewhere.
+    var gloss = A.Report.glossarySections(E.state.instrument, E.state.taxonomy, E.getActiveNarrative());
+    var glossText = gloss.map(function (sec) {
+      return sec.heading + " " + sec.rows.map(function (r) { return r[0] + " " + r[1]; }).join(" ");
+    }).join(" ");
+    ["SL 0", "SL 4", "SL-T", "SL-A", "Foundational Requirement", "Requirement enhancement",
+     "Item", "Zone", "Conduit", "Floor finding", "Blocking item", "Closeness",
+     "Compensating countermeasure", "Not applicable", "Not assessed"].forEach(function (term) {
+      ok(glossText.indexOf(term) !== -1, "the glossary defines " + term);
+    });
+    ok(gloss.filter(function (s) { return /Foundational Requirements$/.test(s.heading); })[0].rows.length === 7,
+       "and lists all seven Foundational Requirements in one line each");
+    var frRow = gloss.filter(function (s) { return /Foundational Requirements$/.test(s.heading); })[0].rows[0];
+    ok(frRow[1] && frRow[1].length > 40, "with the purpose text from the narrative pack", frRow[1] || "(blank)");
+    // Every term the glossary claims to define must actually have a definition.
+    var blank = [];
+    gloss.forEach(function (sec) {
+      sec.rows.forEach(function (r) { if (!r[1] || !String(r[1]).trim()) blank.push(sec.heading + "/" + r[0]); });
+    });
+    ok(blank.length === 0, "no glossary entry is left without a definition", blank.join(", "));
+
+    // The report has to say which slice of the series it is, so a reader who
+    // has only ever heard "62443" knows what it does not answer.
+    var about33 = E.getActiveNarrative().boilerplate.series_context || "";
+    ok(/62443-2-1/.test(about33) && /62443-3-2/.test(about33) && /62443-4-2/.test(about33),
+       "the About section places the part within the 62443 series");
+    ok(/covers 62443-3-3 only/.test(about33), "and says what this report does and does not cover",
+       about33.slice(-120));
+
+    // The component instrument speaks a different dialect: SL-C not SL-A,
+    // component requirements not system requirements, and no zones at all.
+    E.activateInstrument("iec-62443-4-2");
+    var g42 = A.Report.glossarySections(E.state.instrument, E.state.taxonomy, E.getActiveNarrative());
+    var t42 = g42.map(function (sec) {
+      return sec.rows.map(function (r) { return r[0] + " " + r[1]; }).join(" ");
+    }).join(" ");
+    ok(t42.indexOf("SL-C") !== -1, "the component glossary uses SL-C");
+    ok(t42.indexOf("Component requirement (CR)") !== -1, "and names component requirements");
+    ok(t42.indexOf("Zone") === -1 && t42.indexOf("Shared answer") === -1,
+       "and drops the zone vocabulary, which does not apply to a component");
+    var about42 = E.getActiveNarrative().boilerplate.series_context || "";
+    ok(/covers 62443-4-2 only/.test(about42) && /62443-3-3/.test(about42),
+       "the component report places itself in the series and points at 62443-3-3 for the system",
+       about42.slice(-120));
+    E.activateInstrument("iec-62443-3-3");
+
+    // ---- 10. weakest-link, not an average --------------------------------
+    tid = fresh();
+    var fr1reqs = allReqs().filter(function (r) { return r.frId === "FR1"; });
+    fr1reqs.forEach(function (r, i) {
+      S.requirementItems(r).forEach(function (it) {
+        if (it.firstSL <= 2) E.setItemState(tid, r.id, it.componentId, i === 0 ? "not-met" : "met");
+      });
+    });
+    s = E.scoreActiveTarget();
+    fr1 = s.perFR.filter(function (f) { return f.frId === "FR1"; })[0];
+    ok(fr1.conformantAchievedSL === 0,
+       "one failed level-1 item caps the whole FR at SL 0, however good the rest is",
+       String(fr1.conformantAchievedSL));
+    ok(fr1.closeness > 0.8, "even though closeness is high", S.formatPct(fr1.closeness));
+    ok(fr1.frTargetMet === false, "and the target is not met on closeness alone");
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+});
+</script>
+</body></html>

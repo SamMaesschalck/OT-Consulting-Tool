@@ -1,0 +1,145 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 multi-zone Word report: hidden sections stop at the zones</title></head>
+<body>
+<!--
+  The multi-zone 62443-3-3 Word report opens each zone with its own numbered
+  Heading 1, but that heading carried none of the tags the section-override
+  pass reads, so the pass could not see it. A hidden section therefore ran on
+  to the next heading it COULD see: hiding "Terms used in this report" took all
+  three zones of the demo with it, and hiding "Further recommendations" (then
+  an unnumbered Heading 1 inside the first zone) took zones 2 and 3.
+
+  This builds the real document from the 3-3 demo, with advice recorded on a
+  met requirement in every zone so each zone carries a Further recommendations
+  part, then hides the glossary, then the further recommendations as well, and
+  checks that every zone heading and every part of every zone survives, that
+  only the hidden section goes, and that the section numbers still run 1 to 5.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["sl"] }); H.dom();</script>
+<script>
+function docXml(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function textOf(el) { return Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); }
+// Every Heading 1 with the Heading 2s and text that follow it.
+function sections(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null;
+  Array.prototype.forEach.call(body.children, function (el) {
+    var st = el.localName === "p" && el.getElementsByTagNameNS(W, "pStyle")[0];
+    var val = st ? st.getAttribute("w:val") : "";
+    if (/^Heading1$/i.test(val)) { cur = { title: textOf(el).trim(), h2: [], text: "" }; out.push(cur); return; }
+    if (!cur) return;
+    if (/^Heading2$/i.test(val)) cur.h2.push(textOf(el).trim());
+    cur.text += " " + textOf(el);
+  });
+  return out;
+}
+function build(A, E) {
+  return new Promise(function (res) {
+    A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+      E.getActiveNarrative(), { targetId: E.state.activeTargetId }, function (err, blob) { res(err ? null : blob); });
+  }).then(function (blob) { return blob ? docXml(blob).then(sections) : null; });
+}
+// The zone's own section: the Heading 1 that carries its name.
+function zoneSec(list, z) { return list.filter(function (x) { return x.title.indexOf(z.name) >= 0 && /\(Zone/.test(x.title); })[0]; }
+function numOf(title) { var m = /^(\d+)[\s ]/.exec(title); return m ? Number(m[1]) : null; }
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.on("instrument-changed", function (inst) { if (inst && inst.id === "iec-62443-3-3") A.TourSL.apply(E); });
+  E.activateInstrument("iec-62443-3-3");
+  var zones = (E.state.engagement.targets || []).slice();
+  ok(zones.length === 3, "the demo assesses three zones (" + zones.length + ")");
+
+  // Advice on a requirement that is NOT on the zone's roadmap, in every zone,
+  // so each zone's section has a Further recommendations part to hide.
+  var all = A.Scoring.scoreEngagement(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile);
+  zones.forEach(function (z) {
+    var res = all.perTarget.filter(function (t) { return t.target.id === z.id; })[0].result;
+    var onRoadmap = {};
+    (res.roadmap || []).forEach(function (r) { onRoadmap[r.requirementId] = true; });
+    var cand = (E.state.instrument.requirements || []).filter(function (r) { return !onRoadmap[r.id]; })[0];
+    E.setResponse(z.id, cand.id, { action: "Advice for " + z.name + " on " + cand.code + "." });
+  });
+
+  var base;
+  build(A, E).then(function (list) {
+    ok(!!list, "the multi-zone Word report builds");
+    base = list || [];
+    zones.forEach(function (z) {
+      var s = zoneSec(base, z);
+      ok(!!s, "control: " + z.name + " has its own numbered section", base.map(function (x) { return x.title; }).join(" | "));
+      ok(s && s.h2.indexOf("Further recommendations") >= 0,
+         "Further recommendations is a Heading 2 inside " + z.name + "'s own section", s ? s.h2.join(" | ") : "");
+    });
+    ok(!base.some(function (x) { return x.title === "Further recommendations"; }),
+       "and never a Heading 1 of its own, a sibling of the zones");
+    ok(base.some(function (x) { return x.title === "Terms used in this report"; }), "control: the glossary is in the document");
+
+    // ---- hide the glossary ----
+    E.setReportSection("terms-used-in-this-report", { hidden: true });
+    return build(A, E);
+  }).then(function (list) {
+    list = list || [];
+    ok(!list.some(function (x) { return x.title === "Terms used in this report"; }), "hiding the glossary drops it");
+    zones.forEach(function (z) {
+      var s = zoneSec(list, z), b = zoneSec(base, z);
+      ok(!!s, "hiding the glossary keeps " + z.name + "'s heading", list.map(function (x) { return x.title; }).join(" | "));
+      ok(s && b && s.h2.join("|") === b.h2.join("|"), "and every part of " + z.name + "'s section", s ? s.h2.join(" | ") : "");
+      ok(s && s.text.indexOf("Advice for " + z.name) >= 0, "including its own further recommendation");
+    });
+    ok(list.some(function (x) { return x.title === "Method and limitations"; }) &&
+       list.some(function (x) { return x.title === "Proposed next steps"; }),
+       "the sections after the zones are still there");
+    var nums = list.map(function (x) { return numOf(x.title); }).filter(function (n) { return n !== null; });
+    ok(nums.join(",") === "1,2,3,4,5", "the section numbers still run 1 to 5", nums.join(","));
+
+    // ---- and hide the further recommendations as well ----
+    E.setReportSection("further-recommendations", { hidden: true });
+    return build(A, E);
+  }).then(function (list) {
+    list = list || [];
+    ok(!list.some(function (x) { return x.title === "Terms used in this report"; }), "the glossary stays hidden");
+    ok(!list.some(function (x) { return x.title === "Further recommendations" || x.h2.indexOf("Further recommendations") >= 0; }),
+       "hiding Further recommendations drops it from every zone");
+    zones.forEach(function (z) {
+      var s = zoneSec(list, z), b = zoneSec(base, z);
+      var expected = b ? b.h2.filter(function (h) { return h !== "Further recommendations"; }) : [];
+      ok(!!s, "hiding Further recommendations keeps " + z.name + "'s heading", list.map(function (x) { return x.title; }).join(" | "));
+      ok(s && s.h2.join("|") === expected.join("|"), "and the rest of " + z.name + "'s section", s ? s.h2.join(" | ") : "");
+      ok(s && s.text.indexOf("Advice for " + z.name) === -1, "only the advice itself is gone from " + z.name);
+      ok(s && /Roadmap to the target Security Level/.test(s.h2.join("|")) && s.text.length > 2000,
+         z.name + "'s roadmap and findings are intact (" + (s ? s.text.length : 0) + " characters)");
+    });
+    var nums = list.map(function (x) { return numOf(x.title); }).filter(function (n) { return n !== null; });
+    ok(nums.join(",") === "1,2,3,4,5", "the section numbers still run 1 to 5", nums.join(","));
+    ok(list.some(function (x) { return x.title === "Method and limitations"; }), "the closing sections are still there");
+  }).then(done, function (e) { ok(false, "threw: " + (e && e.message)); done(); });
+});
+</script>
+</body></html>

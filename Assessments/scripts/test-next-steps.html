@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Proposed next steps - scaffolding, editing and clearing</title></head>
+<body><div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script>
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ o=o||{}; this.__type="Paragraph"; this.children=o.children||[]; this.heading=o.heading||null;
+    this.style=o.style||null; this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ o=o||{}; this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ o=o||{}; this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ o=o||{}; this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text=""; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.sections=o.sections||[]; window.__doc=this; }
+  var Packer={ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } };
+  return { Document:Document,Paragraph:Paragraph,TextRun:TextRun,TableCell:TableCell,TableRow:TableRow,
+    Table:Table,ImageRun:ImageRun,PageBreak:PageBreak,Header:Header,Footer:Footer,
+    PageNumber:{CURRENT:"CURRENT",TOTAL_PAGES:"TOTAL_PAGES"},
+    PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"Heading1",HEADING_2:"Heading2",HEADING_3:"Heading3"},
+    AlignmentType:{LEFT:"left",CENTER:"center",RIGHT:"right"},
+    WidthType:{PERCENTAGE:"pct"}, ShadingType:{SOLID:"solid"}, Packer:Packer };
+})();
+</script>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["posture"] });</script>
+<script>
+(function () {
+  var A = window.App, E = A.Engine, R = A.Report, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() { document.getElementById("out").textContent = out.join("\n") + "\n\n" + (fail ? fail + " FAILED" : "ALL TESTS PASSED (" + out.length + ")"); }
+
+  E.loadCatalog();
+  A.UI.init({ autosave: false });
+  var IDS = ["general-ot-posture", "ncsc-caf", "iec-62443-3-3", "nis2-assessment", "eu-cra", "iec-62443-2-1-2024"];
+
+  function mainText() { return document.getElementById("main").textContent; }
+  function docText() {
+    var t = [];
+    (window.__doc.sections || []).forEach(function (s) {
+      (s.children || []).forEach(function (n) { if (n && n.__type === "Paragraph") t.push(n.text || ""); });
+    });
+    return t.join("\n");
+  }
+  function docPlaceholders() {
+    var p = [];
+    (window.__doc.sections || []).forEach(function (s) {
+      (s.children || []).forEach(function (n) {
+        if (n && n.__type === "Paragraph" && n.style === "PlaceholderText") p.push(n.text || "");
+      });
+    });
+    return p;
+  }
+
+  function step(i) {
+    flush();
+    if (i >= IDS.length) return finalChecks();
+    var id = IDS[i];
+    E.activateInstrument(id);
+    A.UI.go("report");
+    var scored = E.scoreActiveTarget();
+    var lines = R.defaultNextSteps({ instrument: E.state.instrument, scored: scored });
+    ok(lines.length >= 4, id + ": scaffold has real content", String(lines.length));
+    ok(lines.filter(R.nextStepsIsPrompt).length === 2, id + ": scaffold carries two [prompts]");
+    ok(/^Agree/.test(lines[0]), id + ": opens with the ownership step", lines[0]);
+    ok(/Re-assess in twelve months/.test(lines[lines.length - 1]), id + ": closes with the re-assess step");
+    // untouched -> nextStepsLines falls back to the scaffold
+    var shown = R.nextStepsLines(E.state.engagement, { instrument: E.state.instrument, scored: scored });
+    ok(shown.length === lines.length, id + ": an untouched assessment reports the scaffold");
+    // ...and it reaches the Word document, with the prompts in red
+    window.__doc = null;
+    A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+      E.getActiveNarrative(), { targetId: E.state.activeTargetId }, function (err) {
+        if (err) { ok(false, id + ": Word build - " + err.message); return step(i + 1); }
+        var txt = docText(), ph = docPlaceholders();
+        ok(txt.indexOf("Proposed next steps") !== -1, id + ": doc has the section");
+        ok(txt.indexOf(lines[0]) !== -1, id + ": doc prints the scaffolded first step");
+        ok(ph.filter(function (p) { return /^\[Add what was agreed/.test(p); }).length === 1,
+           id + ": the [prompt] lines print as red placeholders", ph.join(" | "));
+        ok(ph.indexOf("[Consultant to set out the proposed next steps: what should happen now, in what order, and by when.]") === -1,
+           id + ": the bare placeholder is gone now there is a scaffold");
+        step(i + 1);
+      });
+  }
+
+  // The next steps are written where they are read: the report's own closing
+  // section, edited in place. There is no separate capture card.
+  function nsCard() { return document.querySelector("#main .card[data-next-steps]"); }
+  function openNS() { nsCard().querySelector(".sect-edit").click(); return nsCard().querySelector(".sect-prose-input"); }
+  function closeNS() {
+    [].slice.call(nsCard().querySelectorAll("button"))
+      .filter(function (b) { return b.textContent.trim() === "Done"; })[0].click();
+  }
+
+  function finalChecks() {
+    // --- the report's own section, on a fresh posture assessment ---
+    E.activateInstrument("general-ot-posture");
+    A.UI.go("report");
+    ok(!!nsCard(), "card: the next steps are a section of the report itself");
+    // The executive-summary input card (exposure, priorities, method) has boxes
+    // of its own; none of them is a copy of the next steps.
+    ok([].slice.call(document.querySelectorAll("#main textarea")).filter(function (t) {
+         return !t.closest('[data-check-anchor^="narrative-"]'); }).length === 0,
+       "card: nothing is editable until you ask - no capture copy at the top of the page");
+    ok(mainText().indexOf("suggested starting point") !== -1, "card: labelled as a suggestion, not the consultant's words");
+    ok(E.getReportNarrative().nextSteps == null, "card: rendering the page stores nothing");
+
+    var ta = openNS();
+    ok(/^Agree /.test(ta.value), "card: the box opens holding the scaffold", ta.value.slice(0, 40));
+    ok(ta.value.split("\n").length >= 4, "card: the scaffold is multi-line");
+    ok(nsCard().querySelectorAll("li").length === 0,
+       "card: the rendered steps are swapped for the box, not duplicated beside it");
+    ok(mainText().indexOf("Back to the generated version") === -1, "card: no revert offered while untouched");
+
+    // --- consultant edits: their text wins ---
+    ta.value = "Book the steering meeting\nAgree the budget line";
+    ta.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(/Book the steering meeting/.test(E.getReportNarrative().nextSteps || ""), "edit: the consultant's text is stored");
+    var shown = R.nextStepsLines(E.state.engagement, {});
+    ok(shown.length === 2 && shown[0] === "Book the steering meeting", "edit: the scaffold is out of the way", shown.join(" | "));
+    ok(mainText().indexOf("Back to the generated version") !== -1, "edit: the revert appears once edited");
+    closeNS();
+    ok(mainText().indexOf("Book the steering meeting") !== -1, "edit: the report shows what was typed");
+
+    // --- consultant clears it: placeholder, NOT the scaffold coming back ---
+    var ta2 = openNS();
+    ta2.value = "";
+    ta2.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(R.nextStepsLines(E.state.engagement, {}).length === 0, "clear: an emptied box stays empty");
+    closeNS();
+    ok(mainText().indexOf("Not yet written") !== -1, "clear: the report shows the placeholder");
+
+    // --- restore ---
+    nsCard().querySelector(".sect-edit").click();
+    var btns = [].slice.call(nsCard().querySelectorAll("button"))
+      .filter(function (b) { return /Back to the generated version/.test(b.textContent || ""); });
+    ok(btns.length === 1, "restore: the revert is offered on a cleared section");
+    btns[0].click();
+    ok(E.getReportNarrative().nextSteps == null, "restore: puts the field back to untouched");
+    // The section stays open across the revert, so the box is already there.
+    var ta3 = nsCard().querySelector(".sect-prose-input");
+    ok(!!ta3 && /^Agree /.test(ta3.value), "restore: the box refills with the scaffold",
+       ta3 ? ta3.value.slice(0, 40) : "no box");
+    closeNS();
+
+    // --- a demo dataset's own steps are never overwritten ---
+    E.activateInstrument("general-ot-posture");
+    A.TourPosture.apply(E);
+    var demo = R.nextStepsLines(E.state.engagement, {});
+    ok(demo.length >= 3 && !demo.some(R.nextStepsIsPrompt), "demo: the tour's own next steps stand, with no prompts left in");
+
+    // --- the scaffold reflects the assessment it was built from ---
+    var sc = E.scoreActiveTarget();
+    var l = R.defaultNextSteps({ instrument: E.state.instrument, scored: sc });
+    ok(/\d+ actions on the roadmap above/.test(l[0]), "scaffold: counts the real roadmap", l[0]);
+    ok(l.some(function (x) { return /weakest area in this read/.test(x); }), "scaffold: names the weakest domain", l.join(" | "));
+    flush();
+  }
+
+  try { step(0); } catch (e) { ok(false, "threw: " + (e && e.message)); flush(); }
+})();
+</script>
+</body></html>

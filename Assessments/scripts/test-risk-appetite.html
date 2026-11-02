@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Risk appetite: exposure vs appetite coherence</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  The risk-appetite-coherence family. The thing this file is really guarding is
+  that the tool never turns a characterisation into a grade: two independent
+  axes, no good direction on either, and a headline that is a verdict about FIT.
+  If someone later adds a score, a percentage or a letter here, these fail.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true }); H.dom();</script>
+<script>
+H.test(function (ok) {
+  var A = window.App, E = A.Engine, RA = A.ScoringRiskAppetite;
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+
+  E.loadCatalog();
+  A.UI.init({ autosave: false });
+
+  // ---- 1. it loads at all ------------------------------------------------
+  var listed = E.state.instruments.filter(function (i) { return i.id === "risk-appetite"; })[0];
+  ok(!!listed, "the instrument is in the catalogue");
+  ok(listed && listed.status === "active", "and loads for real rather than as a coming-soon stub",
+     listed && listed.status);
+  ok(!!(listed && listed.skeleton), "while still carrying the draft/skeleton flag");
+
+  E.activateInstrument("risk-appetite");
+  var inst = E.state.instrument, prof = E.state.profile;
+  ok(!!prof, "the risk-appetite-coherence scoring profile resolves");
+  ok(E.state.scoringFamily === "risk-appetite-coherence", "family is risk-appetite-coherence",
+     E.state.scoringFamily);
+  ok((inst.items || []).length === 18, "18 items load", String((inst.items || []).length));
+  ok((inst.sections || []).length === 3, "3 sections load", String((inst.sections || []).length));
+
+  // The two new shared mirrors.
+  ok(!!RA.sectorTable(), "the sector-baseline lookup is loaded from its .js mirror");
+  ok(RA.sectors().length === 15, "15 sectors", String(RA.sectors().length));
+  ok(RA.sectorById("energy-grid").baseline === "severe", "electricity transmission baselines at severe");
+  ok(RA.exposureModifiers().length === 7, "7 exposure modifiers", String(RA.exposureModifiers().length));
+
+  // ---- 1b. it sits with its siblings in the picker -----------------------
+  // The posture screener, the supplier screener and this one are the three
+  // short, indicative, assessor-led instruments. They belong under one heading.
+  // The family id is what groups them: "screeners" renders the same HEADING but
+  // is not in the curated order, so it came out as a SECOND group with the same
+  // name tacked on the end - two "Screening and posture" sections in one list.
+  var idx = A.Data && A.Data.index;
+  function famOf(id) {
+    return ((idx.instruments || []).filter(function (i) { return i.id === id; })[0] || {}).family;
+  }
+  ok(famOf("risk-appetite") === "screening",
+     "risk appetite is in the 'screening' family, like its two siblings", famOf("risk-appetite"));
+  ok(famOf("general-ot-posture") === "screening" && famOf("supplier-screener") === "screening",
+     "which is the family the posture and supplier screeners use");
+
+  A.UI.go("home");
+  var hm = document.getElementById("main");
+  var heads = [].slice.call(hm.querySelectorAll(".home-family-title, .nav-family-title, h2, h3"))
+    .map(function (n) { return (n.textContent || "").trim(); })
+    .filter(function (t) { return /Screening and posture/.test(t); });
+  ok(heads.length <= 1, "the picker shows ONE 'Screening and posture' heading, not two",
+     "found " + heads.length);
+
+  E.activateInstrument("risk-appetite");
+  var side = document.getElementById("sidebar");
+  var toggle = side.querySelector(".nav-section-toggle");
+  if (toggle) toggle.click();
+  side = document.getElementById("sidebar");
+  var fams = [].slice.call(side.querySelectorAll(".nav-family-title"))
+    .map(function (n) { return n.textContent.replace(/[▾▸]/g, "").trim(); });
+  var sp = fams.filter(function (t) { return t === "Screening and posture"; });
+  ok(sp.length === 1, "and so does the sidebar instrument list", fams.join(" | "));
+  ok(fams.indexOf("Screening and posture") === fams.length - 1,
+     "still last in the curated order - the short screeners that route into the rest",
+     fams.join(" | "));
+
+  // ---- 2. the axes are independent, and neither has a good end -----------
+  var exp = RA.axisSpec(prof, "exposure"), app = RA.axisSpec(prof, "appetite");
+  ok(exp.bands.join(",") === "limited,moderate,high,severe", "exposure bands run limited->severe", exp.bands.join(","));
+  ok(app.bands.join(",") === "averse,cautious,open,tolerant", "appetite bands run averse->tolerant", app.bands.join(","));
+  ok(prof.letterGrade === false, "the profile declares no letter grade");
+
+  var tid = E.state.activeTargetId;
+  function setItem(id, band, notes) { E.setResponse(tid, id, { band: band, notes: notes || "" }); }
+  function score() { return E.scoreActiveTarget(); }
+
+  // ---- 3. nothing is asserted before the assessor says anything ----------
+  var blank = score();
+  ok(blank.verdict.key === "incomplete", "with nothing recorded there is no verdict", blank.verdict.key);
+  ok(blank.exposure.band === null, "and no exposure position is invented");
+  ok(blank.complete === false, "the read is marked incomplete");
+
+  // ---- 4. the sector baseline scaffolds, it does not decide --------------
+  E.updateRiskAppetiteSetup({ sectorId: "water" });
+  var s = score();
+  ok(s.exposure.band === "high", "choosing a sector pre-sets the exposure band from the baseline", s.exposure.band);
+  ok(s.exposure.source === "sector-baseline", "and says the baseline is where it came from", s.exposure.source);
+
+  // Answering the items takes over from the baseline.
+  setItem("EXP1", "severe", "CNI water utility, safety-relevant treatment chemistry.");
+  setItem("EXP2", "severe", "Credible state-level interest in UK water.");
+  setItem("EXP3", "high",   "Geopolitically exposed sector.");
+  setItem("EXP4", "severe", "Public-health consequence.");
+  setItem("EXP5", "high",   "NIS regulated, CAF assessed.");
+  setItem("EXP6", "high",   "Large supplier estate with remote access.");
+  s = score();
+  ok(s.exposure.source === "items", "once items are characterised they drive the band", s.exposure.source);
+  ok(s.exposure.band === "severe", "the worst of six severe and high readings sets exposure at severe", s.exposure.band);
+  ok(s.exposure.movedFromBaseline === true,
+     "and the report can see the assessor moved off the baseline");
+
+  // An explicit override beats both.
+  E.updateRiskAppetiteSetup({ exposureBand: "high" });
+  s = score();
+  ok(s.exposure.band === "high" && s.exposure.source === "assessor",
+     "an explicit override wins over the item roll-up and the baseline",
+     s.exposure.band + "/" + s.exposure.source);
+  E.updateRiskAppetiteSetup({ exposureBand: "" });
+
+  // ---- 5. the coherence read ---------------------------------------------
+  //
+  // The warranted appetite MIRRORS exposure: the more you face, the less you
+  // should be accepting. So the coherent pairs run severe<->averse and
+  // limited<->tolerant, which is what the profile's own two worked examples
+  // say and what "Diagonal = coherence" means on the plot. (The profile's
+  // coherenceRead.method sentence says "appetite minus exposure", which
+  // contradicts both examples and would call severe+tolerant aligned - see the
+  // note in scoring-risk-appetite.js.)
+  ["APP1","APP2","APP3","APP4","APP5","APP6","APP7"].forEach(function (id) {
+    setItem(id, "tolerant", "Little board attention; security competes badly for funding.");
+  });
+  s = score();
+  ok(s.appetite.band === "tolerant", "appetite rolls up to tolerant", s.appetite.band);
+  ok(s.verdict.key === "under-protected",
+     "severe exposure with a tolerant appetite reads as under-protected", s.verdict.key);
+  ok(s.verdict.delta === 3, "three bands more tolerant than the exposure warrants",
+     String(s.verdict.delta));
+  ok(s.verdict.warrantedBand === "averse",
+     "and the tool can say what aligned would have looked like: averse",
+     s.verdict.warrantedBand);
+  ok(s.verdict.severity === 2, "flagged as the most serious kind of finding");
+
+  // The profile's own worked examples, both of which are ALIGNED.
+  E.updateRiskAppetiteSetup({ exposureBand: "severe", appetiteBand: "averse" });
+  s = score();
+  ok(s.verdict.key === "aligned",
+     "a severe-exposure organisation that is appropriately averse is aligned", s.verdict.key);
+  E.updateRiskAppetiteSetup({ exposureBand: "limited", appetiteBand: "tolerant" });
+  s = score();
+  ok(s.verdict.key === "aligned",
+     "and so is a limited-exposure organisation that is tolerant - tolerance is not a failing in itself",
+     s.verdict.key);
+
+  // Over-investment: very little to lose, and treating it as though there were.
+  E.updateRiskAppetiteSetup({ exposureBand: "limited", appetiteBand: "averse" });
+  s = score();
+  ok(s.verdict.key === "over-invested",
+     "limited exposure with an averse appetite is over-invested", s.verdict.key);
+  ok(s.verdict.severity === 1, "which matters, but less than under-protection");
+
+  // One band off the mirror line is still aligned.
+  E.updateRiskAppetiteSetup({ exposureBand: "high", appetiteBand: "cautious" });
+  s = score();
+  ok(s.verdict.key === "aligned", "high exposure with a cautious appetite is aligned", s.verdict.key);
+  E.updateRiskAppetiteSetup({ exposureBand: "high", appetiteBand: "open" });
+  s = score();
+  ok(s.verdict.key === "aligned", "one band off the line is still aligned", s.verdict.key);
+  E.updateRiskAppetiteSetup({ exposureBand: "high", appetiteBand: "tolerant" });
+  s = score();
+  ok(s.verdict.key === "under-protected", "two bands off it is not", s.verdict.key);
+
+  // ---- 5b. the case the instrument is really for -------------------------
+  // A nuclear operator faces severe exposure. It is ALIGNED when its appetite
+  // is correspondingly low, and under-protected when it is not - which is the
+  // whole point of mirroring rather than subtracting.
+  E.updateRiskAppetiteSetup({ sectorId: "nuclear" });
+  ok(RA.sectorBaselineBand(E.getRiskAppetiteSetup()) === "severe",
+     "nuclear baselines at severe exposure");
+  E.updateRiskAppetiteSetup({ exposureBand: "severe", appetiteBand: "averse" });
+  ok(score().verdict.key === "aligned",
+     "a nuclear operator with an averse appetite is aligned");
+  E.updateRiskAppetiteSetup({ appetiteBand: "open" });
+  ok(score().verdict.key === "under-protected",
+     "the same operator with an open appetite is under-protected");
+
+  // ---- 5c. the consultant has the final say ------------------------------
+  // The bands cannot see a compensating group control or a regulator-agreed
+  // trajectory. The assessor can set the verdict - but never silently.
+  var mech = score();
+  ok(mech.verdict.overridden === false, "by default the verdict is the computed one");
+  ok(!!mech.verdict.computed, "and the computed read is always carried");
+
+  E.updateRiskAppetiteSetup({ verdictOverride: "aligned" });
+  s = score();
+  ok(s.verdict.key === "aligned", "the assessor can record a different verdict", s.verdict.key);
+  ok(s.verdict.overridden === true, "flagged as an override");
+  ok(s.verdict.computed.key === "under-protected",
+     "with the computed read preserved, not discarded", s.verdict.computed.key);
+  ok(s.verdict.rationaleMissing === true, "and flagged while no reason has been given");
+  // The positions themselves are untouched: an override is a judgement about
+  // the FIT, not a re-characterisation of what was found.
+  ok(s.exposure.band === "severe" && s.appetite.band === "open",
+     "an override does not move the characterised positions",
+     s.exposure.band + "/" + s.appetite.band);
+
+  E.updateRiskAppetiteSetup({ verdictRationale: "Group-level SOC and an agreed ONR remediation trajectory cover this." });
+  s = score();
+  ok(s.verdict.rationaleMissing === false, "recording a reason clears the flag");
+  ok(/Group-level SOC/.test(s.verdict.rationale), "and the reason is carried on the result");
+
+  // The deliverable carries the consultant's judgement and their reasoning -
+  // and says NOTHING about the tool. The client is paying for the consultant's
+  // knowledge, not for a commentary on what software would have concluded;
+  // printing the disagreement invites an argument with a tool instead of a
+  // conversation about risk.
+  A.UI.go("report");
+  var rm = document.getElementById("main");
+  ok(/Group-level SOC/.test(rm.textContent),
+     "the report carries the assessor's reasoning - the part with the professional value in it");
+  ok(/Assessor's reasoning/i.test(rm.textContent), "attributed to the assessor");
+  // Asserted on the badge element, not on textContent: textContent runs the
+  // heading straight into the badge ("Coherence verdictAligned"), so a \b-
+  // anchored search for the label finds nothing even though it is on screen.
+  var badgeEl = rm.querySelector(".ra-verdict-badge");
+  ok(badgeEl && badgeEl.textContent.trim() === "Aligned",
+     "and states the verdict they reached", badgeEl && badgeEl.textContent);
+  ok(!/band arithmetic/i.test(rm.textContent),
+     "the report never mentions the band arithmetic");
+  ok(!/would be under-protected/i.test(rm.textContent) && !/computed/i.test(rm.textContent),
+     "nor what the tool would otherwise have concluded");
+  ok(!/override|overrid/i.test(rm.textContent),
+     "and never frames the finding as agreeing or disagreeing with a default",
+     (rm.textContent.match(/\S*overrid\S*/i) || [""])[0]);
+  // The wider principle, not just one phrase: the deliverable must not narrate
+  // which POSITIONS came from a scaffold and which the consultant set. "Rolled
+  // up from the characterisations", "set by the assessor", "moved off this
+  // baseline" each tell the client where the consultant agreed with a default.
+  //
+  // This is deliberately a list of attributions, not of method words. The
+  // instrument's own framing and caveats say plainly that the assessment is
+  // assessor-led and scaffolded by sector baselines and prompts - that is
+  // honest method description the client should read, and it stays.
+  // "Scaffold" and "structured prompts" are out of client-facing text too: they
+  // describe the tool's apparatus rather than the work, and a client reading
+  // that it was "scaffolded by prompts" is being told about software. Sector
+  // baselines may be named - they are a real, defensible input.
+  [/moved off/i, /rolled up from/i, /set by the assessor/i, /assessor override/i,
+   /from the sector baseline/i, /the tool would/i, /pending the item/i,
+   /scaffold/i, /structured prompt/i].forEach(function (re) {
+    ok(!re.test(rm.textContent), "the report does not attribute positions to a source: " + re.source,
+       (rm.textContent.match(new RegExp(".{0,40}" + re.source + ".{0,40}", "i")) || [""])[0]);
+  });
+  ok(/Sector: Nuclear/.test(rm.textContent),
+     "though the sector itself is legitimate context and stays");
+
+  // The trace is not lost - it is on the consultant's own working page.
+  A.UI.go("ra-verdict");
+  var vp = document.getElementById("main");
+  ok(/Under-protected/.test(vp.textContent),
+     "the computed read is still visible to the CONSULTANT on the assessor's-read page");
+  ok(score().verdict.computed.key === "under-protected",
+     "and is still carried on the result for QA and the saved file");
+  A.UI.go("report");
+
+  // Setting it back to the computed verdict is not an override at all.
+  E.updateRiskAppetiteSetup({ verdictOverride: "under-protected" });
+  s = score();
+  ok(s.verdict.overridden === false,
+     "'overriding' to the same answer the bands gave is not an override");
+  E.updateRiskAppetiteSetup({ verdictOverride: "", verdictRationale: "" });
+
+  // ---- 6. it is NOT a grade ----------------------------------------------
+  // The whole point. If any of these appear, someone has quietly turned a
+  // characterisation into a score that can be compared between clients.
+  s = score();
+  ok(s.letterGrade === false, "the result carries no letter grade");
+  ok(!("headlineGrade" in s), "no headlineGrade field");
+  ok(!("score" in s) && !("percentage" in s), "no score or percentage field");
+  var json = JSON.stringify(s);
+  ok(!/"grade"\s*:\s*"[A-F]"/.test(json), "nothing in the result looks like an A-F grade");
+  ok(["Aligned", "Under-protected", "Over-invested"].indexOf(s.verdict.label) !== -1,
+     "the headline is a verdict about fit, not a mark out of anything", s.verdict.label);
+
+  // ---- 7. the optional technical layer -----------------------------------
+  ok(E.getRiskAppetiteSections().length === 2,
+     "with the technical layer off, only the two core sections are offered",
+     String(E.getRiskAppetiteSections().length));
+  E.updateRiskAppetiteSetup({ includeTech: true });
+  ok(E.getRiskAppetiteSections().length === 3, "switching it on adds the third");
+
+  E.updateRiskAppetiteSetup({ exposureBand: "high", appetiteBand: "cautious" });
+  ["TECH1","TECH2","TECH3","TECH4","TECH5"].forEach(function (id) {
+    setItem(id, "tolerant", "Unpatched for years; flat network; no OT monitoring.");
+  });
+  s = score();
+  ok(!!s.revealed, "the technical layer produces a revealed-appetite position");
+  ok(s.revealed.band === "tolerant", "which the technical answers set to tolerant", s.revealed.band);
+  ok(!!s.statedVsRevealed, "and a stated-vs-revealed read");
+  ok(s.statedVsRevealed.gap === 2, "a two-band gap between what is said and what is done",
+     String(s.statedVsRevealed.gap));
+  ok(s.statedVsRevealed.material === true, "flagged as material");
+  ok(/more tolerant/.test(s.statedVsRevealed.note),
+     "described in the direction that matters - practice is more tolerant than the words",
+     s.statedVsRevealed.note);
+
+  // Switching the layer off must not destroy the interview already recorded.
+  E.updateRiskAppetiteSetup({ includeTech: false });
+  s = score();
+  ok(s.statedVsRevealed === null, "switching the layer off drops it from the read");
+  ok((E.findResponse(tid, "TECH1") || {}).band === "tolerant",
+     "but the answers are kept, not deleted - toggling is not destructive");
+  E.updateRiskAppetiteSetup({ includeTech: true });
+
+  // ---- 8. coverage counts only what is in play ---------------------------
+  s = score();
+  ok(s.coverage.total === 18, "with the technical layer on, all 18 items count", String(s.coverage.total));
+  E.updateRiskAppetiteSetup({ includeTech: false });
+  s = score();
+  ok(s.coverage.total === 13, "with it off, only the 13 core items do", String(s.coverage.total));
+
+  // ---- 9. the capture screen puts the interview prompt first -------------
+  E.updateRiskAppetiteSetup({ exposureBand: "", appetiteBand: "", includeTech: true });
+  A.UI.go("ra-section", "EXP");
+  var m = document.getElementById("main");
+  ok(!!m.querySelector(".ra-prompt"), "the capture page renders the interview prompt");
+  var firstCard = m.querySelector(".ra-item");
+  var promptEl = firstCard && firstCard.querySelector(".ra-prompt");
+  var bandEl = firstCard && firstCard.querySelector(".ra-band-row");
+  ok(!!promptEl && !!bandEl, "with both the prompt and the band controls on the item");
+  ok(promptEl && bandEl &&
+     (promptEl.compareDocumentPosition(bandEl) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+     "and the prompt comes BEFORE the bands - this is interview-led, the question is the work");
+  ok(m.querySelectorAll(".ra-item").length === 6, "six exposure items on the page",
+     String(m.querySelectorAll(".ra-item").length));
+  ok(/Why this is asked/.test(m.textContent), "each item can show why it is asked");
+
+  // The guided wizard. This family is a structured interview, so one prompt on
+  // screen is how it is actually run - the prompt has to lead here too.
+  E.updateRiskAppetiteSetup({ includeTech: false });
+  A.UI.go("ra-wizard");
+  var wm = document.getElementById("main");
+  ok(!!wm.querySelector(".wizard"), "the guided wizard renders");
+  ok(/Item\s+1\s+of\s+13/.test(wm.textContent),
+     "counter reads 'Item 1 of 13' - the technical layer is off, so it is out of the run",
+     (wm.querySelector(".wizard-topmeta") || {}).textContent);
+  var wPrompt = wm.querySelector(".wizard-answer .ra-prompt");
+  var wBands = wm.querySelector(".wizard-answer .ra-band-row");
+  ok(!!wPrompt && !!wBands, "the item's prompt and bands are in the answer column");
+  ok(wPrompt && wBands &&
+     (wPrompt.compareDocumentPosition(wBands) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+     "with the prompt above the bands, as on the list view");
+  ok(!!wm.querySelector(".wizard-answer .ra-band-legend"),
+     "the band definitions sit in the wide answer column, not the narrow rail");
+  ok(!!wm.querySelector(".wizard-context") && /Why this matters/.test(wm.textContent),
+     "the rail carries why the item is asked");
+  ok(wm.querySelectorAll(".wizard-stepper .wizard-step").length === 2,
+     "the stepper shows the two sections in play",
+     String(wm.querySelectorAll(".wizard-stepper .wizard-step").length));
+
+  // Turning the technical layer on lengthens the run.
+  E.updateRiskAppetiteSetup({ includeTech: true });
+  A.UI.go("ra-wizard");
+  wm = document.getElementById("main");
+  ok(/Item\s+1\s+of\s+18/.test(wm.textContent),
+     "switching the technical layer on brings its items into the wizard too",
+     (wm.querySelector(".wizard-topmeta") || {}).textContent);
+  ok(wm.querySelectorAll(".wizard-stepper .wizard-step").length === 3,
+     "and adds its step to the stepper");
+  E.updateRiskAppetiteSetup({ includeTech: false });
+
+  // The assessor's-read page: both readings visible at once, so overriding is
+  // done while looking at what you are disagreeing with.
+  A.UI.go("ra-verdict");
+  var vm = document.getElementById("main");
+  ok(/Assessor's read/.test(vm.textContent), "there is a page for the final say");
+  ok(!!vm.querySelector("select"), "with a control to record a different verdict");
+  ok(!!vm.querySelector("svg"), "and the plot on the same page");
+  ok(/final say/i.test(vm.textContent), "which says the judgement is the consultant's");
+  A.UI.go("ra-section", "EXP");
+  m = document.getElementById("main");
+  ok(!!m.querySelector(".ra-band-legend"), "the band definitions are on the page, not hidden in a tooltip");
+
+  // Sector picker and the toggle.
+  A.UI.go("ra-setup");
+  m = document.getElementById("main");
+  ok(m.querySelectorAll("select option").length >= 16, "the setup page lists every sector",
+     String(m.querySelectorAll("select option").length));
+  ok(/not a determination/i.test(m.textContent),
+     "and says out loud that the baseline is not a determination");
+
+  // ---- 10. the report: the plot is the headline --------------------------
+  E.updateRiskAppetiteSetup({ sectorId: "energy-grid", exposureBand: "severe", appetiteBand: "tolerant" });
+  A.UI.go("report");
+  m = document.getElementById("main");
+  var svg = m.querySelector("svg");
+  ok(!!svg, "the report renders the exposure-vs-appetite plot");
+  ok(/Inherent exposure/.test(m.textContent) && /Apparent appetite/.test(m.textContent),
+     "with both axes labelled");
+  ok(/coherence/i.test(m.textContent), "and the coherence line named");
+  ok(/Under-protected/.test(m.textContent), "the verdict is stated in the report");
+  ok(/usually opens up gradually, without anyone deciding on it/.test(m.textContent),
+     "with the plain-terms sentence a consultant would actually say");
+  ok(/characterisation, not a measurement/i.test(m.textContent),
+     "and the caveat leads the report");
+
+  // The plot must be a real drawing, not an empty frame.
+  ok(svg.querySelectorAll("circle").length >= 1, "the organisation is plotted as a point");
+  ok(svg.querySelectorAll("line").length >= 8, "the grid and coherence line are drawn",
+     String(svg.querySelectorAll("line").length));
+
+  // Still no grade anywhere on the page.
+  ok(!/\bGrade\b/.test(m.textContent), "the report shows no grade");
+  // The issue check leads the page now; the headline is the first card after it.
+  ok(!/%/.test(m.querySelector(".card:not(.issue-check)").textContent), "and no percentage in the headline card");
+
+  // ---- 11. every item carries its interview prompt -----------------------
+  // This is an interview-led instrument; an item without a prompt is a question
+  // the consultant has to invent in the room.
+  var noPrompt = (inst.items || []).filter(function (it) { return !String(it.interviewPrompt || "").trim(); });
+  ok(noPrompt.length === 0, "every item ships an interview prompt",
+     noPrompt.map(function (i) { return i.code; }).join(", "));
+  var noRationale = (inst.items || []).filter(function (it) { return !String(it.rationale || "").trim(); });
+  ok(noRationale.length === 0, "and a rationale for why it is asked",
+     noRationale.map(function (i) { return i.code; }).join(", "));
+
+  // ---- 12. exposure follows the worst credible consequence ---------------
+  // It used to be the rounded mean, which let a severe consequence be averaged
+  // down by milder readings beside it: 4,3,3,3,3,4 averaged to high.
+  var R = A.Report, N = E.getActiveNarrative();
+  E.newAssessment("risk-appetite");
+  tid = E.state.activeTargetId;
+  ok(RA.axisSpec(prof, "exposure").rollUp === "worst" && RA.axisSpec(prof, "appetite").rollUp === "mean",
+     "the profile says exposure follows the worst reading and appetite is weighed across its readings");
+  [["EXP1", "severe"], ["EXP2", "high"], ["EXP3", "high"], ["EXP4", "high"], ["EXP5", "high"], ["EXP6", "severe"]]
+    .forEach(function (p) { setItem(p[0], p[1], "x"); });
+  s = score();
+  ok(s.exposure.band === "severe",
+     "two severe readings among four high ones make exposure severe, where the old average said high",
+     s.exposure.band + " (suggested rank " + s.exposure.section.suggestedRank + ")");
+  ["APP1","APP2","APP3","APP4","APP5","APP6","APP7"].forEach(function (id, i) {
+    setItem(id, i < 4 ? "cautious" : "open", "x");
+  });
+  s = score();
+  ok(s.appetite.band === "cautious", "appetite is still the weighed mean: 4 cautious and 3 open is cautious",
+     s.appetite.band);
+
+  // The explanation for readings below the headline is only given when it is
+  // true: not when the assessor has set exposure away from the highest reading.
+  var slots = R.riskAppetiteSlots(s, E.state.engagement);
+  ok(/rated high\. Exposure follows its highest reading, not an average/.test(R.riskAppetiteExposureDrivers(s, N, slots) || ""),
+     "with severe set by the worst reading, the high readings are explained");
+  E.updateRiskAppetiteSetup({ exposureBand: "high" });
+  s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
+  ok(R.riskAppetiteExposureDrivers(s, N, slots) === null,
+     "but not when the assessor has set exposure below its highest reading, where that rule did not set it");
+  E.updateRiskAppetiteSetup({ exposureBand: "" });
+
+  // ---- 13. "on either reading", only when it is true ----------------------
+  // Severe exposure, stated appetite open, revealed tolerant: both readings are
+  // two or more bands past the line, so under-protected on either.
+  ["APP1","APP2","APP3","APP4","APP5","APP6","APP7"].forEach(function (id) { setItem(id, "open", "x"); });
+  E.updateRiskAppetiteSetup({ includeTech: true });
+  ["TECH1","TECH2","TECH3","TECH4","TECH5"].forEach(function (id) { setItem(id, "tolerant", "x"); });
+  s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
+  ok(s.verdict.key === "under-protected" && s.statedVsRevealed.verdictOnStated === "under-protected" &&
+     s.statedVsRevealed.verdictOnRevealed === "under-protected",
+     "stated open and revealed tolerant are each under-protected against severe exposure");
+  ok(R.riskAppetiteHeadlineValue(s) === "stated Open, revealed Tolerant; under-protected on either reading",
+     "so the headline says so", R.riskAppetiteHeadlineValue(s));
+  ok(/On either reading, the organisation is under-protected\./.test(R.riskAppetiteAppetiteSentence(s, N, slots)),
+     "and so does the summary", R.riskAppetiteAppetiteSentence(s, N, slots));
+
+  // Stated cautious instead: aligned on that reading, so "either" must go.
+  ["APP1","APP2","APP3","APP4","APP5","APP6","APP7"].forEach(function (id) { setItem(id, "cautious", "x"); });
+  E.updateRiskAppetiteSetup({ verdictOverride: "under-protected", verdictRationale: "The systems reveal it." });
+  s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
+  ok(R.riskAppetiteHeadlineValue(s) === "stated Cautious, revealed Tolerant",
+     "where the stated reading alone is aligned, the headline carries both readings without claiming 'either'",
+     R.riskAppetiteHeadlineValue(s));
+  ok(!/either reading/i.test(R.riskAppetiteAppetiteSentence(s, N, slots)),
+     "and neither does the summary");
+
+  // ---- 14. informal acceptance, named -------------------------------------
+  setItem("APP4", "open", "x");
+  s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
+  var spots = R.riskAppetiteSpotlights(s, N, slots);
+  ok(spots.length === 1 && /main cause of the drift/.test(spots[0]),
+     "acceptance looser than the rest of appetite, in an under-protected read, is named as the root cause of the drift",
+     spots.join(" | "));
+  // Aligned and no looser technical picture: not "drift", but still worth saying.
+  E.updateRiskAppetiteSetup({ includeTech: false, verdictOverride: "", verdictRationale: "", exposureBand: "high" });
+  s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
+  spots = R.riskAppetiteSpotlights(s, N, slots);
+  ok(s.verdict.key === "aligned" && spots.length === 1 && /starts to drift/.test(spots[0]) && !/root cause/.test(spots[0]),
+     "in an aligned read it is still named, as how drift starts rather than as its cause",
+     s.verdict.key + " | " + spots.join(" | "));
+  // Another appetite reading at the same band is named with it: the summary
+  // must not single out risk acceptance when the table shows it is not alone.
+  setItem("APP6", "open", "x");
+  s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
+  spots = R.riskAppetiteSpotlights(s, N, slots);
+  ok(spots.length === 1 && /^How risk gets accepted and how cyber features in safety are rated open/.test(spots[0]),
+     "a second reading at the same band is named alongside risk acceptance", spots.join(" | "));
+  setItem("APP6", "cautious", "x");
+  s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
+  spots = R.riskAppetiteSpotlights(s, N, slots);
+  ok(spots.length === 1 && /^How risk gets accepted is rated open/.test(spots[0]),
+     "and with risk acceptance alone at that band, it is named alone", spots.join(" | "));
+  setItem("APP4", "cautious", "x");
+  s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
+  ok(R.riskAppetiteSpotlights(s, N, slots).length === 0,
+     "and not at all when acceptance reads no looser than the rest");
+
+  // ---- 15. every item says what each band looks like for it ---------------
+  // The axis definitions say what "open" means for appetite in general. That
+  // leaves two consultants free to band the same organisation differently; an
+  // anchor per item per band is what makes the read repeatable.
+  var axisOfSec = {};
+  (inst.sections || []).forEach(function (sc) { axisOfSec[sc.id] = RA.axisForSection(sc); });
+  var anchorGaps = [], anchorDupes = [], anchorStyle = [];
+  (inst.items || []).forEach(function (it) {
+    var want = RA.axisSpec(prof, axisOfSec[it.sectionId]).bands;
+    var a = it.bandAnchors || {};
+    want.forEach(function (b) {
+      var t = String(a[b] || "").trim();
+      if (t.length < 30) anchorGaps.push(it.code + "/" + b);
+      if (/—|–|\S - \S/.test(t)) anchorStyle.push(it.code + "/" + b);
+    });
+    var texts = want.map(function (b) { return a[b]; });
+    if (texts.some(function (t, i) { return texts.indexOf(t) !== i; })) anchorDupes.push(it.code);
+  });
+  ok(anchorGaps.length === 0, "all 18 items describe all four bands of their own scale", anchorGaps.join(", "));
+  ok(anchorDupes.length === 0, "no item describes two bands the same way", anchorDupes.join(", "));
+  ok(anchorStyle.length === 0, "and none of the descriptions uses a dash", anchorStyle.join(", "));
+
+  // The scored item carries the description of its chosen band.
+  E.newAssessment("risk-appetite");
+  tid = E.state.activeTargetId;
+  var exp1 = (inst.items || []).filter(function (i) { return i.id === "EXP1"; })[0];
+  setItem("EXP1", "severe", "x");
+  s = score();
+  var sEXP1 = s.exposure.section.items.filter(function (i) { return i.itemId === "EXP1"; })[0];
+  ok(sEXP1.anchor === exp1.bandAnchors.severe, "the result carries what the chosen band means for that item");
+
+  // On screen: the chosen band's meaning under the buttons, and all four behind a toggle.
+  A.UI.go("ra-section", "EXP");
+  var card1 = document.querySelector('#main .ra-item[data-req-id="EXP1"]');
+  var cur = card1 && card1.querySelector(".ra-anchor-current");
+  ok(cur && cur.textContent.indexOf(exp1.bandAnchors.severe) !== -1,
+     "the list view shows what 'severe' means for this item, under the buttons", cur && cur.textContent);
+  var sevBtn = [].slice.call(card1.querySelectorAll(".ra-band-btn")).filter(function (b) { return b.textContent === "Severe"; })[0];
+  ok(sevBtn && sevBtn.title === exp1.bandAnchors.severe, "each band button's tooltip is the item's own description");
+  var tog = [].slice.call(card1.querySelectorAll("button")).filter(function (b) { return /What each band looks like/.test(b.textContent); })[0];
+  ok(!!tog, "a toggle opens all four descriptions for the item");
+  tog.click();
+  card1 = document.querySelector('#main .ra-item[data-req-id="EXP1"]');
+  ok(card1.querySelectorAll(".ra-band-def").length === 4, "which lists all four",
+     String(card1.querySelectorAll(".ra-band-def").length));
+  ok(card1.textContent.indexOf(exp1.bandAnchors.limited) !== -1, "including the ones not chosen");
+
+  // In the wizard the item's four descriptions are simply open.
+  A.UI.go("ra-wizard");
+  var wa = document.querySelector("#main .wizard-answer");
+  var code = (wa.querySelector(".req-code") || {}).textContent;
+  var wItem = (inst.items || []).filter(function (i) { return i.code === code; })[0];
+  ok(wItem && wa.querySelectorAll(".ra-band-def").length === 4 &&
+     wa.textContent.indexOf(wItem.bandAnchors[Object.keys(wItem.bandAnchors)[0]]) !== -1,
+     "the wizard shows the current item's own descriptions, not the general ones", code);
+
+  // ---- 16. technical readings: a choice, or a managed constraint -----------
+  // Old firmware pinned by vendor certification, with the risk compensated and
+  // tracked, is a constraint, not appetite. Counting it would be unfair, and it
+  // is the first thing a client's OT engineers would challenge.
+  E.newAssessment("risk-appetite");
+  tid = E.state.activeTargetId;
+  E.updateRiskAppetiteSetup({ includeTech: true, exposureBand: "severe", appetiteBand: "cautious" });
+  ["TECH1","TECH2","TECH3","TECH4","TECH5"].forEach(function (id) { setItem(id, "tolerant", "x"); });
+  E.setResponse(tid, "TECH3", { band: "open" });
+  s = score();
+  ok(s.revealed && s.revealed.band === "tolerant", "with every reading counted, revealed appetite is tolerant",
+     s.revealed && s.revealed.band);
+
+  ["TECH1","TECH2","TECH4","TECH5"].forEach(function (id) { E.setResponse(tid, id, { disposition: "constrained" }); });
+  s = score();
+  ok(s.revealed && s.revealed.band === "open",
+     "managed constraints are not counted: only the monitoring reading remains, so revealed is open",
+     s.revealed && s.revealed.band);
+  ok(s.techSection.constrainedCount === 4 && s.techSection.countedCount === 1,
+     "the section knows how many were constraints and how many counted",
+     s.techSection.constrainedCount + "/" + s.techSection.countedCount);
+  ok(s.techSection.answeredCount === 5,
+     "constraints still count as answered: the question was asked and settled",
+     String(s.techSection.answeredCount));
+
+  E.setResponse(tid, "TECH3", { disposition: "unknown" });
+  s = score();
+  ok(s.revealed === null && s.statedVsRevealed === null,
+     "with nothing left to count there is no revealed reading, rather than an invented one");
+  ok(!!R.riskAppetiteTechAxis(s), "but the technical section is still there to be reported");
+
+  // An interview reading is appetite by definition: a stray disposition on one
+  // must not remove it from the read.
+  setItem("EXP1", "severe", "x");
+  E.setResponse(tid, "EXP1", { disposition: "constrained" });
+  E.updateRiskAppetiteSetup({ exposureBand: "" });
+  s = score();
+  ok(s.exposure.band === "severe", "a disposition on an interview item is ignored", s.exposure.band);
+  E.updateRiskAppetiteSetup({ exposureBand: "severe" });
+
+  // On screen: the control sits on technical items only.
+  A.UI.go("ra-section", "TECH");
+  var t1 = document.querySelector('#main .ra-item[data-req-id="TECH1"]');
+  ok(t1 && !!t1.querySelector(".ra-disposition"), "technical items ask whether the state is a choice or a constraint");
+  ok(t1 && t1.querySelector('.ra-disp-btn[data-disposition="constrained"]').classList.contains("active"),
+     "and show the recorded answer");
+  A.UI.go("ra-section", "APP");
+  ok(!document.querySelector("#main .ra-disposition"), "interview items do not");
+  A.UI.go("ra-section", "TECH");
+  document.querySelector('#main .ra-item[data-req-id="TECH1"] .ra-disp-btn[data-disposition="accepted"]').click();
+  ok((E.findResponse(tid, "TECH1") || {}).disposition === "accepted", "clicking records the choice on the engine");
+
+  // In the report: said plainly, with a column showing how each was treated.
+  A.UI.go("report");
+  var rep = document.getElementById("main").textContent;
+  ok(/Three of the technical readings reflect genuine operational constraints that are being managed/.test(rep),
+     "the report says how many readings were managed constraints, in words",
+     (rep.match(/[A-Z][a-z]+ of the technical readings reflect[^.]*/) || [""])[0]);
+  ok(/One technical reading could not be established/.test(rep), "and how many could not be established");
+  ok(/Treated as/.test(rep) && /Managed constraint/.test(rep) && /Not established/.test(rep),
+     "with a column showing how each technical reading was treated");
+  ok(/Managed constraint/.test(rep) && /reported but not counted as appetite/.test(rep),
+     "and the glossary explains what a managed constraint is");
+
+  // Every technical reading excluded: said, not silently dropped.
+  E.setResponse(tid, "TECH1", { disposition: "constrained" });
+  A.UI.go("report");
+  rep = document.getElementById("main").textContent;
+  ok(/None of the technical readings could be counted as appetite/.test(rep),
+     "when none can be counted, the report says there is no revealed reading");
+
+  // ---- 17. "aligned" says which way it leans ----------------------------
+  // Aligned covers 10 of the 16 combinations. The four one band off the line
+  // are in proportion but not centred, and the report says which way.
+  E.newAssessment("risk-appetite");
+  tid = E.state.activeTargetId;
+  function fit(e, a) {
+    E.updateRiskAppetiteSetup({ exposureBand: e, appetiteBand: a, verdictOverride: "", verdictRationale: "" });
+    return score().verdict;
+  }
+  var v1 = fit("severe", "cautious");
+  ok(v1.key === "aligned" && v1.lean === "under-protected" && v1.displayLabel === "Aligned, leaning under-protected",
+     "severe exposure with a cautious appetite is aligned, leaning under-protected", v1.displayLabel);
+  var v2 = fit("high", "open");
+  ok(v2.lean === "under-protected", "so is high exposure with an open appetite", v2.displayLabel);
+  var v3 = fit("high", "averse");
+  ok(v3.key === "aligned" && v3.lean === "over-invested", "high exposure with an averse appetite leans over-invested", v3.displayLabel);
+  var v4 = fit("high", "cautious");
+  ok(v4.key === "aligned" && v4.lean === null && v4.displayLabel === "Aligned", "on the line, no lean", v4.displayLabel);
+  ok(fit("severe", "open").key === "under-protected", "two bands off is still under-protected, not a lean");
+  // Count the grid: every one of the 16 cells, so the rule is pinned whole.
+  var tally = { centre: 0, leanUnder: 0, leanOver: 0, under: 0, over: 0 };
+  ["limited","moderate","high","severe"].forEach(function (e) {
+    ["averse","cautious","open","tolerant"].forEach(function (a) {
+      var v = fit(e, a);
+      if (v.key === "under-protected") tally.under++;
+      else if (v.key === "over-invested") tally.over++;
+      else if (v.lean === "under-protected") tally.leanUnder++;
+      else if (v.lean === "over-invested") tally.leanOver++;
+      else tally.centre++;
+    });
+  });
+  ok(tally.centre === 4 && tally.leanUnder === 3 && tally.leanOver === 3 && tally.under === 3 && tally.over === 3,
+     "the grid splits 4 centred, 3 leaning each way, 3 under-protected, 3 over-invested", JSON.stringify(tally));
+
+  // On screen and in the words.
+  fit("severe", "cautious");
+  A.UI.go("report");
+  var badge = document.querySelector("#main .ra-verdict-badge");
+  ok(badge && badge.textContent === "Aligned, leaning under-protected" && badge.classList.contains("leaning-under"),
+     "the report's verdict badge says it, in the watch colour", badge && badge.textContent);
+  var rtext = document.getElementById("main").textContent;
+  ok(/Even so, a cautious appetite is one band more tolerant than the averse one that severe exposure calls for, so a little further drift towards tolerance would leave/.test(rtext),
+     "and the verdict explains what leaning means");
+  ok(/leaning under-protected/.test((document.querySelector("#main svg") || {}).textContent || ""),
+     "and so does the chart caption");
+
+  // Never on a verdict the assessor set.
+  E.updateRiskAppetiteSetup({ exposureBand: "severe", appetiteBand: "open",
+                              verdictOverride: "aligned", verdictRationale: "Group SOC covers this." });
+  s = score();
+  ok(s.verdict.key === "aligned" && s.verdict.overridden && s.verdict.lean === null && s.verdict.displayLabel === "Aligned",
+     "an aligned verdict set by the assessor carries no lean: that would put the arithmetic back in front of the client",
+     s.verdict.displayLabel);
+  E.updateRiskAppetiteSetup({ verdictOverride: "", verdictRationale: "" });
+
+  // ---- 18. "could not establish", on any item ----------------------------
+  // Interview work always produces readings nobody could give. They are left
+  // out of the band rather than guessed, count as dealt with, and are reported.
+  E.newAssessment("risk-appetite");
+  tid = E.state.activeTargetId;
+  ["EXP1","EXP2","EXP4","EXP5","EXP6"].forEach(function (id) { setItem(id, "high", "x"); });
+  E.setResponse(tid, "EXP3", { notEstablished: true });
+  ["APP1","APP2","APP3","APP5","APP6","APP7"].forEach(function (id) { setItem(id, "cautious", "x"); });
+  E.setResponse(tid, "APP4", { notEstablished: true });
+  s = score();
+  ok(s.exposure.band === "high" && s.appetite.band === "cautious",
+     "readings not established are left out of the bands, not guessed", s.exposure.band + "/" + s.appetite.band);
+  ok(s.exposure.section.notEstablishedCount === 1 && s.appetite.section.notEstablishedCount === 1,
+     "each section knows what could not be established");
+  ok(s.coverage.answered === 11 && s.coverage.notEstablished === 2, "coverage reports them separately",
+     JSON.stringify(s.coverage));
+
+  // Counted as dealt with for progress.
+  A.UI.go("ra-section", "EXP");
+  // Section 1b expanded the instrument list; progress shows when it is collapsed.
+  var tg2 = document.querySelector("#sidebar .nav-section-toggle");
+  if (tg2 && !tg2.classList.contains("collapsed")) tg2.click();
+  var prog2 = document.querySelector("#sidebar .nav-progress-txt");
+  ok(prog2 && prog2.textContent.trim() === "13 / 13", "and they count as dealt with in the progress figure",
+     prog2 ? prog2.textContent : "no progress element; sidebar: " + document.getElementById("sidebar").textContent.slice(0, 300));
+
+  // The button: exclusive with the bands, and it hides what no longer applies.
+  var e3 = document.querySelector('#main .ra-item[data-req-id="EXP3"]');
+  var neBtn = e3 && e3.querySelector(".ra-ne-btn");
+  ok(neBtn && neBtn.classList.contains("active"), "every item offers 'Could not establish', shown as chosen");
+  ok(!e3.querySelector(".ra-band-btn.active:not(.ra-ne-btn)"), "with no band chosen alongside it");
+  [].slice.call(e3.querySelectorAll(".ra-band-btn")).filter(function (b) { return b.textContent === "Severe"; })[0].click();
+  ok((E.findResponse(tid, "EXP3") || {}).notEstablished === false && (E.findResponse(tid, "EXP3") || {}).band === "severe",
+     "choosing a band clears it");
+  document.querySelector('#main .ra-item[data-req-id="EXP3"] .ra-ne-btn').click();
+  ok((E.findResponse(tid, "EXP3") || {}).notEstablished === true && !(E.findResponse(tid, "EXP3") || {}).band,
+     "and choosing it clears the band");
+
+  // In the report, worded for what it means on each axis.
+  A.UI.go("report");
+  rep = document.getElementById("main").textContent;
+  ok(/One exposure reading could not be established: geopolitical exposure\. It is left out of the rating, so the exposure position rests on the other readings/.test(rep),
+     "an exposure reading not established lowers confidence", (rep.match(/One exposure reading[^.]*\./) || [""])[0]);
+  ok(/Nobody interviewed could say how risk gets accepted/.test(rep),
+     "and not knowing how risk gets accepted is named as the finding it is");
+  ok(/Not established/.test(rep), "with 'Not established' in the band column");
+
+  // Several appetite readings, listed in words.
+  E.setResponse(tid, "APP2", { notEstablished: true });
+  A.UI.go("report");
+  rep = document.getElementById("main").textContent;
+  ok(/Two appetite readings could not be established, because nobody interviewed could give a clear account of how security is funded and how risk gets accepted\./.test(rep),
+     "two appetite readings are named together, in a sentence that reads", (rep.match(/Two appetite readings[^.]*\./) || [""])[0]);
+  ok(!/\bhow how\b/.test(rep), "without doubling up words");
+
+  // Files from before this recorded it as the technical-only "unknown".
+  E.updateRiskAppetiteSetup({ includeTech: true });
+  E.setResponse(tid, "TECH2", { band: "open", disposition: "unknown" });
+  s = score();
+  var t2 = s.techSection.items.filter(function (i) { return i.itemId === "TECH2"; })[0];
+  ok(t2.notEstablished === true && t2.band === null,
+     "an older file's technical 'unknown' reads as not established");
+
+  // ---- 18. evidence, kept apart from the characterisation ------------------
+  // What a reading rests on (who said it, which document, what was seen) is a
+  // different thing from what it tells you. A board that challenges a band
+  // should be pointed at the source, not at the consultant's reading of it.
+  E.newAssessment("risk-appetite");
+  tid = E.state.activeTargetId;
+  setItem("APP4", "open", "Acceptance happens by a deferred date.");
+  A.UI.go("ra-section", "APP");
+  var a4 = document.querySelector('#main .ra-item[data-req-id="APP4"]');
+  var evTa = a4 && a4.querySelector(".ra-evidence textarea");
+  ok(!!evTa, "each item has an Evidence field on the capture page");
+  evTa.value = "Board risk register BRR-2026-Q2; interview with the audit chair.";
+  evTa.dispatchEvent(new Event("change"));
+  var r4 = E.findResponse(tid, "APP4") || {};
+  ok(r4.evidence === "Board risk register BRR-2026-Q2; interview with the audit chair." &&
+     r4.notes === "Acceptance happens by a deferred date.",
+     "it saves to its own field and leaves the characterisation alone", JSON.stringify(r4));
+  A.UI.go("ra-wizard");
+  ok(!!document.querySelector("#main .wizard-answer .ra-evidence textarea"), "and in the guided wizard");
+
+  s = score();
+  var i4 = [].concat.apply([], s.sections.map(function (x) { return x.items || []; }))
+             .filter(function (i) { return i.itemId === "APP4"; })[0];
+  ok(i4 && i4.evidence === r4.evidence, "the scorer carries it through to the report");
+
+  A.UI.go("report");
+  rep = document.getElementById("main").textContent;
+  ok(/Evidence: Board risk register BRR-2026-Q2/.test(rep), "the screen report shows it under the characterisation");
+
+  // Excel: an Evidence column, and no internal axis ids.
+  var wb = A.ExportXLSX.build(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+                              { targetId: tid, riskAppetiteSetup: E.getRiskAppetiteSetup() });
+  var sheet = XLSX.utils.sheet_to_json(wb.Sheets["Characterisation"], { header: 1, defval: "" });
+  // Header cells are styled objects without a type, so read their values directly.
+  var wsC = wb.Sheets["Characterisation"], head = [];
+  for (var hc = 0; wsC[XLSX.utils.encode_cell({ r: 0, c: hc })]; hc++) head.push(String(wsC[XLSX.utils.encode_cell({ r: 0, c: hc })].v));
+  ok(head.indexOf("Axis") === -1, "the Characterisation sheet has no Axis column", head.join(" | "));
+  ok(!sheet.some(function (row) { return row.some(function (c) { return /^(exposure|appetite|appetite-revealed)$/.test(String(c)); }); }),
+     "and no internal axis id appears anywhere on it");
+  var evCol = head.indexOf("Evidence");
+  ok(evCol === head.indexOf("Characterisation") + 1, "Evidence sits next to Characterisation", head.join(" | "));
+  var row4 = sheet.filter(function (row) { return row[1] === "APP.4" || row[1] === "APP4"; })[0];
+  ok(row4 && row4[evCol] === r4.evidence, "and carries the item's evidence", row4 && JSON.stringify(row4));
+  ok(row4 && row4[0] && head[0] === "Section", "rows still line up under their headers (section first)");
+});
+</script>
+</body></html>

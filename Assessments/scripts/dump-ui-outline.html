@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>UI outline dump</title></head>
+<body>
+<div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<div id="toast"></div>
+<pre id="out">running…</pre>
+
+<script src="../data/manifest.js"></script>
+<script src="../js/version.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/scoring.js"></script>
+<script src="../js/scoring-domain-letter.js"></script>
+<script src="../js/scoring-caf-achieved.js"></script>
+<script src="../js/scoring-program-ml.js"></script>
+<script src="../js/scoring-nis2.js"></script>
+<script src="../js/scoring-csms.js"></script>
+<script src="../js/scoring-cra.js"></script>
+<script src="../js/scoring-risk-appetite.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/charts.js"></script>
+<script src="../js/compare.js"></script>
+<script src="../js/report.js"></script>
+<script src="../js/engine.js"></script>
+<script src="../js/ui.js"></script>
+<script>
+(function () {
+  var A = window.App, E = A.Engine;
+  window.confirm = function () { return true; }; window.alert = function () {};
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var id = (location.hash || "").replace(/^#/, "").split("|")[0] || "onr-syaps-management";
+  var view = (location.hash || "").split("|")[1] || "engagement";
+  E.activateInstrument(id);
+  A.UI.go(view);
+
+  function trim(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
+  var out = [];
+  function walk(node, depth) {
+    for (var i = 0; i < node.children.length; i++) {
+      var el = node.children[i];
+      var tag = el.tagName.toLowerCase();
+      var cls = el.className && typeof el.className === "string" ? el.className : "";
+      var own = "";
+      // direct text of this element (not descendants) for leaf-ish nodes
+      var direct = "";
+      for (var j = 0; j < el.childNodes.length; j++) { if (el.childNodes[j].nodeType === 3) direct += el.childNodes[j].nodeValue; }
+      direct = trim(direct);
+      var mark = null;
+      if (/^h[1-4]$/.test(tag)) mark = tag.toUpperCase() + ": " + trim(el.textContent);
+      else if (tag === "p") mark = "p: " + trim(el.textContent).slice(0, 160);
+      else if (/\bpage-title\b/.test(cls)) mark = "TITLE: " + trim(el.textContent);
+      else if (/\bpage-sub\b/.test(cls)) mark = "SUB: " + trim(el.textContent).slice(0, 160);
+      else if (/\bpill\b/.test(cls)) mark = "[pill] " + trim(el.textContent);
+      else if (/\bcaf-summary-label\b|\bcaf-picker-label\b|\bsub\b/.test(cls) && direct) mark = "(" + cls.split(" ")[0] + ") " + direct;
+      else if (tag === "summary") mark = "<summary> " + trim(el.textContent).slice(0, 100);
+      else if (tag === "button" && direct) mark = "[btn] " + direct;
+      else if (tag === "option" && el.selected) mark = "[option*] " + direct;
+      if (mark) out.push(new Array(depth + 1).join("  ") + mark);
+      if (el.children.length) walk(el, depth + (mark ? 1 : 0));
+    }
+  }
+  out.push("===== " + id + " / view=" + view + " =====");
+  walk(document.getElementById("main"), 0);
+  document.getElementById("out").textContent = out.join("\n");
+})();
+</script>
+</body></html>

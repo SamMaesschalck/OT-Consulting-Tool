@@ -1,0 +1,2886 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* OT Cyber Assessment Tool - design system
+   Flat, professional, white with blue accents. No neon, no gradients, no glass. */
+
+:root {
+  /* Brand colours - drop in the exact SolutionsPT brand hex here. */
+  --brand-blue:        #0F5FA6;
+  --brand-blue-dark:   #0A3D62;
+  --brand-blue-tint:   #E6EEF6;
+
+  /* Surfaces */
+  --surface:           #FFFFFF;
+  --surface-2:         #F4F7FA;
+  --surface-3:         #ECF1F6;
+  --border:            #E2E8F0;
+  --border-strong:     #C8D2DD;
+
+  /* Text */
+  --text:              #1A2533;
+  --text-muted:        #5A6B7B;
+  --text-soft:         #8595A5;
+
+  /* Semantic scoring - muted */
+  --met:               #2E7D52;
+  --met-bg:            #E5F1EA;
+  --near:              #C28A1E;
+  --near-bg:           #F7EFD9;
+  --gap:               #B23A33;
+  --gap-bg:            #F3DEDC;
+  --severe:            #7A0E1A;
+  --severe-bg:         #EBD2D3;
+  --above:             #2E6FA6;
+  --above-bg:          #DCE9F3;
+  --na:                #94A0AD;
+  --na-bg:             #ECEFF2;
+
+  --radius:            4px;
+  --radius-lg:         6px;
+  --shadow-sm:         0 1px 1px rgba(20,33,52,0.04);
+
+  --sidebar-w:         260px;
+  --sidebar-w-slim:    64px;
+  --header-h:          56px;
+  --font:              "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Tells the browser to render native controls (select popups, date pickers,
+     scrollbars) in the light palette. Repointed to dark below. */
+  color-scheme: light;
+}
+
+/* ---------- Dark theme ----------
+   Applied via data-theme="dark" on <html>. The whole design system is
+   variable-driven, so dark mode is mostly a palette swap. Two things need
+   explicit handling: --brand-blue-dark doubles as the (navy) header background
+   AND as heading text - in dark mode we repoint it to a light heading blue and
+   pin the header to navy below; and the semantic *-bg tints become dark so the
+   status chips read as subtle fills rather than glaring light blocks. */
+:root[data-theme="dark"] {
+  --brand-blue:        #4C97DE;
+  --brand-blue-dark:   #9CC6EE;  /* heading / strong text on dark surfaces */
+  --brand-blue-tint:   #1C3346;  /* active / highlight background */
+
+  --surface:           #1B2430;
+  --surface-2:         #131A22;
+  --surface-3:         #232E3C;
+  --border:            #2C3947;
+  --border-strong:     #3D4C5C;
+
+  --text:              #E6EDF3;
+  --text-muted:        #A6B6C5;
+  --text-soft:         #7E8D9C;
+
+  --met:               #4FB07E;
+  --met-bg:            #18352A;
+  --near:              #D7A53C;
+  --near-bg:           #38301A;
+  --gap:               #DB6A62;
+  --gap-bg:            #3A211F;
+  --severe:            #F0868C;
+  --severe-bg:         #45151A;
+  --above:             #6FB0E0;
+  --above-bg:          #17293A;
+  --na:                #9AA8B6;
+  --na-bg:             #28313C;
+
+  --shadow-sm:         0 1px 1px rgba(0,0,0,0.35);
+
+  color-scheme: dark;
+}
+/* Header stays navy in both themes (its text/logo chip are tuned for navy). */
+:root[data-theme="dark"] .header { background: #0A3D62; }
+/* Primary-button hover: --brand-blue-dark is light in dark mode, so use a
+   deeper blue for the hover state instead. */
+:root[data-theme="dark"] .btn.primary:hover { background: #3B82C4; border-color: #3B82C4; }
+/* Hand-drawn SVG charts paint a white plate; on a dark card, frame it so it
+   reads as an intentional chart panel rather than a raw white block. */
+:root[data-theme="dark"] .report-grid svg,
+:root[data-theme="dark"] .card-b svg {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+}
+
+a { color: var(--brand-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------- Layout ---------- */
+
+.app {
+  display: grid;
+  grid-template-rows: var(--header-h) 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-areas: "header header" "sidebar main";
+  height: 100vh;
+}
+
+.header {
+  grid-area: header;
+  background: var(--brand-blue-dark);
+  color: #FFF;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  border-bottom: 1px solid #07273E;
+}
+.header .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  font-size: 15px;
+}
+/* The brand lockup is the "Positive" (dark-on-light) artwork, so it needs a
+   light chip to read against the dark-blue header bar. */
+.header .brand .brand-logo {
+  display: inline-flex;
+  align-items: center;
+  background: #FFFFFF;
+  border-radius: var(--radius);
+  padding: 5px 10px;
+}
+.header .brand .brand-logo img {
+  display: block;
+  height: 34px;
+  width: auto;
+}
+.header .brand .sub {
+  font-weight: 400;
+  color: #C9D8E5;
+  font-size: 13px;
+}
+/* Which release this is, so anyone can say what they are using. */
+.header .brand .version-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  color: #FFFFFF;
+  vertical-align: 1px;
+}
+.header .spacer { flex: 1; }
+
+.header-actions { display: flex; gap: 8px; align-items: center; }
+/* Groups the header actions: New (discards the project) | project actions |
+   exports. Without it, "New" sat between Engagement and Load looking exactly
+   like them. */
+.header-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 12px 2px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.header-actions .engagement-summary {
+  color: #C9D8E5;
+  font-size: 13px;
+  margin-right: 10px;
+}
+
+.sidebar {
+  grid-area: sidebar;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 12px 0;
+}
+
+.main {
+  grid-area: main;
+  overflow-y: auto;
+  padding: 24px 32px;
+  background: var(--surface-2);
+}
+/* Cap the content column and centre it so wide screens get comfortable left/
+   right whitespace instead of edge-to-edge stretch (brand container = 1280px).
+   The side padding above still applies below that width. */
+.main > * {
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---------- Slim sidebar ----------
+   Collapsed, the sidebar is a 64px rail of short tokens, and it stays that way:
+   the tokens ARE the navigation. There is deliberately no hover expansion. On
+   the small screens this exists for, a panel that springs open over the capture
+   page covers the thing being worked on, and on a touch screen there is no
+   hover to trigger it with anyway. Two states, one control, no surprises.
+
+   Each row keeps a title attribute, which is both the tooltip and - since the
+   label is display:none and the token is aria-hidden - the accessible name. */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  /* Deliberately short. This row sits above the capture nav, and vertical space
+     at the top of the sidebar is the scarce resource on a 1366x768 laptop -
+     the instrument picker is collapsed by default for the same reason. */
+  padding: 4px 18px 5px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-toggle:hover { background: var(--surface-2); color: var(--text); }
+.sidebar-toggle-icon { font-size: 14px; line-height: 1; }
+
+/* The rail token: hidden at full width, shown when collapsed. */
+.nav-slim { display: none; }
+
+.app.sidebar-slim {
+  grid-template-columns: var(--sidebar-w-slim) 1fr;
+}
+
+/* Ownership notice at the foot of the sidebar; the full terms are its tooltip.
+   On the slim rail only the symbol is left, so the notice is never lost. */
+.sidebar-legal {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px 16px 4px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sidebar-legal-link { display: block; text-decoration: underline; }
+.sidebar-version { display: block; font-weight: 600; }
+.licence-version { margin: 0 0 12px; }
+.sidebar-legal:hover .sidebar-legal-link,
+.sidebar-legal:focus-visible .sidebar-legal-link { color: var(--brand-blue); }
+.link-btn {
+  border: 0; padding: 0; background: none; font: inherit;
+  color: inherit; text-decoration: underline; cursor: pointer;
+}
+.licence-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.app.sidebar-slim .sidebar .sidebar-legal { font-size: 0; text-align: center; padding: 10px 0 4px; }
+.app.sidebar-slim .sidebar .sidebar-legal::before { content: "\00A9"; font-size: 13px; }
+.home-legal { margin-top: 32px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* Everything that needs the full width is hidden rather than squeezed - a 64px
+   column cannot hold a progress bar or an instrument title without lying about
+   them. Expand the sidebar to reach those. */
+.app.sidebar-slim .sidebar .nav-label,
+.app.sidebar-slim .sidebar .nav-section-title,
+.app.sidebar-slim .sidebar .nav-current,
+.app.sidebar-slim .sidebar .kbd,
+.app.sidebar-slim .sidebar .nav-family-title,
+.app.sidebar-slim .sidebar .nav-section-chevron {
+  display: none;
+}
+.app.sidebar-slim .sidebar .nav-slim {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+/* Rows become square-ish targets: token over badge, centred. Kept at 34px+ so
+   they stay comfortable to hit on a laptop trackpad or a touch screen. */
+.app.sidebar-slim .sidebar .nav-item {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-left-width: 2px;
+}
+.app.sidebar-slim .sidebar .sidebar-toggle {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+/* Badges stay: at 64px the rail doubles as a strip of domain grades, which is
+   most of why anyone glances at the sidebar mid-capture. */
+.app.sidebar-slim .sidebar .badge {
+  font-size: 9px;
+  padding: 0 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+@media print { .sidebar-toggle { display: none; } }
+
+/* ---------- Sidebar nav ---------- */
+
+.nav-section { padding: 10px 0; }
+/* Section headers get a tinted band with rules top and bottom so each capture
+   section reads as a distinct block in the sidebar. */
+.nav-section-title {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  color: var(--brand-blue-dark);
+  font-weight: 700;
+  padding: 7px 18px;
+  margin-top: 10px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+/* The first section header sits flush under the sidebar's top padding - no
+   gap or top rule above it. */
+.nav-section-title:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+/* The Instrument section header doubles as a collapse toggle: collapsed shows
+   only the active instrument. */
+.nav-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.nav-section-toggle:hover { background: var(--border); }
+.nav-section-chevron { color: var(--text-muted); font-weight: 400; font-size: 10px; }
+/* Instrument-family sub-heading (e.g. "ISA/IEC 62443") within the Instrument
+   section. Smaller and lighter than nav-section-title to read as a child of
+   it; peer instruments grouped under it are indented via .nav-item-family-child. */
+.nav-family-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand-blue-dark);
+  padding: 5px 18px 3px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+}
+.nav-family-title:hover { background: var(--surface-2); }
+.fam-chevron { display: inline-block; width: 12px; color: var(--text-muted); }
+.nav-item.nav-item-family-child {
+  padding-left: 28px;
+  font-size: 13px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px;
+  cursor: pointer;
+  color: var(--text);
+  border-left: 3px solid transparent;
+  user-select: none;
+}
+.nav-item:hover { background: var(--surface-2); }
+.nav-item.active {
+  background: var(--brand-blue-tint);
+  border-left-color: var(--brand-blue);
+  color: var(--brand-blue-dark);
+  font-weight: 600;
+}
+.nav-item .badge {
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 11px;
+  border-radius: 12px;
+  padding: 1px 8px;
+  min-width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+/* When the badge sits inside the highlighted (active) nav row, ensure the
+   small circled P keeps enough contrast against the brand-blue background. */
+.nav-item.active .badge .pmark { background: rgba(255, 255, 255, 0.85); color: var(--brand-blue-dark); }
+.nav-item.active .badge { background: var(--brand-blue); color: #FFF; }
+.nav-item .badge.gap   { background: var(--gap);  color: #FFF; }
+.nav-item .badge.near  { background: var(--near); color: #FFF; }
+.nav-item .badge.met   { background: var(--met);  color: #FFF; }
+
+.nav-sub {
+  padding-left: 18px;
+}
+
+/* ---------- Sidebar: the selected assessment (collapsed picker) ----------
+   The default state of the Assessment section. Shows what you are working on,
+   how far through it you are, and the way back to the picker - in one block,
+   so the capture nav below it starts near the top of the sidebar instead of a
+   screen and a half down. */
+.nav-current {
+  padding: 10px 18px 12px;
+  border-left: 3px solid var(--brand-blue);
+  background: var(--brand-blue-tint);
+}
+.nav-current-title {
+  color: var(--brand-blue-dark);
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 8px;
+}
+/* Switch assessment. A proper control rather than an underlined word: it sits
+   inside a tinted panel where an underline read as a stray hyperlink, and it is
+   the one action on this row. Full width so it lines up with the progress bar
+   above it. */
+.nav-change {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--brand-blue);
+  border-radius: var(--radius);
+  color: var(--brand-blue-dark);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.nav-change:hover {
+  background: var(--brand-blue);
+  border-color: var(--brand-blue);
+  color: #FFF;
+}
+.nav-change:focus-visible {
+  outline: 2px solid var(--brand-blue-dark);
+  outline-offset: 1px;
+}
+.nav-change-icon { font-size: 13px; line-height: 1; }
+
+/* Overall progress through the assessment: the one number that says how much
+   is left. Per-group badges below say where the gaps are. */
+.nav-progress { display: flex; align-items: center; gap: 8px; }
+.nav-progress-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.nav-progress-fill {
+  height: 100%;
+  background: var(--brand-blue);
+  border-radius: 3px;
+}
+.nav-progress-fill.done { background: var(--met); }
+.nav-progress-txt {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Assessment picker ("Start an assessment") ----------
+   The landing screen with nothing selected, and the same screen again behind
+   "change". Cards carry the purpose of each instrument so the choice is
+   informed, and the progress already captured so switching framework
+   mid-project never feels like leaving work behind. */
+/* Collapsed standing report text at the foot of the preview. The cards inside
+   keep their own styling; the wrapper strips their outer margin so the stack
+   reads as one block once opened. */
+.boilerplate-stack > summary {
+  cursor: pointer;
+  color: var(--brand-blue);
+  font-weight: 600;
+  font-size: 13px;
+}
+.boilerplate-stack > summary:hover { color: var(--brand-blue-dark); }
+.boilerplate-stack .card {
+  margin: 0 0 12px;
+  box-shadow: none;
+  border-color: var(--border);
+}
+.boilerplate-stack .card:last-child { margin-bottom: 0; }
+
+/* Vertical margin only - see the note on .page-title. */
+.home-search { margin-top: 0; margin-bottom: 18px; }
+.home-search input {
+  width: 100%;
+  max-width: 460px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.home-search input:focus {
+  outline: none;
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 2px var(--brand-blue-tint);
+}
+
+.home-strip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.home-strip.filled {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+}
+.home-strip-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.home-strip-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-right: 10px;
+}
+.home-fields {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0 16px;
+}
+.home-fields .field { margin-bottom: 0; }
+.home-strip-note { margin: 12px 0 0; font-size: 12px; }
+@media (max-width: 1000px) { .home-fields { grid-template-columns: repeat(2, 1fr); gap: 12px 16px; } }
+
+.home-fam-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+  color: var(--brand-blue-dark);
+  padding-bottom: 6px;
+  margin: 22px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+/* How many assessments are in the group, so its size is readable before you
+   read the cards. */
+.home-fam-count {
+  font-size: 10px;
+  letter-spacing: 0;
+  font-weight: 700;
+  color: var(--text-soft);
+  background: var(--surface-3);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+.home-card:hover {
+  border-color: var(--brand-blue);
+  border-left-color: var(--brand-blue);
+  background: var(--surface-2);
+}
+.home-card:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+.home-card.current {
+  border-left-color: var(--brand-blue);
+  background: var(--brand-blue-tint);
+}
+.home-card.stub {
+  cursor: default;
+  opacity: 0.62;
+}
+.home-card.stub:hover { border-color: var(--border); border-left-color: var(--border-strong); background: var(--surface); }
+.home-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.home-card-top h3 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--brand-blue-dark);
+}
+.home-card-tags { display: flex; flex-wrap: wrap; gap: 4px; flex: 0 0 auto; }
+.home-card-ed { font-size: 11px; color: var(--text-soft); }
+/* Clamped to three lines so one instrument with a long "coming soon" note
+   cannot stretch its whole grid row; the full text is on the title tooltip. */
+.home-card-purpose {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* The progress line takes the slack instead of the clamped paragraph: giving
+   the paragraph flex:1 stretched its box past three lines and let a sliced
+   fourth line show through the clamp. */
+.home-card-prog, .home-card > .home-card-prog-txt { margin-top: auto; }
+.home-card-prog { display: flex; align-items: center; gap: 8px; padding-top: 8px; }
+.home-card-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.home-card-bar-fill { height: 100%; background: var(--brand-blue); border-radius: 3px; }
+.home-card-prog-txt {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:active { background: var(--surface-3); }
+.btn.primary {
+  background: var(--brand-blue);
+  color: #FFF;
+  border-color: var(--brand-blue);
+}
+.btn.primary:hover { background: var(--brand-blue-dark); border-color: var(--brand-blue-dark); }
+.btn.danger {
+  background: var(--surface);
+  color: var(--gap);
+  border-color: var(--gap);
+}
+.btn.danger:hover { background: var(--gap-bg); }
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #FFF;
+}
+.btn.ghost:hover { background: rgba(255,255,255,0.08); }
+.btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+/* Save button when there are unsaved changes: an amber ring cue in the header. */
+.btn.btn-unsaved { box-shadow: inset 0 0 0 1.5px var(--near); color: #FFF; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Cards / panels ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 18px;
+}
+.card .card-h {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.card .card-h h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.card .card-h .sub { color: var(--text-muted); font-size: 13px; }
+.card .card-b { padding: 16px 18px; }
+
+/* NB: set the vertical margins individually, never with the `margin`
+   shorthand. These are direct children of .main, which centres the content
+   column with `margin-left/right: auto`; a shorthand here has equal
+   specificity and comes later in the file, so it silently resets those to 0
+   and the heading drifts 16px left of the cards under it on any viewport
+   wide enough to trigger the 1280px cap. */
+.page-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+.page-sub {
+  color: var(--text-muted);
+  margin-top: 0;
+  margin-bottom: 18px;
+}
+
+/* ---------- Forms ---------- */
+
+.field { margin-bottom: 12px; }
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+/* Base theming for ALL text-like form controls, so they render correctly in
+   dark mode even when they are not wrapped in a .field (e.g. the inline name
+   inputs in the CRA products table, basis-of-assessment rows). Without this
+   they fall back to the browser default: a white box that shows the page's
+   light dark-mode text as pale grey - unreadable. Excludes checkboxes, radios,
+   buttons, file and range inputs, which have their own painting. */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=button]):not([type=submit]):not([type=reset]):not([type=color]),
+textarea,
+select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font: inherit;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+input::placeholder,
+textarea::placeholder { color: var(--text-soft); opacity: 1; }
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 2px var(--brand-blue-tint);
+}
+
+.field input[type=text],
+.field input[type=date],
+.field input[type=email],
+.field textarea,
+.field select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 2px var(--brand-blue-tint);
+}
+.field textarea { min-height: 70px; resize: vertical; }
+.field .hint { color: var(--text-soft); font-size: 12px; margin-top: 3px; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px 18px; }
+@media (max-width: 900px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+/* ---------- SL chooser (segmented) ---------- */
+
+.sl-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.sl-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  min-width: 56px;
+  text-align: center;
+  font-weight: 500;
+}
+.sl-btn.active {
+  background: var(--brand-blue);
+  color: #FFF;
+  border-color: var(--brand-blue);
+}
+.sl-btn.na.active {
+  background: var(--na);
+  border-color: var(--na);
+}
+.sl-btn:hover:not(.active) { background: var(--surface-2); }
+/* "Clear" (un-answer) utility button: muted and set apart from the state
+   options, with a left margin so it never reads as another choice. */
+.sl-btn.clear-answer {
+  border-style: dashed;
+  color: var(--text-muted);
+  font-weight: 400;
+  min-width: 0;
+  margin-left: 12px;
+}
+.sl-btn.clear-answer:hover { color: var(--gap); border-color: var(--gap); background: var(--surface); }
+
+/* ---------- Status pills ---------- */
+
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.pill.met  { background: var(--met-bg);  color: var(--met); }
+.pill.near { background: var(--near-bg); color: var(--near); }
+.pill.gap  { background: var(--gap-bg);  color: var(--gap); }
+.pill.severe { background: var(--severe-bg); color: var(--severe); font-weight: 700; }
+.pill.above { background: var(--above-bg); color: var(--above); }
+.pill.na   { background: var(--na-bg);   color: var(--na); }
+.pill.flag { background: var(--gap);     color: #FFF; }
+.pill.exceeds { background: var(--brand-blue-tint); color: var(--brand-blue-dark); }
+.pill.neutral { background: var(--surface-3); color: var(--text-muted); }
+/* An answer inherited from the system-wide layer rather than recorded here. */
+.pill.inherit {
+  background: var(--brand-blue-tint);
+  color: var(--brand-blue-dark);
+  border: 1px dashed var(--brand-blue);
+}
+
+/* Provisional marker: gray circle with a white "P". Signals that a grade is
+   based on coverage below the threshold and should be treated as indicative.
+   Never combined with the amber/near colour, which is reserved for the
+   partial-score band on the A-F scale. */
+.pmark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-soft);
+  color: #FFF;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.pmark.lg { width: 22px; height: 22px; font-size: 12px; }
+.pmark.sm { width: 14px; height: 14px; font-size: 9px; margin-left: 4px; }
+.legend .pmark { margin-left: 0; margin-right: 4px; width: 14px; height: 14px; font-size: 9px; }
+
+/* Confidence tag - inline note alongside a grade letter (e.g. "B  · moderate
+   confidence"). Kept muted and small; confidence is meta information about
+   the responses, not a quality colour, so it must not change the grade's own
+   colour. The user explicitly wanted these two signals separate. */
+.conf-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.2px;
+}
+.conf-tag .conf-sep {
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1;
+}
+.conf-tag.conf-moderate { color: var(--near); }
+.conf-tag.conf-low      { color: var(--gap); }
+.kpi .val .conf-tag { font-size: 13px; margin-left: 10px; }
+.conf-cell {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.conf-cell.conf-high     { color: var(--met); }
+.conf-cell.conf-moderate { color: var(--near); }
+.conf-cell.conf-low      { color: var(--gap); }
+
+/* ---------- Requirement row ---------- */
+
+.req {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.req:last-child { border-bottom: 0; }
+.req .req-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.req .req-code {
+  font-weight: 700;
+  color: var(--brand-blue-dark);
+  min-width: 64px;
+  display: inline-block;
+  margin-right: 8px;
+}
+.req .req-title { font-weight: 600; }
+.req .req-q {
+  color: var(--text);
+  margin: 4px 0 10px;
+}
+/* Evidence gets the width; notes open on demand beneath it. */
+.req .req-controls { display: block; }
+.req .req-controls .field + .field { margin-top: 10px; }
+.req-meta { display: flex; align-items: center; gap: 8px; }
+.req-add-note {
+  background: none; border: 0; padding: 4px 0 0;
+  font: inherit; font-size: 12px;
+  color: var(--brand-blue); cursor: pointer;
+}
+.req-add-note:hover { text-decoration: underline; }
+
+/* The answer, then the quiet ways of going deeper. One row, not three. */
+.sl-answer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 2px 0 12px;
+}
+.sl-answer-aside {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+/* Secondary controls share one quiet treatment so none of them competes with
+   the answer buttons. */
+.sl-answer-aside .sl-items-toggle,
+.sl-answer-aside .sl-guidance-toggle,
+.sl-answer-aside .why-toggle {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sl-answer-aside .sl-items-toggle:hover,
+.sl-answer-aside .sl-guidance-toggle:hover,
+.sl-answer-aside .why-toggle:hover { color: var(--brand-blue); text-decoration: underline; }
+.sl-answer-aside .sl-items-toggle.open,
+.sl-answer-aside .sl-guidance-toggle.open,
+.sl-answer-aside .why-toggle.open { color: var(--brand-blue); font-weight: 600; }
+.why-toggle {
+  background: none; border: 0; padding: 0;
+  font: inherit; font-size: 12px;
+  color: var(--text-muted); cursor: pointer;
+}
+.why-toggle:hover { color: var(--brand-blue); text-decoration: underline; }
+.why-toggle::before { content: "\25B8 "; }
+.why-toggle.open::before { content: "\25BE "; }
+
+/* ---------- SL guidance reference (62443-3-3 capture) ---------- */
+
+.sl-row-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.sl-guidance-toggle {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.sl-guidance-toggle:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--brand-blue);
+}
+.sl-guidance-toggle::after {
+  content: "\25B8"; /* small right triangle */
+  display: inline-block;
+  font-size: 10px;
+  color: var(--text-soft);
+  transition: transform 0.15s;
+}
+.sl-guidance-toggle.open {
+  background: var(--brand-blue-tint);
+  border-color: var(--brand-blue);
+  color: var(--brand-blue-dark);
+}
+.sl-guidance-toggle.open::after {
+  transform: rotate(90deg);
+  color: var(--brand-blue);
+}
+
+/* Obligation guidance expander (NIS2 capture) - a full-width memory-jog panel
+   reusing the self-contained .wiz-ctx-* inner styles. */
+.nis2-guidance {
+  margin: 4px 0 12px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand-blue);
+  border-radius: var(--radius-lg);
+}
+/* ---------- capability-SL item capture ----------
+   One block per item (base requirement + each requirement enhancement), each
+   labelled with the Security Level it first applies at. Only in-scope items
+   render, so SL-T scoping is what keeps the list finishable. */
+.sl-items-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 6px;
+}
+.sl-items-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.sl-allmet {
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--met);
+  cursor: pointer;
+}
+.sl-allmet:hover { background: var(--met-bg); border-color: var(--met); }
+
+.sl-items { display: flex; flex-direction: column; gap: 8px; }
+.sl-item {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  background: var(--surface);
+}
+.sl-item.is-answered { border-left-color: var(--brand-blue); }
+/* An N/A without a justification does not exclude the item - it blocks the
+   level - so it must not look finished. */
+.sl-item.is-unjustified { border-left-color: var(--gap); background: var(--gap-bg); }
+.sl-item-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sl-item-code { font-weight: 700; font-size: 12px; color: var(--brand-blue-dark); }
+.sl-item-sl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  background: var(--surface-3);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+.sl-item-title { font-size: 13px; font-weight: 600; }
+.sl-item-hint { font-size: 12.5px; color: var(--text-muted); margin: 4px 0 8px; }
+.sl-item .sl-row { margin-top: 6px; }
+.sl-btn.sl-comp { font-style: italic; }
+/* Glossary: a definition list rendered as a table, so the term column stays
+   aligned down the page and the definitions stay readable. */
+.glossary-section + .glossary-section { margin-top: 18px; }
+.glossary-section h3 {
+  font-size: 14px;
+  margin: 0 0 2px;
+  color: var(--brand-blue-dark);
+}
+table.glossary th[scope="row"] {
+  width: 26%;
+  text-align: left;
+  vertical-align: top;
+  font-weight: 600;
+  color: var(--brand-blue-dark);
+  white-space: normal;
+}
+table.glossary td { vertical-align: top; }
+
+/* An explanatory card rather than a result: reads as guidance, not data. */
+.card.card-note { border-left: 3px solid var(--brand-blue); background: var(--surface-2); }
+/* An item taking the system-wide answer is settled but not answered HERE, so
+   it reads as neither blank nor zone-owned. */
+.sl-item.is-inherited { border-left-style: dashed; border-left-color: var(--brand-blue); }
+.sl-item-inherit-count { font-size: 11.5px; margin-left: auto; }
+/* The Security Level picker: the primary control on a requirement card, so it
+   reads as the answer rather than as one option among several. */
+.sl-achieved-row { margin: 2px 0 6px; }
+.sl-achieved-btn { min-width: 56px; font-weight: 600; }
+.sl-achieved-btn.active {
+  background: var(--brand-blue);
+  border-color: var(--brand-blue);
+  color: #FFF;
+}
+/* Beyond what the target asks for: available, but visibly not part of the
+   required set, so it never reads as outstanding work. */
+.sl-achieved-btn.above-target { opacity: 0.72; border-style: dotted; }
+.sl-achieved-btn.above-target.active,
+.sl-achieved-btn.above-target.derived { opacity: 1; }
+/* The whole ladder is always shown, so the break between what the target asks
+   for and what is beyond it has to be visible at a glance. */
+.sl-achieved-btn.first-above { margin-left: 12px; }
+.pill.above { background: var(--above-bg); color: var(--above); }
+
+/* The level is what the items add up to, but they were set individually, so it
+   is shown as a result rather than as the chosen answer. */
+.sl-achieved-btn.derived {
+  border-color: var(--brand-blue);
+  border-style: dashed;
+  color: var(--brand-blue-dark);
+  font-weight: 700;
+}
+.sl-items-toggle::before { content: "\25B8 "; display: inline-block; }
+.sl-items-toggle.open::before { content: "\25BE "; }
+.sl-achieved-row { margin: 0; }
+
+/* One panel per Security Level: what it adds, and the controls for it. */
+.sl-levels { margin: 4px 0 12px; }
+.sl-level {
+  border-left: 3px solid var(--border);
+  padding: 8px 0 8px 12px;
+  margin-bottom: 6px;
+}
+.sl-level.is-target { border-left-color: var(--brand-blue); }
+.sl-level.is-above  { opacity: 0.75; }
+.sl-level-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.sl-level-n {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  color: var(--brand-blue-dark);
+  min-width: 34px;
+}
+.sl-level-none { font-size: 12.5px; color: var(--text-soft); font-style: italic; }
+.sl-level-item + .sl-level-item { margin-top: 10px; }
+.sl-level-item-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sl-level .sl-item { border: 0; padding: 4px 0 0; background: none; }
+/* An item excluded with a justification: still readable, visibly set aside. */
+.sl-level-item.is-excluded .sl-item-title,
+.sl-level-item.is-excluded .sl-item-hint { color: var(--text-soft); }
+.sl-level .sl-item.is-inherited { border-left: 0; }
+/* In the guided wizard the panel shares its card with the fixed 322px context
+   rail, which is just narrow enough to wrap the fifth state button onto a line
+   of its own. Trimming the padding keeps the five on one row. */
+.wizard-answer .sl-level .caf-state-btn { min-width: 0; flex: 1 1 0; padding-left: 8px; padding-right: 8px; }
+
+/* Which zones a system-wide answer reaches. Collapsed by default: the default
+   (all of them) is right most of the time. */
+.sl-coverage-toggle {
+  margin-top: 8px;
+  background: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sl-coverage-toggle.scoped { border-color: var(--brand-blue); color: var(--brand-blue-dark); font-weight: 600; }
+.sl-coverage-toggle.open { background: var(--surface-3); }
+.sl-coverage-body {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 3px dashed var(--brand-blue);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+.sl-coverage-list { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0; }
+.sl-coverage-zone { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.sl-coverage-zone input { margin: 0; }
+/* The requirement-level control shares the item styling, but its toggle sits
+   inline in the answer row - where a top margin would push it off the
+   baseline of the links beside it - and its body spans the card. */
+.sl-answer-aside .sl-coverage-toggle { margin-top: 0; }
+.sl-req-coverage, .sl-req-link { margin: 0 0 4px; }
+/* "Same as another zone?" - the link control, on a zone page. Same family as
+   the reach pill; solid rather than dashed once a link exists, because a
+   shared answer is a fact about this requirement, not a default. */
+.sl-link-toggle {
+  background: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sl-link-toggle:hover { color: var(--text); }
+.sl-link-toggle.linked {
+  border-style: solid;
+  border-color: var(--brand-blue);
+  color: var(--brand-blue-dark);
+  font-weight: 600;
+}
+.sl-link-toggle.open { background: var(--surface-3); }
+.sl-coverage-zone .small { margin-left: 2px; }
+
+/* Choosing which zone's answer a link should use. The text each one holds is
+   shown in full: the point is to read it and decide whether it really does say
+   the same thing before anything is replaced. */
+.sl-link-choose { margin-top: 12px; }
+.sl-link-choose-h {
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.sl-link-cards { display: flex; flex-direction: column; gap: 6px; }
+.sl-link-card {
+  display: block;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.sl-link-card.is-chosen { border-color: var(--brand-blue); border-left-color: var(--brand-blue); }
+.sl-link-card-h { display: flex; align-items: center; gap: 8px; }
+.sl-link-card-h input { margin: 0; }
+.sl-link-card-name { font-weight: 600; font-size: 13px; }
+.sl-link-card-b { margin: 4px 0 0 22px; display: flex; flex-direction: column; gap: 3px; }
+.sl-link-field { font-size: 12.5px; color: var(--text-muted); }
+.sl-link-field-l {
+  display: inline-block;
+  min-width: 62px;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  vertical-align: top;
+}
+.sl-link-actions { display: flex; gap: 8px; margin-top: 10px; }
+.inherited-evidence {
+  border-left: 3px dashed var(--brand-blue);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+.inherited-evidence p { margin: 4px 0 0; font-size: 12.5px; color: var(--text-muted); }
+/* The shared text is editable in place: the head carries the badge and the
+   control that swaps the paragraph for a box writing to the shared answer. */
+.inherited-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.inherited-edit {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--brand-blue);
+  cursor: pointer;
+}
+.inherited-edit:hover { color: var(--brand-blue-dark); text-decoration: underline; }
+.inherited-evidence.is-editing { border-left-style: solid; }
+.inherited-evidence textarea { margin-top: 6px; }
+.inherited-evidence .hint { margin-top: 4px; }
+.sl-item-note { margin: 8px 0 0; }
+.sl-item-note.needs-note textarea { border-color: var(--gap); }
+.sl-note-warn { color: var(--gap); font-weight: 600; }
+/* Out-of-scope requirements stay visible but recede. */
+.req.is-outofscope { opacity: 0.62; }
+.req.is-outofscope .req-title { font-weight: 400; }
+
+/* ---------- SL-T matrix (zones x foundational requirements) ----------
+   One row per zone or conduit, one cell per FR, so a 62443-3-2 SL-T vector can
+   be entered as it was derived. Compact selects keep seven FR columns plus the
+   zone default on screen; the table scrolls horizontally inside its card. */
+.slt-matrix th, .slt-matrix td { padding: 5px 6px; }
+.slt-matrix th.center, .slt-matrix td.center { text-align: center; }
+/* The engagement-default row every zone inherits from: shaded and ruled off so
+   the table reads as "this, then the exceptions below it". */
+.slt-matrix tr.slt-base > td {
+  background: var(--surface-2);
+  border-bottom: 2px solid var(--border-strong);
+}
+select.slt-cell {
+  padding: 3px 4px;
+  font-size: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 74px;
+}
+select.slt-cell:focus { outline: none; border-color: var(--brand-blue); }
+
+/* ---------- Capability security level vector ----------
+   The headline claim of a component assessment, one cell per Foundational
+   Requirement. Coloured on the same met / near / gap semantics as everything
+   else so it reads at a glance, with the formal notation spelled out beneath
+   for anyone quoting it. */
+.sl-vector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sl-vector-cell {
+  flex: 1 1 90px;
+  min-width: 90px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 10px 8px 12px;
+  text-align: center;
+}
+.sl-vector-abbr {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.sl-vector-val {
+  display: block;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.sl-vector-cell.met   { border-top-color: var(--met); }
+.sl-vector-cell.met   .sl-vector-val { color: var(--met); }
+/* Better than the target asks for: distinct from "met", because it is a
+   different fact and it invites a different conversation. */
+.sl-vector-cell.above { border-top-color: var(--above); }
+.sl-vector-cell.above .sl-vector-val { color: var(--above); }
+.sl-vector-cell.near  { border-top-color: var(--near); }
+.sl-vector-cell.near  .sl-vector-val { color: var(--near); }
+.sl-vector-cell.gap   { border-top-color: var(--gap); }
+.sl-vector-cell.gap   .sl-vector-val { color: var(--gap); }
+.sl-vector-cell.unset .sl-vector-val { color: var(--text-soft); }
+.sl-vector-claims { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+.sl-vector-claims .sl-vector-claim { margin-top: 0; }
+.sl-vector-claims .sl-vector-claim + .sl-vector-claim { color: var(--text-muted); }
+.sl-vector-claim {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* The inline recommendation editor, on every item in both the list views and
+   the wizards. Separated from the evidence above it by a rule, so the capture
+   (what is true) and the advice (what to do) read as two things. */
+.rec-block {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+/* Organisation-wide vs site-by-site: two cards, the active one marked. */
+.scope-choices { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.scope-choice {
+  flex: 1 1 260px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.scope-choice:hover:not(.disabled):not(.active) { background: var(--surface-2); }
+.scope-choice.active {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue-tint);
+  color: var(--brand-blue-dark);
+}
+.scope-choice.disabled { opacity: 0.55; cursor: not-allowed; }
+.scope-choice .small { margin-top: 3px; }
+
+.rec-block-h { display: flex; align-items: baseline; gap: 8px; }
+.rec-block-h label { margin: 0; }
+.req-add-rec { margin-top: 4px; }
+/* Remove sits at the end of the header, small and quiet. It is destructive, so
+   it keeps the danger colour, but it must not compete with the fields below -
+   the common case is filling this in, not throwing it away. */
+.rec-block-h .spacer { flex: 1; }
+.rec-remove {
+  padding: 2px 8px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  align-self: center;
+}
+.inherited-h .rec-remove { margin-left: auto; }
+
+/* A section the consultant has not written yet: visible on screen as a prompt,
+   matching the red placeholder the Word document prints. */
+.placeholder-note {
+  color: var(--note, #B23A33);
+  font-style: italic;
+}
+
+/* A file can hold several assessments of one instrument - a 2026 review and a
+   2028 one - so the picker card lists them instead of hiding all but the last. */
+.home-card-instances {
+  margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.home-instance {
+  padding: 6px 8px; border-radius: 4px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid transparent;
+}
+.home-instance:hover, .home-instance:focus { border-color: var(--brand-blue); outline: none; }
+.home-instance.current { border-color: var(--brand-blue); background: var(--brand-blue-tint); }
+.home-instance-label { font-size: 12.5px; font-weight: 600; }
+.home-instance-foot { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.home-instance-meta { flex: 1; font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+.home-instance-rename, .home-instance-del {
+  background: none; border: 0; padding: 2px 4px; cursor: pointer;
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+}
+.home-instance-rename:hover { color: var(--brand-blue); text-decoration: underline; }
+.home-instance-del:hover { color: var(--note, #B23A33); text-decoration: underline; }
+.home-card-new {
+  margin-top: 8px; align-self: flex-start;
+  background: none; border: 1px dashed var(--border); border-radius: 4px;
+  padding: 4px 10px; cursor: pointer; font-size: 12px; font-weight: 600;
+  color: var(--text-muted);
+}
+.home-card-new:hover { border-style: solid; border-color: var(--brand-blue); color: var(--brand-blue); }
+.nav-current-which {
+  font-size: 11.5px; color: var(--text-muted); margin: 2px 0 4px;
+}
+
+/* Engagement metadata splits into the customer (shared by the file) and this
+   assessment; the modal groups on that so the difference is visible. */
+.meta-group-h {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin: 18px 0 8px; padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.meta-group-h:first-child { margin-top: 0; }
+.meta-group-h h3 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+.meta-group-h .muted { font-size: 12px; }
+
+/* ---- consultant customisation of report sections ---------------------- */
+.sect-edit {
+  margin-left: auto; font-size: 11.5px; font-weight: 600;
+  padding: 3px 9px; border-radius: 4px; cursor: pointer;
+  background: var(--surface); border: 1px dashed var(--border); color: var(--muted);
+}
+.sect-edit:hover { border-style: solid; border-color: var(--brand-blue); color: var(--brand-blue); }
+.sect-edit.changed { border-style: solid; border-color: var(--brand-blue); color: var(--brand-blue); }
+.sect-edit.open { background: var(--brand-blue); border-color: var(--brand-blue); color: #FFF; }
+
+/* Editing happens in place: the heading becomes a field and the wording
+   becomes a box holding those same sentences, sized to the text. */
+.card.editing { box-shadow: inset 0 0 0 2px var(--brand-blue); }
+
+.sect-title-input {
+  flex: 1; margin: -4px 0;
+  font: inherit; font-size: 16px; font-weight: 600; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 7px;
+}
+.sect-title-input:focus { outline: none; border-color: var(--brand-blue); }
+
+.sect-prose-input {
+  display: block; width: 100%; margin: 0 0 12px;
+  font: inherit; color: var(--text); line-height: 1.55;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px 10px;
+  resize: vertical; overflow: hidden;
+}
+.sect-prose-input:focus { outline: none; border-color: var(--brand-blue); }
+
+.sect-actions {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+
+.terms-editor h3 { margin: 18px 0 0; font-size: 14px; }
+.term-row {
+  display: grid; grid-template-columns: 200px 1fr auto; gap: 10px;
+  align-items: start; margin-bottom: 8px;
+}
+.term-row .term-name, .term-row .term-def {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px;
+}
+.term-row .term-name { font-weight: 600; }
+.term-row .term-def { resize: vertical; line-height: 1.5; }
+.term-row .term-name:focus, .term-row .term-def:focus { outline: none; border-color: var(--brand-blue); }
+.term-remove {
+  background: none; border: 0; padding: 6px 2px; cursor: pointer;
+  font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+}
+.term-remove:hover { color: var(--note, #B23A33); text-decoration: underline; }
+
+/* Tables whose rows open a plan editor - further recommendations, the
+   cross-zone actions - flagged the same way the roadmap rows are. */
+tr.plan-row { cursor: pointer; }
+tr.plan-row:hover td { background: var(--surface-2); }
+tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
+
+.reorder-grip { display: inline-flex; gap: 3px; margin-left: 10px; }
+.priority-row.reordering { display: flex; cursor: grab; }
+.priority-row.reordering .priority-name { flex: 1; }
+/* Same feedback as the remediation roadmap, so reordering looks and behaves
+   the same wherever a list can be reordered. */
+.priority-row.reordering.dragging { opacity: .45; cursor: grabbing; }
+.priority-row.reordering.drop-target { box-shadow: inset 0 2px 0 0 var(--brand-blue); }
+.priority-row.reordering .reorder-btn { cursor: pointer; }
+.reorder-btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 3px; width: 24px; height: 22px; cursor: pointer; line-height: 1;
+}
+.reorder-btn:hover:not(:disabled) { border-color: var(--brand-blue); color: var(--brand-blue); }
+.reorder-btn:disabled { opacity: .35; cursor: default; }
+
+.card.section-hidden { opacity: .45; }
+.section-hidden-tag {
+  margin-left: 10px; font-size: 11px; font-weight: 600;
+  color: var(--note, #B23A33); text-transform: none;
+}
+
+/* "What is in place": the evidence behind requirements that meet target, the
+   counterpart to the gap list. Grouped by Foundational Requirement. */
+.evidence-group + .evidence-group { margin-top: 12px; }
+.evidence-group-h { font-size: 13px; margin-bottom: 4px; }
+.evidence-text {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+  padding-left: 2px;
+}
+
+/* ---------- Posture priority list (worst-to-best ordering) ---------- */
+
+.priority-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.priority-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.priority-row.priority-insufficient {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.priority-rank {
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: right;
+}
+.priority-name {
+  font-weight: 500;
+}
+
+/* Compact inline priority used in the interview running banner. */
+.priority-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 10px;
+  font-size: 13px;
+}
+.priority-inline-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  margin-right: 4px;
+}
+.priority-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.priority-chip .pill {
+  font-size: 10px;
+  padding: 1px 6px;
+}
+
+/* ---------- CAF (caf-achieved) capture ---------- */
+
+/* Profile selector lives in the sidebar above the objectives nav. */
+.caf-profile-select {
+  width: calc(100% - 36px);
+  margin: 0 18px 6px;
+  font-size: 13px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+.caf-placeholder-banner {
+  margin: 0 18px 8px;
+  padding: 6px 10px;
+  background: var(--near-bg);
+  border: 1px solid var(--near);
+  color: var(--near);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.3;
+}
+/* Two-step picker: a small label above each <select>. */
+.caf-picker-label {
+  display: block;
+  margin: 0 18px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+.caf-picker-label + .caf-profile-select { margin-bottom: 8px; }
+/* Active (non-placeholder) profile confirmation under the picker. */
+.caf-profile-active-note {
+  margin: 0 18px 8px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.3;
+}
+/* Persistent active-profile chip in the top header. */
+.engagement-profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #EAF2F8;
+}
+.engagement-profile-chip.placeholder {
+  background: var(--near-bg);
+  color: var(--near);
+}
+.engagement-profile-chip .chip-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--near);
+  color: #fff;
+}
+
+/* Objective header rows in the sidebar: clickable, with a chevron, then
+   the principle children sit slightly indented under them. */
+.nav-item.caf-obj-header {
+  font-weight: 600;
+  color: var(--brand-blue-dark);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.nav-item.caf-obj-header:hover { background: var(--surface-3); }
+.caf-obj-chevron { display: inline-block; width: 12px; color: var(--text-muted); }
+.nav-item.caf-prin {
+  padding-left: 28px;
+  font-size: 13px;
+}
+
+/* CAF state buttons use the semantic palette directly so the consultant
+   sees Achieved / Partially / Not Achieved colour-cued at all times. */
+.caf-state-row { gap: 6px; flex-wrap: wrap; }
+.caf-state-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  padding: 5px 12px;
+  border-radius: var(--radius);
+  min-width: 130px;
+  cursor: pointer;
+}
+.caf-state-btn:hover:not(.active) { background: var(--surface-2); }
+.caf-state-achieved.active { background: var(--met);  color: #FFF; border-color: var(--met); }
+.caf-state-partially.active { background: var(--near); color: #FFF; border-color: var(--near); }
+.caf-state-not.active       { background: var(--gap);  color: #FFF; border-color: var(--gap); }
+/* CSMS conformance: "Largely in place" sits between Partially and In place. */
+.csms-state-largely.active  { background: var(--brand-blue-dark, #1d4ed8); color: #FFF; border-color: var(--brand-blue-dark, #1d4ed8); }
+
+/* Autosave restore bar: a fixed prompt offering to recover an unsaved session. */
+.autosave-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 9999;
+  display: flex; align-items: center; gap: 10px;
+  /* --surface-1 and --line-soft do not exist, so this was a hardcoded white bar
+     carrying var(--text) - which is near-white in the dark theme, leaving the
+     message unreadable. Use the tokens the rest of the app defines. */
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-left: 4px solid var(--brand-blue);
+  border-radius: 8px; padding: 10px 14px; box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  max-width: 92vw; font-size: 13px;
+}
+.autosave-bar .autosave-msg { margin-right: 4px; }
+/* Discard sits on the bar's own light surface, so it cannot use .btn.ghost -
+   that is white-on-transparent for the dark header and vanishes here. It reads
+   as the quieter choice beside Restore without pretending to be harmless. */
+.autosave-bar .autosave-discard {
+  background: var(--surface);
+  color: var(--text-muted);
+  border-color: var(--border-strong);
+}
+.autosave-bar .autosave-discard:hover {
+  background: var(--gap-bg);
+  color: var(--gap);
+  border-color: var(--gap);
+}
+/* Leave it alone and get on with the day. */
+.autosave-bar .autosave-dismiss {
+  background: none; border: 0; cursor: pointer;
+  color: var(--text-muted);
+  font-size: 20px; line-height: 1; padding: 2px 6px; margin-left: 2px;
+  border-radius: 4px;
+}
+.autosave-bar .autosave-dismiss:hover { background: var(--surface-2); color: var(--text); }
+
+/* State summaries (paraphrased memory jogs) under the buttons. */
+.caf-summaries { margin-top: 12px; }
+.caf-summary-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+/* Indicators of good practice: Achieved / Partially / Not, side by side where
+   there is room. auto-fit on a minimum column width rather than a viewport
+   media query, because what matters is how wide THIS container is - the same
+   block appears in a narrow expander and in the wide wizard column, and a
+   viewport query cannot tell them apart. Below ~700px of container the columns
+   stack instead of squeezing verbatim CAF text into ninety pixels. */
+.caf-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+/* The criteria stack in the wizard's answer column, under the state buttons. */
+.caf-criteria { margin-top: 14px; }
+.caf-criteria .sl-items-toggle { margin-top: 8px; }
+.caf-criteria .caf-summaries { margin-top: 6px; }
+.caf-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.caf-summary-achieved  { border-left-color: var(--met); }
+.caf-summary-partially { border-left-color: var(--near); }
+.caf-summary-not       { border-left-color: var(--gap); }
+.caf-summary-tag {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.caf-igp-list { margin: 4px 0 0 16px; padding: 0; }
+
+/* Supplementary guidance from a regulator profile. */
+.caf-supplementary {
+  margin-top: 10px;
+  background: var(--brand-blue-tint);
+  border: 1px solid var(--brand-blue);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--brand-blue-dark);
+}
+.caf-supplementary-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+/* Combined state-guidance panel: the CAF indicators of good practice (or
+   paraphrased state summaries) plus the OT lens, revealed together by the
+   toggle to the right of the state buttons. Collapsed by default. */
+.caf-state-guide {
+  margin: 10px 0 4px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.caf-state-guide .caf-summaries:first-child { margin-top: 0; }
+.caf-lens-wrap { margin-top: 12px; }
+
+/* Verbatim control/requirement text (NIST SP 800-53), rendered line-by-line so
+   the a./b./c. hierarchy reads clearly. */
+.caf-control-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: normal;
+}
+.caf-control-line { margin: 0 0 3px; }
+.caf-control-line:empty { display: none; }
+
+/* OT lens panel - shown when the toggle is open. Reuses the SL-guidance
+   "What each SL requires" button styling for the toggle itself. */
+.caf-lens-panel {
+  margin: 8px 0 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.caf-lens-framing { margin: 0 0 6px; }
+.caf-lens-refs    { color: var(--text-muted); font-size: 12px; margin: 6px 0; }
+.caf-lens-gotchas { margin: 6px 0 0; color: var(--text); }
+
+/* ---------- Program maturity (program-maturity-ml) capture ---------- */
+
+/* SPE title that toggles its summary: clickable, with a chevron. */
+.page-title.ml-spe-title { cursor: pointer; user-select: none; }
+.page-title.ml-spe-title:hover { color: var(--brand-blue); }
+.ml-spe-chevron { color: var(--text-muted); font-size: 0.8em; }
+.ml-spe-summary { margin-top: 4px; max-width: 70ch; }
+
+.req.ml-req { padding: 16px 0; border-bottom: 1px solid var(--border); }
+/* Requirement title that toggles the on-demand detail panel (hint / verbatim
+   text): clickable, with a chevron. */
+.ml-req-titletoggle { cursor: pointer; user-select: none; }
+.ml-req-titletoggle:hover .req-title { color: var(--brand-blue); }
+.ml-req-chevron { color: var(--text-muted); font-size: 0.85em; margin-right: 2px; }
+.ml-req-detail {
+  margin: 6px 0 10px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 80ch;
+}
+.ml-req-verbatim-label,
+.ml-req-hint-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.ml-req-hint-label { margin-top: 8px; }
+.ml-req-verbatim { margin: 0; color: var(--text); }
+.ml-req-hint { margin: 0; }
+/* Single ordered capture control: one row of buttons (Not met / ML1-4 with
+   short labels) plus Unknown / N/A alongside, separated by a small gap. The
+   full ML definitions live in the reference panel, not here. */
+.ml-scale-row { gap: 6px; flex-wrap: wrap; align-items: center; }
+.ml-scale-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ml-scale-btn:hover { background: var(--surface-2); border-color: var(--brand-blue); }
+/* A thin divider between the scored scale and the non-scoring options. */
+.ml-scale-sep {
+  display: inline-block;
+  width: 1px;
+  align-self: stretch;
+  min-height: 22px;
+  margin: 0 4px;
+  background: var(--border-strong);
+}
+/* Active selection uses the semantic palette: not-met red, ML1 grey,
+   ML2 amber, ML3 green, ML4 brand-blue; unknown/na muted. */
+.ml-scale-btn.active { color: #fff; border-color: transparent; font-weight: 600; }
+.ml-scale-btn.active.ml-notmet  { background: var(--gap); }
+.ml-scale-btn.active.ml-ml1     { background: var(--text-muted); }
+.ml-scale-btn.active.ml-ml2     { background: var(--near); }
+.ml-scale-btn.active.ml-ml3     { background: var(--met); }
+.ml-scale-btn.active.ml-ml4     { background: var(--brand-blue); }
+.ml-scale-btn.active.ml-unknown { background: var(--text-soft); }
+.ml-scale-btn.active.ml-na      { background: var(--na); }
+
+.ml-target-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.ml-target-label { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
+.ml-target-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 3px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ml-target-btn:hover { border-color: var(--brand-blue); color: var(--text); }
+.ml-target-btn.active {
+  background: var(--brand-blue-tint);
+  border-color: var(--brand-blue);
+  color: var(--brand-blue-dark);
+  font-weight: 600;
+}
+
+/* ---------- Guided wizard (design B: focused card + inline context) ----------
+   One question per page, but using the full width: a domain stepper and a
+   progress bar across the top, an elevated card that pairs the answer (left)
+   with supporting context (right), and a sticky footer bar for movement.
+   Replaces the older centred-column-with-side-arrows layout. */
+.wizard { max-width: 1180px; margin: 0 auto; }
+
+/* Top bar: domain stepper + progress + counter. */
+.wizard-topbar { margin-bottom: 4px; }
+.wizard-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.wizard-step {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+.wizard-step:hover { border-color: var(--brand-blue); color: var(--text); }
+.wizard-step.done { color: var(--text-muted); }
+.wizard-step.active {
+  background: var(--brand-blue-tint);
+  border-color: var(--brand-blue);
+  color: var(--brand-blue-dark);
+  font-weight: 700;
+}
+.wizard-step-sep { color: var(--border-strong); font-size: 13px; }
+.wizard-topmeta {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.wizard-topmeta strong { color: var(--text); }
+.wizard-progress {
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+.wizard-progress-bar {
+  height: 100%;
+  background: var(--brand-blue);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+/* The two-column question card. */
+.wizard-card {
+  margin: 22px 0 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(20, 33, 52, 0.12);
+}
+.wizard-answer {
+  flex: 1.5;
+  min-width: 0;
+  padding: 26px 30px;
+}
+/* The answer column reuses the verbose posture question (band list + capture),
+   so flatten its outer padding - the column already provides it. */
+.wizard-answer .posture-q { padding: 0; }
+.wizard-context {
+  flex: 0 0 322px;
+  width: 322px;
+  border-left: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 24px 22px;
+}
+@media (max-width: 1000px) {
+  .wizard-card { flex-direction: column; }
+  .wizard-context {
+    flex: none;
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* Context column blocks. */
+.wiz-ctx-block { margin-bottom: 18px; }
+.wiz-ctx-block:last-child { margin-bottom: 0; }
+.wiz-ctx-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.wiz-ctx-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.wiz-ctx-good {
+  padding: 11px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--met);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.wiz-ctx-maps { display: flex; gap: 6px; flex-wrap: wrap; }
+.wiz-ctx-tag {
+  background: var(--surface-3);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+}
+
+/* Sticky footer navigation - replaces the side arrows. */
+.wizard-footbar {
+  position: sticky;
+  bottom: 16px;
+  margin-top: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wizard-footbar .spacer { flex: 1; }
+.wizard-footmeta { font-size: 13px; color: var(--text-muted); }
+
+.btn.disabled, .btn[disabled] { opacity: 0.45; cursor: default; pointer-events: none; }
+
+/* Verbose band selector: one clickable list (number + label + description)
+   replacing the compact buttons + read-only anchor grid. Used in the wizard. */
+.band-verbose { margin: 4px 0 0; }
+.band-choices { display: flex; flex-direction: column; gap: 8px; }
+.band-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--text);
+}
+.band-choice:hover { border-color: var(--brand-blue); background: var(--surface-2); }
+.band-choice.active {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue-tint);
+  box-shadow: inset 0 0 0 1px var(--brand-blue);
+}
+.band-choice-num {
+  flex: 0 0 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.band-choice.active .band-choice-num { background: var(--brand-blue); color: #fff; }
+.band-choice-body { display: flex; flex-direction: column; gap: 3px; }
+.band-choice-label { font-weight: 600; }
+.band-choice-anchor { font-size: 13px; color: var(--text-muted); line-height: 1.45; }
+
+/* Unknown choice sits at the top; selected, it reads neutral (not a positive
+   capability score) rather than brand-blue. */
+.band-choice-unknown .band-choice-num { background: var(--surface-3); color: var(--text-muted); }
+.band-choice-unknown.active {
+  border-color: var(--text-soft);
+  background: var(--na-bg);
+  box-shadow: inset 0 0 0 1px var(--text-soft);
+}
+.band-choice-unknown.active .band-choice-num { background: var(--text-soft); color: #fff; }
+
+/* When the question is marked N/A, the band list is dimmed (still clickable -
+   choosing a band clears N/A). */
+.band-choices.is-na { opacity: 0.4; }
+
+/* N/A as a question-level toggle in the header. */
+.na-toggle {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.na-toggle:hover { border-color: var(--na); color: var(--text); }
+.na-toggle.active { background: var(--na-bg); border-color: var(--na); color: var(--na); }
+
+/* Verbose question (wizard): flatten the nested boxes - the question prompt is
+   larger, and the capture fields sit under a divider rather than in their own
+   shaded panel. */
+.posture-q-verbose .req-title { font-size: 16px; }
+.posture-q-verbose .capture-block {
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: 14px 0 0;
+  margin-top: 16px;
+}
+
+/* ---------- Posture (domain-letter) capture ---------- */
+
+.posture-q { padding: 14px 0; }
+.posture-q .anchors {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+.posture-q .anchors .anchor {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.posture-q .anchors .anchor.active {
+  background: var(--brand-blue-tint);
+  border-color: var(--brand-blue);
+  color: var(--brand-blue-dark);
+}
+.posture-q .anchors .anchor .anchor-num {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 16px;
+  margin-right: 4px;
+}
+.posture-q .capture-block {
+  margin-top: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+@media (max-width: 900px) { .posture-q .anchors { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- Tables ---------- */
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+.tbl th, .tbl td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  font-size: 13px;
+}
+.tbl thead th {
+  background: var(--surface-2);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+.tbl tbody tr:hover { background: var(--surface-2); }
+.tbl th.center, .tbl td.center  { text-align: center; }
+.tbl th.right,  .tbl td.right   { text-align: right; }
+.tbl td.met  { background: var(--met-bg); }
+.tbl td.near { background: var(--near-bg); }
+.tbl td.gap  { background: var(--gap-bg); }
+.tbl td.severe { background: var(--severe-bg); color: var(--severe); font-weight: 700; }
+.tbl td.above { background: var(--above-bg); color: var(--above); }
+.tbl td.na   { background: var(--na-bg); color: var(--text-muted); }
+/* "Example questions to ask" list (inspector prompts, behind their own toggle). */
+.caf-questions { margin: 6px 0 0; padding-left: 18px; }
+.caf-questions li { margin: 4px 0; font-size: 13px; line-height: 1.5; }
+
+/* Totals row: bold, with a heavier rule separating it from the body. */
+.tbl tfoot td { font-weight: 700; border-top: 2px solid var(--border-strong); border-bottom: none; }
+.tbl tfoot tr:hover { background: transparent; }
+
+/* ---------- Sites toolbar ---------- */
+
+.sites-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.site-tab {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.site-tab.active {
+  background: var(--brand-blue);
+  color: #FFF;
+  border-color: var(--brand-blue);
+}
+/* The system-wide layer is not a target, so its tab reads as a different kind
+   of thing: dashed, and separated from the zones that follow it. */
+.site-tab-shared {
+  border-style: dashed;
+  margin-right: 6px;
+}
+.site-tab-shared::after {
+  content: "";
+  border-right: 1px solid var(--border);
+  align-self: stretch;
+  margin-left: 10px;
+  margin-right: -8px;
+}
+.site-tab.active .x { color: #FFF; }
+.site-tab .x {
+  color: var(--text-soft);
+  margin-left: 2px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- Modal ---------- */
+
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,30,50,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  width: min(720px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  box-shadow: 0 6px 30px rgba(15,30,50,0.18);
+}
+.modal-h { padding: 14px 18px; border-bottom: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.modal-h h2 { margin: 0; font-size: 16px; }
+.modal-b { padding: 18px; }
+.modal-f { padding: 12px 18px; border-top: 1px solid var(--border); display:flex; justify-content:flex-end; gap: 8px; }
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed;
+  bottom: 20px; right: 20px;
+  background: var(--text);
+  color: #FFF;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(15,30,50,0.2);
+  z-index: 60;
+  max-width: 360px;
+}
+.toast.warn { background: var(--near); }
+.toast.err { background: var(--gap); }
+
+/* ---------- Report ---------- */
+
+.report-section { margin-bottom: 26px; }
+.report-section h2 {
+  font-size: 18px;
+  margin: 0 0 10px;
+  color: var(--brand-blue-dark);
+}
+.report-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; }
+@media (max-width: 1100px) { .report-grid { grid-template-columns: 1fr; } }
+
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+}
+.kpi .lbl { color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px; font-weight: 600; }
+.kpi .val {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  /* Pmark inside a 22px letter sits on the line baseline by default and looks
+     too low; flex+center pulls them onto the same horizontal mid-line. */
+}
+.kpi .val.met  { color: var(--met); }
+.kpi .val.near { color: var(--near); }
+.kpi .val.gap  { color: var(--gap); }
+/* KPI value variants: a wrapping pill row, a compact wrapping text value, and
+   a small muted sub-line stacked beneath a value (e.g. coverage + confidence). */
+.kpi .val.kpi-pills { flex-wrap: wrap; gap: 6px; font-size: 13px; font-weight: 600; }
+.kpi .val.kpi-small { display: block; font-size: 14px; font-weight: 600; line-height: 1.35; margin-top: 6px; }
+.kpi .val.kpi-stack { flex-direction: column; align-items: flex-start; }
+.kpi .kpi-sub { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+
+/* ---------- Gap roadmap (interactive remediation planning) ---------- */
+.small { font-size: 12px; }
+.rm-table tbody tr.rm-row { cursor: pointer; transition: background 0.1s; }
+.rm-table tbody tr.rm-row:hover { background: var(--brand-blue-tint); }
+.rm-table tbody tr.rm-row.dragging { opacity: 0.45; }
+.rm-table tbody tr.rm-row.drop-target td { box-shadow: inset 0 2px 0 0 var(--brand-blue); }
+.rm-pri { white-space: nowrap; }
+.rm-handle {
+  display: inline-block;
+  cursor: grab;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: -1px;
+  margin-right: 6px;
+  user-select: none;
+}
+.rm-table tbody tr.rm-row.dragging .rm-handle { cursor: grabbing; }
+.pri-badge { display: inline-block; font-weight: 700; font-size: 13px; }
+.pri-band {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.pri-band.high   { background: var(--gap-bg);  color: var(--gap); }
+.pri-band.medium { background: var(--near-bg); color: var(--near); }
+.pri-band.low    { background: var(--brand-blue-tint); color: var(--brand-blue); }
+
+/* ---------- Coming soon ---------- */
+
+.coming-soon {
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+  padding: 22px 24px;
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+}
+.coming-soon h2 { color: var(--brand-blue-dark); margin-top: 0; }
+.coming-soon .tag {
+  display: inline-block;
+  background: var(--brand-blue-tint);
+  color: var(--brand-blue-dark);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 10px;
+}
+
+/* ---------- Print ---------- */
+
+@media print {
+  .sidebar, .header, .no-print { display: none !important; }
+  .app { display: block; height: auto; }
+  .main { padding: 0; background: #FFF; }
+  .card { box-shadow: none; border-color: #CCC; page-break-inside: avoid; }
+}
+
+/* ---------- Misc ---------- */
+
+.muted { color: var(--text-muted); }
+.soft  { color: var(--text-soft); }
+.spacer-12 { height: 12px; }
+.spacer-20 { height: 20px; }
+.hidden { display: none !important; }
+.row-flex { display: flex; gap: 10px; align-items: center; }
+.row-flex.wrap { flex-wrap: wrap; }
+.right { text-align: right; }
+.center { text-align: center; }
+.legend {
+  display: flex; gap: 14px; flex-wrap: wrap; color: var(--text-muted);
+  font-size: 12px; align-items: center;
+}
+.legend .sw {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px;
+  vertical-align: middle;
+}
+.legend .sw.met  { background: var(--met); }
+.legend .sw.near { background: var(--near); }
+.legend .sw.gap  { background: var(--gap); }
+.legend .sw.severe { background: var(--severe); }
+.legend .sw.above { background: var(--above); }
+.legend .sw.na   { background: var(--na); }
+.legend .sw.target { background: var(--brand-blue); }
+
+/* ---------- Interview list view (design B: merged selector, collapsible) ----
+   Replaces the dense stacked layout (band buttons + duplicate read-only anchor
+   grid + oversized notes). Each question is a self-contained card with a
+   coloured answer-state edge, a merged 4-up band/anchor selector, inline
+   capture, and per-question / per-domain collapse for scanning long sets. */
+
+/* Toolbar above the domains: collapse controls. */
+.interview-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+.interview-toolbar .spacer { flex: 1; }
+
+/* Domain section: collapsible header with progress, then its question cards. */
+.domain-sec { margin-top: 22px; }
+.domain-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+.domain-sec-head:hover { border-color: var(--border-strong); }
+.domain-sec-chev {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-soft); font-size: 14px; line-height: 1;
+  padding: 0; width: 16px; flex: none;
+  transition: transform 0.15s ease;
+}
+.domain-sec.collapsed .domain-sec-chev { transform: rotate(-90deg); }
+.domain-sec-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.domain-sec-code { font-size: 12px; color: var(--text-soft); }
+.domain-sec-meta { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.domain-sec-count { font-size: 12px; color: var(--text-muted); }
+.domain-sec-bar {
+  width: 90px; height: 6px; background: var(--surface-3);
+  border-radius: 999px; overflow: hidden;
+}
+.domain-sec-bar > span { display: block; height: 100%; background: var(--brand-blue); border-radius: 999px; }
+.domain-sec-body { margin-top: 2px; }
+.domain-sec.collapsed .domain-sec-body { display: none; }
+
+/* Question card. */
+.q-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-top: 12px;
+}
+.q-card.state-met     { border-left-color: var(--met); }
+.q-card.state-near    { border-left-color: var(--near); }
+.q-card.state-gap     { border-left-color: var(--gap); }
+.q-card.state-unknown { border-left-color: var(--text-soft); }
+.q-card.state-na      { border-left-color: var(--na); }
+.q-card.state-context { border-left-color: var(--brand-blue); }
+
+.q-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.q-head-main { display: flex; gap: 12px; align-items: baseline; min-width: 0; }
+.q-head-main .req-code { font-weight: 700; color: var(--brand-blue-dark); }
+.q-head-main .req-title { font-weight: 600; font-size: 15px; }
+.q-head-meta { display: flex; align-items: center; gap: 8px; flex: none; }
+.q-notscore { display: flex; align-items: center; gap: 6px; }
+.q-notscore-lbl { font-size: 12px; color: var(--text-muted); }
+.mini-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 4px 11px; border-radius: 4px;
+  font-size: 12px; cursor: pointer;
+  font-family: inherit; line-height: 1.3;
+}
+.mini-btn:hover { border-color: var(--brand-blue); color: var(--text); }
+.mini-btn.unknown.active { background: var(--na-bg); border-color: var(--text-soft); color: var(--text-soft); }
+.mini-btn.na.active      { background: var(--na-bg); border-color: var(--na); color: var(--na); }
+.q-chev {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-soft); font-size: 15px; line-height: 1;
+  padding: 2px 4px;
+  transition: transform 0.15s ease;
+}
+.q-card.collapsed .q-chev { transform: rotate(-90deg); }
+
+/* Merged band + anchor selector: a 4-up grid of self-describing cells. */
+.band-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+@media (max-width: 1000px) { .band-grid { grid-template-columns: repeat(2, 1fr); } }
+.band-grid.is-na { opacity: 0.4; }
+.band-cell {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 11px 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+.band-cell:hover { border-color: var(--brand-blue); }
+.band-cell.active {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue-tint);
+  box-shadow: inset 0 0 0 1px var(--brand-blue);
+}
+.band-cell-top { display: flex; gap: 9px; align-items: center; }
+.band-cell-num {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  background: var(--surface-3); color: var(--text-muted);
+  font-weight: 700; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.band-cell.active .band-cell-num { background: var(--brand-blue); color: #fff; }
+.band-cell-label { font-weight: 600; font-size: 13.5px; }
+.band-cell-anchor { font-size: 12px; color: var(--text-muted); margin-top: 7px; line-height: 1.4; }
+
+/* Capture row: fields sit inline next to a compact notes box. */
+.q-capture {
+  display: flex; gap: 28px; flex-wrap: wrap;
+  margin-top: 16px; align-items: flex-start;
+}
+.q-capture .field { margin: 0; }
+.q-capture .field.notes { flex: 1; min-width: 280px; }
+.q-capture .field > label {
+  display: block;
+  font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-soft); font-weight: 700; margin-bottom: 8px;
+}
+.q-capture textarea { min-height: 42px; }
+
+/* Collapsed question: a single scannable line. */
+.q-summary { display: flex; align-items: center; gap: 14px; cursor: pointer; }
+.q-summary .req-code { font-weight: 700; color: var(--brand-blue-dark); width: 48px; flex: none; }
+.q-summary-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-summary-note {
+  color: var(--text-soft); font-size: 12.5px; flex: none;
+  max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.q-summary .q-chev { margin-left: auto; }
+
+/* ---- find & jump: quick-find palette + jumped-to highlight ------------- */
+.nav-item.nav-find { color: var(--text-muted); }
+.nav-item .kbd {
+  margin-left: auto;
+  font-size: 10.5px; letter-spacing: 0.3px;
+  color: var(--text-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px; padding: 1px 5px;
+  background: var(--surface-2);
+}
+.find-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,30,50,0.45);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 12vh;
+  z-index: 60;
+}
+.find-box {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 48px rgba(15,30,50,0.28);
+  width: min(680px, calc(100vw - 40px));
+  max-height: 70vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.find-input {
+  border: none; outline: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 17px;
+  padding: 16px 18px;
+}
+.find-input::placeholder { color: var(--text-soft); }
+.find-results { overflow-y: auto; padding: 6px; }
+.find-result {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 9px 12px; border-radius: var(--radius);
+  cursor: pointer;
+}
+.find-result.active { background: var(--brand-blue-tint); }
+.find-result-code {
+  flex: none; font-weight: 600; color: var(--brand-blue-dark);
+  font-size: 13px; min-width: 62px;
+}
+.find-result-title {
+  flex: 1 1 auto; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.find-result-group {
+  flex: none; color: var(--text-soft); font-size: 12px;
+  max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.find-empty { padding: 16px 14px; }
+.find-hint {
+  border-top: 1px solid var(--border);
+  padding: 8px 14px; font-size: 12px;
+}
+
+/* "Hide answered" capture-page toggle: answered items collapse away so only
+   the remaining work is visible. */
+.hide-answered .req.is-answered { display: none; }
+
+/* Keyboard focus for the div/span interactive controls (sidebar rows, site
+   tabs) made focusable for keyboard use. */
+.nav-item:focus-visible, .nav-family-title:focus-visible, .site-tab:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: -2px;
+}
+
+/* The requirement a jump landed on: a brief tint pulse so the eye finds it. */
+.req.jump-flash, .q-card.jump-flash, .ra-item.jump-flash {
+  animation: jumpFlash 2.2s ease-out;
+}
+@keyframes jumpFlash {
+  0%   { box-shadow: 0 0 0 3px var(--brand-blue); background: var(--brand-blue-tint); }
+  100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+}
+
+/* ---------- Risk appetite (exposure vs appetite coherence) ---------------
+   Deliberately colour-neutral. Neither axis has a good end: painting
+   "tolerant" red or "averse" green would be the tool asserting a position it
+   has no basis for. Selection is shown by weight and the brand tint only, and
+   the same styling serves both axes. The one place colour IS used is the
+   coherence verdict, where under-protection genuinely is the serious finding. */
+.ra-prompt {
+  border-left: 3px solid var(--brand-blue);
+  background: var(--brand-blue-tint);
+  padding: 10px 12px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 0 0 10px;
+}
+.ra-prompt-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase; color: var(--brand-blue-dark); margin-bottom: 3px;
+}
+.ra-prompt-text { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text); }
+
+.ra-band-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.ra-band-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  min-width: 108px;
+  cursor: pointer;
+  font: inherit;
+}
+.ra-band-btn:hover:not(.active) { background: var(--surface-2); }
+.ra-band-btn.active {
+  background: var(--brand-blue); border-color: var(--brand-blue);
+  color: #FFF; font-weight: 600;
+}
+
+.ra-band-legend {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.ra-band-def { border-left: 2px solid var(--border); padding-left: 10px; }
+.ra-band-name { font-weight: 600; margin-bottom: 2px; }
+
+.check-row { display: flex; align-items: flex-start; gap: 8px; margin: 6px 0; cursor: pointer; }
+.check-row input { margin-top: 3px; flex: none; }
+
+/* The verdict. Severity is real here - under-protection is the finding the
+   instrument exists to surface - so it alone carries weight. */
+.ra-verdict { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ra-verdict-badge {
+  font-size: 15px; font-weight: 700; padding: 4px 12px; border-radius: var(--radius);
+  border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text);
+}
+.ra-verdict-badge.under-protected { background: var(--gap-bg); color: var(--gap); border-color: var(--gap); }
+.ra-verdict-badge.over-invested  { background: var(--near-bg); color: var(--near); border-color: var(--near); }
+.ra-verdict-badge.aligned        { background: var(--met-bg); color: var(--met); border-color: var(--met); }
+.ra-verdict-badge.incomplete     { background: var(--na-bg); color: var(--na); border-color: var(--na); }
+
+/* Risk appetite: what the selected band means for this item, and the
+   choice-or-constraint control on technical readings. Neutral, like the rest
+   of this instrument's controls. */
+.ra-anchors { margin: 6px 0 4px; }
+.ra-anchor-current { margin: 6px 0 0; font-size: 13px; color: var(--text-muted); }
+.ra-anchor-current strong { color: var(--text); }
+.ra-band-def.current { border-left-color: var(--brand-blue); }
+.ra-disposition label { font-weight: 600; }
+.ra-disposition-row { margin-top: 4px; }
+.ra-disp-btn { min-width: 0; }
+/* "Could not establish" sits with the bands but is not one of them. */
+.ra-band-btn.ra-ne-btn { border-style: dashed; color: var(--text-muted); }
+.ra-band-btn.ra-ne-btn.active { background: var(--na-bg); color: var(--text); border-color: var(--na); border-style: solid; font-weight: 600; }
+/* Aligned, but leaning towards under-protection: in proportion, worth watching. */
+.ra-verdict-badge.aligned.leaning-under { background: var(--near-bg); color: var(--near); border-color: var(--near); }
+
+/* ---------- Ready to issue -------------------------------------------------
+   The report page's check: what would print red in the Word report (blocks a
+   final) and what is worth a look first. Compact; each line goes to the field. */
+.issue-check .issue-pill {
+  font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-muted);
+}
+.issue-check .issue-pill.blocked { background: var(--gap-bg); color: var(--gap); border-color: var(--gap); }
+.issue-check .issue-pill.ready   { background: var(--met-bg); color: var(--met); border-color: var(--met); }
+.issue-check .issue-lead { margin: 0 0 6px; font-size: 13px; }
+.issue-check h3 { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); }
+.issue-list { list-style: none; margin: 0; padding: 0; }
+.issue-line {
+  display: flex; align-items: baseline; gap: 10px; padding: 3px 0 3px 10px;
+  border-left: 3px solid var(--border); font-size: 13px; margin: 2px 0;
+}
+.issue-line.block { border-left-color: var(--gap); }
+.issue-line.warn  { border-left-color: var(--near); }
+.issue-line .issue-text { flex: 1 1 auto; }
+.issue-line .issue-go {
+  flex: none; font: inherit; font-size: 12px; color: var(--brand-blue); background: none;
+  border: 0; padding: 0; cursor: pointer; text-decoration: underline;
+}
+.issue-more { font: inherit; font-size: 12px; color: var(--text-muted); background: none; border: 0; padding: 2px 0 0 13px; cursor: pointer; text-decoration: underline; }
+.export-issue-note { margin: 4px 0 0; font-size: 12.5px; }
+.export-issue-note.blocked { color: var(--gap); }
+/* A field the check took the consultant to: the same pulse as a find-jump. */
+.check-flash { animation: jumpFlash 2.2s ease-out; }

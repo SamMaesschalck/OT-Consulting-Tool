@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Previous assessment file that cannot be read</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Storage.loadProjectFromFile now hands the parsed file to its caller outside
+  its own try (so a caller's error is no longer reported as "could not parse").
+  "Load previous assessment..." on the report did nothing to catch its own
+  errors, so a file that parsed but held its sites as something other than a
+  list threw unseen: the consultant chose a file and nothing happened at all.
+  It now says the file could not be used.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  var A = window.App, E = A.Engine, STG = A.Storage;
+  window.confirm = function () { return true; };
+  var uncaught = [];
+  window.addEventListener("error", function (ev) { uncaught.push(ev.message); });
+
+  function toastText() { return document.getElementById("toast").textContent || ""; }
+  function waitFor(cond, then, tries) {
+    tries = tries == null ? 100 : tries;
+    if (cond() || tries <= 0) { then(); return; }
+    setTimeout(function () { waitFor(cond, then, tries - 1); }, 30);
+  }
+
+  E.loadCatalog();
+  A.UI.init({ autosave: false });
+  E.activateInstrument("ncsc-caf");
+  E.updateMetadata({ clientName: "Acme Water" });
+  A.UI.go("report");
+
+  var input = [].slice.call(document.getElementById("main").querySelectorAll("input[type=file]"))[0];
+  ok(!!input, "the report offers a previous-assessment file input");
+  if (!input) { done(); return; }
+
+  var prev = JSON.parse(JSON.stringify(E.getProjectFile()));
+  var id = prev.activeAssessmentId;
+  prev.assessments[id].targets = { t1: { id: "t1", name: "Site 1" } };    // not a list
+  var dt = new DataTransfer();
+  dt.items.add(new File([JSON.stringify(prev)], "previous.json", { type: "application/json" }));
+  input.files = dt.files;
+  document.getElementById("toast").textContent = "";
+  input.dispatchEvent(new Event("change"));
+
+  waitFor(function () { return toastText() !== ""; }, function () {
+    ok(/could not be used as the previous assessment/.test(toastText()),
+       "the consultant is told the file could not be used", "toast: '" + toastText() + "'");
+    ok(!/is not a function/.test(toastText()), "in words, not as the script error behind it", toastText());
+    ok(uncaught.length === 0, "nothing is thrown unseen", uncaught.join(" | "));
+    ok(!E.getBaseline(), "and no baseline is set from it");
+    done();
+  });
+});
+</script>
+</body></html>

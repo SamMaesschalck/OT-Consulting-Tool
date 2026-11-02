@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Removing a recommendation</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  A recommendation can be added on any item, in any list view and any wizard.
+  It must be removable the same way, and removing one that holds text has to
+  ask first - a misclick otherwise silently deletes the consultant's own words,
+  which nothing else in the file can reconstruct.
+
+  The rule is the evidence register's: confirm only when there is something to
+  lose. Adding a recommendation and immediately changing your mind is one
+  click, not a dialogue.
+-->
+<div class="app"><div class="header"><div class="brand"><span class="sub">x</span></div>
+<span id="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["caf", "sl"] });</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+
+  // A real confirm() blocks headless Edge for ever, so it is stubbed - and the
+  // stub records what it was asked, which is half of what is being tested.
+  var asked = [], reply = true;
+  window.confirm = function (m) { asked.push(String(m)); return reply; };
+
+  function main() { return document.getElementById("main"); }
+  function card(reqId) { return main().querySelector('[data-req-id="' + CSS.escape(reqId) + '"]'); }
+  function btn(root, txt) {
+    return [].slice.call((root || main()).querySelectorAll("button")).filter(function (b) {
+      return b.textContent.trim() === txt;
+    })[0] || null;
+  }
+  function plan(tid, id) {
+    var r = E.findResponse(tid, id) || {};
+    return { band: r.priorityBand || "", owner: r.owner || "", action: r.action || "",
+             impact: r.impact || "", rank: r.priorityRank };
+  }
+  function hasPlan(p) { return !!(p.band || p.owner || p.action || p.impact || typeof p.rank === "number"); }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+    E.activateInstrument("iec-62443-3-3");
+    A.TourSL.apply(E);
+
+    var SHARED = E.SHARED_TARGET_ID;
+
+    // ---- list view, the consultant's own recommendation -------------------
+    // On the shared scope the plan belongs to the scope being edited, so this
+    // is the plain case: a card with its own recommendation on it.
+    E.setActiveTarget(SHARED);
+    A.UI.go("fr", "FR1");
+    var withPlan = null;
+    (E.state.instrument.requirements || []).forEach(function (r) {
+      if (!withPlan && r.frId === "FR1" && hasPlan(plan(SHARED, r.id))) withPlan = r.id;
+    });
+    ok(!!withPlan, "the demo gives FR1 a requirement carrying a recommendation", withPlan || "none");
+
+    var c = card(withPlan);
+    ok(!!c, "its card renders in the list view");
+    var remove = c && c.querySelector(".rec-remove");
+    ok(!!remove, "the list view offers a Remove control on the recommendation");
+
+    // "#shot" stops here, with a filled recommendation on screen, so the
+    // control can be eyeballed in place.
+    if ((location.hash || "").indexOf("shot") !== -1) {
+      document.getElementById("out").style.display = "none";
+      c.scrollIntoView();
+      return;
+    }
+
+    // Declining must change nothing. Tested first, so a broken decline cannot
+    // be hidden by the delete that follows.
+    var before = plan(SHARED, withPlan);
+    asked = []; reply = false;
+    remove.click();
+    ok(asked.length === 1, "removing a recommendation that holds text asks first", String(asked.length));
+    ok(/remove this recommendation/i.test(asked[0] || ""), "the question names what is being removed", asked[0]);
+    var afterDecline = plan(SHARED, withPlan);
+    ok(JSON.stringify(afterDecline) === JSON.stringify(before),
+       "saying no leaves every field exactly as it was",
+       JSON.stringify(afterDecline));
+
+    // Accepting clears all four fields and the rank behind them.
+    asked = []; reply = true;
+    card(withPlan).querySelector(".rec-remove").click();
+    ok(asked.length === 1, "accepting still asked exactly once", String(asked.length));
+    var gone = plan(SHARED, withPlan);
+    ok(!hasPlan(gone), "the recommendation is gone - band, owner, action, impact and rank",
+       JSON.stringify(gone));
+    ok(gone.rank === null || gone.rank === undefined,
+       "the priority rank is cleared too, so the roadmap does not keep a ghost row",
+       String(gone.rank));
+
+    // And the card falls back to the "+ Add a recommendation" affordance, so
+    // removing is undoable by simply typing it again.
+    var reopened = card(withPlan);
+    ok(!!btn(reopened, "+ Add a recommendation"),
+       "the card returns to offering '+ Add a recommendation'");
+
+    // ---- an empty recommendation removes without ceremony -----------------
+    asked = [];
+    btn(card(withPlan), "+ Add a recommendation").click();
+    var emptyCard = card(withPlan);
+    ok(!!emptyCard.querySelector(".rec-remove"), "an opened but empty editor still offers Remove");
+    emptyCard.querySelector(".rec-remove").click();
+    ok(asked.length === 0, "removing an empty recommendation does not ask", asked.join(" | "));
+    ok(!!btn(card(withPlan), "+ Add a recommendation"),
+       "and it closes the editor again");
+
+    // ---- the wizard offers the same control -------------------------------
+    A.UI.go("sl-wizard");
+    var wizCard = main().querySelector(".req");
+    ok(!!wizCard, "the wizard renders a requirement");
+    // Walk to a requirement that still CARRIES a plan. The wizard card has no
+    // data-req-id, so it is identified by its printed code; and the presence of
+    // a Remove button is not enough, because the editor opens on any gap and
+    // offers Remove whether or not anything has been typed into it yet.
+    var codeToId = {};
+    (E.state.instrument.requirements || []).forEach(function (r) { codeToId[r.code] = r.id; });
+    function wizReqId() {
+      var el = main().querySelector(".req-code");
+      return el ? codeToId[el.textContent.trim()] : null;
+    }
+    var wizId = null, guard = 0;
+    while (guard++ < 60) {
+      var id = wizReqId();
+      if (id && hasPlan(plan(SHARED, id)) && main().querySelector(".rec-remove")) { wizId = id; break; }
+      var next = btn(main(), "Next ›") || btn(main(), "Next");
+      if (!next) break;
+      next.click();
+    }
+    ok(!!wizId, "the wizard offers Remove on a requirement carrying a recommendation", wizId || "none found");
+    if (wizId) {
+      asked = []; reply = true;
+      main().querySelector(".rec-remove").click();
+      ok(asked.length === 1, "the wizard asks before removing too", String(asked.length));
+      ok(!hasPlan(plan(SHARED, wizId)), "and that requirement's recommendation is cleared",
+         wizId + " -> " + JSON.stringify(plan(SHARED, wizId)));
+    }
+
+    // ---- a shared plan seen from a zone -----------------------------------
+    // A zone inheriting the system-wide recommendation must not be able to
+    // throw it away in passing: removal belongs inside the shared editor,
+    // and the question has to say it reaches the other zones.
+    var zone = (E.state.engagement.targets || [])[0];
+    ok(!!zone, "the demo has a zone to view the shared plan from");
+    E.setActiveTarget(zone.id);
+    var sharedReq = null;
+    (E.state.instrument.requirements || []).forEach(function (r) {
+      if (sharedReq) return;
+      if (!hasPlan(plan(SHARED, r.id))) return;
+      if (hasPlan(plan(zone.id, r.id))) return;            // the zone has its own
+      if ((E.linkedTargets(r.id) || []).indexOf(zone.id) === -1) return;
+      sharedReq = r;
+    });
+    ok(!!sharedReq, "a requirement whose recommendation this zone inherits",
+       sharedReq ? sharedReq.id : "none");
+
+    if (sharedReq) {
+      A.UI.go("fr", sharedReq.frId);
+      var zc = card(sharedReq.id);
+      ok(!!zc, "its card renders for the zone");
+      ok(!zc.querySelector(".rec-remove"),
+         "a zone reading an inherited recommendation is NOT offered Remove");
+      var edit = btn(zc, "Edit shared recommendation");
+      ok(!!edit, "it offers 'Edit shared recommendation' instead");
+      edit.click();
+      var zc2 = card(sharedReq.id);
+      var sharedRemove = zc2.querySelector(".rec-remove");
+      ok(!!sharedRemove, "Remove appears once the shared recommendation is open for editing");
+
+      asked = []; reply = true;
+      sharedRemove.click();
+      ok(asked.length === 1, "removing a shared recommendation asks", String(asked.length));
+      var linked = (E.linkedTargets(sharedReq.id) || []).length;
+      if (linked > 1) {
+        ok(/all\s+\d+/.test(asked[0] || ""),
+           "and says how many " + "zones" + " it is being removed for", asked[0]);
+      }
+      ok(!hasPlan(plan(SHARED, sharedReq.id)),
+         "the shared recommendation is cleared", JSON.stringify(plan(SHARED, sharedReq.id)));
+      ok(!hasPlan(plan(zone.id, sharedReq.id)),
+         "and the zone did not quietly get a copy of its own",
+         JSON.stringify(plan(zone.id, sharedReq.id)));
+    }
+
+    // ---- not a 62443 feature: the same control in another family ----------
+    E.activateInstrument("ncsc-caf");
+    A.TourCAF.apply(E);
+    var cafTid = E.state.activeTargetId;
+    var cafId = null;
+    (A.TourCAF.rows || []).forEach(function (r) {
+      if (!cafId && hasPlan(plan(cafTid, r.id))) cafId = r.id;
+    });
+    ok(!!cafId, "the CAF demo carries a recommendation", cafId || "none");
+    if (cafId) {
+      var principle = (E.state.instrument.outcomes || []).filter(function (o) { return o.id === cafId; })[0];
+      A.UI.go("caf-principle", principle ? principle.principleId : null);
+      var cc = card(cafId);
+      ok(!!cc, "its CAF card renders", cafId);
+      var cafRemove = cc && cc.querySelector(".rec-remove");
+      ok(!!cafRemove, "CAF offers the same Remove control");
+      if (cafRemove) {
+        asked = []; reply = true;
+        cafRemove.click();
+        ok(asked.length === 1, "CAF asks before removing", String(asked.length));
+        ok(!hasPlan(plan(cafTid, cafId)), "and the CAF recommendation is cleared",
+           JSON.stringify(plan(cafTid, cafId)));
+      }
+    }
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+});
+</script>
+</body></html>

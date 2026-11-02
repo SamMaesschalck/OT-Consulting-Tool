@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>NIST 800-53 instrument check</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+
+  try {
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });
+    A.Engine.activateInstrument("nist-800-53");
+    var inst = A.Engine.state.instrument;
+    ok(inst && inst.id === "nist-800-53", "nist-800-53 activates");
+    ok(A.Engine.state.scoringFamily === "caf-achieved", "uses the caf-achieved scoring family");
+
+    // ---- structure ----
+    ok(A.Engine.getCAFObjectives().length === 3, "3 objective groups (T/O/M)", String(A.Engine.getCAFObjectives().length));
+    ok(A.Engine.getCAFPrinciples().length === 20, "20 control families", String(A.Engine.getCAFPrinciples().length));
+    ok((inst.outcomes || []).length === 300, "300 base controls (incl. Release 5.2.0 IA-13 + SA-24)", String((inst.outcomes || []).length));
+    // Release 5.2.0 additions: verbatim text, correct family, not yet in any baseline
+    var ia13 = (inst.outcomes || []).filter(function (o) { return o.id === "IA-13"; })[0];
+    var sa24 = (inst.outcomes || []).filter(function (o) { return o.id === "SA-24"; })[0];
+    ok(ia13 && ia13.principleId === "IA" && ia13.title === "Identity Providers and Authorization Servers", "IA-13 present in the IA family with its 5.2.0 name", ia13 && ia13.title);
+    ok(sa24 && sa24.principleId === "SA" && sa24.title === "Design for Cyber Resiliency", "SA-24 present in the SA family with its 5.2.0 name", sa24 && sa24.title);
+    ok(ia13 && ia13.controlText && /identity providers and authorization servers/i.test(ia13.controlText), "IA-13 carries verbatim control text");
+    ok(sa24 && sa24.controlText && /cyber resiliency/i.test(sa24.controlText), "SA-24 carries verbatim control text");
+    var ac = A.Engine.getCAFOutcomesByPrinciple("AC");
+    ok(ac.length === 23 && ac[0].id === "AC-1", "AC family has its 23 base controls", ac.length + " first=" + (ac[0] && ac[0].id));
+    var acFam = A.Engine.getCAFPrinciples().filter(function (p) { return p.id === "AC"; })[0];
+    ok(acFam && !acFam.otLens, "AC family has NO OT lens (generic enterprise instrument)");
+    ok(A.Engine.getCAFPrinciples().every(function (p) { return !p.otLens; }), "no family carries an OT lens");
+    ok(inst.title === "NIST SP 800-53 Rev 5 Control Assessment" && !/OT|operational tech/i.test(inst.title), "title is generic (no OT focus)", inst.title);
+    ok(!/operational technology|OT\/ICS|800-82/i.test(inst.framing), "framing has no OT/800-82 wording");
+    ok(inst.attribution && /U\.S\. Government/.test(inst.attribution), "instrument carries the NIST public-domain attribution");
+
+    // ---- default baseline = moderate ----
+    ok(A.Engine.getActiveCAFProfileId() === "nist-moderate", "default baseline is Moderate", A.Engine.getActiveCAFProfileId());
+    var reg = A.Engine.getCAFProfileRegistry();
+    ok(reg && reg.profiles.length === 4, "registry has 4 baselines (full/low/moderate/high)", reg && String(reg.profiles.length));
+
+    // ---- overlay semantics: AC-4 is Moderate/High but NOT Low; AC-2 IS in Low ----
+    var ovMod = A.Engine.getActiveCAFOverlay();
+    ok(ovMod["AC-4"] && ovMod["AC-4"].applicable === true && ovMod["AC-4"].expectedState === "achieved", "AC-4 expected under Moderate");
+    A.Engine.setCAFProfile("nist-low");
+    var ovLow = A.Engine.getActiveCAFOverlay();
+    ok(ovLow["AC-4"] && ovLow["AC-4"].applicable === false, "AC-4 drops out under Low (Moderate-only control)");
+    ok(ovLow["AC-2"] && ovLow["AC-2"].applicable === true, "AC-2 stays in scope under Low (it is in the 800-53B Low baseline)");
+    ok(ovLow["MA-1"] && ovLow["MA-1"].applicable === true, "MA-1 policy control is in Low (all -1 controls are)");
+    ok(ovLow["AC-1"] && ovLow["AC-1"].applicable === true, "AC-1 stays in scope under Low");
+    var lowApp = 0; for (var lk in ovLow) if (ovLow[lk] && ovLow[lk].applicable) lowApp++;
+    ok(lowApp === 163, "Low baseline has 163 applicable controls (was 156 before the 7 wrongly-excluded controls were corrected)", String(lowApp));
+    ok(ovLow["IA-13"] && ovLow["IA-13"].applicable === false, "IA-13 (5.2.0, no baseline) is not applicable under Low");
+    A.Engine.setCAFProfile("nist-full");
+    var ovFull = A.Engine.getActiveCAFOverlay();
+    ok(ovFull["IA-13"] && ovFull["IA-13"].applicable === true && ovFull["SA-24"] && ovFull["SA-24"].applicable === true, "IA-13 and SA-24 are assessable under the Full catalog profile");
+    ok(ovLow["PM-1"] && ovLow["PM-1"].applicable === true && ovLow["PM-1"].expectedState === "achieved", "PM controls expected in every baseline (Low)");
+    A.Engine.setCAFProfile("nist-moderate");
+
+    // ---- engagement page shows NIST wording, not CAF ----
+    A.UI.go("engagement");
+    var mainTxt = document.getElementById("main").textContent;
+    ok(mainTxt.indexOf("control-by-control gap assessment") !== -1, "getting-started card shows the NIST intro");
+    ok(mainTxt.indexOf("NCSC CAF 4.0") === -1, "no leftover CAF wording on the NIST page");
+    ok(mainTxt.indexOf("Baseline") !== -1 && mainTxt.indexOf("Moderate baseline") !== -1, "baseline picker present with the three baselines");
+
+    // ---- family page: controls render, no OT lens card ----
+    A.UI.go("caf-principle", "AC");
+    var acMain = document.getElementById("main");
+    ok(acMain.textContent.indexOf("OT lens") === -1, "family page shows NO OT lens card (generic instrument)");
+    ok(acMain.querySelectorAll(".caf-state-btn").length >= 2, "control rows render with state buttons");
+    // SP 800-53A binary determination model: Satisfied / Other Than Satisfied
+    var subStates = (inst.states || []).filter(function (s) { return s.value !== "unknown" && s.value !== "na"; });
+    ok(subStates.length === 2, "2 substantive states (SP 800-53A binary determination)", String(subStates.length));
+    ok(subStates.map(function (s) { return s.label; }).join(",") === "Satisfied,Other Than Satisfied", "states are Satisfied / Other Than Satisfied", subStates.map(function (s) { return s.label; }).join(","));
+    var firstRow = acMain.querySelector(".req.caf-outcome .sl-row-bar");
+    ok(firstRow && firstRow.querySelectorAll(".caf-state-btn").length === 2, "a control offers exactly 2 determination buttons");
+    ok(firstRow && /Satisfied/.test(firstRow.textContent) && /Other Than Satisfied/.test(firstRow.textContent), "the two buttons read Satisfied and Other Than Satisfied");
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "AC-1", { applicable: true, state: "achieved" });
+    A.UI.go("caf-principle", "AC"); acMain = document.getElementById("main");
+    var a1row = acMain.querySelector('[data-req-id="AC-1"] .req-meta');
+    ok(a1row && /Satisfied/.test(a1row.textContent) && !/Other Than/.test(a1row.textContent), "AC-1 pill reads 'Satisfied' (not 'Achieved')", a1row && a1row.textContent);
+    ok(acMain.textContent.indexOf("AC-1") !== -1 && acMain.textContent.indexOf("Account Management") !== -1, "control ids and titles render");
+
+    // ---- control text: AC-1 carries the verbatim Control statement in the expander ----
+    var allOutcomes = inst.outcomes || [];
+    var a1 = allOutcomes.filter(function (o) { return o.id === "AC-1"; })[0];
+    ok(a1 && a1.controlText && /Develop, document, and disseminate/.test(a1.controlText), "AC-1 carries verbatim control text");
+    var withText = allOutcomes.filter(function (o) { return o.controlText; }).length;
+    ok(withText >= 130, "a substantial set of controls carry control text", withText + "/" + allOutcomes.length);
+    // first control row's expander toggle names the control text; expanding shows it
+    var firstBar = acMain.querySelector(".sl-row-bar");
+    var ctToggle = firstBar && firstBar.querySelector(".sl-guidance-toggle");
+    ok(ctToggle && /What this control requires/.test(ctToggle.textContent), "AC-1 row has a 'What this control requires' expander", ctToggle && ctToggle.textContent);
+    if (ctToggle) {
+      ctToggle.click();
+      acMain = document.getElementById("main");
+      var ctPanel = acMain.querySelector(".caf-state-guide .caf-control-text");
+      ok(!!ctPanel && /Develop, document, and disseminate/.test(ctPanel.textContent), "expanding shows the verbatim control statement");
+    }
+
+    // ---- capture + scoring ----
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "AC-1", { applicable: true, state: "achieved" });
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "AC-3", { applicable: true, state: "not" });
+    var scored = A.Engine.scoreActiveTarget();
+    ok(!!scored && !!scored.byObjective && !!scored.byPrinciple, "scoreActiveTarget returns objective + family rollups");
+    var acRes = scored.byPrinciple.filter(function (x) { return x.principleId === "AC"; })[0];
+    ok(acRes && acRes.counts.achieved >= 1 && acRes.counts.not >= 1, "AC family counts reflect the captured states");
+
+    // ---- NIST does NOT treat Unknown as a finding (coverage only) ----
+    ok(!inst.unknownIsFinding, "NIST does not flag Unknown as a finding");
+    A.Engine.setResponse(A.Engine.state.activeTargetId, "AC-2", { applicable: true, state: "unknown" });
+    var scoredU = A.Engine.scoreActiveTarget();
+    var acu = scoredU.perOutcome.filter(function (o) { return o.outcomeId === "AC-2"; })[0];
+    ok(acu && acu.state === "unknown" && !acu.isUnknownFinding && acu.meetsExpected === null, "AC-2 Unknown is not a finding (meetsExpected null)");
+    ok(!(scoredU.roadmap || []).some(function (it) { return it.outcomeId === "AC-2"; }), "Unknown control does not appear on the NIST roadmap");
+
+    // ---- engagement scoring doesn't throw ----
+    var eng = A.Engine.scoreAllTargets();
+    ok(!!eng, "scoreAllTargets runs for the NIST instrument");
+
+    // ---- report renders for the NIST instrument (shared caf-achieved report,
+    // NIST data has no per-outcome narrative/stateSummary) ----
+    var container = document.createElement("div");
+    var reportOpts = {
+      engagement: A.Engine.state.engagement,
+      instrument: A.Engine.state.instrument,
+      taxonomy: A.Engine.state.taxonomy,
+      profile: A.Engine.state.profile,
+      narrative: A.Engine.getActiveNarrative ? A.Engine.getActiveNarrative() : null,
+      scored: A.Engine.scoreActiveTarget(),
+      scoredAll: A.Engine.scoreAllTargets(),
+      activeTarget: A.Engine.getActiveTarget(),
+      targetProfile: A.Engine.state.engagement.targetProfile,
+      cafProfileRegistry: A.Engine.getCAFProfileRegistry(),
+      cafProfileId: A.Engine.getActiveCAFProfileId(),
+      cafProfile: A.Engine.getActiveCAFProfile ? A.Engine.getActiveCAFProfile() : null
+    };
+    window.App.Report.render(container, reportOpts);
+    ok(container.children.length > 0 && container.textContent.length > 100, "report renders content for the NIST instrument");
+    ok(container.textContent.indexOf("Access Control") !== -1, "report references the control families");
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+
+});
+</script>
+</body></html>

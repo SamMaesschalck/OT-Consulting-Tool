@@ -1,0 +1,269 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/ncsc-caf/profiles/caf-dft-rail-basic.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["ncsc-caf"] = window.App.Data.instruments["ncsc-caf"] || {};
+window.App.Data.instruments["ncsc-caf"].profiles = window.App.Data.instruments["ncsc-caf"].profiles || {};
+window.App.Data.instruments["ncsc-caf"].profiles["caf-dft-rail-basic"] = {
+  "id": "caf-dft-rail-basic",
+  "name": "DfT Rail (Basic)",
+  "appliesToInstrument": "ncsc-caf",
+  "sectorRegulator": "dft",
+  "sectorRegulatorName": "DfT",
+  "sector": "rail",
+  "sectorName": "Rail",
+  "level": "basic",
+  "status": "placeholder",
+  "profileVersion": "UNSET",
+  "verifiedSource": false,
+  "_note": "Structure ready. expectedState / applicability / weights and any supplementary guidance MUST be populated from the authoritative published profile and version-stamped before use. Do not populate from memory. Source: DfT-issued CAF profile for Rail OES.",
+  "overlay": {
+    "A1.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A1.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A1.c": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A2.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A2.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A2.c": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A3.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A4.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A4.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B1.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B1.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B2.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B2.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B2.c": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B2.d": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.c": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.d": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.e": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B4.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B4.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B4.c": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B4.d": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B5.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B5.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B5.c": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B6.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B6.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.c": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.d": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.e": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.f": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C2.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D1.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D1.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D1.c": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D2.a": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D2.b": {
+      "expectedState": null,
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    }
+  }
+};

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>NIST + CIS tour datasets</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app({ tours: ["cis", "nist", "nist82"] }); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"])); };
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    var CASES = [
+      { id: "nist-800-53", tour: A.TourNIST,   client: "Atlas Digital Services",     name: "NIST 800-53" },
+      { id: "nist-800-82", tour: A.TourNIST82, client: "Riverbend Water Authority",  name: "NIST 800-82" },
+      { id: "cis-controls-v8", tour: A.TourCIS, client: "Brightpath Retail Group",   name: "CIS Controls" }
+    ];
+
+    CASES.forEach(function (c) {
+      ok(!!c.tour && typeof c.tour.apply === "function", c.name + ": tour applier exposed");
+      E.activateInstrument(c.id);
+      c.tour.apply(E);
+      var inst = E.state.instrument, tid = E.state.activeTargetId;
+
+      // metadata
+      ok((E.state.engagement.engagement || {}).clientName === c.client, c.name + ": client metadata set", (E.state.engagement.engagement || {}).clientName);
+
+      // every in-scope outcome answered (finished assessment)
+      var overlay = E.getActiveCAFOverlay() || {};
+      var unanswered = [], inScope = 0;
+      inst.outcomes.forEach(function (o) {
+        var ov = overlay[o.id];
+        if (!ov || ov.applicable === false) return;
+        inScope++;
+        var r = E.findResponse(tid, o.id);
+        if (!r || !r.state) unanswered.push(o.id);
+      });
+      ok(inScope > 40, c.name + ": a substantial in-scope set (" + inScope + ")", String(inScope));
+      ok(unanswered.length === 0, c.name + ": every in-scope item answered (finished)", unanswered.slice(0, 8).join(","));
+
+      // the curated gaps all landed (in-profile) and drive the roadmap
+      var scored = E.scoreActiveTarget();
+      ok((scored.roadmap || []).length === c.tour.gaps.length, c.name + ": roadmap == curated gaps (" + c.tour.gaps.length + ")", String((scored.roadmap || []).length));
+      var gapsNoPlan = (scored.roadmap || []).filter(function (it) { return !(it.owner && it.action && it.impact && it.priorityBand); });
+      ok(gapsNoPlan.length === 0, c.name + ": every roadmap item carries a full remediation plan", gapsNoPlan.map(function (it) { return it.outcomeId; }).join(","));
+
+      // consultant narrative set for the exec summary addenda
+      var rn = E.getReportNarrative ? E.getReportNarrative() : null;
+      ok(rn && rn.regulatoryExposure && rn.topPriorities, c.name + ": consultant exec narrative set");
+
+      // report renders
+      var container = document.createElement("div");
+      A.Report.render(container, {
+        engagement: E.state.engagement, instrument: inst, taxonomy: E.state.taxonomy, profile: E.state.profile,
+        narrative: E.getActiveNarrative ? E.getActiveNarrative() : null,
+        scored: scored, scoredAll: E.scoreAllTargets(), activeTarget: E.getActiveTarget(),
+        cafProfileRegistry: E.getCAFProfileRegistry(), cafProfileId: E.getActiveCAFProfileId(),
+        cafProfile: E.getActiveCAFProfile ? E.getActiveCAFProfile() : null
+      });
+      ok(container.textContent.length > 200, c.name + ": report renders content");
+    });
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Sanity check: every instrument</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true }); H.dom();</script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"])); };
+
+  E.loadCatalog();
+  A.UI.init({ autosave: false });
+
+  // Every non-placeholder instrument in the catalog.
+  var list = E.state.instruments.filter(function (i) { return i.status !== "placeholder"; });
+  ok(list.length >= 15, "catalog has the expected instrument count (" + list.length + ")", String(list.length));
+
+  var snaps = [];
+
+  function validateCaf(inst) {
+    // Use the engine's RESOLVED taxonomy (handles both inst.taxonomy and the
+    // older top-level objectives/principles layout, e.g. the aviation skeleton).
+    var objs = E.getCAFObjectives ? E.getCAFObjectives() : [];
+    var prins = E.getCAFPrinciples ? E.getCAFPrinciples() : [];
+    var objIds = {}; objs.forEach(function (o) { objIds[o.id] = true; });
+    var prinById = {}; prins.forEach(function (p) { prinById[p.id] = p; });
+    ok(objs.length > 0 && prins.length > 0, inst.id + ": has objectives + principles (" + objs.length + "/" + prins.length + ")");
+    var badPrin = prins.filter(function (p) { return !objIds[p.objectiveId]; });
+    ok(badPrin.length === 0, inst.id + ": every principle resolves to an objective", badPrin.map(function (p) { return p.id; }).join(","));
+    var seen = {}, dupes = [], badOut = [];
+    (inst.outcomes || []).forEach(function (o) {
+      if (seen[o.id]) dupes.push(o.id); seen[o.id] = true;
+      if (!prinById[o.principleId]) badOut.push(o.id);
+    });
+    ok((inst.outcomes || []).length > 0, inst.id + ": has outcomes (" + (inst.outcomes || []).length + ")");
+    ok(dupes.length === 0, inst.id + ": outcome ids are unique", dupes.slice(0, 5).join(","));
+    ok(badOut.length === 0, inst.id + ": every outcome resolves to a principle", badOut.slice(0, 5).join(","));
+    // The caf-achieved scorer keys on fixed state VALUES; only labels/colours vary.
+    var VALS = { achieved: 1, partially: 1, not: 1, unknown: 1, na: 1 };
+    var badStates = (inst.states || []).filter(function (s) { return !VALS[s.value]; });
+    ok(badStates.length === 0, inst.id + ": state values are the canonical set (achieved/partially/not/unknown/na)", badStates.map(function (s) { return s.value; }).join(","));
+    // profiles: default resolves, every overlay key is a real outcome id
+    var reg = E.getCAFProfileRegistry();
+    if (reg && reg.profiles && reg.profiles.length) {
+      var defOk = reg.profiles.some(function (p) { return p.id === reg.default; });
+      ok(defOk, inst.id + ": profile registry default resolves", reg.default);
+      var badKeys = 0, checked = 0;
+      reg.profiles.forEach(function (p) {
+        E.setCAFProfile(p.id);
+        var ov = E.getActiveCAFOverlay() || {};
+        checked++;
+        Object.keys(ov).forEach(function (k) { if (!seen[k]) badKeys++; });
+      });
+      ok(badKeys === 0, inst.id + ": all profile overlay keys are valid outcome ids (" + checked + " profiles)", "stray=" + badKeys);
+      E.setCAFProfile(reg.default);
+    }
+  }
+
+  list.forEach(function (i0) {
+    var id = i0.id;
+    try {
+      E.activateInstrument(id);
+      var inst = E.state.instrument, fam = E.state.scoringFamily;
+      ok(inst && inst.id === id, id + ": activates and matches id");
+      ok(!!inst.title && !!fam, id + ": has title + scoringFamily (" + fam + ")");
+
+      if (fam === "caf-achieved") validateCaf(inst);
+
+      // scores without throwing (return shape varies by family; just require a value)
+      var scoredAll = E.scoreAllTargets();
+      ok(!!scoredAll, id + ": scores all targets without error");
+      var scoredActive = E.scoreActiveTarget ? E.scoreActiveTarget() : null;
+
+      // report renders with real content
+      var container = document.createElement("div");
+      A.Report.render(container, {
+        engagement: E.state.engagement, instrument: inst, taxonomy: E.state.taxonomy, profile: E.state.profile,
+        narrative: E.getActiveNarrative ? E.getActiveNarrative() : null,
+        scored: scoredActive, scoredAll: scoredAll, activeTarget: E.getActiveTarget(),
+        cafProfileRegistry: E.getCAFProfileRegistry ? E.getCAFProfileRegistry() : null,
+        cafProfileId: E.getActiveCAFProfileId ? E.getActiveCAFProfileId() : null,
+        cafProfile: E.getActiveCAFProfile ? E.getActiveCAFProfile() : null
+      });
+      ok(container.textContent.replace(/\s/g, "").length > 200, id + ": report renders substantial content", container.textContent.length + " chars");
+      // Every instrument's on-screen report closes with the proposed next
+      // steps, whether or not the consultant has written any yet.
+      ok(container.textContent.indexOf("Proposed next steps") !== -1, id + ": report shows 'Proposed next steps'");
+
+      // snapshot export args now (state changes as we move to the next instrument)
+      snaps.push({
+        id: id, inst: inst, eng: E.state.engagement, tax: E.state.taxonomy, prof: E.state.profile,
+        narr: E.getActiveNarrative ? E.getActiveNarrative() : null,
+        opts: {
+          cafProfileRegistry: E.getCAFProfileRegistry ? E.getCAFProfileRegistry() : null,
+          cafProfileId: E.getActiveCAFProfileId ? E.getActiveCAFProfileId() : null,
+          cafProfile: E.getActiveCAFProfile ? E.getActiveCAFProfile() : null,
+          cafOverlay: E.getActiveCAFOverlay ? E.getActiveCAFOverlay() : null,
+          targetId: E.state.activeTargetId
+        }
+      });
+    } catch (e) {
+      ok(false, id + ": FATAL during activate/score/render", e.message + " | " + (e.stack || "").split("\n")[1]);
+    }
+  });
+
+  // Word: safe to run in parallel (buildAsync passes a blob to its callback).
+  var docxJobs = snaps.map(function (s) {
+    return new Promise(function (resolve) {
+      A.ExportDOCX.buildAsync(s.eng, s.inst, s.tax, s.prof, s.narr, s.opts, function (err, blob) {
+        ok(!err && blob && blob.size > 2000, s.id + ": Word (.docx) builds", err ? err.message : (blob && ("size " + blob.size)));
+        resolve();
+      });
+    });
+  });
+
+  // Excel: run SEQUENTIALLY behind one global downloadBlob stub (ExcelJS is
+  // async and the stub is global, so parallel runs would race).
+  var captured = {};
+  A.Storage.downloadBlob = function (blob, name) { captured[String(name).replace(/^.*\./, "")] = blob; return blob; };
+  function runXlsx(i) {
+    if (i >= snaps.length) return Promise.resolve();
+    var s = snaps[i];
+    captured = {};
+    return Promise.resolve().then(function () {
+      var p = A.ExportXLSX.download(s.eng, s.inst, s.tax, s.prof, s.opts);
+      return (p && p.then ? p : Promise.resolve());
+    }).then(function () {
+      ok(captured["xlsx"] && captured["xlsx"].size > 2000, s.id + ": Excel (.xlsx) builds", captured["xlsx"] && ("size " + captured["xlsx"].size));
+    }, function (e) {
+      ok(false, s.id + ": Excel build rejected", e && e.message);
+    }).then(function () { return runXlsx(i + 1); });
+  }
+
+  Promise.all(docxJobs).then(function () { return runXlsx(0); }).then(function () {
+    lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED (" + snaps.length + " instruments)" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  });
+})();
+</script>
+</body></html>

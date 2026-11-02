@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Several assessments of one instrument in one customer file</title></head>
+<body><div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock" });</script>
+<script>
+// A customer comes back. We do a 62443-3-3 in 2026 and another in 2028, and
+// both belong in the one file we keep for that customer. `assessments` used to
+// be keyed by instrument id, which allowed exactly one of each.
+(function () {
+  var A = window.App, E = A.Engine, STG = A.Storage, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    document.getElementById("out").textContent =
+      out.join("\n") + "\n\n" + (fail ? fail + " FAILED" : "ALL TESTS PASSED (" + out.length + ")");
+  }
+  function card(instId) {
+    return [].slice.call(document.querySelectorAll("#main .home-card")).filter(function (c) {
+      var t = c.querySelector("h3");
+      return t && t.textContent === (E.state.instruments.filter(function (i) { return i.id === instId; })[0] || {}).title;
+    })[0];
+  }
+  function clickIn(scope, label) {
+    var b = [].slice.call(scope.querySelectorAll("button"))
+      .filter(function (x) { return (x.textContent || "").trim() === label; })[0];
+    if (b) b.click();
+    return !!b;
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // ---- the 2026 review ----
+    E.activateInstrument("iec-62443-3-3");
+    E.updateMetadata({ clientName: "Acme Petrochemicals", siteName: "Plant A",
+                       opportunityId: "OPP-2026", dateOfVisit: "2026-05-21", documentRevision: "1.0" });
+    var first = E.state.activeAssessmentId;
+    E.setResponse(E.getActiveTarget().id, "SR1.1", { applicable: true, evidence: "2026 finding" });
+    ok(!!first, "the first assessment has an id of its own", first);
+    ok(E.assessmentsFor("iec-62443-3-3").length === 1, "one assessment of the instrument so far");
+
+    // ---- the 2028 re-assessment, same customer, same instrument ----
+    var second = E.newAssessment("iec-62443-3-3", { dateOfVisit: "2028-06-04" }).id;
+    ok(second !== first, "a second assessment gets a distinct id");
+    ok(E.assessmentsFor("iec-62443-3-3").length === 2,
+       "the file now holds two assessments of the SAME instrument",
+       String(E.assessmentsFor("iec-62443-3-3").length));
+    ok(E.state.activeAssessmentId === second, "creating one opens it");
+    ok((E.state.engagement.responses || []).length === 0,
+       "it starts empty - a re-assessment is not a copy of the last one");
+    ok(E.state.engagement.engagement.clientName === "Acme Petrochemicals",
+       "...but the customer record carries over");
+    ok(!E.state.engagement.engagement.opportunityId,
+       "...and the 2026 opportunity does not");
+
+    E.updateMetadata({ opportunityId: "OPP-2028", documentRevision: "0.1" });
+    E.setResponse(E.getActiveTarget().id, "SR1.1", { applicable: true, evidence: "2028 finding" });
+
+    // ---- they stay apart ----
+    E.activateAssessment(first);
+    var r1 = E.findResponse(E.getActiveTarget().id, "SR1.1");
+    ok(r1 && r1.evidence === "2026 finding", "the 2026 answers are still the 2026 ones", r1 && r1.evidence);
+    ok(E.state.engagement.engagement.opportunityId === "OPP-2026", "with its own opportunity");
+    E.activateAssessment(second);
+    var r2 = E.findResponse(E.getActiveTarget().id, "SR1.1");
+    ok(r2 && r2.evidence === "2028 finding", "and the 2028 answers are the 2028 ones", r2 && r2.evidence);
+    ok(E.state.engagement.engagement.opportunityId === "OPP-2028", "with its own opportunity");
+
+    // ---- activateInstrument opens the LATEST, so every existing caller still works ----
+    E.activateInstrument("iec-62443-3-3");
+    ok(E.state.activeAssessmentId === second,
+       "activateInstrument opens the most recent assessment of it");
+
+    // ---- labels tell them apart ----
+    var list = E.listAssessments().filter(function (x) { return x.instrumentId === "iec-62443-3-3"; });
+    ok(list.length === 2, "listAssessments reports both");
+    ok(/2026-05-21/.test(list[0].label) && /2028-06-04/.test(list[1].label),
+       "each is labelled by its visit date", list.map(function (x) { return x.label; }).join(" | "));
+    E.renameAssessment(second, "Post-upgrade review");
+    ok(E.listAssessments().filter(function (x) { return x.id === second; })[0].label === "Post-upgrade review",
+       "a consultant can name one themselves");
+
+    // ---- save / load keeps both ----
+    var file = E.getProjectFile();
+    ok(Object.keys(file.assessments).length === 2, "the file writes both assessments",
+       String(Object.keys(file.assessments).length));
+    ok(file.activeAssessmentId === second, "and remembers which was open");
+    E.loadProjectFile(JSON.parse(JSON.stringify(file)));
+    ok(E.assessmentsFor("iec-62443-3-3").length === 2, "both survive a save/load");
+    ok(E.state.activeAssessmentId === second, "...and the open one is restored");
+    E.activateAssessment(first);
+    ok(E.findResponse(E.getActiveTarget().id, "SR1.1").evidence === "2026 finding",
+       "...with their answers still apart");
+
+    // ---- an OLD file, keyed by instrument id ----
+    var legacy = {
+      schemaVersion: "2.0",
+      project: { clientName: "Northbridge", siteName: "Works" },
+      activeInstrumentId: "iec-62443-3-3",
+      assessments: {
+        "iec-62443-3-3": { instrumentId: "iec-62443-3-3", targetProfile: { defaultTargetSL: 2, perFR: {}, perZone: {} },
+          targets: [{ id: "t1", name: "Zone 1" }],
+          responses: [{ targetId: "t1", requirementId: "SR1.1", applicable: true, evidence: "legacy finding" }] }
+      }
+    };
+    E.loadProjectFile(legacy);
+    ok(E.state.instrument.id === "iec-62443-3-3", "a pre-split file still opens");
+    ok(E.findResponse(E.getActiveTarget().id, "SR1.1").evidence === "legacy finding",
+       "with its answers intact");
+    var rekeyed = Object.keys(E.state.assessments)[0];
+    ok(rekeyed !== "iec-62443-3-3", "it is rekeyed to an assessment id", rekeyed);
+    ok(E.state.assessments[rekeyed].instrumentId === "iec-62443-3-3",
+       "...with the instrument kept as a field");
+    E.newAssessment("iec-62443-3-3", { dateOfVisit: "2029-01-15" });
+    ok(E.assessmentsFor("iec-62443-3-3").length === 2,
+       "and a second one can then be added to it");
+
+    // ---- the picker offers all of this ----
+    E.loadProjectFile(JSON.parse(JSON.stringify(file)));
+    A.UI.go("home");
+    var c = card("iec-62443-3-3");
+    ok(!!c, "the picker shows the instrument");
+    var rows = c.querySelectorAll(".home-instance");
+    ok(rows.length === 2, "with a row per assessment", String(rows.length));
+    ok(/2026-05-21/.test(rows[0].textContent), "the older one is listed first", rows[0].textContent);
+    ok(/Post-upgrade review/.test(rows[1].textContent), "and a renamed one shows its name");
+    ok(/2 assessments/.test(c.textContent), "the card says how many there are");
+
+    rows[0].click();
+    ok(E.state.activeAssessmentId === first, "clicking a row opens that assessment");
+
+    A.UI.go("home");
+    ok(clickIn(card("iec-62443-3-3"), "+ New assessment"), "the card offers a new assessment");
+    ok(E.assessmentsFor("iec-62443-3-3").length === 3, "which creates a third",
+       String(E.assessmentsFor("iec-62443-3-3").length));
+
+    // ---- the sidebar says which one you are in ----
+    ok(document.getElementById("sidebar").textContent.indexOf("ISA/IEC 62443-3-3") !== -1,
+       "the sidebar names the instrument");
+    var which = document.querySelector(".nav-current-which");
+    ok(!!which, "and, with several, which assessment is open");
+
+    // ---- an instrument with only one assessment is unchanged ----
+    E.activateInstrument("general-ot-posture");
+    A.UI.go("home");
+    var p = card("general-ot-posture");
+    ok(p && p.querySelectorAll(".home-instance").length === 0,
+       "a single-assessment instrument shows no instance list - there is nothing to choose between");
+    ok(p && !!p.querySelector(".home-card-new"),
+       "...but it DOES offer a new one, or a file could never get from one to two");
+
+    // An instrument with none at all: opening the card is starting the first.
+    var untouched = E.state.instruments.filter(function (i) {
+      return i.status !== "placeholder" && E.assessmentsFor(i.id).length === 0;
+    })[0];
+    ok(!!untouched, "the catalogue has an instrument not yet started", untouched && untouched.id);
+    if (untouched) {
+      var u = card(untouched.id);
+      ok(u && !u.querySelector(".home-card-new"),
+         "an unstarted instrument offers no New button - opening it IS starting it",
+         untouched.id);
+    }
+
+    flush();
+  } catch (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); flush(); }
+})();
+</script>
+</body></html>

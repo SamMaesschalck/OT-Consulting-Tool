@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>62443 shared layer</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<div class="app"><div class="header"><div class="brand"><span class="sub">x</span></div>
+<span id="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true });</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, S = A.Scoring, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  // The item rows sit behind the Security Level picker, so anything asserting
+  // on them has to open them first - as the consultant would.
+  function openItems(root) {
+    var toggles = Array.prototype.slice.call(root.querySelectorAll(".sl-items-toggle"));
+    toggles.forEach(function (t) {
+      if (!/open/.test(t.className)) t.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    return document.getElementById("main");
+  }
+
+  // ---- pure resolution, no engine -------------------------------------
+  //
+  // A directory service satisfies the base item everywhere and nothing else;
+  // one zone the directory does not reach overrides just the base item.
+  function comp(state, note) { return note ? { state: state, note: note } : { state: state }; }
+
+  var sharedResp = { targetId: "__shared", requirementId: "SR1.1",
+    components: { base: comp("met"), RE1: comp("not-met") },
+    evidence: "Corporate AD, individual accounts, joiner/leaver evidenced.",
+    owner: "IT/OT Network Team", action: "Enforce MFA on engineering access.", priorityRank: 1 };
+
+  var plain = S.resolveResponse(null, sharedResp);
+  ok(plain.components.base.state === "met", "a zone with no answer inherits the shared state");
+  ok(plain.components.base.source === "shared", "the inherited item is marked as coming from shared");
+  ok(plain.evidence === sharedResp.evidence && plain.evidenceSource === "shared",
+     "evidence is inherited and marked");
+  ok(plain.planSource === "shared" && plain.action === sharedResp.action,
+     "the remediation plan is inherited and marked");
+
+  var overridden = S.resolveResponse(
+    { targetId: "z3", requirementId: "SR1.1", components: { base: comp("not-met") }, evidence: "" },
+    sharedResp);
+  ok(overridden.components.base.state === "not-met", "a zone answer overrides the shared one");
+  ok(overridden.components.base.source === "zone", "the overriding item is marked as zone-owned");
+  ok(overridden.components.base.sharedState === "met",
+     "the overridden shared value is kept so the capture page can say what was overridden");
+  ok(overridden.components.RE1.state === "not-met" && overridden.components.RE1.source === "shared",
+     "items the zone did not answer are still inherited");
+
+  var ownEvidence = S.resolveResponse(
+    { targetId: "z3", requirementId: "SR1.1", components: {}, evidence: "Local accounts only." }, sharedResp);
+  ok(ownEvidence.evidence === "Local accounts only." && ownEvidence.evidenceSource === "zone",
+     "a zone's own evidence wins over the shared text");
+
+  var ownPlan = S.resolveResponse(
+    { targetId: "z3", requirementId: "SR1.1", components: {}, action: "Fit a local jump host." }, sharedResp);
+  ok(ownPlan.planSource === "zone" && ownPlan.action === "Fit a local jump host.",
+     "a zone's own remediation plan wins over the shared one");
+  ok(ownPlan.owner === undefined || ownPlan.owner === "",
+     "an owned plan is not part-filled from the shared one", String(ownPlan.owner));
+
+  // ---- the shared target profile ---------------------------------
+  var tp = { defaultTargetSL: 2, perFR: { FR3: 1 },
+             perZone: { z1: { default: 2, perFR: {} }, z2: { default: 3, perFR: { FR6: 4 } } } };
+  var sp = S.sharedTargetProfile(tp, [{ id: "z1" }, { id: "z2" }]);
+  ok(sp.defaultTargetSL === 3, "the shared default is the highest zone default", String(sp.defaultTargetSL));
+  ok(sp.perFR.FR6 === 4, "a zone's per-FR override lifts the shared target for that FR", String(sp.perFR.FR6));
+  ok(S.effectiveTargetSL(sp, "FR3", null) === 3,
+     "an engagement-wide per-FR floor never hides an item a zone needs", String(S.effectiveTargetSL(sp, "FR3", null)));
+
+  // ---- end to end through the engine ----------------------------------
+  try {
+    A.UI.init({ autosave: false });
+    E.activateInstrument("iec-62443-3-3");
+    var z1 = E.getActiveTarget().id;
+    E.renameTarget(z1, "Z1 Control");
+    var z2 = E.addTarget("Z2 DMZ").id;
+    var z3 = E.addTarget("Z3 Safety").id;
+    E.setDefaultTargetSL(2);
+
+    ok(E.supportsSharedScope(), "the shared layer is offered once there is more than one zone");
+
+    var SH = E.SHARED_TARGET_ID;
+    // The scenario the layer exists for: one directory service covers user
+    // identification across the zones, but multi-factor (RE1) is missing
+    // everywhere. Stated once, it lands in every zone.
+    E.setItemState(SH, "SR1.1", "base", "met");
+    E.setItemState(SH, "SR1.1", "RE1", "not-met");
+    E.setResponse(SH, "SR1.1", {
+      evidence: "Corporate Active Directory serves every zone; individual accounts with a joiner/leaver process evidenced.",
+      owner: "IT/OT Network Team", action: "Enforce multifactor authentication for engineering access across the directory.",
+      impact: "One stolen credential reaches every zone the directory serves.", priorityRank: 1, priorityBand: "High"
+    });
+
+    var all = E.scoreAllTargets();
+    var perZone = all.perTarget.map(function (t) {
+      var r = t.result.perRequirement.filter(function (x) { return x.requirementId === "SR1.1"; })[0];
+      return { name: t.target.name, achieved: r.itemsAchieved, shared: r.sharedAnswer, plan: r.planSource };
+    });
+    ok(perZone.every(function (p) { return p.achieved === 1; }),
+       "one shared answer scores in every zone",
+       perZone.map(function (p) { return p.name + "=" + p.achieved; }).join(","));
+    ok(perZone.every(function (p) { return p.shared === true; }),
+       "each zone records that the answer came from the shared layer");
+    ok(perZone.every(function (p) { return p.plan === "shared"; }),
+       "each zone inherits the one remediation plan");
+
+    ok(all.sharedRoadmap.length === 1, "the shared gap produces exactly one cross-zone action",
+       String(all.sharedRoadmap.length));
+    var act = all.sharedRoadmap[0];
+    ok(act.code === "SR 1.1", "the cross-zone action names the requirement", act.code);
+    ok(act.affected.length === 3, "it names every zone it resolves", String(act.affected.length));
+    ok(act.owner === "IT/OT Network Team" && act.action.indexOf("multifactor") !== -1,
+       "it carries the plan written once at system level");
+
+    // ---- the shared layer reaches the report and both exports ---------
+    var host = document.createElement("div");
+    A.Report.render(host, { engagement: E.state.engagement, instrument: E.state.instrument,
+      taxonomy: E.state.taxonomy, profile: E.state.profile, narrative: E.getActiveNarrative(),
+      scored: E.scoreActiveTarget(), scoredAll: E.scoreAllTargets(), activeTarget: E.getActiveTarget(),
+      targetProfile: E.state.engagement.targetProfile });
+    ok(host.textContent.indexOf("Actions that span") !== -1,
+       "the report carries a cross-zone actions section");
+    ok(/SR 1\.1[^]{0,400}Z1 Control[^]{0,200}Z2 DMZ/.test(host.textContent),
+       "the section names each zone the one action resolves");
+    ok(host.textContent.indexOf("Shared action") !== -1,
+       "the per-zone roadmap marks the entry as a shared action");
+    var wb = A.ExportXLSX.build(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, { targetId: z1 });
+    ok(wb.SheetNames.indexOf("Shared actions") !== -1,
+       "the workbook gains a Shared actions sheet", wb.SheetNames.join(","));
+    ok(wb.SheetNames.indexOf("Items") !== -1, "the item register is still present");
+
+    // The directory does not reach the safety network, so that zone overrides
+    // the base item. Its shortfall is now partly its own, which makes it a
+    // separate piece of work rather than part of the shared action.
+    E.setItemState(z3, "SR1.1", "base", "not-met");
+    E.setResponse(z3, "SR1.1", { evidence: "The safety network is not joined to the directory; the SIS engineering station uses a shared local account." });
+    all = E.scoreAllTargets();
+    function reqFor(tid) {
+      var t = all.perTarget.filter(function (x) { return x.target.id === tid; })[0];
+      return t.result.perRequirement.filter(function (x) { return x.requirementId === "SR1.1"; })[0];
+    }
+    ok(reqFor(z3).items.filter(function (i) { return i.componentId === "base"; })[0].state === "not-met",
+       "the zone override wins over the shared answer");
+    ok(reqFor(z1).items.filter(function (i) { return i.componentId === "base"; })[0].state === "met",
+       "the other zones still inherit");
+    ok(reqFor(z3).itemsAchieved === 0 && reqFor(z1).itemsAchieved === 1,
+       "the overriding zone scores differently from the ones that inherit",
+       reqFor(z3).itemsAchieved + " vs " + reqFor(z1).itemsAchieved);
+    ok(reqFor(z3).evidenceSource === "zone" && reqFor(z3).evidence.indexOf("not joined to the directory") !== -1,
+       "the overriding zone shows its own evidence");
+    ok(reqFor(z1).evidenceSource === "shared",
+       "the inheriting zones still show the shared evidence");
+    // The safety zone now has a shortfall of its own, so the shared action no
+    // longer speaks for it: fixing the directory would not fix that zone.
+    ok(all.sharedRoadmap.length === 1 && all.sharedRoadmap[0].affected.length === 2,
+       "a zone with a shortfall of its own drops out of the cross-zone action",
+       all.sharedRoadmap.length ? String(all.sharedRoadmap[0].affected.length) : "no shared action");
+    ok(all.sharedRoadmap[0].affected.map(function (a) { return a.name; }).indexOf("Z3 Safety") === -1,
+       "the zone that stands on its own is not named by the shared action");
+    ok(reqFor(z3).gapIsShared === false && reqFor(z1).gapIsShared === true,
+       "each zone records whether its shortfall is the shared one");
+
+    // Reverting the override hands the item back.
+    E.setItemState(z3, "SR1.1", "base", null);
+    all = E.scoreAllTargets();
+    ok(reqFor(z3).items.filter(function (i) { return i.componentId === "base"; })[0].state === "met",
+       "clearing a zone answer reverts the item to the shared one");
+    ok(all.sharedRoadmap[0].affected.length === 3, "and the zone rejoins the cross-zone action");
+
+    // ---- a countermeasure shared by only SOME zones --------------------
+    //
+    // The case the two-level model could not state: one historian serving the
+    // control zone and the DMZ but not the safety zone. Recorded once, scoped
+    // to the zones it reaches, with no group and no precedence rule.
+    E.setItemState(SH, "SR6.1", "base", "met");
+    E.setResponse(SH, "SR6.1", { evidence: "Logs are forwarded to the plant historian and retained for 90 days." });
+    var all6 = E.scoreAllTargets();
+    function item(tid, req, comp) {
+      var t = all6.perTarget.filter(function (x) { return x.target.id === tid; })[0];
+      var r = t.result.perRequirement.filter(function (x) { return x.requirementId === req; })[0];
+      return r.items.filter(function (i) { return i.componentId === comp; })[0];
+    }
+    ok(item(z1, "SR6.1", "base").state === "met" && item(z3, "SR6.1", "base").state === "met",
+       "an unscoped shared answer reaches every zone");
+
+    E.setItemCoverage("SR6.1", "base", [z1, z2]);
+    all6 = E.scoreAllTargets();
+    ok(item(z1, "SR6.1", "base").state === "met" && item(z2, "SR6.1", "base").state === "met",
+       "scoping it keeps the zones it covers");
+    ok(item(z3, "SR6.1", "base").state === null,
+       "and the zone outside it is left unanswered, not silently inherited",
+       String(item(z3, "SR6.1", "base").state));
+    ok(item(z1, "SR6.1", "base").sharedCoverage.length === 2,
+       "the covered zones travel with the item for the exports");
+    var r3 = all6.perTarget.filter(function (x) { return x.target.id === z3; })[0]
+              .result.perRequirement.filter(function (x) { return x.requirementId === "SR6.1"; })[0];
+    ok(!r3.evidence, "a zone outside the reach does not inherit the evidence either", r3.evidence || "(blank)");
+    ok(E.getItemCoverage("SR6.1", "base").length === 2, "the coverage is readable back", "");
+
+    // Overlapping subsets need no groups: each item carries its own set.
+    ok(E.getItemCoverage("SR1.1", "base") === null,
+       "another item on the same layer is unaffected and still covers everything");
+
+    // Selecting every zone is the same as not scoping it at all, so nothing is
+    // left behind to maintain when a zone is added later.
+    E.setItemCoverage("SR6.1", "base", [z1, z2, z3]);
+    ok(E.getItemCoverage("SR6.1", "base") === null,
+       "selecting all zones clears the scope rather than freezing today's list");
+    E.setItemCoverage("SR6.1", "base", [z1, z2]);
+
+    // ---- the shared capture page ---------------------------------
+    E.setActiveTarget(SH);
+    ok(E.isSharedScope(E.state.activeTargetId), "the shared scope can be made active");
+    ok(E.getActiveTarget().shared === true, "the active target reports itself as the shared scope");
+    A.UI.go("fr", "FR1");
+    var main = document.getElementById("main");
+    ok(main.textContent.indexOf("Shared") !== -1, "the capture page names the shared layer");
+    ok(main.querySelector(".card-note") !== null, "it explains what the layer does before any answers");
+    // The Security Level is the primary control; the items are behind it.
+    ok(main.querySelectorAll(".sl-achieved-btn").length > 0,
+       "requirements are answered by Security Level");
+    main = openItems(main);
+    ok(main.textContent.indexOf("inherited by all 3") !== -1,
+       "it says how many zones are taking each answer");
+    ok(main.querySelectorAll(".sl-item").length > 0, "items are answerable on the shared page");
+    ok(main.textContent.indexOf("Achieved SL-A") === -1,
+       "the shared page shows no SL-A of its own");
+    // A gap verdict here would be a judgement about something that is not a
+    // zone; the marker says only whether anything has been recorded.
+    ok(main.textContent.indexOf("Shared answer") !== -1,
+       "requirements answered here are marked as such");
+    ok(main.textContent.indexOf("Blocking") === -1,
+       "the shared page passes no verdict on requirements");
+    var frBadge = document.getElementById("sidebar").textContent;
+    ok(/FR2 - Use control\s*-/.test(frBadge),
+       "the sidebar counts what was recorded here rather than what is outstanding",
+       frBadge.replace(/\s+/g, " ").slice(0, 160));
+
+    // ---- the shared text is readable AND editable from the zone ----------
+    //
+    // The zone's own evidence box is deliberately EMPTY when the zone is using
+    // a shared answer - filling it would fork the text and break the link - so
+    // the shared wording is shown above it. Read-only, that looked like the
+    // tool had failed to fill anything in, and changing the wording meant
+    // leaving the zone for the Shared tab. It edits in place now.
+    E.setActiveTarget(z1);
+    A.UI.go("fr", "FR1");
+    var evCard = document.getElementById("main").querySelector('.req[data-req-id="SR1.1"]');
+    var inhBlock = evCard.querySelector(".inherited-evidence");
+    ok(!!inhBlock, "a zone using a shared answer is shown the shared evidence");
+    ok(inhBlock.textContent.indexOf("Corporate Active Directory") !== -1,
+       "with the actual text, not just a badge", inhBlock.textContent.slice(0, 60));
+    // The zone's own box is OFFERED, not shown: on a page of 13 requirements it
+    // was 13 empty rectangles that mostly stay empty, under text that already
+    // answers the question.
+    var addOwn = Array.prototype.filter.call(evCard.querySelectorAll(".req-add-note"),
+      function (b) { return /Add evidence specific/.test(b.textContent); })[0];
+    ok(!!addOwn, "the zone's own evidence box is offered rather than shown");
+    ok(!evCard.querySelector(".req-controls > .field > textarea"),
+       "so no empty box sits under the shared text");
+    addOwn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    evCard = document.getElementById("main").querySelector('.req[data-req-id="SR1.1"]');
+    var ownBox = evCard.querySelector(".req-controls > .field > textarea");
+    ok(!!ownBox && (ownBox.value || "") === "",
+       "opening it gives an empty box, so the shared answer is not forked");
+    ok(/optional/.test(ownBox.getAttribute("placeholder") || ""),
+       "marked optional, because the shared text already covers it",
+       ownBox.getAttribute("placeholder"));
+
+    var editBtn = evCard.querySelector(".inherited-edit");
+    ok(!!editBtn, "the shared text can be edited from the zone page");
+    editBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    evCard = document.getElementById("main").querySelector('.req[data-req-id="SR1.1"]');
+    var sharedTa = evCard.querySelector(".inherited-evidence textarea");
+    ok(!!sharedTa && sharedTa.value.indexOf("Corporate Active Directory") !== -1,
+       "editing opens the shared text in a box, already filled in");
+    ok(/changes it for/.test(evCard.querySelector(".inherited-evidence .hint").textContent || ""),
+       "and says how far the change reaches");
+    sharedTa.value = "Rewritten from the zone page.";
+    sharedTa.dispatchEvent(new Event("change", { bubbles: true }));
+    ok((E.findResponse(SH, "SR1.1") || {}).evidence === "Rewritten from the zone page.",
+       "the edit lands on the shared answer, not on the zone");
+    var ownAfter = E.findResponse(z1, "SR1.1");
+    ok(!ownAfter || !(ownAfter.evidence || ""), "the zone still holds no evidence of its own");
+    var sc2 = E.scoreAllTargets().perTarget.filter(function (x) { return x.target.id === z2; })[0];
+    ok(sc2.result.perRequirement.filter(function (x) { return x.requirementId === "SR1.1"; })[0].evidence ===
+       "Rewritten from the zone page.",
+       "and every other zone sharing it reads the new text");
+    E.setResponse(SH, "SR1.1", { evidence: sharedResp.evidence });
+    E.setActiveTarget(SH);
+
+    // ---- controls that would do nothing are not offered ------------------
+    //
+    // `touched` counts inherited items, so a zone that merely TAKES a shared
+    // answer looked answered - and was offered a Clear that deleted nothing and
+    // changed nothing on screen.
+    E.setActiveTarget(z1);
+    A.UI.go("fr", "FR1");
+    function clearBtnFor(reqId) {
+      var c = document.getElementById("main").querySelector('.req[data-req-id="' + reqId + '"]');
+      return c && Array.prototype.filter.call(c.querySelectorAll(".sl-btn"),
+        function (b) { return b.textContent === "Clear"; })[0];
+    }
+    var ownNow = E.findResponse(z1, "SR1.1");
+    ok(!ownNow || !Object.keys(ownNow.components || {}).length,
+       "the zone holds nothing of its own for SR 1.1");
+    ok(!clearBtnFor("SR1.1"), "so no Clear is offered on an answer it does not own");
+    E.setRequirementSL(z1, "SR1.1", 1, 2);
+    A.UI.go("fr", "FR1");
+    ok(!!clearBtnFor("SR1.1"), "and Clear returns as soon as the zone answers for itself");
+    E.setRequirementSL(z1, "SR1.1", null, 2);
+    E.setActiveTarget(SH);
+
+    // ---- reach, at the level the consultant thinks in -------------------
+    //
+    // The per-item control sits inside a collapsed panel, so on its own it
+    // could not be found: the requirement card carries the same choice.
+    function cardFor(reqId) {
+      return document.getElementById("main").querySelector('.req[data-req-id="' + reqId + '"]');
+    }
+    function coverageToggle(reqId) {
+      var c = cardFor(reqId);
+      return c && c.querySelector(".sl-answer-aside .sl-coverage-toggle");
+    }
+    A.UI.go("fr", "FR1");
+    ok(!!coverageToggle("SR1.1"),
+       "an answered requirement offers its reach on the card, without opening anything");
+    ok(coverageToggle("SR1.1").textContent.indexOf("Applies to all") === 0,
+       "and reads as covering everything until it is narrowed",
+       coverageToggle("SR1.1").textContent);
+
+    var covResult = E.setRequirementCoverage("SR1.1", [z1, z2]);
+    ok(covResult && covResult.mixed === false && covResult.appliesTo.length === 2,
+       "setting it at requirement level writes one reach for the whole requirement");
+    ok(E.getItemCoverage("SR1.1", "base").length === 2 && E.getItemCoverage("SR1.1", "RE1").length === 2,
+       "every answered item of that requirement takes it");
+    A.UI.go("fr", "FR1");
+    ok(/Applies to 2 of 3/.test(coverageToggle("SR1.1").textContent),
+       "the card says how far it now reaches", coverageToggle("SR1.1").textContent);
+    ok(/scoped/.test(coverageToggle("SR1.1").className),
+       "and is marked as narrowed rather than left looking like the default");
+
+    // An unanswered item must not acquire a reach: that would be a claim about
+    // something nobody has assessed.
+    E.setRequirementCoverage("SR1.1", null);
+    ok(E.getItemCoverage("SR1.1", "base") === null, "clearing it hands the requirement back to every zone");
+
+    // One enhancement reaching further than the base is still expressible, and
+    // the card says so rather than pretending there is a single answer.
+    E.setItemCoverage("SR1.1", "RE1", [z1]);
+    var mixed = E.getRequirementCoverage("SR1.1");
+    ok(mixed.mixed === true, "items with different reaches report as mixed");
+    A.UI.go("fr", "FR1");
+    ok(/set per item/i.test(coverageToggle("SR1.1").textContent),
+       "and the card says so instead of showing a reach that is not true",
+       coverageToggle("SR1.1").textContent);
+    E.setRequirementCoverage("SR1.1", null);
+    ok(E.getRequirementCoverage("SR1.1").mixed === false,
+       "choosing one reach resolves the mixed state");
+
+    // A requirement nobody has answered here has no reach to set.
+    ok(E.getRequirementCoverage("SR1.13") === null,
+       "an unanswered requirement reports no reach at all");
+    ok(!coverageToggle("SR1.13"),
+       "and offers no control, since a reach for a blank answer means nothing");
+
+    // The reach is a property of the shared layer; on a zone the answer
+    // only ever applies to the zone you are standing in.
+    E.setActiveTarget(z1);
+    A.UI.go("fr", "FR1");
+    ok(!coverageToggle("SR1.1"), "a zone page offers no reach control");
+    E.setActiveTarget(SH);
+
+    // ---- a shared answer must never outlive its own point ----------------
+    //
+    // Delete one zone out of a linked pair and what is left is a shared answer
+    // serving a single zone. Drop to one zone overall and the Shared tab is
+    // withdrawn, so those answers would still be scoring with no way to reach
+    // them. Both cases hand the answer back to the zone that still uses it.
+    (function () {
+      var keep = E.state.engagement.targets.map(function (t) { return t.id; });
+      var extra = E.addTarget("Doomed").id;
+      E.setRequirementSL(keep[0], "SR3.1", 2, 2);
+      E.setResponse(keep[0], "SR3.1", { evidence: "One malware defence, one console." });
+      E.linkRequirement("SR3.1", keep[0], [extra]);
+      ok(E.linkedTargets("SR3.1").length === 2, "two zones share SR 3.1");
+      E.removeTarget(extra);
+      ok(E.linkedTargets("SR3.1").length !== 1,
+         "deleting one of a linked pair leaves no shared answer serving a single zone",
+         JSON.stringify(E.linkedTargets("SR3.1")));
+      var back = E.findResponse(keep[0], "SR3.1");
+      ok(back && back.evidence === "One malware defence, one console.",
+         "the surviving zone gets the answer back as its own",
+         back ? back.evidence : "(gone)");
+    })();
+    E.setActiveTarget(SH);
+
+    // ---- linking a requirement from a zone ------------------------------
+    //
+    // "SR 1.9 is the same here as in the DMZ." Said from the zone, which is
+    // where it is noticed - halfway through the second zone, recognising the
+    // answer just written for the first.
+    E.setRequirementSL(z1, "SR1.9", 1, 3);
+    E.setResponse(z1, "SR1.9", { evidence: "One PKI issued by the corporate CA.",
+                                 notes: "Confirmed with IT.", action: "Move to per-device certificates.",
+                                 owner: "OT Engineering" });
+    ok(E.linkedTargets("SR1.9").length === 0, "a zone's own answer is not a link");
+
+    ok(E.linkRequirement("SR1.9", z1, [z2]) === true, "two zones can be linked from one of them");
+    var linked19 = E.linkedTargets("SR1.9");
+    ok(linked19.length === 2 && linked19.indexOf(z1) !== -1 && linked19.indexOf(z2) !== -1,
+       "both zones now share the one answer", JSON.stringify(linked19));
+    ok(E.findResponse(z1, "SR1.9") === undefined,
+       "the source zone no longer holds its own copy - there is one answer, not two");
+    var sc19 = E.scoreAllTargets();
+    function req19(tid) {
+      var t = sc19.perTarget.filter(function (x) { return x.target.id === tid; })[0];
+      return t.result.perRequirement.filter(function (x) { return x.requirementId === "SR1.9"; })[0];
+    }
+    ok(req19(z2).evidence === "One PKI issued by the corporate CA." && req19(z2).evidenceSource === "shared",
+       "the linked zone takes the evidence");
+    ok(req19(z2).action === "Move to per-device certificates." && req19(z2).planSource === "shared",
+       "and the remediation plan, which is the point of saying they are the same");
+    ok(req19(z2).notes === "Confirmed with IT.", "and the notes");
+    ok(req19(z1).itemsAchieved === req19(z2).itemsAchieved,
+       "both zones score the same, because it is one answer");
+    ok(req19(z3).evidence !== "One PKI issued by the corporate CA.",
+       "a zone outside the link is untouched by it");
+
+    // Edited once, changed everywhere: that is what a link is for.
+    E.setResponse(SH, "SR1.9", { evidence: "One PKI; certificates renewed annually." });
+    sc19 = E.scoreAllTargets();
+    ok(req19(z1).evidence === "One PKI; certificates renewed annually." &&
+       req19(z2).evidence === req19(z1).evidence,
+       "editing it once changes it in every linked zone");
+
+    // Linking two zones must not quietly change a third that was already
+    // sharing the answer: it keeps what it had, as its own.
+    E.linkRequirement("SR1.9", z1, [z2, z3]);
+    ok(E.linkedTargets("SR1.9").length === 3, "a third zone can join the link");
+    E.setRequirementSL(z2, "SR1.9", 0, 3);   // z2 answers for itself again
+    E.linkRequirement("SR1.9", z1, [z3]);
+    sc19 = E.scoreAllTargets();
+    ok(E.linkedTargets("SR1.9").indexOf(z2) === -1, "re-linking a pair drops the zone that left");
+    ok(req19(z3).evidence === "One PKI; certificates renewed annually.",
+       "and the zone still in the link keeps the shared text", req19(z3).evidence);
+
+    // Bystander: a zone sharing an answer that is not part of a new link keeps
+    // what it had rather than being overwritten or blanked.
+    E.setRequirementSL(z2, "SR1.10", 1, 3);
+    E.setResponse(z2, "SR1.10", { evidence: "Zone 2 wrote this." });
+    E.linkRequirement("SR1.10", z2, [z1, z3]);
+    ok(E.linkedTargets("SR1.10").length === 3, "three zones share it to begin with");
+    E.setRequirementSL(z1, "SR1.10", 0, 3);  // z1 takes it back, then links only with z2
+    E.linkRequirement("SR1.10", z1, [z2]);
+    var sc110 = E.scoreAllTargets();
+    function req110(tid) {
+      var t = sc110.perTarget.filter(function (x) { return x.target.id === tid; })[0];
+      return t.result.perRequirement.filter(function (x) { return x.requirementId === "SR1.10"; })[0];
+    }
+    ok(req110(z3).evidence === "Zone 2 wrote this." && req110(z3).evidenceSource === "zone",
+       "the zone left out keeps what it had, as its own answer",
+       req110(z3).evidence + "/" + req110(z3).evidenceSource);
+
+    // Unlinking is lossless, and a link of one is not a link.
+    E.unlinkRequirement("SR1.9", z3);
+    ok(E.linkedTargets("SR1.9").length === 0,
+       "unlinking the second of two ends the link rather than leaving one zone on a shared answer");
+    sc19 = E.scoreAllTargets();
+    ok(req19(z3).evidence === "One PKI; certificates renewed annually." && req19(z3).evidenceSource === "zone",
+       "and the unlinked zone keeps the answer it was using");
+    ok(req19(z1).evidence === "One PKI; certificates renewed annually." && req19(z1).evidenceSource === "zone",
+       "as does the one it was linked to");
+    ok(E.findResponse(SH, "SR1.9") === undefined,
+       "no orphan shared answer is left behind");
+
+    // The control itself, on a zone card.
+    function linkToggle(reqId) {
+      var c = document.getElementById("main").querySelector('.req[data-req-id="' + reqId + '"]');
+      return c && c.querySelector(".sl-link-toggle");
+    }
+    E.setActiveTarget(z1);
+    A.UI.go("fr", "FR1");
+    ok(!!linkToggle("SR1.9"), "an answered requirement offers the link control on a zone card");
+    ok(/Same as another/.test(linkToggle("SR1.9").textContent),
+       "which invites the comparison rather than naming the mechanism",
+       linkToggle("SR1.9").textContent);
+    E.linkRequirement("SR1.9", z1, [z2]);
+    A.UI.go("fr", "FR1");
+    ok(/Shared with 1 other/.test(linkToggle("SR1.9").textContent),
+       "once linked it says how many others share it", linkToggle("SR1.9").textContent);
+    ok(/linked/.test(linkToggle("SR1.9").className), "and is marked as a link, not a suggestion");
+    // A zone outside a link between two others must not read as being in it.
+    E.setActiveTarget(z3);
+    A.UI.go("fr", "FR1");
+    var t3 = linkToggle("SR1.9");
+    ok(!t3 || !/Shared with/.test(t3.textContent),
+       "a zone outside the link does not claim to be in it", t3 ? t3.textContent : "(no control)");
+
+    // The guided wizard is the on-site flow: one requirement at a time is
+    // exactly where "this is the same as the last zone" is noticed, so it must
+    // offer the same controls rather than sending the consultant to the list.
+    E.setActiveTarget(z1);
+    A.UI.go("fr", "FR1");
+    var listHasLink = !!document.getElementById("main").querySelector(".sl-link-toggle");
+    A.UI.go("sl-wizard");
+    var wizHasLink = !!document.getElementById("main").querySelector(".sl-link-toggle");
+    ok(listHasLink && wizHasLink === listHasLink,
+       "the guided wizard offers the same link control as the list view",
+       "list=" + listHasLink + " wizard=" + wizHasLink);
+    E.setActiveTarget(SH);
+    A.UI.go("sl-wizard");
+    ok(!!document.getElementById("main").querySelector(".sl-coverage-toggle"),
+       "and the reach control when standing on the shared layer");
+    ok(!!document.getElementById("main").querySelector(".site-tab-shared"),
+       "which the wizard can actually navigate to");
+
+    // ---- read the other zone's answer BEFORE replacing it ---------------
+    //
+    // Linking discards what the other zone held. The consultant has to be able
+    // to see that text first - to check it really does say the same thing, and
+    // to keep it instead of their own if it is the better write-up.
+    E.setRequirementSL(z1, "SR1.5", 1, 2);
+    E.setResponse(z1, "SR1.5", { evidence: "Passwords are set locally on each console.",
+                                 notes: "Seen on two consoles." });
+    E.setRequirementSL(z2, "SR1.5", 2, 2);
+    E.setResponse(z2, "SR1.5", { evidence: "Password policy comes from the corporate GPO.",
+                                 action: "Extend the domain policy to the consoles." });
+    E.setActiveTarget(z1);
+    A.UI.go("fr", "FR1");
+    function card15() { return document.getElementById("main").querySelector('.req[data-req-id="SR1.5"]'); }
+    card15().querySelector(".sl-link-toggle").click();
+    card15().querySelectorAll(".sl-coverage-zone input")[0].click();   // tick the first other zone
+
+    var cards = card15().querySelectorAll(".sl-link-card");
+    ok(cards.length === 2, "ticking a zone offers both answers for comparison", String(cards.length));
+    ok(E.linkedTargets("SR1.5").length === 0,
+       "and nothing is linked yet - the other zone's answer is still its own");
+    var panelText = card15().querySelector(".sl-link-choose").textContent;
+    ok(panelText.indexOf("Passwords are set locally on each console.") !== -1,
+       "this zone's evidence is shown");
+    ok(panelText.indexOf("Password policy comes from the corporate GPO.") !== -1,
+       "and so is the other zone's, which is the text about to be replaced");
+    ok(panelText.indexOf("Extend the domain policy to the consoles.") !== -1,
+       "along with its remediation action");
+
+    // Cancel leaves everything exactly as it was.
+    Array.prototype.filter.call(card15().querySelectorAll("button"),
+      function (b) { return b.textContent === "Cancel"; })[0].click();
+    ok(!card15().querySelector(".sl-link-card"), "cancelling drops the staged link");
+    ok(E.linkedTargets("SR1.5").length === 0 &&
+       (E.findResponse(z2, "SR1.5") || {}).evidence === "Password policy comes from the corporate GPO.",
+       "and leaves the other zone's answer untouched");
+
+    // Commit, having chosen the OTHER zone's answer.
+    card15().querySelectorAll(".sl-coverage-zone input")[0].click();
+    card15().querySelectorAll(".sl-link-card input[type=radio]")[1].click();
+    Array.prototype.filter.call(card15().querySelectorAll("button"),
+      function (b) { return b.textContent === "Share this answer"; })[0].click();
+    ok(E.linkedTargets("SR1.5").length === 2, "committing links the two zones",
+       String(E.linkedTargets("SR1.5").length));
+    var sc15 = E.scoreAllTargets();
+    function ev15(t) {
+      var x = sc15.perTarget.filter(function (p) { return p.target.id === t; })[0];
+      return x.result.perRequirement.filter(function (p) { return p.requirementId === "SR1.5"; })[0];
+    }
+    ok(ev15(z1).evidence === "Password policy comes from the corporate GPO." &&
+       ev15(z1).evidenceSource === "shared",
+       "the answer chosen from the other zone is the one both now use", ev15(z1).evidence);
+    ok(ev15(z2).evidence === ev15(z1).evidence, "and both read the same text");
+    ok(ev15(z1).action === "Extend the domain policy to the consoles.",
+       "its remediation plan travels with it");
+
+    E.setActiveTarget(SH);
+
+    // Zone page: the inherited answer is visible, badged, and revertible.
+    E.setActiveTarget(z1);
+    A.UI.go("fr", "FR1");
+    main = openItems(document.getElementById("main"));
+    ok(main.querySelector(".sl-item.is-inherited") !== null, "an inherited item is marked on the zone page");
+    ok(main.querySelector(".pill.inherit") !== null, "the inherited item carries a Shared badge");
+    ok(main.querySelector(".inherited-evidence") !== null, "the shared evidence is shown on the zone page");
+    ok(main.textContent.indexOf("Revert to shared") === -1,
+       "an item that is merely inherited offers no revert control");
+    E.setItemState(z1, "SR1.1", "base", "met");
+    A.UI.go("fr", "FR1");
+    main = openItems(document.getElementById("main"));
+    ok(main.textContent.indexOf("Revert to shared") !== -1,
+       "an overriding item offers a revert control");
+    // One tag only. The revert control is what marks an overriding item as
+    // connected to the shared layer; a second badge said the same thing
+    // twice and competed with the answer itself for attention.
+    ok(main.textContent.indexOf("Overridden here") === -1,
+       "and carries no second badge saying so");
+    var reverted = Array.prototype.filter.call(main.querySelectorAll("button"), function (b) {
+      return /Revert to shared/.test(b.textContent || "");
+    })[0];
+    ok(reverted && /shared answer is Met/.test(reverted.getAttribute("title") || ""),
+       "the revert control names the answer it would restore",
+       reverted ? reverted.getAttribute("title") : "(no control)");
+    E.setItemState(z1, "SR1.1", "base", null);
+
+    // The shared layer must survive a save/load round trip.
+    var file = JSON.parse(JSON.stringify(E.getProjectFile()));
+    E.newProject();
+    E.loadProjectFile(file);
+    E.activateInstrument("iec-62443-3-3");
+    var reloaded = E.getSharedResponses();
+    var r11 = reloaded.filter(function (r) { return r.requirementId === "SR1.1"; })[0];
+    var r61 = reloaded.filter(function (r) { return r.requirementId === "SR6.1"; })[0];
+    ok(!!r11 && r11.components.base.state === "met" &&
+       r11.components.RE1.state === "not-met" && r11.action.indexOf("multifactor") !== -1,
+       "shared answers and their plan survive save and load", String(reloaded.length));
+    ok(!!r61 && r61.components.base.appliesTo && r61.components.base.appliesTo.length === 2,
+       "and so does the set of zones a scoped answer covers",
+       r61 && r61.components.base.appliesTo ? r61.components.base.appliesTo.join(",") : "(none)");
+
+    // A deleted zone must not linger in a coverage list, or the answer quietly
+    // narrows to something that no longer exists.
+    var targets = E.state.engagement.targets.slice();
+    E.setItemCoverage("SR6.1", "base", [targets[0].id, targets[1].id]);
+    E.removeTarget(targets[1].id);
+    var covAfter = E.getItemCoverage("SR6.1", "base");
+    ok(!covAfter || covAfter.indexOf(targets[1].id) === -1,
+       "removing a zone takes it out of every coverage list",
+       covAfter ? covAfter.join(",") : "(covers all)");
+
+    // Deleting back down to one zone must not strand the user on a layer that
+    // no longer applies.
+    E.setActiveTarget(E.SHARED_TARGET_ID);
+    E.removeTarget(targets[2].id);
+    ok(!E.supportsSharedScope(), "the layer is withdrawn when only one zone is left");
+    A.UI.go("fr", "FR1");
+    ok(!E.isSharedScope(E.state.activeTargetId),
+       "rendering moves off the withdrawn layer rather than showing an empty page");
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+});
+</script>
+</body></html>

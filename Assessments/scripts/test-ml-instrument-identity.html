@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Maturity instruments name their own standard and their own nouns</title></head>
+<body><div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script>
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ o=o||{}; this.__type="Paragraph"; this.children=o.children||[]; this.heading=o.heading||null;
+    this.style=o.style||null; this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ o=o||{}; this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ o=o||{}; this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ o=o||{}; this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text=""; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.sections=o.sections||[]; window.__doc=this; }
+  var Packer={ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } };
+  return { Document:Document,Paragraph:Paragraph,TextRun:TextRun,TableCell:TableCell,TableRow:TableRow,
+    Table:Table,ImageRun:ImageRun,PageBreak:PageBreak,Header:Header,Footer:Footer,
+    PageNumber:{CURRENT:"CURRENT",TOTAL_PAGES:"TOTAL_PAGES"},
+    PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"Heading1",HEADING_2:"Heading2",HEADING_3:"Heading3"},
+    AlignmentType:{LEFT:"left",CENTER:"center",RIGHT:"right"},
+    WidthType:{PERCENTAGE:"pct"}, ShadingType:{SOLID:"solid"}, Packer:Packer };
+})();
+</script>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["41", "ml"] });</script>
+<script>
+// Two instruments share the program-maturity-ml family. The chassis strings
+// used to name the first of them everywhere, so a 62443-4-1 report told its
+// reader it was a 62443-2-1:2024 assessment and called its Practices "Security
+// Program Elements" - the standard's own word colliding with the wrong one.
+// Each instrument must name ITS OWN standard and use ITS OWN nouns, on screen,
+// in Word and in Excel.
+(function () {
+  var A = window.App, E = A.Engine, R = A.Report, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    document.getElementById("out").textContent =
+      out.join("\n") + "\n\n" + (fail ? fail + " FAILED" : "ALL TESTS PASSED (" + out.length + ")");
+  }
+  function docText() {
+    var t = [];
+    (function walk(n) {
+      if (!n) return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      if (n.__type === "Paragraph") { t.push(n.text || ""); return; }
+      if (n.__type === "Table") { walk(n.rows); return; }
+      if (n.__type === "TableRow" || n.__type === "TableCell") { walk(n.children); return; }
+    })((window.__doc.sections || []).map(function (s) { return s.children; }));
+    return t.join("\n");
+  }
+  function headings() {
+    var hs = [];
+    (window.__doc.sections || []).forEach(function (s) {
+      (s.children || []).forEach(function (n) { if (n && n.__headingText) hs.push(n.__headingText.trim()); });
+    });
+    return hs;
+  }
+
+  var CASES = [
+    { id: "iec-62443-2-1-2024", tour: "TourML", ref: "ISA/IEC 62443-2-1:2024",
+      element: "Security Program Element", other: "ISA/IEC 62443-4-1", otherNoun: /\bPractice\b/ },
+    { id: "iec-62443-4-1", tour: "Tour41", ref: "ISA/IEC 62443-4-1",
+      element: "Practice", other: "ISA/IEC 62443-2-1:2024", otherNoun: /Security Program Element/ }
+  ];
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+  } catch (e) { ok(false, "setup threw: " + e.message); flush(); return; }
+
+  function run(i) {
+    flush();
+    if (i >= CASES.length) { flush(); return; }
+    var c = CASES[i];
+    E.activateInstrument(c.id);
+    (A[c.tour] || {}).apply(E);
+    var inst = E.state.instrument;
+    var tag = c.id;
+
+    // ---- the instrument declares its own identity ----
+    ok(R.standardRef(inst) === c.ref, tag + ": standardRef is its own standard", R.standardRef(inst));
+    ok(R.mlNoun(inst, "elementNounTitle") === c.element, tag + ": its own word for a grouping",
+       R.mlNoun(inst, "elementNounTitle"));
+
+    // ---- every family instrument has a narrative pack ----
+    var narr = E.getActiveNarrative();
+    ok(!!(narr && narr.executiveSummary && narr.executiveSummary.templates),
+       tag + ": has a narrative pack with a composed executive summary");
+    ok(!!(narr && narr.executiveSummary.consultantBlocks &&
+          narr.executiveSummary.consultantBlocks.consultant_exposure),
+       tag + ": ...including somewhere for the consultant's own words");
+
+    // ---- the screen report ----
+    A.UI.go("report");
+    var t = document.getElementById("main").textContent;
+    ok(t.indexOf(c.other) === -1, tag + ": the screen never names the OTHER standard");
+    ok(!c.otherNoun.test(t), tag + ": nor uses the other instrument's noun");
+    ok(t.indexOf("Results by " + c.element) !== -1, tag + ": results are grouped by its own noun",
+       t.indexOf("Results by") >= 0 ? t.slice(t.indexOf("Results by"), t.indexOf("Results by") + 40) : "(none)");
+
+    // ---- the Word document ----
+    window.__doc = null;
+    A.ExportDOCX.buildAsync(E.state.engagement, inst, E.state.taxonomy, E.state.profile,
+      narr, { targetId: E.state.activeTargetId }, function (err) {
+        try {
+          if (err) { ok(false, tag + ": Word build - " + (err.message || err)); return run(i + 1); }
+          var txt = docText(), hs = headings();
+          ok(txt.indexOf(c.ref) !== -1, tag + ": Word names its own standard");
+          // The framing legitimately credits where the maturity model came
+          // from, so only the OTHER standard's noun is out of bounds here.
+          // Word-boundary: "ML3 Defined / Practiced" is the standard's own
+          // anchor label and contains "Practice" in BOTH instruments.
+          var hit = c.otherNoun.exec(txt);
+          ok(!hit, tag + ": Word never uses the other instrument's noun",
+             hit ? txt.slice(Math.max(0, hit.index - 60), hit.index + 60) : "");
+          ok(hs.indexOf("Results by " + c.element) !== -1, tag + ": Word groups results by its own noun",
+             hs.join(" | "));
+          ok(hs.indexOf("Findings by " + c.element) !== -1, tag + ": and findings too");
+          // The composed summary, not the bullet fallback.
+          var start = -1;
+          for (var k = 0; k < hs.length; k++) if (/Executive summary/i.test(hs[k])) { start = k; break; }
+          ok(start >= 0, tag + ": Word has an executive summary");
+          ok(txt.indexOf("achieved-maturity profile") !== -1,
+             tag + ": composed from the pack, not the bullet fallback");
+          run(i + 1);
+        } catch (e) { ok(false, tag + ": threw: " + e.message); flush(); }
+      });
+  }
+
+  try { run(0); } catch (e) { ok(false, "threw: " + (e && e.message)); flush(); }
+})();
+</script>
+</body></html>

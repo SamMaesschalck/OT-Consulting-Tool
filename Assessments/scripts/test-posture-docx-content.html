@@ -1,0 +1,378 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Verify posture Word content</title>
+<style>
+body{font:17px "Segoe UI",sans-serif;padding:22px;color:#1A2533}
+.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}
+.row{padding:3px 0;font-family:Consolas,monospace;font-size:15px}
+.sec{padding:14px 0 4px;font-weight:600;font-size:18px}
+.preview{background:#F4F7FA;border:1px solid #C8D2DD;border-radius:4px;padding:12px;margin:10px 0;font:14px Consolas,monospace;white-space:pre-wrap}
+</style></head>
+<body>
+<h1>Posture Word document content verification</h1>
+<div id="out"></div>
+<div id="preview"></div>
+
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock" });</script>
+
+<script>
+// Mock docx so we can capture the document structure without serialising.
+window.docx = (function () {
+  function TextRun(opts) { if (typeof opts === "string") opts = { text: opts }; this.__type = "TextRun"; this.text = opts.text || ""; this.bold = !!opts.bold; this.italics = !!opts.italics; this.color = opts.color || null; }
+  function Paragraph(opts) { this.__type = "Paragraph"; this.children = opts.children || []; this.style = opts.style || null; this.heading = opts.heading || null; this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join(""); }
+  function TableCell(opts) { this.__type = "TableCell"; this.children = opts.children || []; this.shading = opts.shading || null; }
+  function TableRow(opts)  { this.__type = "TableRow"; this.children = opts.children || []; }
+  function Table(opts)     { this.__type = "Table"; this.rows = opts.rows || []; }
+  function ImageRun(opts)  { this.__type = "ImageRun"; }
+  // Everything below was added to the exporter after this mock was written
+  // (headers/footers, page numbering, the landscape results sections). Missing
+  // any one of them made buildAsync throw before a single assertion ran, so
+  // this page silently reported nothing at all rather than failing loudly.
+  function PageBreak()     { this.__type = "PageBreak"; this.text = ""; }
+  function Header(opts)    { this.__type = "Header"; this.children = (opts && opts.children) || []; }
+  function Footer(opts)    { this.__type = "Footer"; this.children = (opts && opts.children) || []; }
+  var PageNumber      = { CURRENT: "CURRENT", TOTAL_PAGES: "TOTAL_PAGES" };
+  var PageOrientation = { PORTRAIT: "portrait", LANDSCAPE: "landscape" };
+  var TableLayoutType = { FIXED: "fixed", AUTOFIT: "autofit" };
+  var HeightRule      = { AUTO: "auto", EXACT: "exact", AT_LEAST: "atLeast" };
+  function Document(opts)  { this.__type = "Document"; this.styles = opts.styles || null; this.sections = opts.sections || []; }
+  var HeadingLevel = { TITLE: "Title", HEADING_1: "Heading1", HEADING_2: "Heading2", HEADING_3: "Heading3" };
+  var AlignmentType = { LEFT: "left", CENTER: "center", RIGHT: "right" };
+  var WidthType = { PERCENTAGE: "pct" };
+  var ShadingType = { SOLID: "solid" };
+  var Packer = { toBlob: function (doc) { window.__capturedDoc = doc; return Promise.resolve(new Blob(["dummy"])); } };
+  return { Document: Document, Paragraph: Paragraph, TextRun: TextRun, TableCell: TableCell, TableRow: TableRow, Table: Table, ImageRun: ImageRun, PageBreak: PageBreak, Header: Header, Footer: Footer, PageNumber: PageNumber, PageOrientation: PageOrientation, TableLayoutType: TableLayoutType, HeightRule: HeightRule, HeadingLevel: HeadingLevel, AlignmentType: AlignmentType, WidthType: WidthType, ShadingType: ShadingType, Packer: Packer };
+})();
+</script>
+<script>
+(function () {
+  var A = window.App;
+  var out = document.getElementById("out");
+  var pv  = document.getElementById("preview");
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function section(text) { var d = document.createElement("div"); d.className = "sec"; d.textContent = text; out.appendChild(d); }
+
+  var inst = A.Data.instruments["general-ot-posture"].instrument;
+  var narr = A.Data.instruments["general-ot-posture"].narrative;
+  var prof = A.Data.shared.scoringProfiles["posture-domain-letter"];
+
+  var eng = A.Storage.makeEmptyEngagement(inst);
+  eng.engagement.clientName = "Northbridge Manufacturing";
+  eng.engagement.siteName = "Organisation-wide";
+  eng.engagement.consultant = "S. Maesschalck";
+  eng.engagement.dateOfVisit = "2026-05-21";
+  var tid = eng.targets[0].id;
+
+  function set(qid, patch) {
+    var p = Object.assign({ targetId: tid, requirementId: qid, applicable: true, band: null, unknown: false, capture: {} }, patch);
+    eng.responses.push(p);
+  }
+  // FR scenario that exercises: governance with some answered, arch.5 floor (safety),
+  // monitor as worst (F), protect with unknowns to drop coverage below threshold.
+  set("gov.1", { band: 2, capture: { notes: "Sat with IT security." } });
+  set("gov.2", { band: 2 });
+  set("gov.3", { band: 1, capture: { which: ["Acceptable use"] } });
+  set("gov.4", { unknown: true });
+  // gov.6/7/8 were added to the instrument after this fixture was written. They
+  // are answered 2/2/1 - the same mean as gov.1/2/3 - so the domain score stays
+  // exactly 0.556 and the arithmetic documented below still holds. Leaving them
+  // unanswered would instead have dropped governance under the coverage
+  // threshold and made it ungradeable, which is a different test.
+  set("gov.6", { band: 2 });
+  set("gov.7", { band: 2 });
+  set("gov.8", { band: 1 });
+  set("assets.1", { band: 2 });
+  set("assets.2", { band: 1 });
+  set("assets.3", { band: 1 });
+  set("assets.4", { band: 2 });
+  set("arch.1", { band: 2 });
+  set("arch.2", { band: 1 });
+  set("arch.3", { band: 2 });
+  set("arch.4", { band: 2 });
+  set("arch.5", { band: 0, capture: { notes: "SIS shares the BPCS segment; no logical separation." } });
+  set("access.1", { band: 2 });
+  set("access.2", { band: 1 });
+  set("access.3", { band: 1 });
+  set("access.4", { band: 2 });
+  // Likewise access.5/6, answered 2/1 to hold the domain at 0.5.
+  set("access.5", { band: 2 });
+  set("access.6", { band: 1 });
+  // protect: three unknowns to break coverage threshold for this domain
+  set("protect.1", { band: 1 });
+  set("protect.2", { unknown: true });
+  set("protect.3", { unknown: true });
+  set("protect.4", { unknown: true });
+  set("protect.5", { unknown: true });
+  // protect.6/7 also unknown, so this domain stays below the coverage
+  // threshold and keeps exercising the insufficient-evidence path.
+  set("protect.6", { unknown: true });
+  set("protect.7", { unknown: true });
+  set("monitor.1", { band: 0 });
+  set("monitor.2", { band: 0 });
+  set("monitor.3", { band: 1 });
+  // monitor.4/5 added in content version 1.2.0. Answered 0/1 so the domain
+  // stays the weakest and stays F, which the headline arithmetic below relies
+  // on - it is the F that sets the cap.
+  set("monitor.4", { band: 0 });
+  set("monitor.5", { band: 1 });
+  set("respond.1", { band: 1 });
+  set("respond.2", { band: 2 });
+  set("respond.3", { band: 1 });
+  set("respond.4", { band: 0 });
+  // respond.5 answered at the domain's existing mean (1), so respond stays 0.333.
+  set("respond.5", { band: 1 });
+
+  A.ExportDOCX.buildAsync(eng, inst, null, prof, narr, { targetId: tid }, function (err) {
+    if (err) { out.innerHTML = "<div class='bad'>buildAsync failed: " + (err.message || err) + "</div>"; return; }
+    var doc = window.__capturedDoc;
+    var paras = [];
+    function walk(node) {
+      if (!node) return;
+      if (node.__type === "Paragraph") { paras.push(node); return; }
+      if (node.__type === "Table") { node.rows.forEach(walk); return; }
+      if (node.__type === "TableRow") { node.children.forEach(walk); return; }
+      if (node.__type === "TableCell") { node.children.forEach(walk); return; }
+      if (Array.isArray(node)) node.forEach(walk);
+    }
+    doc.sections.forEach(function (s) { s.children.forEach(walk); });
+    var allText = paras.map(function (p) { return p.text; }).join("\n");
+
+    // Acceptance 5: indicative-grade caveat appears prominently
+    section("Acceptance 5 - indicative-grade caveat appears prominently");
+    check("Caveat text is present verbatim",
+      allText.indexOf(narr.boilerplate.indicative_grade_caveat) !== -1);
+    var indexInDoc = allText.indexOf(narr.boilerplate.indicative_grade_caveat);
+    check("Caveat appears in the upper portion of the document (within the first 25%)",
+      indexInDoc !== -1 && indexInDoc < (allText.length * 0.25));
+    check("Caveat section heading 'Indicative grade' is present", allText.indexOf("Indicative grade") !== -1);
+
+    // Acceptance 6: safety-flagged SIS appears with safety note
+    section("Acceptance 6 - safety-flagged SIS named and the safety_note prepended");
+    check("arch.5 prompt appears in findings",
+      allText.indexOf("Are safety systems (SIS) separated from the basic process control network?") !== -1);
+    check("templates.safety_note appears verbatim",
+      allText.indexOf(narr.templates.safety_note) !== -1);
+
+    // Acceptance 7: template-only composition; verbatim boilerplate
+    section("Acceptance 7 - verbatim boilerplate + template-only composition");
+    // Verbatim means the pack's text printed exactly, not rewritten. The pack
+    // now carries the client's name as {clientName}, filled in when the report
+    // is built, so compare against the pack as the document receives it.
+    var BP = A.Report.personaliseNarrative(narr, eng, inst).boilerplate;
+    check("report_intro verbatim",        allText.indexOf(BP.report_intro) !== -1);
+    check("about_instrument verbatim",    allText.indexOf(BP.about_instrument) !== -1);
+    check("how_to_read verbatim",         allText.indexOf(BP.how_to_read) !== -1);
+    // The method's closing [prompt] prints as its own red paragraph, straight
+    // after the description, until the consultant answers it in the tool.
+    var mCut = BP.method.indexOf("[");
+    check("method verbatim",              mCut < 0 ? allText.indexOf(BP.method) !== -1
+      : allText.indexOf(BP.method.slice(0, mCut).trim() + "\n" + BP.method.slice(mCut).trim()) !== -1);
+    check("limitations verbatim",         allText.indexOf(BP.limitations) !== -1);
+    var DN = narr.domain_narrative;
+    check("gov.purpose verbatim",         allText.indexOf(DN.gov.purpose) !== -1);
+    check("gov.why_it_matters verbatim",  allText.indexOf(DN.gov.why_it_matters) !== -1);
+    check("arch.purpose verbatim",        allText.indexOf(DN.arch.purpose) !== -1);
+    check("monitor.why_it_matters verbatim", allText.indexOf(DN.monitor.why_it_matters) !== -1);
+    // Headline composition under the new methodology.
+    //   gov 0.556 (C), assets 0.5 (D), arch 0.467 (D), access 0.5 (D),
+    //   monitor 0.111 (F), respond 0.333 (E)         (protect excluded - low coverage)
+    //   Weighted mean (equal) = 0.411 -> D. Weakest graded = monitor (F).
+    //   Cap rank = 0+1 = 1 (E). Mean rank = 2 (D) > 1 -> cap pulls headline to E.
+    //
+    // This pack carries an `executiveSummary` block, so the composed summary
+    // runs rather than the older flat templates. It has to carry the same
+    // facts: the headline grade, the named weakest domain, and the coverage the
+    // read rests on. (The flat templates are still exercised below, against a
+    // pack with no executiveSummary.)
+    // With the cap at two grades, this fixture's mean (D) already sits at the
+    // ceiling the F imposes, so the headline is D and the cap does not bite.
+    check("exec verdict states the headline grade and the weakest domain",
+      /indicative OT security posture grade of D, with the weakest ground in Monitoring and detection/.test(allText));
+    // The weakest domain and its grade must still be stated - but once. It used
+    // to be named in the verdict, again in the low-grade list, and again in a
+    // sentence of its own, all within four paragraphs.
+    check("exec summary names the weakest domain with its grade",
+      /Monitoring and detection \(F\)/.test(allText));
+    // Scoped to the summary: the domain is legitimately named many times later
+    // (its own heading, the priority list, the roadmap entries).
+    var execOnly = allText.split("Indicative grade")[0];
+    var mentions = (execOnly.match(/Monitoring and detection/g) || []).length;
+    // Four legitimate mentions with no consultant-written exposure paragraph,
+    // each doing a different job: the verdict, the lowest-graded list, the
+    // ceiling sentence (which has to name the domain to mean anything), and the
+    // suggested priorities. It used to be six - those four plus a standalone
+    // "The weakest domain is X, graded F." and a seed line saying the same thing
+    // again directly above the placeholder telling the consultant to write it.
+    check("the summary names the weakest domain at most four times (got " + mentions + ")",
+      mentions <= 4);
+    check("and no longer carries a standalone weakest-domain sentence",
+      !/The weakest domain is [^.]*, graded/.test(execOnly));
+    check("exec summary does not claim a cap that did not bite",
+      !/held there rather than averaged up/.test(allText));
+    check("exec summary states overall coverage",
+      /based on \d+% of applicable questions being answered/.test(allText));
+    // low_confidence_flag should NOT appear here (overall coverage is not below threshold given this seed)
+    // - but it should appear if the overall coverage IS low. Let's check the protect domain shows low coverage:
+    check("domain_low_coverage composed for the protect domain",
+      /Protective controls: insufficient evidence to grade with confidence/.test(allText));
+    // domain_result composed for at least one domain
+    check("domain_result template composed for at least one domain",
+      /Governance and risk: graded \w+ \(based on \d+ of \d+ questions answered\)\./.test(allText));
+    // weakest_question_item composed (with band label)
+    check("weakest_question_item composed",
+      /scored Not in place|scored Partial \/ ad hoc/.test(allText));
+
+    // Style verification (named styles + brand colour)
+    section("Named styles + brand colour");
+    var styles = doc.styles;
+    check("Document has styles config",                   !!styles);
+    check("Heading 1 colour = 173267 (brand navy)",
+      !!styles && styles.default.heading1.run.color === "173267");
+    check("Heading 2 colour = 173267 (brand navy)",
+      !!styles && styles.default.heading2.run.color === "173267");
+    var pStyles = styles.paragraphStyles || [];
+    function find(id) { return pStyles.filter(function (s) { return s.id === id; })[0]; }
+    check("BodyText style defined",        !!find("BodyText"));
+    check("Caption style defined",         !!find("Caption"));
+    check("PlaceholderText style defined", !!find("PlaceholderText"));
+    var usedStyles = {};
+    paras.forEach(function (p) { if (p.style) usedStyles[p.style] = true; });
+    check("Body paragraphs use BodyText style",    !!usedStyles.BodyText);
+    check("Some paragraphs use PlaceholderText",   !!usedStyles.PlaceholderText);
+    var headings = paras.filter(function (p) { return p.heading; }).length;
+    check("Document contains >= 8 heading paragraphs", headings >= 8);
+
+    // The blank "Recommendations" scaffold was replaced by a per-question
+    // improvement plan, so the remediation prompt now sits on each entry.
+    section("Acceptance: structured improvement plan");
+    check("Improvement plan prompts for the recommended action",
+      allText.indexOf("Recommended action: To be completed by the consultant") !== -1);
+    check("Improvement plan is ordered by priority", /Priority: P1/.test(allText));
+    check("No bare '[Consultant to complete]' line",
+      allText.indexOf("[Consultant to complete]") === -1);
+
+    // The flat headline templates are the fallback for a narrative pack with
+    // no executiveSummary block. No shipped pack takes that path today, so the
+    // only way to keep it honest is to build a document that does.
+    section("Fallback - narrative pack with no executiveSummary block");
+    var flatNarr = JSON.parse(JSON.stringify(narr));
+    delete flatNarr.executiveSummary;
+    A.ExportDOCX.buildAsync(eng, inst, null, prof, flatNarr, { targetId: tid }, function (err2) {
+      if (!err2) {
+        var flatParas = [];
+        function walk2(node) {
+          if (!node) return;
+          if (node.__type === "Paragraph") { flatParas.push(node); return; }
+          if (node.__type === "Table") { node.rows.forEach(walk2); return; }
+          if (node.__type === "TableRow") { node.children.forEach(walk2); return; }
+          if (node.__type === "TableCell") { node.children.forEach(walk2); return; }
+          if (Array.isArray(node)) node.forEach(walk2);
+        }
+        window.__capturedDoc.sections.forEach(function (s) { s.children.forEach(walk2); });
+        var flatText = flatParas.map(function (p) { return p.text; }).join("\n");
+        check("fallback: headline template composed",
+          flatText.indexOf("The overall indicative posture grade is D.") !== -1);
+        check("fallback: weakest_named names monitor and grade F",
+          flatText.indexOf("The weakest domain is Monitoring and detection, graded F.") !== -1);
+        // The cap allows two grades above the weakest, and this fixture's mean
+        // (D) already sits at that ceiling - so the cap does not bite and the
+        // document must not claim it did.
+        check("fallback: no cap note, because the cap did not bite here",
+          flatText.indexOf("The grade has been held down relative to the weakest domain") === -1);
+        check("fallback: coverage_overall composed",
+          /This grade is based on \d+% of applicable questions being answered\./.test(flatText));
+      } else {
+        check("fallback: document builds without an executiveSummary block", false);
+      }
+      populationRun();
+    });
+
+    // ---- Acceptance 8: the report is GENERATED, so every conditional block
+    // must actually fire when its condition is met.
+    //
+    // Each of these existed and had never reached a document: the ceiling
+    // sentence (guarded on "cap lowered the grade", which the demo never hits)
+    // and the overall-unknown finding (stranded after the early return that
+    // sends packs with an executiveSummary down the composed path).
+    function populationRun() {
+      section("Acceptance 8 - conditional blocks fire when their condition is met");
+      var eng2 = A.Storage.makeEmptyEngagement(inst);
+      eng2.engagement.clientName = "Population Test Ltd";
+      var t2 = eng2.targets[0].id;
+      (inst.questions || []).forEach(function (q) {
+        if (q.scored === false) return;
+        var dom = q.id.split(".")[0];
+        var r = { targetId: t2, requirementId: q.id, applicable: true, band: null, unknown: false, capture: {} };
+        if (dom === "gov") r.band = 3;                       // whole domain at the top band
+        else if (dom === "protect" || dom === "respond") r.unknown = true;  // two domains below coverage
+        else if (dom === "monitor") r.band = 0;              // an F to drive the ceiling
+        else r.band = 2;
+        eng2.responses.push(r);
+      });
+
+      A.ExportDOCX.buildAsync(eng2, inst, null, prof, narr, { targetId: t2 }, function (e2) {
+        if (e2) { check("population document builds", false); finish(); return; }
+        var p2 = [];
+        (function w(n) {
+          if (!n) return;
+          if (n.__type === "Paragraph") { p2.push(n.text); return; }
+          if (n.__type === "Table") { n.rows.forEach(w); return; }
+          if (n.__type === "TableRow" || n.__type === "TableCell") { n.children.forEach(w); return; }
+          if (Array.isArray(n)) n.forEach(w);
+        })(window.__capturedDoc.sections.map(function (s) { return s.children; }));
+        var txt = p2.join("\n");
+
+        check("population document builds", txt.length > 2000);
+        check("a domain with nothing below the top band says so",
+          /no lower-scoring points to note/.test(txt));
+        check("a domain below the coverage threshold is reported as such",
+          /insufficient evidence to grade with confidence/.test(txt));
+        check("ungradeable domains are listed for attention",
+          /coverage was below the threshold/i.test(txt));
+        check("the overall Unknown rate is stated in the summary",
+          /Across the assessment, \d+ of the \d+ questions attempted came back Unknown/.test(txt));
+        check("low-coverage domains are named in the gap shape",
+          /reported as indicative/i.test(txt));
+        check("the consultant's exposure paragraph is prompted for",
+          /Consultant to add a short, client-specific note/.test(txt));
+        check("and the top priorities are prompted for",
+          /Consultant to confirm and refine the top/.test(txt));
+        // The ceiling: this dataset has an F, so it is the weakest-domain rule.
+        check("the ceiling that decided the grade is stated",
+          /held down to [A-F](,| as a result)|could not have been higher than [A-F]/.test(txt));
+        check("no slot is left unsubstituted anywhere in the document",
+          !/\{[a-zA-Z][a-zA-Z0-9_]*\}/.test(txt),
+          (txt.match(/\{[a-zA-Z][a-zA-Z0-9_]*\}/g) || []).join(","));
+        finish();
+      });
+    }
+
+    // The verdict is written only once the fallback build has reported, so a
+    // truncated run cannot read as a clean pass.
+    function finish() {
+      var s = document.createElement("div");
+      s.className = "row " + (fail === 0 ? "ok" : "bad");
+      s.style.marginTop = "12px"; s.style.fontWeight = "600";
+      s.textContent = pass + " passed, " + fail + " failed";
+      out.appendChild(s);
+
+      var preview = "Total paragraphs: " + paras.length + "\n";
+      preview += "Heading paragraphs: " + headings + "\n";
+      preview += "Body paragraphs: " + paras.filter(function (p) { return p.style === "BodyText"; }).length + "\n\n";
+      preview += "--- HEADING SEQUENCE ---\n";
+      paras.filter(function (p) { return p.heading; }).forEach(function (p) {
+        preview += "[" + p.heading + "] " + p.text + "\n";
+      });
+      pv.innerHTML = "<div class='preview'>" + preview.replace(/</g, "&lt;") + "</div>";
+    }
+  });
+})();
+</script>
+</body></html>

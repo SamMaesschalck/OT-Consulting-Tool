@@ -1,0 +1,269 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/ncsc-caf/profiles/caf-general.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["ncsc-caf"] = window.App.Data.instruments["ncsc-caf"] || {};
+window.App.Data.instruments["ncsc-caf"].profiles = window.App.Data.instruments["ncsc-caf"].profiles || {};
+window.App.Data.instruments["ncsc-caf"].profiles["caf-general"] = {
+  "id": "caf-general",
+  "name": "General CAF (no regulator profile)",
+  "appliesToInstrument": "ncsc-caf",
+  "sectorRegulator": "none",
+  "sectorRegulatorName": "NCSC (General)",
+  "sector": "general",
+  "sectorName": "Generic CAF",
+  "level": "n/a",
+  "status": "active",
+  "profileVersion": "UNSET",
+  "verifiedSource": false,
+  "_note": "Default profile. Target = Achieved for every outcome. Use for generic CAF readiness or gap analysis where no regulator profile applies.",
+  "overlay": {
+    "A1.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A1.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A1.c": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A2.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A2.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A2.c": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A3.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A4.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "A4.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B1.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B1.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B2.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B2.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B2.c": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B2.d": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.c": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.d": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B3.e": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B4.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B4.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B4.c": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B4.d": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B5.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B5.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B5.c": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B6.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "B6.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.c": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.d": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.e": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C1.f": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "C2.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D1.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D1.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D1.c": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D2.a": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    },
+    "D2.b": {
+      "expectedState": "achieved",
+      "applicable": true,
+      "weight": null,
+      "supplementaryGuidance": ""
+    }
+  }
+};

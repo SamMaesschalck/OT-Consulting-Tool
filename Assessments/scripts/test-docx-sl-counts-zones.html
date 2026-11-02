@@ -1,0 +1,226 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 Word counts and zone summary agree</title></head>
+<body>
+<!--
+  Follow-up checks on the 62443-3-3 Word report after "target met" learned to
+  wait for every in-scope FR:
+
+  1. The executive summary, Scope and method and Limitations counted FRs by
+     answeredCount, so an FR at SL-T 0 (out of scope) and an FR whose every
+     item is a justified N/A both landed under "not assessed", while the tiles
+     used the scorer's counts. One document gave three numbers for one fact.
+  2. The met-so-far caveat was spliced into the verdict phrase, so the
+     template's ", with the weakest protection in ..." ran on behind it.
+  3. Multi-zone: a zone with nothing answered was ignored by the verdict
+     caveat and the "meeting target" tile ("1 of 1" in green), so answering
+     less made the report more confident.
+  4. Multi-zone: the at-a-glance FR tile was the lead zone's weakest FR,
+     labelled "Weakest FR", while the grid below showed a lower level in
+     another zone. It is now chosen across all zones and labelled for what it
+     is. The scope count, limitations list and next-steps draft read every
+     zone rather than the lead zone alone.
+  5. The scorecard caption under "Not yet" names the question.
+  6. An instrument on the CAF engine with an attribution and series context
+     but no About prose gets its About heading before the series context.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: ["caf"] }); H.dom();</script>
+<script>
+function docXml(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function textOf(el) { return Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); }
+// Heading 1 sections; text has one line per paragraph.
+function sections(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null;
+  Array.prototype.forEach.call(body.children, function (el) {
+    var st = el.localName === "p" && el.getElementsByTagNameNS(W, "pStyle")[0];
+    var val = st ? st.getAttribute("w:val") : "";
+    if (/^Heading1$/i.test(val)) { cur = { title: textOf(el).trim(), text: "", paras: [] }; out.push(cur); return; }
+    if (!cur) return;
+    var paras = el.localName === "p" ? [el] : Array.prototype.slice.call(el.getElementsByTagNameNS(W, "p"));
+    paras.forEach(function (p) { var t = textOf(p); cur.paras.push(t); cur.text += "\n" + t; });
+  });
+  return out;
+}
+function sec(list, re) { return list.filter(function (x) { return re.test(x.title); })[0] || { title: "", text: "", paras: [] }; }
+
+function responsesFor(inst, targetId, upTo, frs) {
+  var S = window.App.Scoring;
+  return (inst.requirements || []).filter(function (req) { return !frs || frs.indexOf(req.frId) >= 0; }).map(function (req) {
+    var comps = {};
+    S.requirementItems(req).forEach(function (it) {
+      comps[it.componentId] = { state: it.firstSL <= upTo ? "met" : "not-met" };
+    });
+    return { targetId: targetId, requirementId: req.id, components: comps };
+  });
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, S = A.Scoring;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.activateInstrument("iec-62443-3-3");
+  var inst = E.state.instrument, tax = E.state.taxonomy, prof = E.state.profile, narr = E.getActiveNarrative();
+  var MET = narr.executiveSummary.templates.verdictPhrases.met;
+
+  function eng(targets, perZone, responses, perFR) {
+    var e = JSON.parse(JSON.stringify(E.state.engagement));
+    e.engagement = Object.assign({}, e.engagement || {}, { clientName: "Acme Water" });
+    e.targets = targets;
+    e.targetProfile = { defaultTargetSL: 2, perFR: perFR || {}, perZone: perZone || {} };
+    e.responses = responses;
+    e.reportCustom = {};
+    delete e.reportNarrative;
+    return e;
+  }
+  function word(e, targetId, instrument, narrative, taxonomy) {
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(e, instrument || inst, taxonomy || tax, prof, narrative || narr, { targetId: targetId },
+        function (err, blob) { if (err) console.log("build error: " + err.message); res(err ? null : blob); });
+    }).then(function (blob) { return blob ? docXml(blob).then(sections) : []; });
+  }
+  var one = [{ id: "z1", name: "Control system" }];
+
+  // ---- 1. FR1 met, FR7 out of scope, FR2 to FR6 untouched -------------------
+  var eOut = eng(one, {}, responsesFor(inst, "z1", 2, ["FR1"]), { FR7: 0 });
+  var sOut = S.scoreEngagement(eOut, inst, tax, prof).perTarget[0].result;
+  ok(sOut.overallTargetStatus === "incomplete" && sOut.assessedFRCount === 1 && sOut.inScopeFRCount === 6,
+     "set-up: incomplete, 1 of 6 in scope assessed", sOut.assessedFRCount + " of " + sOut.inScopeFRCount);
+
+  word(eOut, "z1").then(function (d) {
+    var es = sec(d, /Executive summary$/);
+    ok(/covered 1 of the seven Foundational Requirements.*\(5 Foundational Requirement\(s\) were not assessed and 1 was out of scope\)/.test(es.text),
+       "exec summary: 1 assessed, 5 not assessed and 1 out of scope, as the tile counts", (es.text.match(/The assessment covered[^\n]*/) || [""])[0]);
+    ok(es.text.indexOf("(6 Foundational Requirement(s) were not assessed)") === -1, "exec summary: never 6 not assessed");
+    // 2. The caveat is its own sentence; the verdict is "so far".
+    ok(es.text.indexOf(MET + " so far") >= 0, "the verdict reads met so far", es.text.slice(0, 300));
+    ok(es.text.indexOf("Not every Foundational Requirement in scope has been assessed yet, so the target is not yet shown to be met.") >= 0,
+       "followed by a sentence saying the result is not complete");
+    ok(!/, though not every/.test(es.text), "and nothing is spliced into the verdict phrase");
+    var sm = sec(d, /Scope and method$/);
+    ok(/Foundational Requirements assessed: 1 of 6 in scope\./.test(sm.text), "scope and method: 1 of 6 in scope", (sm.text.match(/Foundational Requirements assessed[^\n]*/) || [""])[0]);
+    ok(/Foundational Requirements out of scope \(target SL 0\): FR7 /.test(sm.text), "scope and method: FR7 listed as out of scope");
+    ok(/Foundational Requirements not assessed: FR2 [^\n]*FR6 [^\n]*\./.test(sm.text) && !/not assessed: [^\n]*FR7/.test(sm.text),
+       "scope and method: FR2 to FR6 not assessed, FR7 not among them");
+    var lim = sec(d, /Method and limitations$/);
+    ok(/not assessed in this engagement: FR2 /.test(lim.text) && !/not assessed in this engagement: [^\n]*FR7/.test(lim.text),
+       "limitations: FR7 is not listed as not assessed");
+    // 5. The caption under "Not yet".
+    ok(/Not yet\nOverall target \(1 of 6 [^\n]*FRs assessed\)/.test(d.map(function (s) { return s.text; }).join("\n")),
+       "the scorecard caption reads Overall target (...), not Target met (...)");
+
+    // ---- FR1 met, FR2 every item a justified N/A -------------------------
+    var naResp = (inst.requirements || []).filter(function (req) { return req.frId === "FR2"; }).map(function (req) {
+      var comps = {};
+      S.requirementItems(req).forEach(function (it) { comps[it.componentId] = { state: "na", note: "No such function on this system." }; });
+      return { targetId: "z1", requirementId: req.id, components: comps };
+    });
+    return word(eng(one, {}, responsesFor(inst, "z1", 2, ["FR1"]).concat(naResp)), "z1");
+  }).then(function (d) {
+    var es = sec(d, /Executive summary$/);
+    ok(/covered 2 of the seven Foundational Requirements.*\(5 Foundational Requirement\(s\) were not assessed\)/.test(es.text),
+       "an all-N/A FR counts as assessed: 2 covered, 5 not", (es.text.match(/The assessment covered[^\n]*/) || [""])[0]);
+    var sm = sec(d, /Scope and method$/);
+    ok(/Foundational Requirements assessed: 2 of 7\./.test(sm.text) && !/not assessed: [^\n]*FR2 /.test(sm.text),
+       "scope and method: 2 of 7, FR2 not listed as not assessed");
+
+    // ---- 3. two zones: one complete and met, one with nothing answered ----
+    var zones = [ { id: "z-a", name: "Control zone" }, { id: "z-b", name: "Safety zone" } ];
+    var eTwo = eng(zones, {}, responsesFor(inst, "z-a", 2));
+    var roll = S.scoreEngagement(eTwo, inst, tax, prof).systemRollup;
+    ok(roll.zonesMeetingTarget.join() === "Control zone" && roll.zonesNotAssessed.join() === "Safety zone",
+       "set-up: one zone met in full, one not assessed at all");
+    return word(eTwo, "z-a");
+  }).then(function (d) {
+    var es = sec(d, /Executive summary$/);
+    ok(es.text.indexOf(MET + " so far") >= 0, "multi-zone: a wholly unassessed zone qualifies the verdict as so far", es.text.slice(0, 300));
+    ok(/No zone or conduit assessed so far falls short of its target Security Level, and 1 of the 2 meets it in full\. One zone or conduit has not been fully assessed yet\./.test(es.text),
+       "multi-zone: the zone line counts the untouched zone as not fully assessed", es.text.slice(0, 900));
+    ok(!/Both zones and conduits meet/.test(es.text), "multi-zone: no both-meet claim");
+    var glance = sec(d, /Results across the system/);
+    ok(/1 of 2\n[^\n]*meeting target \(1 not fully assessed\)/.test(glance.text),
+       "multi-zone: the tile reads 1 of 2 meeting target, 1 not fully assessed, not 1 of 1", (glance.text.match(/.{0,20}\n[^\n]*meeting target[^\n]*/) || [""])[0]);
+    var sm = sec(d, /Scope and method$/);
+    ok(/Foundational Requirements assessed, by zone or conduit: Control zone 7 of 7; Safety zone none\./.test(sm.text),
+       "multi-zone: scope and method gives each zone's count", (sm.text.match(/Foundational Requirements assessed[^\n]*/) || [""])[0]);
+    var lim = sec(d, /Method and limitations$/);
+    ok(/Safety zone was not assessed at all in this engagement\./.test(lim.text), "multi-zone: limitations names the zone not assessed");
+
+    // ---- 4. DMZ at SL 0 against SL 1; BPCS at SL 1 against SL 3 ------------
+    var zones2 = [ { id: "z-dmz", name: "Plant DMZ" }, { id: "z-bpcs", name: "BPCS" } ];
+    var e4 = eng(zones2, { "z-dmz": { default: 1 }, "z-bpcs": { default: 3 } },
+      responsesFor(inst, "z-dmz", 0).concat(responsesFor(inst, "z-bpcs", 1)));
+    var all4 = S.scoreEngagement(e4, inst, tax, prof);
+    var total = all4.perTarget.reduce(function (a, t) { return a + (t.result.roadmap || []).length; }, 0);
+    var leadOnly = all4.perTarget[1].result.roadmap.length;
+    ok(all4.perTarget[0].result.weakestFR.conformantAchievedSL === 0 && all4.perTarget[1].result.weakestFR.conformantAchievedSL === 1,
+       "set-up: DMZ at SL 0, BPCS at SL 1");
+    ok(total > leadOnly, "set-up: the zones' roadmaps together hold more actions than the BPCS's alone", total + " vs " + leadOnly);
+    return word(e4, "z-dmz").then(function (d) { return { d: d, total: total, leadOnly: leadOnly }; });
+  }).then(function (r) {
+    var d = r.d;
+    var glance = sec(d, /Results across the system/);
+    ok(/Furthest below target \(BPCS, target SL 3\)/.test(glance.text),
+       "multi-zone: the FR tile is labelled furthest below target and names the zone and its target", (glance.text.match(/[^\n]*(Furthest|Weakest FR \()[^\n]*/) || [""])[0]);
+    ok(!/Weakest FR \(BPCS\)/.test(glance.text), "and does not call a level of SL 1 the weakest while SL 0 sits in the grid");
+    var es = sec(d, /Executive summary$/);
+    ok(/Both zones and conduits in scope fall short of their target Security Level\./.test(es.text) &&
+       /figures in this summary are for BPCS, the zone or conduit furthest below its target\./.test(es.text),
+       "multi-zone: the zone line counts the short zones and names the lead", es.text.slice(0, 900));
+    var ns = sec(d, /Proposed next steps$/);
+    ok(ns.text.indexOf("each of the " + r.total + " actions") >= 0,
+       "multi-zone: the next-steps draft counts every zone's roadmap (" + r.total + "), not the lead's (" + r.leadOnly + ")",
+       (ns.text.match(/each of the \d+ actions/) || [""])[0]);
+    var all = d.map(function (s) { return s.text; }).join("\n");
+    ok(!/—|–/.test(all), "no em or en dash anywhere in the document");
+
+    // ---- 6. CAF engine: attribution + series context, no About prose ---------
+    E.on("instrument-changed", function (i) { if (i && i.id === "ncsc-caf") A.TourCAF.apply(E); });
+    E.activateInstrument("ncsc-caf");
+    var caf = JSON.parse(JSON.stringify(E.state.instrument));
+    caf.seriesContext = "Series context paragraph for this check.";
+    if (caf.display) delete caf.display.about;
+    delete caf.framing;
+    var n2 = JSON.parse(JSON.stringify(E.getActiveNarrative()));
+    n2.boilerplate = n2.boilerplate || {};
+    delete n2.boilerplate.about_caf; delete n2.boilerplate.series_context;
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(E.state.engagement, caf, E.state.taxonomy, E.state.profile, n2, { targetId: E.state.activeTargetId },
+        function (err, blob) { res(err ? null : blob); });
+    }).then(function (blob) { return blob ? docXml(blob).then(sections) : []; })
+      .then(function (d) { return { d: d, attr: caf.attribution }; });
+  }).then(function (r) {
+    var about = r.d.filter(function (s) { return s.title === "About this assessment"; });
+    ok(about.length === 1, "CAF engine, no About prose: one About heading", r.d.map(function (s) { return s.title; }).join(" | "));
+    var sc = about[0] ? about[0].paras.indexOf("Series context paragraph for this check.") : -1;
+    var at = about[0] ? about[0].paras.indexOf(r.attr) : -1;
+    ok(sc >= 0 && at > sc, "the series context and then the attribution sit under it");
+    ok(!r.d.some(function (s) { return s.title !== "About this assessment" && s.paras.indexOf("Series context paragraph for this check.") >= 0; }),
+       "the series context does not trail on the previous section");
+  }).then(done, function (e) { ok(false, "threw: " + (e && e.stack || e)); done(); });
+});
+</script>
+</body></html>

@@ -1,0 +1,186 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Framework attribution in the Word report</title></head>
+<body>
+<!--
+  Several instruments reproduce their framework's text verbatim (NCSC CAF,
+  NIST SP 800-53 and 800-82, the CIS Controls, the three ONR SyAPs sets) and
+  carry the licence statement that text is reproduced under as `attribution`
+  in instrument.json. Nothing read it, so the Word report quoted the source
+  and never said under what terms.
+
+  This builds the Word report for two instruments that carry one (the CAF,
+  whose About section is "About the CAF", and NIST SP 800-82, whose About
+  section comes from its framing) and checks the statement prints verbatim
+  inside the About section. It then checks the statement survives the
+  consultant rewording the About prose and hiding the About section, and that
+  an object-shaped attribution prints its text. The CAF for Aviation carries
+  no attribution and is the control: nothing is added and no empty heading
+  appears.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: ["caf", "nist82", "caf-aviation"] }); H.dom();</script>
+<script>
+function docXml(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function textOf(el) { return Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); }
+// Heading 1 sections, each with its paragraphs' text, plus the whole text.
+function parse(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null, all = [];
+  Array.prototype.forEach.call(body.children, function (el) {
+    var st = el.localName === "p" && el.getElementsByTagNameNS(W, "pStyle")[0];
+    var val = st ? st.getAttribute("w:val") : "";
+    var t = textOf(el);
+    all.push(t);
+    if (/^Heading1$/i.test(val)) { cur = { title: t.trim(), paras: [] }; out.push(cur); return; }
+    if (cur) cur.paras.push(t);
+  });
+  return { sections: out, paras: all };
+}
+function count(paras, s) { return paras.filter(function (p) { return p === s; }).length; }
+
+function activate(E, id, tour) {
+  E.on("instrument-changed", function (inst) { if (inst && inst.id === id) tour.apply(E); });
+  E.activateInstrument(id);
+}
+function build(A, E, instOverride) {
+  return new Promise(function (res) {
+    A.ExportDOCX.buildAsync(E.state.engagement, instOverride || E.state.instrument, E.state.taxonomy, E.state.profile,
+      E.getActiveNarrative(), { targetId: E.state.activeTargetId }, function (err, blob) { res(err ? null : blob); });
+  }).then(function (blob) { return blob ? docXml(blob).then(parse) : { sections: [], paras: [] }; });
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+
+  activate(E, "ncsc-caf", A.TourCAF);
+  var CAF_ATTR = E.state.instrument.attribution;
+  ok(typeof CAF_ATTR === "string" && /Open Government Licence/.test(CAF_ATTR), "set-up: the CAF carries an attribution");
+
+  build(A, E).then(function (d) {
+    var about = d.sections.filter(function (s) { return s.title === "About the CAF"; })[0];
+    ok(!!about, "the CAF report has its About section", d.sections.map(function (s) { return s.title; }).join(" | "));
+    ok(about && about.paras.indexOf(CAF_ATTR) >= 0, "the attribution prints verbatim inside it");
+    ok(count(d.paras, CAF_ATTR) === 1, "once");
+
+    // The consultant rewords the About prose: their words replace the
+    // generated paragraphs, the licence statement stays.
+    E.setReportSection("about-the-caf", { prose: "Our own words about the framework." });
+    return build(A, E);
+  }).then(function (d) {
+    var about = d.sections.filter(function (s) { return s.title === "About the CAF"; })[0];
+    ok(about && about.paras.indexOf("Our own words about the framework.") >= 0, "a rewording of the About section is used");
+    ok(about && about.paras.indexOf(CAF_ATTR) >= 0 && count(d.paras, CAF_ATTR) === 1,
+       "and the attribution survives it, once");
+
+    // Hidden: the section goes, but the framework text it licenses is still
+    // quoted in the roadmap, so the statement moves to the end of the document.
+    E.setReportSection("about-the-caf", { hidden: true });
+    return build(A, E);
+  }).then(function (d) {
+    ok(!d.sections.some(function (s) { return s.title === "About the CAF"; }), "hiding the About section drops it");
+    ok(count(d.paras, CAF_ATTR) === 1, "but the attribution is still in the document, once");
+    var last = d.paras.filter(function (p) { return p.trim() !== ""; }).slice(-1)[0];
+    ok(last === CAF_ATTR, "at the end of the document", last);
+    // Under a heading of its own: bare after the methodology appendix it read
+    // as part of the appendix.
+    var lastSec = d.sections[d.sections.length - 1];
+    ok(lastSec && lastSec.title === "Source material" && lastSec.paras.indexOf(CAF_ATTR) >= 0,
+       "under its own Source material heading, not inside the appendix", lastSec && lastSec.title);
+    var appendix = d.sections.filter(function (s) { return /^Appendix/.test(s.title); })[0];
+    ok(appendix && appendix.paras.indexOf(CAF_ATTR) === -1, "the appendix does not carry it");
+    E.clearReportSection("about-the-caf");
+
+    // Not hidden: no Source material heading.
+    return build(A, E);
+  }).then(function (d) {
+    ok(!d.sections.some(function (s) { return s.title === "Source material"; }), "with About shown there is no Source material heading");
+
+    // An attribution held as an object prints every field, text first, one
+    // paragraph each, as the screen and the workbook do. Printing .text alone
+    // dropped the licence name and link.
+    var inst = JSON.parse(JSON.stringify(E.state.instrument));
+    inst.attribution = { text: "Object-form attribution, printed as given.", licence: "Example Licence v1.0", url: "https://example.org/licence" };
+    return build(A, E, inst);
+  }).then(function (d) {
+    var about = d.sections.filter(function (s) { return s.title === "About the CAF"; })[0];
+    var i = about ? about.paras.indexOf("Object-form attribution, printed as given.") : -1;
+    ok(i >= 0, "an object-shaped attribution prints its text");
+    ok(about && about.paras[i + 1] === "Example Licence v1.0" && about.paras[i + 2] === "https://example.org/licence",
+       "and every other field after it, each on its own line", about && about.paras.slice(i, i + 3).join(" | "));
+
+    // The organisation-wide document quotes requirement wording too, so it
+    // carries the attribution in its Method and limitations section.
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+        { orgWide: true, siteEntries: [{ id: "a", name: "Plant A", responses: E.state.engagement.responses || [] }, { id: "b", name: "Plant B", responses: [] }] },
+        function (err, blob) { res(err ? null : blob); });
+    }).then(function (blob) { return blob ? docXml(blob).then(parse) : { sections: [], paras: [] }; });
+  }).then(function (d) {
+    var ml = d.sections.filter(function (s) { return s.title === "Method and limitations"; })[0];
+    ok(!!ml, "the organisation-wide document builds, with its Method and limitations", d.sections.map(function (s) { return s.title; }).join(" | "));
+    ok(ml && ml.paras.indexOf(CAF_ATTR) >= 0 && count(d.paras, CAF_ATTR) === 1,
+       "and carries the CAF attribution there, once");
+
+    // ---- NIST SP 800-82: About comes from the instrument's framing ----
+    activate(E, "nist-800-82", A.TourNIST82);
+    return build(A, E);
+  }).then(function (d) {
+    var attr = E.state.instrument.attribution;
+    ok(typeof attr === "string" && attr.length > 40, "set-up: NIST SP 800-82 carries an attribution");
+    var about = d.sections.filter(function (s) { return s.title === "About this assessment"; })[0];
+    ok(about && about.paras.indexOf(attr) >= 0 && count(d.paras, attr) === 1,
+       "NIST SP 800-82: the attribution prints verbatim in About this assessment, once",
+       d.sections.map(function (s) { return s.title; }).join(" | "));
+
+    // ---- Control: the CAF for Aviation has no attribution ----
+    activate(E, "ncsc-caf-aviation", A.TourCAFAviation);
+    return build(A, E);
+  }).then(function (d) {
+    ok(E.state.instrument.id === "ncsc-caf-aviation" && !E.state.instrument.attribution,
+       "control: the CAF for Aviation carries no attribution");
+    ok(d.sections.length > 5, "control: its report builds");
+    ok(count(d.paras, CAF_ATTR) === 0, "control: the CAF's attribution is not borrowed");
+    ok(!d.sections.some(function (s) { return s.title === ""; }), "control: no empty heading");
+    var aboutHeads = d.sections.filter(function (s) { return /^About /.test(s.title); });
+    ok(aboutHeads.length === 1, "control: one About section, as before", aboutHeads.map(function (s) { return s.title; }).join(" | "));
+
+    // Control: its organisation-wide document gains nothing either.
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+        { orgWide: true, siteEntries: [{ id: "a", name: "Plant A", responses: [] }, { id: "b", name: "Plant B", responses: [] }] },
+        function (err, blob) { res(err ? null : blob); });
+    }).then(function (blob) { return blob ? docXml(blob).then(parse) : { sections: [], paras: [] }; });
+  }).then(function (d) {
+    var ml = d.sections.filter(function (s) { return s.title === "Method and limitations"; })[0];
+    ok(!!ml, "control: the organisation-wide document builds");
+    ok(ml && ml.paras.filter(function (p) { return p.trim() !== ""; }).length === 3,
+       "control: and its Method and limitations has its three paragraphs and nothing added", ml && ml.paras.length);
+  }).then(done, function (e) { ok(false, "threw: " + (e && e.message)); done(); });
+});
+</script>
+</body></html>

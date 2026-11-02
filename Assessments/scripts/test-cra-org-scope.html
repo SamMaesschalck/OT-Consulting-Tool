@@ -1,0 +1,85 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>CRA org-scope sharing</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style>
+</head>
+<body>
+<h1>CRA organisation-scope sharing (item level)</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<script src="harness.js"></script>
+<script>H.app();</script>
+<script>
+(function () {
+  var A = window.App, E = A.Engine, CRA = A.ScoringCRA;
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+
+  E.loadCatalog();
+  E.activateInstrument("eu-cra");
+  var inst = E.state.instrument;
+
+  // ---- scope resolution (item beats layer; layer default covers P2) ----
+  check("P2 item resolves organisation via its layer default", CRA.itemScope(inst, "CRAP21") === "organisation");
+  check("CRA-C.7 (Art 14 reporting) resolves organisation via its item scope", CRA.itemScope(inst, "CRAC7") === "organisation");
+  check("CRA-C.9 (due diligence) resolves organisation via its item scope", CRA.itemScope(inst, "CRAC9") === "organisation");
+  check("CRA-C.2 (technical documentation) stays per product", CRA.itemScope(inst, "CRAC2") === "product");
+  check("P1 item stays per product", CRA.itemScope(inst, "CRAP1a") === "product");
+
+  // ---- fan-out: an org answer set on product A appears on product B ----
+  var tidA = E.state.activeTargetId;
+  var tB = E.addTarget("Second Product");
+  var tidB = E.state.activeTargetId;
+  check("two products exist", E.state.engagement.targets.length === 2 && tidA !== tidB);
+
+  E.setActiveTarget(tidA);
+  E.setResponse(tidA, "CRAC7", { applicable: true, state: "partially", evidence: "Reporting runbook drafted, not yet exercised." });
+  var c7onB = E.findResponse(tidB, "CRAC7");
+  check("CRA-C.7 answer fans out to the other product", !!c7onB && c7onB.state === "partially");
+  check("CRA-C.7 evidence fans out too", !!c7onB && /runbook/.test(c7onB.evidence || ""));
+
+  E.setResponse(tidA, "CRAC9", { applicable: true, state: "in-place", evidence: "Component register reviewed quarterly." });
+  var c9onB = E.findResponse(tidB, "CRAC9");
+  check("CRA-C.9 answer fans out to the other product", !!c9onB && c9onB.state === "in-place");
+
+  // ---- per-product isolation preserved for the rest of P3 and P1 ----
+  E.setResponse(tidA, "CRAC2", { applicable: true, state: "in-place", evidence: "Annex VII pack complete for product A." });
+  check("CRA-C.2 stays isolated to the product it was answered on", !E.findResponse(tidB, "CRAC2"));
+  E.setResponse(tidA, "CRAP1a", { applicable: true, state: "in-place" });
+  check("P1 answers stay isolated per product", !E.findResponse(tidB, "CRAP1a"));
+
+  // ---- a product added later inherits the shared answers ----
+  E.addTarget("Third Product");
+  var tidC = E.state.activeTargetId;
+  var c7onC = E.findResponse(tidC, "CRAC7"), c9onC = E.findResponse(tidC, "CRAC9");
+  check("a later-added product inherits CRA-C.7", !!c7onC && c7onC.state === "partially");
+  check("a later-added product inherits CRA-C.9", !!c9onC && c9onC.state === "in-place");
+  check("a later-added product does NOT inherit per-product answers", !E.findResponse(tidC, "CRAC2") && !E.findResponse(tidC, "CRAP1a"));
+
+  // ---- editing the shared answer from another product updates all ----
+  E.setActiveTarget(tidC);
+  E.setResponse(tidC, "CRAC7", { applicable: true, state: "in-place", evidence: "Runbook exercised in June drill." });
+  var c7backOnA = E.findResponse(tidA, "CRAC7");
+  check("editing CRA-C.7 on one product updates every product", !!c7backOnA && c7backOnA.state === "in-place" && /drill/.test(c7backOnA.evidence || ""));
+
+  // ---- scoring: both products count the shared conformity answers ----
+  var scoredAll = E.scoreAllTargets();
+  var byT = {}; (scoredAll.perTarget || []).forEach(function (p) { byT[p.target.id] = p.result; });
+  function p3counts(r) { var l = (r.layers || []).filter(function (x) { return x.layerId === "P3"; })[0]; return l ? l.overall.counts : null; }
+  var cA = p3counts(byT[tidA]), cB = p3counts(byT[tidB]);
+  check("product A P3 counts its own + shared answers (3 answered)", !!cA && (cA.inPlace + cA.partially + cA.notInPlace) === 3);
+  check("product B P3 counts only the shared answers (2 answered)", !!cB && (cB.inPlace + cB.partially + cB.notInPlace) === 2);
+
+  var s = document.getElementById("summary");
+  s.className = "sum " + (fail === 0 ? "ok" : "bad");
+  s.textContent = fail === 0 ? "ALL TESTS PASSED (" + pass + ")" : pass + " passed, " + fail + " FAILED";
+})();
+</script>
+</body></html>

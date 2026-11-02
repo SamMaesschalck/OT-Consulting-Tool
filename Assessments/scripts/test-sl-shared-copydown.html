@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>62443 shared layer: copy-down on link, unlink and zone delete</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  A 62443-3-3 zone inherits the shared answer PER ITEM: overriding RE1 still
+  leaves the zone taking the base item, the evidence and the plan from the
+  shared layer. Link, unlink and zone delete all replace, narrow or remove a
+  shared answer, and each used to treat "the zone has one answer of its own"
+  as "the zone inherits nothing" - so the base item and the evidence of a
+  partially overriding zone silently disappeared.
+
+  Every scenario here takes a snapshot of each zone's scored answers (item
+  states and notes, evidence, notes, plan, levels) before the operation and
+  asserts that every zone the consultant did not act on reads exactly the same
+  afterwards.
+-->
+<script src="harness.js"></script>
+<script>H.app({}); H.dom();</script>
+<script>
+H.test(function (ok) {
+  var A = window.App, E = A.Engine;
+  var SH = E.SHARED_TARGET_ID;
+
+  E.loadCatalog();
+  E.activateInstrument("iec-62443-3-3");
+
+  // A fresh engagement with n zones, all at SL-T 3 so SR 1.1 base, RE1 and
+  // RE2 are all in scope.
+  function fresh(n) {
+    E.newProject();
+    E.activateInstrument("iec-62443-3-3");
+    var ids = [E.getActiveTarget().id];
+    E.renameTarget(ids[0], "Z1");
+    for (var i = 2; i <= n; i++) ids.push(E.addTarget("Z" + i).id);
+    E.setDefaultTargetSL(3);
+    return ids;
+  }
+
+  // The shared answer most scenarios start from: a directory that meets the
+  // base item and RE1, with a justified N/A on RE2 (so a lost item note would
+  // change the score), plus evidence, notes and a remediation plan.
+  function sharedDirectory() {
+    E.setItemState(SH, "SR1.1", "base", "met");
+    E.setItemState(SH, "SR1.1", "RE1", "met");
+    E.setItemState(SH, "SR1.1", "RE2", "na", "No access from untrusted networks.");
+    E.setResponse(SH, "SR1.1", {
+      evidence: "One corporate directory serves the zones it reaches.",
+      notes: "Seen in the directory console.",
+      owner: "IT/OT Network Team", action: "Enforce multifactor authentication.",
+      impact: "One stolen credential reaches every zone.", priorityRank: 2, priorityBand: "High"
+    });
+  }
+
+  // What a zone is scored on, requirement by requirement. Provenance (shared
+  // or zone) is deliberately left out: handing an inherited answer down to
+  // the zone changes where it lives, never what it says.
+  function effective(tid) {
+    var all = E.scoreAllTargets();
+    var t = all.perTarget.filter(function (p) { return p.target.id === tid; })[0];
+    if (!t) return null;
+    var m = {};
+    t.result.perRequirement.forEach(function (r) {
+      m[r.requirementId] = JSON.stringify({
+        items: r.items.map(function (i) {
+          return i.componentId + "=" + (i.state || "-") + (i.note ? " (" + i.note + ")" : "");
+        }),
+        evidence: r.evidence || "", notes: r.notes || "",
+        plan: [r.priorityRank, r.priorityBand || "", r.owner || "", r.action || "", r.impact || ""],
+        levels: [r.itemsAchieved, r.achievedShown, r.chosenSL]
+      });
+    });
+    return m;
+  }
+  function snap(ids) {
+    var o = {};
+    ids.forEach(function (id) { o[id] = effective(id); });
+    return o;
+  }
+  // "" when identical, otherwise the first requirement that moved.
+  function diff(before, after) {
+    if (!before || !after) return "zone missing";
+    var keys = Object.keys(before);
+    for (var i = 0; i < keys.length; i++) {
+      if (before[keys[i]] !== after[keys[i]]) {
+        return keys[i] + ": " + before[keys[i]] + "  ->  " + after[keys[i]];
+      }
+    }
+    return Object.keys(after).length === keys.length ? "" : "requirement count changed";
+  }
+  // The scored state of one item, "-" when unanswered, with any note.
+  function item(tid, reqId, comp) {
+    var m = effective(tid);
+    var r = m && m[reqId] ? JSON.parse(m[reqId]) : null;
+    var hit = r && r.items.filter(function (s) { return s.indexOf(comp + "=") === 0; })[0];
+    return hit ? hit.slice(comp.length + 1) : null;
+  }
+  function evidenceOf(tid, reqId) {
+    var m = effective(tid);
+    return m && m[reqId] ? JSON.parse(m[reqId]).evidence : null;
+  }
+  function sourceOf(tid, reqId, comp) {
+    var all = E.scoreAllTargets();
+    var t = all.perTarget.filter(function (p) { return p.target.id === tid; })[0];
+    var r = t.result.perRequirement.filter(function (x) { return x.requirementId === reqId; })[0];
+    return r.items.filter(function (i) { return i.componentId === comp; })[0].source;
+  }
+
+  // ---- zone delete ------------------------------------------------------
+  //
+  // Probe A: two zones share SR 1.1; zone A overrides only RE1. Deleting zone
+  // B leaves a shared answer serving one zone, which is collapsed into it. A
+  // must keep the base item, the N/A note and the evidence it was taking.
+  (function () {
+    var z = fresh(2), a = z[0], b = z[1];
+    sharedDirectory();
+    E.setItemState(SH, "SR2.1", "base", "met");            // a second, untouched inheritance
+    E.setItemState(a, "SR1.1", "RE1", "not-met");
+    var before = snap([a]);
+    ok(item(a, "SR1.1", "base") === "met", "delete: zone A takes the base item from the shared answer");
+    E.removeTarget(b);
+    var d = diff(before[a], effective(a));
+    ok(d === "", "delete: the surviving zone's scored answers are unchanged", d);
+    ok(item(a, "SR1.1", "base") === "met" && item(a, "SR1.1", "RE1") === "not-met",
+       "delete: it keeps the inherited base item and its own RE1 override",
+       item(a, "SR1.1", "base") + "/" + item(a, "SR1.1", "RE1"));
+    ok(item(a, "SR1.1", "RE2") === "na (No access from untrusted networks.)",
+       "delete: an inherited N/A keeps its justification", item(a, "SR1.1", "RE2"));
+    ok(evidenceOf(a, "SR1.1") === "One corporate directory serves the zones it reaches.",
+       "delete: and the evidence it was reading", evidenceOf(a, "SR1.1"));
+    var own = E.findResponse(a, "SR1.1");
+    ok(!E.findResponse(SH, "SR1.1") && own && own.components.base && own.components.base.state === "met",
+       "delete: the one-zone shared answer is handed down rather than left behind");
+  })();
+
+  // An item scoped to ONLY the deleted zone used to widen back to every zone
+  // left, handing them an answer nobody gave them.
+  (function () {
+    var z = fresh(3), a = z[0], b = z[1], c = z[2];
+    E.setItemState(SH, "SR2.1", "base", "met");
+    E.setItemState(SH, "SR2.1", "RE1", "met");
+    E.setItemCoverage("SR2.1", "RE1", [b]);
+    E.setResponse(SH, "SR2.1", { evidence: "Role-based access is enforced by the domain." });
+    E.setItemState(c, "SR2.1", "base", "partial");         // a partial override on a bystander
+    var before = snap([a, c]);
+    ok(item(a, "SR2.1", "RE1") === "-", "delete: before, RE1 reaches only zone B", item(a, "SR2.1", "RE1"));
+    E.removeTarget(b);
+    var dA = diff(before[a], effective(a)), dC = diff(before[c], effective(c));
+    ok(dA === "", "delete: a zone outside the deleted zone's item is unchanged", dA);
+    ok(dC === "", "delete: so is a zone with a partial override", dC);
+    var sh = E.findResponse(SH, "SR2.1");
+    ok(sh && !sh.components.RE1,
+       "delete: an item that only reached the deleted zone goes with it",
+       sh ? JSON.stringify(sh.components) : "(no shared answer)");
+    ok(sh && sh.components.base && sh.components.base.state === "met",
+       "delete: the rest of the shared answer still serves the zones left");
+  })();
+
+  // ---- link -------------------------------------------------------------
+  //
+  // Probe B: the shared answer reaches Z1-Z3; Z3 overrides only RE1. Linking
+  // Z4 into the Z1/Z2 link (as the zone page does, from Z1) used to narrow the
+  // reach to Z1, Z2 and Z4, so Z3 lost the base item it was taking.
+  (function () {
+    var z = fresh(4);
+    sharedDirectory();
+    E.setRequirementCoverage("SR1.1", [z[0], z[1], z[2]]);
+    E.setItemState(z[2], "SR1.1", "RE1", "not-met");
+    E.setRequirementSL(z[3], "SR1.1", 0, 3);
+    E.setResponse(z[3], "SR1.1", { evidence: "Zone 4 uses local accounts." });
+    var before = snap(z);
+    ok(E.linkRequirement("SR1.1", z[0], [z[0], z[1], z[3]]) === true, "link: Z4 joins the Z1/Z2 link");
+    var after = snap(z);
+    var d3 = diff(before[z[2]], after[z[2]]);
+    ok(d3 === "", "link: the zone left out, which overrode only RE1, is unchanged", d3);
+    ok(item(z[2], "SR1.1", "base") === "met" &&
+       evidenceOf(z[2], "SR1.1") === "One corporate directory serves the zones it reaches.",
+       "link: it still has the base item and the evidence it was inheriting");
+    ok(diff(before[z[0]], after[z[0]]) === "" && diff(before[z[1]], after[z[1]]) === "",
+       "link: the zones already in the link read the same", diff(before[z[0]], after[z[0]]));
+    ok(diff(before[z[0]], after[z[3]]) === "",
+       "link: the joining zone now reads exactly what the source zone read", diff(before[z[0]], after[z[3]]));
+  })();
+
+  // The source is the zone that overrode RE1. "Use this answer" means the
+  // answer its card shows: the inherited base item and evidence as well as
+  // its own RE1, not only the items it recorded itself.
+  (function () {
+    var z = fresh(4);
+    sharedDirectory();
+    E.setItemState(z[2], "SR1.1", "RE1", "not-met");
+    E.setRequirementSL(z[3], "SR1.1", 0, 3);
+    E.setResponse(z[3], "SR1.1", { evidence: "Zone 4 uses local accounts." });
+    var before = snap(z);
+    E.linkRequirement("SR1.1", z[2], [z[3]]);
+    var after = snap(z);
+    var dSrc = diff(before[z[2]], after[z[2]]);
+    ok(dSrc === "", "link from a partial override: the source zone is unchanged", dSrc);
+    var dJoin = diff(before[z[2]], after[z[3]]);
+    ok(dJoin === "", "link from a partial override: the joining zone takes the whole answer", dJoin);
+    var d0 = diff(before[z[0]], after[z[0]]), d1 = diff(before[z[1]], after[z[1]]);
+    ok(d0 === "" && d1 === "", "link from a partial override: the zones left out are unchanged", d0 || d1);
+    ok(E.linkedTargets("SR1.1").length === 2, "link from a partial override: the two zones are linked",
+       JSON.stringify(E.linkedTargets("SR1.1")));
+  })();
+
+  // Linking from the shared layer itself narrows its reach; a zone outside
+  // the new set that was taking the base item keeps it.
+  (function () {
+    var z = fresh(3);
+    sharedDirectory();
+    E.setItemState(z[2], "SR1.1", "RE1", "not-met");
+    var before = snap(z);
+    E.linkRequirement("SR1.1", SH, [z[0], z[1]]);
+    var after = snap(z);
+    var dAll = z.map(function (id) { return diff(before[id], after[id]); }).filter(Boolean)[0] || "";
+    ok(dAll === "", "link from the shared layer: no zone's scored answers move", dAll);
+  })();
+
+  // ---- unlink -----------------------------------------------------------
+  //
+  // Z1-Z3 inherit everything, Z4 overrides only RE1. Unlinking Z1 used to
+  // narrow the reach to Z2 and Z3, so Z4 lost the base item and the evidence.
+  (function () {
+    var z = fresh(4);
+    sharedDirectory();
+    E.setItemState(z[3], "SR1.1", "RE1", "not-met");
+    var before = snap(z);
+    ok(E.unlinkRequirement("SR1.1", z[0]) === true, "unlink: Z1 leaves the link");
+    var after = snap(z);
+    var dAll = z.map(function (id) { return diff(before[id], after[id]); }).filter(Boolean)[0] || "";
+    ok(dAll === "", "unlink: no zone's scored answers move, the unlinked one included", dAll);
+    var own = E.findResponse(z[0], "SR1.1");
+    ok(own && own.components.base && own.components.base.state === "met" &&
+       own.evidence === "One corporate directory serves the zones it reaches.",
+       "unlink: the unlinked zone now holds the answer as its own");
+    ok(sourceOf(z[3], "SR1.1", "base") === "shared",
+       "unlink: the zone with a partial override is still taking the base item from the shared answer");
+    ok(JSON.stringify(E.linkedTargets("SR1.1")) === JSON.stringify([z[1], z[2]]),
+       "unlink: the other two zones stay linked", JSON.stringify(E.linkedTargets("SR1.1")));
+  })();
+
+  // The last two linked zones, with a third that overrode RE1 still taking
+  // the base: unlinking one must not take the base away from the third.
+  (function () {
+    var z = fresh(3);
+    sharedDirectory();
+    E.setItemState(z[2], "SR1.1", "RE1", "not-met");
+    var before = snap(z);
+    E.unlinkRequirement("SR1.1", z[0]);
+    var after = snap(z);
+    var dAll = z.map(function (id) { return diff(before[id], after[id]); }).filter(Boolean)[0] || "";
+    ok(dAll === "", "unlink, one linked zone left: no zone's scored answers move", dAll);
+    ok(item(z[2], "SR1.1", "base") === "met",
+       "unlink, one linked zone left: the overriding zone keeps the base item", item(z[2], "SR1.1", "base"));
+  })();
+
+  // A zone with evidence of its own reads that, not the shared text. Taking
+  // its copy back must not overwrite it with the shared text.
+  (function () {
+    var z = fresh(3);
+    sharedDirectory();
+    E.setResponse(z[1], "SR1.1", { evidence: "Zone 2 has its own write-up." });
+    var before = snap(z);
+    E.unlinkRequirement("SR1.1", z[1]);
+    var after = snap(z);
+    var dAll = z.map(function (id) { return diff(before[id], after[id]); }).filter(Boolean)[0] || "";
+    ok(dAll === "", "unlink with own evidence: no zone's scored answers move", dAll);
+    ok(evidenceOf(z[1], "SR1.1") === "Zone 2 has its own write-up.",
+       "unlink with own evidence: the zone keeps its own text", evidenceOf(z[1], "SR1.1"));
+  })();
+
+  // Items with different reaches: RE1 reaches only Z1 and Z2. Unlinking Z1
+  // used to write one reach (Z2, Z3) across the whole requirement, which
+  // stretched RE1 over Z3.
+  (function () {
+    var z = fresh(3);
+    sharedDirectory();
+    E.setItemCoverage("SR1.1", "RE1", [z[0], z[1]]);
+    var before = snap(z);
+    E.unlinkRequirement("SR1.1", z[0]);
+    var after = snap(z);
+    var dAll = z.map(function (id) { return diff(before[id], after[id]); }).filter(Boolean)[0] || "";
+    ok(dAll === "", "unlink with per-item reach: no zone's scored answers move", dAll);
+    ok(item(z[2], "SR1.1", "RE1") === "-",
+       "unlink with per-item reach: RE1 is not stretched over a zone it never covered", item(z[2], "SR1.1", "RE1"));
+    ok(JSON.stringify(E.getItemCoverage("SR1.1", "RE1")) === JSON.stringify([z[1]]),
+       "unlink with per-item reach: RE1 keeps its own reach, less the unlinked zone",
+       JSON.stringify(E.getItemCoverage("SR1.1", "RE1")));
+  })();
+
+  // Round 2 (verification): a link of one is not a link. Z1/Z2 linked, Z3
+  // overrides every item and takes only the evidence and plan. Unlinking Z1
+  // used to keep the shared answer because it still "reached" two zones, so
+  // Z2 inherited silently with no link on its card and no control to answer
+  // separately. It now goes down to both, each keeping what it read.
+  (function () {
+    var z = fresh(3);
+    sharedDirectory();
+    E.setItemState(z[2], "SR1.1", "base", "partial");
+    E.setItemState(z[2], "SR1.1", "RE1", "not-met");
+    E.setItemState(z[2], "SR1.1", "RE2", "not-met");
+    var before = snap(z);
+    E.unlinkRequirement("SR1.1", z[0]);
+    var after = snap(z);
+    var dAll = z.map(function (id) { return diff(before[id], after[id]); }).filter(Boolean)[0] || "";
+    ok(dAll === "", "unlink to one full inheritor: no zone's scored answers move", dAll);
+    ok(!E.findResponse(SH, "SR1.1"),
+       "unlink to one full inheritor: no shared answer is left for a single zone to inherit unseen");
+    var own2 = E.findResponse(z[1], "SR1.1");
+    ok(own2 && own2.components.base && own2.components.base.state === "met",
+       "unlink to one full inheritor: Z2 holds the answer as its own, where its card can show it");
+    ok(evidenceOf(z[2], "SR1.1") === "One corporate directory serves the zones it reaches.",
+       "unlink to one full inheritor: Z3 keeps the evidence it was reading", evidenceOf(z[2], "SR1.1"));
+  })();
+
+  // Round 2 (verification): an item stored with an EMPTY reach list covers
+  // every zone (Scoring.coversTarget). Deleting an unrelated zone treated the
+  // emptied-looking list as "served only the deleted zone" and removed the
+  // item, and with it the whole shared answer, evidence and plan included.
+  // The engine never writes [] itself; a hand-edited or foreign file can.
+  (function () {
+    var z = fresh(3);
+    sharedDirectory();
+    var sh = E.findResponse(SH, "SR1.1");
+    Object.keys(sh.components).forEach(function (k) { sh.components[k].appliesTo = []; });
+    var before = snap([z[0], z[1]]);
+    ok(item(z[0], "SR1.1", "base") === "met", "empty reach list: before, it covers every zone");
+    E.removeTarget(z[2]);
+    var d0 = diff(before[z[0]], effective(z[0])), d1 = diff(before[z[1]], effective(z[1]));
+    ok(d0 === "" && d1 === "", "empty reach list: deleting an unrelated zone changes no zone left", d0 || d1);
+    var left = E.findResponse(SH, "SR1.1");
+    ok(left && left.components.base && left.components.base.state === "met" && !left.components.base.appliesTo,
+       "empty reach list: the shared answer stays, read as covering every zone",
+       left ? JSON.stringify(left.components.base) : "(gone)");
+  })();
+
+  // A plain pair still ends the link: both zones get the answer as their own
+  // and nothing is left on the shared layer.
+  (function () {
+    var z = fresh(2);
+    sharedDirectory();
+    var before = snap(z);
+    E.unlinkRequirement("SR1.1", z[0]);
+    var after = snap(z);
+    var dAll = z.map(function (id) { return diff(before[id], after[id]); }).filter(Boolean)[0] || "";
+    ok(dAll === "", "unlink a pair: neither zone's scored answers move", dAll);
+    ok(!E.findResponse(SH, "SR1.1") && E.linkedTargets("SR1.1").length === 0,
+       "unlink a pair: no shared answer is left serving one zone");
+  })();
+});
+</script>
+</body></html>

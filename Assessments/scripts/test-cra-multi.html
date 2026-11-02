@@ -1,0 +1,153 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>CRA multi-product capture + report</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style>
+</head>
+<body>
+<h1>CRA multi-product: capture layout + single combined Word report</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<!-- Mock docx (complete constructor set) so the test can walk the document tree. -->
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock", tours: ["cra"] }); H.dom();</script>
+<script>
+window.docx = (function () {
+  function TextRun(opts) {
+    if (typeof opts === "string") opts = { text: opts };
+    this.__type = "TextRun";
+    this.text = opts.text != null ? opts.text : (Array.isArray(opts.children) ? opts.children.join("") : "");
+    this.bold = !!opts.bold; this.italics = !!opts.italics;
+    this.color = opts.color || null; this.size = opts.size || null;
+  }
+  function Paragraph(opts) {
+    opts = opts || {};
+    this.__type = "Paragraph";
+    this.children = opts.children || [];
+    this.style = opts.style || null; this.heading = opts.heading || null;
+    this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join("");
+    this.runs = this.children;
+  }
+  function TableCell(opts) { this.__type = "TableCell"; this.children = (opts && opts.children) || []; this.shading = (opts && opts.shading) || null; }
+  function TableRow(opts)  { this.__type = "TableRow"; this.children = (opts && opts.children) || []; }
+  function Table(opts)     { this.__type = "Table"; this.rows = (opts && opts.rows) || []; }
+  function ImageRun(opts)  { this.__type = "ImageRun"; this.text = ""; }
+  function PageBreak()     { this.__type = "PageBreak"; this.text = ""; }
+  function Header(opts)    { this.__type = "Header"; this.children = (opts && opts.children) || []; }
+  function Footer(opts)    { this.__type = "Footer"; this.children = (opts && opts.children) || []; }
+  function Document(opts)  { this.__type = "Document"; this.sections = (opts && opts.sections) || []; }
+  return {
+    Document: Document, Paragraph: Paragraph, TextRun: TextRun,
+    TableCell: TableCell, TableRow: TableRow, Table: Table,
+    ImageRun: ImageRun, PageBreak: PageBreak, Header: Header, Footer: Footer,
+    HeadingLevel: { TITLE: "Title", HEADING_1: "Heading1", HEADING_2: "Heading2", HEADING_3: "Heading3" },
+    AlignmentType: { LEFT: "left", CENTER: "center", RIGHT: "right", BOTH: "both" },
+    WidthType: { PERCENTAGE: "pct", DXA: "dxa" },
+    ShadingType: { SOLID: "solid" },
+    TableLayoutType: { FIXED: "fixed" },
+    PageOrientation: { PORTRAIT: "portrait", LANDSCAPE: "landscape" },
+    HeightRule: { EXACT: "exact", ATLEAST: "atLeast" },
+    PageNumber: { CURRENT: "current" },
+    Packer: { toBlob: function (doc) { window.__capturedDoc = doc; return Promise.resolve(new Blob(["dummy"])); } }
+  };
+})();
+</script>
+<script>
+(function () {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function finish() {
+    var s = document.getElementById("summary");
+    s.className = "sum " + (fail === 0 ? "ok" : "bad");
+    s.textContent = fail === 0 ? "ALL TESTS PASSED (" + pass + ")" : pass + " passed, " + fail + " FAILED";
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+    E.activateInstrument("eu-cra");
+    A.TourCRA.apply(E);
+    var inst = E.state.instrument;
+    var tidA = E.state.activeTargetId;
+
+    // Second product with its own class and a couple of its own answers.
+    E.addTarget("SentinelEdge IDS-4400");
+    var tidB = E.state.activeTargetId;
+    if (E.setCRAProductClass) E.setCRAProductClass("important-class-i");
+    E.setResponse(tidB, "CRAP1a", { applicable: true, state: "in-place", evidence: "Release gate mirrors the 2200 process." });
+    E.setResponse(tidB, "CRAP1b", { applicable: true, state: "partially", evidence: "Hardening guide exists; defaults not yet locked.", owner: "Firmware Lead", action: "Lock secure defaults in the 4400 factory image.", impact: "Units ship with weaker defaults than the 2200." });
+    E.setResponse(tidB, "CRAC2", { applicable: true, state: "partially", evidence: "Annex VII pack started for the 4400.", owner: "Quality & Compliance Manager", action: "Complete the 4400 Annex VII documentation.", impact: "Cannot demonstrate conformity for the 4400 on request." });
+
+    // ---- capture layout ----
+    A.UI.go("cra-layer", "P2");
+    var main = document.getElementById("main");
+    check("P2 page has NO product switcher (one shared answer set)", !main.querySelector(".sites-bar"));
+    check("P2 requirements card says organisation-wide", main.textContent.indexOf("one answer set for all products") !== -1);
+
+    A.UI.go("cra-layer", "P3");
+    main = document.getElementById("main");
+    check("P3 page HAS the product switcher", !!main.querySelector(".sites-bar"));
+    var t = main.textContent;
+    check("P3 splits organisation-level obligations from product-specific ones",
+      t.indexOf("Organisation-level obligations") !== -1 && t.indexOf("Product-specific obligations") !== -1);
+    check("organisation group comes first, product group after the switcher",
+      t.indexOf("Organisation-level obligations") < t.indexOf("Product-specific obligations"));
+    check("product group names the active product", t.indexOf("SentinelEdge IDS-4400") !== -1);
+
+    A.UI.go("cra-layer", "P1");
+    main = document.getElementById("main");
+    check("P1 page keeps the product switcher up top", !!main.querySelector(".sites-bar"));
+
+    // ---- one combined Word report for both products ----
+    A.ExportDOCX.buildAsync(E.state.engagement, inst, null, E.state.profile, null,
+      { targetId: tidA, craSetup: E.getCRASetupRaw ? E.getCRASetupRaw() : null },
+      function (err) {
+        try {
+          if (err) { check("multi-product doc builds - " + (err.message || err), false); finish(); return; }
+          var doc = window.__capturedDoc;
+          var paras = [];
+          function walk(node) {
+            if (!node) return;
+            if (node.__type === "Paragraph") { paras.push(node); return; }
+            if (node.__type === "Table") { node.rows.forEach(walk); return; }
+            if (node.__type === "TableRow") { node.children.forEach(walk); return; }
+            if (node.__type === "TableCell") { node.children.forEach(walk); return; }
+            if (Array.isArray(node)) node.forEach(walk);
+          }
+          doc.sections.forEach(function (s) { walk(s.children); });
+          var allText = paras.map(function (p) { return p.text; }).join("\n");
+          function count(re) { return (allText.match(re) || []).length; }
+
+          check("exec summary covers both products in one engagement", allText.indexOf("gap assessment of 2 products") !== -1 && allText.indexOf("SentinelEdge IDS-2200") !== -1 && allText.indexOf("SentinelEdge IDS-4400") !== -1);
+          check("exec summary states org-wide obligations are assessed once", allText.indexOf("assessed once for the manufacturer") !== -1);
+          // The org-wide Art 14 gap (CRA-C.7 not in place) is a conformity
+          // floor for EVERY product, so both are correctly named as blocked.
+          check("blocker line names every blocked product (org conformity gap blocks all)", allText.indexOf("Market placement is currently blocked for SentinelEdge IDS-2200 and SentinelEdge IDS-4400") !== -1);
+          check("scope table lists each product with class and route", allText.indexOf("Important - Class II") !== -1 && allText.indexOf("Important - Class I") !== -1);
+          check("organisation-wide P2 results appear exactly once", count(/P2 - Annex I Part II[^\n]*\(organisation-wide\)/g) === 1);
+          check("each product gets its own P1 results section", count(/P1 - [^\n]*SentinelEdge IDS-2200/g) >= 1 && count(/P1 - [^\n]*SentinelEdge IDS-4400/g) >= 1);
+          check("each product gets its own P3 results section", count(/P3 - [^\n]*SentinelEdge IDS-2200/g) >= 1 && count(/P3 - [^\n]*SentinelEdge IDS-4400/g) >= 1);
+          check("combined roadmap tags organisation-wide gaps", allText.indexOf("Applies to: Organisation-wide") !== -1);
+          check("organisation-wide gaps are de-duplicated (5 org gaps once each)", count(/Applies to: Organisation-wide/g) === 5);
+          check("combined roadmap tags per-product gaps", allText.indexOf("Applies to: SentinelEdge IDS-4400") !== -1);
+          check("scorecard shows per-product tile groups", allText.indexOf("Conformance profile by layer and product") !== -1);
+          check("readiness page present", allText.indexOf("CRA readiness at a glance") !== -1);
+        } catch (e) { check("doc assertions threw: " + e.message, false); }
+        finish();
+      });
+  } catch (e) {
+    check("harness threw: " + e.message, false);
+    finish();
+  }
+})();
+</script>
+</body></html>

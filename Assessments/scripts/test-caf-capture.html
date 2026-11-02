@@ -1,0 +1,92 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>CAF capture card check</title></head>
+<body>
+<!-- Minimal DOM shell ui.init() expects, so we can boot it headlessly. -->
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+
+  function toggleFor(main) {
+    // The guidance toggle sits inside the state-button row bar.
+    var bar = main.querySelector(".sl-row-bar");
+    if (!bar) return null;
+    return bar.querySelector(".sl-guidance-toggle");
+  }
+
+  try {
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });
+    A.Engine.activateInstrument("ncsc-caf");
+    var inst = A.Engine.state.instrument;
+    ok(inst && inst.id === "ncsc-caf", "ncsc-caf activates");
+
+    // The verbatim CAF indicators of good practice are loaded for every outcome.
+    var outcomes = inst.outcomes || [];
+    var withIgps = outcomes.filter(function (o) {
+      return o.igps && ((o.igps.achieved || []).length || (o.igps.not || []).length);
+    });
+    ok(outcomes.length === 41 && withIgps.length === 41, "all 41 outcomes carry IGP statements", withIgps.length + "/" + outcomes.length);
+    var a1a = outcomes.filter(function (o) { return o.id === "A1.a"; })[0];
+    ok(a1a && a1a.igps.achieved.length === 6 && a1a.igps.not.length === 4, "A1.a has the expected IGP counts (6 achieved / 4 not)");
+    ok(a1a && /board-level/.test(a1a.igps.achieved.join(" ")), "A1.a IGP text is the verbatim CAF wording");
+    ok(inst.attribution && /Open Government Licence/.test(inst.attribution), "instrument carries the OGL attribution");
+
+    var firstPrin = (A.Engine.getCAFPrinciples()[0] || {}).id;
+    A.UI.go("caf-principle", firstPrin);
+    var main = document.getElementById("main");
+
+    // State capture is unchanged: Achieved / Partially / Not buttons render.
+    var stateBtns = main.querySelectorAll(".caf-state-btn");
+    ok(stateBtns.length >= 3, "state buttons render (Achieved / Partially / Not)", "got " + stateBtns.length);
+    var bar = main.querySelector(".sl-row-bar");
+    ok(!!bar, "state buttons live in an sl-row-bar (toggle sits to their right)");
+
+    // A single combined guidance toggle sits to the right of the state buttons.
+    var toggle = toggleFor(main);
+    ok(!!toggle, "a guidance toggle is present to the right of the state buttons");
+    ok(toggle && bar.contains(toggle) && bar.querySelectorAll(".caf-state-btn").length >= 3,
+       "the toggle is in the same row as the state buttons");
+    ok(toggle && /OT lens/.test(toggle.textContent), "the toggle folds the OT lens into it", toggle && toggle.textContent);
+    ok(toggle && /Indicators of good practice/.test(toggle.textContent), "the toggle names the CAF indicators", toggle && toggle.textContent);
+
+    // The old standalone "OT lens" button (text exactly "OT lens") is gone.
+    var standaloneLens = [].slice.call(main.querySelectorAll("button")).filter(function (b) { return b.textContent.trim() === "OT lens"; });
+    ok(standaloneLens.length === 0, "no standalone 'OT lens' button remains", "found " + standaloneLens.length);
+
+    // Collapsed by default: the detail panel is not in the DOM until toggled.
+    ok(!main.querySelector(".caf-state-guide"), "detail panel is collapsed by default");
+
+    // Expand: clicking reveals the combined panel with the OT lens content.
+    toggle.click();
+    main = document.getElementById("main"); // re-rendered
+    var panel = main.querySelector(".caf-state-guide");
+    ok(!!panel, "clicking the toggle reveals the detail panel");
+    ok(panel && panel.querySelector(".caf-igp-list"), "revealed panel shows the verbatim IGP lists");
+    ok(panel && /verbatim from the CAF/.test(panel.textContent), "IGP block is labelled as verbatim CAF text");
+    ok(panel && /board-level/.test(panel.textContent), "revealed panel shows A1.a's verbatim indicators");
+    ok(panel && panel.querySelector(".caf-lens-panel"), "revealed panel contains the OT lens");
+    ok(panel && /OT lens/.test(panel.textContent), "revealed panel is labelled with an OT lens heading");
+    var t2 = toggleFor(main);
+    ok(t2 && t2.className.indexOf("open") >= 0, "toggle shows its open state");
+
+    // Collapse again.
+    t2.click();
+    main = document.getElementById("main");
+    ok(!main.querySelector(".caf-state-guide"), "clicking again collapses the panel");
+
+    // Whichever detail the instrument carries (verbatim IGPs or paraphrased
+    // summaries) shows inside the panel, never always-on in the card body.
+    ok(!document.querySelector("#main .caf-summaries"), "state detail is NOT shown always-on outside the expander");
+  } catch (e) {
+    ok(false, "boot/render threw: " + e.message + "\n" + (e.stack || ""));
+  }
+
+});
+</script>
+</body></html>

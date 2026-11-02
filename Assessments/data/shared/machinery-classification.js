@@ -1,0 +1,65 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/shared/machinery-classification.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.shared = window.App.Data.shared || {};
+window.App.Data.shared.machineryClassification = {
+  "schema": "spt-classification/1.0",
+  "_note": "EU Machinery Regulation (Regulation (EU) 2023/1230) Annex I classification lookup. Categories paraphrase the Annex I Part A and Part B lists; the class drives the conformity-assessment route under Article 25. Same shape as the CRA lookup so the shared layered-conformance machinery (scoring-cra.js) can use either.",
+  "authorityRef": "Machinery Regulation Annex I",
+  "classes": [
+    { "id": "default", "label": "Not listed in Annex I (internal control)" },
+    { "id": "annex-i-part-b", "label": "Annex I Part B (higher-risk category)" },
+    { "id": "annex-i-part-a", "label": "Annex I Part A (third party mandatory)" }
+  ],
+  "severity": { "default": 0, "annex-i-part-b": 1, "annex-i-part-a": 2 },
+  "deriveClass": {
+    "none-match": "default",
+    "annex-i-part-a": "annex-i-part-a",
+    "annex-i-part-b": "annex-i-part-b"
+  },
+  "routeByClass": {
+    "default": "Internal production control (Module A, Annex VI): manufacturer self-assessment; no notified body required.",
+    "annex-i-part-b": "Internal production control (Module A) is permitted ONLY where the machine is designed and constructed fully in accordance with harmonised standards or common specifications covering ALL the relevant essential health and safety requirements (Art 25(3)). Otherwise a notified-body route is required: EU type-examination (Module B) + conformity to type (Module C), full quality assurance (Module H), or unit verification (Module G).",
+    "annex-i-part-a": "Third-party conformity assessment is mandatory (Art 25(2)): EU type-examination (Module B) + conformity to type (Module C), full quality assurance (Module H), or unit verification (Module G). Internal control (Module A) is not available."
+  },
+  "groupLabels": {
+    "annex-i-part-a": "Annex I Part A (third-party assessment mandatory)",
+    "annex-i-part-b": "Annex I Part B (Module A only with full harmonised-standard coverage)"
+  },
+  "groupOrder": ["annex-i-part-a", "annex-i-part-b"],
+  "categories": {
+    "annex-i-part-a": [
+      { "id": 1, "text": "Removable mechanical transmission devices, including their guards" },
+      { "id": 2, "text": "Guards for removable mechanical transmission devices" },
+      { "id": 3, "text": "Vehicle servicing lifts" },
+      { "id": 4, "text": "Portable cartridge-operated fixing and other impact machinery" },
+      { "id": 5, "text": "Safety components with fully or partially self-evolving behaviour using machine-learning approaches ensuring safety functions" },
+      { "id": 6, "text": "Machinery embedding self-evolving (machine-learning) systems ensuring safety functions that were not placed independently on the market, in respect of those systems" }
+    ],
+    "annex-i-part-b": [
+      { "id": 1, "text": "Circular saws for wood/similar or meat/similar (fixed or movable blade types listed in Part B point 1)" },
+      { "id": 2, "text": "Hand-fed surface planing machinery for woodworking" },
+      { "id": 3, "text": "Thicknessers for one-side dressing with built-in mechanical feed, manual loading/unloading, for woodworking" },
+      { "id": 4, "text": "Band-saws with manual loading/unloading for wood/similar or meat/similar" },
+      { "id": 5, "text": "Combined machinery of the sawing/planing/moulding types for wood and similar materials" },
+      { "id": 6, "text": "Hand-fed tenoning machinery with several tool holders for woodworking" },
+      { "id": 7, "text": "Hand-fed vertical spindle moulding machinery for wood and similar materials" },
+      { "id": 8, "text": "Portable chainsaws for woodworking" },
+      { "id": 9, "text": "Presses, including press-brakes, for cold working of metals, manual loading/unloading, travel > 6 mm and speed > 30 mm/s" },
+      { "id": 10, "text": "Injection or compression plastics-moulding machinery with manual loading or unloading" },
+      { "id": 11, "text": "Injection or compression rubber-moulding machinery with manual loading or unloading" },
+      { "id": 12, "text": "Machinery for underground working: locomotives and brake-vans; hydraulic-powered roof supports" },
+      { "id": 13, "text": "Manually loaded trucks for the collection of household refuse incorporating a compression mechanism" },
+      { "id": 14, "text": "Devices for lifting persons, or persons and goods, involving a hazard of falling from a vertical height of more than 3 m" },
+      { "id": 15, "text": "Protective devices designed to detect the presence of persons" },
+      { "id": 16, "text": "Power-operated interlocking movable guards used as safeguards in presses and moulding machinery (Part B points 9-11)" },
+      { "id": 17, "text": "Logic units to ensure safety functions" },
+      { "id": 18, "text": "Roll-over protective structures (ROPS)" },
+      { "id": 19, "text": "Falling-object protective structures (FOPS)" }
+    ]
+  },
+  "classifierFlags": {
+    "selfEvolvingSafety": "A machine whose safety functions rely on a fully or partially self-evolving (machine-learning) system falls under Annex I Part A points 5-6: third-party conformity assessment is mandatory for those systems even where the rest of the machine would self-assess."
+  }
+};

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool report export tests</title></head>
+<body>
+<h1>risk-tool report exports — Word + Excel on the completed demo project</h1>
+<pre id="out">running…</pre>
+<iframe id="app" src="../index.html?tour=1" style="width:10px;height:10px;visibility:hidden"></iframe>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.ExcelJS || !w.docx ||
+        (w.RiskTool.state.project.suc.name || "").indexOf("Acme") !== 0) {
+      if (++tries > 300) { clearInterval(t); lines.push("FAIL app/exports/libs did not load seeded"); failures++; done(); }
+      return;
+    }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async: " + (e && e.message)); done(); });
+    else done();
+  }, 50);
+
+  // Minimal docx mock (same pattern as the Assessments content tests) so the
+  // Word document tree can be walked and asserted. Installed only for the
+  // build call; the real patched lib stays loaded for actual use.
+  function mockDocx() {
+    function TextRun(o) { if (typeof o === "string") o = { text: o }; this.__t = "run"; this.text = o.text != null ? o.text : ""; this.bold = !!o.bold; this.color = o.color || null; }
+    function Paragraph(o) { o = o || {}; this.__t = "p"; this.children = o.children || []; this.heading = o.heading || null; this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join(""); }
+    function TableCell(o) { this.__t = "cell"; this.children = (o && o.children) || []; this.shading = (o && o.shading) || null; }
+    function TableRow(o) { this.__t = "row"; this.children = (o && o.children) || []; }
+    function Table(o) { this.__t = "table"; this.rows = (o && o.rows) || []; }
+    function Header(o) { this.__t = "hdr"; this.children = (o && o.children) || []; }
+    function Footer(o) { this.__t = "ftr"; this.children = (o && o.children) || []; }
+    function PageBreak() { this.__t = "br"; this.text = ""; }
+    function ImageRun(o) { this.__t = "img"; this.data = (o && o.data) || null; this.floating = (o && o.floating) || null; }
+    function Document(o) { this.__t = "doc"; this.sections = (o && o.sections) || []; }
+    return {
+      Document: Document, Paragraph: Paragraph, TextRun: TextRun, Table: Table, TableRow: TableRow, TableCell: TableCell,
+      Header: Header, Footer: Footer, PageBreak: PageBreak, ImageRun: ImageRun,
+      HeadingLevel: { HEADING_1: "h1", HEADING_2: "h2", HEADING_3: "h3", TITLE: "t" },
+      WidthType: { DXA: "dxa", PERCENTAGE: "pct" },
+      ShadingType: { SOLID: "solid" },
+      TableLayoutType: { FIXED: "fixed" },
+      AlignmentType: { LEFT: "l", CENTER: "c", RIGHT: "r" },
+      HeightRule: { ATLEAST: "atLeast", EXACT: "exact" },
+      PageNumber: { CURRENT: "current" },
+      PageOrientation: { PORTRAIT: "portrait" },
+      Packer: { toBlob: function () { return Promise.resolve(new Blob(["x"])); } }
+    };
+  }
+  function docText(doc) {
+    var out = [];
+    (function walk(n) {
+      if (!n) return;
+      if (n.__t === "p") { out.push(n.text); return; }
+      if (n.__t === "table") { n.rows.forEach(walk); return; }
+      if (n.__t === "row" || n.__t === "cell") { n.children.forEach(walk); return; }
+      if (Array.isArray(n)) n.forEach(walk);
+    })(doc.sections.map(function (s) { return s.children; }));
+    return out.join("\n");
+  }
+
+  function run(w) {
+    var RT = w.RiskTool, RX = w.RiskExports;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var p = RT.state.project;
+
+    ok(!!w.docx && !!w.ExcelJS && !!RX, "vendor libs and RiskExports loaded by index.html");
+    ok(!!(w.App && w.App.Assets && w.App.Assets.logo && w.App.Assets.coverBg && w.App.Assets.logoCard), "brand assets (logo + cover art) loaded by index.html");
+    ok(p.engagement && p.engagement.client === "Acme Petrochemicals Ltd", "tour project carries engagement details");
+
+    // ---- Word (full) via the mock ----
+    var realDocx = w.docx;
+    w.docx = mockDocx();
+    var doc = RX.buildWordDoc(p, {});
+    var text = docText(doc);
+    ok(!!doc && doc.sections.length === 2, "full Word doc builds (cover + body)");
+    ok(text.indexOf("OT CYBER RISK ASSESSMENT") !== -1 && text.indexOf("OT Cyber Risk") !== -1, "Design-B cover carries the kicker and title lines");
+    ok(text.indexOf("www.solutionspt.com") !== -1 && text.indexOf("CLASSIFICATION") !== -1, "cover carries the SolutionsPT address block and issue/author/classification line");
+    ok(text.indexOf("Acme Petrochemicals Ltd") !== -1 && text.indexOf("Unit 300") !== -1, "cover + document control carry the engagement client and SuC");
+    (function () { // cover hero: floating background image behind the text, plus the logo card
+      var imgs = [];
+      (function walk(n) {
+        if (!n) return;
+        if (n.__t === "img") { imgs.push(n); return; }
+        if (n.__t === "p" || n.__t === "cell" || n.__t === "hdr") { n.children.forEach(walk); return; }
+        if (n.__t === "table") { n.rows.forEach(walk); return; }
+        if (n.__t === "row") { n.children.forEach(walk); return; }
+        if (Array.isArray(n)) n.forEach(walk);
+      })(doc.sections[0].children);
+      ok(imgs.length >= 2 && imgs.some(function (i) { return i.floating && i.floating.behindDocument; }), "cover section embeds the hero background (floating, behind text) and the logo card");
+    })();
+    ok(text.indexOf("Risk at a glance") !== -1 && text.indexOf("threats registered") !== -1 && text.indexOf("above tolerable (Medium)") !== -1, "scorecard page: headline tiles present");
+    ok(text.indexOf("Risk profile by zone and conduit") !== -1 && text.indexOf("Z2 Safety Instrumented System") !== -1, "scorecard page: per-zone/conduit risk bars");
+    ok(text.indexOf("Target security levels: worst case per foundational requirement") !== -1, "scorecard page: SL-T tile strip");
+    ok(text.indexOf("Where to focus first") !== -1, "scorecard page: focus cards");
+    ok(text.indexOf("Executive summary") !== -1 && text.indexOf("9 threats were registered") !== -1, "exec summary composed from the data (9 threats)");
+    ok(text.indexOf("Why this assessment") !== -1 && text.indexOf("What this report is") !== -1 && text.indexOf("What we found") !== -1 && text.indexOf("What happens next") !== -1, "exec summary has the why/what/found/next structure");
+    ok(text.indexOf("essential functions this assessment protects") !== -1 && text.indexOf("assumed adversary of SL3 grade") !== -1, "exec summary states the operational stakes and adversary assumption from the SRS");
+    ok(text.indexOf("The findings rest on the evidence gathered during the engagement") !== -1 && text.indexOf("4 interviews") !== -1, "exec summary cites the evidence base (basis of assessment)");
+    ok(text.indexOf("record and decision instrument") !== -1 && text.indexOf("Three artefacts leave this engagement") !== -1, "exec summary explains what the report is and the Word/Excel/export trio");
+    ok(text.indexOf("This assessment is a snapshot") !== -1, "exec summary sets the revisit expectation");
+    ok(/exceed the tolerable risk of Medium/.test(text), "exec summary names the tolerable risk");
+    ok(/The exposure concentrates in Z\d/.test(text) && text.indexOf("The single highest unmitigated risk is") !== -1, "exec summary says where the risk concentrates and names the worst threat");
+    ok(/1 formally accepted by the asset owner/.test(text), "disposition tally includes the recorded acceptance");
+    ok(/Accepted risk T8 \(Z4\): /.test(text) && text.indexOf("revisited at the next assessment") !== -1, "the accepted risk is named in the summary");
+    ok(text.indexOf("no disposition yet") === -1, "fully-dispositioned demo raises no undispositioned warning");
+    ok(/ceiling is set by/.test(text) && text.indexOf("risk-context export feeds directly") !== -1, "SL-T outcome paragraph names the ceiling driver and the 3-3 handoff");
+    ok(text.indexOf("Delete this note.") !== -1, "red consultant tailor-me note present");
+    ok(text.indexOf("High-level risk ranking (§4.2)") !== -1 && text.indexOf("Laboratory information system link") !== -1, "§4.2 ranking table present with all systems");
+    ok(text.indexOf("Z2: Safety Instrumented System") !== -1 && text.indexOf("T4") !== -1, "zone threat registers present");
+    ok(text.indexOf("risk acceptance: Accepted by R. Calder") !== -1, "the recorded acceptance text prints in full");
+    ok(text.indexOf("Target security levels") !== -1 && /Worst case/.test(text) && /SL3/.test(text), "SL-T matrix with worst-case row");
+    ok(text.indexOf("Justification for Z2") !== -1 && text.indexOf("SIS floor applies") !== -1, "per-zone SL-T justifications print");
+    ok(text.indexOf("Sign-off") !== -1 && text.indexOf("R. Calder (Asset Owner - Unit 300)") !== -1, "sign-off section carries the approval");
+    ok(text.indexOf("Method and limitations") !== -1 && text.indexOf("house defaults") !== -1, "limitations state the house-matrix caveat");
+    ok(text.indexOf("undefined") === -1 && text.indexOf("[object") === -1, "no undefined/object leaks in the Word text");
+    (function () { // prose style rule: no em-dashes in running text (table cells may use the dash as an empty placeholder)
+      var prose = doc.sections[1].children.filter(function (n) { return n.__t === "p"; }).map(function (n) { return n.text; }).join("\n");
+      ok(prose.indexOf("—") === -1, "no em-dashes in the report prose");
+    })();
+
+    // ---- Word (high-level only) ----
+    var hl = RX.buildWordDoc(p, { highLevelOnly: true });
+    var hlText = docText(hl);
+    ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking (§4.2)") !== -1, "high-level variant builds with the ranking");
+    ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked (§4.2)") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
+    ok(hlText.indexOf("candidates for detailed, per-system assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the High+ candidates and carries the tailor-me note");
+    ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("triage question is what this high-level assessment answers") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
+    ok(hlText.indexOf("Target security levels") === -1 && hlText.indexOf("Zones, conduits and the detailed") === -1, "high-level variant omits the detailed tier");
+    ok(hlText.indexOf("Sign-off") !== -1, "high-level variant still carries sign-off");
+    w.docx = realDocx;
+
+    // ---- Word packs to a real .docx blob with the real (patched) lib ----
+    var realDoc = RX.buildWordDoc(p, {});
+    var packPromise = w.docx.Packer.toBlob(realDoc).then(function (blob) {
+      ok(blob && blob.size > 5000, "real docx lib packs the report to a non-trivial blob", blob && ("size " + blob.size));
+    });
+
+    // ---- Excel via the real ExcelJS ----
+    var wb = RX.buildWorkbook(p);
+    var names = wb.worksheets.map(function (ws) { return ws.name; }).join(",");
+    ok(names === "Front,Ranking,Threat register,Zones,Conduits,Countermeasures,SL-T,Basis", "workbook has the eight sheets", names);
+    var front = wb.getWorksheet("Front");
+    ok(front.getCell("B2").value === "Acme Petrochemicals Ltd", "Front carries the client");
+    ok(/R\. Calder/.test(String(front.getCell("B13").value)), "Front carries the sign-off");
+    var tr = wb.getWorksheet("Threat register");
+    ok(tr.rowCount === 10, "threat register = header + 9 threats", String(tr.rowCount));
+    ok(String(tr.getCell("H2").value).length > 0, "risk band cells filled");
+    var dv = tr.getCell("M2").dataValidation;
+    ok(!!dv && dv.type === "list", "Status column has the dropdown validation");
+    ok(!!tr.autoFilter, "threat register is autofiltered");
+    var sl = wb.getWorksheet("SL-T");
+    ok(sl.getCell("A1").value === "Zone / conduit" && String(sl.getCell("B3").value) === "SL3", "SL-T matrix rows present (Z2 IAC SL3)");
+    var worstRow = sl.getRow(sl.rowCount);
+    ok(String(worstRow.getCell(1).value) === "WORST CASE" && String(worstRow.getCell(2).value) === "SL3", "worst-case SL-T row present");
+    var rk = wb.getWorksheet("Ranking");
+    ok(rk.rowCount === 7, "ranking sheet = header + 6 systems", String(rk.rowCount));
+    var cm = wb.getWorksheet("Countermeasures");
+    ok(cm.rowCount === 8, "countermeasures sheet = header + 7 measures", String(cm.rowCount));
+
+    // ---- Excel writes a real .xlsx buffer ----
+    var xlsxPromise = wb.xlsx.writeBuffer().then(function (buf) {
+      ok(buf && buf.byteLength > 8000, "ExcelJS writes a non-trivial xlsx buffer", buf && ("bytes " + buf.byteLength));
+    });
+
+    // ---- builders survive an EMPTY project (no crashes on day one) ----
+    var fresh = JSON.parse(JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "", description: "", scopeStatement: "", assumptions: [] }, zones: [], conduits: [] }));
+    RT.loadProjectText(JSON.stringify(fresh));
+    var emptyP = RT.state.project;
+    w.docx = mockDocx();
+    var emptyDoc = RX.buildWordDoc(emptyP, {});
+    ok(!!emptyDoc && docText(emptyDoc).indexOf("not yet been signed off") !== -1, "Word builder handles an empty project");
+    w.docx = realDocx;
+    var emptyWb = RX.buildWorkbook(emptyP);
+    ok(emptyWb.worksheets.length === 8, "Excel builder handles an empty project");
+
+    return Promise.all([packPromise, xlsxPromise]);
+  }
+})();
+</script>
+</body>
+</html>

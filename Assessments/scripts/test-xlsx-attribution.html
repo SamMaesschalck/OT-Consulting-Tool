@@ -1,0 +1,77 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Workbook carries the framework attribution</title></head>
+<body>
+<!--
+  Several instruments reproduce framework text word for word (CAF indicators,
+  NIST control text, CIS safeguards, SyAPs expectations) under a licence that
+  asks for the attribution to travel with it. Each carries that attribution
+  in instrument.attribution, and the workbook printed the verbatim text in
+  its registers but never the attribution.
+
+  For every instrument: where the field exists, the Read me sheet carries it
+  exactly as written, under its own heading, in the per-site workbook and the
+  organisation-wide one. Where it does not, there is no empty heading.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true }); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+
+  function readmeCells(wb) {
+    var ws = wb.Sheets["Read me"];
+    if (!ws) return [];
+    return Object.keys(ws).filter(function (k) { return k.charAt(0) !== "!"; })
+      .map(function (k) { var c = ws[k]; return c && c.v != null ? String(c.v) : ""; });
+  }
+  function expectedLines(a) {
+    if (!a) return [];
+    if (typeof a === "string") return [a];
+    if (Array.isArray(a)) return a.filter(function (x) { return typeof x === "string"; });
+    return Object.keys(a).map(function (k) { return a[k]; }).filter(function (x) { return typeof x === "string"; });
+  }
+
+  var list = E.state.instruments.filter(function (i) { return i.status !== "placeholder"; });
+  var withAttr = 0, without = 0;
+  list.forEach(function (i0) {
+    E.activateInstrument(i0.id);
+    var inst = E.state.instrument, fam = E.state.scoringFamily;
+    if (!inst || !E.state.profile) return;
+    var opts = { targetId: E.state.activeTargetId };
+    if (fam === "caf-achieved") {
+      opts.cafProfileRegistry = E.getCAFProfileRegistry(); opts.cafProfileId = E.getActiveCAFProfileId();
+      opts.cafProfile = E.getActiveCAFProfile(); opts.cafOverlay = E.getActiveCAFOverlay();
+    }
+    if (fam === "risk-appetite-coherence") opts.riskAppetiteSetup = E.getRiskAppetiteSetup();
+    var wb = null, err = null;
+    try { wb = A.ExportXLSX.build(E.state.engagement, inst, E.state.taxonomy, E.state.profile, opts); } catch (e) { err = e; }
+    ok(!err && wb, inst.id + ": the workbook builds", err && err.message);
+    if (!wb) return;
+    var cells = readmeCells(wb);
+    ok(cells.length > 0, inst.id + ": has a Read me sheet", wb.SheetNames.join(", "));
+    var lines = expectedLines(inst.attribution);
+    if (lines.length) {
+      withAttr++;
+      ok(cells.indexOf("Attribution") !== -1, inst.id + ": the Read me has an attribution heading");
+      ok(lines.every(function (l) { return cells.indexOf(l) !== -1; }), inst.id + ": with the attribution exactly as the instrument gives it",
+         lines[0].slice(0, 60));
+      // The organisation-wide workbook shows the same framework text, so it
+      // carries the same attribution.
+      var org = A.ExportXLSX.build(E.state.engagement, inst, E.state.taxonomy, E.state.profile, Object.assign({}, opts, {
+        orgWide: true,
+        siteEntries: [{ id: "a", name: "Plant A", responses: [] }, { id: "b", name: "Plant B", responses: [] }]
+      }));
+      ok(lines.every(function (l) { return readmeCells(org).indexOf(l) !== -1; }), inst.id + ": and so does the organisation-wide workbook");
+    } else {
+      without++;
+      ok(cells.indexOf("Attribution") === -1, inst.id + ": no attribution field, so no empty attribution heading");
+    }
+  });
+  ok(withAttr >= 7, "the instruments that carry an attribution were all checked", String(withAttr));
+  ok(without >= 1, "as were the ones that carry none", String(without));
+});
+</script>
+</body></html>

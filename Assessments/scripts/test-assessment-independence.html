@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Two assessments of one instrument are completely independent</title></head>
+<body><div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock" });</script>
+<script>
+// Two assessments of the SAME instrument in one customer file must not touch
+// each other. Two ways that can go wrong, and both are checked here:
+//   1. a SHARED OBJECT REFERENCE - the two assessments pointing at one array or
+//      object, so writing through either changes both. A test that only pokes
+//      values can miss this until the day the shapes happen to differ.
+//   2. a write path that resolves the wrong assessment.
+(function () {
+  var A = window.App, E = A.Engine, STG = A.Storage, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    document.getElementById("out").textContent =
+      out.join("\n") + "\n\n" + (fail ? fail + " FAILED" : "ALL TESTS PASSED (" + out.length + ")");
+  }
+
+  // Every object/array reachable from a value, with the path that reached it.
+  function refMap(root) {
+    var seen = new Map(), stack = [[root, "" ]];
+    while (stack.length) {
+      var pair = stack.pop(), v = pair[0], path = pair[1];
+      if (!v || typeof v !== "object") continue;
+      if (seen.has(v)) continue;
+      seen.set(v, path);
+      Object.keys(v).forEach(function (k) {
+        stack.push([v[k], path + "." + k]);
+      });
+    }
+    return seen;
+  }
+  function sharedRefs(a, b) {
+    var ma = refMap(a), shared = [];
+    refMap(b).forEach(function (pathB, obj) {
+      if (ma.has(obj)) shared.push(ma.get(obj) + "  <->  " + pathB);
+    });
+    return shared;
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // ---------- two assessments of the SAME instrument ----------
+    E.activateInstrument("iec-62443-3-3");
+    E.updateMetadata({ clientName: "Acme", siteName: "Plant A",
+                       opportunityId: "OPP-A", consultant: "S. Maes", dateOfVisit: "2026-05-21" });
+    var idA = E.state.activeAssessmentId;
+    var tidA = E.getActiveTarget().id;
+    E.setResponse(tidA, "SR1.1", { applicable: true, evidence: "A-evidence", owner: "A-owner",
+                                   action: "A-action", impact: "A-impact", priorityBand: "high" });
+    E.setItemState(tidA, "SR1.2", "base", "met");
+    E.setZoneFRTarget(tidA, "FR3", 3);
+    E.setReportNarrative({ nextSteps: "A-steps", topPriorities: "A-pri" });
+    E.setReportSection("where-to-focus-first", { title: "A-title", order: ["FR3", "FR1"] });
+    E.setReportSection("terms-used-in-this-report", { terms: [{ term: "A-term", definition: "A-def" }] });
+    var bA = E.getBasisOfAssessment();
+    bA.interviews.push({ name: "A-person", role: "r", date: "2026-05-21" });
+    bA.documents.push({ title: "A-doc", reference: "A-ref", date: "2026-05-21" });
+    E.addTarget("A-only zone");
+
+    var idB = E.newAssessment("iec-62443-3-3", { dateOfVisit: "2028-06-04" }).id;
+    var tidB = E.getActiveTarget().id;
+    E.updateMetadata({ opportunityId: "OPP-B", consultant: "R. Hendry" });
+    E.setResponse(tidB, "SR1.1", { applicable: true, evidence: "B-evidence" });
+
+    var assA = E.state.assessments[idA], assB = E.state.assessments[idB];
+    ok(assA !== assB, "they are different objects");
+
+    // ---------- 1. no shared object anywhere in the two trees ----------
+    var shared = sharedRefs(assA, assB);
+    ok(shared.length === 0,
+       "no object or array is reachable from BOTH assessments",
+       shared.slice(0, 6).join("   |   "));
+
+    // The target ids must differ too, or a response written against one would
+    // look addressed to the other after a merge or a copy-paste of responses.
+    var idsA = assA.targets.map(function (t) { return t.id; });
+    var idsB = assB.targets.map(function (t) { return t.id; });
+    var collide = idsA.filter(function (x) { return idsB.indexOf(x) !== -1; });
+    ok(collide.length === 0, "their target ids do not collide",
+       "A=" + idsA.join(",") + "  B=" + idsB.join(","));
+
+    // ---------- 2. every mutable surface, one direction then the other ----------
+    function snapshot(ass) { return JSON.stringify(ass); }
+    var beforeA = snapshot(assA);
+
+    // Write to B in every way the app can.
+    E.activateAssessment(idB);
+    E.setResponse(tidB, "SR1.3", { applicable: true, evidence: "B-new" });
+    E.setItemState(tidB, "SR1.2", "base", "not-met");
+    E.setZoneFRTarget(tidB, "FR3", 1);
+    E.setDefaultTargetSL(4);
+    E.setReportNarrative({ nextSteps: "B-steps" });
+    E.setReportSection("where-to-focus-first", { title: "B-title", order: ["FR1", "FR3"] });
+    E.setReportSection("terms-used-in-this-report", { terms: [{ term: "B-term", definition: "B-def" }] });
+    var bB = E.getBasisOfAssessment();
+    bB.interviews.push({ name: "B-person", role: "r", date: "2028-06-04" });
+    E.addTarget("B-only zone");
+    E.renameTarget(tidB, "B renamed");
+
+    ok(snapshot(assA) === beforeA,
+       "after writing to B in every way, A is byte-for-byte unchanged",
+       "A changed");
+
+    // ...and the reverse.
+    var beforeB = snapshot(assB);
+    E.activateAssessment(idA);
+    E.setResponse(tidA, "SR2.1", { applicable: true, evidence: "A-later" });
+    E.setReportSection("the-system-as-a-whole", { prose: "A-prose" });
+    E.setDefaultTargetSL(1);
+    E.getBasisOfAssessment().observations.push({ name: "A-obs", method: "m" });
+    E.renameTarget(tidA, "A renamed");
+    ok(snapshot(assB) === beforeB, "and writing to A leaves B untouched", "B changed");
+
+    // ---------- 3. the values themselves, read back ----------
+    E.activateAssessment(idA);
+    ok(E.findResponse(tidA, "SR1.1").evidence === "A-evidence", "A keeps its own evidence");
+    ok(E.findResponse(tidA, "SR1.1").owner === "A-owner", "...its own remediation plan");
+    ok(E.state.engagement.engagement.opportunityId === "OPP-A", "...its own opportunity");
+    ok(E.state.engagement.engagement.consultant === "S. Maes", "...its own consultant");
+    ok(E.getReportNarrative().nextSteps === "A-steps", "...its own next steps");
+    ok(E.getReportSection("where-to-focus-first").title === "A-title", "...its own section rename");
+    ok((E.getReportSection("where-to-focus-first").order || []).join(",") === "FR3,FR1",
+       "...its own custom order");
+    ok(A.Report.consultantTerms(E.state.engagement)[0].term === "A-term", "...its own glossary term");
+    ok(E.getBasisOfAssessment().interviews.some(function (i) { return i.name === "A-person"; }) &&
+       !E.getBasisOfAssessment().interviews.some(function (i) { return i.name === "B-person"; }),
+       "...its own basis of assessment");
+    ok(A.Scoring.effectiveTargetSL(E.state.engagement.targetProfile, "FR3", tidA) === 3,
+       "...its own SL-T for FR3",
+       String(A.Scoring.effectiveTargetSL(E.state.engagement.targetProfile, "FR3", tidA)));
+    ok(E.state.engagement.targets.some(function (t) { return t.name === "A-only zone"; }) &&
+       !E.state.engagement.targets.some(function (t) { return t.name === "B-only zone"; }),
+       "...its own zones");
+
+    E.activateAssessment(idB);
+    ok(E.findResponse(tidB, "SR1.1").evidence === "B-evidence", "B keeps its own evidence");
+    ok(!E.findResponse(tidB, "SR1.1").owner, "...and did NOT inherit A's remediation plan",
+       E.findResponse(tidB, "SR1.1").owner);
+    ok(E.state.engagement.engagement.opportunityId === "OPP-B", "...its own opportunity");
+    ok(E.getReportNarrative().nextSteps === "B-steps", "...its own next steps");
+    ok(E.getReportSection("where-to-focus-first").title === "B-title", "...its own section rename");
+    ok(A.Report.consultantTerms(E.state.engagement)[0].term === "B-term", "...its own glossary term");
+    ok(A.Scoring.effectiveTargetSL(E.state.engagement.targetProfile, "FR3", tidB) === 1,
+       "...its own SL-T for FR3");
+    ok(!E.getReportSection("the-system-as-a-whole").prose,
+       "...and did not pick up the prose written on A");
+
+    // ---------- 4. the shared customer record still IS shared ----------
+    E.updateMetadata({ clientName: "Acme Petrochemicals Ltd" });
+    E.activateAssessment(idA);
+    ok(E.state.engagement.engagement.clientName === "Acme Petrochemicals Ltd",
+       "the customer record is deliberately shared, and still is");
+
+    // ---------- 5. scoring one does not read the other ----------
+    // Assert on WHAT the scorer saw, not on the two totals differing: a count
+    // that happens to match in both proves nothing either way.
+    function scoredEvidence(scored, reqId) {
+      var r = (scored.perRequirement || []).filter(function (x) { return x.requirementId === reqId; })[0];
+      return r ? (r.evidence || "") : "(not scored)";
+    }
+    E.activateAssessment(idA);
+    var scoredA = E.scoreActiveTarget();
+    E.activateAssessment(idB);
+    var scoredB = E.scoreActiveTarget();
+    ok(scoredA !== scoredB, "each activation scores into its own result object");
+    ok(scoredEvidence(scoredA, "SR1.1") === "A-evidence",
+       "A's scored result carries A's evidence", scoredEvidence(scoredA, "SR1.1"));
+    ok(scoredEvidence(scoredB, "SR1.1") === "B-evidence",
+       "B's scored result carries B's evidence", scoredEvidence(scoredB, "SR1.1"));
+    ok((scoredA.perRequirement || []).filter(function (x) { return x.requirementId === "SR2.1"; })[0].evidence === "A-later" &&
+       !(scoredB.perRequirement || []).filter(function (x) { return x.requirementId === "SR2.1"; })[0].evidence,
+       "a requirement answered only in A is unanswered in B");
+    ok((scoredB.perRequirement || []).filter(function (x) { return x.requirementId === "SR1.3"; })[0].evidence === "B-new" &&
+       !(scoredA.perRequirement || []).filter(function (x) { return x.requirementId === "SR1.3"; })[0].evidence,
+       "and one answered only in B is unanswered in A");
+
+    // ---------- 6. all of it survives a save/load, still independent ----------
+    var file = JSON.parse(JSON.stringify(E.getProjectFile()));
+    E.loadProjectFile(file);
+    var rA = E.state.assessments[idA], rB = E.state.assessments[idB];
+    ok(!!rA && !!rB, "both assessments come back");
+    ok(sharedRefs(rA, rB).length === 0,
+       "and are still not sharing a single object after a reload",
+       sharedRefs(rA, rB).slice(0, 4).join(" | "));
+    E.activateAssessment(idA);
+    ok(E.findResponse(E.state.engagement.targets[0].id, "SR1.1").evidence === "A-evidence" ||
+       E.findResponse(tidA, "SR1.1").evidence === "A-evidence",
+       "A's answers survived");
+    ok(E.getReportSection("where-to-focus-first").title === "A-title", "A's overrides survived");
+    E.activateAssessment(idB);
+    ok(E.getReportSection("where-to-focus-first").title === "B-title", "B's overrides survived");
+    ok(E.getReportNarrative().nextSteps === "B-steps", "B's next steps survived");
+
+    // ---------- 7. deleting one leaves the other whole ----------
+    var keep = snapshot(E.state.assessments[idA]);
+    E.deleteAssessment(idB);
+    ok(!E.state.assessments[idB], "the deleted one is gone");
+    ok(snapshot(E.state.assessments[idA]) === keep, "and the other is untouched by the delete");
+
+    // ---------- 8. the same holds in every family, not just capability-SL ----------
+    // Each family stores its answers differently and some carry extra
+    // per-assessment state (the CAF profile, the CRA setup), so each is paired
+    // against itself rather than trusting one family to speak for the rest.
+    [
+      { id: "general-ot-posture", req: "gov.1", a: { applicable: true, band: 3 }, b: { applicable: true, band: 0 } },
+      { id: "ncsc-caf",           req: "A1.a",  a: { applicable: true, state: "achieved" }, b: { applicable: true, state: "not" } },
+      { id: "nis2-assessment",    req: "GOV.1", a: { applicable: true, state: "achieved" }, b: { applicable: true, state: "not" } },
+      { id: "iec-62443-2-1-2024", req: "ORG1.1", a: { applicable: true, ml: "ML3" }, b: { applicable: true, ml: "ML1" } },
+      { id: "iec-62443-2-1-2010", req: "E423",  a: { applicable: true, state: "in-place" }, b: { applicable: true, state: "not-in-place" } },
+      { id: "eu-cra",             req: "CRA-P1.a", a: { applicable: true, state: "in-place" }, b: { applicable: true, state: "not-in-place" } }
+    ].forEach(function (c) {
+      E.activateInstrument(c.id);
+      var fam = E.state.scoringFamily;
+      var oneId = E.state.activeAssessmentId;
+      E.setResponse(E.getActiveTarget().id, c.req, c.a);
+      E.setReportSection("terms-used-in-this-report", { terms: [{ term: c.id + "-one", definition: "d" }] });
+
+      var twoId = E.newAssessment(c.id, { dateOfVisit: "2029-01-01" }).id;
+      E.setResponse(E.getActiveTarget().id, c.req, c.b);
+      E.setReportSection("terms-used-in-this-report", { terms: [{ term: c.id + "-two", definition: "d" }] });
+
+      var o = E.state.assessments[oneId], t = E.state.assessments[twoId];
+      ok(sharedRefs(o, t).length === 0, fam + ": the two share no object",
+         sharedRefs(o, t).slice(0, 3).join(" | "));
+
+      E.activateAssessment(oneId);
+      var r1 = E.findResponse(E.getActiveTarget().id, c.req) || {};
+      ok(JSON.stringify(r1).indexOf(JSON.stringify(c.a.band !== undefined ? c.a.band : (c.a.state || c.a.ml))) !== -1,
+         fam + ": the first keeps its own answer", JSON.stringify(r1));
+      ok(A.Report.consultantTerms(E.state.engagement)[0].term === c.id + "-one",
+         fam + ": ...and its own glossary term");
+
+      E.activateAssessment(twoId);
+      var r2 = E.findResponse(E.getActiveTarget().id, c.req) || {};
+      ok(JSON.stringify(r2).indexOf(JSON.stringify(c.b.band !== undefined ? c.b.band : (c.b.state || c.b.ml))) !== -1,
+         fam + ": the second keeps its own answer", JSON.stringify(r2));
+      ok(A.Report.consultantTerms(E.state.engagement)[0].term === c.id + "-two",
+         fam + ": ...and its own glossary term");
+    });
+
+    // The CAF profile and the CRA setup are per-assessment too.
+    E.activateInstrument("ncsc-caf");
+    var cafOne = E.state.activeAssessmentId;
+    var cafTwo = E.newAssessment("ncsc-caf", { dateOfVisit: "2030-03-03" }).id;
+    E.state.assessments[cafOne].selectedProfileId = "caf-general";
+    E.state.assessments[cafTwo].selectedProfileId = "caf-ofgem";
+    ok(E.state.assessments[cafOne].selectedProfileId === "caf-general",
+       "caf: the regulator profile is per assessment, not shared");
+
+    flush();
+  } catch (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); flush(); }
+})();
+</script>
+</body></html>

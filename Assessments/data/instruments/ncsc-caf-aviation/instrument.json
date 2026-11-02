@@ -1,0 +1,1132 @@
+﻿{
+    "id":  "ncsc-caf-aviation",
+    "title":  "CAF for Aviation (CAP1850) Assessment",
+    "framework":  "NCSC CAF for Aviation",
+    "edition":  "adapted from NCSC core CAF v3.0 (CAP1850, 2020)",
+    "family":  "sector",
+    "contentVersion":  "1.0.0",
+    "scoringFamily":  "caf-achieved",
+    "scoringProfileRef":  "caf-achieved",
+    "targetDimension":  "site",
+    "targetDimensionLabel":  "Site",
+    "status":  "active-skeleton",
+    "framing":  "The CAF for Aviation is the CAA\u0027s outcome-focused assessment used at Stage 4 of the CAP1753 oversight process for Tier 1 and Tier 2 aviation organisations. Adapted from NCSC core CAF v3.0, it assesses 39 contributing outcomes across 14 principles and 4 objectives, using the standard CAF three-state model (Achieved / Partially Achieved / Not Achieved, plus Not relevant). The CAA issues each organisation an expected profile (Tier 1 or Tier 2); the assessment is the basis for an ASSURE Cyber Audit and Certificate of Compliance. This is a SEPARATE instrument from the core NCSC CAF 4.0 instrument: different lineage (v3.0), aviation-specific principle wording, and 39 (not 41) outcomes.",
+    "sourceNote":  "Objective / principle / outcome structure and aviation-specific principle descriptions extracted from CAP1850 (CAF for Aviation guidance) and NCSC core CAF v3.0. The per-outcome Indicators of Good Practice (IGPs) live in the CAF for Aviation workbook and are EMPTY slots here, to be populated from that official source. stateSummary and otLens are empty first-draft slots. Source: CAA CAP1850 (CAF for Aviation), Crown copyright; built on NCSC CAF v3.0.",
+    "states":  [
+                   {
+                       "value":  "achieved",
+                       "label":  "Achieved",
+                       "colour":  "met"
+                   },
+                   {
+                       "value":  "partially",
+                       "label":  "Partially Achieved",
+                       "colour":  "near"
+                   },
+                   {
+                       "value":  "not",
+                       "label":  "Not Achieved",
+                       "colour":  "gap"
+                   },
+                   {
+                       "value":  "unknown",
+                       "label":  "Unknown",
+                       "colour":  "na",
+                       "effect":  "not verified; lowers confidence"
+                   },
+                   {
+                       "value":  "na",
+                       "label":  "Not relevant",
+                       "colour":  "na",
+                       "effect":  "excluded; justification required"
+                   }
+               ],
+    "taxonomy":  {
+                     "objectives":  [
+                                        {
+                                            "id":  "A",
+                                            "name":  "Managing security risk"
+                                        },
+                                        {
+                                            "id":  "B",
+                                            "name":  "Protecting against cyber attack"
+                                        },
+                                        {
+                                            "id":  "C",
+                                            "name":  "Detecting cyber security events"
+                                        },
+                                        {
+                                            "id":  "D",
+                                            "name":  "Minimising the impact of cyber security incidents"
+                                        }
+                                    ],
+                     "principles":  [
+                                        {
+                                            "id":  "A1",
+                                            "name":  "Governance",
+                                            "description":  "The organisation has appropriate management policies and processes in place to govern its approach to the security of critical systems.",
+                                            "objectiveId":  "A"
+                                        },
+                                        {
+                                            "id":  "A2",
+                                            "name":  "Risk management",
+                                            "description":  "The organisation takes appropriate steps to identify, assess and understand security risks to the critical systems supporting the operation of essential functions, including an overall organisational approach to risk management.",
+                                            "objectiveId":  "A"
+                                        },
+                                        {
+                                            "id":  "A3",
+                                            "name":  "Asset management",
+                                            "description":  "Everything required to deliver, maintain or support critical systems is determined and understood, including data, people and systems, as well as supporting infrastructure such as power or cooling.",
+                                            "objectiveId":  "A"
+                                        },
+                                        {
+                                            "id":  "A4",
+                                            "name":  "Supply chain",
+                                            "description":  "The organisation understands and manages security risks to critical systems that arise from dependencies on external suppliers, including ensuring appropriate measures where third-party services are used.",
+                                            "objectiveId":  "A"
+                                        },
+                                        {
+                                            "id":  "B1",
+                                            "name":  "Function protection policies and processes",
+                                            "description":  "The organisation defines, implements, communicates and enforces appropriate policies and processes that direct its overall approach to securing critical systems and data that support operation of essential functions.",
+                                            "objectiveId":  "B"
+                                        },
+                                        {
+                                            "id":  "B2",
+                                            "name":  "Identity and access control",
+                                            "description":  "The organisation understands, documents and manages access to critical systems. Users (or automated functions) that can access critical data or systems are appropriately verified, authenticated and authorised.",
+                                            "objectiveId":  "B"
+                                        },
+                                        {
+                                            "id":  "B3",
+                                            "name":  "Data security",
+                                            "description":  "Data stored or transmitted electronically is protected from unauthorised access, modification or deletion that may cause an adverse impact on critical systems, including information that would assist an attacker such as design details of critical systems.",
+                                            "objectiveId":  "B"
+                                        },
+                                        {
+                                            "id":  "B4",
+                                            "name":  "System security",
+                                            "description":  "Critical systems and technology critical for the operation of essential functions are protected from cyber attack, using robust and reliable protective security measures informed by an organisational understanding of risk.",
+                                            "objectiveId":  "B"
+                                        },
+                                        {
+                                            "id":  "B5",
+                                            "name":  "Resilient networks and systems",
+                                            "description":  "The organisation builds resilience against cyber attack and system failure into the design, implementation, operation and management of critical systems.",
+                                            "objectiveId":  "B"
+                                        },
+                                        {
+                                            "id":  "B6",
+                                            "name":  "Staff awareness and training",
+                                            "description":  "Staff have appropriate awareness, knowledge and skills to carry out their organisational roles effectively in relation to the security of critical systems supporting the operation of essential functions.",
+                                            "objectiveId":  "B"
+                                        },
+                                        {
+                                            "id":  "C1",
+                                            "name":  "Security monitoring",
+                                            "description":  "The organisation monitors the security status of the networks and systems supporting the operation of critical systems in order to detect potential security problems and to track the ongoing effectiveness of protective security measures.",
+                                            "objectiveId":  "C"
+                                        },
+                                        {
+                                            "id":  "C2",
+                                            "name":  "Proactive security event discovery",
+                                            "description":  "The organisation detects, within critical systems, malicious activity affecting or with the potential to affect the operation of essential functions, even when the activity evades standard signature-based solutions or when such solutions are not deployable.",
+                                            "objectiveId":  "C"
+                                        },
+                                        {
+                                            "id":  "D1",
+                                            "name":  "Response and recovery planning",
+                                            "description":  "There are well-defined and tested incident management processes in place that aim to ensure continuity of essential functions in the event of system or service failure, with mitigation activities to contain or limit the impact of compromise.",
+                                            "objectiveId":  "D"
+                                        },
+                                        {
+                                            "id":  "D2",
+                                            "name":  "Lessons learned",
+                                            "description":  "When an incident occurs, steps are taken to understand its root causes and to ensure appropriate remediating action is taken to protect against future incidents.",
+                                            "objectiveId":  "D"
+                                        }
+                                    ]
+                 },
+    "outcomes":  [
+                     {
+                         "id":  "A1.a",
+                         "principleId":  "A1",
+                         "objectiveId":  "A",
+                         "title":  "Board direction",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The board sets and owns the direction for securing critical systems, with cyber risk visible at the top of the organisation rather than confined to IT.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Without board ownership, security of critical systems competes for attention and funding and loses; in aviation, where cyber risk can ultimately touch safety, that ownership needs to sit at the top of the organisation. The CAA looks for cyber risk to be genuinely governed, not delegated and forgotten."
+                     },
+                     {
+                         "id":  "A1.b",
+                         "principleId":  "A1",
+                         "objectiveId":  "A",
+                         "title":  "Roles and responsibilities",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Security roles and responsibilities for critical systems are clearly defined and assigned, including the Accountable Manager and Cyber Security Responsible Manager that CAP1753 requires.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Security falling into the gap between functions is a common weakness, and CAP1753 specifically requires named accountable roles. Clear responsibilities ensure someone owns the security of critical systems rather than everyone assuming someone else does."
+                     },
+                     {
+                         "id":  "A1.c",
+                         "principleId":  "A1",
+                         "objectiveId":  "A",
+                         "title":  "Decision-making",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Decisions affecting the security of critical systems are made by people who understand both the cyber risk and the operational and safety consequences.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Decisions about critical systems must weigh cyber risk against operational and safety consequence together. Where security and operational decisions are taken in isolation, the result is controls that don\u0027t fit the operation or risks no one accountable signed off."
+                     },
+                     {
+                         "id":  "A2.a",
+                         "principleId":  "A2",
+                         "objectiveId":  "A",
+                         "title":  "Risk management process",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "A defined, repeatable risk-management process identifies, assesses and treats risks to the critical systems supporting essential functions, with risk ownership and a maintained risk register.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "You cannot defend critical systems against risks you have not identified, and effort without a risk process goes wherever the loudest voice points. A defined process is what makes protection of essential functions proportionate and justified."
+                     },
+                     {
+                         "id":  "A2.b",
+                         "principleId":  "A2",
+                         "objectiveId":  "A",
+                         "title":  "Assurance",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The organisation gains independent assurance that its security risk picture is accurate, rather than relying on unchallenged self-belief.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "An organisation can believe its risk is well managed right up until an incident proves otherwise. Independent assurance catches the gap between the paper position and the operational reality before an attacker does."
+                     },
+                     {
+                         "id":  "A3.a",
+                         "principleId":  "A3",
+                         "objectiveId":  "A",
+                         "title":  "Asset management",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Everything needed to deliver and support critical systems, data, people, systems and supporting infrastructure such as power and cooling, is identified, recorded and kept current.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "You cannot protect, patch or monitor critical systems you do not know exist, and aviation environments accumulate legacy and supporting infrastructure over decades. A complete, current asset picture underpins almost every other outcome."
+                     },
+                     {
+                         "id":  "A4.a",
+                         "principleId":  "A4",
+                         "objectiveId":  "A",
+                         "title":  "Supply chain",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Security risks arising from external suppliers and third-party services to critical systems are understood and managed, with cyber requirements placed on critical suppliers.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Suppliers and third-party services hold standing access to, and supply components for, critical systems, turning a trusted relationship into a potential attack path. Managing supplier risk manages one of the most direct routes into essential functions."
+                     },
+                     {
+                         "id":  "B1.a",
+                         "principleId":  "B1",
+                         "objectiveId":  "B",
+                         "title":  "Policy and process development",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Policies and processes that direct how critical systems and their data are secured are developed and documented.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Policy is where the organisation decides in advance and consistently how it will secure critical systems. Without it, protection depends on individual memory and varies by person and shift, which cannot be assured to a regulator."
+                     },
+                     {
+                         "id":  "B1.b",
+                         "principleId":  "B1",
+                         "objectiveId":  "B",
+                         "title":  "Policy and process implementation",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Those policies and processes are actually implemented and followed in practice, not just written down.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "A policy that exists only on paper protects nothing. The CAA audits what is actually done, so implementation, the gap between written and practised, is where real exposure is usually found."
+                     },
+                     {
+                         "id":  "B2.a",
+                         "principleId":  "B2",
+                         "objectiveId":  "B",
+                         "title":  "Identity verification, authentication and authorisation",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Users and automated functions accessing critical systems or data are verified, authenticated and authorised appropriately, including for physical, remote and privileged access.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Verifying who and what accesses critical systems is the foundation of access control, and shared or unauthenticated access, common operationally, undermines it. Sound authentication and authorisation is the gate the rest of protection depends on."
+                     },
+                     {
+                         "id":  "B2.b",
+                         "principleId":  "B2",
+                         "objectiveId":  "B",
+                         "title":  "Device management",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Devices that connect to critical systems are known and managed, so unmanaged or transient equipment cannot quietly introduce risk.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Unmanaged and transient devices are a common way threats reach otherwise controlled critical systems. Knowing and managing connecting devices closes a frequent route in."
+                     },
+                     {
+                         "id":  "B2.c",
+                         "principleId":  "B2",
+                         "objectiveId":  "B",
+                         "title":  "Privileged user management",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Privileged access to critical systems is tightly controlled, granted only where needed and managed across its lifecycle.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Privileged accounts can change critical systems themselves, so their compromise is among the most serious outcomes. Tight control of elevated access limits both external attackers and the damage from a single mistake."
+                     },
+                     {
+                         "id":  "B2.d",
+                         "principleId":  "B2",
+                         "objectiveId":  "B",
+                         "title":  "Identity and access management",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Identity and access are managed across the joiner, mover and leaver lifecycle, so access stays aligned with who genuinely needs it.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Access granted and never reviewed accumulates into standing risk, with old accounts and excess rights lingering. Managing the full identity lifecycle keeps access aligned with genuine need."
+                     },
+                     {
+                         "id":  "B3.a",
+                         "principleId":  "B3",
+                         "objectiveId":  "B",
+                         "title":  "Understanding data",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The organisation understands what critical data it holds and transmits, including information that would assist an attacker, and protects it accordingly.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "You cannot protect data appropriately until you know what you hold and why it matters, including information that would help an attacker map critical systems. Understanding the data is the basis for protecting it proportionately."
+                     },
+                     {
+                         "id":  "B3.b",
+                         "principleId":  "B3",
+                         "objectiveId":  "B",
+                         "title":  "Data in transit",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Data in transit across networks supporting critical systems is protected against interception and, more importantly for control, against alteration.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Data crossing networks that support critical systems can be intercepted or, more seriously, altered, and altered data affecting an operational system has real-world consequences. Protecting data in transit guards both its confidentiality and its integrity."
+                     },
+                     {
+                         "id":  "B3.c",
+                         "principleId":  "B3",
+                         "objectiveId":  "B",
+                         "title":  "Stored data",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Stored critical data and the systems holding it are protected against unauthorised access, modification or deletion.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Stored critical data is a target for theft and for tampering that could mask or enable an attack. Protecting it at rest limits what an intruder gains from reaching a store and what they can quietly change."
+                     },
+                     {
+                         "id":  "B3.d",
+                         "principleId":  "B3",
+                         "objectiveId":  "B",
+                         "title":  "Mobile data",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Data on mobile and removable media is managed so it does not leak sensitive information or carry threats into critical systems.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Data on mobile and removable media leaves the controlled environment and is a well-known route for both data loss and malware ingress. Managing it closes a gap that otherwise sound protection leaves open."
+                     },
+                     {
+                         "id":  "B3.e",
+                         "principleId":  "B3",
+                         "objectiveId":  "B",
+                         "title":  "Media equipment sanitisation",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Media and equipment are sanitised before disposal or reuse, so retired kit does not hand over configuration, credentials or data.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Equipment retired without sanitisation still holds configuration, credentials and network detail useful to an attacker. Proper sanitisation ensures decommissioned kit does not leak a map of critical systems."
+                     },
+                     {
+                         "id":  "B4.a",
+                         "principleId":  "B4",
+                         "objectiveId":  "B",
+                         "title":  "Secure by design",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Critical systems are designed with security built in, including sound architecture and segregation, rather than added afterwards.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Security designed into critical systems from the start is far more effective than security retrofitted, and in aviation those systems persist for a long time. Early architecture and segregation choices shape resilience for years."
+                     },
+                     {
+                         "id":  "B4.b",
+                         "principleId":  "B4",
+                         "objectiveId":  "B",
+                         "title":  "Secure configuration",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Critical systems are securely configured and hardened, with unnecessary services and default settings removed.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Default configurations favour ease of setup over security and leave unnecessary services exposed. Secure configuration reduces the attack surface of critical systems to what the operation actually needs."
+                     },
+                     {
+                         "id":  "B4.c",
+                         "principleId":  "B4",
+                         "objectiveId":  "B",
+                         "title":  "Secure management",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The management and administration of critical systems is secured, especially remote and privileged management access.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "The management plane is how critical systems are configured and controlled, so its compromise hands an attacker the keys. Securing management access, especially remote, protects the most powerful routes in."
+                     },
+                     {
+                         "id":  "B4.d",
+                         "principleId":  "B4",
+                         "objectiveId":  "B",
+                         "title":  "Vulnerability management",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Vulnerabilities in critical systems are found, assessed and addressed through a managed process, with patching and mitigation appropriate to an operational environment.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Most breaches exploit known, unaddressed vulnerabilities. A managed process to find, assess and address them shrinks the window attackers rely on, with the assessment and mitigation steps carrying particular weight where operational systems constrain patching."
+                     },
+                     {
+                         "id":  "B5.a",
+                         "principleId":  "B5",
+                         "objectiveId":  "B",
+                         "title":  "Resilience preparation",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The organisation has prepared for disruption to critical systems, understanding what essential functions need to keep running and what to do when they cannot.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Resilience depends on having prepared before disruption, not improvising during it. Knowing what essential functions need to keep running is the difference between a contained event and a crisis."
+                     },
+                     {
+                         "id":  "B5.b",
+                         "principleId":  "B5",
+                         "objectiveId":  "B",
+                         "title":  "Design for resilience",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Critical systems are designed to remain resilient against cyber attack and failure, degrading safely rather than failing unpredictably.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "A critical system designed to fail safe and degrade gracefully limits how far an attack or failure spreads. In aviation this connects directly to keeping operations safe when systems are degraded."
+                     },
+                     {
+                         "id":  "B5.c",
+                         "principleId":  "B5",
+                         "objectiveId":  "B",
+                         "title":  "Backups",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Critical systems, including their configuration and software, are backed up in a way that is protected, verified and demonstrably restorable.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Backups are the last line against destructive attacks, ransomware and serious error, and for critical systems they must include configuration and software, not just data. Verified, restorable backups are what make recovery possible rather than hoped-for."
+                     },
+                     {
+                         "id":  "B6.a",
+                         "principleId":  "B6",
+                         "objectiveId":  "B",
+                         "title":  "Cyber security culture",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "A positive security culture means staff value and support the security of critical systems in how they actually work.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Culture determines what people do when no procedure quite fits. A workforce that values the security of critical systems catches what controls miss; one that treats it as someone else\u0027s problem undermines even good defences."
+                     },
+                     {
+                         "id":  "B6.b",
+                         "principleId":  "B6",
+                         "objectiveId":  "B",
+                         "title":  "Cyber security training",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Staff have the awareness, knowledge and skills their roles require in relation to the security of critical systems.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "People act safely when they know how, and roles touching critical systems need relevant, current skills. Training converts good intentions into the right action in routine and critical moments alike."
+                     },
+                     {
+                         "id":  "C1.a",
+                         "principleId":  "C1",
+                         "objectiveId":  "C",
+                         "title":  "Monitoring coverage",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Security monitoring covers the networks and systems supporting critical systems sufficiently to detect potential security problems.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "You cannot detect what you cannot see, and gaps in monitoring coverage are blind spots an attacker can move through. Adequate coverage of critical systems is the precondition for noticing an attack at all."
+                     },
+                     {
+                         "id":  "C1.b",
+                         "principleId":  "C1",
+                         "objectiveId":  "C",
+                         "title":  "Securing logs",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Logs are complete, trustworthy, correctly correlated and protected against alteration, with access attributable to unique users.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Logs are only useful if complete and trustworthy, and altering them is an attacker\u0027s early move. Securing and correctly correlating logs preserves both the evidence and the trust placed in it."
+                     },
+                     {
+                         "id":  "C1.c",
+                         "principleId":  "C1",
+                         "objectiveId":  "C",
+                         "title":  "Generating alerts",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Monitoring generates meaningful, timely alerts that prompt a human to act, rather than data no one reviews.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Collecting monitoring data achieves nothing if nothing prompts a human to look. Timely, meaningful alerts turn visibility into the chance to respond before an intrusion becomes an incident."
+                     },
+                     {
+                         "id":  "C1.d",
+                         "principleId":  "C1",
+                         "objectiveId":  "C",
+                         "title":  "Identifying security incidents",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Genuine security incidents are reliably distinguished from background events so that response can begin.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Distinguishing real incidents from constant background events is what makes monitoring actionable. Without reliable identification, genuine attacks are lost in noise and the response clock never starts."
+                     },
+                     {
+                         "id":  "C1.e",
+                         "principleId":  "C1",
+                         "objectiveId":  "C",
+                         "title":  "Monitoring tools and skills",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The organisation has the monitoring tools and the skilled people, spanning security and operational understanding, to make detection effective.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Monitoring is only as good as the tools deployed and the people reading them, who in aviation must understand both security and the operational systems. Adequate tooling and skilled analysts are what make detection effective rather than nominal."
+                     },
+                     {
+                         "id":  "C2.a",
+                         "principleId":  "C2",
+                         "objectiveId":  "C",
+                         "title":  "System abnormalities for attack detection",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The organisation can recognise abnormalities in critical systems that indicate attack, including activity that evades signature-based detection.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Capable attackers deliberately evade signature-based detection, so recognising abnormal behaviour in critical systems is what catches them. It is the detection of last resort against the threats that matter most."
+                     },
+                     {
+                         "id":  "C2.b",
+                         "principleId":  "C2",
+                         "objectiveId":  "C",
+                         "title":  "Proactive attack discovery",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The organisation proactively looks for malicious activity in critical systems rather than waiting for automated detection to fire.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Proactive discovery assumes prevention sometimes fails and looks for the intruder who has slipped past automated defences. It is what finds the quiet, capable attacker specifically trying not to trip an alert."
+                     },
+                     {
+                         "id":  "D1.a",
+                         "principleId":  "D1",
+                         "objectiveId":  "D",
+                         "title":  "Response plan",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "A well-defined incident response plan covers the lifecycle of an incident affecting critical systems, including roles, responsibilities and the operational decisions an aviation incident demands.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "An incident response plan made in advance allows fast, coordinated action under pressure, and for aviation it must include operational and safety decisions a generic IT plan never covers. The plan is what prevents improvisation when there is least time for it."
+                     },
+                     {
+                         "id":  "D1.b",
+                         "principleId":  "D1",
+                         "objectiveId":  "D",
+                         "title":  "Response and recovery capability",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "The organisation can actually execute response and recovery, with the people, tools and rehearsed procedures to restore essential functions.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "A plan only helps if the organisation can actually execute it. Real response and recovery capability, people, tools and rehearsed procedures, is what restores essential functions and limits how long they stay degraded."
+                     },
+                     {
+                         "id":  "D1.c",
+                         "principleId":  "D1",
+                         "objectiveId":  "D",
+                         "title":  "Testing and exercising",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Incident plans are tested and exercised under realistic conditions so gaps are found before a live incident, not during one.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "A plan never tested fails on first use. Exercising response under realistic conditions surfaces gaps and wrong assumptions while they are still cheap to fix, rather than during a live incident affecting operations."
+                     },
+                     {
+                         "id":  "D2.a",
+                         "principleId":  "D2",
+                         "objectiveId":  "D",
+                         "title":  "Incident root cause analysis",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "After an incident, root causes are understood through routine analysis covering policy as well as technical issues.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "Understanding why an incident happened is what stops it recurring. Root cause analysis covering policy as well as technical failure turns a single event into a systemic fix rather than a treated symptom."
+                     },
+                     {
+                         "id":  "D2.b",
+                         "principleId":  "D2",
+                         "objectiveId":  "D",
+                         "title":  "Using incidents to drive improvements",
+                         "igps":  {
+                                      "achieved":  [
+
+                                                   ],
+                                      "partially":  [
+
+                                                    ],
+                                      "notAchieved":  [
+
+                                                      ]
+                                  },
+                         "verify":  "",
+                         "stateSummary":  "Lessons from incidents are fed back into controls and the response capability, driving continual improvement.",
+                         "otLens":  {
+                                        "framing":  "",
+                                        "gotchas":  ""
+                                    },
+                         "allowNA":  true,
+                         "rationale":  "An organisation that learns from incidents matures its defences; one that doesn\u0027t repeats the same failures. Feeding lessons back into controls and response is what turns painful experience into lasting improvement."
+                     }
+                 ],
+    "profileRegistry":  "profiles/_registry.json",
+    "defaultProfile":  "caf-aviation-tier1",
+    "_contentNote":  "39 outcomes across 14 principles, 4 objectives, aviation-specific. stateSummary (what Achieved looks like) and rationale (why it matters) populated in house style. IGPs remain EMPTY pending the CAF for Aviation workbook - those are the authoritative assessment criteria and must come from that official source. otLens optional/empty.",
+    "_assessmentMechanics":  "Per CAP1850: Not Achieved if any one Not-Achieved IGP applies; Partially/Achieved only if all IGPs in that column apply and no Not-Achieved applies. Not relevant requires justification. Assessment is per critical system (the workbook provides up to 25 system tabs); organisational outcomes (e.g. A1) assessed once and referenced.",
+    "targetDimensionLabelPlural":  "Sites"
+}

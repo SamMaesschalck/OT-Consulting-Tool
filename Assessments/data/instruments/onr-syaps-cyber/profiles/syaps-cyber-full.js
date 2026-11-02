@@ -1,0 +1,241 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/onr-syaps-cyber/profiles/syaps-cyber-full.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["onr-syaps-cyber"] = window.App.Data.instruments["onr-syaps-cyber"] || {};
+window.App.Data.instruments["onr-syaps-cyber"].profiles = window.App.Data.instruments["onr-syaps-cyber"].profiles || {};
+window.App.Data.instruments["onr-syaps-cyber"].profiles["syaps-cyber-full"] = {
+    "id":  "syaps-cyber-full",
+    "name":  "Full dutyholder (all expectations demonstrated)",
+    "appliesToInstrument":  "onr-syaps-cyber",
+    "profileVersion":  "1.0.0",
+    "verifiedSource":  "ONR SyAPs 2022 + CNS-TAST-GD TAGs",
+    "_note":  "Full dutyholder profile: every published SyDP expectation in scope is expected to be demonstrated (achieved).",
+    "overlay":  {
+                    "7.1.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.1.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.1.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.1.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.1.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.1.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.1.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.1.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.1.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.2.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.2.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.2.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.2.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.2.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.2.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.3.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.3.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.3.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.4.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.4.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "",
+                                  "overlaySource":  null
+                              },
+                    "7.5.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "",
+                                   "overlaySource":  null
+                               },
+                    "7.5.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "",
+                                   "overlaySource":  null
+                               },
+                    "7.5.12":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "",
+                                   "overlaySource":  null
+                               }
+                }
+};

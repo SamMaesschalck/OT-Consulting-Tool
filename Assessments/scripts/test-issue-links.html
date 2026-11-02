@@ -1,0 +1,215 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Issue check: the panel and where its links go</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  The issue check on the report page. Each line has to take the consultant to
+  the field that settles it, and the panel has to follow their edits:
+    - consultant input (exposure, priorities, method): the box, focused
+    - proposed next steps: the section opened for editing
+    - a roadmap entry's plan: the plan dialogue, on the right zone
+    - the basis register: the engagement page card
+    - document control: the engagement details, cursor in the blank field
+    - a 62443 Security Level not assessed: that FR's page
+    - an item not answered: the item on its capture page, flashed
+    - a risk appetite verdict with no reasoning: the reasoning box
+  and once everything is written the panel reads Ready to issue. The panel
+  lives outside the report itself, so it never reaches the Word document.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+function poll(test, cb, n) {
+  n = n == null ? 400 : n;
+  if (test() || n <= 0) { cb(); return; }
+  setTimeout(function () { poll(test, cb, n - 1); }, 50);
+}
+function wait(test) { return new Promise(function (res) { poll(test, res); }); }
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, I;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  I = A.UI.__issue;
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+
+  function card() { return document.querySelector(".issue-check"); }
+  function pill() { var p = card() && card().querySelector(".issue-pill"); return p ? p.textContent : ""; }
+  function lines(kind) {
+    var c = card(); if (!c) return [];
+    var more = c.querySelectorAll(".issue-more");
+    Array.prototype.forEach.call(more, function (b) { if (/Show \d+ more/.test(b.textContent)) b.click(); });
+    return Array.prototype.slice.call(card().querySelectorAll(".issue-line" + (kind ? "." + kind : "")));
+  }
+  function line(re) { return lines().filter(function (l) { return re.test(l.querySelector(".issue-text").textContent); })[0]; }
+  function click(l) { l.querySelector(".issue-go").click(); }
+  // Re-render the report page and wait for a check newer than the last one.
+  function fresh(fn) {
+    var before = I.last();
+    if (fn) fn();
+    if (A.UI.__currentView() !== "report") A.UI.go("report");
+    return wait(function () { return I.last() && I.last() !== before && card() && !/Checking/.test(pill()); });
+  }
+  function closeModals() { Array.prototype.forEach.call(document.querySelectorAll(".modal-backdrop"), function (m) {
+    var c = Array.prototype.filter.call(m.querySelectorAll("button"), function (b) { return b.textContent === "Cancel" || b.textContent === "Close"; })[0];
+    if (c) c.click();
+  }); }
+
+  var chain = Promise.resolve();
+
+  // ---- 62443-3-3, the multi-zone demo ----
+  var zone2, frGone, item;
+  chain = chain.then(function () {
+    E.activateInstrument("iec-62443-3-3");
+    E.setReportNarrative({ regulatoryExposure: "", topPriorities: "", method: "", nextSteps: "" });
+    E.updateMetadata({ qaReviewBy: "", issuedTo: "" });
+    var b = E.getBasisOfAssessment(); b.interviews.length = 0; b.documents.length = 0; b.observations.length = 0;
+    // One zone's own plan for one gap taken away.
+    var targets = E.state.engagement.targets;
+    zone2 = targets[1].id;
+    var rm = (E.scoreAllTargets().perTarget.filter(function (p) { return p.target.id === zone2; })[0].result.roadmap || [])
+      .filter(function (it) { return !it.toAssess && it.planSource !== "shared"; })[0];
+    item = rm.requirementId;
+    E.setResponse(zone2, item, { impact: "", action: "" });
+    // And one Foundational Requirement in the first zone left unanswered.
+    var zone1 = targets[0].id, fr = E.state.taxonomy.frs[E.state.taxonomy.frs.length - 1].id;
+    var reqIds = (E.state.instrument.requirements || []).filter(function (r) { return r.frId === fr; }).map(function (r) { return r.id; });
+    E.state.engagement.responses.slice().forEach(function (r) {
+      if ((r.targetId === zone1 || r.targetId === E.SHARED_TARGET_ID) && reqIds.indexOf(r.requirementId) !== -1) {
+        E.state.engagement.responses.splice(E.state.engagement.responses.indexOf(r), 1);
+      }
+    });
+    frGone = fr;
+    return fresh();
+  }).then(function () {
+    ok(!!card() && !card().hasAttribute("data-section"), "the panel sits on the report page, outside the report itself (no section key, so never in Word)");
+    ok(card() === document.querySelector("#main .card"), "and leads the page");
+    ok(/^\d+ still to write$/.test(pill()), "the pill counts what is still to write", pill());
+    ok(!!line(/^Exposure note: still to be written/) && !!line(/^Top priorities: still to be written/) &&
+       !!line(/^Method \(how the assessment was run\): still to be written/),"consultant input lines, by the card's own labels");
+    ok(!!line(/^Proposed next steps: still to be written/), "the next steps line");
+    var zname = E.state.engagement.targets[1].name;
+    var il = line(new RegExp("\\(" + zname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\): Business impact and recommended action still to be written"));
+    ok(!!il, "a roadmap entry's plan, naming its zone", zname);
+    ok(!!line(/^Basis of assessment: no interviews/), "the basis register");
+    ok(lines("block").every(function (l) { return !!l.querySelector(".issue-go"); }), "every blocker has a way to it");
+    ok(!!line(/^Document control: .*QA review by.*issued to not filled in/),"warnings: the blank document control fields", (lines("warn")[0] || {}).textContent);
+    ok(!!line(new RegExp(frGone + " is not assessed yet")), "warnings: an FR not assessed in a zone");
+
+    // consultant input
+    click(line(/^Exposure note/));
+    var anchor = document.querySelector('[data-check-anchor="narrative-regulatoryExposure"]');
+    ok(anchor && anchor.classList.contains("check-flash") && document.activeElement === anchor.querySelector("textarea"),
+       "Write it: lands in the exposure box, flashed and focused");
+    click(line(/^Method/));
+    anchor = document.querySelector('[data-check-anchor="narrative-method"]');
+    ok(anchor && document.activeElement === anchor.querySelector("textarea"), "and the method box");
+    var std = Array.prototype.filter.call(anchor.querySelectorAll("button"), function (b) { return /standard description/.test(b.textContent); })[0];
+    ok(!!std, "which offers the standard description");
+    std.click();
+    ok(/^Each requirement was assessed/.test(E.getReportNarrative().method || "") && !/\[/.test(E.getReportNarrative().method),
+       "taking it answers the prompt without the prompt", E.getReportNarrative().method);
+
+    // next steps
+    click(line(/^Proposed next steps/));
+    var ns = document.querySelector("[data-next-steps]");
+    ok(ns && ns.classList.contains("editing") && !!ns.querySelector("textarea.sect-prose-input"), "Edit: opens the next steps for editing");
+    ok(ns.classList.contains("check-flash"), "and points at them");
+
+    // a roadmap plan on the second zone
+    E.setActiveTarget(E.state.engagement.targets[0].id);
+    A.UI.go("report");
+    return fresh();
+  }).then(function () {
+    var zname = E.state.engagement.targets[1].name;
+    click(lines().filter(function (l) { return l.textContent.indexOf("(" + zname + ")") !== -1; })[0]);
+    var modal = document.querySelector(".modal-backdrop");
+    ok(!!modal && /Remediation plan/.test(modal.textContent), "Open: the plan dialogue for that entry");
+    ok(E.state.activeTargetId === zone2, "on the zone it belongs to");
+    var tas = modal.querySelectorAll("textarea");
+    tas[1].value = "Introduce named accounts on the engineering workstations.";
+    tas[2].value = "Shared accounts hide who changed the safety logic.";
+    Array.prototype.filter.call(modal.querySelectorAll("button"), function (b) { return b.textContent === "Save"; })[0].click();
+    return fresh();
+  }).then(function () {
+    var zname = E.state.engagement.targets[1].name;
+    ok(!lines().some(function (l) { return l.textContent.indexOf("(" + zname + ")") !== -1; }), "saved in the dialogue, the line goes");
+    ok(!line(/^Method/), "as does the method, answered above");
+
+    // basis
+    click(line(/^Basis of assessment/));
+    var basis = document.querySelector('[data-check-anchor="basis"]');
+    ok(A.UI.__currentView() === "engagement" && basis && basis.classList.contains("check-flash"), "Go to: the basis register on the engagement page");
+    return fresh();
+  }).then(function () {
+    // document control
+    var dcText = line(/^Document control/).querySelector(".issue-text").textContent;
+    // The first blank field the line names (the demo leaves others blank too).
+    var first = /^Document control: (.+?)(,| and | not )/.exec(dcText)[1].toLowerCase();
+    click(line(/^Document control/));
+    var modal = document.querySelector(".modal-backdrop");
+    var focused = document.activeElement;
+    ok(!!modal && /Engagement details/.test(modal.textContent), "Fill in: the engagement details");
+    ok(focused && focused.tagName === "INPUT" && focused.parentNode.textContent.toLowerCase().indexOf(first) === 0 &&
+       focused.parentNode.classList.contains("check-flash"), "with the cursor in the first blank field", focused && focused.parentNode.textContent);
+    closeModals();
+    return fresh();
+  }).then(function () {
+    // an FR not assessed
+    click(line(new RegExp(frGone + " is not assessed yet")));
+    ok(A.UI.__currentView() === "fr" && E.state.activeTargetId === E.state.engagement.targets[0].id, "Go to: that FR's page, on its zone");
+    // write the rest and the blockers clear
+    E.setReportNarrative({ regulatoryExposure: "Written.", topPriorities: "Written.", nextSteps: "Agree the plan" });
+    E.getBasisOfAssessment().interviews.push({ name: "A. Engineer", role: "Lead", date: "2026-10-01" });
+    return fresh();
+  }).then(function () {
+    ok(pill() === "Ready to issue", "everything written: Ready to issue", pill() + " / " + lines("block").map(function (l) { return l.textContent; }).join(" | "));
+    ok(/Nothing in the Word report is left to write/.test(card().textContent), "said in one line");
+    ok(lines("warn").length > 0 && !lines("block").length, "the warnings stay, as warnings only");
+  });
+
+  // ---- the posture screener: an unanswered question ----
+  chain = chain.then(function () {
+    E.activateInstrument("general-ot-posture");
+    var q = (E.state.instrument.questions || [])[0];
+    E.state.engagement.responses.slice().forEach(function (r) {
+      if (r.requirementId === q.id) E.state.engagement.responses.splice(E.state.engagement.responses.indexOf(r), 1);
+    });
+    return fresh().then(function () { return q; });
+  }).then(function (q) {
+    var l = line(/\d+ of \d+ items not answered yet/);
+    ok(!!l, "an unanswered question is a warning", lines("warn").map(function (x) { return x.textContent; }).join(" | "));
+    ok(pill() === "Ready to issue", "but does not hold up a final");
+    click(l);
+    return wait(function () { var el = document.querySelector('[data-req-id="' + q.id + '"]'); return el && el.classList.contains("jump-flash"); })
+      .then(function () {
+        var el = document.querySelector('[data-req-id="' + q.id + '"]');
+        var flashed = document.querySelector(".jump-flash");
+        ok(A.UI.__currentView() === "interview" && el && el.classList.contains("jump-flash"), "Go to first: the question on its page, flashed",
+           A.UI.__currentView() + " / " + q.id + " / flashed " + (flashed && flashed.getAttribute("data-req-id")));
+      });
+  });
+
+  // ---- risk appetite: a verdict set by hand with no reasoning ----
+  chain = chain.then(function () {
+    E.activateInstrument("risk-appetite");
+    var v = E.scoreActiveTarget().verdict || {}, computed = (v.computed || v).key;
+    var other = Object.keys(A.ScoringRiskAppetite.VERDICTS).filter(function (k) { return k !== computed; })[0];
+    E.updateRiskAppetiteSetup({ verdictOverride: other, verdictRationale: "" });
+    return fresh();
+  }).then(function () {
+    var l = line(/^Your verdict: the reasoning behind the verdict you set is not recorded/);
+    ok(!!l, "a verdict with no reasoning is a blocker", lines("block").map(function (x) { return x.textContent; }).join(" | "));
+    click(l);
+    var a = document.querySelector('[data-check-anchor="ra-rationale"]');
+    ok(A.UI.__currentView() === "ra-verdict" && a && document.activeElement === a.querySelector("textarea"), "Go to: the reasoning box on the verdict page");
+    E.updateRiskAppetiteSetup({ verdictOverride: "" });
+  });
+
+  chain.then(done, function (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+});
+</script>
+</body></html>

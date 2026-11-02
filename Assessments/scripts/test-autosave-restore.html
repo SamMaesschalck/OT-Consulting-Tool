@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Autosave restore conditions</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Reported: "Unsaved work found from ... (engagement setup in progress)" appears
+  regularly, and the only visible control is Restore.
+
+  Two causes, both covered here.
+
+  1. The backstop outlived the work. beforeunload wrote it on every tab close
+     whether or not anything was unsaved, and nothing removed it when the
+     project WAS saved to a file - so the next launch offered saved work back as
+     "unsaved". A warning that fires when nothing is wrong is worse than no
+     warning: it teaches the consultant to dismiss the one that matters.
+
+  2. Discard existed but was invisible: .btn.ghost is white-on-transparent, made
+     for the dark header, and the bar is white. There was also no way to close
+     the bar without deleting the work.
+
+  NOTE: this page enables autosave, so it touches the SAME localStorage key as
+  the real app (one file:// origin for everything). It saves whatever is there
+  first and puts it back at the end. The headless runner uses a throwaway
+  browser profile, so nothing of the consultant's is in reach there anyway.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  var A = window.App, E = A.Engine, STG = A.Storage;
+  // Each session's backup has a key of its own: this prefix plus the session
+  // id (see test-autosave-offer-limits.html for why). EARLIER stands in for
+  // a session that ended with unsaved work.
+  var PREFIX = "otcat:autosave:live:v2:";
+  var EARLIER = PREFIX + "s-earlier-session";
+  // Where offered work waits once the bar has shown it (see
+  // test-autosave-offer-kept.html for why it moved off the live key).
+  var OFFERED = "otcat:autosave:offered:v2";
+  function autosaveKeys() {
+    var out = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf("otcat:autosave") === 0) out.push(k);
+      }
+    } catch (e) {}
+    return out;
+  }
+  var saved = {};
+  autosaveKeys().forEach(function (k) {
+    try { saved[k] = localStorage.getItem(k); localStorage.removeItem(k); } catch (e) {}
+  });
+
+  var confirmAnswer = true;
+  window.confirm = function () { return confirmAnswer; };
+  window.alert = function () {};
+
+  // This window's own backup.
+  function get() { try { return localStorage.getItem(A.UI.__autosave.liveKey()); } catch (e) { return null; } }
+  // Unsaved work a session that has ended left behind.
+  function set(v) { try { localStorage.setItem(EARLIER, v); } catch (e) {} }
+  // Is the unsaved work still in the browser, on any key?
+  function held() {
+    var off = null;
+    try { off = JSON.parse(localStorage.getItem(OFFERED) || "[]"); } catch (e) {}
+    var live = autosaveKeys().some(function (k) { return k.indexOf(PREFIX) === 0; });
+    return live || (Array.isArray(off) && off.length > 0);
+  }
+  function bar() { return document.getElementById("autosave-bar"); }
+  function btnIn(root, re) {
+    return [].slice.call((root || document).querySelectorAll("button")).filter(function (b) {
+      return re.test(b.textContent);
+    })[0];
+  }
+
+  try {
+    // ---- 1. what counts as work worth rescuing ---------------------------
+    E.loadCatalog();
+    A.UI.init({ autosave: true });
+    var AS = A.UI.__autosave;
+    ok(!!AS, "the autosave rules are exposed for testing");
+
+    function emptyFile() {
+      return { schemaVersion: "2.0", project: STG.defaultProject(), assessments: {}, activeAssessmentId: null };
+    }
+    var pristine = emptyFile();
+    ok(AS.hasContent(pristine) === false,
+       "a project nobody has touched holds nothing to restore");
+
+    var withClient = emptyFile();
+    withClient.project.clientName = "Acme Foods";
+    ok(AS.hasContent(withClient) === true,
+       "a client name is work: it survives a crash");
+
+    // Engagement setup lives on the ASSESSMENT since the metadata split. This
+    // was checked only on the project, so an afternoon of prep with nothing
+    // scored was backed up only if a client name happened to be typed too.
+    var withSetup = emptyFile();
+    withSetup.assessments = { "a1": { id: "a1", instrumentId: "ncsc-caf", responses: [],
+      engagementMeta: { siteName: "Manchester", consultant: "", dateOfVisit: "" } } };
+    ok(AS.hasContent(withSetup) === true,
+       "a site name on the assessment is work, not just one on the project");
+
+    var withVisit = emptyFile();
+    withVisit.assessments = { "a1": { id: "a1", instrumentId: "ncsc-caf", responses: [],
+      engagementMeta: { consultant: "A. Consultant", dateOfVisit: "2026-08-24" } } };
+    ok(AS.hasContent(withVisit) === true, "so are the consultant and the visit date");
+
+    // The default confidentiality is not a decision anyone made.
+    var defaultsOnly = emptyFile();
+    defaultsOnly.assessments = { "a1": { id: "a1", instrumentId: "ncsc-caf", responses: [],
+      engagementMeta: { confidentiality: "Confidential", consultant: "", siteName: "" } } };
+    ok(AS.hasContent(defaultsOnly) === false,
+       "an assessment holding nothing but default metadata is not work",
+       "would offer to restore an empty engagement");
+
+    var chosen = emptyFile();
+    chosen.assessments = { "a1": { id: "a1", instrumentId: "ncsc-caf", responses: [],
+      engagementMeta: { confidentiality: "Public" } } };
+    ok(AS.hasContent(chosen) === true, "but a confidentiality actually chosen is");
+
+    var answered = emptyFile();
+    answered.assessments = { "a1": { id: "a1", instrumentId: "ncsc-caf",
+      responses: [{ targetId: "t1", requirementId: "A1.a", state: "achieved" }] } };
+    ok(AS.hasContent(answered) === true, "answers are obviously work");
+
+    // ---- 2. the backstop exists only while work is unsaved ---------------
+    AS.clear();
+    E.newProject();
+    E.activateInstrument("ncsc-caf");
+    E.updateMetadata({ clientName: "Acme Foods" });
+    ok(AS.isDirty() === true, "typing a client name makes the session dirty");
+    AS.write();
+    ok(get() !== null, "and NOW the work is backed up");
+    ok(/Acme Foods/.test(get() || ""), "with the typed name in it");
+
+    // ---- 3. saving to a file retires the backstop ------------------------
+    var origSave = STG.saveProjectToFile;
+    STG.saveProjectToFile = function (pf, opts, cb) { cb({ ok: true, method: "file", name: "acme.json" }); };
+    document.getElementById("btn-save").click();
+    ok(AS.isDirty() === false, "after a successful save the session is clean");
+    ok(get() === null,
+       "and the localStorage copy is gone - the work is in a file, so there is nothing to rescue",
+       "this leftover is what the restore bar kept offering at every launch");
+
+    // The reported sequence, exactly: save the work, then close the tab.
+    // beforeunload flushes the autosave, and it used to write unconditionally -
+    // recreating the copy that was just retired, so the next launch announced
+    // unsaved work that had been saved a moment earlier.
+    AS.write();
+    ok(get() === null,
+       "closing the tab after a save writes nothing back - there is nothing unsaved",
+       "the flush on close re-armed the backstop, which is the reported bug");
+    STG.saveProjectToFile = origSave;
+
+    // Editing again re-arms it: the backstop must come back the moment there is
+    // something new to lose.
+    E.updateMetadata({ clientName: "Acme Foods Ltd" });
+    AS.write();
+    ok(get() !== null, "editing after a save arms the backstop again");
+
+    // ---- 4. (moved) what a Load does to the backup ------------------------
+    // The UI's Load no longer DELETES the replaced session's backup: it sets it
+    // aside to be offered until restored or discarded (code review: a Load that
+    // never asked used to destroy unsaved work without trace).
+    // test-autosave-offer-kept.html drives that path through the real Load,
+    // and asserts the loaded project starts with no backup of its own. The
+    // assertion that stood here ran straight after clearing the store, so it
+    // could not fail; the store is still cleared, to give the sections below
+    // an empty start.
+    var loaded = emptyFile();
+    loaded.project.clientName = "Beta Chemicals";
+    E.loadProjectFile(loaded);
+    AS.clear();
+
+    // ---- 5. the bar offers three different things ------------------------
+    // Restore, Discard and dismiss are genuinely different outcomes. Dismiss is
+    // the one that was missing: a consultant who just wants the bar gone had to
+    // delete the work to get rid of it.
+    var stored = emptyFile();
+    stored.project.clientName = "Gamma Water";
+    stored.updatedAt = "2026-08-24T09:57:56.000Z";
+    set(JSON.stringify(stored));
+    E.newProject();
+    A.UI.init({ autosave: true });
+    var b = bar();
+    ok(!!b, "the restore bar appears when there is genuinely unsaved work");
+    ok(/Unsaved work found/.test(b ? b.textContent : ""), "and says so");
+
+    var restoreBtn = btnIn(b, /Restore/);
+    var discardBtn = btnIn(b, /Discard/);
+    var dismissBtn = b && b.querySelector(".autosave-dismiss");
+    ok(!!restoreBtn, "Restore is offered");
+    ok(!!discardBtn, "Discard is offered");
+    ok(!!dismissBtn, "and so is a dismiss control - the one the report asked for");
+
+    // The invisibility itself: .btn.ghost is white text on transparent, made for
+    // the dark header. On the white bar it was there and unreadable.
+    ok(discardBtn && !discardBtn.classList.contains("ghost"),
+       "Discard is not styled .ghost, which rendered it white-on-white",
+       discardBtn ? discardBtn.className : "");
+    ok(dismissBtn && (dismissBtn.getAttribute("title") || "").length > 0,
+       "the dismiss control explains itself on hover");
+
+    // Dismiss keeps the work. That is the whole difference from Discard.
+    dismissBtn.click();
+    ok(!bar(), "dismissing closes the bar");
+    ok(held(), "and KEEPS the unsaved work, to offer again next time");
+
+    // ---- 6. Discard confirms, because it destroys the only copy ----------
+    E.newProject();
+    A.UI.init({ autosave: true });
+    confirmAnswer = false;
+    btnIn(bar(), /Discard/).click();
+    ok(!!bar(), "declining the Discard confirmation leaves the bar up");
+    ok(held(), "and the work is still there");
+
+    confirmAnswer = true;
+    btnIn(bar(), /Discard/).click();
+    ok(!bar(), "confirming Discard closes the bar");
+    ok(!held(), "and removes the work, which is what was asked for");
+
+    // ---- 7. restoring hands the work back, and marks it unsaved ----------
+    var again = emptyFile();
+    again.project.clientName = "Delta Rail";
+    again.updatedAt = "2026-08-24T09:57:56.000Z";
+    set(JSON.stringify(again));
+    E.newProject();
+    A.UI.init({ autosave: true });
+    btnIn(bar(), /Restore/).click();
+    ok((E.getProjectFile().project || {}).clientName === "Delta Rail",
+       "Restore puts the work back",
+       (E.getProjectFile().project || {}).clientName);
+    ok(A.UI.__autosave.isDirty() === true,
+       "and leaves it marked unsaved, because it is still only in the browser");
+
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+
+  // Put back whatever was in the store before this page ran.
+  try {
+    autosaveKeys().forEach(function (k) { localStorage.removeItem(k); });
+    Object.keys(saved).forEach(function (k) { localStorage.setItem(k, saved[k]); });
+  } catch (e) {}
+
+});
+</script>
+</body></html>

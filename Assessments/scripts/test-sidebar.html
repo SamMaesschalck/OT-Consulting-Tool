@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Sidebar instrument bar check</title>
+<!-- The real stylesheet: this page asserts on layout (where the Capture
+     section lands in the sidebar), which is meaningless unstyled. -->
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<!-- Below the app shell, not above it. This page measures where the Capture
+     section lands in the sidebar, so anything rendered before the shell pushes
+     the thing being measured down and fails the assertion for the wrong
+     reason. -->
+<pre id="out">running…</pre>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App;
+  try {
+    // Deterministic starting point: no stored picker preference, so the
+    // shipped default (collapsed) applies.
+    try { localStorage.removeItem("ot-instrument-picker"); } catch (e0) {}
+
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // ---- nothing selected: the picker page is the UI, the sidebar is empty ----
+    var sb = document.getElementById("sidebar");
+    ok(sb.querySelectorAll(".nav-item").length === 0, "no instrument: sidebar carries no nav rows");
+    ok(document.getElementById("main").textContent.indexOf("Start an assessment") !== -1, "no instrument: the picker page is shown");
+    ok(document.querySelectorAll("#main .home-card").length >= 15, "picker lists the catalogue as cards",
+       String(document.querySelectorAll("#main .home-card").length));
+
+    A.Engine.activateInstrument("cis-controls-v8");
+    sb = document.getElementById("sidebar");
+    function famTitles() { return Array.prototype.map.call(sb.querySelectorAll(".nav-family-title"), function (n) { return n.textContent.replace(/[▾▸]/g, "").trim(); }); }
+
+    // ---- selecting collapses the picker to the choice (the working default) ----
+    var toggle = sb.querySelector(".nav-section-toggle");
+    ok(!!toggle && /Assessment/.test(toggle.textContent), "Assessment section header is a collapse toggle");
+    ok(!!sb.querySelector(".nav-section-toggle.collapsed"), "selecting an instrument collapses the picker");
+    ok(sb.querySelectorAll(".nav-family-title").length === 0, "collapsed: no family headings");
+    var navText = sb.textContent;
+    ok(navText.indexOf("CIS Critical Security Controls v8.1.2 Assessment") !== -1, "collapsed: the selected instrument is shown");
+    ok(navText.indexOf("NIST SP 800-53 Rev 5 Control Assessment") === -1, "collapsed: other instruments are hidden");
+    ok(!!sb.querySelector(".nav-change"), "collapsed: a control returns to the picker");
+    ok(/Switch assessment/.test(sb.querySelector(".nav-change").textContent),
+       "which says what it does rather than sitting there as an underlined word",
+       sb.querySelector(".nav-change").textContent);
+    ok(!!sb.querySelector(".nav-progress"), "collapsed: overall progress is shown for the assessment");
+
+    // ---- the capture nav is near the top, not below the whole catalogue ----
+    var capture = Array.prototype.filter.call(sb.querySelectorAll(".nav-section-title"), function (n) {
+      return n.textContent.trim() === "Capture";
+    });
+    ok(capture.length === 1, "exactly one 'Capture' section heading", String(capture.length));
+    // The failure this guards against is the instrument picker pushing Capture
+    // down a whole screen (it was ~700px before the picker collapsed by
+    // default), which on a 1366x768 laptop left no capture nav visible at all.
+    // The bound was 220 until the collapse control was added above it; that
+    // control is deliberately short and costs ~26px, so 280 still catches the
+    // real regression with room for one row of chrome.
+    ok(capture[0].offsetTop < 280, "Capture starts near the top of the sidebar", "offsetTop=" + capture[0].offsetTop);
+
+    // ---- 'change' reopens the picker without dropping the assessment ----
+    sb.querySelector(".nav-change").click();
+    ok(document.getElementById("main").textContent.indexOf("Change assessment") !== -1, "'change' opens the picker page");
+    ok(document.getElementById("sidebar").querySelectorAll(".nav-item").length > 0, "'change' keeps the capture nav available");
+    ok(!!document.querySelector("#main .home-card.current"), "picker marks the current assessment");
+
+    // ---- expanding restores the full list, and collapsing returns ----
+    sb = document.getElementById("sidebar");
+    sb.querySelector(".nav-section-toggle").click();
+    sb = document.getElementById("sidebar");
+    var fams = famTitles();
+    // Grouped by the kind of work, not the publisher: publisher grouping left
+    // CIS in a group of one and NIST in a group of two. Every heading is
+    // curated - a raw family id auto-capitalised ("Nist", "Onr") means one was
+    // added to the manifest without a name to go with it.
+    ok(fams.indexOf("ISA/IEC 62443") !== -1, "the 62443 series keeps its own group", fams.join(" | "));
+    ok(fams.indexOf("Control frameworks") !== -1, "CIS and NIST sit with the other frameworks", fams.join(" | "));
+    ok(fams.indexOf("Sector regulators") !== -1, "ONR and aviation sit with the sector regimes", fams.join(" | "));
+    ok(fams.every(function (t) { return !/^[A-Z][a-z]+$/.test(t) || t === "Regulation"; }),
+       "no heading is a raw family id auto-capitalised", fams.join(" | "));
+    ok(fams.every(function (t) { return t.length > 0; }), "no heading is blank");
+    // The order is curated too: the standard first, the screeners last.
+    ok(fams.indexOf("ISA/IEC 62443") < fams.indexOf("Screening and posture"),
+       "groups run from the core standard to the quick screeners", fams.join(" | "));
+    ok(sb.querySelectorAll(".nav-family-title").length >= 2, "expanded: family headings return");
+    ok(sb.textContent.indexOf("NIST SP 800-53 Rev 5 Control Assessment") !== -1, "expanded: other instruments visible again");
+
+    sb.querySelector(".nav-section-toggle").click();
+    sb = document.getElementById("sidebar");
+    ok(sb.querySelectorAll(".nav-family-title").length === 0, "re-collapsed: family headings hidden again");
+
+    // ---- slim rail --------------------------------------------------------
+    // Collapsed, the sidebar is a 64px rail of tokens and stays that way: the
+    // tokens are the navigation, with no hover expansion to fall back on. That
+    // makes the title on every row load-bearing - it is the tooltip AND, since
+    // the label is hidden and the token aria-hidden, the accessible name.
+    A.Engine.activateInstrument("general-ot-posture");
+    sb = document.getElementById("sidebar");
+    var app = document.querySelector(".app");
+
+    var toggle = sb.querySelector(".sidebar-toggle");
+    ok(!!toggle, "the sidebar offers a collapse control");
+    ok(!app.classList.contains("sidebar-slim"), "it starts at full width");
+    ok(toggle.getAttribute("aria-pressed") === "false", "and reports itself as not collapsed");
+
+    // Every row carries a token and a title whichever state we are in, so the
+    // rail is correct the moment it appears rather than after a re-render.
+    var rows = sb.querySelectorAll(".nav-item");
+    ok(rows.length > 4, "there are rows to tokenise", String(rows.length));
+    var noToken = [].slice.call(rows).filter(function (r) { return !r.querySelector(".nav-slim"); });
+    ok(noToken.length === 0, "every row carries a rail token", String(noToken.length));
+    var noTitle = [].slice.call(rows).filter(function (r) { return !r.getAttribute("title"); });
+    ok(noTitle.length === 0, "and a title, which names it for both tooltip and screen reader",
+       String(noTitle.length));
+
+    // Tokens are derived from the label: a leading code wins, else initials of
+    // the words that mean something ("Governance and risk" -> GR, not GA).
+    function tokenFor(label) {
+      var hit = [].slice.call(sb.querySelectorAll(".nav-item")).filter(function (r) {
+        return (r.getAttribute("title") || "") === label;
+      })[0];
+      return hit ? hit.querySelector(".nav-slim").textContent : null;
+    }
+    ok(tokenFor("Governance and risk") === "GR",
+       "'Governance and risk' tokenises as GR", String(tokenFor("Governance and risk")));
+    ok(tokenFor("Monitoring and detection") === "MD",
+       "'Monitoring and detection' tokenises as MD", String(tokenFor("Monitoring and detection")));
+    // Find keeps its own longer title ("...by code or keyword (Ctrl+K)"), so it
+    // is looked up by class rather than by label.
+    var findTok = sb.querySelector(".nav-find .nav-slim");
+    ok(findTok && findTok.textContent === "⌕",
+       "Find gets the search glyph rather than colliding initials",
+       findTok ? findTok.textContent : "no token");
+
+    toggle.click();
+    sb = document.getElementById("sidebar");
+    ok(app.classList.contains("sidebar-slim"), "clicking it collapses the sidebar to the rail");
+    ok(sb.querySelector(".sidebar-toggle").getAttribute("aria-pressed") === "true",
+       "and the control now reports itself as collapsed");
+    ok(sb.querySelectorAll(".nav-label").length > 0,
+       "the labels stay in the DOM, hidden, ready for expanding again",
+       String(sb.querySelectorAll(".nav-label").length));
+    ok(sb.querySelectorAll(".nav-item").length === rows.length,
+       "the rail lists the same rows, not a reduced set");
+
+    // Navigation still works from the rail.
+    var domainRow = [].slice.call(sb.querySelectorAll(".nav-item")).filter(function (r) {
+      return (r.getAttribute("title") || "") === "Monitoring and detection";
+    })[0];
+    ok(!!domainRow, "a domain row is reachable in the rail");
+    if (domainRow) {
+      domainRow.click();
+      ok(document.getElementById("main").textContent.indexOf("Monitoring and detection") !== -1,
+         "clicking it navigates, without leaving the rail");
+      ok(document.querySelector(".app").classList.contains("sidebar-slim"),
+         "and the sidebar stays collapsed after navigating");
+    }
+
+    // The choice is remembered.
+    var stored = null;
+    try { stored = localStorage.getItem("ot-sidebar"); } catch (e) {}
+    ok(stored === "slim", "the collapsed choice is stored for next session", String(stored));
+
+    document.getElementById("sidebar").querySelector(".sidebar-toggle").click();
+    ok(!document.querySelector(".app").classList.contains("sidebar-slim"),
+       "and it expands again");
+    try { stored = localStorage.getItem("ot-sidebar"); } catch (e) {}
+    ok(stored === "full", "which is stored too", String(stored));
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

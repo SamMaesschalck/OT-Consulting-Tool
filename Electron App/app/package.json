@@ -1,0 +1,10 @@
+{
+  "name": "ot-cyber-assessment-tool",
+  "productName": "OT Cyber Assessment Tool",
+  "version": "0.5.0",
+  "description": "OT Cyber Assessment Tool (Electron test build). Copyright (c) 2026 SolutionsPT. All rights reserved.",
+  "author": "SolutionsPT",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js"
+}

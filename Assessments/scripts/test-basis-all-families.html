@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Basis register works for every instrument/family</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // One representative active instrument per scoring family.
+    var IDS = ["iec-62443-3-3", "supplier-screener", "ncsc-caf", "iec-62443-2-1-2024",
+               "nis2-assessment", "iec-62443-2-1-2010", "cis-controls-v8",
+               "onr-syaps-management", "onr-syaps-cyber", "onr-syaps-full"];
+    var actives = {};
+    E.state.instruments.forEach(function (i) { if (i.status === "active") actives[i.id] = true; });
+    var tested = 0;
+
+    IDS.forEach(function (id) {
+      if (!actives[id]) { lines.push("(skip " + id + " - not active)"); return; }
+      E.activateInstrument(id);
+      tested++;
+      var fam = E.state.scoringFamily;
+
+      // 1. the register exists and is well-formed for this instrument
+      var b = E.getBasisOfAssessment();
+      ok(b && Array.isArray(b.interviews) && Array.isArray(b.documents) && Array.isArray(b.observations),
+        id + " (" + fam + "): register available with the three arrays");
+
+      // 2. it starts empty (no bleed from the previously-activated instrument)
+      ok(b.documents.length === 0 && b.interviews.length === 0 && b.observations.length === 0,
+        id + ": register starts empty (no bleed from the previous instrument)",
+        b.interviews.length + "/" + b.documents.length + "/" + b.observations.length);
+
+      // 3. it accepts an instrument-specific row and keeps it
+      b.documents.push({ title: "Doc for " + id, reference: "REF-" + id, date: "2026-07-01" });
+      E.touchBasisOfAssessment();
+      ok(E.getBasisOfAssessment().documents.length === 1 &&
+         E.getBasisOfAssessment().documents[0].reference === "REF-" + id,
+        id + ": records and retains its own document");
+
+      // 4. the engagement page renders the Basis of assessment card for this family
+      A.UI.go("engagement");
+      ok(/Basis of assessment/i.test(document.getElementById("main").textContent),
+        id + ": engagement page shows the Basis of assessment card");
+    });
+
+    ok(tested >= 8, "covered a broad spread of families (" + tested + " instruments)", String(tested));
+
+    // 5. every register is still separate after all the writes above
+    var mixed = 0;
+    IDS.forEach(function (id) {
+      if (!actives[id]) return;
+      E.activateInstrument(id);
+      var docs = E.getBasisOfAssessment().documents;
+      if (docs.length !== 1 || docs[0].reference !== "REF-" + id) mixed++;
+    });
+    ok(mixed === 0, "after seeding all, each instrument still holds ONLY its own document", "mismatches=" + mixed);
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = lines.join("\n");
+})();
+</script>
+</body></html>

@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Report customisation - every family has the same capabilities</title></head>
+<body><div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script>
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ o=o||{}; this.__type="Paragraph"; this.children=o.children||[]; this.heading=o.heading||null;
+    this.style=o.style||null; this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ o=o||{}; this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ o=o||{}; this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ o=o||{}; this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text=""; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.sections=o.sections||[]; window.__doc=this; }
+  var Packer={ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } };
+  return { Document:Document,Paragraph:Paragraph,TextRun:TextRun,TableCell:TableCell,TableRow:TableRow,
+    Table:Table,ImageRun:ImageRun,PageBreak:PageBreak,Header:Header,Footer:Footer,
+    PageNumber:{CURRENT:"CURRENT",TOTAL_PAGES:"TOTAL_PAGES"},
+    PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"Heading1",HEADING_2:"Heading2",HEADING_3:"Heading3"},
+    AlignmentType:{LEFT:"left",CENTER:"center",RIGHT:"right"},
+    WidthType:{PERCENTAGE:"pct"}, ShadingType:{SOLID:"solid"}, Packer:Packer };
+})();
+</script>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["caf", "cra", "csms", "ml", "nis2", "nist", "posture", "sl"] });</script>
+<script>
+// Every scoring family's report offers the same things to the consultant:
+// every section keyed and editable, the wording rewritable where a section has
+// any, the glossary open to their own terms, the next steps written in place,
+// and advice on something that already meets its target editable like a gap.
+// Anything that works on 62443-3-3 and nowhere else is the bug this catches.
+(function () {
+  var A = window.App, E = A.Engine, R = A.Report, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    document.getElementById("out").textContent =
+      out.join("\n") + "\n\n" + (fail ? fail + " FAILED" : "ALL TESTS PASSED (" + out.length + ")");
+  }
+  function main() { return document.getElementById("main"); }
+  function card(key) { return main().querySelector('.card[data-section="' + key + '"]'); }
+  function clickIn(scope, label) {
+    var b = [].slice.call(scope.querySelectorAll("button"))
+      .filter(function (x) { return (x.textContent || "").trim() === label; })[0];
+    if (b) b.click();
+    return !!b;
+  }
+  function docText() {
+    var t = [];
+    (function walk(n) {
+      if (!n) return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      if (n.__type === "Paragraph") { t.push(n.text || ""); return; }
+      if (n.__type === "Table") { walk(n.rows); return; }
+      if (n.__type === "TableRow" || n.__type === "TableCell") { walk(n.children); return; }
+    })((window.__doc.sections || []).map(function (s) { return s.children; }));
+    return t.join("\n");
+  }
+  function headings() {
+    var hs = [];
+    (window.__doc.sections || []).forEach(function (s) {
+      (s.children || []).forEach(function (n) { if (n && n.__headingText) hs.push(n.__headingText.trim()); });
+    });
+    return hs;
+  }
+
+  var CASES = [
+    ["iec-62443-3-3",      "TourSL"],
+    ["ncsc-caf",           "TourCAF"],
+    ["nist-800-53",        "TourNIST"],
+    ["general-ot-posture", "TourPosture"],
+    ["iec-62443-2-1-2024", "TourML"],
+    ["nis2-assessment",    "TourNIS2"],
+    ["iec-62443-2-1-2010", "TourCSMS"],
+    ["eu-cra",             "TourCRA"]
+  ];
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+  } catch (e) { ok(false, "setup threw: " + e.message); flush(); return; }
+
+  function run(i) {
+    flush();
+    if (i >= CASES.length) { flush(); return; }
+    var id = CASES[i][0], tour = A[CASES[i][1]];
+    E.activateInstrument(id);
+    if (tour && tour.apply) tour.apply(E);
+    A.UI.go("report");
+    var fam = E.state.scoringFamily;
+    var tag = id + " (" + fam + ")";
+
+    // ---- 1. every report section is keyed and offers an Edit control ----
+    var cards = [].slice.call(main().querySelectorAll(".card"));
+    // A wrapper with no heading of its own is not a section; neither are the
+    // capture cards the report page puts around the report.
+    // The issue check is the tool's to-do list for the report, not part of it.
+    var CAPTURE = /^(Progress since previous assessment|Executive summary: consultant input|Basis of assessment|Word report options|Issue check)$/;
+    var sections = cards.filter(function (c) {
+      var head = [].slice.call(c.children).filter(function (x) { return x.classList && x.classList.contains("card-h"); })[0];
+      var h2 = head && head.getElementsByTagName("h2")[0];
+      // A card that previews a document built across several assessments (the
+      // organisation-wide position) says so, because no single assessment's
+      // reportCustom governs that document - see orgRollUpCard in ui.js.
+      if (c.getAttribute("data-cross-assessment")) return false;
+      return h2 && !CAPTURE.test(h2.textContent.trim());
+    });
+    var unkeyed = sections.filter(function (c) { return !c.getAttribute("data-section"); });
+    ok(unkeyed.length === 0, tag + ": every report section is keyed",
+       unkeyed.map(function (c) { return c.querySelector("h2").textContent; }).join(" | "));
+    var noEdit = sections.filter(function (c) { return !c.querySelector(".sect-edit"); });
+    ok(noEdit.length === 0, tag + ": every report section offers Edit",
+       noEdit.map(function (c) { return c.getAttribute("data-section"); }).join(" | "));
+    ok(sections.length >= 6, tag + ": and there are real sections to edit", String(sections.length));
+
+    // ---- 2. the standing prose is editable, not just the computed sections ----
+    var prose = sections.filter(function (c) { return (c.getAttribute("data-generated-prose") || "").trim() !== ""; });
+    ok(prose.length >= 3, tag + ": several sections carry rewritable wording", String(prose.length));
+
+    // ---- 3. rename a section, in place, and check it reaches Word ----
+    var target = prose[0];
+    var tKey = target.getAttribute("data-section");
+    var generatedTitle = target.getAttribute("data-section-title");
+    target.querySelector(".sect-edit").click();
+    var titleIn = card(tKey).querySelector(".sect-title-input");
+    ok(!!titleIn, tag + ": the heading becomes the field");
+    ok(titleIn.value === generatedTitle, tag + ": holding the generated title", titleIn.value);
+    var newTitle = "Renamed for " + id;
+    titleIn.value = newTitle;
+    titleIn.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(E.getReportSection(tKey).title === newTitle, tag + ": the rename is stored");
+
+    // ---- 4. rewrite the wording, in place ----
+    var proseIn = card(tKey).querySelector(".sect-prose-input");
+    ok(!!proseIn && proseIn.value.trim() !== "", tag + ": the wording box holds the generated text");
+    var marker = "MARKER-" + id.toUpperCase() + " ";
+    proseIn.value = marker + proseIn.value;
+    proseIn.dispatchEvent(new Event("change", { bubbles: true }));
+    ok((E.getReportSection(tKey).prose || "").indexOf(marker) === 0, tag + ": the rewrite is stored");
+    clickIn(card(tKey), "Done");
+    ok(main().textContent.indexOf(marker) !== -1, tag + ": and shows in the preview");
+
+    // ---- 5. the glossary takes the consultant's own terms ----
+    var GK = "terms-used-in-this-report";
+    ok(!!card(GK) && card(GK).getAttribute("data-terms") === "1", tag + ": the glossary takes terms");
+    card(GK).querySelector(".sect-edit").click();
+    ok(!!card(GK).querySelector(".terms-editor"), tag + ": editing it offers a terms editor");
+    clickIn(card(GK), "+ Add a term");
+    var nameIn = card(GK).querySelector(".term-name");
+    nameIn.value = "Site term " + id;
+    nameIn.dispatchEvent(new Event("change", { bubbles: true }));
+    var defIn = card(GK).querySelector(".term-def");
+    defIn.value = "Defined for this engagement.";
+    defIn.dispatchEvent(new Event("change", { bubbles: true }));
+    clickIn(card(GK), "Done");
+    ok(card(GK).textContent.indexOf("Site term " + id) !== -1, tag + ": the term prints in the glossary");
+
+    // ---- 6. the next steps are written in the report's own section ----
+    var ns = main().querySelector(".card[data-next-steps]");
+    ok(!!ns, tag + ": the next steps are a section of the report");
+    var nsKey = ns.getAttribute("data-section");
+    ns.querySelector(".sect-edit").click();
+    var nsBox = card(nsKey).querySelector(".sect-prose-input");
+    ok(!!nsBox && nsBox.value.trim() !== "", tag + ": editing gives a box holding the steps");
+    ok(card(nsKey).querySelectorAll("li").length === 0, tag + ": the rendered list is swapped, not duplicated");
+    nsBox.value = "Step one for " + id + "\nStep two";
+    nsBox.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(/Step one for/.test(E.getReportNarrative().nextSteps || ""),
+       tag + ": saved to the next-steps store");
+    ok(!(E.getReportSection(nsKey) || {}).prose, tag + ": and not also as a section override");
+    clickIn(card(nsKey), "Done");
+
+    // ---- 7. advice on something that already meets its target is editable ----
+    var tid = E.getActiveTarget().id;
+    var scored = E.scoreActiveTarget();
+    var onRoadmap = {};
+    (scored.roadmap || []).forEach(function (r) { onRoadmap[r.itemId || r.requirementId] = true; });
+    // From the catalogue, not from the responses: in 62443-3-3 most answers
+    // live on the shared layer, so the active target may hold none of its own.
+    var inst = E.state.instrument;
+    var catalogue = inst.requirements || inst.outcomes || inst.items || inst.questions || [];
+    var cand = catalogue.filter(function (x) { return !onRoadmap[x.id]; })[0];
+    ok(!!cand, tag + ": the instrument has something that is not a gap", cand && cand.id);
+    if (cand) {
+      E.setResponse(tid, cand.id, { action: "Worth doing anyway on " + id + "." });
+      A.UI.go("report");
+      var fr = card("further-recommendations");
+      ok(!!fr, tag + ": advice on a met item gets a Further recommendations section");
+      if (fr) {
+        var row = fr.querySelector("tbody tr");
+        ok(row && row.classList.contains("plan-row"), tag + ": its rows are clickable, like the roadmap's");
+        row.click();
+        var modal = document.querySelector(".modal");
+        ok(!!modal, tag + ": clicking one opens the plan editor");
+        if (modal) {
+          ok(/Recommendation/.test(modal.textContent),
+             tag + ": titled a recommendation, not a remediation");
+          var ta = modal.querySelectorAll("textarea")[1];
+          ok(/Worth doing anyway/.test(ta.value), tag + ": holding the advice already recorded", ta.value);
+          ta.value = "Edited advice for " + id + ".";
+          clickIn(modal, "Save");
+          ok(main().textContent.indexOf("Edited advice for " + id) !== -1,
+             tag + ": the edit reaches the report");
+        }
+      }
+    }
+
+    // ---- 8. hide a section and confirm Word drops it ----
+    card(tKey).querySelector(".sect-edit").click();
+    clickIn(card(tKey), "Hide this section");
+    ok(E.getReportSection(tKey).hidden === true, tag + ": hide is stored");
+    ok(card(tKey).classList.contains("section-hidden"),
+       tag + ": the preview keeps it, dimmed, so it can be put back");
+
+    window.__doc = null;
+    A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+      E.getActiveNarrative(), { targetId: E.state.activeTargetId }, function (err) {
+        try {
+          if (err) { ok(false, tag + ": Word build - " + (err.message || err)); return run(i + 1); }
+          var txt = docText(), hs = headings();
+          ok(hs.indexOf(generatedTitle) === -1 && hs.indexOf(newTitle) === -1,
+             tag + ": Word: a hidden section is dropped, renamed or not", hs.slice(0, 8).join(" | "));
+          ok(txt.indexOf(marker) === -1, tag + ": Word: its wording goes with it");
+          ok(txt.indexOf("Site term " + id) !== -1, tag + ": Word: the consultant's glossary term prints");
+          ok(txt.indexOf("Step one for " + id) !== -1, tag + ": Word: the next steps print");
+          ok(txt.indexOf("Edited advice for " + id) !== -1,
+             tag + ": Word: the edited recommendation prints");
+          run(i + 1);
+        } catch (e) { ok(false, tag + ": threw: " + e.message); flush(); }
+      });
+  }
+
+  try { run(0); } catch (e) { ok(false, "threw: " + (e && e.message)); flush(); }
+})();
+</script>
+</body></html>

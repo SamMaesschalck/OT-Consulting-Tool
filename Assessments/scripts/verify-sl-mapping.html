@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<title>Verify the SL selection mapping against the standard</title>
+<link rel="stylesheet" href="../css/app.css" />
+<style>
+  body { padding: 24px 28px; }
+  h1 { margin: 0 0 6px; }
+  .lede { max-width: 60em; margin: 0 0 18px; }
+  table.map { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.map th, table.map td { border: 1px solid var(--border); padding: 5px 8px; text-align: left; vertical-align: top; }
+  table.map th { background: var(--surface-3); position: sticky; top: 0; }
+  table.map td.sl { text-align: center; white-space: nowrap; font-family: Consolas, monospace; }
+  table.map tr:nth-child(even) td { background: var(--surface-2); }
+  .base { color: var(--text-muted); }
+  .re   { font-weight: 700; color: var(--brand-blue-dark); }
+  .none { color: var(--text-soft); }
+  .toolbar { margin: 0 0 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .count { color: var(--text-muted); font-size: 13px; }
+</style></head>
+<body>
+<h1>SL selection mapping</h1>
+<p class="lede">
+  This is the mapping the tool scores against: for each requirement, which items
+  (the base requirement and each requirement enhancement) the standard selects at
+  each Security Level. <strong>Every achieved Security Level the tool reports is
+  derived from this table.</strong> Check it against your licensed copy of the
+  standard before the instrument is used on a client engagement, and correct
+  <code>slGuidance</code> in the instrument JSON where it differs.
+</p>
+<div class="toolbar">
+  <label>Instrument
+    <select id="pick"></select>
+  </label>
+  <button class="btn" id="csv">Copy as CSV</button>
+  <span class="count" id="count"></span>
+</div>
+<div id="out"></div>
+<script src="../data/manifest.js"></script>
+<script src="../js/scoring.js"></script>
+<script>
+(function () {
+  var A = window.App, S = A.Scoring;
+  var pick = document.getElementById("pick");
+  var IDS = Object.keys(A.Data.instruments).filter(function (id) {
+    var i = A.Data.instruments[id].instrument;
+    return i && i.scoringFamily === "capability-sl";
+  });
+  IDS.forEach(function (id) {
+    var o = document.createElement("option");
+    o.value = id; o.textContent = A.Data.instruments[id].instrument.title;
+    pick.appendChild(o);
+  });
+
+  function rowsFor(id) {
+    var inst = A.Data.instruments[id].instrument;
+    return (inst.requirements || []).map(function (r) {
+      var items = S.requirementItems(r);
+      var byLevel = { 1: [], 2: [], 3: [], 4: [] };
+      items.forEach(function (i) {
+        for (var n = i.firstSL; n <= 4; n++) byLevel[n].push(i);
+      });
+      return { req: r, items: items, byLevel: byLevel };
+    });
+  }
+
+  function cell(items, level, row) {
+    if (!items.length) return '<span class="none">not selected</span>';
+    return items.map(function (i) {
+      var isNew = i.firstSL === level;
+      var label = i.isBase ? "base" : i.componentId;
+      return isNew ? '<span class="re">' + label + '</span>' : '<span class="base">' + label + '</span>';
+    }).join(" + ");
+  }
+
+  function render() {
+    var id = pick.value;
+    var rows = rowsFor(id);
+    var html = '<table class="map"><thead><tr>' +
+      '<th style="width:8%">Code</th><th style="width:26%">Requirement</th>' +
+      '<th style="width:15%">SL 1</th><th style="width:15%">SL 2</th>' +
+      '<th style="width:15%">SL 3</th><th style="width:15%">SL 4</th>' +
+      '<th style="width:6%">Items</th></tr></thead><tbody>';
+    rows.forEach(function (row) {
+      html += "<tr><td><strong>" + row.req.code + "</strong></td><td>" + row.req.title + "</td>";
+      [1, 2, 3, 4].forEach(function (n) {
+        html += '<td class="sl">' + cell(row.byLevel[n], n, row) + "</td>";
+      });
+      html += '<td class="sl">' + row.items.length + "</td></tr>";
+    });
+    html += "</tbody></table>";
+    document.getElementById("out").innerHTML = html;
+    var totalItems = rows.reduce(function (a, r) { return a + r.items.length; }, 0);
+    document.getElementById("count").textContent =
+      rows.length + " requirements, " + totalItems + " items. Bold = first selected at that level.";
+  }
+
+  document.getElementById("csv").addEventListener("click", function () {
+    var rows = rowsFor(pick.value);
+    var lines = ["Code,Title,SL1,SL2,SL3,SL4"];
+    rows.forEach(function (row) {
+      var cells = [1, 2, 3, 4].map(function (n) {
+        return row.byLevel[n].map(function (i) { return i.isBase ? "base" : i.componentId; }).join(" + ") || "-";
+      });
+      lines.push('"' + row.req.code + '","' + String(row.req.title).replace(/"/g, '""') + '","' +
+                 cells.join('","') + '"');
+    });
+    var ta = document.createElement("textarea");
+    ta.value = lines.join("\n");
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+    this.textContent = "Copied";
+    var btn = this;
+    setTimeout(function () { btn.textContent = "Copy as CSV"; }, 1500);
+  });
+
+  pick.addEventListener("change", render);
+  render();
+})();
+</script>
+</body></html>

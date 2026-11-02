@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>CAF guided wizard check</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+  function main() { return document.getElementById("main"); }
+  function btnByText(root, sel, re) { return [].slice.call(root.querySelectorAll(sel)).filter(function (b) { return re.test(b.textContent); })[0]; }
+
+  try {
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });
+    A.Engine.activateInstrument("ncsc-caf");
+    var tid = A.Engine.state.activeTargetId;
+
+    // sidebar exposes a Guided wizard entry
+    var wizNav = [].slice.call(document.querySelectorAll("#sidebar .nav-item")).filter(function (b) { return /Guided wizard/.test(b.textContent); })[0];
+    ok(!!wizNav, "sidebar has a 'Guided wizard' entry");
+
+    A.UI.go("caf-wizard");
+    var m = main();
+    ok(!!m.querySelector(".wizard"), "wizard view renders");
+    var steps = m.querySelectorAll(".wizard-stepper .wizard-step");
+    ok(steps.length === 4, "stepper shows the 4 CAF objectives (A-D)", String(steps.length));
+    ok(/Contributing outcome\s+1\s+of\s+41/.test(m.textContent), "counter reads 'Contributing outcome 1 of 41'", m.querySelector(".wizard-topmeta") && m.querySelector(".wizard-topmeta").textContent);
+    ok(!!m.querySelector(".wizard-answer .caf-state-btn"), "answer column has state buttons");
+    ok(!!m.querySelector(".wizard-context"), "context column present");
+    ok(/Why this matters/.test(m.textContent), "context shows 'Why this matters'");
+    // The verbatim IGPs used to live in the context rail. They are a
+    // three-column grid, and 322px gave each column about ninety pixels, so
+    // they moved to the wide answer column - see the width assertions below.
+    ok(!!m.querySelector(".wizard-answer .caf-igp-list"),
+       "the verbatim IGPs render in the answer column, where there is width for them");
+    ok(m.querySelector(".wizard-answer .req-code") && m.querySelector(".wizard-answer .req-code").textContent === "A1.a", "first outcome is A1.a", m.querySelector(".wizard-answer .req-code") && m.querySelector(".wizard-answer .req-code").textContent);
+
+    // capture a state in the wizard -> flows to the engine
+    var achievedBtn = btnByText(m.querySelector(".wizard-answer"), ".caf-state-btn", /Achieved/);
+    ok(!!achievedBtn, "'Achieved' button present");
+    achievedBtn.click();
+    ok((A.Engine.findResponse(tid, "A1.a") || {}).state === "achieved", "clicking Achieved captures the outcome state in the engine");
+    m = main();
+    ok(/Achieved/.test(m.querySelector(".wizard-context").textContent), "context status pill updates to Achieved");
+
+    // Next advances to A1.b
+    var nextBtn = btnByText(m, ".wizard-footbar .btn", /Next/);
+    ok(!!nextBtn, "Next button present");
+    nextBtn.click(); m = main();
+    ok(m.querySelector(".wizard-answer .req-code").textContent === "A1.b", "Next advances to A1.b", m.querySelector(".wizard-answer .req-code").textContent);
+
+    // jump to objective B via the stepper
+    var stepB = btnByText(m, ".wizard-stepper .wizard-step", /^B$/);
+    ok(!!stepB, "objective B step present");
+    stepB.click(); m = main();
+    ok(/^B/.test(m.querySelector(".wizard-answer .req-code").textContent), "jumping to objective B lands on a B outcome", m.querySelector(".wizard-answer .req-code").textContent);
+
+    // answer flows both ways: the list view reflects the wizard answer
+    A.UI.go("caf-principle", "A1");
+    var pm = main();
+    var a1aRow = pm.querySelector('[data-req-id="A1.a"]');
+    ok(a1aRow && /Achieved/.test(a1aRow.querySelector(".req-meta") ? a1aRow.querySelector(".req-meta").textContent : ""), "list view shows A1.a as Achieved (answer shared)");
+
+    // 'Switch to list view' from the wizard footer
+    A.UI.go("caf-wizard"); m = main();
+    var toList = btnByText(m, ".wizard-footbar .btn", /Switch to list view/);
+    ok(!!toList, "'Switch to list view' button present");
+
+    // remediation: marking an outcome as a gap surfaces the inline recommendation editor
+    var curId = m.querySelector(".wizard-answer .req-code").textContent;
+    ok(!/Recommended action/.test(m.querySelector(".wizard-answer").textContent), "no remediation editor before the outcome is a gap");
+    m.querySelector(".wizard-answer .caf-state-btn.caf-state-not").click(); m = main();
+    var ansTxt = m.querySelector(".wizard-answer").textContent;
+    ok(/Recommendation/.test(ansTxt) && /Recommended action/.test(ansTxt) && /Priority band/.test(ansTxt), "marking an outcome Not Achieved surfaces the inline remediation editor");
+    var band = m.querySelector(".wizard-answer select");
+    ok(!!band, "remediation priority-band select present");
+    band.value = "high"; band.dispatchEvent(new Event("change", { bubbles: true }));
+    ok((A.Engine.findResponse(tid, curId) || {}).priorityBand === "high", "setting priority band saves to the response (feeds the roadmap + exports)", curId);
+    var owner = m.querySelector(".wizard-answer input[type=text]");
+    owner.value = "Head of OT Security"; owner.dispatchEvent(new Event("change", { bubbles: true }));
+    ok((A.Engine.findResponse(tid, curId) || {}).owner === "Head of OT Security", "setting the owner saves to the response");
+    // No longer a gap: the editor STAYS, because it now holds the owner and
+    // priority band just typed into it. It used to vanish, taking the
+    // consultant's own work off the screen while leaving it in the file.
+    m.querySelector(".wizard-answer .caf-state-btn.caf-state-achieved").click(); m = main();
+    ok(/Recommended action/.test(m.querySelector(".wizard-answer").textContent),
+       "a recommendation already recorded stays visible when the outcome stops being a gap");
+    ok(/not a gap/.test(m.querySelector(".wizard-answer").textContent),
+       "and is labelled as advice rather than outstanding work");
+    ok((A.Engine.findResponse(tid, curId) || {}).owner === "Head of OT Security",
+       "with the typed owner still on the response");
+    // An outcome that is neither a gap nor written up keeps the editor folded
+    // away behind an affordance.
+    var nextBtn = btnByText(m, ".wizard-footbar .btn", /Next/);
+    if (nextBtn) {
+      nextBtn.click(); m = main();
+      var freshTxt = m.querySelector(".wizard-answer").textContent;
+      ok(!/Recommended action/.test(freshTxt) && /Add a recommendation/.test(freshTxt),
+         "an untouched outcome offers the editor without opening it");
+    }
+    // ---- indicators of good practice need the width ----------------------
+    // They are a three-column grid of verbatim CAF text (Achieved / Partially
+    // / Not). In the 322px context rail that is three columns of about ninety
+    // pixels, which is not readable, so they render in the wide answer column.
+    var wm = document.getElementById("main");
+    var igpGrid = wm.querySelector(".caf-summary-grid");
+    ok(!!igpGrid, "the wizard shows the indicators of good practice");
+    if (igpGrid) {
+      ok(!!igpGrid.closest(".wizard-answer"),
+         "in the wide answer column, not the fixed-width context rail");
+      ok(!igpGrid.closest(".wizard-context"),
+         "and definitely not in the rail");
+      // Three states, side by side where there is room.
+      ok(igpGrid.querySelectorAll(".caf-summary").length === 3,
+         "with a column each for achieved, partially and not achieved",
+         String(igpGrid.querySelectorAll(".caf-summary").length));
+    }
+    ok(!!wm.querySelector(".caf-criteria .sl-items-toggle"),
+       "the criteria sit behind toggles, so the evidence box stays reachable");
+    // The rail keeps the short context that actually fits in it.
+    var rail = wm.querySelector(".wizard-context");
+    ok(rail && /Why this matters/.test(rail.textContent),
+       "the rail still carries the short why-this-matters note");
+
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

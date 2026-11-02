@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Report customisation - rename, hide, rewrite, note, reorder</title></head>
+<body><div class="app"><div class="header"><div id="engagement-summary"></div>
+<button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"></div>
+<div id="sidebar"></div><div id="main"></div></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+<script>
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ o=o||{}; this.__type="Paragraph"; this.children=o.children||[]; this.heading=o.heading||null;
+    this.style=o.style||null; this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ o=o||{}; this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ o=o||{}; this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ o=o||{}; this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text=""; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.sections=o.sections||[]; window.__doc=this; }
+  var Packer={ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } };
+  return { Document:Document,Paragraph:Paragraph,TextRun:TextRun,TableCell:TableCell,TableRow:TableRow,
+    Table:Table,ImageRun:ImageRun,PageBreak:PageBreak,Header:Header,Footer:Footer,
+    PageNumber:{CURRENT:"CURRENT",TOTAL_PAGES:"TOTAL_PAGES"},
+    PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"Heading1",HEADING_2:"Heading2",HEADING_3:"Heading3"},
+    AlignmentType:{LEFT:"left",CENTER:"center",RIGHT:"right"},
+    WidthType:{PERCENTAGE:"pct"}, ShadingType:{SOLID:"solid"}, Packer:Packer };
+})();
+</script>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["posture", "sl"] });</script>
+<script>
+(function () {
+  var A = window.App, E = A.Engine, R = A.Report, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    document.getElementById("out").textContent =
+      out.join("\n") + "\n\n" + (fail ? fail + " FAILED" : "ALL TESTS PASSED (" + out.length + ")");
+  }
+  var SL_KEY = "where-to-focus-first";
+  function main() { return document.getElementById("main"); }
+  function mainText() { return main().textContent; }
+  // Walks into tables too - the glossary puts its definitions in cells, so a
+  // paragraph-only reader would have reported them missing.
+  function docText() {
+    var t = [];
+    (function walk(n) {
+      if (!n) return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      if (n.__type === "Paragraph") { t.push(n.text || ""); return; }
+      if (n.__type === "Table") { walk(n.rows); return; }
+      if (n.__type === "TableRow" || n.__type === "TableCell") { walk(n.children); return; }
+    })((window.__doc.sections || []).map(function (a) { return a.children; }));
+    return t.join("\n");
+  }
+  function headings() {
+    var hs = [];
+    (window.__doc.sections || []).forEach(function (a) {
+      (a.children || []).forEach(function (n) {
+        if (n && n.__type === "Paragraph" && n.heading) hs.push((n.text || "").trim());
+      });
+    });
+    return hs;
+  }
+  function card(key) { return main().querySelector('.card[data-section="' + key + '"]'); }
+  function clickText(t, scope) {
+    var b = [].slice.call((scope || main()).querySelectorAll("button"))
+      .filter(function (x) { return (x.textContent || "").trim() === t; })[0];
+    if (b) b.click();
+    return !!b;
+  }
+  // Editing is in place, so the fields ARE the heading and the prose of the
+  // card being edited - there is no separate panel to look in.
+  function fieldEl(key, which) {
+    return card(key).querySelector(which === "title" ? ".sect-title-input" : ".sect-prose-input");
+  }
+  function fieldValue(key, which) { var el = fieldEl(key, which); return el ? el.value : null; }
+  function fillField(key, which, value) {
+    var el = fieldEl(key, which);
+    el.value = value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  function editing(key) { return card(key).querySelector(".sect-title-input"); }
+  function build(cb) {
+    window.__doc = null;
+    A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+      E.getActiveNarrative(), { targetId: E.state.activeTargetId }, cb);
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // ================= 62443-3-3 =================
+    E.activateInstrument("iec-62443-3-3");
+    A.TourSL.apply(E);
+    A.UI.go("report");
+
+    // ---- the floor-finding count is requirements, not zone occurrences ----
+    var all = E.scoreAllTargets(), ru = all.systemRollup;
+    ok(ru.floorRequirementCount > 0 && ru.floorOccurrences >= ru.floorRequirementCount,
+       "rollup exposes distinct floor requirements and occurrences",
+       ru.floorRequirementCount + " of " + ru.floorOccurrences);
+    ok(ru.floorOccurrences > ru.floorRequirementCount,
+       "the demo really does inherit shared gaps across zones (so this is worth counting properly)");
+    var sysText = R.systemRollupLines(ru, E.state.instrument).join(" ");
+    ok(sysText.indexOf(ru.floorRequirementCount + " requirements sit at floor") !== -1,
+       "the prose leads with the number of REQUIREMENTS", sysText);
+    ok(sysText.indexOf("appearing " + ru.floorOccurrences + " times") !== -1,
+       "...and explains the occurrence count rather than hiding it");
+    ok(sysText.indexOf("one piece of work rather than one per") !== -1,
+       "...and says how much of it is a single shared job");
+
+    // closing a shared gap must move BOTH numbers
+    var t1 = all.perTarget[1];
+    var v = t1.result.perRequirement.filter(function (r) { return r.floor && r.gapIsShared; })[0];
+    v.items.forEach(function (i) { E.setItemState("__shared", v.requirementId, i.componentId, "met"); });
+    var ru2 = E.scoreAllTargets().systemRollup;
+    ok(ru2.floorRequirementCount === ru.floorRequirementCount - 1,
+       "closing a shared gap drops the distinct count by exactly one",
+       ru.floorRequirementCount + " -> " + ru2.floorRequirementCount);
+    ok(ru2.floorOccurrences < ru.floorOccurrences - 1,
+       "...and drops the occurrence count by more than one, because several zones inherited it",
+       ru.floorOccurrences + " -> " + ru2.floorOccurrences);
+
+    // ---- sections are keyed and stable ----
+    A.UI.go("report");
+    ok(!!card(SL_KEY), "report cards carry a section key");
+    ok(!!card("the-system-as-a-whole"), "the system rollup is keyed too");
+    ok(R.sectionKey("Posture summary - BPCS - basic process control",
+        { engagement: E.state.engagement, activeTarget: { name: "BPCS - basic process control" } }) === "posture-summary",
+       "the key strips the zone name, so a rename follows the zone switch",
+       R.sectionKey("Posture summary - BPCS - basic process control", { engagement: E.state.engagement }));
+
+    // ---- the Edit control is simply there, on every section ----
+    ok(!!card(SL_KEY).querySelector(".sect-edit"), "every section carries an Edit control");
+    ok(mainText().indexOf("Customise report") === -1, "there is no mode to switch into");
+
+    // ---- rename, in the heading itself ----
+    card(SL_KEY).querySelector(".sect-edit").click();
+    ok(!!editing(SL_KEY), "the heading itself becomes the field");
+    ok(!card(SL_KEY).querySelector("h2"), "...replacing it, so the title is not shown twice");
+    ok(main().querySelectorAll(".sect-panel").length === 0, "there is no separate editing panel");
+    ok(fieldValue(SL_KEY, "title") === "Where to focus first",
+       "the heading field holds the generated title", fieldValue(SL_KEY, "title"));
+    fillField(SL_KEY, "title", "Where to start");
+    ok(E.getReportSection(SL_KEY).title === "Where to start", "a rename is stored against the section key");
+    ok(fieldValue(SL_KEY, "title") === "Where to start", "the field keeps it while editing continues");
+    clickText("Done", card(SL_KEY));
+    ok(card(SL_KEY).querySelector("h2").textContent === "Where to start",
+       "closing editing puts the new title back as the heading");
+    ok(card(SL_KEY).getAttribute("data-section") === SL_KEY,
+       "the key still comes from the GENERATED title, so the override survives its own rename");
+
+    // ---- reorder, on the rows themselves ----
+    card(SL_KEY).querySelector(".sect-edit").click();
+    var beforeIds = [].slice.call(card(SL_KEY).querySelectorAll("[data-reorder-id]"))
+      .map(function (r) { return r.getAttribute("data-reorder-id"); });
+    ok(beforeIds.length > 1, "the priority list is reorderable", beforeIds.join(","));
+    var firstRow = card(SL_KEY).querySelector("[data-reorder-id]");
+    ok(!!firstRow.querySelector(".reorder-grip"),
+       "the arrows sit on the report's own rows, not on a copy of the list");
+    var down = [].slice.call(card(SL_KEY).querySelectorAll(".reorder-btn"))
+      .filter(function (b) { return b.textContent === "↓" && !b.disabled; })[0];
+    down.click();
+    var afterIds = [].slice.call(card(SL_KEY).querySelectorAll("[data-reorder-id]"))
+      .map(function (r) { return r.getAttribute("data-reorder-id"); });
+    ok(afterIds[0] === beforeIds[1] && afterIds[1] === beforeIds[0],
+       "moving the top row down swaps the first two", beforeIds.join(",") + " -> " + afterIds.join(","));
+    ok((E.getReportSection(SL_KEY).order || []).length === beforeIds.length,
+       "the whole order is stored, not just the moved row");
+    ok(card(SL_KEY).textContent.indexOf("in the consultant's order") !== -1,
+       "the card says the order is the consultant's, not the computed one");
+
+    // a finding raised after the order was set lands at the end, not nowhere
+    var kept = R.applyOrder([{ id: "a" }, { id: "b" }, { id: "NEW" }], ["b", "a"], function (x) { return x.id; });
+    ok(kept.map(function (x) { return x.id; }).join(",") === "b,a,NEW",
+       "applyOrder puts unplaced rows after the ordered ones", kept.map(function (x) { return x.id; }).join(","));
+
+    // ---- rewrite the wording, in place ----
+    clickText("Done", card(SL_KEY));
+    var sysKey = "the-system-as-a-whole";
+    var proseBefore = card(sysKey).querySelectorAll("p").length;
+    card(sysKey).querySelector(".sect-edit").click();
+    var generated = fieldValue(sysKey, "prose");
+    ok(generated.indexOf("requirements sit at floor") !== -1,
+       "the wording box holds what the report currently says", generated.slice(0, 80));
+    ok(generated.split("\n").length > 1, "...every generated paragraph, not just the first");
+    ok(card(sysKey).querySelectorAll("p").length < proseBefore,
+       "the paragraphs it replaced are gone from the card, so the text is not shown twice",
+       card(sysKey).querySelectorAll("p").length + " vs " + proseBefore);
+    ok(!!card(sysKey).querySelector("table"), "the table below it is untouched while editing");
+
+    // Edit PART of it, the way a consultant would, rather than replacing it.
+    var edited = generated.replace("A floor finding means", "For this client a floor finding means");
+    fillField(sysKey, "prose", edited);
+    ok(!!editing(sysKey), "the section stays in edit mode after a save");
+    clickText("Done", card(sysKey));
+    ok(mainText().indexOf("For this client a floor finding means") !== -1,
+       "the edited wording shows in the preview");
+    ok(mainText().indexOf("requirements sit at floor") !== -1,
+       "...and the untouched sentences are still there");
+    var sysCard = card(sysKey);
+    ok(!!sysCard.querySelector("table"), "the section's table survived the rewrite");
+    // Count the paragraphs OPENING the section - the ones the wording replaced.
+    // The muted caption under the table is not part of it.
+    var opening = 0;
+    [].slice.call(sysCard.querySelector(".card-b").children).some(function (el) {
+      if (el.tagName === "P") { opening++; return false; }
+      return true;
+    });
+    ok(opening === edited.split("\n").filter(function (l) { return l.trim(); }).length,
+       "the generated paragraphs are replaced, not duplicated",
+       opening + " vs " + edited.split("\n").length);
+
+    // Retyping what is already there stores nothing new - an unchanged section
+    // must not start reading as edited.
+    card(SL_KEY).querySelector(".sect-edit").click();
+    fillField(SL_KEY, "title", fieldValue(SL_KEY, "title"));
+    ok(E.getReportSection(SL_KEY).title === "Where to start",
+       "saving an unchanged title leaves the existing override alone");
+    clickText("Done", card(SL_KEY));
+
+    // ---- reordering is drag and drop, as the roadmap already is ----
+    card(SL_KEY).querySelector(".sect-edit").click();
+    var dragRows = [].slice.call(card(SL_KEY).querySelectorAll("[data-reorder-id]"));
+    ok(dragRows.every(function (r) { return r.getAttribute("draggable") === "true"; }),
+       "every ranked row is draggable");
+    var idsNow = dragRows.map(function (r) { return r.getAttribute("data-reorder-id"); });
+    function fire(el, type, dt) {
+      var e = new Event(type, { bubbles: true, cancelable: true });
+      e.dataTransfer = dt || { setData: function () {}, effectAllowed: "", dropEffect: "" };
+      el.dispatchEvent(e);
+      return e;
+    }
+    // Drag the LAST row onto the first: it should land in front of it.
+    var last = dragRows[dragRows.length - 1], first = dragRows[0];
+    fire(last, "dragstart");
+    ok(last.classList.contains("dragging"), "the dragged row is marked while it moves");
+    fire(first, "dragover");
+    ok(first.classList.contains("drop-target"), "the row it is over shows where it will land");
+    fire(first, "drop");
+    var dropped = [].slice.call(card(SL_KEY).querySelectorAll("[data-reorder-id]"))
+      .map(function (r) { return r.getAttribute("data-reorder-id"); });
+    ok(dropped[0] === idsNow[idsNow.length - 1],
+       "dropping onto a row puts the dragged one in front of it",
+       idsNow.join(",") + " -> " + dropped.join(","));
+    ok(dropped.length === idsNow.length, "and nothing is lost on the way");
+    ok((E.getReportSection(SL_KEY).order || []).join(",") === dropped.join(","),
+       "the dropped order is what gets stored");
+    clickText("Done", card(SL_KEY));
+
+    // ---- the consultant can add terms to the glossary ----
+    var GK = "terms-used-in-this-report";
+    ok(!!card(GK), "the glossary is a section like any other");
+    ok(card(GK).getAttribute("data-terms") === "1", "...and is marked as taking terms");
+    var glossBefore = card(GK).querySelectorAll(".glossary-section").length;
+    card(GK).querySelector(".sect-edit").click();
+    ok(!!card(GK).querySelector(".terms-editor"), "editing it offers a terms editor");
+    ok(card(GK).querySelectorAll(".term-row").length === 0, "which starts empty");
+    ok(card(GK).querySelectorAll(".glossary-section").length === glossBefore,
+       "the framework's own definitions are left alone - they are not the consultant's to edit");
+    clickText("+ Add a term", card(GK));
+    var rowsNow = card(GK).querySelectorAll(".term-row");
+    ok(rowsNow.length === 1, "Add gives you a row", String(rowsNow.length));
+    var nameIn = rowsNow[0].querySelector(".term-name");
+    var defIn = rowsNow[0].querySelector(".term-def");
+    nameIn.value = "Deluge system";
+    nameIn.dispatchEvent(new Event("change", { bubbles: true }));
+    defIn = card(GK).querySelector(".term-def");
+    defIn.value = "The site's fire-suppression system, interlocked with the SIS.";
+    defIn.dispatchEvent(new Event("change", { bubbles: true }));
+    var stored = E.getReportSection(GK).terms;
+    ok(stored && stored.length === 1 && stored[0].term === "Deluge system" &&
+       /fire-suppression/.test(stored[0].definition), "the term is stored on the section",
+       JSON.stringify(stored));
+    clickText("Done", card(GK));
+    ok(card(GK).textContent.indexOf("Deluge system") !== -1, "it prints in the glossary");
+    ok(card(GK).textContent.indexOf("Other terms used in this report") !== -1,
+       "under its own heading, after the framework definitions");
+    ok(card(GK).querySelectorAll(".glossary-section").length === glossBefore + 1,
+       "as one extra group, not mixed into the standard's own");
+    ok(!card(GK).querySelector(".terms-editor"), "the editor is gone once editing closes");
+
+    // ---- next steps are written where they are read ----
+    ok(mainText().indexOf("How this report should be acted on") === -1,
+       "there is no capture copy of the next steps at the top of the page");
+    var nsCard = [].slice.call(main().querySelectorAll(".card[data-next-steps]"))[0];
+    ok(!!nsCard, "the report's own closing section carries the next steps");
+    var nsKey = nsCard.getAttribute("data-section");
+    nsCard.querySelector(".sect-edit").click();
+    var nsBox = card(nsKey).querySelector(".sect-prose-input");
+    ok(!!nsBox, "editing it gives a box, not a separate capture card");
+    ok(nsBox.value.split("\n").length > 2 && /^.gree /.test(nsBox.value),
+       "the box holds the steps the report is showing", nsBox.value.slice(0, 40));
+    ok(card(nsKey).querySelectorAll("li").length === 0,
+       "the rendered list is swapped for the box, so the steps are not shown twice");
+    nsBox.value = "Book the steering meeting\nAgree the budget line";
+    nsBox.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(/Book the steering meeting/.test(E.getReportNarrative().nextSteps || ""),
+       "it saves to the next-steps store, not to a section override");
+    ok(!(E.getReportSection(nsKey) || {}).prose, "...and does not also write a section override");
+    clickText("Done", card(nsKey));
+    ok(card(nsKey).textContent.indexOf("Book the steering meeting") !== -1,
+       "the report shows what was typed");
+
+    // ---- advice on a requirement that already MEETS its target is editable ----
+    var metReq = null;
+    (E.scoreActiveTarget().perRequirement || []).forEach(function (r) {
+      if (!metReq && r.band === "met" && r.touched) metReq = r.requirementId;
+    });
+    ok(!!metReq, "the demo has a requirement that meets its target", String(metReq));
+    E.setResponse(E.getActiveTarget().id, metReq, { action: "Keep the quarterly review going." });
+    A.UI.go("report");
+    var frCard = card("further-recommendations");
+    ok(!!frCard, "advice on a met requirement gets its own section");
+    var frRow = frCard.querySelector("tbody tr");
+    ok(frRow.classList.contains("plan-row"), "its rows are clickable, like the roadmap's");
+    frRow.click();
+    var modal = document.querySelector(".modal");
+    ok(!!modal, "clicking one opens the plan editor");
+    ok(modal.textContent.indexOf("Recommendation") !== -1,
+       "titled as a recommendation, not a remediation", modal.textContent.slice(0, 60));
+    var mAction = modal.querySelectorAll("textarea")[1];
+    ok(/quarterly review/.test(mAction.value), "holding the advice already recorded", mAction.value);
+    mAction.value = "Keep the quarterly review going, and widen it to the DMZ.";
+    [].slice.call(modal.querySelectorAll("button")).filter(function (b) { return b.textContent === "Save"; })[0].click();
+    ok(mainText().indexOf("widen it to the DMZ") !== -1, "the edit reaches the report");
+
+    // ---- cross-zone actions are editable, once, on the shared layer ----
+    var xCard = [].slice.call(main().querySelectorAll(".card[data-section]")).filter(function (c) {
+      return /^actions-that-span/.test(c.getAttribute("data-section"));
+    })[0];
+    ok(!!xCard, "the cross-zone actions section is on the page",
+       [].slice.call(main().querySelectorAll("[data-section]")).map(function (c) { return c.getAttribute("data-section"); }).join(" | "));
+    var xRow = xCard.querySelector("tbody tr");
+    ok(xRow.classList.contains("plan-row"), "its rows are clickable too");
+    xRow.click();
+    var xModal = document.querySelector(".modal");
+    ok(!!xModal, "clicking one opens the plan editor");
+    ok(/shared layer/.test(xModal.textContent), "which says the plan is written once, shared");
+    var xAction = xModal.querySelectorAll("textarea")[1];
+    xAction.value = "Deploy the site-wide log collector in the Q3 window.";
+    [].slice.call(xModal.querySelectorAll("button")).filter(function (b) { return b.textContent === "Save"; })[0].click();
+    var sharedResp = E.findResponse(E.SHARED_TARGET_ID,
+      (E.scoreAllTargets().sharedRoadmap[0] || {}).requirementId);
+    ok(sharedResp && /site-wide log collector/.test(sharedResp.action || ""),
+       "the action is stored on the SHARED layer, so it covers every zone it reaches",
+       JSON.stringify(sharedResp && sharedResp.action));
+    ok(mainText().indexOf("site-wide log collector") !== -1, "and shows in the cross-zone table");
+
+    ok(!!(E.state.engagement.reportCustom && E.state.engagement.reportCustom["the-system-as-a-whole"]),
+       "the overrides reach the engagement projection the exporter is handed",
+       JSON.stringify(Object.keys(E.state.engagement.reportCustom || {})));
+
+    // The Word pass has to reach a section nested UNDER an h1. Walking the
+    // heading list flat let the first h1 swallow every h2 below it, so an
+    // override silently did nothing in Word while working on screen.
+    (function () {
+      var nested = [
+        { __headingLevel: 1, __headingText: "Some part", __type: "Paragraph", text: "Some part" },
+        { __isBody: true, __type: "Paragraph", text: "part intro" },
+        { __headingLevel: 2, __headingText: "The system as a whole", __type: "Paragraph", text: "The system as a whole" },
+        { __isBody: true, __type: "Paragraph", text: "generated line" },
+        { __headingLevel: 2, __headingText: "Next thing", __type: "Paragraph", text: "Next thing" }
+      ];
+      var res = A.ExportDOCX.__applyReportCustom(nested, E.state.engagement);
+      var texts = res.map(function (n) { return n.__headingText || n.text; });
+      ok(texts.indexOf("generated line") === -1,
+         "Word pass: an h2 nested under an h1 is still reached", texts.join(" / "));
+      ok(texts.indexOf("part intro") !== -1 && texts.indexOf("Next thing") !== -1,
+         "Word pass: its neighbours are left alone", texts.join(" / "));
+    })();
+
+    build(function (err) {
+      try {
+        if (err) { ok(false, "SL Word build - " + (err.message || err)); return next(); }
+        var txt = docText();
+        ok(txt.indexOf("For this client a floor finding means") !== -1, "Word: the edited wording is used");
+        ok(txt.indexOf("requirements sit at floor") !== -1, "Word: the untouched sentences survive");
+        ok(headings().indexOf("The system as a whole") !== -1, "Word: an un-renamed heading is untouched");
+        ok(headings().indexOf("Where to start") !== -1, "Word: a renamed heading follows the screen",
+           headings().join(" | "));
+        ok(txt.indexOf("Deluge system") !== -1 && txt.indexOf("fire-suppression") !== -1,
+           "Word: the consultant's glossary term prints");
+        ok(headings().indexOf("Other terms used in this report") !== -1,
+           "Word: under its own sub-heading in the glossary");
+
+        // hide it and rebuild
+        card("the-system-as-a-whole").querySelector(".sect-edit").click();
+        clickText("Hide this section", card("the-system-as-a-whole"));
+        ok(E.getReportSection("the-system-as-a-whole").hidden === true, "hide is stored");
+        ok(card("the-system-as-a-whole").classList.contains("section-hidden"),
+           "the preview keeps the section, dimmed, so it can be put back");
+        ok(mainText().indexOf("Hidden: left out of the Word document") !== -1, "...and says so");
+
+        build(function (err2) {
+          try {
+            if (err2) { ok(false, "SL Word rebuild - " + (err2.message || err2)); return next(); }
+            ok(headings().indexOf("The system as a whole") === -1, "Word: a hidden section is dropped");
+            ok(docText().indexOf("For this client a floor finding means") === -1,
+               "Word: its content goes with it, not just the heading");
+            ok(headings().indexOf("Method and limitations") !== -1,
+               "Word: the sections after it are still there", headings().join(" | "));
+            next();
+          } catch (e) { ok(false, "threw: " + e.message); flush(); }
+        });
+      } catch (e) { ok(false, "threw: " + e.message); flush(); }
+    });
+
+    function next() {
+      // ---- overrides are per assessment and survive a save/load ----
+      var saved = JSON.parse(JSON.stringify(A.Storage.getProjectFile
+        ? A.Storage.getProjectFile() : E.getProjectFile()));
+      var asses = A.Storage.findAssessment(saved, "iec-62443-3-3");
+      ok(asses && asses.reportCustom && asses.reportCustom[SL_KEY],
+         "the overrides are written into the project file");
+      E.activateInstrument("general-ot-posture");
+      ok(Object.keys(E.getReportCustom()).length === 0,
+         "a different assessment starts with none of them");
+
+      // ---- domain-letter reorders too, and it reaches its Word document ----
+      A.TourPosture.apply(E);
+      A.UI.go("report");
+      var ids = [].slice.call(card("priority-order").querySelectorAll("[data-reorder-id]"))
+        .map(function (r) { return r.getAttribute("data-reorder-id"); });
+      ok(ids.length > 2, "the posture priority order is reorderable too", ids.join(","));
+      var flipped = ids.slice().reverse();
+      E.setReportSection("priority-order", { order: flipped });
+      A.UI.go("report");
+      var now = [].slice.call(card("priority-order").querySelectorAll("[data-reorder-id]"))
+        .map(function (r) { return r.getAttribute("data-reorder-id"); });
+      ok(now.join(",") === flipped.join(","), "the stored order drives the posture card", now.join(","));
+      build(function (err3) {
+        try {
+          if (err3) { ok(false, "posture Word build - " + (err3.message || err3)); return flush(); }
+          // Read only the bullets under the document's own "Priority order"
+          // heading; domain names appear all over the report otherwise.
+          var nodes = [];
+          (window.__doc.sections || []).forEach(function (a) {
+            (a.children || []).forEach(function (n) { if (n) nodes.push(n); });
+          });
+          var start = -1;
+          for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].__headingText === "Priority order") { start = i; break; }
+          }
+          var bullets = [];
+          for (var j = start + 1; j < nodes.length && !nodes[j].__headingLevel; j++) {
+            var tx = nodes[j].text || "";
+            if (/^•/.test(tx)) bullets.push(tx);
+          }
+          ok(start >= 0 && bullets.length > 2, "the posture document has a priority-order list",
+             "start=" + start + " bullets=" + bullets.length);
+          var perDomain = E.scoreActiveTarget().perDomain || [];
+          var expected = flipped.map(function (id) {
+            var d = perDomain.filter(function (x) { return x.domainId === id; })[0];
+            return d ? d.name : null;
+          }).filter(Boolean);
+          var got = bullets.map(function (b) {
+            var hit = expected.filter(function (nm) { return b.indexOf(nm) !== -1; })[0];
+            return hit || "?";
+          });
+          ok(JSON.stringify(got) === JSON.stringify(expected),
+             "Word: the posture priority order follows the consultant's order",
+             got.join(" > ") + "   expected " + expected.join(" > "));
+          flush();
+        } catch (e) { ok(false, "threw: " + e.message); flush(); }
+      });
+    }
+  } catch (e) { ok(false, "threw: " + (e && e.message)); flush(); }
+  flush();
+})();
+</script>
+</body></html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Issue check: the check and the Word build agree</title></head>
+<body>
+<!--
+  The ready-to-issue check lists what would print red in the Word report. It
+  is read from the build itself, so it cannot drift from the document; this
+  page proves it. For every demo (all 20 instruments, as the tours seed them)
+  the check runs over exactly the documents an export would write, the same
+  documents are then built for real, unzipped, and every red paragraph in
+  word/document.xml (the PlaceholderText style, or a run coloured E00000) is
+  matched one for one against the check's list. Then the same again with the
+  consultant's words taken away (exposure, priorities, method, next steps,
+  every plan's impact and action, the basis register), so each kind of prompt
+  is exercised, and once more with a section hidden, which must take its
+  prompts out of both.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+// The red text of every paragraph in the body that prints any.
+function redTexts(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml"), out = [];
+  Array.prototype.forEach.call(doc.getElementsByTagNameNS(W, "p"), function (p) {
+    var st = p.getElementsByTagNameNS(W, "pStyle")[0];
+    var styled = st && st.getAttributeNS(W, "val") === "PlaceholderText";
+    var text = "";
+    Array.prototype.forEach.call(p.getElementsByTagNameNS(W, "r"), function (r) {
+      var c = r.getElementsByTagNameNS(W, "color")[0];
+      var red = c && /^E00000$/i.test(c.getAttributeNS(W, "val"));
+      if (styled || red) Array.prototype.forEach.call(r.getElementsByTagNameNS(W, "t"), function (t) { text += t.textContent; });
+    });
+    if (styled || text) out.push(text);
+  });
+  return out;
+}
+function sameList(a, b) {
+  var x = a.slice().sort(), y = b.slice().sort();
+  if (x.length !== y.length) return false;
+  for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+  return true;
+}
+var KINDS = ["narrative", "nextSteps", "item", "basis", "raVerdict", "incomplete"];
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, X = A.ExportDOCX, I;
+  // The pixels of the charts are not what is being compared.
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  I = A.UI.__issue;
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+
+  function ids() { return E.state.engagement.targets.map(function (t) { return t.id; }); }
+
+  // Check and build every document the default export would write; compare.
+  function compare(tag) {
+    var jobs = I.jobs(ids(), "per");
+    return new Promise(function (res) { I.run(jobs, function (err, list) { res({ err: err, list: list || [] }); }); })
+    .then(function (chk) {
+      ok(!chk.err, tag + ": the check runs", chk.err && chk.err.message);
+      var docs = Promise.resolve([]);
+      jobs.forEach(function (job) {
+        docs = docs.then(function (acc) {
+          return new Promise(function (res) {
+            X.buildAsync(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+              Object.assign({}, job.opts, { issueStatus: "draft" }), function (err, blob) { res(err ? { err: err } : { blob: blob }); });
+          }).then(function (r) {
+            if (r.err) { ok(false, tag + ": the Word document builds", r.err.message); return acc; }
+            return H.unzipText(r.blob).then(function (parts) {
+              var d = parts.filter(function (p) { return p.name === "word/document.xml"; })[0];
+              return acc.concat(redTexts(d ? d.text : ""));
+            });
+          });
+        });
+      });
+      return docs.then(function (red) {
+        var listed = chk.list.map(function (p) { return p.text; });
+        ok(sameList(red, listed), tag + ": every red paragraph in the Word file is in the check, and nothing else (" + red.length + ")",
+           "word: " + JSON.stringify(red.slice().sort()).slice(0, 600) + "  check: " + JSON.stringify(listed.slice().sort()).slice(0, 600));
+        var unknown = chk.list.filter(function (p) { return KINDS.indexOf(p.where && p.where.kind) === -1; });
+        ok(unknown.length === 0, tag + ": each says where in the tool it is fixed", JSON.stringify(unknown.slice(0, 3)));
+        var orphan = chk.list.filter(function (p) {
+          if (p.where.kind !== "item") return false;
+          var cat = E.state.instrument.requirements || E.state.instrument.outcomes || E.state.instrument.items || E.state.instrument.questions || [];
+          return !p.targetId || !cat.some(function (c) { return c.id === p.where.itemId; });
+        });
+        ok(orphan.length === 0, tag + ": every roadmap prompt names a real item and the target it is on", JSON.stringify(orphan.slice(0, 2)));
+        if (/(demo)/.test(tag)) ok.note("   " + tag + " lists: " + (chk.list.map(function (p) { return p.where.kind + (p.where.field ? ":" + p.where.field : ""); }).join(", ") || "nothing"));
+        return chk.list;
+      });
+    });
+  }
+
+  // Take the consultant's own words away.
+  function strip() {
+    E.setReportNarrative({ regulatoryExposure: "", topPriorities: "", method: "", nextSteps: "",
+                           entityClassification: "", competentAuthority: "" });
+    (E.state.engagement.responses || []).forEach(function (r) { r.impact = ""; r.action = ""; });
+    var b = E.getBasisOfAssessment();
+    b.interviews.length = 0; b.documents.length = 0; b.observations.length = 0;
+    E.touchBasisOfAssessment && E.touchBasisOfAssessment();
+  }
+
+  var chain = Promise.resolve();
+  Object.keys(SEED).forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      return compare(id + " (demo)");
+    }).then(function () {
+      strip();
+      return compare(id + " (blank)");
+    }).then(function (list) {
+      ok(list.length > 0, id + " (blank): with the consultant's words gone there is something to write", list.length);
+      var kinds = {};
+      list.forEach(function (p) { kinds[p.where.kind] = true; });
+      // The risk appetite summary carries no evidence-basis line.
+      ok(kinds.nextSteps && (kinds.basis || id === "risk-appetite"), id + " (blank): the next steps and the basis register are among them", Object.keys(kinds).join(","));
+      // Hide the closing section: its prompt must leave the document and the
+      // check together.
+      var key = A.Report.sectionKey("Proposed next steps", { engagement: E.state.engagement });
+      E.setReportSection(key, { hidden: true });
+      return compare(id + " (next steps hidden)").then(function (l2) {
+        ok(!l2.some(function (p) { return p.where.kind === "nextSteps"; }), id + ": a hidden section's prompt is not reported");
+        E.clearReportSection(key);
+      });
+    });
+  });
+  chain.then(done, function (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+});
+</script>
+</body></html>

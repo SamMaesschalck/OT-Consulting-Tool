@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Risk appetite Excel export, as the Excel button runs it</title></head>
+<body>
+<!--
+  The risk appetite workbook builder appended the "Basis of assessment" sheet
+  itself, and the shared build() then appended it again. With an empty
+  evidence register the second call returns early, so every test built with
+  blank data passed; with a real register (any actual engagement, and the
+  demo) the duplicate sheet name threw before the export's error handling,
+  so pressing Excel produced nothing at all. This builds the workbook from the
+  demo, with the same options the Excel button passes, and then runs the real
+  download path.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, tours: ["risk-appetite"] }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.on("instrument-changed", function (inst) { if (inst && inst.id === "risk-appetite") A.TourRiskAppetite.apply(E); });
+  E.activateInstrument("risk-appetite");
+
+  var basis = E.getBasisOfAssessment ? E.getBasisOfAssessment() : null;
+  ok(basis && (basis.interviews || []).length > 0, "the demo has a filled-in basis of assessment, as a real engagement would");
+
+  var opts = { targetId: E.state.activeTargetId, riskAppetiteSetup: E.getRiskAppetiteSetup(),
+               progress: A.UI.__progressExportPayload ? A.UI.__progressExportPayload() : null };
+  var wb = null, err = null;
+  try { wb = A.ExportXLSX.build(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, opts); }
+  catch (e) { err = e; }
+  ok(!err && wb, "the workbook builds", err && err.message);
+  var names = wb ? wb.SheetNames : [];
+  ok(names.length === new Set(names).size, "no sheet is added twice", names.join(", "));
+  ok(names.filter(function (n) { return /^Basis/.test(n); }).length === 1, "the basis of assessment appears once", names.join(", "));
+  ok(["Front", "Characterisation", "Read me"].every(function (n) { return names.indexOf(n) !== -1; }),
+     "with the risk appetite sheets", names.join(", "));
+  ok(!names.some(function (n) { return n === "Progress"; }) || names.filter(function (n) { return /Progress|Change/.test(n); }).length === 1,
+     "and a single change-since-last-time sheet, not the generic one as well", names.join(", "));
+
+  // The real download path, with the download itself stubbed so it can finish headless.
+  var saved = null, real = A.Storage.downloadBlob;
+  A.Storage.downloadBlob = function (blob, name) { saved = { blob: blob, name: name }; };
+  var p;
+  try { p = A.ExportXLSX.download(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, opts); }
+  catch (e) { ok(false, "the download path does not throw before it starts", e.message); A.Storage.downloadBlob = real; done(); return; }
+  p.then(function () {
+    A.Storage.downloadBlob = real;
+    ok(saved && saved.blob && saved.blob.size > 5000 && /\.xlsx$/.test(saved.name), "the Excel button's download produces a workbook file",
+       saved ? saved.name + " " + saved.blob.size + " bytes" : "nothing saved");
+    done();
+  }, function (e) { A.Storage.downloadBlob = real; ok(false, "the download completes", e && e.message); done(); });
+});
+</script>
+</body></html>

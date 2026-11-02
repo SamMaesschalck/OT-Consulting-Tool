@@ -1,0 +1,157 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Posture and supplier workbook covers every site</title></head>
+<body>
+<!--
+  The export scope dialog promises one workbook covering all the selected
+  sites for the domain-letter family (posture, supplier screener), and
+  screening several suppliers in one file is ordinary use. The workbook read
+  only the first target's results, so a second supplier never appeared, and
+  the Questions sheet keyed answers by question across every target, so the
+  last supplier's notes sat beside the first supplier's bands.
+
+  Two suppliers here: Alpha answered at the top band (grade A) and Bravo at
+  the bottom (grade F), each with notes and evidence naming itself. Every
+  sheet must show both, each with its own grade, bands and notes, and never
+  one supplier's words beside the other's results. A single-supplier
+  workbook keeps the columns it always had.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.activateInstrument("supplier-screener");
+  var inst = E.state.instrument;
+  ok(inst && inst.scoringFamily === "domain-letter", "the supplier screener is a domain-letter instrument");
+
+  var alphaId = E.state.activeTargetId;
+  E.renameTarget(alphaId, "Alpha");
+  var bravo = E.addTarget("Bravo");
+  var bravoId = (bravo && bravo.id) || E.state.activeTargetId;
+  ok(alphaId !== bravoId && E.state.engagement.targets.length === 2, "two suppliers in one engagement");
+
+  var scoredQs = inst.questions.filter(function (q) { return q.scored !== false; });
+  // Alpha: top band everywhere except one question, so it has one improvement
+  // of its own. Bravo: bottom band everywhere. Notes and evidence name the site.
+  var alphaDip = scoredQs[0].id;
+  scoredQs.forEach(function (q) {
+    E.setResponse(alphaId, q.id, { applicable: true, band: q.id === alphaDip ? 2 : 3,
+      evidence: "Alpha evidence " + q.id, notes: "Alpha note " + q.id });
+    E.setResponse(bravoId, q.id, { applicable: true, band: 0,
+      evidence: "Bravo evidence " + q.id, notes: "Bravo note " + q.id });
+  });
+
+  var sc = A.ScoringDomainLetter.scoreEngagement(E.state.engagement, inst, E.state.profile);
+  var gA = sc.perTarget[0].result.headlineGrade, gB = sc.perTarget[1].result.headlineGrade;
+  ok(gA === "A" && gB === "F", "the scorer grades Alpha A and Bravo F", gA + " / " + gB);
+
+  // Cell values as the ExcelJS layer writes them (cell.v). sheet_to_json is no
+  // use here: the styled cells carry no type, and it reads them as blank.
+  function rowsOf(wb, name) {
+    var ws = wb.Sheets[name];
+    if (!ws || !ws["!ref"]) return [];
+    var rg = XLSX.utils.decode_range(ws["!ref"]), out = [];
+    for (var r = 0; r <= rg.e.r; r++) {
+      var row = [];
+      for (var c = 0; c <= rg.e.c; c++) {
+        var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+        row.push(cell && cell.v != null ? cell.v : "");
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  function build(eng) {
+    return A.ExportXLSX.build(eng, inst, E.state.taxonomy, E.state.profile, { targetId: alphaId });
+  }
+
+  var wb = build(E.state.engagement);
+  var names = wb.SheetNames;
+  ok(["Headline", "Domains", "Priority", "Improvements", "Questions"].every(function (n) { return names.indexOf(n) !== -1; }),
+     "the workbook has the posture sheets", names.join(", "));
+
+  // ---- Headline: one column per supplier, named, each with its own grade ---
+  var head = rowsOf(wb, "Headline");
+  ok(head[0][1] === "Alpha" && head[0][2] === "Bravo", "the headline names both suppliers, one column each", JSON.stringify(head[0]));
+  var gradeRow = head.filter(function (r) { return r[0] === "Overall indicative grade"; })[0] || [];
+  ok(String(gradeRow[1]).charAt(0) === "A", "Alpha's own grade (A) sits under Alpha", JSON.stringify(gradeRow));
+  ok(String(gradeRow[2]).charAt(0) === "F", "Bravo's own grade (F) sits under Bravo", JSON.stringify(gradeRow));
+
+  // ---- Domains: a supplier column, each supplier's domains graded its own way
+  var dom = rowsOf(wb, "Domains");
+  ok(dom[0][0] === "Supplier" && dom[0][1] === "Domain", "the domain results lead with a supplier column", JSON.stringify(dom[0]));
+  var domA = dom.slice(1).filter(function (r) { return r[0] === "Alpha"; });
+  var domB = dom.slice(1).filter(function (r) { return r[0] === "Bravo"; });
+  ok(domA.length === inst.domains.length && domB.length === inst.domains.length,
+     "every domain is listed for each supplier", domA.length + " + " + domB.length + " of " + inst.domains.length);
+  ok(domA.every(function (r) { return String(r[3]).charAt(0) === "A"; }), "Alpha's domains carry Alpha's grades",
+     domA.map(function (r) { return r[3]; }).join(","));
+  ok(domB.every(function (r) { return String(r[3]).charAt(0) === "F"; }), "Bravo's domains carry Bravo's grades",
+     domB.map(function (r) { return r[3]; }).join(","));
+
+  // ---- Priority: both suppliers ranked ---------------------------------
+  var pri = rowsOf(wb, "Priority");
+  ok(pri.some(function (r) { return r[0] === "Alpha"; }) && pri.some(function (r) { return r[0] === "Bravo"; }),
+     "the priority order covers both suppliers");
+
+  // ---- Questions: each supplier's own bands beside its own notes ---------
+  var qs = rowsOf(wb, "Questions");
+  var qHead = qs[0];
+  var cSite = 0, cQid = qHead.indexOf("Question ID"), cBand = qHead.indexOf("Band"), cNotes = qHead.indexOf("Notes / captured fields");
+  ok(qHead[cSite] === "Supplier" && cBand > 0 && cNotes > 0, "the question register leads with a supplier column", JSON.stringify(qHead));
+  var qA = qs.slice(1).filter(function (r) { return r[cSite] === "Alpha"; });
+  var qB = qs.slice(1).filter(function (r) { return r[cSite] === "Bravo"; });
+  ok(qA.length === inst.questions.length && qB.length === inst.questions.length,
+     "every question is listed for each supplier", qA.length + " + " + qB.length + " of " + inst.questions.length);
+  var crossedA = qA.filter(function (r) { return /Bravo/.test(r[cNotes]); });
+  var crossedB = qB.filter(function (r) { return /Alpha/.test(r[cNotes]); });
+  ok(crossedA.length === 0 && crossedB.length === 0, "no supplier's notes appear beside the other supplier's answers",
+     crossedA.length + " Alpha rows carry Bravo notes, " + crossedB.length + " Bravo rows carry Alpha notes");
+  var scoredRowsA = qA.filter(function (r) { return r[cBand] !== ""; });
+  ok(scoredRowsA.length === scoredQs.length && scoredRowsA.every(function (r) {
+       return /Alpha note/.test(r[cNotes]) && (r[cBand] === 3 || r[cBand] === 2);
+     }), "Alpha's rows show Alpha's bands with Alpha's notes");
+  var scoredRowsB = qB.filter(function (r) { return r[cBand] !== ""; });
+  ok(scoredRowsB.length === scoredQs.length && scoredRowsB.every(function (r) {
+       return /Bravo note/.test(r[cNotes]) && r[cBand] === 0;
+     }), "Bravo's rows show Bravo's bands with Bravo's notes");
+
+  // ---- Improvements: each supplier's own list, with its own evidence -------
+  var imp = rowsOf(wb, "Improvements");
+  var iHead = imp[1] || [];
+  var cEv = iHead.indexOf("Captured evidence");
+  ok(iHead[0] === "Supplier" && cEv > 0, "the improvement roadmap leads with a supplier column", JSON.stringify(iHead));
+  var impA = imp.slice(2).filter(function (r) { return r[0] === "Alpha"; });
+  var impB = imp.slice(2).filter(function (r) { return r[0] === "Bravo"; });
+  ok(impA.length === 1 && impB.length === scoredQs.length, "Alpha has its one improvement and Bravo all of its own",
+     impA.length + " / " + impB.length);
+  ok(impA.every(function (r) { return /^Alpha evidence/.test(r[cEv]); }) && impB.every(function (r) { return /^Bravo evidence/.test(r[cEv]); }),
+     "each improvement carries its own supplier's evidence");
+
+  // ---- one supplier: the columns it always had --------------------------
+  var single = Object.assign({}, E.state.engagement, {
+    targets: E.state.engagement.targets.filter(function (t) { return t.id === alphaId; }),
+    responses: E.state.engagement.responses.filter(function (r) { return r.targetId === alphaId; })
+  });
+  var wb1 = build(single);
+  var h1 = rowsOf(wb1, "Headline");
+  ok(h1[0].length === 2 && h1[0][1] === "Alpha", "a one-supplier headline keeps two columns and names the supplier", JSON.stringify(h1[0]));
+  ok(rowsOf(wb1, "Domains")[0][0] === "Domain", "a one-supplier domain sheet has no supplier column");
+  var q1 = rowsOf(wb1, "Questions");
+  ok(q1[0][0] === "Domain" && q1.length - 1 === inst.questions.length, "a one-supplier question register keeps its columns and rows");
+
+  // ---- and the real download path writes it -----------------------------
+  var saved = null, real = A.Storage.downloadBlob;
+  A.Storage.downloadBlob = function (blob, name) { saved = blob; };
+  Promise.resolve(A.ExportXLSX.download(E.state.engagement, inst, E.state.taxonomy, E.state.profile, { targetId: alphaId }))
+    .then(function () {
+      A.Storage.downloadBlob = real;
+      ok(saved && saved.size > 5000, "the two-supplier workbook downloads", saved ? saved.size + " bytes" : "nothing saved");
+      done();
+    }, function (e) { A.Storage.downloadBlob = real; ok(false, "the two-supplier workbook downloads", e && e.message); done(); });
+});
+</script>
+</body></html>

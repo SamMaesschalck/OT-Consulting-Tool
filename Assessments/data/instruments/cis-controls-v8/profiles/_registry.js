@@ -1,0 +1,60 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/cis-controls-v8/profiles/_registry.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["cis-controls-v8"] = window.App.Data.instruments["cis-controls-v8"] || {};
+window.App.Data.instruments["cis-controls-v8"].profileRegistry = {
+    "schema":  "caf-profile-registry/2.0",
+    "_note":  "CIS Controls v8.1.2 Implementation Groups overlay the base cis-controls-v8 instrument by Safeguard id. \u0027cis-ig1\u0027 is the default. Membership is from the CIS IG1/IG2/IG3 columns (nested); \u0027full\u0027 assesses every Safeguard with no target.",
+    "default":  "cis-ig1",
+    "levels":  [
+
+               ],
+    "profiles":  [
+                     {
+                         "id":  "cis-full",
+                         "name":  "Full (all Safeguards, no target group)",
+                         "sectorRegulator":  "none",
+                         "sectorRegulatorName":  "CIS Controls",
+                         "sector":  "general",
+                         "sectorName":  "Full",
+                         "level":  "n/a",
+                         "status":  "active",
+                         "file":  "profiles/cis-full.json"
+                     },
+                     {
+                         "id":  "cis-ig1",
+                         "name":  "Implementation Group 1 (essential cyber hygiene)",
+                         "sectorRegulator":  "cis",
+                         "sectorRegulatorName":  "CIS Implementation Group",
+                         "sector":  "ig1",
+                         "sectorName":  "IG1",
+                         "level":  "n/a",
+                         "status":  "active",
+                         "file":  "profiles/cis-ig1.json"
+                     },
+                     {
+                         "id":  "cis-ig2",
+                         "name":  "Implementation Group 2",
+                         "sectorRegulator":  "cis",
+                         "sectorRegulatorName":  "CIS Implementation Group",
+                         "sector":  "ig2",
+                         "sectorName":  "IG2",
+                         "level":  "n/a",
+                         "status":  "active",
+                         "file":  "profiles/cis-ig2.json"
+                     },
+                     {
+                         "id":  "cis-ig3",
+                         "name":  "Implementation Group 3",
+                         "sectorRegulator":  "cis",
+                         "sectorRegulatorName":  "CIS Implementation Group",
+                         "sector":  "ig3",
+                         "sectorName":  "IG3",
+                         "level":  "n/a",
+                         "status":  "active",
+                         "file":  "profiles/cis-ig3.json"
+                     }
+                 ]
+};

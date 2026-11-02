@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>62443-4-2 demo dataset check</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<div class="app"><div class="header"><div class="brand"><span class="sub">x</span></div>
+<span id="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["42"] });</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  try {
+    A.UI.init();
+    E.activateInstrument("iec-62443-4-2");
+    A.Tour42.apply(E);
+    var s = E.scoreActiveTarget();
+
+    ok(!!s, "scores without error");
+    ok(s.totalAnswered === 47, "47 in-scope requirements answered", "got " + s.totalAnswered);
+    ok(E.state.engagement.targetProfile.defaultTargetSL === 2, "target SL 2 applied");
+
+    out.push("");
+    out.push("FR   target achieved closeness  applicable/answered  met  floor");
+    s.perFR.forEach(function (f) {
+      out.push("  " + f.frId + "     " + f.targetSL + "       " +
+        (f.conformantAchievedSL === null ? "-" : f.conformantAchievedSL) + "        " +
+        (f.closeness === null ? "-" : Math.round(f.closeness * 100) + "%") +
+        "        " + f.applicableCount + " / " + f.answeredCount +
+        "          " + f.metCount + "    " + f.floorFlagCount);
+    });
+    out.push("");
+    ok(s.overallTargetMet === false, "overall target NOT met (intended)");
+    // Floor flags count REQUIREMENTS whose base item is in scope and not met:
+    // the requirement is not in place at all, whatever the FR reaches overall.
+    ok(s.floorFlagCount === 7, "7 requirements are floor-flagged", "got " + s.floorFlagCount);
+    var floors = s.perRequirement.filter(function (r) { return r.floor; }).map(function (r) { return r.code; });
+    ok(floors.indexOf("CR 1.1") !== -1 && floors.indexOf("CR 6.2") !== -1,
+       "including the two the demo narrative calls out", floors.join(", "));
+    ok(s.perRequirement.filter(function (r) { return r.code === "CR 1.5"; })[0].floor === false,
+       "a requirement one level below target is not floor-flagged");
+    var weak = (s.weakestFRs || []).map(function (w) { return w.frId; }).join(",");
+    ok(weak === "FR1", "weakest FR is FR1", "got " + weak);
+
+    // every in-scope item answered, and every below-target requirement planned
+    var unanswered = [];
+    var unplanned = [];
+    s.perFR.forEach(function (f) {
+      f.reqs.forEach(function (r) {
+        if (!r.applicable) return;
+        if (!r.answered) unanswered.push(r.requirementId);
+        var resp = E.findResponse(E.state.activeTargetId, r.requirementId) || {};
+        if (!r.met && !resp.action) unplanned.push(r.requirementId);
+      });
+    });
+    ok(unanswered.length === 0, "no in-scope requirement left unanswered", unanswered.join(","));
+    ok(unplanned.length === 0, "every below-target requirement has a remediation plan", unplanned.join(","));
+
+    var na = 0;
+    s.perFR.forEach(function (f) { f.reqs.forEach(function (r) { if (!r.applicable) na++; }); });
+    ok(na === 28, "28 requirements out of scope", "got " + na);
+
+    // The three reasons a requirement went unscored must stay distinct: a
+    // component-type exclusion, a level the target never reached, and a
+    // requirement the standard never selects at any level.
+    function reasons(kind) {
+      var n = 0;
+      s.perRequirement.forEach(function (r) { if (r.exclusionReason === kind) n++; });
+      return n;
+    }
+    ok(reasons("out-of-target") === 1, "CR 2.7 is out of scope because SL-T is 2, not by judgement",
+       "got " + reasons("out-of-target"));
+    ok(reasons("never-selected") === 2, "CR 2.3 and CR 7.5 carry no SL anywhere in Annex B",
+       "got " + reasons("never-selected"));
+    ok(reasons("judged-na") === 25, "25 requirements excluded by assessor judgement",
+       "got " + reasons("judged-na"));
+
+    // Both SL-A vectors: nothing in this dataset leans on a compensating
+    // measure, so the strict vector must equal the conformant one.
+    var propped = s.perFR.filter(function (f) { return f.propUpByCompensating; });
+    ok(propped.length === 0, "no FR is propped up by a compensating measure", propped.length + "");
+
+    // The blocking-item list is the remediation list, and it must name items.
+    var blk = s.blockingItems.map(function (b) { return b.item.label; });
+    ok(blk.indexOf("CR 1.1") !== -1 && blk.indexOf("CR 6.2") !== -1,
+       "blocking items name the specific gaps holding FR1 and FR6 down", blk.join(" | "));
+
+    var rn = E.getReportNarrative();
+    ok(!!rn.regulatoryExposure && !!rn.topPriorities, "consultant exec-summary blocks supplied");
+
+    // report + exports
+    var host = document.createElement("div");
+    A.Report.render(host, { engagement: E.state.engagement, instrument: E.state.instrument,
+      taxonomy: E.state.taxonomy, profile: E.state.profile, narrative: E.getActiveNarrative(),
+      scored: s, scoredAll: E.scoreAllTargets(), activeTarget: E.getActiveTarget(),
+      targetProfile: E.state.engagement.targetProfile });
+    ok(host.textContent.length > 4000, "report renders substantial content", String(host.textContent.length));
+    ok(host.textContent.indexOf("Meridian S9") !== -1, "report carries the demo component name");
+
+    // ---- component-specific report sections ----
+    var vec = host.querySelector(".sl-vector");
+    ok(!!vec, "report states the capability security level vector");
+    ok(vec && vec.querySelectorAll(".sl-vector-cell").length === 7, "vector has one cell per Foundational Requirement",
+       vec ? String(vec.querySelectorAll(".sl-vector-cell").length) : "-");
+    var claim = host.querySelector(".sl-vector-claim");
+    ok(!!claim && /^SL-C \(component\) = \{/.test(claim.textContent.trim()),
+       "vector is written in the standard's notation", claim ? claim.textContent.trim() : "-");
+    // FR1 floors to 0 and FR5 meets SL 2 in this dataset - the vector must agree.
+    var vals = [].map.call(host.querySelectorAll(".sl-vector-val"), function (n) { return n.textContent; });
+    ok(vals[0] === "0" && vals[4] === "2", "vector values match the scored profile", vals.join(","));
+
+    ok(host.textContent.indexOf("What was in scope") !== -1, "report accounts for what was in scope");
+    ok(/Assessed 47 of this instrument's 75 requirements/.test(host.textContent),
+       "scope line reconciles assessed against the instrument total");
+    ok(/22 requirements apply only to a different component type/.test(host.textContent),
+       "scope line explains the component-type exclusions");
+    ok(/3 further requirements were judged not applicable/.test(host.textContent),
+       "scope line explains the remaining exclusions");
+    ok(/1 requirement is first selected above the target security level/.test(host.textContent),
+       "scope line separates target scoping from assessor judgement");
+    ok(/2 requirements carry no security level/.test(host.textContent),
+       "scope line explains the requirements the standard never selects");
+
+    // The same sections must NOT leak into the system-level instrument.
+    var host33 = document.createElement("div");
+    E.activateInstrument("iec-62443-3-3");
+    var s33 = E.scoreActiveTarget();
+    A.Report.render(host33, { engagement: E.state.engagement, instrument: E.state.instrument,
+      taxonomy: E.state.taxonomy, profile: E.state.profile, narrative: E.getActiveNarrative(),
+      scored: s33, scoredAll: E.scoreAllTargets(), activeTarget: E.getActiveTarget(),
+      targetProfile: E.state.engagement.targetProfile });
+    // 62443-3-3 has its own vector, but it is the ACHIEVED level of a system
+    // (SL-A against SL-T), not a component capability claim (SL-C). The two
+    // must not be confused, and the component-type scope card stays 4-2 only.
+    ok(!!host33.querySelector(".sl-vector"), "62443-3-3 has its own SL vector");
+    var claim33 = host33.querySelector(".sl-vector-claim");
+    ok(!!claim33 && /^SL-A \(system\) = \{/.test(claim33.textContent.trim()),
+       "62443-3-3 vector is SL-A (system), not SL-C", claim33 ? claim33.textContent.trim() : "-");
+    ok(host33.textContent.indexOf("SL-C") === -1, "62443-3-3 never labels its vector SL-C");
+    ok(host33.textContent.indexOf("What was in scope") === -1,
+       "62443-3-3 does not gain the component-type scope card");
+    // Both instruments state the target vector alongside the achieved one.
+    var claims42 = host.querySelectorAll(".sl-vector-claim");
+    ok(claims42.length === 2 && /^SL-T/.test(claims42[1].textContent.trim()),
+       "vector states the target alongside the achieved level",
+       claims42.length === 2 ? claims42[1].textContent.trim() : String(claims42.length));
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+});
+</script>
+</body></html>
+

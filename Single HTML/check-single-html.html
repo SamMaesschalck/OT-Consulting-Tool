@@ -1,0 +1,148 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Check: single-file build</title></head>
+<body>
+<!--
+  Proves the single-file build is the same app as the folder version. Loads
+  both, side by side, and for every instrument activates it, scores it, renders
+  the report and builds the Word and Excel files, then compares the two.
+
+  Open it in Edge after running build-single-html.ps1. Headless runs need
+  --allow-file-access-from-files, since it reaches into both frames.
+-->
+<pre id="out">running…</pre>
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+
+  function load(url) {
+    return new Promise(function (resolve, reject) {
+      frame.onload = function () {
+        var w = frame.contentWindow, tries = 0;
+        (function wait() {
+          if (w.App && w.App.UI && w.App.Engine && w.App.Engine.state && w.App.Engine.state.instruments) return resolve(w);
+          if (++tries > 200) return reject(new Error("app did not start: " + url));
+          setTimeout(wait, 50);
+        })();
+      };
+      frame.src = url;
+    });
+  }
+
+  // Everything one copy of the app can tell us about itself.
+  function probe(w, label) {
+    var A = w.App, E = A.Engine, doc = w.document;
+    w.confirm = function () { return true; }; w.alert = function () {};
+    A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new w.Blob(["png"])); };
+    var r = {
+      label: label,
+      modules: Object.keys(A).sort().join(","),
+      version: (A.Version && A.Version.label) || "",
+      badge: ((doc.querySelector(".version-badge") || {}).textContent || ""),
+      // The rendered panel only: body text would include the start-up script,
+      // which contains the error template itself.
+      failedToStart: (((doc.getElementById("main") || {}).textContent || "").match(/.{0,120}Failed to start.{0,300}/) || [""])[0],
+      home: /Start an assessment/.test((doc.getElementById("main") || {}).textContent || ""),
+      licence: (function () {
+        if (!A.UI.openLicence) return 0;
+        A.UI.openLicence();
+        var t = ((doc.querySelector(".licence-modal .licence-text") || {}).textContent || "");
+        var m = doc.querySelector(".licence-modal"); if (m) m.click();
+        return /PROPRIETARY LICENCE/.test(t) ? t.length : 0;
+      })(),
+      legal: !!doc.querySelector(".sidebar-legal") && /SolutionsPT/.test(doc.querySelector(".sidebar-legal").textContent),
+      logo: ((doc.querySelector(".brand-logo img") || {}).naturalWidth || 0) > 0,
+      title: doc.title,
+      insts: {}
+    };
+    var list = E.state.instruments.filter(function (i) { return i.status !== "placeholder"; });
+    r.ids = list.map(function (i) { return i.id; }).join(",");
+    var jobs = [];
+    list.forEach(function (i0) {
+      var id = i0.id, o = r.insts[id] = {};
+      try {
+        E.activateInstrument(id);
+        var inst = E.state.instrument;
+        var scoredAll = E.scoreAllTargets();
+        var c = doc.createElement("div");
+        var opts = {
+          cafProfileRegistry: E.getCAFProfileRegistry ? E.getCAFProfileRegistry() : null,
+          cafProfileId: E.getActiveCAFProfileId ? E.getActiveCAFProfileId() : null,
+          cafProfile: E.getActiveCAFProfile ? E.getActiveCAFProfile() : null,
+          cafOverlay: E.getActiveCAFOverlay ? E.getActiveCAFOverlay() : null,
+          targetId: E.state.activeTargetId
+        };
+        A.Report.render(c, {
+          engagement: E.state.engagement, instrument: inst, taxonomy: E.state.taxonomy, profile: E.state.profile,
+          narrative: E.getActiveNarrative ? E.getActiveNarrative() : null,
+          scored: E.scoreActiveTarget ? E.scoreActiveTarget() : null, scoredAll: scoredAll, activeTarget: E.getActiveTarget(),
+          cafProfileRegistry: opts.cafProfileRegistry, cafProfileId: opts.cafProfileId, cafProfile: opts.cafProfile
+        });
+        o.items = JSON.stringify(inst).length;  // the whole instrument, whatever its shape
+        o.report = c.textContent.replace(/\s+/g, " ").replace(/\d{1,2} \w+ \d{4}|\d{4}-\d{2}-\d{2}/g, "").length;
+        var wb = A.ExportXLSX.build(E.state.engagement, inst, E.state.taxonomy, E.state.profile, opts);
+        o.sheets = wb.SheetNames.join(",");
+        var eng = E.state.engagement, tax = E.state.taxonomy, prof = E.state.profile, narr = E.getActiveNarrative ? E.getActiveNarrative() : null;
+        jobs.push(function () {
+          return new Promise(function (resolve) {
+            A.ExportDOCX.buildAsync(eng, inst, tax, prof, narr, opts, function (err, blob) {
+              o.docx = err ? ("ERROR " + err.message) : (blob ? blob.size : 0);
+              resolve();
+            });
+          });
+        });
+      } catch (e) {
+        o.error = e.message;
+      }
+    });
+    // Word builds one at a time, so the two copies are compared like for like.
+    return jobs.reduce(function (p, j) { return p.then(j); }, Promise.resolve()).then(function () { return r; });
+  }
+
+  var folder, single, bundle;
+  load("../Assessments/index.html").then(function (w) { return probe(w, "folder"); })
+    // The file is named for the version the app reports, so the check always
+    // opens the build of the code it is comparing against.
+    .then(function (r) { folder = r; bundle = "OT%20Cyber%20Assessment%20Tool%20" + r.version + ".html"; return load(bundle); })
+    .then(function (w) {
+      ok(w.location.href.indexOf(bundle) !== -1, "the single file for this version loads (" + decodeURIComponent(bundle) + ")");
+      ok(w.document.querySelectorAll("script[src],link[href]").length === 0,
+         "it loads nothing from beside itself: no script src or stylesheet link");
+      return probe(w, "single");
+    })
+    .then(function (r) {
+      single = r;
+      ok(!single.failedToStart, "the app starts", single.failedToStart);
+      ok(!folder.failedToStart, "(and so does the folder version it is compared with)", folder.failedToStart);
+      ok(single.home, "it opens on the assessment picker");
+      ok(single.version && single.version === folder.version && single.badge === single.version, "it is the same version as the app, and shows it (" + single.version + ")", folder.version + " vs " + single.version + ", badge " + single.badge);
+      ok(single.title === folder.title, "same page title", single.title);
+      ok(single.logo, "the header logo shows (embedded)");
+      ok(single.legal, "the copyright notice is in the sidebar");
+      ok(single.licence > 1000 && single.licence === folder.licence, "the full licence opens in a pop-up, with nothing sent alongside", folder.licence + " vs " + single.licence);
+      ok(single.modules === folder.modules, "the same app modules are present", single.modules);
+      ok(single.ids === folder.ids && single.ids.split(",").length >= 15,
+         "the same instruments are available (" + single.ids.split(",").length + ")", single.ids);
+      Object.keys(folder.insts).forEach(function (id) {
+        var a = folder.insts[id], b = single.insts[id] || {};
+        ok(!b.error, id + ": activates, scores and renders", b.error);
+        ok(b.items === a.items && b.items > 0, id + ": same instrument content (" + b.items + " chars)", a.items + " vs " + b.items);
+        ok(b.report === a.report && b.report > 200, id + ": report is identical in length (" + b.report + " chars)", a.report + " vs " + b.report);
+        ok(b.sheets === a.sheets, id + ": Excel has the same sheets", a.sheets + " vs " + b.sheets);
+        var close = typeof b.docx === "number" && typeof a.docx === "number" && b.docx > 2000 &&
+                    Math.abs(b.docx - a.docx) <= Math.max(200, a.docx * 0.01);
+        ok(close, id + ": Word builds to the same size (" + b.docx + " bytes)", a.docx + " vs " + b.docx);
+      });
+      finish();
+    })
+    .catch(function (e) { ok(false, "check threw: " + e.message); finish(); });
+})();
+</script>
+</body></html>

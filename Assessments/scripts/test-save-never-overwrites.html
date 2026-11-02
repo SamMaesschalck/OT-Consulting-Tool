@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Save never overwrites another project</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Reported as data loss: an assessment was saved (the save dialogue appeared),
+  then a second assessment was started and Save silently overwrote the first
+  customer's file.
+
+  Cause: the file handle is persisted in IndexedDB so Save can write back
+  without asking again, but nothing tied it to the project it came from. On a
+  new session `projectHandle` is null in memory, so Save restored "whatever
+  file was saved last" and wrote the current project straight into it.
+
+  Fix: the handle is stored with the projectId it belongs to, and is only ever
+  reused when that id matches the project being saved. Anything else falls
+  through to the save dialogue - the safe direction to fail.
+
+  These tests stub the File System Access API so the decision (write in place
+  vs ask) can be observed without touching the disk.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app();</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var STG = window.App.Storage, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function flush() {
+    out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = out.join("\n");
+  }
+
+  // ---- a stub filesystem ------------------------------------------------
+  var disk = {};          // filename -> contents written
+  var picked = [];        // filenames the save dialogue was used for
+  var idb = null;         // what "IndexedDB" is holding, or null
+
+  function makeHandle(name) {
+    return {
+      name: name,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () {
+        return Promise.resolve({
+          write: function (t) { disk[name] = t; return Promise.resolve(); },
+          close: function () { return Promise.resolve(); }
+        });
+      }
+    };
+  }
+
+  var nextPickName = "first-customer.json";
+  var pickOpts = [];            // the options each save dialog was opened with
+  var pickerThrows = null;      // set to an Error to simulate a dead startIn
+  window.showSaveFilePicker = function (o) {
+    pickOpts.push(o || {});
+    if (pickerThrows) { var e = pickerThrows; pickerThrows = null; return Promise.reject(e); }
+    picked.push(nextPickName);
+    return Promise.resolve(makeHandle(nextPickName));
+  };
+
+  // window.indexedDB is not reliably assignable, so the persisted store is
+  // supplied through the storage module's own seam instead: __setRestoredForTests
+  // hands back exactly what the store would have returned. That is where the
+  // overwrite decision is made, so it is the thing worth controlling.
+  function persistedIs(rec) { STG.__setRestoredForTests(rec); idb = rec; }
+
+  function fileFor(client) {
+    var p = STG.defaultProject();
+    p.clientName = client;
+    return { schemaVersion: "2.0", project: p, assessments: {}, activeAssessmentId: null };
+  }
+  function save(pf, opts, then) { STG.saveProjectToFile(pf, opts || {}, then); }
+  function later(fn) { setTimeout(fn, 30); }
+
+  try {
+    ok(typeof STG.ensureProjectId === "function", "storage stamps a project id");
+    var a = fileFor("First Customer");
+    var b = fileFor("Second Customer");
+    ok(a.project.projectId && b.project.projectId &&
+       a.project.projectId !== b.project.projectId,
+       "two projects get different ids",
+       a.project.projectId + " / " + b.project.projectId);
+
+    // 1. First customer: no handle yet, so the dialogue appears.
+    save(a, {}, function (r1) {
+      ok(r1.ok && r1.method === "file", "first save writes to a file", JSON.stringify(r1));
+      ok(picked.length === 1, "and it asked where to save", String(picked.length));
+      ok(/First Customer/.test(disk["first-customer.json"] || ""),
+         "the first customer's data is in their file");
+      later(function () {
+      // 2. Same project again: writes back in place, no dialogue. That is the
+      //    whole point of save-in-place and must keep working.
+      save(a, {}, function (r2) {
+        ok(r2.ok && r2.method === "file", "saving the same project again writes to a file");
+        ok(picked.length === 1, "without asking again", String(picked.length));
+
+        // 3. A NEW SESSION: the in-memory handle is gone, but the store still
+        //    holds the FIRST customer's file. This is exactly the state in
+        //    which the reported data loss happened - Save found that handle and
+        //    wrote the second customer straight into the first one's file.
+        STG.__resetHandleForTests();
+        persistedIs({ handle: makeHandle("first-customer.json"), projectId: a.project.projectId });
+        nextPickName = "second-customer.json";
+        save(b, {}, function (r3) {
+          ok(r3.ok, "the second customer saves", JSON.stringify(r3));
+          ok(picked.length === 2,
+             "and it ASKED where to save, instead of reusing the other customer's file",
+             "dialogues: " + picked.join(", "));
+          ok(/First Customer/.test(disk["first-customer.json"] || ""),
+             "THE FIRST CUSTOMER'S FILE IS UNTOUCHED");
+          ok(!/Second Customer/.test(disk["first-customer.json"] || ""),
+             "it does not contain the second customer's data");
+          ok(/Second Customer/.test(disk["second-customer.json"] || ""),
+             "which went to its own file instead");
+
+          // 4. And the second project can now save in place like any other.
+          save(b, {}, function () {
+            ok(picked.length === 2, "the second project then saves in place too",
+               String(picked.length));
+
+            // 4b. The persisted handle IS reused when it belongs to this
+            //     project - otherwise the fix would just have broken
+            //     save-in-place across sessions.
+            STG.__resetHandleForTests();
+            persistedIs({ handle: makeHandle("second-customer.json"), projectId: b.project.projectId });
+            disk["second-customer.json"] = "";
+            save(b, {}, function () {
+              ok(picked.length === 2,
+                 "reopening later and saving the SAME project writes in place, no dialogue",
+                 String(picked.length));
+              ok(/Second Customer/.test(disk["second-customer.json"] || ""),
+                 "straight back into its own file");
+
+            // 5. A handle stored by an older build has no project attached.
+            //    It cannot be shown to belong here, so it must not be used.
+            STG.__resetHandleForTests();
+            persistedIs(makeHandle("legacy.json"));   // bare handle, pre-fix shape
+            nextPickName = "third-customer.json";
+            var c = fileFor("Third Customer");
+            save(c, {}, function () {
+              ok(picked.length === 3,
+                 "a handle left by an older build is not trusted; the dialogue appears",
+                 String(picked.length));
+              ok(!disk["legacy.json"], "and that file is not written to");
+
+              // 6. Save as always asks, even for the project's own file.
+              save(b, { saveAs: true }, function () {
+                ok(picked.length === 4, "Save as always asks", String(picked.length));
+
+                // 7. WHERE the dialog opens. Reported as "it defaults to the
+                //    root of OneDrive": with no hint the browser starts
+                //    wherever it likes, and a project saved somewhere the
+                //    consultant did not intend is one they later cannot find.
+                var last = pickOpts[pickOpts.length - 1];
+                ok(!!last.id, "the save dialog carries a picker id, so the folder is remembered", JSON.stringify(last.id));
+                ok(!!last.suggestedName, "and a suggested filename");
+                ok(!!last.startIn,
+                   "and opens where this project's own file lives, once it has one");
+
+                // 8. A remembered folder that has gone (moved OneDrive folder,
+                //    disconnected drive) must not be the reason a save is
+                //    impossible: drop the hint, ask again plainly.
+                var before = picked.length, optsBefore = pickOpts.length;
+                pickerThrows = new Error("startIn directory not found");
+                save(c, { saveAs: true }, function (r7) {
+                  ok(r7.ok, "a dead remembered folder still saves", JSON.stringify(r7));
+                  ok(picked.length === before + 1, "by asking again", String(picked.length));
+                  ok(pickOpts.length === optsBefore + 2,
+                     "the retry is a second, plainer dialog", String(pickOpts.length - optsBefore));
+                  ok(!pickOpts[pickOpts.length - 1].startIn,
+                     "with the startIn hint dropped");
+                  // An abort is still an abort - it must not be retried into a
+                  // second dialog the consultant did not ask for.
+                  var abortErr = new Error("aborted"); abortErr.name = "AbortError";
+                  pickerThrows = abortErr;
+                  var optsAtAbort = pickOpts.length;
+                  save(c, { saveAs: true }, function (r8) {
+                    ok(r8.aborted === true, "cancelling the dialog reports aborted, not an error");
+                    ok(pickOpts.length === optsAtAbort + 1,
+                       "and does not reopen the dialog", String(pickOpts.length - optsAtAbort));
+                    STG.__setRestoredForTests(undefined);   // back to the real store
+                    flush();
+                  });
+                });
+              });
+              });   // end 4b
+              });   // end later()
+            });
+          });
+        });
+      });
+    });
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+    flush();
+  }
+});
+</script>
+</body></html>

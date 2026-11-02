@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Risk appetite demo dataset</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  The Wearvale Water demo. It is built around the case the instrument exists
+  for, and the one a simpler demo would miss: the bands compute ALIGNED, and
+  the technical layer shows that reading is wrong. The assessor records
+  under-protected with their reasoning.
+
+  The demo is shown to clients, so it must not contradict itself - and because
+  the story depends on the exact band arithmetic, a change to the roll-up or to
+  the coherence rule will land here first.
+-->
+<script src="harness.js"></script>
+<script>H.app({ tours: ["risk-appetite"] }); H.dom();</script>
+<script>
+H.test(function (ok) {
+  var A = window.App, E = A.Engine, T = A.TourRiskAppetite;
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+
+  E.loadCatalog();
+  A.UI.init({ autosave: false });
+  E.activateInstrument("risk-appetite");
+  T.apply(E);
+
+  var tid = E.state.activeTargetId;
+  var s = E.scoreActiveTarget();
+
+  // ---- it is a FINISHED assessment ---------------------------------------
+  ok(T.rows.length === 18, "the dataset answers all 18 items", String(T.rows.length));
+  var unanswered = T.rows.filter(function (r) { return !(E.findResponse(tid, r.id) || {}).band; });
+  ok(unanswered.length === 0, "every item landed on the engine",
+     unanswered.map(function (r) { return r.id; }).join(","));
+  var noNotes = T.rows.filter(function (r) { return !String(r.notes || "").trim(); });
+  ok(noNotes.length === 0, "and every one carries a characterisation, not just a band",
+     noNotes.map(function (r) { return r.id; }).join(","));
+  ok(s.coverage.answered === 18 && s.coverage.total === 18, "coverage is complete",
+     s.coverage.answered + "/" + s.coverage.total);
+
+  // ---- the setup is part of the story ------------------------------------
+  ok(E.getRiskAppetiteSetup().sectorId === "water", "the sector is set");
+  ok(s.exposure.sectorBaseline === "high", "whose baseline is high", s.exposure.sectorBaseline);
+  ok(E.getRiskAppetiteSetup().includeTech === true, "the optional technical layer is in scope");
+  ok((E.getRiskAppetiteSetup().modifiers || []).length === 4,
+     "four exposure modifiers are recorded as weighed",
+     String((E.getRiskAppetiteSetup().modifiers || []).length));
+
+  // ---- the two positions --------------------------------------------------
+  ok(s.exposure.band === "severe", "exposure characterises at severe", s.exposure.band);
+  ok(s.exposure.movedFromBaseline === true,
+     "above the sector baseline, on the assessor's read of consequence and targeting");
+  ok(s.appetite.band === "cautious",
+     "appetite, as DESCRIBED in interview, characterises at cautious", s.appetite.band);
+
+  // ---- the trap the demo is built to show --------------------------------
+  // On the bands alone this is aligned. That is the reading the technical layer
+  // exists to challenge, and the reason the consultant has the final say.
+  ok(s.verdict.computed.key === "aligned",
+     "on the bands alone the read is ALIGNED - severe exposure, cautious appetite, one band off the line",
+     s.verdict.computed.key);
+  ok(s.revealed && s.revealed.band === "tolerant",
+     "but the technical layer reveals a tolerant appetite",
+     s.revealed && s.revealed.band);
+  ok(s.statedVsRevealed && s.statedVsRevealed.gap === 2,
+     "a two-band gap between what is described and what the estate shows",
+     s.statedVsRevealed && String(s.statedVsRevealed.gap));
+  ok(s.statedVsRevealed.material === true, "flagged as material");
+
+  // ---- and the assessor's verdict ----------------------------------------
+  ok(s.verdict.key === "under-protected",
+     "the assessor records the verdict as under-protected", s.verdict.key);
+  ok(s.verdict.overridden === true, "as their own judgement");
+  ok(s.verdict.rationaleMissing === false, "with a reason recorded - never a bare override");
+  ok(/appetite the estate reveals/i.test(s.verdict.rationale),
+     "which explains the disagreement between what is believed and what is there");
+  ok(s.verdict.rationale.length > 300,
+     "at the length a board-facing justification actually needs",
+     String(s.verdict.rationale.length));
+
+  // ---- the demo does not contradict itself -------------------------------
+  // Every technical item should read at or more tolerant than the stated
+  // appetite: if one were tighter, the "practice is looser than the words"
+  // story would be false on its own evidence.
+  var appRank = s.appetite.rank;
+  var tighter = (s.revealed.section.items || []).filter(function (it) { return it.rank && it.rank < appRank; });
+  ok(tighter.length === 0,
+     "no technical finding contradicts the stated-vs-revealed story",
+     tighter.map(function (i) { return i.code + "=" + i.band; }).join(", "));
+
+  // ---- engagement record --------------------------------------------------
+  ok((E.getBasisOfAssessment().interviews || []).length === 5,
+     "five interviews back the characterisation",
+     String((E.getBasisOfAssessment().interviews || []).length));
+  ok((E.getBasisOfAssessment().observations || []).length === 4,
+     "with four things actually observed - this is an evidenced read, not a chat");
+  ok(/board/i.test((E.getReportNarrative() || {}).nextSteps || ""),
+     "the next steps put the finding to the board, which is where a risk-appetite finding has to go");
+
+  // ---- applying twice is not destructive ---------------------------------
+  ok(T.alreadySeeded(E) === true, "the dataset knows it has been applied");
+  T.apply(E);
+  var s2 = E.scoreActiveTarget();
+  ok(s2.coverage.answered === 18, "re-applying does not duplicate answers",
+     String(s2.coverage.answered));
+  ok(E.state.engagement.targets.length === 1, "nor add a second organisation",
+     String(E.state.engagement.targets.length));
+
+  // ---- it LOOKS seeded from the outside ----------------------------------
+  // Reported: "tour.html doesn't seem to have a demo of the appetite
+  // assessment". It did - the report was full - but the progress counters only
+  // understood a NUMERIC band (domain-letter's 0-3), so every named band
+  // ("severe", "cautious") read as unanswered: 0 / 18 in the sidebar, and a
+  // picker card offering to start one. Where the consultant looks first, it
+  // looked empty. These check the places a person looks, not the engine.
+  E.updateRiskAppetiteSetup({ includeTech: true });
+  A.UI.go("ra-section", "EXP");
+  var prog = document.querySelector("#sidebar .nav-progress-txt");
+  ok(prog && prog.textContent.trim() === "18 / 18",
+     "the sidebar shows the demo as fully answered, not 0 / 18",
+     prog && prog.textContent);
+
+  A.UI.go("home");
+  var card = [].slice.call(document.querySelectorAll("#main .home-card")).filter(function (c) {
+    return /Risk Appetite/.test(c.textContent);
+  })[0];
+  ok(!!card, "the picker has a card for it");
+  // The demo holds two visits, so the card lists them (as every instrument's
+  // card does with more than one) rather than showing a single progress bar.
+  var inst2 = card ? [].slice.call(card.querySelectorAll(".home-instance")) : [];
+  ok(inst2.length === 2 && /2024 risk appetite review/.test(card.textContent) && /2026 reassessment/.test(card.textContent),
+     "and the card lists both visits", card && card.textContent.slice(0, 200));
+  ok(inst2.length === 2 && inst2.every(function (r) { return /18 answered/.test(r.textContent); }),
+     "each reading as finished, not 'not started'",
+     inst2.map(function (r) { return r.textContent; }).join(" | "));
+  ok(card && !/Gap analysis against the published framework/.test(card.textContent),
+     "and is not described as a gap analysis against a framework, which it is not");
+  ok(card && /exposure against risk appetite/i.test(card.textContent),
+     "but as what it is");
+
+  // With the technical layer off, its five items are out of the assessment, so
+  // they are out of the count - otherwise a finished read shows 13 / 18 for ever.
+  E.updateRiskAppetiteSetup({ includeTech: false });
+  A.UI.go("ra-section", "EXP");
+  prog = document.querySelector("#sidebar .nav-progress-txt");
+  ok(prog && prog.textContent.trim() === "13 / 13",
+     "with the technical layer off the count is 13 / 13, not 13 / 18",
+     prog && prog.textContent);
+  E.updateRiskAppetiteSetup({ includeTech: true });
+
+  // The engine's own "which assessments have been answered" agrees.
+  var assId = E.state.activeAssessmentId;
+  ok(E.answeredInstrumentIds().indexOf(assId) !== -1,
+     "and the engine counts the assessment as answered");
+
+  // ---- change since the 2024 visit ----------------------------------------
+  // The demo carries a February 2024 visit. Governance has genuinely moved
+  // since (the stated appetite went from open to cautious) but the estate has
+  // not, so Wearvale is closer to proportion and still under-protected.
+  var all = E.assessmentsFor("risk-appetite");
+  ok(all.length === 2, "the demo file holds the 2024 visit and this year's", String(all.length));
+  ok(E.state.activeAssessmentId === all[all.length - 1].id, "and opens on this year's");
+  var bl = E.getBaseline();
+  ok(!!bl && bl.source.dateOfVisit === "2024-02-14", "with the 2024 visit set as the baseline",
+     bl && bl.source.dateOfVisit);
+  ok(bl && bl.riskAppetiteSetup && bl.riskAppetiteSetup.sectorId === "water",
+     "and the baseline carries 2024's own setup, so it is read with its own judgement");
+
+  var pay = A.UI.__progressExportPayload();
+  var fit = pay && pay.fit;
+  ok(!!fit, "the comparison produces a fit, then and now");
+  ok(fit && fit.prev.verdictKey === "under-protected" && fit.prev.appetiteBand === "open" && fit.prev.exposureBand === "severe",
+     "2024: severe exposure, open appetite, under-protected", fit && JSON.stringify(fit.prev));
+  ok(fit && fit.curr.verdictKey === "under-protected" && fit.curr.appetiteBand === "cautious",
+     "2026: still under-protected, with a cautious stated appetite", fit && JSON.stringify(fit.curr));
+  ok(fit && fit.direction === "closer", "closer to proportion than it was", fit && fit.direction);
+
+  var moved = (pay.movements || []).filter(function (m) { return m.change === "moved"; });
+  ok(moved.length === 8, "eight readings moved", String(moved.length));
+  var dirOf = {};
+  moved.forEach(function (m) { dirOf[m.code] = m.direction; });
+  ok(dirOf["EXP.2"] === "Higher" && dirOf["APP.4"] === "More cautious" && dirOf["TECH.3"] === "More cautious",
+     "each move is named by its direction: exposure higher, acceptance and monitoring more cautious",
+     JSON.stringify(dirOf));
+  ok(!(pay.movements || []).some(function (m) { return m.change === "improved" || m.change === "regressed"; }),
+     "and none is called improved or regressed: neither scale has a good end");
+
+  // On screen: the arrow on the chart, the direction in the verdict, and the card.
+  A.UI.go("report");
+  var rm = document.getElementById("main");
+  var plot = rm.querySelector("svg");
+  ok(plot && plot.querySelector('[data-role="previous"]') && plot.querySelector('[data-role="movement"]'),
+     "the chart shows the 2024 position and an arrow to where Wearvale sits now");
+  ok(/Wearvale Water has moved closer to proportion/.test(rm.textContent),
+     "the verdict says it has moved closer to proportion");
+  ok(/At the previous assessment the verdict was under-protected, with severe exposure and an open appetite\. It is now under-protected, with severe exposure and a cautious appetite\./.test(rm.textContent),
+     "the change card states both verdicts in a sentence",
+     (rm.textContent.match(/At the previous assessment[^.]*\.[^.]*\./) || [""])[0]);
+  ok(/Closer to proportion/.test(rm.textContent) && /More cautious/.test(rm.textContent),
+     "with the direction chip and the moved items");
+  ok(!/\bImproved\b|\bRegressed\b/.test(rm.textContent),
+     "and never the words improved or regressed anywhere on the page");
+
+  // ---- it renders ---------------------------------------------------------
+  A.UI.go("report");
+  var m = document.getElementById("main");
+  ok(/Wearvale Water/.test(m.textContent), "the report names the demo client");
+  ok(/Under-protected/.test(m.textContent), "and states the verdict");
+  ok(!!m.querySelector("svg"), "with the exposure-vs-appetite plot");
+  ok(/appetite the estate reveals/i.test(m.textContent),
+     "and carries the assessor's reasoning");
+  // The deliverable still says nothing about the tool.
+  ok(!/band arithmetic|computed|overrid/i.test(m.textContent),
+     "while saying nothing about what the tool computed",
+     (m.textContent.match(/\S*(arithmetic|computed|overrid)\S*/i) || [""])[0]);
+});
+</script>
+</body></html>

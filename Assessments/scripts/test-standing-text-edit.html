@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Standing report text stays open while it is edited</title></head>
+<body>
+<!--
+  The standing report text sits in one collapsible block on the report page.
+  The page is rebuilt on every edit (Edit, Done, each save), and the block
+  used to be rebuilt closed, so it snapped shut each time the consultant
+  clicked Edit or Done on a section inside it. The edit itself was kept; only
+  the view was lost. This drives the real report page for the risk appetite
+  demo, edits a section inside the block, and checks the block stays as the
+  consultant left it.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock", tours: ["risk-appetite"] }); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.on("instrument-changed", function (inst) { if (inst && inst.id === "risk-appetite") A.TourRiskAppetite.apply(E); });
+  E.activateInstrument("risk-appetite");
+  A.UI.go("report");
+
+  function stack() { return document.querySelector("#main details.boilerplate-stack"); }
+  function editInStack() { var s = stack(); return s ? s.querySelector(".sect-edit") : null; }
+
+  ok(!!stack(), "the report has a standing report text block");
+  ok(stack() && !stack().open, "it starts closed");
+  ok(!!editInStack(), "and the sections inside it have an Edit button");
+
+  // Open it, as the consultant would, and edit a section inside it.
+  stack().open = true;
+  stack().dispatchEvent(new Event("toggle"));
+  var key = editInStack().closest(".card[data-section]").getAttribute("data-section");
+  editInStack().click();
+  ok(stack() && stack().open, "after Edit the block is still open");
+  var editing = document.querySelector('#main .card[data-section="' + key + '"]');
+  ok(editing && editing.classList.contains("editing"), "and the section is in edit mode");
+
+  // Change the wording, as a save does, then press Done.
+  var box = editing && editing.querySelector("textarea");
+  if (box) { box.value = box.value + " Edited for the test."; box.dispatchEvent(new Event("change")); }
+  ok(stack() && stack().open, "after saving a change the block is still open");
+  var done = document.querySelector('#main .card[data-section="' + key + '"] .sect-edit');
+  ok(done && done.textContent === "Done", "the button reads Done while editing", done && done.textContent);
+  done.click();
+  ok(stack() && stack().open, "after Done the block is still open");
+  var after = document.querySelector('#main .card[data-section="' + key + '"]');
+  ok(after && !after.classList.contains("editing"), "and the section has left edit mode");
+
+  // Closing it is respected too: a rebuild does not reopen a closed block.
+  stack().open = false;
+  stack().dispatchEvent(new Event("toggle"));
+  A.UI.go("report");
+  ok(stack() && !stack().open, "a block the consultant closed stays closed when the page is rebuilt");
+
+  // Editing a section inside a closed block opens it, so the field is visible.
+  editInStack().click();
+  ok(stack() && stack().open, "starting an edit inside a closed block opens it");
+});
+</script>
+</body></html>

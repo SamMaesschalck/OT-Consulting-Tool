@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>ONR "Example questions to ask" toggle</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  var main = document.getElementById("main");
+  function btn(root, rx) { return Array.prototype.filter.call(root.querySelectorAll("button"), function (b) { return rx.test((b.textContent || "").trim()); })[0]; }
+  function click(el) { el.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+
+  try {
+    E.loadCatalog(); A.UI.init({ autosave: false });
+    E.activateInstrument("onr-syaps-management");
+    var inst = E.state.instrument;
+
+    // data: questions split out of controlText into a separate promptQuestions field
+    var withQ = inst.outcomes.filter(function (x) { return x.promptQuestions && x.promptQuestions.length >= 1; });
+    ok(withQ.length > 50, "many outcomes carry a separate promptQuestions field", withQ.length + " of " + inst.outcomes.length);
+    var target = withQ[0]; // an outcome that actually has questions
+    ok(!/Questions to consider/.test(target.controlText || ""), "questions are NOT baked into controlText any more (slimmer expander)");
+
+    // ---- LIST view (caf-principle) ----
+    A.UI.go("caf-principle", target.principleId);
+    var qbtn = btn(main, /^Example questions to ask$/);
+    ok(!!qbtn, "list view: 'Example questions to ask' button present (principle " + target.principleId + ")");
+    ok(main.querySelectorAll("ul.caf-questions").length === 0, "list view: questions collapsed by default");
+    if (qbtn) {
+      click(qbtn);
+      var ul = main.querySelector("ul.caf-questions");
+      ok(!!ul && ul.querySelectorAll("li").length >= 1, "list view: clicking reveals the questions list", ul && (ul.querySelectorAll("li").length + " items"));
+      click(btn(main, /^Example questions to ask$/));
+      ok(main.querySelectorAll("ul.caf-questions").length === 0, "list view: toggle collapses again");
+    }
+
+    // ---- WIZARD view (caf-wizard) ----
+    A.UI.go("caf-wizard");
+    ok(!!main.querySelector(".wizard"), "wizard renders");
+    // step Next until we reach an item that has questions (some items have none)
+    var found = false, guard = 0;
+    while (!found && guard < inst.outcomes.length + 2) {
+      if (btn(main, /^Example questions to ask$/)) { found = true; break; }
+      var nx = btn(main, /Next ›/);
+      if (!nx || nx.hasAttribute("disabled")) break;
+      click(nx); guard++;
+    }
+    ok(found, "wizard: an item with questions shows the 'Example questions to ask' button (after " + guard + " steps)");
+    ok(main.querySelectorAll("ul.caf-questions").length === 0, "wizard: questions collapsed by default");
+    if (found) {
+      click(btn(main, /^Example questions to ask$/));
+      var wul = main.querySelector("ul.caf-questions");
+      ok(!!wul && wul.querySelectorAll("li").length >= 1, "wizard: clicking reveals the questions list", wul && (wul.querySelectorAll("li").length + " items"));
+    }
+
+    // instruments without prompt questions show no toggle (e.g. CIS)
+    E.activateInstrument("cis-controls-v8");
+    A.UI.go("caf-principle", "1");
+    ok(!btn(document.getElementById("main"), /^Example questions to ask$/), "no questions toggle for instruments without promptQuestions (CIS)");
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

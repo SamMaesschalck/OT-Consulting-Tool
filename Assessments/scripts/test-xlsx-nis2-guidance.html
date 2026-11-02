@@ -1,0 +1,156 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>NIS2 relevant IEC 62443 guidance prints</title></head>
+<body>
+<!--
+  data/shared/cross-references.json keys its NIS2 rows by the obligation's
+  CODE ("GOV.1", "A.1"), but the exports looked them up by the item ID
+  ("MA.1"). Nothing ever matched, so the "Relevant IEC 62443
+  guidance" column on the Excel Obligations and Gap roadmap sheets, and the
+  matching line on the Word roadmap, were blank for every obligation.
+
+  On the NIS2 demo: every obligation whose code has rows shows its guidance,
+  every one without stays blank. The NIS2 quick gap check's codes ("A",
+  "REP") are whole-measure groupings no row maps, so it shows none rather
+  than borrowing a sub-obligation's mapping.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["nis2", "nis2-quick"] }); H.dom();</script>
+<script>
+function unzipText(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    if (eocd < 0) throw new Error("not a zip");
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true), jobs = [];
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+      var data = u8.subarray(start, start + csize);
+      jobs.push((function (name, method, data) {
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+        return bytes.then(function (b) { return { name: name, text: /\.(xml|rels)$/.test(name) ? new TextDecoder().decode(b) : "" }; });
+      })(name, method, data));
+      p += 46 + nlen + xlen + clen;
+    }
+    return Promise.all(jobs);
+  });
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"])); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.on("instrument-changed", function (inst) {
+    if (inst && inst.id === "nis2-assessment") A.TourNIS2.apply(E);
+    if (inst && inst.id === "nis2-quick-gap") A.TourNIS2Quick.apply(E);
+  });
+
+  // What the shared table genuinely maps, by NIS2 code: the 62443 ids.
+  var tbl = A.Data.shared.crossReferences;
+  var xrows = (Array.isArray(tbl) ? tbl : tbl.rows).filter(function (r) {
+    return r.fromStandard === "nis2" && r.relationship !== "informative-reference";
+  });
+  var mapped = {};
+  xrows.forEach(function (r) { (mapped[r.fromId] = mapped[r.fromId] || []).push.apply(mapped[r.fromId], [].concat(r.toIds)); });
+
+  function cellsOf(ws) {
+    var rg = XLSX.utils.decode_range(ws["!ref"]), out = [];
+    for (var r = 0; r <= rg.e.r; r++) {
+      var row = [];
+      for (var c = 0; c <= rg.e.c; c++) {
+        var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+        row.push(cell && cell.v != null ? String(cell.v) : "");
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  // ---- the full NIS2 assessment demo ------------------------------------
+  E.activateInstrument("nis2-assessment");
+  var inst = E.state.instrument;
+  var codeOf = {};
+  // The Code column prints the obligation code, as the capture screen does.
+  inst.items.forEach(function (it) { codeOf[it.code] = it.code; });
+  ok(inst.items.every(function (it) { return /^[A-Z]+\.\d+$/.test(it.code); }), "every NIS2 code reads [abbreviation].[number]",
+     inst.items.map(function (it) { return it.code; }).join(", "));
+  var withRows = inst.items.filter(function (it) { return mapped[it.code]; });
+  var withoutRows = inst.items.filter(function (it) { return !mapped[it.code]; });
+  ok(withRows.length >= 20 && withoutRows.length >= 1,
+     "the table maps most NIS2 obligations by code and leaves some unmapped", withRows.length + " mapped, " + withoutRows.map(function (i) { return i.code; }).join(", ") + " not");
+
+  var opts = { targetId: E.state.activeTargetId };
+  var wb = A.ExportXLSX.build(E.state.engagement, inst, E.state.taxonomy, E.state.profile, opts);
+
+  var ob = cellsOf(wb.Sheets["Obligations"]);
+  var cCode = ob[0].indexOf("Code"), cG = ob[0].indexOf("Relevant IEC 62443 guidance");
+  ok(cCode >= 0 && cG >= 0, "the Obligations sheet has a guidance column", JSON.stringify(ob[0]));
+  var missing = [], invented = [];
+  ob.slice(1).forEach(function (r) {
+    var code = codeOf[r[cCode]];
+    if (!code) return;
+    if (mapped[code]) {
+      var ids = mapped[code];
+      if (!r[cG] || !ids.every(function (id) { return r[cG].indexOf(id) !== -1; })) missing.push(code + " [" + r[cG] + "]");
+    } else if (r[cG]) invented.push(code + " [" + r[cG] + "]");
+  });
+  ok(missing.length === 0, "every obligation with a mapping shows all of its IEC 62443 guidance", missing.join("; "));
+  ok(invented.length === 0, "and an obligation with no mapping shows none", invented.join("; "));
+  var gov1 = ob.filter(function (r) { return r[cCode] === "GOV.1"; })[0] || [];
+  ok(gov1[cG] === "Direct: ORG 1.1", "GOV.1 reads as its row says", gov1[cG]);
+  var b1 = ob.filter(function (r) { return r[cCode] === "B.1"; })[0] || [];
+  ok(/Direct: EVENT 1\.8/.test(b1[cG]) && /Partial: SR 6\.1/.test(b1[cG]), "B.1 carries both of its rows, grouped by strength", b1[cG]);
+
+  var rm = cellsOf(wb.Sheets["Gap roadmap"]);
+  var rh = rm[1], rCode = rh.indexOf("Code"), rG = rh.indexOf("Relevant IEC 62443 guidance");
+  var roadRows = rm.slice(2).filter(function (r) { return r[rCode]; });
+  var roadMapped = roadRows.filter(function (r) { return mapped[codeOf[r[rCode]]]; });
+  ok(roadMapped.length >= 3, "the demo's gap roadmap has mapped obligations on it", String(roadMapped.length));
+  ok(roadMapped.every(function (r) { return r[rG] !== ""; }), "each mapped roadmap obligation shows its guidance",
+     roadMapped.filter(function (r) { return !r[rG]; }).map(function (r) { return r[rCode]; }).join(", "));
+  ok(roadRows.filter(function (r) { return !mapped[codeOf[r[rCode]]]; }).every(function (r) { return r[rG] === ""; }),
+     "an unmapped roadmap obligation shows none");
+
+  // ---- the quick gap check: no row maps its area-level codes --------------
+  E.activateInstrument("nis2-quick-gap");
+  var q = E.state.instrument;
+  ok(q.items.every(function (it) { return !mapped[it.code]; }), "no cross-reference row is keyed by a quick gap code",
+     q.items.filter(function (it) { return mapped[it.code]; }).map(function (it) { return it.code; }).join(", "));
+  var wq = A.ExportXLSX.build(E.state.engagement, q, E.state.taxonomy, E.state.profile, { targetId: E.state.activeTargetId });
+  var qob = cellsOf(wq.Sheets["Obligations"]);
+  var qG = qob[0].indexOf("Relevant IEC 62443 guidance");
+  ok(qob.slice(1).every(function (r) { return r[qG] === ""; }),
+     "so the quick gap check borrows no sub-obligation's guidance (its GOV is not the obligation GOV.1)",
+     qob.slice(1).filter(function (r) { return r[qG]; }).map(function (r) { return r[1] + ": " + r[qG]; }).join("; "));
+
+  // ---- the Word roadmap of the full demo ----------------------------------
+  E.activateInstrument("nis2-assessment");
+  var sc = A.ScoringNIS2.scoreEngagement(E.state.engagement, E.state.instrument, E.state.profile);
+  var road = sc.perTarget.filter(function (t) { return t.target.id === E.state.activeTargetId; })[0].result.roadmap;
+  var roadIds = [];
+  road.forEach(function (it) { if (mapped[it.code]) roadIds = roadIds.concat(mapped[it.code]); });
+  A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile,
+    E.getActiveNarrative(), { targetId: E.state.activeTargetId }, function (err, blob) {
+      ok(!err && blob, "the NIS2 Word document builds", err && err.message);
+      if (!blob) { done(); return; }
+      unzipText(blob).then(function (parts) {
+        var doc = (parts.filter(function (p) { return p.name === "word/document.xml"; })[0] || {}).text || "";
+        var text = doc.replace(/<[^>]+>/g, "");
+        var lines = text.split("Relevant IEC 62443 guidance (draft, to verify)").length - 1;
+        var mappedOnRoad = road.filter(function (it) { return mapped[it.code]; }).length;
+        ok(lines >= mappedOnRoad && mappedOnRoad > 0, "the Word roadmap prints a guidance line for each mapped obligation",
+           lines + " lines for " + mappedOnRoad + " mapped obligations");
+        var absent = roadIds.filter(function (id) { return text.indexOf(id) === -1; });
+        ok(absent.length === 0, "naming the IEC 62443 requirements from the table", absent.join(", "));
+        done();
+      }, function (e) { ok(false, "the Word document unzips", e && e.message); done(); });
+    });
+});
+</script>
+</body></html>

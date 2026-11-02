@@ -1,0 +1,168 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Machinery tour dataset</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style>
+</head>
+<body>
+<h1>EU Machinery Regulation tour dataset - complete demo report</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock", tours: ["41", "caf", "caf-aviation", "cra", "csms", "machinery", "ml", "nis2", "nis2-quick", "posture", "sl"] }); H.dom();</script>
+<script>
+window.docx = (function () {
+  function TextRun(opts) {
+    if (typeof opts === "string") opts = { text: opts };
+    this.__type = "TextRun";
+    this.text = opts.text != null ? opts.text : (Array.isArray(opts.children) ? opts.children.join("") : "");
+    this.bold = !!opts.bold; this.italics = !!opts.italics;
+    this.color = opts.color || null; this.size = opts.size || null;
+  }
+  function Paragraph(opts) {
+    opts = opts || {};
+    this.__type = "Paragraph";
+    this.children = opts.children || [];
+    this.style = opts.style || null; this.heading = opts.heading || null;
+    this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join("");
+    this.runs = this.children;
+  }
+  function TableCell(opts) { this.__type = "TableCell"; this.children = (opts && opts.children) || []; this.shading = (opts && opts.shading) || null; }
+  function TableRow(opts)  { this.__type = "TableRow"; this.children = (opts && opts.children) || []; }
+  function Table(opts)     { this.__type = "Table"; this.rows = (opts && opts.rows) || []; }
+  function ImageRun(opts)  { this.__type = "ImageRun"; this.text = ""; }
+  function PageBreak()     { this.__type = "PageBreak"; this.text = ""; }
+  function Header(opts)    { this.__type = "Header"; this.children = (opts && opts.children) || []; }
+  function Footer(opts)    { this.__type = "Footer"; this.children = (opts && opts.children) || []; }
+  function Document(opts)  { this.__type = "Document"; this.sections = (opts && opts.sections) || []; }
+  return {
+    Document: Document, Paragraph: Paragraph, TextRun: TextRun,
+    TableCell: TableCell, TableRow: TableRow, Table: Table,
+    ImageRun: ImageRun, PageBreak: PageBreak, Header: Header, Footer: Footer,
+    HeadingLevel: { TITLE: "Title", HEADING_1: "Heading1", HEADING_2: "Heading2", HEADING_3: "Heading3" },
+    AlignmentType: { LEFT: "left", CENTER: "center", RIGHT: "right", BOTH: "both" },
+    WidthType: { PERCENTAGE: "pct", DXA: "dxa" },
+    ShadingType: { SOLID: "solid" },
+    TableLayoutType: { FIXED: "fixed" },
+    PageOrientation: { PORTRAIT: "portrait", LANDSCAPE: "landscape" },
+    HeightRule: { EXACT: "exact", ATLEAST: "atLeast" },
+    PageNumber: { CURRENT: "current" },
+    Packer: { toBlob: function (doc) { window.__capturedDoc = doc; return Promise.resolve(new Blob(["dummy"])); } }
+  };
+})();
+</script>
+<script>
+(function () {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App, E = A.Engine, CRA = A.ScoringCRA;
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond, detail) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label + (!cond && detail ? " — " + detail : "");
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function finish() {
+    var s = document.getElementById("summary");
+    s.className = "sum " + (fail === 0 ? "ok" : "bad");
+    s.textContent = fail === 0 ? "ALL TESTS PASSED (" + pass + ")" : pass + " passed, " + fail + " FAILED";
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // Replicate the combined tour: seed every assessment into one shared
+    // project, then land on the machinery instrument (re-applied on switch).
+    var SEED = {
+      "iec-62443-3-3": A.TourSL, "ncsc-caf": A.TourCAF, "general-ot-posture": A.TourPosture,
+      "iec-62443-2-1-2024": A.TourML, "nis2-assessment": A.TourNIS2, "nis2-quick-gap": A.TourNIS2Quick,
+      "iec-62443-4-1": A.Tour41, "iec-62443-2-1-2010": A.TourCSMS, "ncsc-caf-aviation": A.TourCAFAviation,
+      "eu-cra": A.TourCRA, "eu-machinery": A.TourMachinery
+    };
+    E.on("instrument-changed", function (inst) {
+      var mod = inst && SEED[inst.id];
+      if (mod && typeof mod.apply === "function") mod.apply(E);
+    });
+    var seedFailures = [];
+    Object.keys(SEED).forEach(function (id) {
+      try { E.activateInstrument(id); } catch (e) { seedFailures.push(id + ": " + e.message); }
+    });
+    check("all 11 assessments seed without throwing", seedFailures.length === 0, seedFailures.join(" | "));
+
+    E.activateInstrument("eu-machinery");
+    check("App.TourMachinery applier exposed", !!A.TourMachinery && typeof A.TourMachinery.apply === "function");
+    var inst = E.state.instrument;
+    var tid = E.state.activeTargetId;
+
+    // Every one of the 31 items answered: 30 scored + the partly-completed
+    // machinery item recorded as a reasoned N/A.
+    var unanswered = [], noEvidence = [], gapsNoPlan = [];
+    inst.items.forEach(function (it) {
+      var r = E.findResponse(tid, it.id);
+      if (!r || (r.applicable !== false && !r.state)) { unanswered.push(it.id); return; }
+      if (!r.evidence) noEvidence.push(it.id);
+      if ((r.state === "partially" || r.state === "not-in-place") &&
+          !(r.owner && r.action && r.impact && r.priorityBand)) gapsNoPlan.push(it.id);
+    });
+    check("all 31 items answered (incl. one reasoned N/A)", unanswered.length === 0, unanswered.join(","));
+    check("every answer carries evidence", noEvidence.length === 0, noEvidence.join(","));
+    check("every gap carries a full remediation plan", gapsNoPlan.length === 0, gapsNoPlan.join(","));
+    check("the machine is named AutoStak AS-90", (E.getActiveTarget() || {}).name === "AutoStak AS-90");
+
+    // Classification: correctly Part A via the ML-safety category, so the
+    // finding is the un-followed route, not a misclassification flag.
+    var cls = E.getCRAClassification();
+    check("classified Annex I Part A via the ML-safety category", cls.classId === "annex-i-part-a" && !cls.misclassification);
+    check("route requires third-party assessment", /Third-party conformity assessment is mandatory/.test(cls.route || ""));
+
+    var scored = E.scoreActiveTarget();
+    check("three layers scored side by side", scored.layers.length === 3);
+    check("20 gaps on the roadmap", (scored.roadmap || []).length === 20, String((scored.roadmap || []).length));
+    var m3 = scored.layers.filter(function (l) { return l.layerId === "M3"; })[0];
+    check("the conformity layer carries the floor finding (route not followed)", m3 && m3.overall.counts.notInPlace === 1);
+
+    var rn = E.getReportNarrative ? E.getReportNarrative() : null;
+    check("consultant narrative is filled", !!rn && !!(rn.topPriorities || "").length && !!(rn.regulatoryExposure || "").length);
+
+    // ---- the full Word report, with no red placeholders ----
+    A.ExportDOCX.buildAsync(E.state.engagement, inst, null, E.state.profile, null,
+      { targetId: tid, craSetup: E.getCRASetupRaw() },
+      function (err) {
+        try {
+          if (err) { check("tour Word report builds - " + (err.message || err), false); finish(); return; }
+          var doc = window.__capturedDoc, paras = [];
+          function walk(node) {
+            if (!node) return;
+            if (node.__type === "Paragraph") { paras.push(node); return; }
+            if (node.__type === "Table") { node.rows.forEach(walk); return; }
+            if (node.__type === "TableRow") { node.children.forEach(walk); return; }
+            if (node.__type === "TableCell") { node.children.forEach(walk); return; }
+            if (Array.isArray(node)) node.forEach(walk);
+          }
+          doc.sections.forEach(function (s) { walk(s.children); });
+          var allText = paras.map(function (p) { return p.text; }).join("\n");
+          var placeholders = paras.filter(function (p) { return p.style === "PlaceholderText"; });
+
+          check("Word report builds", true);
+          check("NO consultant placeholders remain in the demo report", placeholders.length === 0, placeholders.map(function (p) { return p.text.slice(0, 60); }).join(" | "));
+          check("report names the client and machine", allText.indexOf("Meridian Handling Systems") !== -1 && allText.indexOf("AutoStak AS-90") !== -1);
+          check("exec summary carries the consultant narrative", allText.indexOf("Sequence the conformity route first") !== -1 && allText.indexOf("growth product") !== -1);
+          check("conformity blocker is called out", allText.indexOf("The conformity layer is currently the blocker") !== -1);
+          check("Machinery Regulation framing (glance + 2027 date)", allText.indexOf("Machinery Regulation readiness at a glance") !== -1 && allText.indexOf("14 January 2027") !== -1);
+          check("basis of assessment carries the interviews", allText.indexOf("L. Okonkwo") !== -1);
+          check("roadmap leads with the notified-body route", /P1\s+MR-M3\.1/.test(allText));
+          check("no CRA text leaks into the machinery demo", allText.indexOf("Cyber Resilience") === -1);
+        } catch (e) { check("doc assertions threw: " + e.message, false); }
+        finish();
+      });
+  } catch (e) {
+    check("harness threw: " + (e && e.message), false);
+    if (e && e.stack) { var d = document.createElement("div"); d.className = "row"; d.textContent = e.stack; out.appendChild(d); }
+    finish();
+  }
+})();
+</script>
+</body></html>

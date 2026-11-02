@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Licence pop-up</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  The tool is handed to contractors as a single file, with no LICENCE.txt
+  beside it, so the licence has to be readable from inside the app. This
+  guards that the text is carried in, that it is the current LICENCE.txt and
+  not a stale copy, and that both ways in open it.
+-->
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var side = document.getElementById("sidebar"), main = document.getElementById("main");
+  function modal() { return document.querySelector(".licence-modal"); }
+  function click(el) { el.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+
+  // ---- the text is in the app, and it is the current LICENCE.txt ----------
+  var text = (A.Data.shared || {}).licence || "";
+  ok(/PROPRIETARY LICENCE/.test(text) && /Copyright \(c\) 2026 SolutionsPT/.test(text) && /England and Wales/.test(text),
+     "the full licence text is carried into the app as data", text.slice(0, 60));
+  var file = null;
+  try {
+    var x = new XMLHttpRequest();
+    x.open("GET", "../LICENCE.txt", false); x.send();
+    file = x.responseText;
+  } catch (e) {}
+  ok(file !== null && file.replace(/\r\n/g, "\n").trim() === text.trim(),
+     "and it matches LICENCE.txt (if not, re-run scripts/build-data.ps1)",
+     file === null ? "could not read LICENCE.txt (run with --allow-file-access-from-files)" : "the two differ");
+
+  // ---- from the sidebar ----------------------------------------------------
+  var legal = side.querySelector(".sidebar-legal");
+  ok(legal && legal.tagName === "BUTTON" && /SolutionsPT/.test(legal.textContent) && /Licence terms/.test(legal.textContent),
+     "the sidebar notice is a button that says where the terms are", legal && legal.textContent);
+  ok(!modal(), "nothing is open to begin with");
+  click(legal);
+  var m = modal();
+  ok(!!m, "clicking the sidebar notice opens the licence");
+  var pre = m && m.querySelector(".licence-text");
+  ok(pre && pre.textContent === text, "showing the whole text, line breaks and all");
+  ok(m && /Licence/.test((m.querySelector(".modal-h h2") || {}).textContent), "under a 'Licence' heading");
+  ok(document.activeElement && /Close/.test(document.activeElement.textContent),
+     "with the Close button focused, so Enter or Escape dismisses it");
+
+  m.querySelector(".modal-f button").click();
+  ok(!modal(), "Close closes it");
+
+  click(legal);
+  modal().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  ok(!modal(), "Escape closes it");
+
+  click(legal);
+  click(modal().querySelector(".modal-b"));
+  ok(!!modal(), "clicking inside the dialog leaves it open");
+  click(modal());
+  ok(!modal(), "clicking the backdrop outside it closes it");
+
+  // ---- from the home screen ------------------------------------------------
+  A.UI.go("home");
+  var link = [].filter.call(main.querySelectorAll(".home-legal button"), function (b) { return /Read the licence/.test(b.textContent); })[0];
+  ok(!!link, "the home screen's notice has a 'Read the licence' link");
+  ok(!/LICENCE\.txt/.test(main.textContent + side.textContent),
+     "and nothing on screen sends the reader to a LICENCE.txt that may not be there");
+  click(link);
+  ok(!!modal() && modal().querySelector(".licence-text").textContent === text, "which opens the same licence");
+  click(modal());
+
+  // Opening it twice never stacks two dialogs.
+  A.UI.openLicence(); A.UI.openLicence();
+  ok(document.querySelectorAll(".licence-modal").length === 1, "opening it again replaces it rather than stacking a second");
+  click(modal());
+});
+</script>
+</body></html>

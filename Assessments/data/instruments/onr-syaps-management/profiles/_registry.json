@@ -1,0 +1,32 @@
+{
+    "schema":  "caf-profile-registry/2.0",
+    "_note":  "ONR SyAPs dutyholder profiles overlay the base onr-syaps-management instrument by expectation id. \u0027Full dutyholder\u0027 is the default; \u0027Smaller dutyholder\u0027 applies the same expectations proportionately (ONR CNS-GD-003).",
+    "default":  "syaps-mgmt-full",
+    "levels":  [
+
+               ],
+    "profiles":  [
+                     {
+                         "id":  "syaps-mgmt-full",
+                         "name":  "Full dutyholder",
+                         "sectorRegulator":  "onr",
+                         "sectorRegulatorName":  "ONR (SyAPs)",
+                         "sector":  "full",
+                         "sectorName":  "Full dutyholder",
+                         "level":  "n/a",
+                         "status":  "active",
+                         "file":  "profiles/syaps-mgmt-full.json"
+                     },
+                     {
+                         "id":  "syaps-mgmt-smaller",
+                         "name":  "Smaller dutyholder (proportionate)",
+                         "sectorRegulator":  "onr",
+                         "sectorRegulatorName":  "ONR (SyAPs)",
+                         "sector":  "smaller",
+                         "sectorName":  "Smaller dutyholder",
+                         "level":  "n/a",
+                         "status":  "active",
+                         "file":  "profiles/syaps-mgmt-smaller.json"
+                     }
+                 ]
+}

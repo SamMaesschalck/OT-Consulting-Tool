@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 SL mapping vs the standard</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Checks the 62443-3-3 instrument against Annex B Table B.1 of the standard.
+
+  Every Security Level this tool reports for a 62443-3-3 assessment is derived
+  from slGuidance: which items (the base requirement and each RE) the standard
+  selects at each SL. If that mapping is wrong, every SL-A in every report is
+  wrong with it, silently and plausibly. This is the test that stops it drifting.
+
+  The expected values live in ref-62443-3-3-table-b1.js, transcribed from the
+  licensed copy in data/. If this test fails, check the standard and fix the
+  INSTRUMENT - never edit the reference to make the test pass.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ extra: ["data/instruments/iec-62443-3-3/instrument.js", "data/shared/taxonomy-fr7.js"] });</script>
+<script src="ref-62443-3-3-table-b1.js"></script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+
+  try {
+    var TRUTH  = window.RefTableB1_62443_33;
+    var TITLES = window.RefTableB1Titles_62443_33;
+    var FRS    = window.RefTableB1FRs_62443_33;
+
+    var entry = (window.App.Data.instruments || {})["iec-62443-3-3"];
+    var inst = entry && entry.instrument;
+    ok(!!inst, "the 62443-3-3 instrument is loaded");
+    if (!inst) throw new Error("no instrument");
+
+    var reqs = inst.requirements || [];
+    var truthIds = Object.keys(TRUTH);
+    ok(reqs.length === truthIds.length,
+       "the instrument has one requirement per SR in Table B.1",
+       reqs.length + " vs " + truthIds.length);
+
+    // slGuidance says, per SL, which components are selected. Table B.1 says,
+    // per component, the lowest SL it is selected at. Reduce to the same shape.
+    function firstSLs(req) {
+      var map = {};
+      [1, 2, 3, 4].forEach(function (sl) {
+        var g = (req.slGuidance || {})[sl] || (req.slGuidance || {})[String(sl)];
+        if (!g || !g.required) return;
+        (g.components || []).forEach(function (c) {
+          if (map[c] === undefined) map[c] = sl;
+        });
+      });
+      return map;
+    }
+
+    var byId = {};
+    reqs.forEach(function (r) { byId[r.id] = r; });
+
+    var missing = truthIds.filter(function (id) { return !byId[id]; });
+    ok(missing.length === 0, "every SR in Table B.1 exists in the instrument", missing.join(", "));
+
+    var extra = reqs.map(function (r) { return r.id; }).filter(function (id) { return !TRUTH[id]; });
+    ok(extra.length === 0, "and the instrument invents none that the table does not have", extra.join(", "));
+
+    // The mapping itself, component by component. Reported as one assert per
+    // SR so a failure names the requirement rather than a bare total.
+    var checked = 0, wrong = [];
+    truthIds.forEach(function (id) {
+      var req = byId[id];
+      if (!req) return;
+      var want = TRUTH[id], got = firstSLs(req), diffs = [];
+
+      Object.keys(want).forEach(function (c) {
+        checked++;
+        if (got[c] === undefined) diffs.push(c + ": standard SL" + want[c] + ", instrument never selects it");
+        else if (got[c] !== want[c]) diffs.push(c + ": standard SL" + want[c] + ", instrument SL" + got[c]);
+      });
+      Object.keys(got).forEach(function (c) {
+        if (want[c] === undefined) diffs.push(c + ": instrument selects at SL" + got[c] + ", not in Table B.1");
+      });
+
+      ok(diffs.length === 0, id + " selects the items the standard selects, at the same levels",
+         diffs.join(" | "));
+      if (diffs.length) wrong.push(id);
+    });
+    ok(checked === 100, "all 100 component selections in Table B.1 were checked", String(checked));
+
+    // applicableSLs has to agree with slGuidance, or the capture page offers a
+    // level the scoring does not select anything at (which is how SR 3.4 hid a
+    // wrong base level: guidance said SL2, applicableSLs said 2-4, and the two
+    // agreed with each other while both disagreed with the standard).
+    var mismatched = [];
+    truthIds.forEach(function (id) {
+      var req = byId[id];
+      if (!req || !req.applicableSLs) return;
+      var lowest = Math.min.apply(null, Object.keys(TRUTH[id]).map(function (c) { return TRUTH[id][c]; }));
+      var expected = [];
+      for (var sl = lowest; sl <= 4; sl++) expected.push(sl);
+      if (req.applicableSLs.join(",") !== expected.join(",")) {
+        mismatched.push(id + ": " + req.applicableSLs.join(",") + " vs expected " + expected.join(","));
+      }
+    });
+    ok(mismatched.length === 0,
+       "applicableSLs starts at the level the standard first selects the requirement",
+       mismatched.join(" | "));
+
+    // Titles, so a requirement cannot quietly be relabelled into something the
+    // standard does not say.
+    var badTitles = [];
+    Object.keys(TITLES).forEach(function (id) {
+      var req = byId[id];
+      if (!req) return;
+      // SR 1.8 carries an added "(PKI)" gloss for readability; accept the
+      // standard's wording with or without it, reject anything else.
+      var t = String(req.title || "").replace(" (PKI)", "");
+      if (t !== TITLES[id]) badTitles.push(id + ': "' + req.title + '" vs "' + TITLES[id] + '"');
+    });
+    ok(badTitles.length === 0, "every SR title matches Table B.1", badTitles.join(" | "));
+
+    // FR names, which head each block of the table.
+    var tax = ((window.App.Data.shared || {}).taxonomies || {})["fr-7"];
+    ok(!!tax, "the FR taxonomy is loaded");
+    if (tax) {
+      var badFRs = [];
+      (tax.frs || []).forEach(function (f) {
+        var want = FRS[f.id];
+        if (!want) { badFRs.push(f.id + ": not in Table B.1"); return; }
+        if (f.name !== want.name || f.abbr !== want.abbr) {
+          badFRs.push(f.id + ': "' + f.name + " (" + f.abbr + ')" vs "' + want.name + " (" + want.abbr + ')"');
+        }
+      });
+      ok(badFRs.length === 0, "every FR name and abbreviation matches the standard", badFRs.join(" | "));
+    }
+
+    // And the thing the mapping exists to drive: requirementItems must produce
+    // exactly the components Table B.1 lists, at the levels it lists them.
+    var S = window.App.Scoring;
+    var badItems = [];
+    truthIds.forEach(function (id) {
+      var req = byId[id];
+      if (!req) return;
+      var items = S.requirementItems(req) || [];
+      var want = TRUTH[id];
+      if (items.length !== Object.keys(want).length) {
+        badItems.push(id + ": " + items.length + " items vs " + Object.keys(want).length + " in the table");
+        return;
+      }
+      items.forEach(function (it) {
+        if (want[it.componentId] !== it.firstSL) {
+          badItems.push(id + " " + it.componentId + ": scored from SL" + it.firstSL +
+                        ", table says SL" + want[it.componentId]);
+        }
+      });
+    });
+    ok(badItems.length === 0,
+       "the scoring engine derives exactly the items and levels the table defines",
+       badItems.slice(0, 6).join(" | "));
+
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+});
+</script>
+</body></html>

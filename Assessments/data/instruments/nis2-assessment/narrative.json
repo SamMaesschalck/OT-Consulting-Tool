@@ -1,0 +1,44 @@
+{
+  "_note": "Narrative pack for the NIS2 report. The generator does NOT free-write: boilerplate.* is inserted VERBATIM; executiveSummary.templates lines are composed by slot-substitution ONLY; consultantBlocks are seeded with data-derived facts plus a clearly-marked placeholder for the consultant to complete. Do not auto-assert legal conclusions.",
+  "executiveSummary": {
+    "structureOrder": [
+      "verdict (exec_verdict, composed)",
+      "scope_and_profile (exec_scope + exec_profile, composed)",
+      "gap_shape (exec_gap_shape composed + exec_partial_vs_absent verbatim)",
+      "regulatory_stakes (regulatory_stakes verbatim + consultant_exposure editable)",
+      "path_forward_and_confidence (exec_path_forward composed incl. consultant_top_priorities + exec_confidence composed + not_determination verbatim)"
+    ],
+    "templates": {
+      "exec_verdict": "This assessment finds that {clientName} has {verdictMaturityPhrase} against its obligations under NIS2, with significant gaps remaining in {weakestAreaName}. The gaps identified carry regulatory exposure and are the focus of the roadmap in this report.",
+      "exec_verdict_nogaps": "This assessment finds that {clientName} has {verdictMaturityPhrase} against its obligations under NIS2, with no applicable obligation assessed as Partially or Not Achieved.",
+      "exec_scope": "The assessment covered {applicableCount} applicable NIS2 obligations drawn from the cybersecurity risk-management measures (Article 21) and the governance (Article 20) and incident-reporting (Article 23) duties of Directive (EU) 2022/2555.",
+      "exec_profile": "Of these, {achievedCount} were assessed as Achieved, {partiallyCount} as Partially Achieved, and {notAchievedCount} as Not Achieved.",
+      "exec_gap_shape": "{gapConcentrationSentence} The gaps are not evenly spread, and the weakest area is {weakestAreaName}, where {weakestAreaDetail}.",
+      "exec_path_forward": "The {gapTotal} obligations assessed as Partially or Not Achieved can all be addressed, and the roadmap in this report sets out the work to close them in order of priority.",
+      "exec_confidence": "This picture is based on {coveragePct} of applicable obligations being answerable ({confidenceLabel}). The conformance figure of {conformancePct} is shown for context only and is not a pass mark or a grade.",
+      "exec_exposure_classification": "{clientName} is classified as an {entityClassificationLabel} entity under NIS2.",
+      "exec_exposure_authority": "The relevant competent authority is {competentAuthority}.",
+      "verdictMaturityPhrases": {
+        "foundations": "meaningful cybersecurity foundations in place",
+        "recognised": "cybersecurity foundations that are recognised but not yet fully in place",
+        "substantial": "substantial gaps in the measures required"
+      },
+      "gapConcentrationFragments": {
+        "partialClause": "foundations exist but are not yet fully in place",
+        "absentClause": "absent and need to be established"
+      }
+    },
+    "boilerplate": {
+      "exec_partial_vs_absent": "\"Partially Achieved\" means an obligation is recognised and some controls are in place, but they fall short of full conformance, so the remaining work is improvement and evidence. \"Not Achieved\" means the obligation is not yet met and needs to be established. The two differ in cost and effort, because the first builds on existing work and the second starts from nothing.",
+      "regulatory_stakes": "NIS2 is law, and for essential entities it carries direct consequences. Members of the management body can be held responsible for the entity's compliance with the cybersecurity risk-management measures, and competent authorities have powers of enforcement and financial penalty. The incident-reporting duties also impose hard deadlines after a significant incident: an early warning within 24 hours, an incident notification within 72 hours and a final report within one month. Gaps in these areas are therefore a regulatory exposure as well as a security weakness.",
+      "not_determination": "This is an alignment and gap assessment intended to support improvement and prepare for regulatory engagement. It is not a formal determination of NIS2 compliance, which rests with the relevant competent authority. The judgements here are the consultant's, made against the obligations of the Directive."
+    },
+    "consultantBlocks": {
+      "consultant_exposure_seed": "For {clientName}, the weakest area identified is {weakestAreaName}.{repExposureClause}",
+      "consultant_exposure_rep_clause": " Incident-reporting obligations (REP) are currently assessed as Not Achieved; these carry the statutory reporting deadlines noted above.",
+      "consultant_exposure": "[Consultant to add a short, client-specific note on regulatory exposure: the entity's classification (essential or important), the relevant competent authority, and any specific exposure arising from the weakest areas identified, particularly where incident-reporting obligations are Not Achieved.]",
+      "consultant_top_priorities_seed": "The most urgent priorities are likely to be {autoTopPriorityHint}.",
+      "consultant_top_priorities_placeholder": "[Consultant to confirm and refine the top one or two priorities for this client.]"
+    }
+  }
+}

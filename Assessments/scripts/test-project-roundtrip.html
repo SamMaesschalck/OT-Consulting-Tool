@@ -1,0 +1,177 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Project save/load round-trip</title>
+<style>
+body{font:17px "Segoe UI",sans-serif;padding:22px;color:#1A2533}
+.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}
+.row{padding:3px 0;font-family:Consolas,monospace;font-size:15px}
+.sec{padding:14px 0 4px;font-weight:600;font-size:18px}
+.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0}
+</style></head>
+<body>
+<h1>Project file save / load round-trip</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<script src="harness.js"></script>
+<script>H.app();</script>
+<script>
+(function () {
+  var A = window.App;
+  var E = A.Engine;
+  var STG = A.Storage;
+  var out = document.getElementById("out");
+
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function section(t) { var d = document.createElement("div"); d.className = "sec"; d.textContent = t; out.appendChild(d); }
+
+  E.loadCatalog();
+
+  // -------- 1. Single-instrument project ---------------------------------
+  section("Single-instrument project round-trips");
+  E.newProject();
+  E.activateInstrument("iec-62443-3-3");
+  E.updateMetadata({ clientName: "Acme Petrochemicals", siteName: "Plant A", consultant: "S. Maesschalck", dateOfVisit: "2026-05-21" });
+  var tid = E.state.activeTargetId;
+  E.setResponse(tid, "SR1.1", { applicable: true, achievedSL: 1, evidence: "Shared local accounts found on RTUs." });
+  E.setResponse(tid, "SR1.2", { applicable: true, achievedSL: 0 });
+
+  var file1 = E.getProjectFile();
+  check("getProjectFile returns schemaVersion 2.0",  file1.schemaVersion === "2.0");
+  check("project.clientName set",                    file1.project.clientName === "Acme Petrochemicals");
+  check("activeInstrumentId set",                    file1.activeInstrumentId === "iec-62443-3-3");
+  check("assessment exists for 62443-3-3",           !!STG.findAssessment(file1, "iec-62443-3-3"));
+  check("assessment has the 2 responses",            STG.findAssessment(file1, "iec-62443-3-3").responses.length === 2);
+
+  // Serialize to JSON, parse back, load.
+  var text = JSON.stringify(file1);
+  var parsed = JSON.parse(text);
+  E.newProject(); // wipe state
+  E.loadProjectFile(parsed);
+  check("after reload: clientName preserved",        E.state.project.clientName === "Acme Petrochemicals");
+  check("after reload: active instrument is SL",     E.state.instrument.id === "iec-62443-3-3");
+  check("after reload: 2 responses restored",        E.state.engagement.responses.length === 2);
+  var r11 = E.findResponse(E.state.activeTargetId, "SR1.1");
+  check("SR1.1 achievedSL restored",                 r11 && r11.achievedSL === 1);
+  check("SR1.1 evidence restored",                   r11 && r11.evidence === "Shared local accounts found on RTUs.");
+
+  // -------- 2. Two assessments in one project ---------------------------
+  section("Two assessments in one project share organisation metadata");
+  E.newProject();
+  E.activateInstrument("iec-62443-3-3");
+  E.updateMetadata({ clientName: "Northbridge Manufacturing", consultant: "S. Maesschalck", dateOfVisit: "2026-05-21" });
+  var tid1 = E.state.activeTargetId;
+  E.setResponse(tid1, "SR1.1", { applicable: true, achievedSL: 2 });
+
+  // Switch to posture; organisation metadata should still be there.
+  E.activateInstrument("general-ot-posture");
+  check("after switching instrument, project.clientName persists",
+    E.state.project.clientName === "Northbridge Manufacturing");
+  // engagement.engagement is no longer the project object: it is a MERGE of the
+  // customer record and this assessment's own engagement details. What matters
+  // is that the customer half tracks the project and the assessment half does
+  // not leak from whichever assessment was open before.
+  check("after switching instrument, the merged block still shows the customer",
+    E.state.engagement.engagement.clientName === "Northbridge Manufacturing");
+  check("...but the previous assessment's consultant did not follow it",
+    !E.state.engagement.engagement.consultant,
+    "got: " + E.state.engagement.engagement.consultant);
+  var tid2 = E.state.activeTargetId;
+  E.setResponse(tid2, "gov.1", { applicable: true, band: 2 });
+  E.setResponse(tid2, "monitor.1", { applicable: true, band: 0 });
+
+  var file2 = E.getProjectFile();
+  check("project file has both assessments",
+    !!STG.findAssessment(file2, "iec-62443-3-3") && !!STG.findAssessment(file2, "general-ot-posture"));
+  check("SL responses preserved",
+    STG.findAssessment(file2, "iec-62443-3-3").responses.length === 1);
+  check("posture responses preserved",
+    STG.findAssessment(file2, "general-ot-posture").responses.length === 2);
+
+  // Round-trip the two-assessment project.
+  var text2 = JSON.stringify(file2);
+  var parsed2 = JSON.parse(text2);
+  E.newProject();
+  E.loadProjectFile(parsed2);
+  check("after reload: clientName still Northbridge Manufacturing",
+    E.state.project.clientName === "Northbridge Manufacturing");
+  check("after reload: SL assessment retained",
+    STG.findAssessment({assessments:E.state.assessments}, "iec-62443-3-3") && STG.findAssessment({assessments:E.state.assessments}, "iec-62443-3-3").responses.length === 1);
+  check("after reload: posture assessment retained",
+    STG.findAssessment({assessments:E.state.assessments}, "general-ot-posture") && STG.findAssessment({assessments:E.state.assessments}, "general-ot-posture").responses.length === 2);
+
+  E.activateInstrument("general-ot-posture");
+  var monitor1 = E.findResponse(E.state.activeTargetId, "monitor.1");
+  check("posture monitor.1 band restored",
+    monitor1 && monitor1.band === 0);
+
+  // Switching back to SL after load still sees the SL responses.
+  E.activateInstrument("iec-62443-3-3");
+  var sr11 = E.findResponse(E.state.activeTargetId, "SR1.1");
+  check("SL SR1.1 still present after a cross-instrument round-trip",
+    sr11 && sr11.achievedSL === 2);
+  check("the customer record is still shared after instrument switch + load",
+    E.state.engagement.engagement.clientName === "Northbridge Manufacturing" &&
+    E.state.project.clientName === "Northbridge Manufacturing");
+  check("...and this assessment's own consultant and date came back with it",
+    E.state.engagement.engagement.consultant === "S. Maesschalck" &&
+    E.state.engagement.engagement.dateOfVisit === "2026-05-21",
+    E.state.engagement.engagement.consultant + " / " + E.state.engagement.engagement.dateOfVisit);
+
+  // -------- 3. Project filename uses the organisation + date ------------
+  section("Filename uses the project name and date");
+  var fname = STG.suggestedProjectFilename(file2);
+  check("filename contains the client name",
+    fname.indexOf("Northbridge-Manufacturing") !== -1);
+  check("filename contains the visit date",
+    fname.indexOf("2026-05-21") !== -1);
+  check("filename does NOT contain a per-instrument site label",
+    fname.indexOf("Plant-A") === -1 && fname.indexOf("Site") === -1);
+
+  // -------- 4. v1.0 file migrates transparently --------------------------
+  section("v1.0 engagement files migrate transparently to v2.0");
+  var v1 = {
+    schemaVersion: "1.0",
+    instrumentId: "iec-62443-3-3",
+    instrumentContentVersion: "1.0.0",
+    engagement: { clientName: "Legacy Client", siteName: "Old Site", dateOfVisit: "2025-01-15" },
+    targetProfile: { defaultTargetSL: 3, perFR: {}, perZone: {} },
+    targets: [{ id: "t-legacy", name: "Plant Old" }],
+    responses: [{ targetId: "t-legacy", requirementId: "SR1.1", applicable: true, achievedSL: 1 }]
+  };
+  var migrated = null;
+  var blob = new Blob([JSON.stringify(v1)], { type: "application/json" });
+  var file = new File([blob], "legacy.json", { type: "application/json" });
+  STG.loadProjectFromFile(file, function (res) {
+    check("v1 loads OK",                       res.ok === true);
+    check("v1 migrated flag set",              res.migrated === true);
+    check("schema is now 2.0",                 res.data.schemaVersion === "2.0");
+    check("project.clientName migrated",       res.data.project.clientName === "Legacy Client");
+    check("assessment key matches v1 id",      !!STG.findAssessment(res.data, "iec-62443-3-3"));
+    check("activeInstrumentId set from v1",    res.data.activeInstrumentId === "iec-62443-3-3");
+    check("targetProfile default SL preserved", STG.findAssessment(res.data, "iec-62443-3-3").targetProfile.defaultTargetSL === 3);
+    check("responses preserved",               STG.findAssessment(res.data, "iec-62443-3-3").responses.length === 1);
+
+    // Engine can load the migrated project.
+    E.newProject();
+    E.loadProjectFile(res.data);
+    check("engine loads migrated project: clientName",
+      E.state.project.clientName === "Legacy Client");
+
+    finish();
+  });
+
+  function finish() {
+    var s = document.getElementById("summary");
+    s.className = "sum " + (fail === 0 ? "ok" : "bad");
+    s.textContent = pass + " passed, " + fail + " failed";
+  }
+})();
+</script>
+</body></html>

@@ -1,0 +1,1551 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/cis-controls-v8/instrument.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["cis-controls-v8"] = window.App.Data.instruments["cis-controls-v8"] || {};
+window.App.Data.instruments["cis-controls-v8"].instrument = {
+    "id":  "cis-controls-v8",
+    "title":  "CIS Critical Security Controls v8.1.2 Assessment",
+    "framework":  "CIS Controls",
+    "edition":  "Version 8.1.2",
+    "contentVersion":  "1.0.0",
+    "scoringFamily":  "caf-achieved",
+    "scoringProfileRef":  "caf-achieved",
+    "unknownIsFinding":  true,
+    "targetDimension":  "site",
+    "targetDimensionLabel":  "Site",
+    "framing":  "A safeguard-by-safeguard gap assessment against the CIS Critical Security Controls Version 8.1.2 (Center for Internet Security). Each of the 153 Safeguards across the 18 Controls is assessed as Implemented, Partially Implemented or Not Implemented. The Implementation Groups (IG1, IG2, IG3) act as target profiles that set which Safeguards are expected.",
+    "sourceNote":  "Control and Safeguard identifiers, titles, descriptions, Asset Class, Security Function and Implementation Group (IG1/IG2/IG3) membership are transcribed from the CIS Critical Security Controls Version 8.1.2 (March 2025) reference spreadsheet published by the Center for Internet Security. The Safeguard description is shown in the \u0027What this safeguard requires\u0027 expander on every Safeguard. This is an alignment and gap tool, not a certified CIS assessment.",
+    "attribution":  "The CIS Critical Security Controls are published by the Center for Internet Security, Inc. (CIS(R)) and are used here under the CIS Controls terms of use (attribution, non-commercial internal use; no derivative endorsement implied). (C) 2024 Center for Internet Security, Inc. CIS Controls Version 8.1.2.",
+    "display":  {
+                    "subtitle":  "Safeguard-by-safeguard gap assessment against the CIS Critical Security Controls v8.1.2. Capture engagement details, pick the Implementation Group below, then work through the 18 Controls from the sidebar.",
+                    "reportSubline":  "CIS Controls v8.1.2 assessment",
+                    "reportDescription":  "CIS Critical Security Controls v8.1.2 gap analysis",
+                    "profileTitle":  "Implementation Group",
+                    "profileStep1Label":  "Implementation Group",
+                    "objectiveTitle":  "Control set",
+                    "principleNoun":  "Control",
+                    "outcomesTitle":  "Safeguards",
+                    "gettingStarted":  {
+                                           "cardTitle":  "CIS Critical Security Controls v8.1.2: how this instrument works",
+                                           "intro":  "This is a safeguard-by-safeguard gap assessment against the CIS Critical Security Controls Version 8.1.2. Each Safeguard is assessed as Implemented, Partially Implemented or Not Implemented. It is an alignment and gap tool, not a certified CIS assessment.",
+                                           "profileHeading":  "Implementation Group (sets which Safeguards are expected)",
+                                           "bullets":  [
+                                                           "The unit of capture is the Safeguard: 153 Safeguards across the 18 CIS Controls.",
+                                                           "Record each Safeguard as Implemented, Partially Implemented or Not Implemented. Unknown reduces confidence; Not applicable drops the Safeguard.",
+                                                           "The Implementation Group above sets which Safeguards are expected: IG1 (essential cyber hygiene, 56 Safeguards) is the on-ramp for every enterprise; IG2 (130) adds safeguards for enterprises managing more sensitive data; IG3 (all 153) is for enterprises with the highest risk. The groups are nested (IG1 is part of IG2 is part of IG3). Choose Full to assess every Safeguard with no target group.",
+                                                           "No single score is produced. The report is a profile of Implemented / Partially / Not Implemented counts by Control, plus the roadmap of Safeguards that are not yet implemented."
+                                                       ],
+                                           "profilesHeading":  "Available Implementation Groups"
+                                       }
+                },
+    "states":  [
+                   {
+                       "value":  "achieved",
+                       "label":  "Implemented",
+                       "colour":  "met"
+                   },
+                   {
+                       "value":  "partially",
+                       "label":  "Partially Implemented",
+                       "colour":  "near"
+                   },
+                   {
+                       "value":  "not",
+                       "label":  "Not Implemented",
+                       "colour":  "gap"
+                   },
+                   {
+                       "value":  "unknown",
+                       "label":  "Unknown",
+                       "colour":  "severe",
+                       "effect":  "finding (cannot verify): most severe; also lowers coverage+confidence"
+                   },
+                   {
+                       "value":  "na",
+                       "label":  "Not applicable",
+                       "effect":  "excluded"
+                   }
+               ],
+    "taxonomy":  {
+                     "objectives":  [
+                                        {
+                                            "id":  "cis",
+                                            "name":  "CIS Critical Security Controls"
+                                        }
+                                    ],
+                     "principles":  [
+                                        {
+                                            "id":  "1",
+                                            "name":  "Inventory and Control of Enterprise Assets",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "2",
+                                            "name":  "Inventory and Control of Software Assets",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "3",
+                                            "name":  "Data Protection",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "4",
+                                            "name":  "Secure Configuration of Enterprise Assets and Software",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "5",
+                                            "name":  "Account Management",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "6",
+                                            "name":  "Access Control Management",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "7",
+                                            "name":  "Continuous Vulnerability Management",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "8",
+                                            "name":  "Audit Log Management",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "9",
+                                            "name":  "Email and Web Browser Protections",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "10",
+                                            "name":  "Malware Defenses",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "11",
+                                            "name":  "Data Recovery",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "12",
+                                            "name":  "Network Infrastructure Management",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "13",
+                                            "name":  "Network Monitoring and Defense",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "14",
+                                            "name":  "Security Awareness and Skills Training",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "15",
+                                            "name":  "Service Provider Management",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "16",
+                                            "name":  "Application Software Security",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "17",
+                                            "name":  "Incident Response Management",
+                                            "objectiveId":  "cis"
+                                        },
+                                        {
+                                            "id":  "18",
+                                            "name":  "Penetration Testing",
+                                            "objectiveId":  "cis"
+                                        }
+                                    ]
+                 },
+    "outcomes":  [
+                     {
+                         "id":  "1.1",
+                         "principleId":  "1",
+                         "title":  "Establish and Maintain Detailed Enterprise Asset Inventory",
+                         "controlText":  "Establish and maintain an accurate, detailed, and up-to-date inventory of all enterprise assets with the potential to store or process data, to include: end-user devices (including portable and mobile), network devices, non-computing/IoT devices, and servers. Ensure the inventory records the network address (if static), hardware address, machine name, enterprise asset owner, department for each asset, and whether the asset has been approved to connect to the network. For mobile end-user devices, MDM type tools can support this process, where appropriate. This inventory includes assets connected to the infrastructure physically, virtually, remotely, and those within cloud environments. Additionally, it includes assets that are regularly connected to the enterprise's network infrastructure, even if they are not under control of the enterprise. Review and update the inventory of all enterprise assets bi-annually, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "1.2",
+                         "principleId":  "1",
+                         "title":  "Address Unauthorized Assets",
+                         "controlText":  "Ensure that a process exists to address unauthorized assets on a weekly basis. The enterprise may choose to remove the asset from the network, deny the asset from connecting remotely to the network, or quarantine the asset.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Respond"
+                     },
+                     {
+                         "id":  "1.3",
+                         "principleId":  "1",
+                         "title":  "Utilize an Active Discovery Tool",
+                         "controlText":  "Utilize an active discovery tool to identify assets connected to the enterprise's network. Configure the active discovery tool to execute daily, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "1.4",
+                         "principleId":  "1",
+                         "title":  "Use Dynamic Host Configuration Protocol (DHCP) Logging to Update Enterprise Asset Inventory",
+                         "controlText":  "Use DHCP logging on all DHCP servers or Internet Protocol (IP) address management tools to update the enterprise's asset inventory. Review and use logs to update the enterprise's asset inventory weekly, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "1.5",
+                         "principleId":  "1",
+                         "title":  "Use a Passive Asset Discovery Tool",
+                         "controlText":  "Use a passive discovery tool to identify assets connected to the enterprise's network. Review and use scans to update the enterprise's asset inventory at least weekly, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "2.1",
+                         "principleId":  "2",
+                         "title":  "Establish and Maintain a Software Inventory",
+                         "controlText":  "Establish and maintain a detailed inventory of all licensed software installed on enterprise assets. The software inventory must document the title, publisher, initial install/use date, and business purpose for each entry; where appropriate, include the Uniform Resource Locator (URL), app store(s), version(s), deployment mechanism, decommission date, and number of licenses. Review and update the software inventory bi-annually, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "2.2",
+                         "principleId":  "2",
+                         "title":  "Ensure Authorized Software is Currently Supported",
+                         "controlText":  "Ensure that only currently supported software is designated as authorized in the software inventory for enterprise assets. If software is unsupported, yet necessary for the fulfillment of the enterprise's mission, document an exception detailing mitigating controls and residual risk acceptance. For any unsupported software without an exception documentation, designate as unauthorized. Review the software list to verify software support at least monthly, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "2.3",
+                         "principleId":  "2",
+                         "title":  "Address Unauthorized Software",
+                         "controlText":  "Ensure that unauthorized software is either removed from use on enterprise assets or receives a documented exception. Review monthly, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Respond"
+                     },
+                     {
+                         "id":  "2.4",
+                         "principleId":  "2",
+                         "title":  "Utilize Automated Software Inventory Tools",
+                         "controlText":  "Utilize software inventory tools, when possible, throughout the enterprise to automate the discovery and documentation of installed software.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "2.5",
+                         "principleId":  "2",
+                         "title":  "Allowlist Authorized Software",
+                         "controlText":  "Use technical controls, such as application allowlisting, to ensure that only authorized software can execute or be accessed. Reassess bi-annually, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "2.6",
+                         "principleId":  "2",
+                         "title":  "Allowlist Authorized Libraries",
+                         "controlText":  "Use technical controls to ensure that only authorized software libraries, such as specific .dll, .ocx, and .so files, are allowed to load into a system process. Block unauthorized libraries from loading into a system process. Reassess bi-annually, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "2.7",
+                         "principleId":  "2",
+                         "title":  "Allowlist Authorized Scripts",
+                         "controlText":  "Use technical controls, such as digital signatures and version control, to ensure that only authorized scripts, such as specific .ps1 and .py files, are allowed to execute. Block unauthorized scripts from executing. Reassess bi-annually, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.1",
+                         "principleId":  "3",
+                         "title":  "Establish and Maintain a Data Management Process",
+                         "controlText":  "Establish and maintain a documented data management process. In the process, address data sensitivity, data owner, handling of data, data retention limits, and disposal requirements, based on sensitivity and retention standards for the enterprise. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "3.2",
+                         "principleId":  "3",
+                         "title":  "Establish and Maintain a Data Inventory",
+                         "controlText":  "Establish and maintain a data inventory based on the enterprise's data management process. Inventory sensitive data, at a minimum. Review and update inventory annually, at a minimum, with a priority on sensitive data.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "3.3",
+                         "principleId":  "3",
+                         "title":  "Configure Data Access Control Lists",
+                         "controlText":  "Configure data access control lists based on a user's need to know. Apply data access control lists, also known as access permissions, to local and remote file systems, databases, and applications.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.4",
+                         "principleId":  "3",
+                         "title":  "Enforce Data Retention",
+                         "controlText":  "Retain data according to the enterprise's documented data management process. Data retention must include both minimum and maximum timelines.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.5",
+                         "principleId":  "3",
+                         "title":  "Securely Dispose of Data",
+                         "controlText":  "Securely dispose of data as outlined in the enterprise's documented data management process. Ensure the disposal process and method are commensurate with the data sensitivity.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.6",
+                         "principleId":  "3",
+                         "title":  "Encrypt Data on End-User Devices",
+                         "controlText":  "Encrypt data on end-user devices containing sensitive data. Example implementations can include: Windows BitLocker®, Apple FileVault®, Linux® dm-crypt.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.7",
+                         "principleId":  "3",
+                         "title":  "Establish and Maintain a Data Classification Scheme",
+                         "controlText":  "Establish and maintain an overall data classification scheme for the enterprise. Enterprises may use labels, such as \"Sensitive,\" \"Confidential,\" and \"Public,\" and classify their data according to those labels. Review and update the classification scheme annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "3.8",
+                         "principleId":  "3",
+                         "title":  "Document Data Flows",
+                         "controlText":  "Document data flows. Data flow documentation includes service provider data flows and should be based on the enterprise's data management process. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "3.9",
+                         "principleId":  "3",
+                         "title":  "Encrypt Data on Removable Media",
+                         "controlText":  "Encrypt data on removable media.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.10",
+                         "principleId":  "3",
+                         "title":  "Encrypt Sensitive Data in Transit",
+                         "controlText":  "Encrypt sensitive data in transit. Example implementations can include: Transport Layer Security (TLS) and Open Secure Shell (OpenSSH).",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.11",
+                         "principleId":  "3",
+                         "title":  "Encrypt Sensitive Data at Rest",
+                         "controlText":  "Encrypt sensitive data at rest on servers, applications, and databases. Storage-layer encryption, also known as server-side encryption, meets the minimum requirement of this Safeguard. Additional encryption methods may include application-layer encryption, also known as client-side encryption, where access to the data storage device(s) does not permit access to the plain-text data.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.12",
+                         "principleId":  "3",
+                         "title":  "Segment Data Processing and Storage Based on Sensitivity",
+                         "controlText":  "Segment data processing and storage based on the sensitivity of the data. Do not process sensitive data on enterprise assets intended for lower sensitivity data.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.13",
+                         "principleId":  "3",
+                         "title":  "Deploy a Data Loss Prevention Solution",
+                         "controlText":  "Implement an automated tool, such as a host-based Data Loss Prevention (DLP) tool to identify all sensitive data stored, processed, or transmitted through enterprise assets, including those located onsite or at a remote service provider, and update the enterprise\u0027s data inventory.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "3.14",
+                         "principleId":  "3",
+                         "title":  "Log Sensitive Data Access",
+                         "controlText":  "Log sensitive data access, including modification and disposal.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "4.1",
+                         "principleId":  "4",
+                         "title":  "Establish and Maintain a Secure Configuration Process",
+                         "controlText":  "Establish and maintain a documented secure configuration process for enterprise assets (end-user devices, including portable and mobile, non-computing/IoT devices, and servers) and software (operating systems and applications). Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "4.2",
+                         "principleId":  "4",
+                         "title":  "Establish and Maintain a Secure Configuration Process for Network Infrastructure",
+                         "controlText":  "Establish and maintain a documented secure configuration process for network devices. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "4.3",
+                         "principleId":  "4",
+                         "title":  "Configure Automatic Session Locking on Enterprise Assets",
+                         "controlText":  "Configure automatic session locking on enterprise assets after a defined period of inactivity. For general purpose operating systems, the period must not exceed 15 minutes. For mobile end-user devices, the period must not exceed 2 minutes.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.4",
+                         "principleId":  "4",
+                         "title":  "Implement and Manage a Firewall on Servers",
+                         "controlText":  "Implement and manage a firewall on servers, where supported. Example implementations include a virtual firewall, operating system firewall, or a third-party firewall agent.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.5",
+                         "principleId":  "4",
+                         "title":  "Implement and Manage a Firewall on End-User Devices",
+                         "controlText":  "Implement and manage a host-based firewall or port-filtering tool on end-user devices, with a default-deny rule that drops all traffic except those services and ports that are explicitly allowed.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.6",
+                         "principleId":  "4",
+                         "title":  "Securely Manage Enterprise Assets and Software",
+                         "controlText":  "Securely manage enterprise assets and software. Example implementations include managing configuration through version-controlled Infrastructure-as-Code (IaC) and accessing administrative interfaces over secure network protocols, such as Secure Shell (SSH) and Hypertext Transfer Protocol Secure (HTTPS). Do not use insecure management protocols, such as Telnet (Teletype Network) and HTTP, unless operationally essential.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.7",
+                         "principleId":  "4",
+                         "title":  "Manage Default Accounts on Enterprise Assets and Software",
+                         "controlText":  "Manage default accounts on enterprise assets and software, such as root, administrator, and other pre-configured vendor accounts. Example implementations can include: disabling default accounts or making them unusable.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.8",
+                         "principleId":  "4",
+                         "title":  "Uninstall or Disable Unnecessary Services on Enterprise Assets and Software",
+                         "controlText":  "Uninstall or disable unnecessary services on enterprise assets and software, such as an unused file sharing service, web application module, or service function.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.9",
+                         "principleId":  "4",
+                         "title":  "Configure Trusted DNS Servers on Enterprise Assets",
+                         "controlText":  "Configure trusted DNS servers on network infrastructure. Example implementations include configuring network devices to use enterprise-controlled DNS servers and/or reputable externally accessible DNS servers.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.10",
+                         "principleId":  "4",
+                         "title":  "Enforce Automatic Device Lockout on Portable End-User Devices",
+                         "controlText":  "Enforce automatic device lockout following a predetermined threshold of local failed authentication attempts on portable end-user devices, where supported. For laptops, do not allow more than 20 failed authentication attempts; for tablets and smartphones, no more than 10 failed authentication attempts. Example implementations include Microsoft® InTune Device Lock and Apple® Configuration Profile maxFailedAttempts.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.11",
+                         "principleId":  "4",
+                         "title":  "Enforce Remote Wipe Capability on Portable End-User Devices",
+                         "controlText":  "Remotely wipe enterprise data from enterprise-owned portable end-user devices when deemed appropriate such as lost or stolen devices, or when an individual no longer supports the enterprise.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "4.12",
+                         "principleId":  "4",
+                         "title":  "Separate Enterprise Workspaces on Mobile End-User Devices",
+                         "controlText":  "Ensure separate enterprise workspaces are used on mobile end-user devices, where supported. Example implementations include using an Apple® Configuration Profile or Androidâ„¢ Work Profile to separate enterprise applications and data from personal applications and data.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "5.1",
+                         "principleId":  "5",
+                         "title":  "Establish and Maintain an Inventory of Accounts",
+                         "controlText":  "Establish and maintain an inventory of all accounts managed in the enterprise. The inventory must at a minimum include user, administrator, and service accounts. The inventory, at a minimum, should contain the person's name, username, start/stop dates, and department. Validate that all active accounts are authorized, on a recurring schedule at a minimum quarterly, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "5.2",
+                         "principleId":  "5",
+                         "title":  "Use Unique Passwords",
+                         "controlText":  "Use unique passwords for all enterprise assets. Best practice implementation includes, at a minimum, an 8-character password for accounts using Multi-Factor Authentication (MFA) and a 14-character password for accounts not using MFA.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "5.3",
+                         "principleId":  "5",
+                         "title":  "Disable Dormant Accounts",
+                         "controlText":  "Delete or disable any dormant accounts after a period of 45 days of inactivity, where supported.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "5.4",
+                         "principleId":  "5",
+                         "title":  "Restrict Administrator Privileges to Dedicated Administrator Accounts",
+                         "controlText":  "Restrict administrator privileges to dedicated administrator accounts on enterprise assets. Conduct general computing activities, such as internet browsing, email, and productivity suite use, from the user's primary, non-privileged account.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "5.5",
+                         "principleId":  "5",
+                         "title":  "Establish and Maintain an Inventory of Service Accounts",
+                         "controlText":  "Establish and maintain an inventory of service accounts. The inventory, at a minimum, must contain department owner, review date, and purpose. Perform service account reviews to validate that all active accounts are authorized, on a recurring schedule at a minimum quarterly, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "5.6",
+                         "principleId":  "5",
+                         "title":  "Centralize Account Management",
+                         "controlText":  "Centralize account management through a directory or identity service.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "6.1",
+                         "principleId":  "6",
+                         "title":  "Establish an Access Granting Process",
+                         "controlText":  "Establish and follow a documented process, preferably automated, for granting access to enterprise assets upon new hire or role change of a user.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "6.2",
+                         "principleId":  "6",
+                         "title":  "Establish an Access Revoking Process",
+                         "controlText":  "Establish and follow a process, preferably automated, for revoking access to enterprise assets, through disabling accounts immediately upon termination, rights revocation, or role change of a user. Disabling accounts, instead of deleting accounts, may be necessary to preserve audit trails.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "6.3",
+                         "principleId":  "6",
+                         "title":  "Require MFA for Externally-Exposed Applications",
+                         "controlText":  "Require all externally-exposed enterprise or third-party applications to enforce MFA, where supported. Enforcing MFA through a directory service or SSO provider is a satisfactory implementation of this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "6.4",
+                         "principleId":  "6",
+                         "title":  "Require MFA for Remote Network Access",
+                         "controlText":  "Require MFA for remote network access.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "6.5",
+                         "principleId":  "6",
+                         "title":  "Require MFA for Administrative Access",
+                         "controlText":  "Require MFA for all administrative access accounts, where supported, on all enterprise assets, whether managed on-site or through a service provider.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "6.6",
+                         "principleId":  "6",
+                         "title":  "Establish and Maintain an Inventory of Authentication and Authorization Systems",
+                         "controlText":  "Establish and maintain an inventory of the enterprise's authentication and authorization systems, including those hosted on-site or at a remote service provider. Review and update the inventory, at a minimum, annually, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "6.7",
+                         "principleId":  "6",
+                         "title":  "Centralize Access Control",
+                         "controlText":  "Centralize access control for all enterprise assets through a directory service or SSO provider, where supported.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "6.8",
+                         "principleId":  "6",
+                         "title":  "Define and Maintain Role-Based Access Control",
+                         "controlText":  "Define and maintain role-based access control, through determining and documenting the access rights necessary for each role within the enterprise to successfully carry out its assigned duties. Perform access control reviews of enterprise assets to validate that all privileges are authorized, on a recurring schedule at a minimum annually, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "7.1",
+                         "principleId":  "7",
+                         "title":  "Establish and Maintain a Vulnerability Management Process",
+                         "controlText":  "Establish and maintain a documented vulnerability management process for enterprise assets. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "7.2",
+                         "principleId":  "7",
+                         "title":  "Establish and Maintain a Remediation Process",
+                         "controlText":  "Establish and maintain a risk-based remediation strategy documented in a remediation process, with monthly, or more frequent, reviews.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "7.3",
+                         "principleId":  "7",
+                         "title":  "Perform Automated Operating System Patch Management",
+                         "controlText":  "Perform operating system updates on enterprise assets through automated patch management on a monthly, or more frequent, basis.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "7.4",
+                         "principleId":  "7",
+                         "title":  "Perform Automated Application Patch Management",
+                         "controlText":  "Perform application updates on enterprise assets through automated patch management on a monthly, or more frequent, basis.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "7.5",
+                         "principleId":  "7",
+                         "title":  "Perform Automated Vulnerability Scans of Internal Enterprise Assets",
+                         "controlText":  "Perform automated vulnerability scans of internal enterprise assets on a quarterly, or more frequent, basis. Conduct both authenticated and unauthenticated scans.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "7.6",
+                         "principleId":  "7",
+                         "title":  "Perform Automated Vulnerability Scans of Externally-Exposed Enterprise Assets",
+                         "controlText":  "Perform automated vulnerability scans of externally-exposed enterprise assets. Perform scans on a monthly, or more frequent, basis.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "7.7",
+                         "principleId":  "7",
+                         "title":  "Remediate Detected Vulnerabilities",
+                         "controlText":  "Remediate detected vulnerabilities in software through processes and tooling on a monthly, or more frequent, basis, based on the remediation process.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Respond"
+                     },
+                     {
+                         "id":  "8.1",
+                         "principleId":  "8",
+                         "title":  "Establish and Maintain an Audit Log Management Process",
+                         "controlText":  "Establish and maintain a documented audit log management process that defines the enterprise's logging requirements. At a minimum, address the collection, review, and retention of audit logs for enterprise assets. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "8.2",
+                         "principleId":  "8",
+                         "title":  "Collect Audit Logs",
+                         "controlText":  "Collect audit logs. Ensure that logging, per the enterprise's audit log management process, has been enabled across enterprise assets.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "8.3",
+                         "principleId":  "8",
+                         "title":  "Ensure Adequate Audit Log Storage",
+                         "controlText":  "Ensure that logging destinations maintain adequate storage to comply with the enterprise's audit log management process.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "8.4",
+                         "principleId":  "8",
+                         "title":  "Standardize Time Synchronization",
+                         "controlText":  "Standardize time synchronization. Configure at least two synchronized time sources across enterprise assets, where supported.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "8.5",
+                         "principleId":  "8",
+                         "title":  "Collect Detailed Audit Logs",
+                         "controlText":  "Configure detailed audit logging for enterprise assets containing sensitive data. Include event source, date, username, timestamp, source addresses, destination addresses, and other useful elements that could assist in a forensic investigation.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "8.6",
+                         "principleId":  "8",
+                         "title":  "Collect DNS Query Audit Logs",
+                         "controlText":  "Collect DNS query audit logs on enterprise assets, where appropriate and supported.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "8.7",
+                         "principleId":  "8",
+                         "title":  "Collect URL Request Audit Logs",
+                         "controlText":  "Collect URL request audit logs on enterprise assets, where appropriate and supported.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "8.8",
+                         "principleId":  "8",
+                         "title":  "Collect Command-Line Audit Logs",
+                         "controlText":  "Collect command-line audit logs. Example implementations include collecting audit logs from PowerShell®, BASHâ„¢, and remote administrative terminals.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "8.9",
+                         "principleId":  "8",
+                         "title":  "Centralize Audit Logs",
+                         "controlText":  "Centralize, to the extent possible, audit log collection and retention across enterprise assets in accordance with the documented audit log management process. Example implementations primarily include leveraging a SIEM tool to centralize multiple log sources.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "8.10",
+                         "principleId":  "8",
+                         "title":  "Retain Audit Logs",
+                         "controlText":  "Retain audit logs across enterprise assets for a minimum of 90 days.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "8.11",
+                         "principleId":  "8",
+                         "title":  "Conduct Audit Log Reviews",
+                         "controlText":  "Conduct reviews of audit logs to detect anomalies or abnormal events that could indicate a potential threat. Conduct reviews on a weekly, or more frequent, basis.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "8.12",
+                         "principleId":  "8",
+                         "title":  "Collect Service Provider Logs",
+                         "controlText":  "Collect service provider logs, where supported. Example implementations include collecting authentication and authorization events, data creation and disposal events, and user management events.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "9.1",
+                         "principleId":  "9",
+                         "title":  "Ensure Use of Only Fully Supported Browsers and Email Clients",
+                         "controlText":  "Ensure only fully supported browsers and email clients are allowed to execute in the enterprise, only using the latest version of browsers and email clients provided through the vendor.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "9.2",
+                         "principleId":  "9",
+                         "title":  "Use DNS Filtering Services",
+                         "controlText":  "Use DNS filtering services on all end-user devices, including remote and on-premises assets, to block access to known malicious domains.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "9.3",
+                         "principleId":  "9",
+                         "title":  "Maintain and Enforce Network-Based URL Filters",
+                         "controlText":  "Enforce and update network-based URL filters to limit an enterprise asset from connecting to potentially malicious or unapproved websites. Example implementations include category-based filtering, reputation-based filtering, or through the use of block lists. Enforce filters for all enterprise assets.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "9.4",
+                         "principleId":  "9",
+                         "title":  "Restrict Unnecessary or Unauthorized Browser and Email Client Extensions",
+                         "controlText":  "Restrict, either through uninstalling or disabling, any unauthorized or unnecessary browser or email client plugins, extensions, and add-on applications.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "9.5",
+                         "principleId":  "9",
+                         "title":  "Implement DMARC",
+                         "controlText":  "To lower the chance of spoofed or modified emails from valid domains, implement DMARC policy and verification, starting with implementing the Sender Policy Framework (SPF) and the DomainKeys Identified Mail (DKIM) standards.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "9.6",
+                         "principleId":  "9",
+                         "title":  "Block Unnecessary File Types",
+                         "controlText":  "Block unnecessary file types attempting to enter the enterprise's email gateway.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "9.7",
+                         "principleId":  "9",
+                         "title":  "Deploy and Maintain Email Server Anti-Malware Protections",
+                         "controlText":  "Deploy and maintain email server anti-malware protections, such as attachment scanning and/or sandboxing.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "10.1",
+                         "principleId":  "10",
+                         "title":  "Deploy and Maintain Anti-Malware Software",
+                         "controlText":  "Deploy and maintain anti-malware software on all enterprise assets.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "10.2",
+                         "principleId":  "10",
+                         "title":  "Configure Automatic Anti-Malware Signature Updates",
+                         "controlText":  "Configure automatic updates for anti-malware signature files on all enterprise assets.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "10.3",
+                         "principleId":  "10",
+                         "title":  "Disable Autorun and Autoplay for Removable Media",
+                         "controlText":  "Disable autorun and autoplay auto-execute functionality for removable media.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "10.4",
+                         "principleId":  "10",
+                         "title":  "Configure Automatic Anti-Malware Scanning of Removable Media",
+                         "controlText":  "Configure anti-malware software to automatically scan removable media.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "10.5",
+                         "principleId":  "10",
+                         "title":  "Enable Anti-Exploitation Features",
+                         "controlText":  "Enable anti-exploitation features on enterprise assets and software, where possible, such as Microsoft® Data Execution Prevention (DEP), Windows® Defender Exploit Guard (WDEG), or Apple® System Integrity Protection (SIP) and Gatekeeperâ„¢.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "10.6",
+                         "principleId":  "10",
+                         "title":  "Centrally Manage Anti-Malware Software",
+                         "controlText":  "Centrally manage anti-malware software.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "10.7",
+                         "principleId":  "10",
+                         "title":  "Use Behavior-Based Anti-Malware Software",
+                         "controlText":  "Use behavior-based anti-malware software.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "11.1",
+                         "principleId":  "11",
+                         "title":  "Establish and Maintain a Data Recovery Process",
+                         "controlText":  "Establish and maintain a documented data recovery process that includes detailed backup procedures. In the process, address the scope of data recovery activities, recovery prioritization, and the security of backup data. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "11.2",
+                         "principleId":  "11",
+                         "title":  "Perform Automated Backups",
+                         "controlText":  "Perform automated backups of in-scope enterprise assets. Run backups weekly, or more frequently, based on the sensitivity of the data.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Recover"
+                     },
+                     {
+                         "id":  "11.3",
+                         "principleId":  "11",
+                         "title":  "Protect Recovery Data",
+                         "controlText":  "Protect recovery data with equivalent controls to the original data. Reference encryption or data separation, based on requirements.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "11.4",
+                         "principleId":  "11",
+                         "title":  "Establish and Maintain an Isolated Instance of Recovery Data",
+                         "controlText":  "Establish and maintain an isolated instance of recovery data. Example implementations include, version controlling backup destinations through offline, cloud, or off-site systems or services.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Recover"
+                     },
+                     {
+                         "id":  "11.5",
+                         "principleId":  "11",
+                         "title":  "Test Data Recovery",
+                         "controlText":  "Test backup recovery quarterly, or more frequently, for a sampling of in-scope enterprise assets.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Recover"
+                     },
+                     {
+                         "id":  "12.1",
+                         "principleId":  "12",
+                         "title":  "Ensure Network Infrastructure is Up-to-Date",
+                         "controlText":  "Ensure network infrastructure is kept up-to-date. Example implementations include running the latest stable release of software and/or using currently supported network as a service (NaaS) offerings. Review software versions monthly, or more frequently, to verify software support.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "12.2",
+                         "principleId":  "12",
+                         "title":  "Establish and Maintain a Secure Network Architecture",
+                         "controlText":  "Design and maintain a secure network architecture. A secure network architecture must address segmentation, least privilege, and availability, at a minimum. Example implementations may include documentation, policy, and design components.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "12.3",
+                         "principleId":  "12",
+                         "title":  "Securely Manage Network Infrastructure",
+                         "controlText":  "Securely manage network infrastructure. Example implementations include version-controlled Infrastructure-as-Code (IaC), and the use of secure network protocols, such as SSH and HTTPS.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "12.4",
+                         "principleId":  "12",
+                         "title":  "Establish and Maintain Architecture Diagram(s)",
+                         "controlText":  "Establish and maintain architecture diagram(s) and/or other network system documentation. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "12.5",
+                         "principleId":  "12",
+                         "title":  "Centralize Network Authentication, Authorization, and Auditing (AAA)",
+                         "controlText":  "Centralize network AAA.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "12.6",
+                         "principleId":  "12",
+                         "title":  "Use of Secure Network Management and Communication Protocols",
+                         "controlText":  "Adopt secure network management protocols (e.g., 802.1X) and secure communication protocols (e.g., Wi-Fi Protected Access 2 (WPA2) Enterprise or more secure alternatives).",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "12.7",
+                         "principleId":  "12",
+                         "title":  "Ensure Remote Devices Utilize a VPN and are Connecting to an Enterprise's AAA Infrastructure",
+                         "controlText":  "Require users to authenticate to enterprise-managed VPN and authentication services prior to accessing enterprise resources on end-user devices.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "12.8",
+                         "principleId":  "12",
+                         "title":  "Establish and Maintain Dedicated Computing Resources for All Administrative Work",
+                         "controlText":  "Establish and maintain dedicated computing resources, either physically or logically separated, for all administrative tasks or tasks requiring administrative access. The computing resources should be segmented from the enterprise\u0027s primary network and not be allowed internet access.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "13.1",
+                         "principleId":  "13",
+                         "title":  "Centralize Security Event Alerting",
+                         "controlText":  "Centralize security event alerting across enterprise assets for log correlation and analysis. Best practice implementation requires the use of a SIEM, which includes vendor-defined event correlation alerts. A log analytics platform configured with security-relevant correlation alerts also satisfies this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "13.2",
+                         "principleId":  "13",
+                         "title":  "Deploy a Host-Based Intrusion Detection Solution",
+                         "controlText":  "Deploy a host-based intrusion detection solution on enterprise assets, where appropriate and/or supported.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "13.3",
+                         "principleId":  "13",
+                         "title":  "Deploy a Network Intrusion Detection Solution",
+                         "controlText":  "Deploy a network intrusion detection solution on enterprise assets, where appropriate. Example implementations include the use of a Network Intrusion Detection System (NIDS) or equivalent cloud service provider (CSP) service.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "13.4",
+                         "principleId":  "13",
+                         "title":  "Perform Traffic Filtering Between Network Segments",
+                         "controlText":  "Perform traffic filtering between network segments, where appropriate.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "13.5",
+                         "principleId":  "13",
+                         "title":  "Manage Access Control for Remote Assets",
+                         "controlText":  "Manage access control for assets remotely connecting to enterprise resources. Determine amount of access to enterprise resources based on: up-to-date anti-malware software installed, configuration compliance with the enterprise's secure configuration process, and ensuring the operating system and applications are up-to-date.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "13.6",
+                         "principleId":  "13",
+                         "title":  "Collect Network Traffic Flow Logs",
+                         "controlText":  "Collect network traffic flow logs and/or network traffic to review and alert upon from network devices.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "13.7",
+                         "principleId":  "13",
+                         "title":  "Deploy a Host-Based Intrusion Prevention Solution",
+                         "controlText":  "Deploy a host-based intrusion prevention solution on enterprise assets, where appropriate and/or supported. Example implementations include use of an Endpoint Detection and Response (EDR) client or host-based IPS agent.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Devices",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "13.8",
+                         "principleId":  "13",
+                         "title":  "Deploy a Network Intrusion Prevention Solution",
+                         "controlText":  "Deploy a network intrusion prevention solution, where appropriate. Example implementations include the use of a Network Intrusion Prevention System (NIPS) or equivalent CSP service.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "13.9",
+                         "principleId":  "13",
+                         "title":  "Deploy Port-Level Access Control",
+                         "controlText":  "Deploy port-level access control. Port-level access control utilizes 802.1x, or similar network access control protocols, such as certificates, and may incorporate user and/or device authentication.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "13.10",
+                         "principleId":  "13",
+                         "title":  "Perform Application Layer Filtering",
+                         "controlText":  "Perform application layer filtering. Example implementations include a filtering proxy, application layer firewall, or gateway.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "13.11",
+                         "principleId":  "13",
+                         "title":  "Tune Security Event Alerting Thresholds",
+                         "controlText":  "Tune security event alerting thresholds monthly, or more frequently.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "14.1",
+                         "principleId":  "14",
+                         "title":  "Establish and Maintain a Security Awareness Program",
+                         "controlText":  "Establish and maintain a security awareness program. The purpose of a security awareness program is to educate the enterprise's workforce on how to interact with enterprise assets and data in a secure manner. Conduct training at hire and, at a minimum, annually. Review and update content annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "14.2",
+                         "principleId":  "14",
+                         "title":  "Train Workforce Members to Recognize Social Engineering Attacks",
+                         "controlText":  "Train workforce members to recognize social engineering attacks, such as phishing, business email compromise (BEC), pretexting, and tailgating.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "14.3",
+                         "principleId":  "14",
+                         "title":  "Train Workforce Members on Authentication Best Practices",
+                         "controlText":  "Train workforce members on authentication best practices. Example topics include MFA, password composition, and credential management.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "14.4",
+                         "principleId":  "14",
+                         "title":  "Train Workforce on Data Handling Best Practices",
+                         "controlText":  "Train workforce members on how to identify and properly store, transfer, archive, and destroy sensitive data. This also includes training workforce members on clear screen and desk best practices, such as locking their screen when they step away from their enterprise asset, erasing physical and virtual whiteboards at the end of meetings, and storing data and assets securely.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "14.5",
+                         "principleId":  "14",
+                         "title":  "Train Workforce Members on Causes of Unintentional Data Exposure",
+                         "controlText":  "Train workforce members to be aware of causes for unintentional data exposure. Example topics include mis-delivery of sensitive data, losing a portable end-user device, or publishing data to unintended audiences.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "14.6",
+                         "principleId":  "14",
+                         "title":  "Train Workforce Members on Recognizing and Reporting Security Incidents",
+                         "controlText":  "Train workforce members to be able to recognize a potential incident and be able to report such an incident.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "14.7",
+                         "principleId":  "14",
+                         "title":  "Train Workforce on How to Identify and Report if Their Enterprise Assets are Missing Security Updates",
+                         "controlText":  "Train workforce to understand how to verify and report out-of-date software patches or any failures in automated processes and tools. Part of this training should include notifying IT personnel of any failures in automated processes and tools.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "14.8",
+                         "principleId":  "14",
+                         "title":  "Train Workforce on the Dangers of Connecting to and Transmitting Enterprise Data Over Insecure Networks",
+                         "controlText":  "Train workforce members on the dangers of connecting to, and transmitting data over, insecure networks for enterprise activities. If the enterprise has remote workers, training must include guidance to ensure that all users securely configure their home network infrastructure.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "14.9",
+                         "principleId":  "14",
+                         "title":  "Conduct Role-Specific Security Awareness and Skills Training",
+                         "controlText":  "Conduct role-specific security awareness and skills training. Example implementations include secure system administration courses for IT professionals, OWASP® Top 10 vulnerability awareness and prevention training for web application developers, and advanced social engineering awareness training for high-profile roles.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "15.1",
+                         "principleId":  "15",
+                         "title":  "Establish and Maintain an Inventory of Service Providers",
+                         "controlText":  "Establish and maintain an inventory of service providers. The inventory is to list all known service providers, include classification(s), and designate an enterprise contact for each service provider. Review and update the inventory annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "15.2",
+                         "principleId":  "15",
+                         "title":  "Establish and Maintain a Service Provider Management Policy",
+                         "controlText":  "Establish and maintain a service provider management policy. Ensure the policy addresses the classification, inventory, assessment, monitoring, and decommissioning of service providers. Review and update the policy annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "15.3",
+                         "principleId":  "15",
+                         "title":  "Classify Service Providers",
+                         "controlText":  "Classify service providers. Classification consideration may include one or more characteristics, such as data sensitivity, data volume, availability requirements, applicable regulations, inherent risk, and mitigated risk. Update and review classifications annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "15.4",
+                         "principleId":  "15",
+                         "title":  "Ensure Service Provider Contracts Include Security Requirements",
+                         "controlText":  "Ensure service provider contracts include security requirements. Example requirements may include minimum security program requirements, security incident and/or data breach notification and response, data encryption requirements, and data disposal commitments. These security requirements must be consistent with the enterprise's service provider management policy. Review service provider contracts annually to ensure contracts are not missing security requirements.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "15.5",
+                         "principleId":  "15",
+                         "title":  "Assess Service Providers",
+                         "controlText":  "Assess service providers consistent with the enterprise's service provider management policy. Assessment scope may vary based on classification(s), and may include review of standardized assessment reports, such as Service Organization Control 2 (SOC 2) and Payment Card Industry (PCI) Attestation of Compliance (AoC), customized questionnaires, or other appropriately rigorous processes. Reassess service providers annually, at a minimum, or with new and renewed contracts.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "15.6",
+                         "principleId":  "15",
+                         "title":  "Monitor Service Providers",
+                         "controlText":  "Monitor service providers consistent with the enterprise's service provider management policy. Monitoring may include periodic reassessment of service provider compliance, monitoring service provider release notes, and dark web monitoring.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "15.7",
+                         "principleId":  "15",
+                         "title":  "Securely Decommission Service Providers",
+                         "controlText":  "Securely decommission service providers. Example considerations include user and service account deactivation, termination of data flows, and secure disposal of enterprise data within service provider systems.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Data",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "16.1",
+                         "principleId":  "16",
+                         "title":  "Establish and Maintain a Secure Application Development Process",
+                         "controlText":  "Establish and maintain a secure application development process. In the process, address such items as: secure application design standards, secure coding practices, developer training, vulnerability management, security of third-party code, and application security testing procedures. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "16.2",
+                         "principleId":  "16",
+                         "title":  "Establish and Maintain a Process to Accept and Address Software Vulnerabilities",
+                         "controlText":  "Establish and maintain a process to accept and address reports of software vulnerabilities, including providing a means for external entities to report. The process is to include such items as: a vulnerability handling policy that identifies reporting process, responsible party for handling vulnerability reports, and a process for intake, assignment, remediation, and remediation testing. As part of the process, use a vulnerability tracking system that includes severity ratings and metrics for measuring timing for identification, analysis, and remediation of vulnerabilities. Review and update documentation annually, or when significant enterprise changes occur that could impact this Safeguard.\r\n\r\nThird-party application developers need to consider this an externally-facing policy that helps to set expectations for outside stakeholders.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "16.3",
+                         "principleId":  "16",
+                         "title":  "Perform Root Cause Analysis on Security Vulnerabilities",
+                         "controlText":  "Perform root cause analysis on security vulnerabilities. When reviewing vulnerabilities, root cause analysis is the task of evaluating underlying issues that create vulnerabilities in code, and allows development teams to move beyond just fixing individual vulnerabilities as they arise.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "16.4",
+                         "principleId":  "16",
+                         "title":  "Establish and Manage an Inventory of Third-Party Software Components",
+                         "controlText":  "Establish and manage an updated inventory of third-party components used in development, often referred to as a \"bill of materials,\" as well as components slated for future use. This inventory is to include any risks that each third-party component could pose. Evaluate the list at least monthly to identify any changes or updates to these components, and validate that the component is still supported.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Identify"
+                     },
+                     {
+                         "id":  "16.5",
+                         "principleId":  "16",
+                         "title":  "Use Up-to-Date and Trusted Third-Party Software Components",
+                         "controlText":  "Use up-to-date and trusted third-party software components. When possible, choose established and proven frameworks and libraries that provide adequate security. Acquire these components from trusted sources or evaluate the software for vulnerabilities before use.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "16.6",
+                         "principleId":  "16",
+                         "title":  "Establish and Maintain a Severity Rating System and Process for Application Vulnerabilities",
+                         "controlText":  "Establish and maintain a severity rating system and process for application vulnerabilities that facilitates prioritizing the order in which discovered vulnerabilities are fixed. This process includes setting a minimum level of security acceptability for releasing code or applications. Severity ratings bring a systematic way of triaging vulnerabilities that improves risk management and helps ensure the most severe bugs are fixed first. Review and update the system and process annually.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "16.7",
+                         "principleId":  "16",
+                         "title":  "Use Standard Hardening Configuration Templates for Application Infrastructure",
+                         "controlText":  "Use standard, industry-recommended hardening configuration templates for application infrastructure components. This includes underlying servers, databases, and web servers, and applies to cloud containers, Platform as a Service (PaaS) components, and SaaS components. Do not allow in-house developed software to weaken configuration hardening.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "16.8",
+                         "principleId":  "16",
+                         "title":  "Separate Production and Non-Production Systems",
+                         "controlText":  "Maintain separate environments for production and non-production systems.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "16.9",
+                         "principleId":  "16",
+                         "title":  "Train Developers in Application Security Concepts and Secure Coding",
+                         "controlText":  "Ensure that all software development personnel receive training in writing secure code for their specific development environment and responsibilities. Training can include general security principles and application security standard practices. Conduct training at least annually and design in a way to promote security within the development team, and build a culture of security among the developers.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "16.10",
+                         "principleId":  "16",
+                         "title":  "Apply Secure Design Principles in Application Architectures",
+                         "controlText":  "Apply secure design principles in application architectures. Secure design principles include the concept of least privilege and enforcing mediation to validate every operation that the user makes, promoting the concept of \"never trust user input.\" Examples include ensuring that explicit error checking is performed and documented for all input, including for size, data type, and acceptable ranges or formats. Secure design also means minimizing the application infrastructure attack surface, such as turning off unprotected ports and services, removing unnecessary programs and files, and renaming or removing default accounts.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "16.11",
+                         "principleId":  "16",
+                         "title":  "Leverage Vetted Modules or Services for Application Security Components",
+                         "controlText":  "Leverage vetted modules or services for application security components, such as identity management, encryption, auditing, and logging. Using platform features in critical security functions will reduce developers' workload and minimize the likelihood of design or implementation errors. Modern operating systems provide effective mechanisms for identification, authentication, and authorization and make those mechanisms available to applications. Use only standardized, currently accepted, and extensively reviewed encryption algorithms. Operating systems also provide mechanisms to create and maintain secure audit logs.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "16.12",
+                         "principleId":  "16",
+                         "title":  "Implement Code-Level Security Checks",
+                         "controlText":  "Apply static and dynamic analysis tools within the application life cycle to verify that secure coding practices are being followed.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "16.13",
+                         "principleId":  "16",
+                         "title":  "Conduct Application Penetration Testing",
+                         "controlText":  "Conduct application penetration testing. For critical applications, authenticated penetration testing is better suited to finding business logic vulnerabilities than code scanning and automated security testing. Penetration testing relies on the skill of the tester to manually manipulate an application as an authenticated and unauthenticated user.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "16.14",
+                         "principleId":  "16",
+                         "title":  "Conduct Threat Modeling",
+                         "controlText":  "Conduct threat modeling. Threat modeling is the process of identifying and addressing application security design flaws within a design, before code is created. It is conducted through specially trained individuals who evaluate the application design and gauge security risks for each entry point and access level. The goal is to map out the application, architecture, and infrastructure in a structured way to understand its weaknesses.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Software",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "17.1",
+                         "principleId":  "17",
+                         "title":  "Designate Personnel to Manage Incident Handling",
+                         "controlText":  "Designate one key person, and at least one backup, who will manage the enterprise's incident handling process. Management personnel are responsible for the coordination and documentation of incident response and recovery efforts and can consist of employees internal to the enterprise, service providers, or a hybrid approach. If using a service provider, designate at least one person internal to the enterprise to oversee any third-party work. Review annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Respond"
+                     },
+                     {
+                         "id":  "17.2",
+                         "principleId":  "17",
+                         "title":  "Establish and Maintain Contact Information for Reporting Security Incidents",
+                         "controlText":  "Establish and maintain contact information for parties that need to be informed of security incidents. Contacts may include internal staff, service providers, law enforcement, cyber insurance providers, relevant government agencies, Information Sharing and Analysis Center (ISAC) partners, or other stakeholders. Verify contacts annually to ensure that information is up-to-date.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "17.3",
+                         "principleId":  "17",
+                         "title":  "Establish and Maintain an Enterprise Process for Reporting Incidents",
+                         "controlText":  "Establish and maintain a documented enterprise process for the workforce to report security incidents. The process includes reporting timeframe, personnel to report to, mechanism for reporting, and the minimum information to be reported. Ensure the process is publicly available to all of the workforce. Review annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "17.4",
+                         "principleId":  "17",
+                         "title":  "Establish and Maintain an Incident Response Process",
+                         "controlText":  "Establish and maintain a documented incident response process that addresses roles and responsibilities, compliance requirements, and a communication plan. Review annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "17.5",
+                         "principleId":  "17",
+                         "title":  "Assign Key Roles and Responsibilities",
+                         "controlText":  "Assign key roles and responsibilities for incident response, including staff from legal, IT, information security, facilities, public relations, human resources, incident responders, analysts, and relevant third parties. Review annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Respond"
+                     },
+                     {
+                         "id":  "17.6",
+                         "principleId":  "17",
+                         "title":  "Define Mechanisms for Communicating During Incident Response",
+                         "controlText":  "Determine which primary and secondary mechanisms will be used to communicate and report during a security incident. Mechanisms can include phone calls, emails, secure chat, or notification letters. Keep in mind that certain mechanisms, such as emails, can be affected during a security incident. Review annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Respond"
+                     },
+                     {
+                         "id":  "17.7",
+                         "principleId":  "17",
+                         "title":  "Conduct Routine Incident Response Exercises",
+                         "controlText":  "Plan and conduct routine incident response exercises and scenarios for key personnel involved in the incident response process to prepare for responding to real-world incidents. Exercises need to test communication channels, decision making, and workflows. Conduct testing on an annual basis, at a minimum.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Recover"
+                     },
+                     {
+                         "id":  "17.8",
+                         "principleId":  "17",
+                         "title":  "Conduct Post-Incident Reviews",
+                         "controlText":  "Conduct post-incident reviews. Post-incident reviews help prevent incident recurrence through identifying lessons learned and follow-up action.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Users",
+                         "securityFunction":  "Recover"
+                     },
+                     {
+                         "id":  "17.9",
+                         "principleId":  "17",
+                         "title":  "Establish and Maintain Security Incident Thresholds",
+                         "controlText":  "Establish and maintain security incident thresholds, including, at a minimum, differentiating between an incident and an event. Examples can include: abnormal activity, security vulnerability, security weakness, data breach, privacy incident, etc. Review annually, or when significant enterprise changes occur that could impact this Safeguard.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Recover"
+                     },
+                     {
+                         "id":  "18.1",
+                         "principleId":  "18",
+                         "title":  "Establish and Maintain a Penetration Testing Program",
+                         "controlText":  "Establish and maintain a penetration testing program appropriate to the size, complexity, industry, and maturity of the enterprise. Penetration testing program characteristics include scope, such as network, web application, Application Programming Interface (API), hosted services, and physical premise controls; frequency; limitations, such as acceptable hours, and excluded attack types; point of contact information; remediation, such as how findings will be routed internally; and retrospective requirements.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Documentation",
+                         "securityFunction":  "Govern"
+                     },
+                     {
+                         "id":  "18.2",
+                         "principleId":  "18",
+                         "title":  "Perform Periodic External Penetration Tests",
+                         "controlText":  "Perform periodic external penetration tests based on program requirements, no less than annually. External penetration testing must include enterprise and environmental reconnaissance to detect exploitable information. Penetration testing requires specialized skills and experience and must be conducted through a qualified party. The testing may be clear box or opaque box.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Detect"
+                     },
+                     {
+                         "id":  "18.3",
+                         "principleId":  "18",
+                         "title":  "Remediate Penetration Test Findings",
+                         "controlText":  "Remediate penetration test findings based on the enterprise's documented vulnerability remediation process. This should include determining a timeline and level of effort based on the impact and prioritization of each identified finding.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "18.4",
+                         "principleId":  "18",
+                         "title":  "Validate Security Measures",
+                         "controlText":  "Validate security measures after each penetration test. If deemed necessary, modify rulesets and capabilities to detect the techniques used during testing.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Protect"
+                     },
+                     {
+                         "id":  "18.5",
+                         "principleId":  "18",
+                         "title":  "Perform Periodic Internal Penetration Tests",
+                         "controlText":  "Perform periodic internal penetration tests based on program requirements, no less than annually. The testing may be clear box or opaque box.",
+                         "controlTextLabel":  "CIS Safeguard (v8.1.2)",
+                         "assetClass":  "Network",
+                         "securityFunction":  "Detect"
+                     }
+                 ],
+    "targetDimensionLabelPlural":  "Sites"
+};

@@ -1,0 +1,1242 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/onr-syaps-management/profiles/syaps-mgmt-smaller.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["onr-syaps-management"] = window.App.Data.instruments["onr-syaps-management"] || {};
+window.App.Data.instruments["onr-syaps-management"].profiles = window.App.Data.instruments["onr-syaps-management"].profiles || {};
+window.App.Data.instruments["onr-syaps-management"].profiles["syaps-mgmt-smaller"] = {
+    "id":  "syaps-mgmt-smaller",
+    "name":  "Smaller dutyholder (proportionate)",
+    "appliesToInstrument":  "onr-syaps-management",
+    "profileVersion":  "1.0.0",
+    "verifiedSource":  "ONR CNS-GD-003 (guide for smaller dutyholders) + SyAPs 2022",
+    "_note":  "Smaller dutyholder profile: the same expectations apply but are demonstrated proportionately to a smaller or low-category site (per ONR CNS-GD-003). Nothing is dropped from the score; the proportionate framing is carried as per-expectation guidance.",
+    "overlay":  {
+                    "1.1.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.1.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.1.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.1.12":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.2.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.2.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.2.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.3.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.3.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.3.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.4.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.4.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.5.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "1.5.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.5.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "1.5.12":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "2.1.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "2.1.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "2.1.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "2.1.12":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "3.1.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.1.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.1.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.1.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.2.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "3.3.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.3.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.3.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.3.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.3.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.3.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.3.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "3.4.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.1.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.1.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.1.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.1.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.2.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.3.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "4.4.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "4.4.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "5.1.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.1.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "5.1.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "5.1.12":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "5.2.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.2.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "5.2.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "5.2.12":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "5.3.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "5.3.10":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "5.3.11":  {
+                                   "expectedState":  "achieved",
+                                   "applicable":  true,
+                                   "weight":  null,
+                                   "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                   "overlaySource":  null
+                               },
+                    "7.1.1":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "7.1.2":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "7.1.3":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "7.1.4":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "7.1.5":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "7.1.6":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "7.1.7":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "7.1.8":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              },
+                    "7.1.9":  {
+                                  "expectedState":  "achieved",
+                                  "applicable":  true,
+                                  "weight":  null,
+                                  "supplementaryGuidance":  "Apply proportionately to the site\u0027s security category and risk. A smaller or low-category dutyholder should demonstrate this to a depth commensurate with the risk (see ONR CNS-GD-003, the guide for smaller dutyholders).",
+                                  "overlaySource":  null
+                              }
+                }
+};

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>NIST 800-53 export smoke</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true }); H.dom();</script>
+<script>
+(function () {
+  var lines = [], fail = 0, captured = {};
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() { lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+
+  A.Engine.loadCatalog();
+  A.UI.init({ autosave: false });
+  A.Engine.activateInstrument("nist-800-53");
+  // a few answers so the report has content
+  var tid = A.Engine.state.activeTargetId;
+  A.Engine.setResponse(tid, "AC-1", { applicable: true, state: "achieved" });
+  A.Engine.setResponse(tid, "AC-3", { applicable: true, state: "partially" });
+  A.Engine.setResponse(tid, "SI-2", { applicable: true, state: "not" });
+
+  ok(!!window.docx && !!window.ExcelJS, "vendor libs (docx + ExcelJS) loaded");
+
+  // Capture blobs instead of triggering a browser download (key by extension).
+  A.Storage.downloadBlob = function (blob, name) { captured[String(name).replace(/^.*\./, "")] = blob; return blob; };
+  var narrative = A.Engine.getActiveNarrative();
+  ok(!!narrative && !!narrative.boilerplate && !!narrative.templates, "NIST narrative pack loaded (boilerplate + templates)");
+
+  var inst = A.Engine.state.instrument, tax = A.Engine.state.taxonomy, prof = A.Engine.state.profile;
+  var engagement = A.Engine.state.engagement;
+  var opts = {
+    cafProfileRegistry: A.Engine.getCAFProfileRegistry(),
+    cafProfileId: A.Engine.getActiveCAFProfileId(),
+    cafProfile: A.Engine.getActiveCAFProfile ? A.Engine.getActiveCAFProfile() : null,
+    cafOverlay: A.Engine.getActiveCAFOverlay(),
+    targetId: tid
+  };
+
+  // ---- Excel (returns a promise) ----
+  var xp;
+  try { xp = A.ExportXLSX.download(engagement, inst, tax, prof, opts); }
+  catch (e) { ok(false, "xlsx build threw: " + e.message); }
+
+  // ---- Word (async via opts.onDone) ----
+  var docxDone = new Promise(function (resolve) {
+    var o2 = {}; for (var k in opts) o2[k] = opts[k];
+    o2.onDone = function (err) { ok(!err, "Word export completes without error", err && err.message); resolve(); };
+    try { A.ExportDOCX.download(engagement, inst, tax, prof, narrative, o2); }
+    catch (e) { ok(false, "docx build threw: " + e.message + "\n" + (e.stack||"")); resolve(); }
+  });
+
+  Promise.all([
+    (xp && xp.then ? xp : Promise.resolve()).then(function () { ok(true, "xlsx download promise resolved"); }, function (e) { ok(false, "xlsx promise rejected: " + (e && e.message)); }),
+    docxDone
+  ]).then(function () {
+    ok(captured["docx"] && captured["docx"].size > 3000, "Word .docx blob produced", captured["docx"] && ("size " + captured["docx"].size));
+    ok(captured["xlsx"] && captured["xlsx"].size > 3000, "Excel .xlsx blob produced", captured["xlsx"] && ("size " + captured["xlsx"].size));
+    finish();
+  });
+})();
+</script>
+</body></html>

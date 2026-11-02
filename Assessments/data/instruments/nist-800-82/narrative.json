@@ -1,0 +1,47 @@
+{
+    "_note":  "NIST SP 800-82 Rev 3 OT Overlay gap-analysis narrative. The executiveSummary block drives the expanded Word exec summary by slot-substitution; binary Satisfied / Other Than Satisfied so no partial wording.",
+    "boilerplate":  {
+                        "report_intro":  "This report gives a control-by-control gap assessment against the OT Overlay in NIST SP 800-82 Revision 3 (Appendix F), which tailors the NIST SP 800-53 Rev 5 control catalog for operational technology. Each control is recorded as Satisfied or Other Than Satisfied, the determination model used in NIST SP 800-53A, against the selected OT baseline. The report then sets out a roadmap, based on the evidence gathered, for the controls that are Other Than Satisfied.",
+                        "not_formal_caveat":  "This is an alignment and gap analysis to support improvement. It is neither a formal NIST SP 800-53A control assessment nor an authorisation decision under the NIST Risk Management Framework (SP 800-37). The judgements are the consultant's, made against the OT overlay and informed by the per-control OT Discussion, and should be confirmed by a formal assessment where one is required.",
+                        "ot_focus":  "Operational technology environments differ from enterprise IT in ways that directly affect how controls are implemented. Availability and safety usually take priority over confidentiality, legacy devices may be unable to meet a control as written, and some controls have to be met through compensating measures. The per-control OT Discussion and per-family Tailoring Considerations from NIST SP 800-82 Rev 3 are provided in the tool, and where OT context affects a judgement it should be noted against the control.",
+                        "how_to_read":  "Each control is judged either Satisfied or Other Than Satisfied, following the assessment model in NIST SP 800-53A. Results are given as a profile by control family. There is no single score, because a control catalog is not designed to be reduced to one number. Controls that could not be established are marked unknown; they lower confidence in the result but are not counted as failures. The selected OT baseline (Low, Moderate or High from the SP 800-82 Rev 3 overlay, or the full overlay with no target) sets which controls are expected, and the roadmap lists every in-scope control that is Other Than Satisfied.",
+                        "series_context":  "NIST SP 800-82 Rev 3 is the operational technology security guide published by the US National Institute of Standards and Technology. It has no controls of its own. It overlays SP 800-53 Rev 5, tailors the baselines for OT, and adds guidance on what each control means where availability and safety come first. This report assesses the OT overlay, and the underlying catalog is SP 800-53."
+                    },
+    "templates":  {
+                      "profile_line":  "{objName} ({objId}): {achievedCount} satisfied, {notCount} other than satisfied, of {totalCount} controls.",
+                      "outcome_result":  "{code} {title}: {stateLabel}.",
+                      "roadmap_item":  "{code} {title}: currently {stateLabel}. Recommended OT-aware actions below.",
+                      "unknown_finding":  "{unknownCount} controls could not be established and are marked unknown; confidence is {confidenceLabel}."
+                  },
+    "executiveSummary":  {
+                             "_note":  "Composed by slot-substitution only. Binary determination (Satisfied / Other Than Satisfied), so no partial wording.",
+                             "templates":  {
+                                               "exec_verdict":  "This assessment finds that {clientName} {verdictPhrase} against the {profileName} of the NIST SP 800-82 Rev 3 OT Overlay, with the weakest coverage in {weakestObjectiveName}. The controls assessed as Other Than Satisfied are the focus of the roadmap in this report.",
+                                               "exec_verdict_nogaps":  "This assessment finds that {clientName} {verdictPhrase} against the {profileName} of the NIST SP 800-82 Rev 3 OT Overlay, with every applicable control assessed as Satisfied.",
+                                               "exec_scope":  "The assessment covered {applicableCount} applicable base controls across the 19 control families of the NIST SP 800-82 Rev 3 OT Overlay, grouped as Technical, Operational and Management, judged against the {profileName}.",
+                                               "exec_profile":  "Of these, {achievedCount} were assessed as Satisfied and {notAchievedCount} as Other Than Satisfied (the determination model of NIST SP 800-53A), so {belowCount} control(s) fall short of the OT baseline.",
+                                               "exec_gap_shape":  "The gaps are not evenly spread. {gapConcentrationSentence} The weakest area is {weakestObjectiveName}, where {weakestObjectiveDetail}.",
+                                               "exec_path_forward":  "The {belowCount} controls assessed as Other Than Satisfied can be closed, and this report sets out a prioritised, OT-aware roadmap for doing so.",
+                                               "exec_confidence":  "This picture rests on {coveragePct} of applicable controls having been answered ({confidenceLabel}). There is no single grade or pass mark. The result is the profile of Satisfied and Other Than Satisfied controls across the families.",
+                                               "verdictPhrases":  {
+                                                                      "foundations":  "demonstrates strong implementation of the selected OT baseline",
+                                                                      "recognised":  "shows implementation that is partly in place",
+                                                                      "substantial":  "has substantial gaps against the selected OT baseline"
+                                                                  },
+                                               "gapConcentrationFragments":  {
+                                                                                 "partialClause":  "implementation is partly in place",
+                                                                                 "absentClause":  "the controls are not yet satisfied"
+                                                                             }
+                                           },
+                             "boilerplate":  {
+                                                 "regulatory_stakes":  "The NIST SP 800-82 OT Overlay tailors the NIST SP 800-53 Rev 5 catalog for operational technology, and the selected baseline corresponds to the impact level chosen for the control environment. Controls that are Other Than Satisfied directly affect the ability to protect, detect and recover in the OT environment, and they are where an assessor, or a regulator reviewing an essential service, would concentrate. This report is an alignment and gap analysis to support improvement, and is neither a formal SP 800-53A assessment nor an authorisation decision.",
+                                                 "not_determination":  "This is an alignment and gap analysis against the NIST SP 800-82 Rev 3 OT Overlay, informed by the per-control OT Discussion. It is neither a formal SP 800-53A control assessment nor an authorisation decision under the NIST Risk Management Framework (SP 800-37). The judgements are the consultant's and should be confirmed by a formal assessment where one is required."
+                                             },
+                             "consultantBlocks":  {
+                                                      "consultant_exposure_seed":  "For {clientName}, the weakest area is {weakestObjectiveName}.",
+                                                      "consultant_exposure":  "[Consultant to add a short, client-specific note on the essential service and its OT context, the relevant oversight regime, and any specific exposure arising from the weakest areas identified.]",
+                                                      "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",
+                                                      "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this organisation.]"
+                                                  }
+                         }
+}

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Progress-section export smoke test</title>
+  <style>body{font:13px "Segoe UI",sans-serif;padding:20px;}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}</style>
+</head>
+<body>
+  <h1>Progress-section export smoke test</h1>
+  <div id="out"></div>
+
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true });</script>
+  <script>
+  (function () {
+    var out = document.getElementById("out");
+    function line(kind, text) {
+      var d = document.createElement("div");
+      d.className = kind; d.textContent = text;
+      out.appendChild(d);
+    }
+    var App = window.App;
+
+    var progress = {
+      sourceLine: "Acme Petrochemicals, visit 2025-06-01, rev 1.0 - prev.json",
+      versionMismatch: true,
+      baselineContentVersion: "0.9.0",
+      currentContentVersion: "1.0.0",
+      targetName: "Site 1",
+      baselineTargetName: "Plant A",
+      summary: { improved: 2, regressed: 1, unchanged: 5, newlyAssessed: 1, noLongerAssessed: 0, notCompared: 3 },
+      gaps: { prev: 5, curr: 3 },
+      movements: [
+        { code: "SR 1.1", label: "Human user identification and authentication", group: "FR1 Identification & authentication control", prev: "SL 0", curr: "SL 2", change: "improved" },
+        { code: "SR 3.2", label: "Malicious code protection", group: "FR3 System integrity", prev: "SL 2", curr: "SL 1", change: "regressed" },
+        { code: "SR 7.6", label: "Network and security configuration settings", group: "FR7 Resource availability", prev: "SL 1", curr: "SL 2", change: "improved" }
+      ]
+    };
+    var emptyMoves = Object.assign({}, progress, { movements: [] });
+
+    // ---- Excel: Progress sheet present, ordered before Read me, for two families
+    try {
+      var inst = App.Data.instruments["iec-62443-3-3"].instrument;
+      var tax  = App.Data.shared.taxonomies["fr-7"];
+      var prof = App.Data.shared.scoringProfiles["sl-target-closeness"];
+      var eng = App.Storage.makeEmptyEngagement(inst);
+      eng.responses.push({ targetId: eng.targets[0].id, requirementId: inst.requirements[0].id, applicable: true, achievedSL: 1 });
+      eng.basisOfAssessment.interviews.push({ name: "J. Smith", role: "OT Lead", date: "2026-01-10" });
+      eng.basisOfAssessment.documents.push({ title: "OT Security Policy", reference: "POL-014 v3.2", date: "2025-11-01" });
+      eng.basisOfAssessment.observations.push({ name: "SCADA HMI", method: "walkthrough" });
+
+      var wb = App.ExportXLSX.build(eng, inst, tax, prof, { progress: progress });
+      var names = wb.SheetNames;
+      if (names.indexOf("Progress") === -1) throw new Error("no Progress sheet: " + names.join(","));
+      if (names.indexOf("Progress") !== names.indexOf("Read me") - 1) throw new Error("Progress not before Read me: " + names.join(","));
+      if (names.indexOf("Basis") === -1) throw new Error("no Basis sheet: " + names.join(","));
+      if (!(names.indexOf("Basis") < names.indexOf("Progress"))) throw new Error("Basis not before Progress: " + names.join(","));
+      var arr = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      line("ok", "PASS SL Excel with progress + basis - sheets: " + names.join(", ") + " - " + (arr.byteLength || arr.length) + " bytes");
+
+      var wbNo = App.ExportXLSX.build(eng, inst, tax, prof, {});
+      if (wbNo.SheetNames.indexOf("Progress") !== -1) throw new Error("Progress sheet appeared without a baseline");
+      if (wbNo.SheetNames.indexOf("Basis") === -1) throw new Error("Basis sheet missing when progress absent");
+      line("ok", "PASS SL Excel without progress - no Progress sheet, Basis retained");
+
+      var engEmpty = App.Storage.makeEmptyEngagement(inst);
+      var wbEmpty = App.ExportXLSX.build(engEmpty, inst, tax, prof, {});
+      if (wbEmpty.SheetNames.indexOf("Basis") !== -1) throw new Error("Basis sheet appeared with empty register");
+      line("ok", "PASS SL Excel empty basis - no Basis sheet");
+
+      var instN = App.Data.instruments["nis2-assessment"].instrument;
+      var profN = App.Data.shared.scoringProfiles["nis2-conformance"];
+      var engN = App.Storage.makeEmptyEngagement(instN);
+      engN.responses.push({ targetId: engN.targets[0].id, requirementId: instN.items[0].id, applicable: true, state: "not" });
+      var wbN = App.ExportXLSX.build(engN, instN, null, profN, { targetId: engN.targets[0].id, progress: emptyMoves });
+      if (wbN.SheetNames.indexOf("Progress") === -1) throw new Error("no Progress sheet (nis2): " + wbN.SheetNames.join(","));
+      var arrN = XLSX.write(wbN, { bookType: "xlsx", type: "array" });
+      line("ok", "PASS NIS2 Excel with progress (no movements) - sheets: " + wbN.SheetNames.join(", ") + " - " + (arrN.byteLength || arrN.length) + " bytes");
+    } catch (e) {
+      line("bad", "FAIL Excel - " + (e && (e.message + " :: " + e.stack) || e));
+    }
+
+    // ---- Exec-summary acknowledgement wording (pure text builder) ----------
+    try {
+      var mk = function (basis) { return { engagement: { basisOfAssessment: basis } }; };
+      var full = { interviews: [{ name: "J", role: "Lead", date: "2026-01-10" }], documents: [{ title: "Pol", reference: "v1" }, { title: "SOP" }], observations: [{ name: "HMI", method: "walk" }] };
+
+      // Progress + populated basis
+      var a1 = App.ExportDOCX.execSummaryAddendaText(mk(full), progress);
+      if (a1.length !== 2) throw new Error("expected 2 addenda rows, got " + a1.length);
+      if (!/re-assessment/i.test(a1[0].text) || !/2 scored items improved and 1 regressed/.test(a1[0].text)) throw new Error("progress wording wrong: " + a1[0].text);
+      if (!/open gaps moved from 5 to 3/.test(a1[0].text)) throw new Error("gap wording wrong: " + a1[0].text);
+      if (!/1 interview, 2 documents reviewed and 1 system observed/.test(a1[1].text)) throw new Error("basis wording wrong: " + a1[1].text);
+      if (a1[1].note) throw new Error("populated basis should not be a red note");
+      line("ok", "PASS exec-summary wording (progress + basis): " + a1[0].text + "  ||  " + a1[1].text);
+
+      // No progress, empty basis -> single red consultant prompt
+      var a2 = App.ExportDOCX.execSummaryAddendaText(mk({ interviews: [], documents: [], observations: [] }), null);
+      if (a2.length !== 1) throw new Error("expected 1 addendum (basis prompt), got " + a2.length);
+      if (!a2[0].note) throw new Error("empty basis should be a red note");
+      if (!/not yet recorded/i.test(a2[0].text)) throw new Error("empty-basis prompt wording wrong: " + a2[0].text);
+      line("ok", "PASS exec-summary wording (no progress, empty basis -> red prompt)");
+
+      // Blank rows (all-empty fields) count as empty
+      var a3 = App.ExportDOCX.execSummaryAddendaText(mk({ interviews: [{ name: "", role: "", date: "" }], documents: [], observations: [] }), null);
+      if (!a3[0].note) throw new Error("all-blank interview row should not count as recorded");
+      line("ok", "PASS exec-summary wording (blank rows ignored)");
+    } catch (e) {
+      line("bad", "FAIL exec-summary wording - " + (e && (e.message + " :: " + e.stack) || e));
+    }
+
+    // ---- Word: SL (bodyChildren path), NIS2 (sections path), CSMS ----------
+    try {
+      var instS = App.Data.instruments["iec-62443-3-3"].instrument;
+      var narrS = App.Data.instruments["iec-62443-3-3"].narrative;
+      var taxS  = App.Data.shared.taxonomies["fr-7"];
+      var profS = App.Data.shared.scoringProfiles["sl-target-closeness"];
+      var engS = App.Storage.makeEmptyEngagement(instS);
+      var tidS = engS.targets[0].id;
+      instS.requirements.filter(function (r) { return r.frId === "FR1"; }).forEach(function (r, i) {
+        engS.responses.push({ targetId: tidS, requirementId: r.id, applicable: true, achievedSL: (i === 0 ? 0 : 2) });
+      });
+      engS.basisOfAssessment.interviews.push({ name: "J. Smith", role: "OT Lead", date: "2026-01-10" });
+      engS.basisOfAssessment.documents.push({ title: "OT Security Policy", reference: "POL-014 v3.2", date: "2025-11-01" });
+      engS.basisOfAssessment.observations.push({ name: "SCADA HMI", method: "walkthrough" });
+      App.ExportDOCX.buildAsync(engS, instS, taxS, profS, narrS, { targetId: tidS, progress: progress }, function (err, blob) {
+        if (err) { line("bad", "FAIL Word SL with progress - " + (err.message || err)); return; }
+        line("ok", "PASS Word SL with progress - " + blob.size + " bytes");
+
+        var instN2 = App.Data.instruments["nis2-assessment"].instrument;
+        var profN2 = App.Data.shared.scoringProfiles["nis2-conformance"];
+        var engN2 = App.Storage.makeEmptyEngagement(instN2);
+        var tidN2 = engN2.targets[0].id;
+        engN2.responses.push({ targetId: tidN2, requirementId: instN2.items[0].id, applicable: true, state: "not" });
+        engN2.responses.push({ targetId: tidN2, requirementId: instN2.items[1].id, applicable: true, state: "achieved" });
+        engN2.basisOfAssessment.interviews.push({ name: "A. Jones", role: "CISO", date: "2026-01-11" });
+        App.ExportDOCX.buildAsync(engN2, instN2, null, profN2, null, { targetId: tidN2, progress: progress }, function (err2, blob2) {
+          if (err2) { line("bad", "FAIL Word NIS2 with progress - " + (err2.message || err2)); return; }
+          line("ok", "PASS Word NIS2 with progress - " + blob2.size + " bytes");
+
+          var instC = App.Data.instruments["iec-62443-2-1-2010"].instrument;
+          var profC = App.Data.shared.scoringProfiles["csms-conformance"];
+          var narrC = App.Data.instruments["iec-62443-2-1-2010"].narrative;
+          var engC = App.Storage.makeEmptyEngagement(instC);
+          var tidC = engC.targets[0].id;
+          engC.responses.push({ targetId: tidC, requirementId: instC.requirements[0].id, applicable: true, state: "not-in-place" });
+          App.ExportDOCX.buildAsync(engC, instC, null, profC, narrC, { targetId: tidC, progress: emptyMoves }, function (err3, blob3) {
+            if (err3) { line("bad", "FAIL Word CSMS with progress - " + (err3.message || err3)); return; }
+            line("ok", "PASS Word CSMS with progress (no movements) - " + blob3.size + " bytes");
+            line("ok", "Total: progress-export smoke OK.");
+          });
+        });
+      });
+    } catch (e) {
+      line("bad", "FAIL Word - " + (e && (e.message + " :: " + e.stack) || e));
+    }
+  })();
+  </script>
+</body>
+</html>

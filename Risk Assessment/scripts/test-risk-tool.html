@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool tests</title></head>
+<body>
+<h1>risk-tool engine tests (v0.2 — detailed risk assessment)</h1>
+<pre id="out">running…</pre>
+<iframe id="app" src="../index.html" style="width:10px;height:10px;visibility:hidden"></iframe>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool) { if (++tries > 100) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") {
+      p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    } else {
+      done();
+    }
+  }, 50);
+
+  function run(w) {
+    var RT = w.RiskTool, RULES = w.App.Data.sltRules, proj = RT.state.project;
+
+    // Headless Edge blocks on native confirm()/alert(); stub them. Default to
+    // "yes" so the loadProjectText round-trips below proceed past the new Load
+    // guard; individual tests override w.confirm to exercise the guard both ways.
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+
+    // --- risk matrix (house) ---
+    ok(RT.riskFor("negligible", "high") === "low", "negligible×high -> low");
+    ok(RT.riskFor("serious", "medium") === "high", "serious×medium -> high");
+    ok(RT.riskFor("severe", "high") === "very-high", "severe×high -> very-high");
+    ok(RT.riskFor("serious", "low") === "medium", "serious×low -> medium");
+    ok(RT.riskFor("minor", "") === null, "missing likelihood -> null risk");
+
+    // --- tolerable risk comparison ---
+    proj.srs.tolerableRisk = "medium";
+    ok(RT.exceedsTolerable("high", "medium") === true, "high exceeds medium tolerable");
+    ok(RT.exceedsTolerable("medium", "medium") === false, "medium does not exceed medium tolerable");
+    ok(RT.exceedsTolerable("low", "medium") === false, "low within tolerable");
+
+    // --- per-FR suggestion from threats ---
+    var z = RT.emptyZone(1); z.name = "BPCS"; proj.zones.push(z);
+    var s = RT.suggestZone(z, proj);
+    ok(s.byFR.IAC.sl === null && s.worstRisk === null, "no threats -> no per-FR suggestion");
+
+    var th = RT.emptyThreat(1);
+    th.statement = "External attacker via vendor VPN reaches PLCs.";
+    th.source = "External attacker"; th.affectedFR = ["IAC", "RDF"];
+    th.likelihood = "high"; th.impact = "serious"; // -> high risk -> SL3
+    z.threats.push(th);
+    s = RT.suggestZone(z, proj);
+    ok(s.worstRisk === "high", "zone worst risk = high", "got " + s.worstRisk);
+    ok(s.byFR.IAC.sl === 3 && s.byFR.RDF.sl === 3, "affected FRs (IAC,RDF) suggest SL3");
+    ok(s.byFR.SI.sl === null, "unaffected FR (SI) has no suggestion");
+    ok(s.byFR.IAC.risk === "high", "per-FR risk band surfaced");
+    ok(s.byFR.IAC.trace.join(" ").indexOf("exceeds tolerable") >= 0, "trace flags exceed-tolerable for high vs medium");
+
+    // second threat raises SI via severe/medium -> high
+    var th2 = RT.emptyThreat(2); th2.affectedFR = ["SI"]; th2.likelihood = "low"; th2.impact = "severe"; // severe×low -> high
+    z.threats.push(th2);
+    s = RT.suggestZone(z, proj);
+    ok(s.byFR.SI.sl === 3 && s.byFR.SI.risk === "high", "SI now SL3 from severe×low=high");
+
+    // --- exposure modifier appears in trace for its FRs, does not auto-raise SL ---
+    z.flags["remote-access"] = true; // affects IAC,UC,RDF
+    s = RT.suggestZone(z, proj);
+    ok(s.byFR.UC.trace.join(" ").indexOf("remote-access") >= 0, "remote-access consideration traced on UC");
+    ok(s.byFR.UC.sl === null, "exposure alone does not create an SL where no threat hits UC", "got " + s.byFR.UC.sl);
+
+    // --- SIS floor applies to every FR ---
+    var zs = RT.emptyZone(2); zs.flags["sis-present"] = true; proj.zones.push(zs);
+    s = RT.suggestZone(zs, proj);
+    ok(w.RiskTool.FR_IDS.every(function (fr) { return s.byFR[fr].sl === 3; }), "SIS floor sets every FR to SL3");
+    ok(s.safetyRelated === true, "SIS zone flagged safety-related");
+    var za = RT.emptyZone(3); za.assets.push({ name: "SIS ctrl", type: "safety-plc" }); proj.zones.push(za);
+    ok(RT.suggestZone(za, proj).byFR.RA.sl === 3, "safety-plc asset triggers SIS floor");
+
+    // --- adversary mismatch flags, never raises ---
+    proj.srs.adversaryClass = 4;
+    s = RT.suggestZone(z, proj);
+    ok(s.byFR.IAC.sl === 3, "adversary class 4 does not raise SL beyond risk-derived");
+    ok(s.byFR.IAC.trace.join(" ").indexOf("FLAG") >= 0, "adversary mismatch flagged in trace");
+    proj.srs.adversaryClass = null;
+
+    // --- conduit inherits higher endpoint per FR ---
+    var c = RT.emptyConduit(1); c.fromZone = "Z1"; c.toZone = "Z2"; proj.conduits.push(c);
+    s = RT.suggestConduit(c, proj);
+    ok(s.byFR.IAC.sl === 3, "conduit inherits SL3 for IAC from endpoints", "got " + s.byFR.IAC.sl);
+    ok(s.byFR.IAC.trace.join(" ").indexOf("Inherits") >= 0, "conduit trace notes inheritance");
+
+    // --- SL-T vector + export v1.1 ---
+    w.RiskTool.FR_IDS.forEach(function (fr) { z.slTargetByFR[fr] = (fr === "SI" ? 2 : 3); }); // hold SI below suggestion
+    z.justification = "Vendor rework planned; SI held at SL2 pending brokered access.";
+    w.RiskTool.FR_IDS.forEach(function (fr) { zs.slTargetByFR[fr] = 3; }); zs.justification = "SIS floor.";
+    w.RiskTool.FR_IDS.forEach(function (fr) { za.slTargetByFR[fr] = 3; }); za.justification = "Safety.";
+    w.RiskTool.FR_IDS.forEach(function (fr) { c.slTargetByFR[fr] = 3; }); c.justification = "Carries safety signals.";
+    // add a countermeasure so the exceed-tolerable threat is covered (existing control)
+    z.countermeasures.push({ id: "M1", description: "Broker vendor access via DMZ.", addressesFR: ["IAC", "RDF"], reference: "SR 1.13", existing: true });
+    proj.approval = { name: "A. Approver", role: "Plant Manager", date: "2026-07-01", statement: "Tolerable risk and SL-T targets approved.", approved: true };
+    proj.suc.name = "Test Works"; proj.suc.assumptions = ["assumption 1"];
+    proj.srs.tolerableRisk = "medium"; proj.srs.knownThreats = ["Capable criminal adversary"];
+    proj.srs.mandatorySecurityFunctions = ["Hard-wired ESD"]; proj.srs.regulatory = ["UK NIS 2018"];
+    proj.srs.clientMatrix = true; proj.srs.clientMatrixNote = "Client matrix v3";
+
+    // high-level asset ranking (§4.2) + basis of assessment
+    proj.srs.highLevelAssets.push({ id: "A1", name: "DCS servers", functionLocation: "Equipment room", consequence: "serious", likelihood: "high", note: "→ Z2" });
+    proj.basisOfAssessment.interviews.push({ id: "I1", name: "J. Smith", role: "Control systems engineer", date: "2026-06-30", notes: "Network architecture" });
+    proj.basisOfAssessment.documents.push({ id: "D1", title: "Network diagram", reference: "Rev C", source: "SI", relevance: "Confirmed conduits" });
+    proj.basisOfAssessment.observations.push({ id: "O1", description: "DMZ firewall rules", location: "Control room", date: "2026-06-30", notes: "ANY-ANY rule" });
+
+    var ctx = RT.buildRiskContext();
+    ok(ctx.schema === "spt-risk-context/1.4", "export schema is 1.4", "got " + ctx.schema);
+    ok(ctx.highLevelAssets.length === 1 && ctx.highLevelAssets[0].risk === "high", "high-level asset ranking exported with computed risk (serious×high=high)");
+    ok(ctx.basisOfAssessment.interviews.length === 1 && ctx.basisOfAssessment.documents.length === 1 && ctx.basisOfAssessment.observations.length === 1, "basis of assessment exported (interviews/documents/observations)");
+    ok(ctx.generatedBy === "spt-risk-tool/0.2", "generatedBy stamped");
+    ok(ctx.securityRequirements.tolerableRisk === "medium", "tolerable risk exported");
+    ok(ctx.securityRequirements.knownThreats.length === 1 && ctx.securityRequirements.mandatorySecurityFunctions.length === 1, "SRS threats/functions exported");
+    var ez = ctx.zones[0];
+    ok(ez.slTargetByFR.IAC === 3 && ez.slTargetByFR.SI === 2, "per-FR SL-T vector exported (SI held at 2)");
+    ok(ez.slSuggestedByFR.IAC === 3, "per-FR suggestion exported");
+    ok(ez.slTarget === 3, "scalar slTarget = max of the FR vector (import compat)");
+    ok(ez.worstUnmitigatedRisk === "high", "worst unmitigated risk exported");
+    ok(ez.threats.length === 2 && typeof ez.threats[0].unmitigatedRisk === "string" && typeof ez.threats[0].exceedsTolerable === "boolean", "threats exported with risk + exceedsTolerable");
+    ok(ez.countermeasures.length === 1 && ez.countermeasures[0].reference === "SR 1.13", "countermeasures exported");
+    ok(ez.countermeasures[0].existing === true, "countermeasures export the existing-control flag");
+    ok(ez.threats[0].disposition === "countermeasure", "T1 disposition exported: countermeasure (M1 overlaps IAC/RDF)", "got " + ez.threats[0].disposition);
+    ok(ez.threats[1].disposition === "sl-t", "T2 disposition exported: carried into the SL-T (SI target set, no matching countermeasure)", "got " + ez.threats[1].disposition);
+    ok(typeof ez.threats[0].acceptance === "string", "threats export an acceptance field");
+    ok(ez.threats[0].residualRisk === null && ez.threats[0].residualLikelihood === null, "threats export residual fields (null when untreated)");
+    ok(ctx.approval && ctx.approval.name === "A. Approver" && ctx.approval.approved === true, "risk context exports the asset-owner sign-off");
+    ok(ctx.zones[1].safetyRelated === true, "safetyRelated exported");
+    ok(ctx.conduits.length === 1 && ctx.conduits[0].slTargetByFR.IAC === 3 && ctx.conduits[0].slTarget === 3, "conduit exported with per-FR + scalar SL-T");
+    ok(ctx.assumptions.some(function (a) { return a.indexOf("Client risk matrix used") === 0; }), "client-matrix assumption surfaced");
+
+    // --- completeness validation ---
+    var probs = RT.exportProblems();
+    ok(Array.isArray(probs), "exportProblems returns a list");
+    var zEmpty = RT.emptyZone(9); proj.zones.push(zEmpty);
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("Z9") >= 0 && p.indexOf("no threats") >= 0; }), "empty zone flagged: no threats");
+    proj.zones.pop();
+
+    // --- §4.6/4.7 disposition: the SL-T is itself a legitimate treatment plan ---
+    var zd = RT.emptyZone(7); proj.zones.push(zd);
+    var td = RT.emptyThreat(7); td.statement = "x"; td.affectedFR = ["UC"]; td.likelihood = "high"; td.impact = "serious"; // high > medium tolerable
+    zd.threats.push(td);
+    ok(RT.threatDisposition(zd, td) === null, "over-tolerable threat with nothing recorded has no disposition");
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("no disposition") >= 0; }), "completeness flags the undispositioned threat");
+    zd.slTargetByFR.UC = 2; // immature environment: no countermeasures, SL-T set — legitimate
+    ok(RT.threatDisposition(zd, td) === "sl-t", "SL-T on the affected FR addresses the threat (no countermeasures needed)");
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("no disposition") >= 0; }), "completeness accepts the SL-T as the treatment plan");
+    zd.slTargetByFR.UC = null;
+    td.acceptance = "Accepted by Operations Director, 2026-07 — revisit at next assessment.";
+    ok(RT.threatDisposition(zd, td) === "accepted", "a recorded acceptance addresses the threat");
+    td.acceptance = "";
+    zd.countermeasures.push({ id: "M9", description: "Broker access via jump host", addressesFR: ["RDF"], reference: "", existing: false });
+    ok(RT.threatDisposition(zd, td) === null, "a countermeasure on unrelated FRs does NOT silence the check");
+    zd.countermeasures[0].addressesFR = ["UC"];
+    ok(RT.threatDisposition(zd, td) === "countermeasure", "an FR-overlapping countermeasure addresses the threat");
+    // §4.7 residual risk: countermeasures that bring it to tolerable = mitigated (beats "countermeasure")
+    td.residualLikelihood = "low"; td.residualImpact = "serious"; // serious×low = medium = tolerable
+    ok(RT.residualRisk(td) === "medium", "residual risk computed from residual likelihood/impact", "got " + RT.residualRisk(td));
+    ok(RT.threatDisposition(zd, td, "medium") === "mitigated", "residual within tolerable = mitigated (§4.7)");
+    td.residualLikelihood = "medium"; // serious×medium = high, still exceeds
+    ok(RT.threatDisposition(zd, td, "medium") === "countermeasure", "residual still above tolerable falls back to the countermeasure disposition");
+    td.residualLikelihood = ""; td.residualImpact = "";
+    ok(RT.residualRisk(td) === null, "residual risk is null when neither residual field is set");
+    proj.zones.pop();
+
+    // --- project round-trip ---
+    var saved = JSON.stringify(proj);
+    RT.loadProjectText(saved);
+    ok(RT.state.project.zones.length === 3 && RT.state.project.zones[0].slTargetByFR.SI === 2, "project JSON round-trips (per-FR preserved)");
+    ok(RT.state.project.zones[0].threats.length === 2, "threats survive round-trip");
+    ok(RT.state.project.srs.highLevelAssets.length === 1, "high-level asset ranking survives round-trip");
+    ok(RT.state.project.basisOfAssessment.interviews.length === 1 && RT.state.project.basisOfAssessment.documents.length === 1, "basis of assessment survives round-trip");
+    ok(RT.state.project.approval && RT.state.project.approval.name === "A. Approver" && RT.state.project.approval.approved === true, "asset-owner sign-off survives round-trip");
+    ok(RT.state.project.zones[0].countermeasures[0].existing === true, "countermeasure existing flag survives round-trip");
+
+    // --- schema rejection ---
+    var before = RT.state.project;
+    RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/9.9" }));
+    ok(RT.state.project === before, "unknown project schema rejected");
+
+    // --- older 0.2 file without acceptance/residual/existing/approval normalises cleanly ---
+    RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "Acc", description: "", scopeStatement: "", assumptions: [] }, zones: [{ id: "Z1", name: "", threats: [{ id: "T1", statement: "s", affectedFR: ["UC"], likelihood: "high", impact: "serious" }], countermeasures: [{ id: "M1", description: "c", addressesFR: ["UC"], reference: "" }] }], conduits: [] }));
+    var mt = RT.state.project.zones[0].threats[0], mm = RT.state.project.zones[0].countermeasures[0];
+    ok(mt.acceptance === "" && mt.residualLikelihood === "" && mt.residualImpact === "", "pre-1.4 threat gains empty acceptance + residual fields");
+    ok(mm.existing === false, "pre-1.4 countermeasure gains an existing=false flag");
+    ok(RT.state.project.approval && RT.state.project.approval.approved === false && RT.state.project.approval.name === "", "pre-1.4 project gains an empty approval record");
+
+    // --- 0.1 migration: scalar slTarget -> per-FR vector ---
+    RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.1", suc: { name: "Old", description: "", scopeStatement: "", assumptions: [] }, zones: [{ id: "Z1", name: "old", slTarget: 3, assets: [], flags: {}, consequences: {} }], conduits: [] }));
+    ok(RT.state.project.zones[0].slTargetByFR.IAC === 3 && RT.state.project.zones[0].slTargetByFR.RA === 3, "0.1 scalar slTarget migrates to full per-FR vector");
+    ok(RT.state.project.zones[0].consequences === undefined, "0.1 consequence table dropped on migrate");
+
+    // --- UI smoke ---
+    RT.loadProjectText(saved);
+    var doc = w.document, navItems = doc.querySelectorAll(".nav-item");
+    ok(navItems.length === 9, "nav shows 5 stages + Basis + 2 reports + About", "got " + navItems.length);
+    function clickNav(label) { var n = doc.querySelectorAll(".nav-item"); for (var i = 0; i < n.length; i++) if (n[i].textContent.indexOf(label) >= 0) { n[i].click(); return true; } return false; }
+
+    clickNav("2. High-level");
+    ok(doc.body.textContent.indexOf("Tolerable risk") >= 0, "stage 2 captures tolerable risk (4.3.6)");
+    ok(doc.body.textContent.indexOf("Asset / system risk ranking") >= 0, "stage 2 has the high-level asset risk ranking (§4.2)");
+    ok(doc.body.textContent.indexOf("Detail →") >= 0, "ranking rows offer a promote-to-detailed action");
+
+    // --- promote-to-detailed: ranked system -> single-system zone ---
+    var zonesBefore = RT.state.project.zones.length;
+    var detailBtns = [].slice.call(doc.querySelectorAll("button")).filter(function (btn) { return btn.textContent.indexOf("Detail") >= 0; });
+    ok(detailBtns.length >= 1, "a Detail → button is present for the ranked asset");
+    detailBtns[0].click();
+    ok(RT.state.project.zones.length === zonesBefore + 1, "promoting creates a new zone", zonesBefore + " -> " + RT.state.project.zones.length);
+    var promoted = RT.state.project.zones[RT.state.project.zones.length - 1];
+    ok(promoted.fromHLA === "A1", "new zone records the source high-level asset (A1)", "got " + promoted.fromHLA);
+    ok(promoted.threats.length === 1 && promoted.threats[0].impact === "serious" && promoted.threats[0].likelihood === "high", "promoted zone seeded with a threat at the ranked impact/likelihood");
+    ok(RT.state.stage === "risk", "promoting jumps to the detailed assessment stage");
+
+    clickNav("Basis of assessment");
+    ok(doc.body.textContent.indexOf("People spoken to") >= 0, "Basis stage captures people spoken to");
+    ok(doc.body.textContent.indexOf("Documents reviewed") >= 0, "Basis stage captures documents reviewed");
+    ok(doc.body.textContent.indexOf("Systems & evidence observed") >= 0, "Basis stage captures systems observed");
+    ok(doc.body.textContent.indexOf("Preparation guidance") >= 0, "Basis stage shows preparation guidance");
+    ok(doc.body.textContent.indexOf("Often forgotten") >= 0 && doc.body.textContent.indexOf("Key stakeholders to interview") >= 0, "guidance lists forgotten docs and key stakeholders");
+    ok(doc.body.textContent.indexOf("not a fixed list") >= 0, "guidance is framed as advisory, not a checklist");
+    ok(w.App.Data.engagementGuidance && w.App.Data.engagementGuidance.oftenForgotten.length >= 5, "guidance data mirror loaded");
+    // guidance must never pre-populate the registers: only the one interview
+    // this test added earlier should exist
+    ok(RT.state.project.basisOfAssessment.interviews.length === 1, "registers hold only consultant-entered rows (guidance not auto-added)");
+    clickNav("3. Zones");
+    ok(doc.querySelector(".zone-map-wrap svg") != null, "stage 3 renders the SVG drawing");
+    clickNav("4. Detailed");
+    ok(doc.querySelectorAll(".threat-card").length >= 1, "stage 4 renders threat register");
+    ok(doc.body.textContent.indexOf("Unmitigated risk") >= 0, "stage 4 shows unmitigated risk");
+    ok(doc.body.textContent.indexOf("Risk acceptance") >= 0, "over-tolerable threats offer a risk-acceptance field");
+    ok(doc.body.textContent.indexOf("no disposition yet") >= 0, "freshly promoted threat is flagged as undispositioned");
+    ok(doc.body.textContent.indexOf("carried into the SL-T") >= 0, "an SL-T-addressed threat reads as carried into the SL-T");
+    ok(doc.body.textContent.indexOf("addressed by countermeasure") >= 0, "a countermeasured threat names its countermeasure");
+    ok(doc.body.textContent.indexOf("countermeasure required") < 0, "the old hard 'countermeasure required' wording is gone");
+    ok(doc.body.textContent.indexOf("Residual risk after countermeasures") >= 0, "over-tolerable threats offer a residual-risk capture (§4.7)");
+    ok(doc.body.textContent.indexOf("Existing control") >= 0, "countermeasures can be flagged as existing controls");
+    clickNav("5. SL-T");
+    ok(doc.querySelectorAll(".fr-slt-table").length >= 1, "stage 5 renders per-FR SL-T table");
+    ok(doc.querySelectorAll(".trace details").length >= 7, "stage 5 shows a trace per FR");
+    ok(doc.querySelector(".sis-box") != null, "SIS handling box shown for safety zone");
+    clickNav("High-level report");
+    ok(doc.body.textContent.indexOf("High-level risk assessment report") >= 0, "standalone high-level report renders");
+    ok(doc.body.textContent.indexOf("Relative risk ranking") >= 0, "high-level report shows the relative risk ranking");
+    ok(doc.body.textContent.indexOf("Basis of assessment") >= 0, "high-level report includes the basis of assessment");
+    ok(doc.body.textContent.indexOf("Print high-level report") >= 0, "high-level report offers a print action");
+    ok(doc.querySelector("#main").querySelectorAll(".fr-slt-table").length === 0, "high-level report needs no SL-T table (standalone deliverable)");
+    ok(doc.body.textContent.indexOf("Approval / sign-off") >= 0, "high-level report carries the asset-owner sign-off card");
+
+    clickNav("Full report");
+    ok(doc.body.textContent.indexOf("Review & export") >= 0 || doc.body.textContent.indexOf("Full report") >= 0, "full report page renders");
+    ok(doc.body.textContent.indexOf("Basis of assessment") >= 0, "full report reproduces the basis of assessment");
+    ok(doc.body.textContent.indexOf("High-level risk ranking") >= 0, "full report reproduces the high-level risk ranking");
+    ok(doc.body.textContent.indexOf("Approval / sign-off") >= 0, "full report carries the asset-owner sign-off card");
+    // --- dark mode toggle ---
+    var themeBtn = doc.getElementById("btn-theme");
+    ok(!!themeBtn, "theme toggle button present in header");
+    var startTheme = doc.documentElement.getAttribute("data-theme");
+    themeBtn.click();
+    var afterTheme = doc.documentElement.getAttribute("data-theme");
+    ok(afterTheme !== startTheme && (afterTheme === "dark" || afterTheme === "light"), "clicking the toggle flips the theme", startTheme + " -> " + afterTheme);
+    themeBtn.click();
+    ok(doc.documentElement.getAttribute("data-theme") === startTheme, "toggling twice returns to the original theme");
+
+    clickNav("About");
+    ok(doc.body.textContent.indexOf("not reproduced here") >= 0, "About states verbatim text is not reproduced (licensing)");
+    ok(doc.body.textContent.indexOf("house default") >= 0 || doc.body.textContent.indexOf("house defaults") >= 0, "About states the house-heuristic framing");
+
+    // --- #2 destructive-delete guard: a filled threat confirms before vanishing ---
+    clickNav("4. Detailed");
+    function threatCards() { return [].slice.call(doc.querySelectorAll(".threat-card")).filter(function (c) { return c.querySelector("textarea"); }); }
+    var nThreats = threatCards().length;
+    ok(nThreats >= 1, "detailed stage has at least one filled threat to test", "got " + nThreats);
+    w.confirm = function () { return false; };
+    threatCards()[0].querySelector(".btn.danger").click();
+    ok(threatCards().length === nThreats, "declining the confirm keeps a filled threat");
+    w.confirm = function () { return true; };
+    threatCards()[0].querySelector(".btn.danger").click();
+    ok(threatCards().length === nThreats - 1, "confirming removes a filled threat");
+    // content-gating: a blank row bypasses the prompt entirely; a filled one honours the answer
+    w.confirm = function () { return false; };
+    ok(RT.confirmRemove(false, "threat") === true, "a blank row deletes without a confirm prompt");
+    ok(RT.confirmRemove(true, "threat") === false, "a filled row honours a declined confirm");
+    w.confirm = function () { return true; };
+
+    // --- #1 Load guard: predicate + confirm gate ---
+    ok(RT.projectHasContent({ suc: {}, srs: {}, basisOfAssessment: {}, zones: [], conduits: [] }) === false, "projectHasContent: an untouched project has no content");
+    ok(RT.projectHasContent({ suc: { name: "X" }, srs: {}, basisOfAssessment: {}, zones: [], conduits: [] }) === true, "projectHasContent: a named SuC counts as content");
+    ok(RT.projectHasContent({ suc: {}, srs: { highLevelAssets: [{ id: "A1" }] }, basisOfAssessment: {}, zones: [], conduits: [] }) === true, "projectHasContent: a high-level-only ranking counts as content");
+    var other = JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "Other SuC", description: "", scopeStatement: "", assumptions: [] }, zones: [], conduits: [] });
+    var keep = RT.state.project; // current project has content (Test Works)
+    w.confirm = function () { return false; };
+    RT.loadProjectText(other);
+    ok(RT.state.project === keep, "declining the Load confirm keeps the current project");
+    w.confirm = function () { return true; };
+    RT.loadProjectText(other);
+    ok(RT.state.project !== keep && RT.state.project.suc.name === "Other SuC", "confirming the Load replaces the project");
+
+    // --- #4 empty-zone export is flagged (was a silent 'success' on an empty handoff) ---
+    // state.project is now "Other SuC" with no zones.
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("No zones defined") >= 0; }), "#4 export with no zones is flagged (no silent empty handoff to the 3-3 tool)");
+
+    // --- #5 dirty tracking, Save*, beforeunload guard, autosave-failure warning, restore gate ---
+    var saveBtn = doc.getElementById("btn-save");
+    ok(RT.isDirty() === false, "a freshly loaded project is clean (no unsaved changes)");
+    ok(saveBtn.textContent === "Save", "Save button reads 'Save' when clean");
+    var evClean = new w.Event("beforeunload", { cancelable: true });
+    w.dispatchEvent(evClean);
+    ok(evClean.defaultPrevented === false, "beforeunload does not warn when there is nothing unsaved");
+
+    RT.touched(); // simulate a consultant edit
+    ok(RT.isDirty() === true, "an edit marks the project dirty");
+    ok(saveBtn.textContent === "Save*" && saveBtn.className.indexOf("btn-unsaved") >= 0, "the Save button shows Save* (amber) when dirty");
+    var evDirty = new w.Event("beforeunload", { cancelable: true });
+    w.dispatchEvent(evDirty);
+    ok(evDirty.defaultPrevented === true, "beforeunload warns when there are unsaved changes with content");
+
+    // autosave failure surfaces a warning instead of failing silently (dirty + content present)
+    var origSet = w.Storage.prototype.setItem;
+    w.Storage.prototype.setItem = function () { throw new Error("blocked"); };
+    RT.flushAutosave();
+    w.Storage.prototype.setItem = origSet;
+    ok(doc.getElementById("toast").textContent.indexOf("Autosave unavailable") >= 0, "autosave failure surfaces a one-time warning (locked-down laptop)");
+
+    // New resets to a clean project (confirm is stubbed to true)
+    doc.getElementById("btn-new").click();
+    ok(RT.isDirty() === false && saveBtn.textContent === "Save", "New resets to a clean project (Save no longer starred)");
+
+    // restore gate is widened: high-level-only work (no zones/conduits/suc name) is still offered back
+    var existingBar = doc.querySelector(".autosave-bar"); if (existingBar) existingBar.parentNode.removeChild(existingBar);
+    try { w.localStorage.setItem(RT.AUTOSAVE_KEY, JSON.stringify({ savedOn: new Date().toISOString(), stage: "srs", project: { schema: "spt-risk-project/0.2", suc: { name: "", description: "", scopeStatement: "", assumptions: [] }, srs: { highLevelAssets: [{ id: "A1", name: "DCS servers" }] }, zones: [], conduits: [] } })); } catch (e) {}
+    RT.offerRestore();
+    ok(doc.querySelector(".autosave-bar") != null, "restore is offered for high-level-only work (widened gate)");
+    var bar2 = doc.querySelector(".autosave-bar"); if (bar2) bar2.parentNode.removeChild(bar2);
+    try { w.localStorage.removeItem(RT.AUTOSAVE_KEY); } catch (e) {}
+
+    // --- #7 sharper SL-T-basis warnings (soft; never blocks) + inline cue ---
+    RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "SLT Test", description: "", scopeStatement: "", assumptions: [] }, zones: [{ id: "Z8", name: "", slTargetByFR: { IAC: 2 }, justification: "", threats: [], vulnerabilities: [], countermeasures: [] }], conduits: [] }));
+    var cur = RT.state.project;
+    var p7 = RT.exportProblems();
+    ok(p7.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no justification") >= 0; }), "#7 an SL-T set without a justification is named in the export warning");
+    ok(p7.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no threats") >= 0 && p.indexOf("basis") >= 0; }), "#7 an SL-T on a zone with no threats prompts recording the basis");
+    clickNav("5. SL-T");
+    ok(doc.body.textContent.indexOf("needs justification") >= 0, "#7 the SL-T card flags 'needs justification' inline when a target is set but unjustified");
+    cur.zones[0].justification = "Corporate SL2 floor for all OT zones; no site-specific threats modelled.";
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no justification") >= 0; }), "#7 recording a justification clears the warning (soft, never blocked)");
+    RT.FR_IDS.forEach(function (fr) { cur.zones[0].slTargetByFR[fr] = null; });
+    cur.zones[0].justification = "";
+    var p7b = RT.exportProblems();
+    ok(p7b.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no SL-T set") >= 0; }), "#7 a zone with no SL-T is flagged as incomplete");
+    ok(!p7b.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no justification") >= 0; }), "#7 no justification-nag when there is no SL-T to justify yet");
+
+    // --- save-in-place (File System Access API, stubbed): Save overwrites the
+    // --- same file instead of downloading "name (1).json" copies -----------
+    var pickCount = 0, written = [];
+    function fakeHandle(name) {
+      return {
+        name: name,
+        queryPermission: function () { return Promise.resolve("granted"); },
+        createWritable: function () {
+          return Promise.resolve({
+            write: function (t) { written.push({ name: name, text: t }); return Promise.resolve(); },
+            close: function () { return Promise.resolve(); }
+          });
+        }
+      };
+    }
+    w.showSaveFilePicker = function () { pickCount++; return Promise.resolve(fakeHandle("demo-risk-project.json")); };
+    RT.forgetProjectFile();
+    ok(RT.supportsFilePickers() === true, "picker support detected once the API is present");
+
+    return new Promise(function (resolve, reject) {
+      RT.saveProject(null, function (r1) {
+        try {
+          ok(r1.ok && r1.method === "file" && r1.name === "demo-risk-project.json", "first save asks where to save and writes the file");
+          ok(pickCount === 1 && written.length === 1, "one dialog, one write");
+          var parsed = null; try { parsed = JSON.parse(written[0].text); } catch (e) {}
+          ok(parsed && /^spt-risk-project\//.test(parsed.schema) && parsed.suc, "the written file is the project JSON");
+          ok(RT.isDirty() === false, "a successful save marks the project clean");
+        } catch (e) { reject(e); return; }
+        RT.saveProject(null, function (r2) {
+          try {
+            ok(r2.ok && r2.method === "file" && pickCount === 1 && written.length === 2, "second save OVERWRITES the same file - no new dialog, no (1) copy");
+          } catch (e) { reject(e); return; }
+          RT.saveProject({ shiftKey: true }, function (r3) {
+            try {
+              ok(r3.ok && pickCount === 2, "Shift+click (Save as…) shows the dialog for a fresh copy");
+            } catch (e) { reject(e); return; }
+
+            // Load via the picker captures the handle: Save then writes back
+            // to the loaded file, not the previously saved one.
+            var loadedDoc = JSON.parse(other); loadedDoc.suc.name = "Picker Loaded Works";
+            var loadedHandle = fakeHandle("loaded-project.json");
+            loadedHandle.getFile = function () { return Promise.resolve(new w.Blob([JSON.stringify(loadedDoc)])); };
+            w.showOpenFilePicker = function () { return Promise.resolve([loadedHandle]); };
+            doc.getElementById("btn-load").click();
+            var waited = 0;
+            (function poll() {
+              if (RT.state.project.suc.name === "Picker Loaded Works") {
+                RT.saveProject(null, function (r4) {
+                  try {
+                    ok(r4.ok && r4.name === "loaded-project.json" && pickCount === 2, "after a picker Load, Save writes back to the LOADED file without asking");
+                    // New forgets the file: next save must ask again.
+                    doc.getElementById("btn-new").click();
+                    RT.saveProject(null, function (r5) {
+                      try {
+                        ok(r5.ok && pickCount === 3, "after New, Save asks where to save (never overwrites the old project's file)");
+                        // No API -> the classic download branch applies. Assert
+                        // the detection only: actually clicking a blob-URL
+                        // download hangs headless Edge, and that code path is
+                        // the unchanged pre-existing save behaviour.
+                        delete w.showSaveFilePicker;
+                        ok(RT.supportsFilePickers() === false, "without the API, Save falls back to the classic download");
+                        resolve();
+                      } catch (e) { reject(e); }
+                    });
+                  } catch (e) { reject(e); }
+                });
+              } else if (++waited > 100) {
+                ok(false, "picker Load applied the file", "suc.name=" + RT.state.project.suc.name);
+                resolve();
+              } else {
+                w.setTimeout(poll, 30);
+              }
+            })();
+          });
+        });
+      });
+    });
+  }
+}());
+</script>
+</body>
+</html>

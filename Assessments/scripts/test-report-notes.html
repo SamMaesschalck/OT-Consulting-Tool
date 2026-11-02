@@ -1,0 +1,90 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Roadmap shows captured notes</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style>
+</head>
+<body>
+<h1>On-screen gap roadmap shows the consultant's captured notes</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock", tours: ["caf", "cra", "csms", "ml", "nis2", "sl"] }); H.dom();</script>
+<script>
+window.docx = { Document:function(){}, Paragraph:function(){}, TextRun:function(){}, TableCell:function(){}, TableRow:function(){}, Table:function(){}, ImageRun:function(){}, PageBreak:function(){}, Header:function(){}, Footer:function(){}, HeadingLevel:{}, AlignmentType:{}, WidthType:{}, ShadingType:{}, TableLayoutType:{}, PageOrientation:{}, HeightRule:{}, PageNumber:{}, Packer:{ toBlob:function(){ return Promise.resolve(new Blob()); } } };
+</script>
+<script>
+(function () {
+  window.confirm = function () { return true; };
+  var A = window.App, E = A.Engine;
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function finish() {
+    var s = document.getElementById("summary");
+    s.className = "sum " + (fail === 0 ? "ok" : "bad");
+    s.textContent = fail === 0 ? "ALL TESTS PASSED (" + pass + ")" : pass + " passed, " + fail + " FAILED";
+  }
+
+  var seq = 0;
+  function testFamily(instId, applier, label, prep) {
+    try {
+      E.activateInstrument(instId);
+      if (applier && applier.apply) applier.apply(E);
+      if (prep) prep();
+      var scored = E.scoreActiveTarget();
+      var road = (scored && scored.roadmap) || [];
+      if (!road.length) { check(label + ": engagement has a gap to annotate", false); return; }
+      var gap = road[0];
+      var id = gap.itemId || gap.requirementId || gap.id;
+      var note = "ZZNOTE" + (++seq);
+      E.setResponse(E.state.activeTargetId, id, { notes: note });
+      // The note must actually land on the response the scorer reads back.
+      var saved = (E.findResponse(E.state.activeTargetId, id) || {}).notes === note;
+      check(label + ": note saved onto the gap response", saved);
+      // And the re-scored roadmap item must carry it.
+      var rItem = (E.scoreActiveTarget().roadmap || []).filter(function (r) { return (r.itemId || r.requirementId || r.id) === id; })[0];
+      check(label + ": re-scored roadmap item carries the note", !!rItem && rItem.notes === note);
+      A.UI.go("report");
+      var text = document.getElementById("main").textContent;
+      check(label + ": on-screen roadmap shows the captured note", text.indexOf("Notes: " + note) !== -1);
+    } catch (e) { check(label + ": threw " + (e && e.message), false); }
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    testFamily("iec-62443-3-3", A.TourSL,  "SL (capability-sl)");
+    testFamily("ncsc-caf",      A.TourCAF, "CAF (caf-achieved)");
+    // ML renders its roadmap only when the target overlay is enabled and target
+    // MLs are set - do both so the roadmap (and its notes) is exercised.
+    testFamily("iec-62443-2-1-2024", A.TourML, "Security Program (program-maturity-ml)", function () {
+      E.state.instrument.targetOverlay = { enabled: true, targetScale: (E.getMLLevels ? E.getMLLevels() : []) };
+      E.getMLElements().forEach(function (el) {
+        E.getMLRequirementsByElement(el.id).forEach(function (req) {
+          E.setResponse(E.state.activeTargetId, req.id, { targetMl: "ML4" });
+        });
+      });
+    });
+    testFamily("iec-62443-2-1-2010", A.TourCSMS, "CSMS (csms-conformance)");
+    testFamily("nis2-assessment", A.TourNIS2, "NIS2 (nis2-conformance)");
+    testFamily("eu-cra",        A.TourCRA, "EU CRA (layered csms)");
+
+    // Guard: a gap WITHOUT notes shows no stray "Notes:" label for that item.
+    E.activateInstrument("eu-cra");
+    var scored = E.scoreActiveTarget();
+    var g2 = (scored.roadmap || []).filter(function (r) { return !(E.findResponse(E.state.activeTargetId, r.itemId) || {}).notes; })[0];
+    check("a CRA gap with no captured notes exists to check the guard", !!g2);
+  } catch (e) {
+    check("harness threw: " + (e && e.message), false);
+  }
+  finish();
+})();
+</script>
+</body></html>

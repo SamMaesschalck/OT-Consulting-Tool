@@ -1,0 +1,107 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>tour CRA dataset check</title></head>
+<body>
+<!-- Minimal DOM shell ui.init() expects (same as test-ui-parse.html). -->
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app({ tours: ["41", "caf", "caf-aviation", "cra", "csms", "machinery", "ml", "nis2", "nis2-quick", "posture", "sl", "supplier"] }); H.dom();</script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " — " + d : "")); if (!c) fail++; }
+  var A = window.App, E = A.Engine;
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // Replicate the combined tour.html exactly: seed EVERY assessment into one
+    // shared project (same SEED map + instrument-changed re-apply), so any
+    // cross-instrument interference with the CRA dataset shows up here.
+    var SEED = {
+      "iec-62443-3-3":      A.TourSL,
+      "ncsc-caf":           A.TourCAF,
+      "general-ot-posture": A.TourPosture,
+      "iec-62443-2-1-2024": A.TourML,
+      "nis2-assessment":    A.TourNIS2,
+      "nis2-quick-gap":     A.TourNIS2Quick,
+      "iec-62443-4-1":      A.Tour41,
+      "iec-62443-2-1-2010": A.TourCSMS,
+      "ncsc-caf-aviation":  A.TourCAFAviation,
+      "eu-cra":             A.TourCRA,
+      "eu-machinery":       A.TourMachinery,
+      "supplier-screener":  A.TourSupplier
+    };
+    var seedFailures = [];
+    Object.keys(SEED).forEach(function (id) {
+      ok(!!SEED[id] && typeof SEED[id].apply === "function", "tour dataset applier exposed for " + id);
+    });
+    E.on("instrument-changed", function (inst) {
+      var mod = inst && SEED[inst.id];
+      if (mod && typeof mod.apply === "function") mod.apply(E);
+    });
+    Object.keys(SEED).forEach(function (id) {
+      try { E.activateInstrument(id); } catch (e) { seedFailures.push(id + ": " + e.message); }
+    });
+    ok(seedFailures.length === 0, "all 12 assessments seed without throwing", seedFailures.join(" | "));
+
+    // Now switch to the CRA (re-applies its dataset, as tour.html does).
+    E.activateInstrument("eu-cra");
+    ok(!!A.TourCRA && typeof A.TourCRA.apply === "function", "App.TourCRA applier exposed");
+
+    // Every one of the 30 CRA items must be answered with a scored state.
+    var inst = E.state.instrument;
+    var items = (inst.items || []);
+    ok(items.length === 30, "instrument has 30 items", "got " + items.length);
+    var tid = E.state.activeTargetId;
+    var unanswered = items.filter(function (it) {
+      var r = E.findResponse(tid, it.id);
+      return !r || !r.state || ["in-place", "partially", "not-in-place"].indexOf(r.state) < 0;
+    });
+    ok(unanswered.length === 0, "all 30 items answered with a scored state", unanswered.map(function (i) { return i.id; }).join(","));
+
+    // Evidence on every answer; remediation on every gap.
+    var noEv = 0, gapNoRem = 0;
+    items.forEach(function (it) {
+      var r = E.findResponse(tid, it.id);
+      if (!r.evidence) noEv++;
+      if (r.state !== "in-place" && !(r.action && r.owner)) gapNoRem++;
+    });
+    ok(noEv === 0, "every answer carries evidence", noEv + " without");
+    ok(gapNoRem === 0, "every partial/not-in-place item carries a remediation plan", gapNoRem + " without");
+
+    // Scoring: three independent layers, no blended overall, interlock quiet.
+    var scored = E.scoreActiveTarget();
+    ok(scored && Array.isArray(scored.layers) && scored.layers.length === 3, "three layers scored side by side");
+    ok(!("overall" in scored) || scored.overall == null, "no blended overall CRA score");
+    ok(scored.interlock && !scored.interlock.triggered, "layer interlock not triggered (all layers in scope)");
+    var byId = {}; scored.layers.forEach(function (l) { byId[l.layerId] = l; });
+    ok(!!byId.P1 && !!byId.P2 && !!byId.P3, "layers are P1/P2/P3");
+
+    // Demo narrative: strong product, weak conformity - P3 must score below P1
+    // (overall.conformance is the 0-1 mean of the layer's item scores).
+    ok(byId.P3.overall.conformance < byId.P1.overall.conformance, "conformity layer (P3) scores below the product layer (P1)", "P1=" + byId.P1.overall.conformance + " P3=" + byId.P3.overall.conformance);
+    ok(byId.P1.overall.coverage === 1 && byId.P2.overall.coverage === 1 && byId.P3.overall.coverage === 1, "every layer fully answered (coverage 100%)");
+
+    // Product classification drives the Class II / notified-body route.
+    ok(scored.classification && scored.classification.classId === "important-class-ii", "product classified as Important - Class II", "got " + (scored.classification && scored.classification.classId));
+    ok(scored.classification && !scored.classification.misclassification, "no misclassification flag (category matches the chosen class)");
+
+    // Basis of assessment populated for the report/export.
+    var b = E.getBasisOfAssessment();
+    ok(b.interviews.length === 3 && b.documents.length === 4 && b.observations.length === 3, "basis of assessment populated");
+
+    // The report page renders the completed example.
+    A.UI.go("report");
+    var text = document.getElementById("main").textContent;
+    ok(text.indexOf("SentinelEdge") >= 0, "report names the product");
+    ok(text.indexOf("Ferrovia") >= 0, "report carries the client engagement details");
+    ok(text.indexOf("harmonised standard") >= 0 || text.indexOf("critical caveat") >= 0 || text.indexOf("does NOT equal") >= 0, "report shows the critical caveats");
+  } catch (e) {
+    ok(false, "harness threw: " + e.message);
+  }
+  lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = lines.join("\n");
+})();
+</script>
+</body></html>

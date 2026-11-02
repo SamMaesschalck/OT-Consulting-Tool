@@ -1,0 +1,246 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>EU Machinery Regulation instrument</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style>
+</head>
+<body>
+<h1>EU Machinery Regulation (2023/1230) - layered instrument end-to-end</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<!-- Full docx mock so the test can walk the generated document tree. -->
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock" }); H.dom();</script>
+<script>
+window.docx = (function () {
+  function TextRun(opts) {
+    if (typeof opts === "string") opts = { text: opts };
+    this.__type = "TextRun";
+    this.text = opts.text != null ? opts.text : (Array.isArray(opts.children) ? opts.children.join("") : "");
+    this.bold = !!opts.bold; this.italics = !!opts.italics;
+    this.color = opts.color || null; this.size = opts.size || null;
+  }
+  function Paragraph(opts) {
+    opts = opts || {};
+    this.__type = "Paragraph";
+    this.children = opts.children || [];
+    this.style = opts.style || null; this.heading = opts.heading || null;
+    this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join("");
+    this.runs = this.children;
+  }
+  function TableCell(opts) { this.__type = "TableCell"; this.children = (opts && opts.children) || []; this.shading = (opts && opts.shading) || null; }
+  function TableRow(opts)  { this.__type = "TableRow"; this.children = (opts && opts.children) || []; }
+  function Table(opts)     { this.__type = "Table"; this.rows = (opts && opts.rows) || []; }
+  function ImageRun(opts)  { this.__type = "ImageRun"; this.text = ""; }
+  function PageBreak()     { this.__type = "PageBreak"; this.text = ""; }
+  function Header(opts)    { this.__type = "Header"; this.children = (opts && opts.children) || []; }
+  function Footer(opts)    { this.__type = "Footer"; this.children = (opts && opts.children) || []; }
+  function Document(opts)  { this.__type = "Document"; this.sections = (opts && opts.sections) || []; }
+  return {
+    Document: Document, Paragraph: Paragraph, TextRun: TextRun,
+    TableCell: TableCell, TableRow: TableRow, Table: Table,
+    ImageRun: ImageRun, PageBreak: PageBreak, Header: Header, Footer: Footer,
+    HeadingLevel: { TITLE: "Title", HEADING_1: "Heading1", HEADING_2: "Heading2", HEADING_3: "Heading3" },
+    AlignmentType: { LEFT: "left", CENTER: "center", RIGHT: "right", BOTH: "both" },
+    WidthType: { PERCENTAGE: "pct", DXA: "dxa" },
+    ShadingType: { SOLID: "solid" },
+    TableLayoutType: { FIXED: "fixed" },
+    PageOrientation: { PORTRAIT: "portrait", LANDSCAPE: "landscape" },
+    HeightRule: { EXACT: "exact", ATLEAST: "atLeast" },
+    PageNumber: { CURRENT: "current" },
+    Packer: { toBlob: function (doc) { window.__capturedDoc = doc; return Promise.resolve(new Blob(["dummy"])); } }
+  };
+})();
+</script>
+<script>
+(function () {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App, E = A.Engine, CRA = A.ScoringCRA;
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function finish() {
+    var s = document.getElementById("summary");
+    s.className = "sum " + (fail === 0 ? "ok" : "bad");
+    s.textContent = fail === 0 ? "ALL TESTS PASSED (" + pass + ")" : pass + " passed, " + fail + " FAILED";
+  }
+  function main() { return document.getElementById("main"); }
+  function docText() {
+    var doc = window.__capturedDoc, paras = [];
+    function walk(node) {
+      if (!node) return;
+      if (node.__type === "Paragraph") { paras.push(node); return; }
+      if (node.__type === "Table") { node.rows.forEach(walk); return; }
+      if (node.__type === "TableRow") { node.children.forEach(walk); return; }
+      if (node.__type === "TableCell") { node.children.forEach(walk); return; }
+      if (Array.isArray(node)) node.forEach(walk);
+    }
+    doc.sections.forEach(function (s) { walk(s.children); });
+    return paras.map(function (p) { return p.text; }).join("\n");
+  }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+    E.activateInstrument("eu-machinery");
+    var inst = E.state.instrument;
+    var tidA = E.state.activeTargetId;
+    E.renameTarget(tidA, "PalletPro AGV-350");
+    E.setEngagementField ? E.setEngagementField("clientName", "Fabrik GmbH") : (E.state.engagement.engagement.clientName = "Fabrik GmbH");
+
+    // ---- activation & shape ----
+    check("instrument activates as a layered (isCRA) csms-conformance instrument", CRA.isCRA(inst) && E.state.scoringFamily === "csms-conformance");
+    check("31 items across M1/M2/M3 (13+8+10)",
+      inst.items.length === 31 &&
+      inst.items.filter(function (i) { return i.layerId === "M1"; }).length === 13 &&
+      inst.items.filter(function (i) { return i.layerId === "M2"; }).length === 8 &&
+      inst.items.filter(function (i) { return i.layerId === "M3"; }).length === 10);
+    var scored0 = E.scoreActiveTarget();
+    check("all three layers scored by default", scored0 && scored0.layers.length === 3 && scored0.layersInScope.join(",") === "M1,M2,M3");
+
+    // ---- classification: its OWN lookup, CRA's untouched ----
+    var lkM = CRA.classificationLookup(inst);
+    var lkC = CRA.classificationLookup(null);
+    check("machinery resolves its own Annex I lookup", !!lkM && !!lkM.categories["annex-i-part-a"] && lkM.authorityRef === "Machinery Regulation Annex I");
+    check("the CRA lookup is still the default and intact", !!lkC && !!lkC.categories["annex-iv"] && !lkC.categories["annex-i-part-a"]);
+    check("machinery class list comes from the lookup", CRA.classes(inst).length === 3 && CRA.classes(inst)[0].label === "Not listed in Annex I (internal control)");
+
+    // Category match (ML safety component -> Part A) derives the class + route.
+    E.setCRAProductCategory("annex-i-part-a:5");
+    var cls = E.getCRAClassification();
+    check("Annex I Part A match derives the class", cls.classId === "annex-i-part-a");
+    check("Part A route makes third-party assessment mandatory", /Third-party conformity assessment is mandatory/.test(cls.route));
+    // Under-classify -> misclassification finding with machinery wording.
+    E.setCRAProductClass("default");
+    cls = E.getCRAClassification();
+    check("under-classification is flagged against Annex I", cls.misclassification === true && /Machinery Regulation Annex I/.test(cls.misclassificationNote));
+    E.setCRAProductClass("annex-i-part-a");
+
+    // ---- org scope: M2 via layer, MR-M3.10 via item flag; M1 per machine ----
+    check("M2 items are organisation-scoped via the layer", CRA.itemScope(inst, "MRM2a") === "organisation");
+    check("sales-channel item MR-M3.10 is organisation-scoped via its item flag", CRA.itemScope(inst, "MRM3j") === "organisation");
+    check("M1 and the rest of M3 stay per machine", CRA.itemScope(inst, "MRM1a") === "product" && CRA.itemScope(inst, "MRM3b") === "product");
+
+    E.addTarget("SortMaster Cell 8");
+    var tidB = E.state.activeTargetId;
+    E.setActiveTarget(tidA);
+    E.setResponse(tidA, "MRM2a", { applicable: true, state: "partially", evidence: "Change control exists; standards watch missing.", owner: "Quality Manager", action: "Add harmonised-standards watch to change control.", impact: "Series conformity drifts as standards move." });
+    check("an M2 answer fans out to the other machine", (E.findResponse(tidB, "MRM2a") || {}).state === "partially");
+    E.setResponse(tidA, "MRM3j", { applicable: true, state: "in-place", evidence: "Distribution agreements assign Art 13-16 duties." });
+    check("the org-scoped M3 item fans out too", (E.findResponse(tidB, "MRM3j") || {}).state === "in-place");
+    E.setResponse(tidA, "MRM1b", { applicable: true, state: "not-in-place", evidence: "No tamper evidence on the safety PLC path.", owner: "Controls Lead", action: "Add intervention logging to the safety path.", impact: "1.1.9 cannot be demonstrated." });
+    check("an M1 answer stays isolated per machine", !E.findResponse(tidB, "MRM1b"));
+    E.setResponse(tidA, "MRM3a", { applicable: true, state: "not-in-place", evidence: "No classification decision record; ML safety component unrecognised.", owner: "Compliance Officer", action: "Record the Annex I decision and engage a notified body.", impact: "Wrong conformity route invalidates the CE marking." });
+
+    // ---- UI: nav, engagement cards, layer pages, wizard ----
+    var navText = document.getElementById("sidebar").textContent;
+    check("nav names the Machinery assessment and layers", navText.indexOf("Machinery assessment") !== -1 && navText.indexOf("Machinery layers (in scope)") !== -1);
+
+    A.UI.go("engagement");
+    var t = main().textContent;
+    check("engagement page: Machines under assessment + machinery setup card", t.indexOf("Machines under assessment") !== -1 && t.indexOf("Machinery setup: layers in scope") !== -1);
+    check("engagement page: Machine classification card + Annex I aid", t.indexOf("Machine classification") !== -1 && t.indexOf("Classification aid - Annex I category (optional)") !== -1);
+
+    A.UI.go("cra-layer", "M2");
+    t = main().textContent;
+    check("M2 page: no machine switcher, machinery banner, org wording", !main().querySelector(".sites-bar") && t.indexOf("Regulation (EU) 2023/1230") !== -1 && t.indexOf("one answer set for all machines") !== -1);
+
+    A.UI.go("cra-layer", "M3");
+    t = main().textContent;
+    check("M3 page splits org obligations from machine-specific ones", !!main().querySelector(".sites-bar") && t.indexOf("Organisation-level obligations") !== -1 && t.indexOf("Machine-specific obligations") !== -1);
+
+    A.UI.go("cra-wizard");
+    t = main().textContent;
+    check("wizard mode toggle is Organisation-wide / By machine", t.indexOf("Organisation-wide") !== -1 && t.indexOf("By machine") !== -1);
+    check("wizard reference tag cites 2023/1230", t.indexOf("Regulation (EU) 2023/1230") !== -1);
+    var orgCount = inst.items.filter(function (it) { return CRA.itemScope(inst, it) === "organisation"; }).length;
+    check("org track = 9 items (M2 + sales channel), product track = 22", orgCount === 9 && (inst.items.length - orgCount) === 22);
+
+    A.UI.go("report");
+    t = main().textContent;
+    check("report banner names the Machinery Regulation", t.indexOf("EU Machinery Regulation gap assessment") !== -1);
+    check("report scope shows Machine class and the M3 route", t.indexOf("Machine class") !== -1 && t.indexOf("Conformity route (M3)") !== -1);
+
+    // The consultant fills the two executive-summary paragraphs IN-TOOL (the
+    // rest of the Word exec summary is composed automatically from the data).
+    check("report page offers the consultant-input card", t.indexOf("Executive summary: consultant input") !== -1);
+    var tas = [].slice.call(main().querySelectorAll(".card textarea")).filter(function (x) { return /Leave blank to keep the placeholder/.test(x.placeholder || ""); });
+    check("card has the two narrative fields", tas.length === 2);
+    tas[0].value = "Engage the notified body first; the type-examination is the critical path to 2027 placements.";
+    tas[0].dispatchEvent(new Event("change", { bubbles: true }));
+    tas[1].value = "EU AGV sales depend on CE marking under Regulation 2023/1230 from January 2027.";
+    tas[1].dispatchEvent(new Event("change", { bubbles: true }));
+    // ...and the proposed next steps, which close every family's report and are
+    // edited in the report's own section rather than in a capture card.
+    var nsCard = main().querySelector(".card[data-next-steps]");
+    check("report page carries the proposed-next-steps section", !!nsCard);
+    nsCard.querySelector(".sect-edit").click();
+    var nextTa = main().querySelector(".card[data-next-steps] .sect-prose-input");
+    check("editing it gives a box holding the steps", !!nextTa);
+    nextTa.value = "Book the notified-body slot this quarter\nStart the Annex IV technical file additions in parallel";
+    nextTa.dispatchEvent(new Event("change", { bubbles: true }));
+    var rnSaved = E.getReportNarrative ? E.getReportNarrative() : {};
+    check("narrative saves onto the assessment", /notified body first/.test(rnSaved.topPriorities || "") && /AGV sales/.test(rnSaved.regulatoryExposure || ""));
+    check("next steps save onto the assessment", /notified-body slot/.test(rnSaved.nextSteps || ""));
+
+    // ---- Word: single machine, then one combined doc for both ----
+    E.removeTarget(tidB);
+    A.ExportDOCX.buildAsync(E.state.engagement, inst, null, E.state.profile, null,
+      { targetId: tidA, craSetup: E.getCRASetupRaw() },
+      function (err) {
+        try {
+          if (err) { check("single-machine doc builds - " + (err.message || err), false); finish(); return; }
+          var allText = docText();
+          check("single doc: intro cites the Machinery Regulation", allText.indexOf("against the EU Machinery Regulation (Regulation (EU) 2023/1230)") !== -1);
+          check("single doc: key-dates line is the 14 January 2027 transition", allText.indexOf("applies from 14 January 2027") !== -1);
+          check("single doc: glance page titled for the Machinery Regulation", allText.indexOf("Machinery Regulation readiness at a glance") !== -1);
+          check("single doc: limitations say it is not a machinery-safety inspection", allText.indexOf("machinery-safety inspection") !== -1);
+          check("single doc: cover subline present", allText.indexOf("EU Machinery Regulation: indicative gap assessment") !== -1);
+          check("single doc: no CRA text leaks into the machinery report", allText.indexOf("Cyber Resilience") === -1 && allText.indexOf("CRA") === -1);
+          // The in-tool consultant input replaced the exec-summary placeholders.
+          var placeholders = [];
+          (function walkP(node) {
+            if (!node) return;
+            if (node.__type === "Paragraph") { if (node.style === "PlaceholderText") placeholders.push(node.text); return; }
+            if (node.__type === "Table") { node.rows.forEach(walkP); return; }
+            if (node.__type === "TableRow" || node.__type === "TableCell") { node.children.forEach(walkP); return; }
+            if (Array.isArray(node)) node.forEach(walkP);
+          })(window.__capturedDoc.sections.map(function (s) { return s.children; }));
+          check("single doc: exec-summary consultant slots are filled (no placeholders)", placeholders.length === 0 && allText.indexOf("notified body first") !== -1 && allText.indexOf("AGV sales") !== -1, placeholders.join(" | "));
+          check("single doc: proposed next steps print as written", allText.indexOf("Proposed next steps") !== -1 && allText.indexOf("Book the notified-body slot this quarter") !== -1);
+
+          // Multi: add the second machine back with its own position.
+          E.addTarget("SortMaster Cell 8");
+          var tidB2 = E.state.activeTargetId;
+          E.setResponse(tidB2, "MRM1a", { applicable: true, state: "in-place", evidence: "Risk assessment complete for the cell." });
+          E.setActiveTarget(tidA);
+          A.ExportDOCX.buildAsync(E.state.engagement, inst, null, E.state.profile, null,
+            { targetId: tidA, craSetup: E.getCRASetupRaw() },
+            function (err2) {
+              try {
+                if (err2) { check("multi-machine doc builds - " + (err2.message || err2), false); finish(); return; }
+                var allText2 = docText();
+                check("multi doc: one report covering 2 machines", allText2.indexOf("gap assessment of 2 machines") !== -1);
+                check("multi doc: org obligations sentence is machinery-specific", allText2.indexOf("were assessed once for the manufacturer and apply to every machine") !== -1);
+                check("multi doc: blocker names only the machine with conformity floors", allText2.indexOf("Market placement is currently blocked for PalletPro AGV-350") !== -1 && allText2.indexOf("blocked for PalletPro AGV-350 and SortMaster Cell 8") === -1);
+                check("multi doc: roadmap covers all machines with org gaps tagged", allText2.indexOf("conformance gap roadmap (all machines)") !== -1 && allText2.indexOf("Applies to: Organisation-wide") !== -1);
+                check("multi doc: no CRA text leaks", allText2.indexOf("Cyber Resilience") === -1 && allText2.indexOf("CRA") === -1);
+              } catch (e2) { check("multi doc assertions threw: " + e2.message, false); }
+              finish();
+            });
+        } catch (e) { check("single doc assertions threw: " + e.message, false); finish(); }
+      });
+  } catch (e) {
+    check("harness threw: " + (e && e.message), false);
+    if (e && e.stack) { var d = document.createElement("div"); d.className = "row"; d.textContent = e.stack; out.appendChild(d); }
+    finish();
+  }
+})();
+</script>
+</body></html>

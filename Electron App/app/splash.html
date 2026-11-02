@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only. -->
+<html lang="en"><head><meta charset="utf-8"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"/>
+<title>OT Cyber Assessment Tool</title>
+<!--
+  Shown while the app starts, from the moment Electron is running until the
+  tool's window is ready. It picks up where the launcher's unpacking image
+  (build/splash.bmp) leaves off, and looks the same, so the two read as one.
+-->
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif; color: #1F2D3A; background: #FFFFFF;
+    border: 1px solid #D0D7DE; box-sizing: border-box; user-select: none; -webkit-app-region: drag;
+    display: flex; flex-direction: column; justify-content: center; padding: 0 40px;
+  }
+  .row { display: flex; align-items: center; gap: 22px; }
+  img { width: 92px; height: 92px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  .ver { margin-top: 2px; font-size: 13px; color: #5A6B7B; }
+  .status { margin-top: 30px; font-size: 14px; }
+  .bar { margin-top: 10px; height: 4px; background: #E6EEF6; border-radius: 2px; overflow: hidden; }
+  .bar span { display: block; width: 30%; height: 100%; background: #3398CC; border-radius: 2px; animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
+  .note { margin-top: 12px; font-size: 12px; color: #5A6B7B; }
+  .foot { position: absolute; bottom: 14px; left: 40px; font-size: 11px; color: #8795A1; }
+</style></head>
+<body>
+  <div class="row">
+    <img src="splash-logo.png" alt=""/>
+    <div><h1>OT Cyber Assessment Tool</h1><div class="ver" id="ver"></div></div>
+  </div>
+  <div class="status">Starting up&hellip;</div>
+  <div class="bar"><span></span></div>
+  <div class="note">The first start on a computer can take up to a minute.</div>
+  <div class="foot">&copy; 2026 SolutionsPT. All rights reserved.</div>
+<script>
+  var v = new URLSearchParams(location.search).get("v");
+  if (v) document.getElementById("ver").textContent = v;
+</script>
+</body></html>

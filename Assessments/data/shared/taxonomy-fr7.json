@@ -1,0 +1,41 @@
+{
+  "id": "fr-7",
+  "title": "ISA/IEC 62443 Foundational Requirements",
+  "frs": [
+    {
+      "id": "FR1",
+      "abbr": "IAC",
+      "name": "Identification and authentication control"
+    },
+    {
+      "id": "FR2",
+      "abbr": "UC",
+      "name": "Use control"
+    },
+    {
+      "id": "FR3",
+      "abbr": "SI",
+      "name": "System integrity"
+    },
+    {
+      "id": "FR4",
+      "abbr": "DC",
+      "name": "Data confidentiality"
+    },
+    {
+      "id": "FR5",
+      "abbr": "RDF",
+      "name": "Restricted data flow"
+    },
+    {
+      "id": "FR6",
+      "abbr": "TRE",
+      "name": "Timely response to events"
+    },
+    {
+      "id": "FR7",
+      "abbr": "RA",
+      "name": "Resource availability"
+    }
+  ]
+}

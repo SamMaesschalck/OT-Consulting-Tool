@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>dark-mode input theming check</title>
+<link rel="stylesheet" href="../css/app.css"/></head>
+<body>
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+
+  // luminance helper: parse "rgb(r, g, b)" -> perceived lightness 0..255
+  function lum(rgb) {
+    var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb || "");
+    if (!m) return null;
+    return 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3];
+  }
+  function contrast(a, b) { var la = lum(a), lb = lum(b); return (la == null || lb == null) ? 0 : Math.abs(la - lb); }
+
+  {
+    document.documentElement.setAttribute("data-theme", "dark");
+    A.Engine.loadCatalog();
+    A.UI.init({ autosave: false });
+    A.Engine.activateInstrument("eu-cra");           // CRA -> engagement page has the products table
+    A.UI.go("engagement");
+
+    var main = document.getElementById("main");
+    // the product-name input in the products table (not inside a .field)
+    var input = main.querySelector("table.tbl input") || main.querySelector("input:not([type=file]):not([type=checkbox])");
+    ok(!!input, "found a product name input on the CRA engagement page");
+    if (input) {
+      var cs = getComputedStyle(input);
+      var bg = cs.backgroundColor, fg = cs.color;
+      var bgL = lum(bg), fgL = lum(fg);
+      ok(bgL != null && bgL < 90, "input background is dark in dark mode (not white)", "bg=" + bg + " lum=" + (bgL && bgL.toFixed(0)));
+      ok(fgL != null && fgL > 150, "input text is light in dark mode", "fg=" + fg + " lum=" + (fgL && fgL.toFixed(0)));
+      ok(contrast(bg, fg) > 90, "input text/background have readable contrast", "bg=" + bg + " fg=" + fg + " diff=" + contrast(bg, fg).toFixed(0));
+    }
+
+    // and a .field textarea/select stays correct too
+    A.Engine.activateInstrument("iec-62443-3-3");
+    A.UI.go("engagement");
+    var ta = document.querySelector("#main .field textarea, #main textarea");
+    if (ta) {
+      var tcs = getComputedStyle(ta);
+      ok(lum(tcs.backgroundColor) < 90 && lum(tcs.color) > 150, "themed .field textarea also dark with light text", "bg=" + tcs.backgroundColor + " fg=" + tcs.color);
+    } else {
+      ok(true, "(no textarea on this page to check - skipped)");
+    }
+  }
+});
+</script>
+</body></html>

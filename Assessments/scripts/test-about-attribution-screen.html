@@ -1,0 +1,186 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Framework attribution prints in the on-screen About card</title></head>
+<body>
+<!--
+  Seven instruments quote their framework's own text (the CAF and ONR SyAPs
+  under the Open Government Licence, the CIS Controls under their terms of
+  use, NIST SP 800-53 and 800-82) and each carries an `attribution` string
+  saying so. The on-screen report showed the quoted text and never the
+  notice. This drives the real report page for every instrument and checks:
+
+    1. an instrument with the field prints it, verbatim, once, inside its
+       About card (About this assessment, or the CAF's About the CAF);
+    2. an instrument without it draws no empty attribution element;
+    3. the notice is not part of the editable wording, so a consultant
+       rewriting or editing the About text cannot delete it with the prose;
+    4. every family's About card carries it, including the families that
+       build their own (ML, NIS2, CSMS), and an object-shaped field prints
+       every line rather than "[object Object]".
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: "mock" }); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+
+  function main() { return document.getElementById("main"); }
+  var ABOUT = /^(About this assessment|About the CAF)$/;
+  function aboutCards() {
+    return [].slice.call(main().querySelectorAll(".card")).filter(function (c) {
+      var head = [].slice.call(c.children).filter(function (x) { return x.classList && x.classList.contains("card-h"); })[0];
+      var h2 = head && head.getElementsByTagName("h2")[0];
+      return h2 && ABOUT.test(h2.textContent.trim());
+    });
+  }
+  function notes() { return [].slice.call(main().querySelectorAll("[data-attribution]")); }
+  function noteLines(n) { return [].slice.call(n.querySelectorAll("p")).map(function (p) { return p.textContent; }); }
+  function insideAbout(n) {
+    return aboutCards().some(function (c) { return c.contains(n); });
+  }
+
+  var all = E.state.instruments.filter(function (i) { return i.status !== "placeholder"; });
+  var withAttr = all.filter(function (i) { return typeof i.attribution === "string" && i.attribution.trim() !== ""; });
+  var without = all.filter(function (i) { return !i.attribution; });
+  ok(withAttr.length >= 7, "the catalogue has the instruments that quote their source (" + withAttr.length + ")",
+     withAttr.map(function (i) { return i.id; }).join(", "));
+
+  // ---- 1. every instrument with the field prints it, verbatim, in its About card ----
+  withAttr.forEach(function (inst) {
+    E.newProject();
+    E.activateInstrument(inst.id);
+    A.UI.go("report");
+    var tag = inst.id + " (" + inst.scoringFamily + ")";
+    var ns = notes();
+    ok(ns.length === 1, tag + ": the report prints the attribution once", String(ns.length));
+    var n = ns[0];
+    ok(!!n && insideAbout(n), tag + ": inside the About card");
+    var lines = n ? noteLines(n) : [];
+    ok(lines.length === 1 && lines[0] === inst.attribution, tag + ": verbatim, as the instrument states it",
+       lines.join(" / ").slice(0, 160));
+    ok(main().textContent.indexOf(inst.attribution) !== -1, tag + ": and it is visible text on the report page");
+  });
+
+  // ---- 2. no empty element for an instrument without the field ----
+  without.forEach(function (inst) {
+    E.newProject();
+    E.activateInstrument(inst.id);
+    A.UI.go("report");
+    ok(notes().length === 0, inst.id + ": no attribution element where the instrument has none", String(notes().length));
+  });
+
+  // ---- 3. the notice is not the consultant's wording to rewrite ----
+  ["ncsc-caf", "nist-800-53", "onr-syaps-full"].forEach(function (id) {
+    var inst = all.filter(function (i) { return i.id === id; })[0];
+    if (!inst) { ok(false, id + ": instrument present"); return; }
+    E.newProject();
+    E.activateInstrument(id);
+    A.UI.go("report");
+    var n = notes()[0];
+    var card = n && n.closest(".card[data-section]");
+    ok(!!card, id + ": the About card is a keyed report section");
+    if (!card) return;
+    var key = card.getAttribute("data-section");
+    ok((card.getAttribute("data-generated-prose") || "").indexOf(inst.attribution) === -1,
+       id + ": the notice is not in the section's editable wording");
+
+    // Opening the editor swaps the wording for a box; the notice stays printed.
+    card.querySelector(".sect-edit").click();
+    var editing = main().querySelector('.card[data-section="' + key + '"]');
+    ok(!!editing.querySelector(".sect-prose-input"), id + ": editing the About card offers the wording box");
+    ok(editing.querySelector(".sect-prose-input").value.indexOf(inst.attribution) === -1,
+       id + ": and the box does not hold the notice");
+    var en = editing.querySelector("[data-attribution]");
+    ok(!!en && noteLines(en)[0] === inst.attribution, id + ": the notice stays printed while the wording is edited");
+    // Done, so the rewrite below renders as text rather than inside the box.
+    editing.querySelector(".sect-edit").click();
+
+    // A rewrite replaces the wording and leaves the notice where it was.
+    E.setReportSection(key, { prose: "Rewritten about text for " + id + "." });
+    A.UI.go("report");
+    var after = main().querySelector('.card[data-section="' + key + '"]');
+    ok(after && after.textContent.indexOf("Rewritten about text for " + id + ".") !== -1, id + ": the rewrite shows");
+    var an = after && after.querySelector("[data-attribution]");
+    ok(!!an && noteLines(an)[0] === inst.attribution, id + ": the notice survives the rewrite, verbatim");
+    E.clearReportSection(key);
+  });
+
+  // ---- 3b. hiding the About section does not show the notice as dropped ----
+  // Word keeps the notice when its section is hidden and closes the document
+  // with it. The preview used to leave it inside the dimmed card tagged
+  // "Hidden: left out of the Word document", which said the opposite.
+  ["ncsc-caf", "nist-800-53", "cis-controls-v8"].forEach(function (id) {
+    var inst = all.filter(function (i) { return i.id === id; })[0];
+    if (!inst) { ok(false, id + ": instrument present"); return; }
+    E.newProject();
+    E.activateInstrument(id);
+    A.UI.go("report");
+    var card = notes()[0] && notes()[0].closest(".card[data-section]");
+    if (!card) { ok(false, id + ": About card found"); return; }
+    var key = card.getAttribute("data-section");
+    E.setReportSection(key, { hidden: true });
+    A.UI.go("report");
+    var hiddenCard = main().querySelector('.card[data-section="' + key + '"]');
+    ok(!!hiddenCard && hiddenCard.classList.contains("section-hidden"), id + ": the About card shows as hidden");
+    var ns = notes();
+    ok(ns.length === 1, id + ": the notice still prints once", String(ns.length));
+    var n = ns[0];
+    ok(!!n && !n.closest(".section-hidden"), id + ": and not inside a hidden section");
+    ok(!!n && noteLines(n)[0] === inst.attribution, id + ": verbatim");
+    // Last in the report itself; the page adds its comparison card after it.
+    var rc = n && n.closest("[data-attribution-rescued]");
+    ok(!!rc && rc.parentNode.lastElementChild === rc, id + ": closing the report, where Word puts it");
+    E.clearReportSection(key);
+    A.UI.go("report");
+    var back = notes()[0];
+    ok(!!back && insideAbout(back) && !main().querySelector("[data-attribution-rescued]"),
+       id + ": shown again, the notice is back in its About card");
+  });
+
+  // ---- 4. every family's About card carries it, in either form ----
+  // Instruments that quote nothing are given a notice for the length of the
+  // check, as an object, so the families that build their own About card (ML,
+  // NIS2, CSMS) are covered as well as aboutCard and the CAF's own card.
+  var families = {};
+  without.forEach(function (inst) {
+    var tag = inst.id + " (" + inst.scoringFamily + ")";
+    var lineA = "Notice text for " + inst.id + ".";
+    var lineB = "Source line for " + inst.id + ".";
+    inst.attribution = { text: lineA, source: lineB };
+    try {
+      E.newProject();
+      E.activateInstrument(inst.id);
+      A.UI.go("report");
+      var ns = notes();
+      ok(ns.length === 1, tag + ": an object-form notice prints once", String(ns.length));
+      var n = ns[0];
+      ok(!!n && insideAbout(n), tag + ": inside the About card");
+      var lines = n ? noteLines(n) : [];
+      ok(lines.length === 2 && lines[0] === lineA && lines[1] === lineB, tag + ": every line, text first",
+         lines.join(" / "));
+      ok(main().textContent.indexOf("[object Object]") === -1, tag + ": never as [object Object]");
+      if (n && insideAbout(n)) families[inst.scoringFamily] = true;
+    } finally {
+      delete inst.attribution;
+    }
+  });
+  withAttr.forEach(function (inst) { families[inst.scoringFamily] = true; });
+  var expected = {};
+  all.forEach(function (i) { expected[i.scoringFamily] = true; });
+  var missing = Object.keys(expected).filter(function (f) { return !families[f]; });
+  ok(missing.length === 0, "every scoring family's About card can carry the notice", missing.join(", "));
+
+  // ---- the shared reader ----
+  var R = A.Report;
+  ok(typeof R.attributionLines === "function", "Report exposes attributionLines for the other renderers");
+  if (typeof R.attributionLines === "function") {
+    ok(R.attributionLines({ attribution: "A notice." }).join("|") === "A notice.", "a string is one line, unchanged");
+    ok(R.attributionLines({}).length === 0 && R.attributionLines(null).length === 0, "no field, no lines");
+    ok(R.attributionLines({ attribution: "  " }).length === 0, "a blank field prints nothing");
+    ok(R.attributionLines({ attribution: { source: "S", text: "T" } }).join("|") === "T|S", "an object reads text first");
+  }
+});
+</script>
+</body></html>

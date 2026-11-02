@@ -1,0 +1,384 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Verify Word content</title>
+<style>
+body{font:17px "Segoe UI",sans-serif;padding:22px;color:#1A2533}
+.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}
+.row{padding:3px 0;font-family:Consolas,monospace;font-size:15px}
+.sec{padding:14px 0 4px;font-weight:600;font-size:18px}
+.preview{background:#F4F7FA;border:1px solid #C8D2DD;border-radius:4px;padding:12px;margin:10px 0;font:14px Consolas,monospace;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h1>Word document content verification</h1>
+<div id="out"></div>
+<div id="preview"></div>
+
+<!-- We DELIBERATELY do NOT load vendor/docx.umd.js. We install a mock instead. -->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock" });</script>
+
+<script>
+// Tiny mock of the docx UMD library. Each constructor records the args and returns
+// a plain object the caller can store. The test below walks the recorded tree to
+// pull out the text of every paragraph and the style applied to it.
+window.docx = (function () {
+  var styleConfig = null;
+  function TextRun(opts) {
+    if (typeof opts === "string") opts = { text: opts };
+    this.__type = "TextRun";
+    this.text = opts.text || "";
+    this.bold = !!opts.bold;
+    this.italics = !!opts.italics;
+    this.color = opts.color || null;
+    this.size = opts.size || null;
+  }
+  function Paragraph(opts) {
+    this.__type = "Paragraph";
+    this.children = opts.children || [];
+    this.style = opts.style || null;
+    this.heading = opts.heading || null;
+    this.spacing = opts.spacing || null;
+    this.indent = opts.indent || null;
+    this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join("");
+  }
+  function TableCell(opts) { this.__type = "TableCell"; this.children = opts.children || []; this.shading = opts.shading || null; this.width = opts.width || null; }
+  function TableRow(opts)  { this.__type = "TableRow"; this.children = opts.children || []; }
+  function Table(opts)     { this.__type = "Table"; this.rows = opts.rows || []; }
+  function ImageRun(opts)  { this.__type = "ImageRun"; this.data = opts.data; this.transformation = opts.transformation; }
+  // Everything below was added to the exporter after this mock was written
+  // (headers/footers, page numbering, the landscape results sections). Missing
+  // any one of them made buildAsync throw before a single assertion ran, so
+  // this page silently reported nothing at all rather than failing loudly.
+  function PageBreak()     { this.__type = "PageBreak"; this.text = ""; }
+  function Header(opts)    { this.__type = "Header"; this.children = (opts && opts.children) || []; }
+  function Footer(opts)    { this.__type = "Footer"; this.children = (opts && opts.children) || []; }
+  var PageNumber      = { CURRENT: "CURRENT", TOTAL_PAGES: "TOTAL_PAGES" };
+  var PageOrientation = { PORTRAIT: "portrait", LANDSCAPE: "landscape" };
+  var TableLayoutType = { FIXED: "fixed", AUTOFIT: "autofit" };
+  var HeightRule      = { AUTO: "auto", EXACT: "exact", AT_LEAST: "atLeast" };
+  function Document(opts)  {
+    this.__type = "Document";
+    this.styles = opts.styles || null;
+    this.sections = opts.sections || [];
+    styleConfig = opts.styles;
+  }
+  var HeadingLevel = { TITLE: "Title", HEADING_1: "Heading1", HEADING_2: "Heading2", HEADING_3: "Heading3" };
+  var AlignmentType = { LEFT: "left", CENTER: "center", RIGHT: "right" };
+  var WidthType = { PERCENTAGE: "pct" };
+  var ShadingType = { SOLID: "solid" };
+  var Packer = { toBlob: function (doc) {
+    // expose the recorded document on a global for the test to inspect
+    window.__capturedDoc = doc;
+    return Promise.resolve(new Blob(["dummy"], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+  } };
+  return {
+    Document: Document, Paragraph: Paragraph, TextRun: TextRun,
+    TableCell: TableCell, TableRow: TableRow, Table: Table, ImageRun: ImageRun,
+    PageBreak: PageBreak, Header: Header, Footer: Footer,
+    PageNumber: PageNumber, PageOrientation: PageOrientation,
+    TableLayoutType: TableLayoutType, HeightRule: HeightRule,
+    HeadingLevel: HeadingLevel, AlignmentType: AlignmentType,
+    WidthType: WidthType, ShadingType: ShadingType, Packer: Packer
+  };
+})();
+</script>
+<!-- The multi-zone acceptance below drives the real engine (links live there),
+     so it needs the engine and its dependencies loaded alongside the mock. -->
+<script>
+(function () {
+  var A = window.App;
+  var out = document.getElementById("out");
+  var pv  = document.getElementById("preview");
+  var pass = 0, fail = 0;
+  function check(label, cond) {
+    var d = document.createElement("div");
+    d.className = "row " + (cond ? "ok" : "bad");
+    d.textContent = (cond ? "PASS " : "FAIL ") + label;
+    out.appendChild(d);
+    if (cond) pass++; else fail++;
+  }
+  function section(text) { var d = document.createElement("div"); d.className = "sec"; d.textContent = text; out.appendChild(d); }
+
+  // Build the engagement matching the acceptance checks
+  var inst = A.Data.instruments["iec-62443-3-3"].instrument;
+  var narr = A.Data.instruments["iec-62443-3-3"].narrative;
+  var tax  = A.Data.shared.taxonomies["fr-7"];
+  var prof = A.Data.shared.scoringProfiles["sl-target-closeness"];
+  var eng = A.Storage.makeEmptyEngagement(inst);
+  eng.engagement.clientName = "Acme Petrochemicals";
+  eng.engagement.siteName = "Plant A";
+  eng.engagement.consultant = "S. Maesschalck";
+  eng.engagement.dateOfVisit = "2026-05-20";
+  var tid = eng.targets[0].id;
+  // Answers are per ITEM (base + each requirement enhancement), so the fixture
+  // states the level it wants and lets the item states follow: everything first
+  // selected at or below that level is met, everything above it is not.
+  function byId(id) { for (var i = 0; i < inst.requirements.length; i++) if (inst.requirements[i].id === id) return inst.requirements[i]; }
+  function atSL(resp, sl) {
+    resp.components = {};
+    A.Scoring.requirementItems(byId(resp.requirementId)).forEach(function (it) {
+      resp.components[it.componentId] = { state: it.firstSL <= sl ? "met" : "not-met", note: "" };
+    });
+  }
+  function notApplicable(resp, why) {
+    resp.components = {};
+    A.Scoring.requirementItems(byId(resp.requirementId)).forEach(function (it) {
+      resp.components[it.componentId] = { state: "na", note: why };
+    });
+  }
+  function answerAll(frId, sl) {
+    var reqs = inst.requirements.filter(function (r) { return r.frId === frId; });
+    reqs.forEach(function (r) {
+      var resp = { targetId: tid, requirementId: r.id, components: {}, evidence: "", notes: "" };
+      atSL(resp, sl);
+      eng.responses.push(resp);
+    });
+    return reqs;
+  }
+  function find(arr, id) { for (var i=0;i<arr.length;i++) if (arr[i].requirementId === id) return arr[i]; }
+
+  var fr1 = answerAll("FR1", 2);
+  var r11 = find(eng.responses, fr1[0].id); atSL(r11, 1); r11.evidence = "Engineering workstations use domain accounts but local engineering accounts on the RTUs remain shared between technicians."; r11.notes = "Shared local accounts identified during the workshop with control engineering.";
+  var r12 = find(eng.responses, fr1[1].id); atSL(r12, 0); r12.evidence = "Process-to-controller communications rely on network position; no device authentication is enforced between the SCADA servers and the field controllers.";
+  var fr2 = answerAll("FR2", 2);
+  var r23 = find(eng.responses, fr2[2].id); atSL(r23, 1); r23.evidence = "USB ports on engineering workstations are policy-restricted but not technically enforced.";
+  var fr3 = answerAll("FR3", 2);
+  atSL(find(eng.responses, fr3[0].id), 3);
+  notApplicable(find(eng.responses, fr3[1].id), "No wireless is deployed at this site.");
+  // FR4-FR7 unassessed
+
+  A.ExportDOCX.buildAsync(eng, inst, tax, prof, narr, { targetId: tid }, function (err) {
+    if (err) { out.innerHTML = "<div class='bad'>buildAsync failed: " + err.message + "</div>"; return; }
+    var doc = window.__capturedDoc;
+    var paras = [];
+    function walk(node) {
+      if (!node) return;
+      if (node.__type === "Paragraph") { paras.push(node); return; }
+      if (node.__type === "Table") { node.rows.forEach(walk); return; }
+      if (node.__type === "TableRow") { node.children.forEach(walk); return; }
+      if (node.__type === "TableCell") { node.children.forEach(walk); return; }
+      if (Array.isArray(node)) node.forEach(walk);
+    }
+    doc.sections.forEach(function (s) { s.children.forEach(walk); });
+    var allText = paras.map(function (p) { return p.text; }).join("\n");
+
+    // Acceptance 1: FR1 names SR 1.1 explicitly at SL1 vs SL2
+    section("Acceptance 1 - FR1 names SR 1.1 explicitly with achieved/target");
+    check("'SR 1.1' is mentioned in the findings", allText.indexOf("SR 1.1") !== -1);
+    check("SR 1.1 is reported as achieved SL 1 against target SL 2",
+      /SR 1\.1[^\n]*achieved SL 1 against target SL 2/.test(allText));
+    check("SR 1.2 is named in the shortfall list", /SR 1\.2[^\n]*against target SL 2/.test(allText));
+
+    // Acceptance 2: evidence appears beneath the finding
+    section("Acceptance 2 - Evidence appears beneath findings");
+    check("SR 1.1 evidence paragraph exists",
+      allText.indexOf("Engineering workstations use domain accounts but local engineering accounts on the RTUs") !== -1);
+    check("SR 1.2 evidence paragraph exists",
+      allText.indexOf("Process-to-controller communications rely on network position") !== -1);
+    check("SR 1.1 notes paragraph exists",
+      allText.indexOf("Shared local accounts identified during the workshop") !== -1);
+    check("Gap register includes SR 1.1 evidence column",
+      allText.indexOf("Engineering workstations use domain accounts") !== -1);
+
+    // Acceptance 3: FR4-FR7 show not-assessed sentence and Limitations names them
+    section("Acceptance 3 - FR4-FR7 not-assessed sentence + named in Limitations");
+    check("FR4 not-assessed sentence appears",
+      allText.indexOf("FR4 Data confidentiality was not assessed in this engagement.") !== -1);
+    check("FR5 not-assessed sentence appears",
+      allText.indexOf("FR5 Restricted data flow was not assessed in this engagement.") !== -1);
+    check("FR6 not-assessed sentence appears",
+      allText.indexOf("FR6 Timely response to events was not assessed in this engagement.") !== -1);
+    check("FR7 not-assessed sentence appears",
+      allText.indexOf("FR7 Resource availability was not assessed in this engagement.") !== -1);
+    check("Limitations names FR4 by name",
+      /Foundational Requirements not assessed[^.]*FR4 Data confidentiality/.test(allText));
+    check("Limitations names FR7 by name",
+      /Foundational Requirements not assessed[^.]*FR7 Resource availability/.test(allText));
+
+    // Acceptance 4: the roadmap is a per-requirement scaffold, not a bare
+    // placeholder, and it lists what the assessor actually found short.
+    section("Acceptance 4 - Roadmap is a structured per-requirement scaffold");
+    check("Roadmap section is present", allText.indexOf("Roadmap to the target Security Level") !== -1);
+    check("Roadmap explains the weakest-link rule",
+      /the achieved level is set by the weakest/.test(allText));
+    check("Roadmap entries carry the standard field set",
+      /What target SL 2 requires/.test(allText) && /Captured evidence/.test(allText) &&
+      /Recommended action/.test(allText) && /Owner/.test(allText));
+    check("Roadmap carries the captured evidence for its entries",
+      allText.indexOf("Engineering workstations use domain accounts") !== -1 &&
+      allText.indexOf("Process-to-controller communications rely on network position") !== -1);
+    // Requirements in an FR nobody assessed are a coverage gap, not a finding,
+    // and must not crowd out the real ones. FR4-FR7 were left untouched.
+    check("Roadmap excludes requirements from the unassessed FRs",
+      allText.indexOf("SR 4.1 Information confidentiality") === -1 &&
+      allText.indexOf("SR 7.1 Denial of service protection") === -1);
+    // SR 1.2's base item is unmet, so it is a floor finding and sorts ahead of
+    // SR 1.1, which is one level below target. Both are on the roadmap.
+    check("Roadmap leads with the floor finding", /P1   SR 1\.2/.test(allText));
+    check("Roadmap includes the assessed shortfall SR 1.1", /P\d+   SR 1\.1/.test(allText));
+    // The single bare line "[Consultant to complete]" must NOT appear anywhere
+    check("No bare '[Consultant to complete]' placeholder line",
+      allText.indexOf("[Consultant to complete]") === -1);
+
+    // Acceptance 5: every paragraph is either verbatim narrative or composed from a template.
+    // We check this by asserting: the boilerplate paragraphs appear verbatim, and key
+    // template-derived sentences match expected substitutions.
+    section("Acceptance 5 - Verbatim boilerplate + template-only composition");
+    var BP = narr.boilerplate;
+    // report_intro sits in "About this assessment": the executive summary opens
+    // with the verdict, so the preamble follows it rather than leading.
+    check("report_intro appears verbatim",       allText.indexOf(BP.report_intro) !== -1);
+    check("about_instrument appears verbatim",   allText.indexOf(BP.about_instrument) !== -1);
+    check("security_levels appears verbatim",    allText.indexOf(BP.security_levels) !== -1);
+    check("how_to_read appears verbatim",        allText.indexOf(BP.how_to_read) !== -1);
+    // The method's closing [prompt] prints as its own red paragraph, straight
+    // after the description, until the consultant answers it in the tool.
+    var mCut = BP.method.indexOf("[");
+    check("method appears verbatim",             mCut < 0 ? allText.indexOf(BP.method) !== -1
+      : allText.indexOf(BP.method.slice(0, mCut).trim() + "\n" + BP.method.slice(mCut).trim()) !== -1);
+    check("limitations appears verbatim",        allText.indexOf(BP.limitations) !== -1);
+    var FN = narr.fr_narrative;
+    check("FR1.purpose appears verbatim",        allText.indexOf(FN.FR1.purpose) !== -1);
+    check("FR1.why_it_matters appears verbatim", allText.indexOf(FN.FR1.why_it_matters) !== -1);
+    check("FR4.purpose appears verbatim",        allText.indexOf(FN.FR4.purpose) !== -1);
+    check("FR7.why_it_matters appears verbatim", allText.indexOf(FN.FR7.why_it_matters) !== -1);
+    // Executive summary scope line: 3 FRs assessed, 4 not.
+    check("exec_scope composed correctly",
+      /The assessment covered 3 of the seven Foundational Requirements/.test(allText) &&
+      /\(4 Foundational Requirement\(s\) were not assessed\)/.test(allText));
+    // One requirement in this fixture has an unmet base item, so it is
+    // floor-flagged. The untouched FRs contribute nothing to that count.
+    check("floor count reflects only assessed requirements",
+      /1 requirement\(s\) are floor-flagged/.test(allText));
+
+    // Acceptance 6: named styles + brand colour
+    section("Acceptance 6 - Named paragraph styles + brand colour");
+    var styles = doc.styles;
+    check("Document has named styles config",     !!styles);
+    check("Heading 1 default colour is 173267 (brand navy)",
+      !!styles && styles.default && styles.default.heading1 && styles.default.heading1.run && styles.default.heading1.run.color === "173267");
+    check("Heading 2 default colour is 173267 (brand navy)",
+      !!styles && styles.default && styles.default.heading2 && styles.default.heading2.run && styles.default.heading2.run.color === "173267");
+    var hasBody = (styles.paragraphStyles || []).filter(function (s) { return s.id === "BodyText"; })[0];
+    var hasCap  = (styles.paragraphStyles || []).filter(function (s) { return s.id === "Caption"; })[0];
+    var hasPh   = (styles.paragraphStyles || []).filter(function (s) { return s.id === "PlaceholderText"; })[0];
+    check("BodyText paragraph style defined",        !!hasBody);
+    check("Caption paragraph style defined",         !!hasCap);
+    check("PlaceholderText paragraph style defined", !!hasPh);
+    // Check that some paragraphs actually USE the named styles
+    var usedStyles = {};
+    paras.forEach(function (p) { if (p.style) usedStyles[p.style] = true; });
+    check("Body paragraphs use BodyText style",   !!usedStyles.BodyText);
+    check("Some paragraphs use PlaceholderText style", !!usedStyles.PlaceholderText);
+    // Headings should use HEADING_x via .heading
+    var headings = paras.filter(function (p) { return p.heading; }).length;
+    check("Document contains heading paragraphs (>=10)", headings >= 10);
+
+    // Acceptance 7: a multi-zone document where one requirement is SHARED
+    // between two of three zones. The partial share is the case the wording has
+    // to get right: it is not "the whole system", and the zone outside it must
+    // not be named as covered.
+    section("Acceptance 7 - a shared answer across some, not all, zones");
+    var E2 = A.Engine;
+    E2.loadCatalog();          // this page has no UI.init to do it
+    E2.newProject();
+    E2.activateInstrument("iec-62443-3-3");
+    var zA = E2.getActiveTarget().id; E2.renameTarget(zA, "Zone Alpha");
+    var zB = E2.addTarget("Zone Bravo").id;
+    var zC = E2.addTarget("Zone Charlie").id;
+    E2.setDefaultTargetSL(2);
+    // Alpha and Charlie share one directory; Bravo answers for itself.
+    E2.setRequirementSL(zA, "SR1.1", 1, 2);
+    E2.setResponse(zA, "SR1.1", {
+      evidence: "One corporate directory reaches Alpha and Charlie.",
+      action: "Enforce multifactor authentication on the directory.", owner: "IT/OT" });
+    E2.linkRequirement("SR1.1", zA, [zC]);
+    // Bravo is short too, so its own write-up reaches the document by the same
+    // route as the shared one. What is being tested is that the two do not
+    // bleed into each other. (Word reports evidence for requirements that MISS
+    // their target; a met requirement carries none, which is why this fixture
+    // leaves Bravo short rather than met.)
+    E2.setRequirementSL(zB, "SR1.1", 1, 2);
+    E2.setResponse(zB, "SR1.1", { evidence: "Bravo runs standalone accounts, reviewed quarterly." });
+
+    A.ExportDOCX.buildAsync(E2.state.engagement, E2.state.instrument, E2.state.taxonomy,
+      E2.state.profile, E2.getActiveNarrative(),
+      { scopeTargetIds: [zA, zB, zC] }, function (err2) {
+        if (err2) { check("multi-zone build succeeds", false); finish(); return; }
+        var doc2 = window.__capturedDoc;
+        var p2 = [];
+        (function walk2(node) {
+          if (!node) return;
+          if (node.__type === "Paragraph") { p2.push(node); return; }
+          if (node.__type === "Table") { node.rows.forEach(walk2); return; }
+          if (node.__type === "TableRow" || node.__type === "TableCell") { node.children.forEach(walk2); return; }
+          if (Array.isArray(node)) node.forEach(walk2);
+          else if (node.sections) node.sections.forEach(function (s) { s.children.forEach(walk2); });
+        })(doc2);
+        var t2 = p2.map(function (p) { return p.text; }).join("\n");
+
+        check("multi-zone build succeeds", t2.length > 3000);
+        check("every zone is named", t2.indexOf("Zone Alpha") !== -1 &&
+              t2.indexOf("Zone Bravo") !== -1 && t2.indexOf("Zone Charlie") !== -1);
+        check("the shared evidence is reported in the zones that take it",
+              t2.indexOf("One corporate directory reaches Alpha and Charlie.") !== -1);
+        check("the zone answering for itself keeps its own evidence",
+              t2.indexOf("Bravo runs standalone accounts, reviewed quarterly.") !== -1);
+        // The two must not bleed into each other. Counting globally cannot say
+        // that - the same evidence legitimately appears in a zone's findings
+        // AND again in its roadmap - so slice the document into its per-zone
+        // sections and ask which text landed in which zone.
+        function sectionFor(name) {
+          var start = -1, end = p2.length;
+          for (var i = 0; i < p2.length; i++) {
+            var isZoneHead = p2[i].heading && /Zone (Alpha|Bravo|Charlie)/.test(p2[i].text || "");
+            if (isZoneHead && (p2[i].text || "").indexOf(name) !== -1 && start === -1) { start = i; continue; }
+            if (start !== -1 && isZoneHead) { end = i; break; }
+          }
+          if (start === -1) return "";
+          return p2.slice(start, end).map(function (p) { return p.text; }).join("\n");
+        }
+        var secA = sectionFor("Zone Alpha"), secB = sectionFor("Zone Bravo"), secC = sectionFor("Zone Charlie");
+        check("each zone has its own section in the document",
+              secA.length > 0 && secB.length > 0 && secC.length > 0);
+        // Printed once: under the first zone that takes it. The later zone that
+        // also inherits it points back rather than reprinting it.
+        check("the shared write-up appears under the first zone that takes it",
+              secA.indexOf("One corporate directory") !== -1);
+        check("and the later zone that inherits it refers back instead of reprinting it",
+              secC.indexOf("One corporate directory") === -1 &&
+              /recorded once for the whole system is given under the first/.test(secC));
+        check("and NOT in the zone that answered for itself",
+              secB.indexOf("One corporate directory") === -1);
+        check("whose own write-up appears only in its own section",
+              secB.indexOf("Bravo runs standalone accounts") !== -1 &&
+              secA.indexOf("Bravo runs standalone accounts") === -1 &&
+              secC.indexOf("Bravo runs standalone accounts") === -1);
+        check("the document never says System-wide", t2.indexOf("System-wide") === -1);
+        check("no undefined or NaN reaches the page",
+              t2.indexOf("undefined") === -1 && t2.indexOf("NaN") === -1);
+        check("no null Security Level is printed", !/SL null/.test(t2));
+        finish();
+      });
+
+    function finish() {
+      var s = document.createElement("div");
+      s.className = "row " + (fail === 0 ? "ok" : "bad");
+      s.style.marginTop = "12px"; s.style.fontWeight = "600";
+      s.textContent = pass + " passed, " + fail + " failed";
+      out.appendChild(s);
+    }
+
+    // Render an excerpt of the document for visual confirmation: section headings + first text
+    var preview = "Total paragraphs: " + paras.length + "\n";
+    preview += "Heading paragraphs: " + headings + "\n";
+    preview += "Body paragraphs: " + paras.filter(function (p) { return p.style === "BodyText"; }).length + "\n";
+    preview += "\n--- HEADING SEQUENCE ---\n";
+    paras.filter(function (p) { return p.heading; }).forEach(function (p) {
+      preview += "[" + p.heading + "] " + p.text + "\n";
+    });
+    pv.innerHTML = "<div class='preview'>" + preview.replace(/</g, "&lt;") + "</div>";
+  });
+})();
+</script>
+</body></html>

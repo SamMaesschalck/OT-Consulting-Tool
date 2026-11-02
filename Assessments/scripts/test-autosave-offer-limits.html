@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Offered unsaved work: limits, full storage and two windows</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Verification of the offered-work list (test-autosave-offer-kept.html) found
+  three ways it could still go wrong.
+
+  1. No cap. Every session ended with unsaved work added a whole project file
+     to the list and only Restore or Discard took one out. Every file:// page
+     shares one storage quota, so the list grew towards it. It is now capped at
+     the newest few copies.
+
+  2. A full store lost the newest copy. When the list could not be written,
+     the live copy went back on the live key, but the bar offered only the
+     list - an OLDER copy - and the first edit then overwrote the newest one.
+     Now the oldest copies make room first; if even one will not fit, the
+     copy stays on its own key and is offered from there.
+
+  3. A false alarm from a second window. Opening the app in a second window
+     while the first is still editing sets the first window's copy aside as
+     offered work. The first window then saved, which cleared only the live
+     key, and the stale copy was announced as "unsaved work found" at every
+     launch. A window now takes its own set-aside copy back out when it
+     writes a newer one or saves, and Save no longer deletes a live copy
+     another window wrote.
+
+  Round 3: one live key per session (otcat:autosave:live:v2:<session id>).
+  With a single key for every window, two windows open at once took turns
+  overwriting it, and the last write won (section 5). The single key the
+  previous release wrote is still offered at start-up, then removed (section
+  6). A copy a full store will not let start-up move stays on its own key,
+  is offered from there, and no longer blocks this window's own backstop
+  (section 3).
+
+  NOTE: this page enables autosave, so it uses the SAME keys as the real app
+  (one file:// origin). It saves what is there first and puts it back at the
+  end; the headless runner uses a throwaway browser profile anyway.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  var A = window.App, E = A.Engine, STG = A.Storage;
+  var PREFIX = "otcat:autosave:live:v2:", OFFERED = "otcat:autosave:offered:v2";
+  var LEGACY = "otcat:autosave:v2", LEGACY_OWNER = "otcat:autosave:owner:v2";
+
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function put(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function autosaveKeys() {
+    var out = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf("otcat:autosave") === 0) out.push(k);
+    }
+    return out;
+  }
+  function wipe() { autosaveKeys().forEach(function (k) { put(k, null); }); }
+  var kept = {};
+  autosaveKeys().forEach(function (k) { kept[k] = get(k); });
+  wipe();
+
+  // A store that can be made to run out of room for the offered list.
+  var realSetItem = Storage.prototype.setItem;
+  var offeredLimit = Infinity;
+  Storage.prototype.setItem = function (k, v) {
+    if (k === OFFERED && String(v).length > offeredLimit) {
+      throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+    }
+    return realSetItem.call(this, k, v);
+  };
+  function finish() {
+    Storage.prototype.setItem = realSetItem;
+    wipe();
+    Object.keys(kept).forEach(function (k) { put(k, kept[k]); });
+    done();
+  }
+
+  var confirms = [];
+  window.confirm = function (msg) { confirms.push(String(msg)); return true; };
+  window.alert = function () {};
+  STG.saveProjectToFile = function (pf, opts, cb) { cb({ ok: true, method: "file", name: "x.json" }); };
+
+  function fileFor(name, when) {
+    var p = STG.defaultProject();
+    p.clientName = name;
+    return { schemaVersion: "2.0", project: p, assessments: {}, activeAssessmentId: null, updatedAt: when };
+  }
+  function nameOf(raw) {
+    try { return ((JSON.parse(raw || "null") || {}).project || {}).clientName || null; } catch (e) { return null; }
+  }
+  function offeredNames() {
+    var list = [];
+    try { list = JSON.parse(get(OFFERED) || "[]"); } catch (e) {}
+    return (Array.isArray(list) ? list : []).map(function (b) { return ((b.file || {}).project || {}).clientName; });
+  }
+  function pendingNames() {
+    return AS.pending().map(function (b) { return ((b.file || {}).project || {}).clientName; });
+  }
+  // This window's own backup, and every live key in the store.
+  function ownName() { return nameOf(get(AS.liveKey())); }
+  function liveKeys() { return autosaveKeys().filter(function (k) { return k.indexOf(PREFIX) === 0; }); }
+  // What another window's start-up does to this window's copy: it is set
+  // aside as offered work. Done by hand, because this window's own start-up
+  // leaves its own key alone.
+  function anotherWindowStarts() {
+    var raw = get(AS.liveKey());
+    var list = [];
+    try { list = JSON.parse(get(OFFERED) || "[]"); } catch (e) {}
+    list.unshift({ id: "b-other-" + list.length, file: JSON.parse(raw), session: AS.session() });
+    put(OFFERED, JSON.stringify(list));
+    put(AS.liveKey(), null);
+  }
+  function client() { return (E.getProjectFile().project || {}).clientName; }
+  function bar() { return document.getElementById("autosave-bar"); }
+  function btnIn(root, re) {
+    return [].slice.call((root || document).querySelectorAll("button")).filter(function (b) {
+      return re.test(b.textContent);
+    })[0];
+  }
+  function save() { document.getElementById("btn-save").click(); }
+  function dismissBar() { if (bar()) bar().querySelector(".autosave-dismiss").click(); }
+
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: true });
+    var AS = A.UI.__autosave;
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+    finish();
+    return;
+  }
+
+  setTimeout(function () {
+  try {
+    // ---- 1. the list is capped, newest kept -------------------------------
+    for (var i = 1; i <= 7; i++) {
+      put(PREFIX + "s-ended-" + i, JSON.stringify(fileFor("Copy " + i, "2026-09-0" + i + "T09:00:00.000Z")));
+      AS.startup();
+    }
+    var names = offeredNames();
+    ok(names.length === AS.maxOffered && AS.maxOffered > 0 && AS.maxOffered <= 10,
+       "seven sessions abandoned with unsaved work keep only the newest " + AS.maxOffered,
+       names.length + ": " + names.join(", "));
+    ok(names[0] === "Copy 7" && names[names.length - 1] === "Copy " + (8 - names.length),
+       "newest first, and the oldest are the ones that go", names.join(", "));
+    ok(liveKeys().length === 0, "every ended session's live key is freed", liveKeys().join(", "));
+    wipe();
+    dismissBar();
+
+    // Several copies at one start-up: the newest ends up first, whatever
+    // order the store lists them in.
+    put(PREFIX + "s-b-mid", JSON.stringify(fileFor("Middle", "2026-09-15T09:00:00.000Z")));
+    put(PREFIX + "s-a-new", JSON.stringify(fileFor("Newest", "2026-09-20T09:00:00.000Z")));
+    put(PREFIX + "s-c-old", JSON.stringify(fileFor("Oldest", "2026-09-10T09:00:00.000Z")));
+    AS.startup();
+    ok(offeredNames().join() === "Newest,Middle,Oldest",
+       "copies set aside at one start-up are offered newest first", offeredNames().join(", "));
+    wipe();
+    dismissBar();
+
+    // ---- 2. a second window does not leave a false alarm ------------------
+    E.activateInstrument("ncsc-caf");
+    E.updateMetadata({ clientName: "First Window" });
+    ok(AS.write() === true, "(this window backs up its unsaved work)");
+    ok(AS.liveKey() === PREFIX + AS.session() && ownName() === "First Window",
+       "on a key of its own, named after this window's session", AS.liveKey());
+    anotherWindowStarts();
+    ok(offeredNames().indexOf("First Window") !== -1, "(a second window set this window's copy aside)");
+    E.updateMetadata({ clientName: "First Window Ltd" });
+    AS.write();
+    ok(offeredNames().indexOf("First Window") === -1 && ownName() === "First Window Ltd",
+       "this window's next backup takes the stale copy back out",
+       "offered: " + offeredNames().join(", ") + " / own: " + ownName());
+    anotherWindowStarts();
+    ok(offeredNames().indexOf("First Window Ltd") !== -1, "(set aside again)");
+    save();
+    ok(offeredNames().indexOf("First Window Ltd") === -1,
+       "saving takes it out too: work that is in a file is not announced as unsaved at the next launch",
+       "offered: " + offeredNames().join(", "));
+    dismissBar();
+
+    // Another window's live copy is not this window's to delete.
+    var OTHER = PREFIX + "s-another-window";
+    put(OTHER, JSON.stringify(fileFor("Other Window", "2026-10-20T09:00:00.000Z")));
+    save();
+    ok(nameOf(get(OTHER)) === "Other Window", "saving here leaves the backup another window wrote", String(nameOf(get(OTHER))));
+    wipe();
+
+    // ---- 3. a full store: a copy that cannot move is still offered --------
+    put(OFFERED, JSON.stringify([{ id: "b-older", file: fileFor("Older Customer", "2026-09-01T09:00:00.000Z") }]));
+    var ENDED = PREFIX + "s-ended-session";
+    put(ENDED, JSON.stringify(fileFor("Latest Customer", "2026-10-20T09:00:00.000Z")));
+    ok(AS.isDirty() === false, "(nothing unsaved on screen)");
+    offeredLimit = 0;      // no room for any list at all
+    AS.startup();
+    ok(nameOf(get(ENDED)) === "Latest Customer", "(the store is full, so the newest copy stays on its own key)");
+    ok(!!bar() && /1 more copy/.test(bar().textContent),
+       "both copies are offered", bar() && bar().textContent);
+    ok(pendingNames().join() === "Latest Customer,Older Customer" && AS.pending()[0].key === ENDED,
+       "the stranded copy first, offered from its own key", pendingNames().join(", "));
+
+    // This window's own backstop is written regardless: it is a different key.
+    E.updateMetadata({ clientName: "Typed While Full" });
+    ok(AS.write() === true && ownName() === "Typed While Full",
+       "this window's own backup is still written while the stranded copy waits",
+       "the stranded copy used to block it");
+    ok(nameOf(get(ENDED)) === "Latest Customer",
+       "and the stranded copy is untouched by it",
+       "the first edit used to write over it");
+
+    // The bar offers the newest copy first, and Restore asks honestly.
+    var typedKey = AS.liveKey();
+    confirms = [];
+    btnIn(bar(), /Restore/).click();
+    ok(client() === "Latest Customer", "Restore brings back the newest copy, not an older one", client());
+    ok(confirms.length === 1 && /kept in this browser and offered the next time/.test(confirms[0] || "") &&
+       !/will be lost/.test(confirms[0] || "") && !/storage is full/.test(confirms[0] || ""),
+       "and says the work on screen is kept, which is true even with the store full", confirms[0]);
+    ok(get(ENDED) === null && ownName() === "Latest Customer" && AS.liveKey() !== typedKey,
+       "the restored work moves off the ended session's key onto this window's new one");
+    ok(nameOf(get(typedKey)) === "Typed While Full",
+       "the work it replaced could not be listed, so it stays on its old key, which is now an ended session's");
+    ok(offeredNames().join() === "Older Customer", "and the older copy is still offered", offeredNames().join(", "));
+    AS.startup();
+    ok(pendingNames()[0] === "Typed While Full",
+       "the next start offers the replaced work from that key", pendingNames().join(", "));
+    ok(pendingNames().indexOf("Latest Customer") === -1, "(and not this window's own copy)");
+
+    // Discard of a stranded copy acts on its key.
+    btnIn(bar(), /Discard/).click();
+    ok(get(typedKey) === null, "Discard removes a stranded copy from its key");
+    ok(pendingNames().join() === "Older Customer" && !!bar(), "and the next copy is offered", pendingNames().join(", "));
+
+    // With room again, start-up moves stranded copies as usual.
+    offeredLimit = Infinity;
+    put(ENDED, JSON.stringify(fileFor("Left Behind", "2026-10-21T09:00:00.000Z")));
+    AS.startup();
+    ok(get(ENDED) === null && offeredNames()[0] === "Left Behind",
+       "once there is room, the next start-up sets it aside", offeredNames().join(", "));
+    save();
+    wipe();
+    dismissBar();
+
+    // ---- 4. when some room is left, the oldest copies make way ------------
+    var many = [];
+    for (var j = 1; j <= 4; j++) {
+      many.push({ id: "b-" + j, file: fileFor("Kept " + j, "2026-09-1" + j + "T09:00:00.000Z") });
+    }
+    put(OFFERED, JSON.stringify(many));
+    var NEWEST = PREFIX + "s-newest";
+    put(NEWEST, JSON.stringify(fileFor("Newest Customer", "2026-10-21T09:00:00.000Z")));
+    var one = JSON.stringify({ id: "b-xxxxxxxxx-xxxxx", file: fileFor("Newest Customer", "2026-10-21T09:00:00.000Z"), session: "s-newest" });
+    offeredLimit = one.length * 2 + 40;     // room for two copies
+    AS.startup();
+    names = offeredNames();
+    ok(names[0] === "Newest Customer",
+       "the newest copy is set aside even when the store is nearly full", names.join(", "));
+    ok(names.length === 2 && names[1] === "Kept 1",
+       "older copies are dropped, oldest first, to make room", names.join(", "));
+    ok(get(NEWEST) === null, "and its key is freed");
+    offeredLimit = Infinity;
+    wipe();
+    dismissBar();
+
+    // ---- 5. two windows at once: neither overwrites the other -------------
+    // Round 3. With one live key for every window, the last write won: this
+    // window's backup replaced the other's, or the other way round.
+    var SECOND = PREFIX + "s-second-window";
+    E.updateMetadata({ clientName: "This Window" });
+    ok(AS.write() === true, "(this window backs up its unsaved work)");
+    put(SECOND, JSON.stringify(fileFor("Second Window", "2026-10-22T09:00:00.000Z")));   // the other window writes
+    E.updateMetadata({ clientName: "This Window Ltd" });
+    AS.write();                                                                          // and this one again
+    ok(nameOf(get(SECOND)) === "Second Window",
+       "this window's backup does not overwrite the other window's",
+       "one key for every window: the last write won");
+    ok(ownName() === "This Window Ltd", "and the other window's write did not replace this window's");
+    ok(liveKeys().length === 2, "two windows, two live keys", liveKeys().join(", "));
+    AS.clear();
+    ok(nameOf(get(SECOND)) === "Second Window" && get(AS.liveKey()) === null,
+       "clearing this window's backup leaves the other window's alone");
+    AS.write();
+
+    AS.startup();          // what the next start does with both keys present
+    ok(offeredNames().join() === "Second Window" && get(SECOND) === null,
+       "start-up offers the other window's copy", offeredNames().join(", "));
+    ok(ownName() === "This Window Ltd" && pendingNames().indexOf("This Window Ltd") === -1,
+       "and leaves this window's own copy where it is, not offered back to itself", pendingNames().join(", "));
+    ok(!!bar() && /Unsaved work found/.test(bar().textContent) && !/more cop/.test(bar().textContent),
+       "the bar offers just the one", bar() && bar().textContent);
+    save();
+    wipe();
+    dismissBar();
+
+    // ---- 6. the previous release's single key -----------------------------
+    put(LEGACY, JSON.stringify(fileFor("Previous Release", "2026-10-01T09:00:00.000Z")));
+    put(LEGACY_OWNER, "s-old-release");
+    ok(AS.legacyKey === LEGACY && AS.legacyOwnerKey === LEGACY_OWNER && AS.livePrefix === PREFIX,
+       "(the hook names the same keys this page uses)");
+    AS.startup();
+    var offered = AS.offered();
+    ok(offered.length === 1 && ((offered[0].file || {}).project || {}).clientName === "Previous Release",
+       "unsaved work the previous release left on its single key is offered at start-up",
+       offeredNames().join(", "));
+    ok(offered.length === 1 && offered[0].session === "s-old-release",
+       "tagged with the session that wrote it", offered.length ? String(offered[0].session) : "");
+    ok(get(LEGACY) === null && get(LEGACY_OWNER) === null, "and the legacy keys are removed");
+    ok(!!bar() && /Unsaved work found/.test(bar().textContent), "the bar offers it");
+
+    // An empty legacy copy is just removed.
+    wipe();
+    dismissBar();
+    put(LEGACY, JSON.stringify(fileFor("", "2026-10-01T09:00:00.000Z")));
+    put(LEGACY_OWNER, "s-old-release");
+    AS.startup();
+    ok(get(LEGACY) === null && get(LEGACY_OWNER) === null && offeredNames().length === 0 && !bar(),
+       "a legacy copy with nothing in it is removed, not offered");
+    wipe();
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  finish();
+  }, 20);
+});
+</script>
+</body></html>

@@ -1,0 +1,47 @@
+{
+    "_note":  "NIST SP 800-53 Rev 5 control gap-analysis narrative. Boilerplate is fixed prose; data lines come from templates by token substitution only. The executiveSummary block drives the expanded Word exec summary (verdict, scope, gap shape, stakes, path forward) by slot-substitution; binary Satisfied / Other Than Satisfied so no partial wording.",
+    "boilerplate":  {
+                        "report_intro":  "This report gives a control-by-control gap assessment against the NIST SP 800-53 Revision 5 catalog of security and privacy controls. Each control is recorded as Satisfied or Other Than Satisfied, the determination model used in NIST SP 800-53A, against the selected NIST SP 800-53B baseline. The report then sets out a roadmap, based on the evidence gathered, for the controls that are Other Than Satisfied.",
+                        "not_formal_caveat":  "This is an alignment and gap analysis to support improvement. It is neither a formal NIST SP 800-53 control assessment (SP 800-53A) nor an authorisation decision under the NIST Risk Management Framework (SP 800-37) or FISMA. The judgements are the consultant's, made against the control catalog, and should be confirmed by a formal assessment where one is required.",
+                        "implementation_context":  "Where a control cannot be met as written, for example because of legacy technology, third-party dependencies or operational constraints, it may be satisfied through compensating measures, and the compensating control should be noted against the item. Any context that materially affects a judgement should be recorded against the control, so that the determination can be understood and revisited.",
+                        "how_to_read":  "Each control is judged either Satisfied or Other Than Satisfied, following the assessment model in NIST SP 800-53A. Results are given as a profile by control family. There is no single score, because a control catalog is not designed to be reduced to one number. Controls that could not be established are marked unknown; they lower confidence in the result but are not counted as failures. The selected baseline (Low, Moderate or High from NIST SP 800-53B, or the full catalog with no target) sets which controls are expected, and the roadmap lists every in-scope control that is Other Than Satisfied.",
+                        "series_context":  "NIST SP 800-53 is a catalog of security and privacy controls published by the US National Institute of Standards and Technology. It is used with SP 800-53B, which defines the Low, Moderate and High baselines, and with SP 800-53A, which defines how a formal assessment is conducted. This report follows the catalog and the baselines. It is a gap analysis, and is neither an SP 800-53A assessment nor an authorisation decision."
+                    },
+    "templates":  {
+                      "profile_line":  "{objName} ({objId}): {achievedCount} satisfied, {notCount} other than satisfied, of {totalCount} controls.",
+                      "outcome_result":  "{code} {title}: {stateLabel}.",
+                      "roadmap_item":  "{code} {title}: currently {stateLabel}. Recommended actions below.",
+                      "unknown_finding":  "{unknownCount} controls could not be established and are marked unknown; confidence is {confidenceLabel}."
+                  },
+    "executiveSummary":  {
+                             "_note":  "Composed by slot-substitution only. Binary determination (Satisfied / Other Than Satisfied), so no partial wording; exec_partial_vs_absent is intentionally omitted.",
+                             "templates":  {
+                                               "exec_verdict":  "This assessment finds that {clientName} {verdictPhrase} against the {profileName} of NIST SP 800-53 Rev 5, with the weakest coverage in {weakestObjectiveName}. The controls assessed as Other Than Satisfied are the focus of the roadmap in this report.",
+                                               "exec_verdict_nogaps":  "This assessment finds that {clientName} {verdictPhrase} against the {profileName} of NIST SP 800-53 Rev 5, with every applicable control assessed as Satisfied.",
+                                               "exec_scope":  "The assessment covered {applicableCount} applicable base controls across the 20 control families of NIST SP 800-53, grouped as Technical, Operational and Management, judged against the {profileName}.",
+                                               "exec_profile":  "Of these, {achievedCount} were assessed as Satisfied and {notAchievedCount} as Other Than Satisfied (the determination model of NIST SP 800-53A), so {belowCount} control(s) fall short of the baseline.",
+                                               "exec_gap_shape":  "The gaps are not evenly spread. {gapConcentrationSentence} The weakest area is {weakestObjectiveName}, where {weakestObjectiveDetail}.",
+                                               "exec_path_forward":  "The {belowCount} controls assessed as Other Than Satisfied can be closed, and this report sets out a prioritised roadmap for doing so.",
+                                               "exec_confidence":  "This picture rests on {coveragePct} of applicable controls having been answered ({confidenceLabel}). There is no single grade or pass mark. The result is the profile of Satisfied and Other Than Satisfied controls across the families.",
+                                               "verdictPhrases":  {
+                                                                      "foundations":  "demonstrates strong implementation of the selected baseline",
+                                                                      "recognised":  "shows implementation that is partly in place",
+                                                                      "substantial":  "has substantial gaps against the selected baseline"
+                                                                  },
+                                               "gapConcentrationFragments":  {
+                                                                                 "partialClause":  "implementation is partly in place",
+                                                                                 "absentClause":  "the controls are not yet satisfied"
+                                                                             }
+                                           },
+                             "boilerplate":  {
+                                                 "regulatory_stakes":  "NIST SP 800-53 is the control catalog used across US federal information systems, and many enterprises and their customers use it as a benchmark of security-control maturity. The selected baseline corresponds to the impact level chosen for the systems assessed. A customer security review, an auditor or an authorising official would concentrate on the controls that are Other Than Satisfied. This report is an alignment and gap analysis to support improvement, and is neither a formal SP 800-53A assessment nor an authorisation decision.",
+                                                 "not_determination":  "This is an alignment and gap analysis against the NIST SP 800-53 control catalog. It is neither a formal SP 800-53A control assessment nor an authorisation decision under the NIST Risk Management Framework (SP 800-37) or FISMA. The judgements are the consultant's and should be confirmed by a formal assessment where one is required."
+                                             },
+                             "consultantBlocks":  {
+                                                      "consultant_exposure_seed":  "For {clientName}, the weakest area is {weakestObjectiveName}.",
+                                                      "consultant_exposure":  "[Consultant to add a short, client-specific note on the drivers for this assessment (customer or contractual security requirements, certifications in scope such as SOC 2 or ISO 27001) and any specific exposure arising from the weakest areas identified.]",
+                                                      "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",
+                                                      "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this organisation.]"
+                                                  }
+                         }
+}

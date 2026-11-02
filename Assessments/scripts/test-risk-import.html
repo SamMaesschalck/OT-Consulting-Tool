@@ -1,0 +1,175 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Risk-context import (v1.0/v1.1)</title>
+<style>body{font:16px "Segoe UI",sans-serif;padding:22px;color:#1A2533}.ok{color:#2E7D52}.bad{color:#B23A33;font-weight:600}.row{padding:2px 0;font-family:Consolas,monospace;font-size:14px}.sum{padding:10px;border:1px solid #C8D2DD;border-radius:4px;margin:14px 0;font-weight:600}</style></head>
+<body>
+<h1>Risk-context import into the 62443-3-3 instrument</h1>
+<div id="out"></div>
+<div id="summary" class="sum"></div>
+
+<script src="harness.js"></script>
+<script>H.app();</script>
+<script>
+(function () {
+  var A = window.App, E = A.Engine, out = document.getElementById("out");
+  var pass = 0, fail = 0;
+  function check(label, cond) { var d = document.createElement("div"); d.className = "row " + (cond ? "ok" : "bad"); d.textContent = (cond ? "PASS " : "FAIL ") + label; out.appendChild(d); if (cond) pass++; else fail++; }
+
+  E.loadCatalog();
+
+  // The bundled import contract must accept both schema versions.
+  var contract = A.Data.shared && A.Data.shared.riskContextInterchange;
+  check("contract copy present in Assessments", !!contract);
+  var accepted = (contract && contract.acceptedSchemas) || [];
+  check("contract accepts spt-risk-context/1.0", accepted.indexOf("spt-risk-context/1.0") >= 0);
+  check("contract accepts spt-risk-context/1.1", accepted.indexOf("spt-risk-context/1.1") >= 0);
+  check("contract accepts spt-risk-context/1.2", accepted.indexOf("spt-risk-context/1.2") >= 0);
+  check("contract accepts spt-risk-context/1.3", accepted.indexOf("spt-risk-context/1.3") >= 0);
+  check("contract accepts spt-risk-context/1.4", accepted.indexOf("spt-risk-context/1.4") >= 0);
+  check("contract copy itself is at 1.4", contract && contract.schema === "spt-risk-context/1.4");
+  // Replicate the importer's accept predicate (ui.js loadRiskContextFromFile) exactly.
+  function accepts(schema) { return accepted.indexOf(schema) >= 0; }
+  check("predicate: 1.1 accepted", accepts("spt-risk-context/1.1") === true);
+  check("predicate: 1.0 accepted", accepts("spt-risk-context/1.0") === true);
+  check("predicate: bogus rejected", accepts("spt-risk-context/9.9") === false);
+
+  // A representative v1.1 export from the risk tool (scalar slTarget + per-FR vector).
+  var ctx11 = {
+    schema: "spt-risk-context/1.1",
+    generatedBy: "spt-risk-tool/0.2",
+    generatedOn: "2026-07-02",
+    suc: { name: "Riverside Works", description: "Treatment & distribution control", scopeStatement: "ICS only" },
+    securityRequirements: { tolerableRisk: "medium", knownThreats: ["Capable criminal adversary"], mandatorySecurityFunctions: [], regulatory: ["UK NIS 2018"] },
+    assumptions: ["Client risk matrix used"],
+    zones: [
+      { id: "Z1", name: "Safety systems", safetyRelated: true,
+        slSuggestedByFR: { IAC:3,UC:3,SI:3,DC:3,RDF:3,TRE:3,RA:3 }, slTargetByFR: { IAC:3,UC:3,SI:3,DC:3,RDF:3,TRE:3,RA:3 }, slTarget: 3,
+        worstUnmitigatedRisk: "very-high", justification: "SIS floor.", assets: [{ name:"SIS", type:"safety-plc" }],
+        threats: [{ id:"T1", statement:"insider alters logic", affectedFR:["UC","SI"], likelihood:"medium", impact:"severe", unmitigatedRisk:"very-high", exceedsTolerable:true }],
+        vulnerabilities: [], countermeasures: [{ id:"M1", description:"separate SIS zone", addressesFR:["UC"], reference:"SR 2.1" }] },
+      { id: "Z2", name: "Basic process control", safetyRelated: false,
+        slSuggestedByFR: { IAC:3,UC:2,SI:3,DC:1,RDF:3,TRE:2,RA:2 }, slTargetByFR: { IAC:3,UC:2,SI:2,DC:1,RDF:3,TRE:2,RA:2 }, slTarget: 3,
+        worstUnmitigatedRisk: "high", justification: "Vendor rework planned.", assets: [{ name:"PLC", type:"plc" }],
+        threats: [{ id:"T2", statement:"vendor VPN abuse", affectedFR:["IAC","RDF"], likelihood:"high", impact:"serious", unmitigatedRisk:"high", exceedsTolerable:true }],
+        vulnerabilities: [], countermeasures: [] }
+    ],
+    conduits: [
+      { id:"C2", fromZone:"Z2", toZone:"EXT", name:"Vendor remote access", channels:["vpn"], slTargetByFR:{ IAC:3,UC:2,SI:2,DC:2,RDF:3,TRE:2,RA:2 }, slTarget:3, justification:"To be brokered." }
+    ]
+  };
+
+  // ---- Import into a fresh 3-3 project (no captured responses -> replace) ----
+  E.newProject();
+  E.activateInstrument("iec-62443-3-3");
+  var beforeTargets = E.state.engagement.targets.length;
+  check("fresh 3-3 project has a default site", beforeTargets >= 1);
+
+  E.setRiskContext(ctx11, { scope: true, zoneIds: ["Z1", "Z2"], fileName: "riverside-risk-context.json" });
+
+  var ass = A.Storage.findAssessment({ assessments: E.state.assessments }, "iec-62443-3-3");
+  check("riskContext stored on assessment", !!ass.riskContext && ass.riskContext.schema === "spt-risk-context/1.1");
+  check("getRiskContext() returns it", E.getRiskContext() && E.getRiskContext().suc.name === "Riverside Works");
+  check("two sites created from the two zones", E.state.engagement.targets.length === 2);
+  check("sites carry zoneId", E.state.engagement.targets.every(function (t) { return !!t.zoneId; }));
+
+  var tp = ass.targetProfile;
+  var z1t = E.state.engagement.targets.filter(function (t) { return t.zoneId === "Z1"; })[0];
+  var z2t = E.state.engagement.targets.filter(function (t) { return t.zoneId === "Z2"; })[0];
+  // A zone's SL-T is a VECTOR now ({ default, perFR }), so assert through the
+  // normaliser rather than the stored shape - a scalar in a saved file is still
+  // valid and must resolve to the same target.
+  function zoneDefault(id) {
+    var z = A.Scoring.normaliseZoneTarget(tp.perZone[id]);
+    return z ? z.default : null;
+  }
+  check("perZone SL-T set from scalar for Z1 (SL3)", z1t && zoneDefault(z1t.id) === 3);
+  check("perZone SL-T set from scalar for Z2 (SL3)", z2t && zoneDefault(z2t.id) === 3);
+
+  // ---- Per-zone target resolution feeds the scorer ----
+  if (A.Scoring && typeof A.Scoring.effectiveTargetSL === "function") {
+    // arity: effectiveTargetSL(targetProfile, frId, targetId)
+    var r = A.Scoring.effectiveTargetSL(tp, "FR1", z1t.id);
+    check("effectiveTargetSL resolves per-zone target (Z1 -> SL3)", r === 3);
+    // Precedence is MOST SPECIFIC FIRST. A zone's own SL-T must NOT be
+    // overridden by an engagement-wide per-FR setting: 62443-3-2 assigns SL-T
+    // per zone, so a global value is the weaker statement. This assertion used
+    // to require the opposite, which is how the bug survived.
+    var zoneWins = A.Scoring.effectiveTargetSL(
+      { defaultTargetSL: 2, perFR: { FR1: 4 }, perZone: (function(){var o={};o[z1t.id]=3;return o;})() },
+      "FR1", z1t.id);
+    check("zone SL-T beats an engagement-wide per-FR override", zoneWins === 3);
+
+    // A zone may carry a full SL-T VECTOR: per-FR inside the zone wins over the
+    // zone default, which wins over anything engagement-wide.
+    var vec = { defaultTargetSL: 2, perFR: { FR1: 4 },
+      perZone: (function(){var o={}; o[z1t.id] = { default: 2, perFR: { FR3: 3 } }; return o;})() };
+    check("zone per-FR wins for that FR (FR3 -> SL3)", A.Scoring.effectiveTargetSL(vec, "FR3", z1t.id) === 3);
+    check("zone default applies to other FRs (FR1 -> SL2)", A.Scoring.effectiveTargetSL(vec, "FR1", z1t.id) === 2);
+    check("engagement per-FR still applies to a zone with no entry",
+      A.Scoring.effectiveTargetSL(vec, "FR1", "no-such-target") === 4);
+    check("engagement default is the last resort",
+      A.Scoring.effectiveTargetSL(vec, "FR5", "no-such-target") === 2);
+
+    // Legacy files hold a bare number in perZone; both shapes must score alike.
+    var legacy = { defaultTargetSL: 2, perZone: (function(){var o={};o[z1t.id]=3;return o;})() };
+    var modern = { defaultTargetSL: 2, perZone: (function(){var o={};o[z1t.id]={ default: 3, perFR: {} };return o;})() };
+    check("legacy scalar perZone scores the same as the object form",
+      A.Scoring.effectiveTargetSL(legacy, "FR2", z1t.id) === A.Scoring.effectiveTargetSL(modern, "FR2", z1t.id));
+    var noTid = A.Scoring.effectiveTargetSL({ defaultTargetSL: 2, perFR: {}, perZone: {} }, "FR1");
+    check("no targetId falls back to default (backwards compatible)", noTid === 2);
+  } else {
+    check("A.Scoring.effectiveTargetSL exposed", false);
+  }
+
+  // ---- A v1.0 file (scalar-only) still imports ----
+  var ctx10 = { schema: "spt-risk-context/1.0", generatedBy: "spt-risk-tool/0.1", generatedOn: "2026-07-02",
+    suc: { name: "Legacy SuC" }, zones: [{ id:"Z1", name:"Zone one", safetyRelated:false, slSuggested:2, slTarget:2, justification:"x", assets:[] }], conduits: [] };
+  check("v1.0 schema is accepted by the predicate", accepts(ctx10.schema));
+  E.newProject();
+  E.activateInstrument("iec-62443-3-3");
+  E.setRiskContext(ctx10, { scope: true, zoneIds: ["Z1"], fileName: "legacy.json" });
+  var ass10 = A.Storage.findAssessment({ assessments: E.state.assessments }, "iec-62443-3-3");
+  var t10 = E.state.engagement.targets.filter(function (t) { return t.zoneId === "Z1"; })[0];
+  check("v1.0 import scopes a site with SL2",
+    t10 && A.Scoring.effectiveTargetSL(ass10.targetProfile, "FR1", t10.id) === 2);
+
+  // ---- A v1.4 file (residual risk, existing controls, sign-off) imports ----
+  var ctx14 = JSON.parse(JSON.stringify(ctx11));
+  ctx14.schema = "spt-risk-context/1.4";
+  ctx14.zones[0].threats[0].disposition = "mitigated";
+  ctx14.zones[0].threats[0].residualLikelihood = "low"; ctx14.zones[0].threats[0].residualImpact = "serious"; ctx14.zones[0].threats[0].residualRisk = "medium"; ctx14.zones[0].threats[0].acceptance = "";
+  ctx14.zones[0].countermeasures[0].existing = true;
+  ctx14.zones[1].threats[0].disposition = "sl-t"; ctx14.zones[1].threats[0].residualRisk = null; ctx14.zones[1].threats[0].acceptance = "";
+  ctx14.approval = { name: ".. Patel", role: "Plant Manager", date: "2026-07-01", statement: ".pproved.", approved: true };
+  check("v1.4 schema is accepted by the predicate", accepts(ctx14.schema));
+  E.newProject();
+  E.activateInstrument("iec-62443-3-3");
+  E.setRiskContext(ctx14, { scope: true, zoneIds: ["Z1", "Z2"], fileName: "riverside-14.json" });
+  var ass14 = A.Storage.findAssessment({ assessments: E.state.assessments }, "iec-62443-3-3");
+  check("v1.4 riskContext stored with residual + existing-control zone provenance intact",
+    ass14.riskContext && ass14.riskContext.zones[0].threats[0].residualRisk === "medium" && ass14.riskContext.zones[0].countermeasures[0].existing === true);
+  check("v1.4 file carries the asset-owner sign-off (provenance the 3-3 importer may ignore)", ctx14.approval.approved === true);
+  var t14 = E.state.engagement.targets.filter(function (t) { return t.zoneId === "Z1"; })[0];
+  check("v1.4 import scopes and targets exactly as 1.1 (new fields are context only)",
+    t14 && A.Scoring.effectiveTargetSL(ass14.targetProfile, "FR1", t14.id) === 3);
+
+  // ---- Round-trip: project save/load keeps riskContext + perZone ----
+  E.setRiskContext(ctx11, { scope: true, zoneIds: ["Z1", "Z2"], fileName: "riverside.json" });
+  var file = E.getProjectFile();
+  var reloaded = JSON.parse(JSON.stringify(file));
+  E.newProject();
+  E.loadProjectFile(reloaded);
+  E.activateInstrument("iec-62443-3-3");
+  var ass2 = A.Storage.findAssessment({ assessments: E.state.assessments }, "iec-62443-3-3");
+  check("riskContext survives project save/load", ass2.riskContext && ass2.riskContext.schema === "spt-risk-context/1.1");
+  check("per-zone targets survive save/load", Object.keys(ass2.targetProfile.perZone || {}).length >= 1);
+
+  // ---- clearRiskContext ----
+  E.clearRiskContext();
+  check("clearRiskContext removes provenance", !E.getRiskContext());
+
+  var s = document.getElementById("summary");
+  s.className = "sum " + (fail === 0 ? "ok" : "bad");
+  s.textContent = pass + " passed, " + fail + " failed";
+})();
+</script>
+</body></html>

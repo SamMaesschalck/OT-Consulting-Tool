@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Basis of assessment is per-assessment</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  try {
+    E.loadCatalog();
+    A.UI.init({ autosave: false });
+
+    // Instrument A: record a document.
+    E.activateInstrument("cis-controls-v8");
+    var ba = E.getBasisOfAssessment();
+    ba.documents.push({ title: "CIS-only evidence doc", reference: "CIS-DOC-1", date: "2026-06-01" });
+    E.touchBasisOfAssessment();
+    ok(E.getBasisOfAssessment().documents.length === 1, "instrument A records its own document");
+
+    // Instrument B: should start EMPTY (no bleed from A).
+    E.activateInstrument("onr-syaps-management");
+    var bb = E.getBasisOfAssessment();
+    ok(bb.documents.length === 0, "instrument B basis is EMPTY - no bleed from A", "docs=" + bb.documents.length);
+    bb.interviews.push({ name: "ONR-only person", role: "Head of Security", date: "2026-06-22" });
+    E.touchBasisOfAssessment();
+
+    // Back to A: its register is intact and does NOT contain B's interview.
+    E.activateInstrument("cis-controls-v8");
+    var ba2 = E.getBasisOfAssessment();
+    ok(ba2.documents.length === 1 && ba2.documents[0].reference === "CIS-DOC-1", "instrument A register intact after switching");
+    ok(ba2.interviews.length === 0, "A did not inherit B's interview");
+
+    // The engagement projection points at the active assessment's basis.
+    ok(E.state.engagement.basisOfAssessment === ba2, "engagement projection references the active basis");
+
+    // Persisted per-assessment: save + reload keeps each register separate.
+    var pf = E.getProjectFile();
+    ok(A.Storage.findAssessment(pf, "cis-controls-v8").basisOfAssessment.documents.length === 1, "saved: CIS assessment holds its document");
+    ok(A.Storage.findAssessment(pf, "onr-syaps-management").basisOfAssessment.interviews.length === 1, "saved: ONR assessment holds its interview");
+    ok(!(pf.project && pf.project.basisOfAssessment), "saved: no project-level basis remains");
+
+    E.loadProjectFile(pf);
+    E.activateInstrument("onr-syaps-management");
+    ok(E.getBasisOfAssessment().interviews.length === 1 && E.getBasisOfAssessment().documents.length === 0, "reloaded: ONR keeps its interview only");
+    E.activateInstrument("cis-controls-v8");
+    ok(E.getBasisOfAssessment().documents.length === 1, "reloaded: CIS keeps its document only");
+
+    // Legacy migration: an old file with a PROJECT-level register moves onto the
+    // active assessment (not shared across all).
+    var legacy = {
+      schemaVersion: "2.0",
+      project: Object.assign(A.Storage.defaultProject(), { clientName: "Legacy Co",
+        basisOfAssessment: { interviews: [{ name: "Legacy interviewee", role: "CISO", date: "2026-01-01" }], documents: [], observations: [] } }),
+      activeInstrumentId: "cis-controls-v8",
+      assessments: {
+        "cis-controls-v8": { instrumentId: "cis-controls-v8", targetProfile: {}, targets: [{ id: "t1", name: "S1" }], responses: [] },
+        "onr-syaps-cyber": { instrumentId: "onr-syaps-cyber", targetProfile: {}, targets: [{ id: "t2", name: "S2" }], responses: [] }
+      }
+    };
+    E.loadProjectFile(legacy);
+    E.activateInstrument("cis-controls-v8");
+    ok(E.getBasisOfAssessment().interviews.length === 1, "legacy: project-level register migrated onto the active assessment");
+    E.activateInstrument("onr-syaps-cyber");
+    ok(E.getBasisOfAssessment().interviews.length === 0, "legacy: the OTHER assessment did NOT inherit the migrated register");
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+});
+</script>
+</body></html>

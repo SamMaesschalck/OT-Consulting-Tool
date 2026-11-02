@@ -1,0 +1,41 @@
+{
+    "_note":  "Narrative for the ISA/IEC 62443-2-1:2010 CSMS conformance assessment. Boilerplate inserted VERBATIM; the executive summary is composed by slot-substitution only (no free-writing). The instrument framing supplies 'About this assessment'; this pack adds the composed executive summary, a caveat box and the consultant blocks. Aim: a conformance PROFILE by category and element group - never a single CSMS grade - with Not-in-place / Partially-in-place elements surfaced as the gap roadmap.",
+    "boilerplate":  {
+                        "report_intro":  "This report presents a conformance and gap analysis of the organisation's Cyber Security Management System (CSMS) against ISA/IEC 62443-2-1:2010. It records, for each CSMS element, whether it is Not in place, Partially in place, Largely in place or In place, and sets out a prioritised roadmap for the elements not yet in place. The results are a conformance profile by category and element group, with no single CSMS grade.",
+                        "not_certification_caveat":  "This is a conformance and gap analysis of the CSMS against ISA/IEC 62443-2-1:2010, in which the consultant has judged each element to be Not in place, Partially in place, Largely in place or In place. The results are a conformance profile by category and element group, with no single CSMS grade, and the analysis is not a certification or a statement of conformance with the standard. The 2024 edition restructures the CSMS into a maturity-based Security Program and is assessed separately, so its results should not be read as a later view of this assessment. The judgements reflect what could be demonstrated at the time and should be confirmed during remediation.",
+                        "series_context":  "ISA/IEC 62443 is a series of standards, divided according to who is responsible for what. This part, 62443-2-1:2010, deals with the organisation and the cyber security management system it is expected to establish and maintain. The 3-x parts address the system as designed and operated, and the 4-x parts the products it is built from. A technical assessment against 62443-3-3 answers a different question from this one, and a complete picture needs both."
+                    },
+    "executiveSummary":  {
+                             "_note":  "Composed by slot-substitution only; boilerplate VERBATIM; consultant blocks seeded with data-derived facts plus a marked placeholder. No free-writing. Order: verdict, scope + profile, gap-shape, conformance-method + stakes, path forward + confidence.",
+                             "templates":  {
+                                               "exec_verdict":  "This assessment finds that {clientName}'s cyber security management system {verdictPhrase} against ISA/IEC 62443-2-1:2010, with the weakest conformance in {weakestCategoryName}. The elements not yet in place are the focus of the roadmap in this report.",
+                                               "exec_verdict_nogaps":  "This assessment finds that {clientName}'s cyber security management system {verdictPhrase} against ISA/IEC 62443-2-1:2010, with every applicable element In place or Largely in place.",
+                                               "exec_scope":  "The assessment covered {answeredCount} applicable CSMS elements across the standard's three categories: Risk analysis, Addressing risk with the CSMS, and Monitoring and improving the CSMS.",
+                                               "exec_profile":  "Of these, {inPlace} are In place, {largely} Largely in place, {partially} Partially in place and {notInPlace} Not in place.",
+                                               "exec_gap_shape":  "{gapConcentrationSentence} The shortfalls are not evenly spread, and the weakest category is {weakestCategoryName}{weakestDetail}.",
+                                               "exec_path_forward":  "The elements that are Not in place or Partially in place can all be addressed. The OT-aware roadmap in this report deals with the Not-in-place elements first and leads to full conformance of the CSMS.",
+                                               "exec_confidence":  "This picture rests on {coveragePct} of applicable elements being assessable ({confidenceLabel}). The overall conformance index, {conformancePct}, is shown for context only. A Not-in-place element is reported separately as a floor finding, so the average cannot hide it.",
+                                               "verdictPhrases":  {
+                                                                      "substantial":  "has substantial gaps in conformance",
+                                                                      "recognised":  "shows partial conformance that is recognised but not yet complete",
+                                                                      "strong":  "is largely conformant"
+                                                                  },
+                                               "gapConcentrationFragments":  {
+                                                                                 "notInPlace":  "{notInPlace} element(s) are Not in place, so there is no conformance at all where the standard requires it.",
+                                                                                 "partially":  "{partially} element(s) are only Partially in place."
+                                                                             }
+                                           },
+                             "boilerplate":  {
+                                                 "exec_conformance_method":  "ISA/IEC 62443-2-1:2010 defines a Cyber Security Management System as a set of elements grouped into three categories: establishing why security matters and assessing the risk; addressing that risk through policy, organisation, countermeasures and implementation; and monitoring and improving the system over time. Conformance is judged element by element and there is no single grade. A CSMS can be strong in one area and absent in another, and a blended score would hide the gaps that most need attention.",
+                                                 "stakes":  "An element that is Not in place is missing from the management system. Partially in place means the element exists but is incomplete, and Largely in place means it is close to conformant. The CSMS is the framework that keeps OT security planned and sustained, so gaps in it are where security most often lapses over time and under pressure.",
+                                                 "not_determination":  "This is a conformance and gap analysis against ISA/IEC 62443-2-1:2010, informed by operational technology context. It is not a certification and does not by itself constitute conformance with the standard; the judgements reflect what could be demonstrated during the engagement and should be confirmed during remediation."
+                                             },
+                             "consultantBlocks":  {
+                                                      "consultant_exposure_seed":  "For {clientName}, the weakest conformance is in {weakestCategoryName}.{floorExposureClause}",
+                                                      "consultant_exposure_floor_clause":  " Not-in-place elements mean parts of the management system are absent, which is where an incident is most likely to find the organisation unprepared.",
+                                                      "consultant_exposure":  "[Consultant to add a short, client-specific note on what the weakest CSMS categories mean operationally for this organisation, and any safety or availability implications.]",
+                                                      "consultant_top_priorities_seed":  "The most urgent priorities are likely to be {autoTopPriorityHint}.",
+                                                      "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this CSMS.]"
+                                                  }
+                         }
+}

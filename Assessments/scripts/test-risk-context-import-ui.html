@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Risk context import through the real UI</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  Reported: every import of an spt-risk-context file on 62443-3-3 failed with
+  "Could not parse risk context file: contract is not defined". The modal read
+  `contract`, which was a local of the file reader's callback, so it threw the
+  moment a valid file reached it and the consultant was told the file was bad.
+
+  test-risk-import.html exercises the engine (setRiskContext) and copies the
+  accept check rather than calling it, so it never reached the modal - which is
+  how this shipped. This page drives the path a consultant takes: the Target SL
+  card's own file input, the real FileReader, the accept check, the modal, and
+  its Import button.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app(); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  var A = window.App, E = A.Engine;
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+
+  var contract = A.Data.shared && A.Data.shared.riskContextInterchange;
+  ok(!!contract && !!contract.example, "the bundled interchange contract carries an example export");
+
+  E.loadCatalog();
+  A.UI.init({ autosave: false });
+  E.activateInstrument("iec-62443-3-3");
+
+  // The Target SL card owns a hidden file input next to its "Import risk
+  // context" button. Found through the button, so a second file input
+  // elsewhere on the page cannot be picked up by mistake.
+  function riskFileInput() {
+    var btn = [].slice.call(document.querySelectorAll("#main button")).filter(function (b) {
+      return /Import risk context/.test(b.textContent);
+    })[0];
+    var card = btn;
+    while (card && !(card.classList && card.classList.contains("card"))) card = card.parentNode;
+    return card ? card.querySelector("input[type=file]") : null;
+  }
+  function feed(obj, name) {
+    var input = riskFileInput();
+    var dt = new DataTransfer();
+    dt.items.add(new File([JSON.stringify(obj)], name, { type: "application/json" }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change"));
+  }
+  function modal() { return document.querySelector(".modal-backdrop"); }
+  function toastText() { return (document.getElementById("toast") || {}).textContent || ""; }
+  function waitFor(cond, then, tries) {
+    tries = tries == null ? 100 : tries;
+    if (cond() || tries <= 0) { then(); return; }
+    setTimeout(function () { waitFor(cond, then, tries - 1); }, 30);
+  }
+
+  ok(!!riskFileInput(), "the Target SL card has the risk context file input");
+
+  // A file at the schema the contract declares today, built from the
+  // contract's own example so it tracks the contract rather than this page.
+  var ctx = JSON.parse(JSON.stringify(contract.example));
+  ok(ctx.schema === contract.schema, "the example is at the contract's current schema", ctx.schema + " / " + contract.schema);
+  ok((contract.acceptedSchemas || []).indexOf(ctx.schema) >= 0, "and the contract accepts it");
+  var zones = ctx.zones || [];
+  ok(zones.length >= 2, "the example has several zones to scope from", String(zones.length));
+
+  // ---- 1. a schema the contract does not list is refused, with no modal ---
+  var bogus = JSON.parse(JSON.stringify(ctx));
+  bogus.schema = "spt-risk-context/9.9";
+  feed(bogus, "from-the-future.json");
+  waitFor(function () { return /rejected/.test(toastText()); }, function () {
+    ok(/rejected/.test(toastText()) && /9\.9/.test(toastText()),
+       "a file at an unlisted schema is rejected, naming the schema it declares", toastText());
+    ok(!modal(), "and no import modal opens for it");
+
+    // ---- 2. a valid file opens the modal (it threw here before) ----------
+    var targetsBefore = E.state.engagement.targets.length;
+    feed(ctx, "example-risk-context.json");
+    waitFor(function () { return !!modal() || /Could not parse/.test(toastText()); }, function () {
+      ok(!/contract is not defined/.test(toastText()),
+         "the import does not fail with 'contract is not defined'", toastText());
+      ok(!/Could not parse/.test(toastText()), "a valid file is not reported as unparseable", toastText());
+      var m = modal();
+      ok(!!m, "a valid file opens the import modal");
+      if (!m) { done(); return; }
+      ok(m.textContent.indexOf(ctx.suc.name) >= 0, "the modal names the system under consideration");
+      var boxes = m.querySelectorAll("tbody input[type=checkbox]");
+      ok(boxes.length === zones.length, "one row per zone, each ticked to import",
+         boxes.length + " rows for " + zones.length + " zones");
+      ok([].every.call(boxes, function (b) { return b.checked; }), "every zone starts ticked");
+      // The per-FR vector line is the code that read `contract`.
+      var frKeys = (contract.importContract && contract.importContract.frKeys) || [];
+      ok(frKeys.length === 7 && m.textContent.indexOf(frKeys.join("/") + " = ") >= 0,
+         "each zone's per-FR SL-T vector is shown, keyed by the contract's FR keys");
+      ok(targetsBefore === E.state.engagement.targets.length, "nothing is applied before Import is pressed");
+
+      // ---- 3. Import applies the zones and their targets ------------------
+      var importBtn = [].slice.call(m.querySelectorAll(".modal-f button")).filter(function (b) {
+        return b.textContent === "Import";
+      })[0];
+      ok(!!importBtn, "the modal has an Import button");
+      importBtn.click();
+      ok(!modal(), "Import closes the modal");
+      ok(/Risk context imported/.test(toastText()), "and says what it did", toastText());
+
+      var rc = E.getRiskContext();
+      ok(rc && rc.schema === ctx.schema && rc.fileName === "example-risk-context.json",
+         "the risk context is stored on the assessment with its file name", JSON.stringify(rc && [rc.schema, rc.fileName]));
+      var targets = E.state.engagement.targets;
+      ok(targets.length === zones.length,
+         "no responses were captured, so the zones replace the default site", targets.length + " targets");
+      var tp = E.state.engagement.targetProfile;
+      var frByAbbr = {};
+      (E.state.taxonomy.frs || []).forEach(function (fr) { if (fr.abbr) frByAbbr[fr.abbr] = fr.id; });
+      zones.forEach(function (z) {
+        var t = targets.filter(function (x) { return x.zoneId === z.id; })[0];
+        ok(!!t && t.name === z.name, "zone " + z.id + " became a " + (E.state.instrument.targetDimensionLabel || "site").toLowerCase() + " named after it");
+        if (!t) return;
+        var zt = A.Scoring.normaliseZoneTarget(tp.perZone[t.id]);
+        ok(zt && zt.default === z.slTarget, "zone " + z.id + " carries its SL-T (SL " + z.slTarget + ")",
+           JSON.stringify(tp.perZone[t.id]));
+        var allFRs = Object.keys(z.slTargetByFR || {}).every(function (abbr) {
+          var frId = frByAbbr[abbr];
+          return frId && A.Scoring.effectiveTargetSL(tp, frId, t.id) === z.slTargetByFR[abbr];
+        });
+        ok(allFRs, "zone " + z.id + " scores against its per-FR SL-T vector", JSON.stringify(z.slTargetByFR));
+      });
+      ok((document.getElementById("main").textContent || "").indexOf("Imported risk context") >= 0,
+         "the Target SL card now shows the imported context's provenance");
+      done();
+    });
+  });
+});
+</script>
+</body></html>

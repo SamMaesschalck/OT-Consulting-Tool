@@ -1,0 +1,22 @@
+# Built releases. They are attached to GitHub Releases, never committed.
+/Single HTML/OT Cyber Assessment Tool v*.html
+/Electron App/*.exe
+/Electron App/*.zip
+/dist/
+
+# Test output from tools/run-tests.ps1
+/test-results/
+
+# Licensed standards and reference copies stay out of the repository.
+/Reference documents/
+
+# Personal tool settings
+.claude/settings.local.json
+.vscode/
+
+# OS and editor clutter
+Thumbs.db
+desktop.ini
+.DS_Store
+~$*
+*.tmp

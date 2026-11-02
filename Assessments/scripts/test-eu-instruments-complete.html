@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>EU CRA and Machinery: completeness</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  The EU CRA and Machinery Regulation instruments were shipped as
+  "active-skeleton" and finished in August 2026. This page pins what finished
+  means, so neither can drift back:
+
+    - full coverage of the source (CRA Annex I has exactly 13 + 8 provisions)
+    - every item carries a citation to the Regulation
+    - the Regulation's own wording is carried IN THE INSTRUMENT for the items
+      that map to a single provision, so the tool never needs the PDF
+    - nothing still calls itself a skeleton where a consultant can read it
+
+  Verbatim text is Official Journal material, reproduced with attribution. That
+  is why these two carry it and the IEC-derived instruments do not.
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ extra: ["data/instruments/eu-cra/instrument.js", "data/instruments/eu-machinery/instrument.js"] });</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+
+  try {
+    var D = window.App.Data;
+    var idx = {};
+    ((D.index && D.index.instruments) || []).forEach(function (e) { idx[e.id] = e; });
+
+    ["eu-cra", "eu-machinery"].forEach(function (id) {
+      var entry = idx[id];
+      var inst = (D.instruments[id] || {}).instrument;
+      var tag = id + ": ";
+
+      ok(!!inst, tag + "instrument loads");
+      if (!inst) return;
+
+      // Out of skeleton state, in every place that records it.
+      ok(entry && entry.status === "active", tag + "the index lists it as active",
+         entry ? entry.status : "no index entry");
+      ok(inst.status === "active", tag + "and so does the instrument", inst.status);
+      ok(!/skeleton/i.test(String(inst.contentVersion)),
+         tag + "the content version is not a skeleton version", String(inst.contentVersion));
+
+      // Nothing a consultant can read still says "skeleton".
+      var banner = (inst.display && inst.display.captureBanner) || "";
+      ok(!/skeleton/i.test(banner), tag + "the capture banner does not call itself a skeleton", banner.slice(0, 60));
+      ["sourceNote", "_contentNote", "framing", "scoringNote"].forEach(function (k) {
+        ok(!/skeleton/i.test(String(inst[k] || "")), tag + k + " does not call itself a skeleton");
+      });
+
+      // Every item cites where it comes from.
+      var items = inst.items || [];
+      ok(items.length > 0, tag + "has items", String(items.length));
+      var noRef = items.filter(function (it) { return !String(it.reference || "").trim(); });
+      ok(noRef.length === 0, tag + "every item cites the Regulation",
+         noRef.map(function (i) { return i.code; }).join(", "));
+
+      // Content that was already there must stay there.
+      var thin = items.filter(function (it) {
+        return !String(it.requirement || "").trim() || !String(it.rationale || "").trim();
+      });
+      ok(thin.length === 0, tag + "every item still has a requirement and a rationale",
+         thin.map(function (i) { return i.code; }).join(", "));
+
+      // The scorer's fallback means no item is ever displayed empty.
+      var blank = items.filter(function (it) {
+        return !String(it.verbatimText || it.requirement || "").trim();
+      });
+      ok(blank.length === 0, tag + "no item would render with no text at all",
+         blank.map(function (i) { return i.code; }).join(", "));
+    });
+
+    // ---- CRA: coverage of Annex I, which is a countable fact ---------------
+    var cra = (D.instruments["eu-cra"] || {}).instrument;
+    if (cra) {
+      var byLayer = {};
+      (cra.items || []).forEach(function (it) { (byLayer[it.layerId] = byLayer[it.layerId] || []).push(it); });
+      ok((byLayer.P1 || []).length === 13,
+         "CRA: 13 items for Annex I Part I, which has points (a) to (m)",
+         String((byLayer.P1 || []).length));
+      ok((byLayer.P2 || []).length === 8,
+         "CRA: 8 items for Annex I Part II, which has points (1) to (8)",
+         String((byLayer.P2 || []).length));
+
+      // The lettering must be complete, not just the count.
+      var letters = (byLayer.P1 || []).map(function (it) { return it.code.slice(-1); }).sort().join("");
+      ok(letters === "abcdefghijklm", "CRA: Part I covers every letter a to m", letters);
+
+      // Every Annex I item carries the Official Journal wording, so the tool
+      // does not depend on the PDF sitting in data/.
+      var annexI = (byLayer.P1 || []).concat(byLayer.P2 || []);
+      var noVerbatim = annexI.filter(function (it) { return !String(it.verbatimText || "").trim(); });
+      ok(noVerbatim.length === 0,
+         "CRA: every Annex I item carries the Regulation's own wording",
+         noVerbatim.map(function (i) { return i.code; }).join(", "));
+
+      // Spot-check two against the Official Journal text, so a mangled
+      // transcription is caught rather than merely a non-empty string.
+      function verbatimOf(code) {
+        var m = (cra.items || []).filter(function (it) { return it.code === code; })[0];
+        return m ? String(m.verbatimText || "") : "";
+      }
+      ok(verbatimOf("CRA-P1.a") === "be made available on the market without known exploitable vulnerabilities;",
+         "CRA: P1.a matches Annex I Part I (2)(a) exactly", verbatimOf("CRA-P1.a"));
+      ok(/software bill of materials in a commonly used and machine-readable format/.test(verbatimOf("CRA-P2.1")),
+         "CRA: P2.1 carries the SBOM wording from Part II (1)", verbatimOf("CRA-P2.1").slice(0, 70));
+      ok(/Annex I, Part I, point \(2\)\(a\)/.test(
+           ((cra.items || []).filter(function (i) { return i.code === "CRA-P1.a"; })[0] || {}).reference || ""),
+         "CRA: citations name the Annex, Part and point");
+    }
+
+    // ---- Machinery: the provisions that make it a cyber instrument --------
+    var mach = (D.instruments["eu-machinery"] || {}).instrument;
+    if (mach) {
+      function machItem(code) {
+        return (mach.items || []).filter(function (it) { return it.code === code; })[0] || {};
+      }
+      ok(/learning phase/.test(machItem("MR-M1.7").verbatimText || ""),
+         "Machinery: the self-evolving item carries Annex III 1.2.1(c), including the learning phase",
+         (machItem("MR-M1.7").verbatimText || "").slice(0, 70));
+      ok(/For wireless control/.test(machItem("MR-M1.8").verbatimText || ""),
+         "Machinery: the wireless item carries the wireless-control provision",
+         (machItem("MR-M1.8").verbatimText || "").slice(0, 70));
+      ok(/1\.1\.9/.test(machItem("MR-M1.2").reference || ""),
+         "Machinery: the corruption items cite Annex III 1.1.9",
+         machItem("MR-M1.2").reference || "");
+    }
+
+    // ---- the report prose lives in data, and is not stale -----------------
+    // Both instruments supply their own docx/xlsx string pack. The CRA's used
+    // to sit in export-docx.js as fallbacks, where it went stale unnoticed: it
+    // told the client "Requirement text is paraphrased pending the licensed
+    // reference" for months after the Annex I wording was added.
+    ["eu-cra", "eu-machinery"].forEach(function (id) {
+      var inst = (D.instruments[id] || {}).instrument;
+      if (!inst) return;
+      var tag = id + ": ";
+      ok(!!inst.docx, tag + "supplies its own report and workbook string pack");
+      if (!inst.docx) return;
+      ["howToRead", "limitations", "regName", "layersSentence", "xlsxTitle"].forEach(function (k) {
+        var v = inst.docx[k];
+        ok(!!v && (typeof v === "string" ? v.trim() : v.length), tag + "docx." + k + " is set");
+      });
+      // Nothing in the pack may claim the requirement text is pending.
+      var packText = JSON.stringify(inst.docx);
+      ok(!/pending the licensed reference/i.test(packText),
+         tag + "the pack does not claim the requirement text is still pending");
+    });
+
+    // The CRA quotes the Official Journal, so its limitations must say so
+    // rather than describing the text as paraphrased.
+    var craPack = ((D.instruments["eu-cra"] || {}).instrument || {}).docx || {};
+    var craLim = (craPack.limitations || []).join(" ");
+    ok(/Official Journal/.test(craLim),
+       "CRA: the limitations name the Official Journal as the source of the Annex I text");
+    ok(!/Requirement text is paraphrased/i.test(craLim),
+       "CRA: and no longer describe the requirement text as paraphrased");
+    ok(/Regulation text governs/i.test(craLim),
+       "CRA: while still saying the Regulation itself governs");
+
+    // ---- both still score -------------------------------------------------
+    ["eu-cra", "eu-machinery"].forEach(function (id) {
+      var inst = (D.instruments[id] || {}).instrument;
+      if (!inst) return;
+      ok(window.App.ScoringCRA.isCRA(inst), id + ": still recognised as a layered instrument");
+      ok((inst.layers || []).length === 3, id + ": still has its three layers",
+         String((inst.layers || []).length));
+    });
+
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+});
+</script>
+</body></html>

@@ -1,0 +1,283 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 partly answered FR is not a shortfall</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  "Not yet, but keep on roadmap". Only an ANSWERED in-scope item that falls
+  short (not met or partial) is a finding. An FR or requirement whose answers
+  are all satisfied but which still has blank in-scope items is not short:
+
+    - the FR reads "Not yet" (frTargetStatus "incomplete"), never "No", and the
+      zone is incomplete; its achieved SL is unchanged (a blank still blocks
+      the level, so nothing is over-claimed);
+    - one answered not-met item in the same FR makes it short again;
+    - a requirement with its base met and a required enhancement blank stays
+      on the roadmap with toAssess, after the findings unless the consultant
+      has ordered it, labelled "To assess" on screen, in Word and in Excel,
+      and is not counted as a remediation action in the next-steps draft;
+    - priorityFRs and weakestFRs leave the partly answered FR out while a
+      settled (met or short) FR exists;
+    - two zones, one met and one partly assessed: the rollup and the Word
+      summary say met so far / not fully assessed, never "falls short".
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true }); H.dom();</script>
+<script>
+function docXml(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function textOf(el) { return Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); }
+function sections(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null;
+  Array.prototype.forEach.call(body.children, function (el) {
+    var st = el.localName === "p" && el.getElementsByTagNameNS(W, "pStyle")[0];
+    var val = st ? st.getAttribute("w:val") : "";
+    if (/^Heading1$/i.test(val)) { cur = { title: textOf(el).trim(), text: "" }; out.push(cur); return; }
+    if (!cur) return;
+    var paras = el.localName === "p" ? [el] : Array.prototype.slice.call(el.getElementsByTagNameNS(W, "p"));
+    cur.text += "\n" + paras.map(textOf).join("\n");
+  });
+  return { list: out, all: out.map(function (s) { return s.text; }).join("\n") };
+}
+function sec(list, re) { return list.filter(function (x) { return re.test(x.title); })[0] || { title: "", text: "" }; }
+function responsesFor(inst, targetId, upTo, frs) {
+  var S = window.App.Scoring;
+  return (inst.requirements || []).filter(function (req) { return !frs || frs.indexOf(req.frId) >= 0; }).map(function (req) {
+    var comps = {};
+    S.requirementItems(req).forEach(function (it) {
+      comps[it.componentId] = { state: it.firstSL <= upTo ? "met" : "not-met" };
+    });
+    return { targetId: targetId, requirementId: req.id, components: comps };
+  });
+}
+function esc(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, S = A.Scoring, R = A.Report;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.activateInstrument("iec-62443-3-3");
+  var inst = E.state.instrument, tax = E.state.taxonomy, prof = E.state.profile, narr = E.getActiveNarrative();
+
+  // R1: an FR1 requirement with its base at SL 1 and an enhancement first
+  // required at SL 2. R3: an FR3 requirement with a base at SL 1.
+  function itemsOf(req) { return S.requirementItems(req); }
+  var R1 = inst.requirements.filter(function (q) {
+    return q.frId === "FR1" && itemsOf(q).some(function (i) { return i.isBase && i.firstSL === 1; }) &&
+           itemsOf(q).some(function (i) { return !i.isBase && i.firstSL === 2; });
+  })[0];
+  var RE = R1 && itemsOf(R1).filter(function (i) { return !i.isBase && i.firstSL === 2; })[0];
+  var R3 = inst.requirements.filter(function (q) {
+    return q.frId === "FR3" && itemsOf(q).some(function (i) { return i.isBase && i.firstSL === 1; });
+  })[0];
+  // A second FR1 requirement with a base at SL 1, for the same-FR shortfall.
+  var R1b = inst.requirements.filter(function (q) {
+    return q.frId === "FR1" && q !== R1 && itemsOf(q).some(function (i) { return i.isBase && i.firstSL === 1; });
+  })[0];
+  ok(!!(R1 && RE && R3 && R1b), "set-up: found the requirements to vary", [R1 && R1.code, RE && RE.componentId, R3 && R3.code, R1b && R1b.code].join(", "));
+  function baseOf(req) { return itemsOf(req).filter(function (i) { return i.isBase; })[0].componentId; }
+
+  function eng(targets, responses) {
+    var e = JSON.parse(JSON.stringify(E.state.engagement));
+    e.engagement = Object.assign({}, e.engagement || {}, { clientName: "Acme Water" });
+    e.targets = targets;
+    e.targetProfile = { defaultTargetSL: 2, perFR: {}, perZone: {} };
+    e.responses = responses;
+    e.reportCustom = {};
+    delete e.reportNarrative;
+    return e;
+  }
+  // Every item at or below SL 2 met, then the variations.
+  function zoneResponses(tid, opts) {
+    var rs = responsesFor(inst, tid, 2);
+    rs.forEach(function (r) {
+      if (r.requirementId === R1.id) delete r.components[RE.componentId];          // RE blank
+      if (opts.r3Short && r.requirementId === R3.id) r.components[baseOf(R3)] = { state: "not-met" };
+      if (opts.r1bShort && r.requirementId === R1b.id) r.components[baseOf(R1b)] = { state: "partial" };
+      if (opts.rankR1 && r.requirementId === R1.id) r.priorityRank = 0;
+    });
+    return rs;
+  }
+  var one = [{ id: "z1", name: "Control system" }];
+  function frOf(s, id) { return s.perFR.filter(function (f) { return f.frId === id; })[0]; }
+  function scoreOne(e) { return S.scoreEngagement(e, inst, tax, prof).perTarget[0].result; }
+
+  // ---- A. FR1 answered and met, one required RE blank ------------------------
+  var eA = eng(one, zoneResponses("z1", {}));
+  var sA = scoreOne(eA), f1 = frOf(sA, "FR1");
+  ok(f1.frTargetStatus === "incomplete", "A: FR1 with every answer met and a blank is incomplete", f1.frTargetStatus);
+  ok(f1.frTargetMet === false, "A: and frTargetMet stays false");
+  ok(f1.conformantAchievedSL === 1, "A: SL-A unchanged: the blank RE at SL 2 still holds FR1 at SL 1", String(f1.conformantAchievedSL));
+  ok(frOf(sA, "FR2").frTargetStatus === "met", "A: FR2 answered in full is met");
+  ok(sA.overallTargetStatus === "incomplete" && sA.overallTargetMet === false, "A: the zone is incomplete, not short", sA.overallTargetStatus);
+  ok(sA.partlyAssessedFRs.length === 1 && sA.partlyAssessedFRs[0].frId === "FR1", "A: partlyAssessedFRs is FR1");
+  ok(sA.fullyAssessedFRCount === 6 && sA.assessedFRCount === 7, "A: 6 fully assessed of 7 assessed", sA.fullyAssessedFRCount + "/" + sA.assessedFRCount);
+  ok(sA.priorityFRs.length === 0, "A: priorityFRs leaves out the incomplete FR", sA.priorityFRs.map(function (f) { return f.frId; }).join());
+  ok(sA.weakestFRs.length > 0 && sA.weakestFRs.every(function (f) { return f.frId !== "FR1"; }),
+     "A: weakestFRs leaves out FR1 while met FRs exist", sA.weakestFRs.map(function (f) { return f.frId; }).join());
+  var tmA = R.slTargetMetWords(sA);
+  ok(tmA.value === "Not yet" && tmA.detail === "6 of 7 FRs fully assessed", "A: the zone words read Not yet, 6 of 7 FRs fully assessed", JSON.stringify(tmA));
+  var fwA = R.frTargetWords(f1);
+  ok(fwA.value === "Not yet" && fwA.band === "near" && fwA.status === "incomplete", "A: frTargetWords(FR1) is Not yet / near", JSON.stringify(fwA));
+  ok(R.frTargetWords(frOf(sA, "FR2")).value === "Yes", "A: frTargetWords(FR2) is Yes");
+  var rA = sA.perRequirement.filter(function (r) { return r.requirementId === R1.id; })[0];
+  ok(rA.status === "to-assess" && rA.toAssess === true, "A: the requirement with a blank RE is to-assess", rA.status);
+  ok(sA.roadmap.length === 1 && sA.roadmap[0].requirementId === R1.id && sA.roadmap[0].toAssess,
+     "A: it stays on the roadmap, flagged toAssess", sA.roadmap.map(function (r) { return r.code; }).join());
+  var nsA = R.nextStepsLines(eA, { instrument: inst, scored: sA });
+  ok(!nsA.some(function (l) { return /each of the \d+ action/.test(l); }), "A: next steps count no remediation actions", nsA[0]);
+  ok(nsA.some(function (l) { return l === "Complete the assessment of the requirement marked To assess on the roadmap, so the result can be confirmed."; }),
+     "A: and mention the requirement still to assess once", nsA.join(" | "));
+
+  // ---- C. same FR, one answered item partial: short --------------------------
+  var sC = scoreOne(eng(one, zoneResponses("z1", { r1bShort: true })));
+  var f1c = frOf(sC, "FR1");
+  ok(f1c.frTargetStatus === "short" && f1c.frTargetMet === false, "C: FR1 with one answered partial item is short", f1c.frTargetStatus);
+  ok(f1c.conformantAchievedSL === 0, "C: SL-A is the base partial's SL 0", String(f1c.conformantAchievedSL));
+  ok(sC.overallTargetStatus === "short", "C: and the zone is short", sC.overallTargetStatus);
+  ok(R.frTargetWords(f1c).value === "No", "C: frTargetWords reads No");
+  ok(sC.priorityFRs.map(function (f) { return f.frId; }).join() === "FR1", "C: priorityFRs is FR1");
+
+  // ---- B. A plus a finding in FR3: ordering, outputs -------------------------
+  var eB = eng(one, zoneResponses("z1", { r3Short: true }));
+  var sB = scoreOne(eB);
+  ok(frOf(sB, "FR3").frTargetStatus === "short" && frOf(sB, "FR1").frTargetStatus === "incomplete", "B: FR3 short, FR1 incomplete");
+  ok(sB.priorityFRs.map(function (f) { return f.frId; }).join() === "FR3", "B: priorityFRs lists only the short FR3",
+     sB.priorityFRs.map(function (f) { return f.frId; }).join());
+  ok(sB.roadmap.length === 2 && sB.roadmap[0].requirementId === R3.id && sB.roadmap[1].requirementId === R1.id,
+     "B: the finding comes before the requirement to assess", sB.roadmap.map(function (r) { return r.code; }).join());
+  var sBr = scoreOne(eng(one, zoneResponses("z1", { r3Short: true, rankR1: true })));
+  ok(sBr.roadmap[0].requirementId === R1.id, "B: a manual priority order still wins", sBr.roadmap.map(function (r) { return r.code; }).join());
+  var nsB = R.nextStepsLines(eB, { instrument: inst, scored: sB });
+  ok(/each of the 1 action on the roadmap/.test(nsB[0]), "B: next steps count only the one finding", nsB[0]);
+
+  // Screen.
+  var allB = S.scoreEngagement(eB, inst, tax, prof);
+  var host = document.createElement("div");
+  R.render(host, { engagement: eB, instrument: inst, taxonomy: tax, profile: prof, narrative: narr,
+    scored: allB.perTarget[0].result, scoredAll: allB, activeTarget: allB.perTarget[0].target, targetProfile: eB.targetProfile });
+  function cardByTitle(t) {
+    return Array.prototype.filter.call(host.querySelectorAll(".card"), function (c) {
+      var h2 = c.querySelector(".card-h h2"); return h2 && h2.textContent === t;
+    })[0];
+  }
+  var br = cardByTitle("FR breakdown");
+  var fr1Row = br && Array.prototype.filter.call(br.querySelectorAll("tbody tr"), function (tr) { return tr.querySelector("td").textContent === "FR1"; })[0];
+  ok(fr1Row && fr1Row.lastElementChild.textContent === "Not yet", "screen: FR breakdown reads Not yet for FR1", fr1Row && fr1Row.lastElementChild.textContent);
+  var fr3Row = br && Array.prototype.filter.call(br.querySelectorAll("tbody tr"), function (tr) { return tr.querySelector("td").textContent === "FR3"; })[0];
+  ok(fr3Row && fr3Row.lastElementChild.textContent === "No", "screen: and No for the short FR3");
+  var rm = cardByTitle("Remediation roadmap");
+  var rmRows = rm ? Array.prototype.slice.call(rm.querySelectorAll("tbody tr")) : [];
+  ok(rmRows.length === 2 && rmRows[1].textContent.indexOf(R1.code) >= 0 && /To assess/.test(rmRows[1].textContent),
+     "screen: the roadmap's second row is the requirement to assess, labelled To assess", rmRows.map(function (r) { return r.textContent.slice(0, 60); }).join(" || "));
+  ok(rmRows[0] && !/To assess/.test(rmRows[0].textContent), "screen: the finding is not labelled To assess");
+  var gaps = cardByTitle("Top gaps");
+  ok(gaps && !/FR1 - target not met/.test(gaps.textContent), "screen: top gaps does not list FR1", gaps && gaps.textContent.slice(0, 200));
+
+  // Excel.
+  var wb = A.ExportXLSX.build(eB, inst, tax, prof, { targetId: "z1" });
+  function rowsOf(ws) {
+    var rg = XLSX.utils.decode_range(ws["!ref"]), out = [];
+    for (var r = rg.s.r; r <= rg.e.r; r++) {
+      var row = [];
+      for (var c = rg.s.c; c <= rg.e.c; c++) { var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })]; row.push(cell ? String(cell.v) : ""); }
+      out.push(row);
+    }
+    return out;
+  }
+  var sum = rowsOf(wb.Sheets["Summary"]);
+  var head = sum[1] || [], col = head.indexOf("FR target met");
+  var x1 = sum.filter(function (r) { return r[1] === "FR1"; })[0], x3 = sum.filter(function (r) { return r[1] === "FR3"; })[0];
+  ok(col >= 0 && x1 && x1[col] === "Not yet", "Excel: Summary FR target met reads Not yet for FR1", x1 && x1[col]);
+  ok(x3 && x3[col] === "No", "Excel: and No for FR3", x3 && x3[col]);
+  var road = rowsOf(wb.Sheets["Roadmap"]);
+  var xr1 = road.filter(function (r) { return r[1] === R1.code; })[0], xr3 = road.filter(function (r) { return r[1] === R3.code; })[0];
+  ok(xr1 && xr1[4] === "To assess", "Excel: the roadmap labels the requirement To assess", xr1 && xr1.slice(0, 6).join(" | "));
+  ok(xr3 && xr3[4] !== "To assess", "Excel: and not the finding", xr3 && xr3[4]);
+
+  // Word.
+  function word(e, tid) {
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(e, inst, tax, prof, narr, { targetId: tid }, function (err, blob) {
+        if (err) console.log("build error: " + err.message); res(err ? null : blob);
+      });
+    }).then(function (blob) { return blob ? docXml(blob).then(sections) : { list: [], all: "" }; });
+  }
+  word(eB, "z1").then(function (d) {
+    ok(d.list.length > 5, "Word: the single-zone report builds");
+    var post = sec(d.list, /^Overall posture/);
+    ok(new RegExp("\\nFR1\\n[^\\n]*\\nSL 2\\nSL 1\\n[^\\n]*\\n0\\nNot yet\\n").test(post.text),
+       "Word: the FR breakdown reads Not yet for FR1", (post.text.match(/\nFR1\n(?:[^\n]*\n){6}/) || [""])[0]);
+    ok(/\nFR3\n[^\n]*\nSL 2\nSL 0\n[^\n]*\n\d+\nNo\n/.test(post.text), "Word: and No for FR3");
+    var rmw = sec(d.list, /Roadmap to the target Security Level/);
+    ok(/Entries marked To assess are not findings/.test(rmw.text), "Word: the roadmap says what To assess means");
+    ok(new RegExp("P2 +" + esc(R1.code) + "[^\\n]*\\nStatus: To assess").test(rmw.text),
+       "Word: P2 is the requirement to assess, with Status: To assess", (rmw.text.match(new RegExp("P2[^\\n]*\\n[^\\n]*")) || [""])[0]);
+    ok(new RegExp("P1 +" + esc(R3.code) + "[^\\n]*\\nAchieved: ").test(rmw.text), "Word: P1 is the finding, with its achieved level");
+    ok(new RegExp("Items still to assess: " + esc(R1.code)).test(rmw.text), "Word: the blank item is named");
+    var lim = sec(d.list, /Method and limitations$/);
+    ok(new RegExp("Requirements with items still to assess: " + esc(R1.code) + "\\.").test(lim.text),
+       "Word: limitations name the requirement with items still to assess", (lim.text.match(/Requirements with items[^\n]*/) || [""])[0]);
+    var ns = sec(d.list, /Proposed next steps$/);
+    ok(/each of the 1 action/.test(ns.text) && /Complete the assessment of the requirement marked To assess/.test(ns.text),
+       "Word: next steps count one action and mention the requirement to assess", ns.text.slice(0, 300));
+    var es = sec(d.list, /Executive summary$/);
+    ok(/Of the assessed Foundational Requirements, \d+ met the target Security Level, \d+ fell short and 1 \(FR1\) is not yet fully assessed, with nothing short so far; /.test(es.text),
+       "Word: the summary's count sentence names FR1 as partly assessed", (es.text.match(/Of the assessed[^\n]*/) || [""])[0]);
+    ok(es.text.indexOf("has nothing short so far but still has items to assess") === -1,
+       "Word: and no separate sentence is bolted on after it");
+    ok(!/—|–/.test(d.all), "Word: no em or en dash");
+
+    // ---- D. two zones: A met in full, B partly assessed ----------------------
+    var zones = [{ id: "z-a", name: "Control zone" }, { id: "z-b", name: "Safety zone" }];
+    var eD = eng(zones, responsesFor(inst, "z-a", 2).concat(zoneResponses("z-b", {})));
+    var allD = S.scoreEngagement(eD, inst, tax, prof), roll = allD.systemRollup;
+    ok(roll.zonesMeetingTarget.join() === "Control zone" && (roll.zonesIncomplete || []).join() === "Safety zone" && roll.zonesShort.length === 0,
+       "D: Control met, Safety incomplete, none short", JSON.stringify([roll.zonesMeetingTarget, roll.zonesIncomplete, roll.zonesShort]));
+    var rf1 = roll.frs.filter(function (f) { return f.frId === "FR1"; })[0];
+    ok(rf1.verdict === "met-so-far" && rf1.incomplete.join() === "Safety zone" && rf1.short.length === 0,
+       "D: FR1 across zones is met so far, not met everywhere", rf1.verdict);
+    var lines = R.systemRollupLines(roll, inst).join(" ");
+    ok(/Safety zone has nothing short of its target so far, but is not yet fully assessed\./.test(lines),
+       "D: the rollup prose says the safety zone is not yet fully assessed", lines.slice(0, 500));
+    ok(!/Safety zone (falls|fall) short/.test(lines) && !/other Foundational Requirements have not been assessed/.test(lines),
+       "D: and never that it falls short or that its other FRs are unassessed", lines.slice(0, 500));
+    ok(/FR1 [^.]*has nothing short in any assessed zone or conduit so far, but is not yet fully assessed in Safety zone\./.test(lines),
+       "D: FR1 is met so far, not yet fully assessed in the safety zone", lines);
+    return word(eD, "z-a");
+  }).then(function (d) {
+    var es = sec(d.list, /Executive summary$/);
+    ok(/not been fully assessed/.test(es.text), "D Word: the summary says a zone is not fully assessed", es.text.slice(0, 900));
+    ok(!/Safety zone (falls|fall) short/.test(es.text) && !/(Both|all \d+) zones and conduits in scope fall short/i.test(es.text),
+       "D Word: and never that a zone falls short", es.text.slice(0, 900));
+    var sys = sec(d.list, /Results across the system/);
+    ok(/Safety zone has nothing short of its target so far, but is not yet fully assessed\./.test(sys.text),
+       "D Word: the system section says the same", (sys.text.match(/Safety zone has[^\n]*/) || [""])[0]);
+    ok(/Met so far/.test(sys.text), "D Word: the rollup table reads Met so far for FR1");
+    ok(/SL 1\nnot yet, target SL 2/.test(sys.text), "D Word: the zone grid marks FR1 not yet", (sys.text.match(/SL \d\nnot yet[^\n]*/) || [""])[0]);
+  }).then(done, function (e) { ok(false, "threw: " + (e && e.stack || e)); done(); });
+});
+</script>
+</body></html>

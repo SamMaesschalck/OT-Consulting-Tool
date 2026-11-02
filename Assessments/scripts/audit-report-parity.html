@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>Report parity audit</title>
+<link rel="stylesheet" href="../css/app.css" />
+<style>
+ body{padding:20px 26px}
+ table.p{border-collapse:collapse;font-size:12px;width:100%}
+ table.p th,table.p td{border:1px solid var(--border);padding:4px 7px;text-align:left}
+ table.p th{background:var(--surface-3);position:sticky;top:0}
+ td.y{background:#E5F1EA;color:#2E7D52;text-align:center;font-weight:700}
+ td.n{background:#F3DEDC;color:#B23A33;text-align:center;font-weight:700}
+ td.na{background:var(--surface-2);color:var(--text-soft);text-align:center}
+ .fam{font-size:11px;color:var(--text-muted)}
+</style></head>
+<body>
+<h1 class="page-title">Report parity audit</h1>
+<p class="page-sub">Every non-placeholder instrument, measured against what the 62443-3-3 report carries. W = Word document, S = on-screen report preview.</p>
+<div id="out">running...</div>
+
+<script src="../vendor/xlsx.full.min.js"></script>
+<script src="../vendor/exceljs.min.js"></script>
+<script>
+// Mock docx so every document can be built and read as text in one pass.
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ this.__type="Paragraph"; this.children=o.children||[]; this.style=o.style||null;
+    this.heading=o.heading||null; this.pageBreakBefore=!!o.pageBreakBefore;
+    this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text=""; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.styles=o.styles||null; this.sections=o.sections||[]; }
+  return { Document:Document, Paragraph:Paragraph, TextRun:TextRun, TableCell:TableCell, TableRow:TableRow,
+    Table:Table, ImageRun:ImageRun, PageBreak:PageBreak, Header:Header, Footer:Footer,
+    PageNumber:{CURRENT:"C",TOTAL_PAGES:"T"}, PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"H1",HEADING_2:"H2",HEADING_3:"H3"},
+    AlignmentType:{LEFT:"l",CENTER:"c",RIGHT:"r"}, WidthType:{PERCENTAGE:"pct",DXA:"dxa"},
+    ShadingType:{SOLID:"solid"},
+    Packer:{ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } } };
+})();
+</script>
+<script src="../data/manifest.js"></script>
+<script src="../js/version.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/scoring.js"></script>
+<script src="../js/scoring-domain-letter.js"></script>
+<script src="../js/scoring-caf-achieved.js"></script>
+<script src="../js/scoring-program-ml.js"></script>
+<script src="../js/scoring-nis2.js"></script>
+<script src="../js/scoring-csms.js"></script>
+<script src="../js/scoring-cra.js"></script>
+<script src="../js/scoring-risk-appetite.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/compare.js"></script>
+<script src="../js/charts.js"></script>
+<script src="../js/report.js"></script>
+<script src="../js/export-xlsx.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../js/export-docx.js"></script>
+<script src="../js/engine.js"></script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine;
+
+  // What "on a par with 62443-3-3" means, as testable presence checks.
+  var CHECKS = [
+    { key: "docctl",  label: "Document control",      w: /Document control/i },
+    { key: "exec",    label: "Executive summary",     w: /Executive summary/i },
+    { key: "caveat",  label: "Not-a-certification caveat",
+      w: /not a certification|does not constitute|not a conformance|not a conformity assessment|is not a regulatory|not a compliance|alignment and gap analysis|not a formal|NOT an ONR|not an? (official|accredited)/i },
+    // "About the CAF" is the CAF's own correctly-titled About section.
+    { key: "about",   label: "About section", w: /About this assessment|About the CAF/i, s: /About this assessment|About the CAF/i },
+    { key: "series",  label: "Where it sits (series/context)",
+      w: /is a series of standards|published by|maintained by|not an assessment against a published standard|is an EU Regulation|is European law/i },
+    { key: "howto",   label: "How to read this report", w: /How to read this report/i },
+    { key: "gloss",   label: "Glossary of terms",     w: /Terms used in this report/i, s: /Terms used in this report/i },
+    // What was assessed, and against what. capability-sl gives this its own
+    // section because it also has to state SL-T and any per-FR overrides;
+    // every other family states the same facts (instrument, framework, content
+    // version, scope) in the document control block, so either satisfies it.
+    { key: "scope",   label: "What was assessed (scope)",
+      w: /Scope and method|What was in scope|Document control and confidentiality/i },
+    { key: "basis",   label: "Basis of assessment",   w: /Basis of assessment|Basis not yet recorded|basis of assessment/i },
+    { key: "roadmap", label: "Roadmap / improvement plan", w: /Roadmap|Improvement plan|Gap roadmap|Priority/i },
+    { key: "limits",  label: "Method and limitations", w: /Method and limitations|Limitations/i },
+    { key: "method",  label: "Methodology appendix",  w: /Appendix: scoring methodology|Scoring methodology/i }
+  ];
+
+  var ids = Object.keys(A.Data.instruments).filter(function (id) {
+    var i = A.Data.instruments[id].instrument;
+    return i && i.status !== "placeholder";
+  });
+
+  var results = [];
+  function next(i) {
+    if (i >= ids.length) { render(); return; }
+    var id = ids[i];
+    var slot = A.Data.instruments[id];
+    var inst = slot.instrument;
+    var row = { id: id, title: inst.title, family: inst.scoringFamily, w: {}, s: {}, err: null };
+    try {
+      E.loadCatalog();
+      E.newProject();
+      E.activateInstrument(id);
+      // Screen report
+      var host = document.createElement("div");
+      A.Report.render(host, {
+        engagement: E.state.engagement, instrument: E.state.instrument, taxonomy: E.state.taxonomy,
+        profile: E.state.profile, narrative: E.getActiveNarrative(),
+        scored: E.scoreActiveTarget(), scoredAll: E.scoreAllTargets(),
+        activeTarget: E.getActiveTarget(), targetProfile: E.state.engagement.targetProfile,
+        cafProfileRegistry: E.getCAFProfileRegistry ? E.getCAFProfileRegistry() : null,
+        cafProfileId: E.getActiveCAFProfileId ? E.getActiveCAFProfileId() : null,
+        cafProfile: E.getActiveCAFProfile ? E.getActiveCAFProfile() : null
+      });
+      var stext = host.textContent;
+      CHECKS.forEach(function (c) { if (c.s) row.s[c.key] = c.s.test(stext); });
+    } catch (e) { row.err = "screen: " + e.message; }
+
+    var opts = { targetId: E.state.activeTargetId };
+    if (E.state.scoringFamily === "caf-achieved") {
+      opts.cafProfileRegistry = E.getCAFProfileRegistry();
+      opts.cafProfileId = E.getActiveCAFProfileId();
+      opts.cafProfile = E.getActiveCAFProfile();
+      opts.cafOverlay = E.getActiveCAFOverlay();
+    }
+    if (A.ScoringCRA && A.ScoringCRA.isCRA(inst)) opts.craSetup = E.getCRASetupRaw();
+    var tax = A.Data.shared.taxonomies[inst.taxonomyRef] || null;
+    var prof = A.Data.shared.scoringProfiles[inst.scoringProfileRef] || null;
+    A.ExportDOCX.buildAsync(E.state.engagement, inst, tax, prof, slot.narrative, opts, function (err) {
+      if (err) { row.err = (row.err ? row.err + "; " : "") + "word: " + err.message; }
+      else {
+        var texts = [];
+        function walk(n) {
+          if (!n) return;
+          if (n.__type === "Paragraph") { if (n.text) texts.push(n.text); return; }
+          if (n.__type === "Table") { n.rows.forEach(walk); return; }
+          if (n.__type === "TableRow" || n.__type === "TableCell") { n.children.forEach(walk); return; }
+          if (Array.isArray(n)) n.forEach(walk);
+        }
+        var heads = [];
+        function walkHeads(n) {
+          if (!n) return;
+          if (n.__type === "Paragraph") { if (n.heading === "H1" && n.text) heads.push(n.text); return; }
+          if (n.__type === "Table") { n.rows.forEach(walkHeads); return; }
+          if (n.__type === "TableRow" || n.__type === "TableCell") { n.children.forEach(walkHeads); return; }
+          if (Array.isArray(n)) n.forEach(walkHeads);
+        }
+        window.__doc.sections.forEach(function (s) { s.children.forEach(walk); s.children.forEach(walkHeads); });
+        row.heads = heads;
+        var wtext = texts.join("\n");
+        CHECKS.forEach(function (c) { if (c.w) row.w[c.key] = c.w.test(wtext); });
+      }
+      results.push(row);
+      next(i + 1);
+    });
+  }
+
+  function render() {
+    var html = '<table class="p"><thead><tr><th>Instrument</th>';
+    CHECKS.forEach(function (c) { html += "<th>" + c.label + "</th>"; });
+    html += "</tr></thead><tbody>";
+    results.sort(function (a, b) { return a.family.localeCompare(b.family) || a.id.localeCompare(b.id); });
+    results.forEach(function (r) {
+      html += "<tr><td>" + r.title + '<div class="fam">' + r.family + (r.err ? " — " + r.err : "") + "</div></td>";
+      CHECKS.forEach(function (c) {
+        var w = r.w[c.key], s = c.s ? r.s[c.key] : null;
+        var cls = w ? "y" : "n";
+        var txt = w ? "W" : "-";
+        if (c.s) { txt += " / " + (s ? "S" : "-"); if (!s) cls = w ? "n" : "n"; }
+        html += '<td class="' + cls + '">' + txt + "</td>";
+      });
+      html += "</tr>";
+    });
+    html += "</tbody></table><h2>Section outlines (Word, heading 1)</h2>";
+    results.forEach(function (r) {
+      html += "<p style='margin:8px 0 2px'><strong>" + r.title + "</strong> <span class='fam'>" + r.family + "</span><br>" +
+              "<span style='font:12px Consolas,monospace'>" + ((r.heads || []).join("  |  ") || "(none)") + "</span></p>";
+    });
+    var missing = {};
+    CHECKS.forEach(function (c) {
+      missing[c.label] = results.filter(function (r) { return !r.w[c.key] || (c.s && !r.s[c.key]); })
+                                .map(function (r) { return r.id; });
+    });
+    html += "<h2>Gaps</h2><ul>";
+    CHECKS.forEach(function (c) {
+      var m = missing[c.label];
+      html += "<li><strong>" + c.label + "</strong>: " + (m.length ? m.length + " missing — " + m.join(", ") : "all present") + "</li>";
+    });
+    html += "</ul>";
+    document.getElementById("out").innerHTML = html;
+    document.title = "AUDIT-DONE";
+  }
+
+  next(0);
+});
+</script>
+</body></html>

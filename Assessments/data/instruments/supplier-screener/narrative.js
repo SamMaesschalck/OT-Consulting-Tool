@@ -1,0 +1,100 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/instruments/supplier-screener/narrative.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+window.App.Data.instruments = window.App.Data.instruments || {};
+window.App.Data.instruments["supplier-screener"] = window.App.Data.instruments["supplier-screener"] || {};
+window.App.Data.instruments["supplier-screener"].narrative = {
+    "_note":  "Narrative for the Supplier Cyber Exposure Screener report. Boilerplate and domain text inserted VERBATIM; data lines composed ONLY from templates. The generator must not free-write prose. Same keys and slots as the posture pack.",
+    "boilerplate":  {
+                        "report_intro":  "This report gives management and procurement a high-level view of the cyber exposure carried through {targetName}, as an early indication of strengths, weaknesses and priorities. It is based on a structured screening across six domains, using the supplier's answers and the evidence offered. Where the screening was run as a self-assessment, 'the supplier' throughout means the assessed organisation itself. The question-by-question detail is in the companion workbook.",
+                        "about_instrument":  "It covers the supplier's corporate security and assurance, its secure development practice, its product security capability, its vulnerability handling and support, its regulatory readiness, and the supply-chain and operational dependency carried. Each answer is scored on the consultant's judgement of what was said and shown, so the grade reflects what could be established in the screening and has not been verified. It is neither a conformance assessment against a standard such as ISA/IEC 62443 nor a regulatory determination.",
+                        "how_to_read":  "Each question is scored on a four-point scale, from not in place to fully in place and managed, using the consultant's judgement of the answer. Questions are grouped into six domains, and each domain receives a grade. The overall grade starts from the average across the domains and is then held down so that it can never sit more than two grades above the weakest domain, and the top grade is given only when every domain reaches it. An area in poor shape therefore drags the headline down sharply rather than being averaged away. A coverage figure shows how many questions could be answered. Where coverage is low, the grade is shown as indicative only and should be confirmed. Questions answered as unknown reduce coverage rather than counting as a failure, and questions that do not apply are excluded. With a supplier, though, a sustained inability to answer is itself a signal about transparency.",
+                        "method":  "The screening was carried out as a structured review with the supplier's product, security and account contacts, supported by the certificates, policies, advisories and contract terms available at the time. Each scored answer reflects the consultant's judgement of the response given. [Consultant to confirm or adjust this description so it matches how the screening was run, including whether it was run as a supplier assessment or a self-assessment.]",
+                        "limitations":  "This is a point-in-time screening based on the supplier's answers and the evidence it chose to share. It does not verify the supplier's controls in technical depth, which is the role of the deep assessments it points to (ISA/IEC 62443-4-1 for development practice, the EU CRA and Machinery Regulation gap assessments for the regulatory position). Where coverage was low or answers were uncertain, the grade should be treated as provisional.",
+                        "indicative_grade_caveat":  "The grade in this report is an indicative, high-level read based on a structured screening and the evidence available at the time. It does not measure conformance against ISA/IEC 62443 or any other standard, and it is not a regulatory determination about the supplier or its products. Its purpose is to show where the supplier's cyber position stands and where to look deeper first; conformance is established by the detailed assessments that follow in the priority areas.",
+                        "unknown_explained":  "An Unknown answer has not been used to push a domain's capability score up or down. Not knowing is treated as a finding about visibility and not as a known gap in control, so the lowest capability band (0, Not in place) remains the worst capability score and Unknown does not sit below it. Unknown answers do reduce the coverage figure, and they lower confidence in the resulting grade. Where a supplier repeatedly cannot or will not answer, that opacity should be read as a finding about the relationship.",
+                        "series_context":  "Its purpose is to decide where a fuller assessment is justified. The supplier's actual position is established by the deep assessments it points to."
+                    },
+    "executiveSummary":  {
+                             "_note":  "Composed by slot-substitution only; boilerplate inserted VERBATIM; consultant blocks seeded with data-derived facts plus a marked placeholder. No free-writing. Screener aim: an indicative capped-average headline grade showing where to look deeper first - NOT a conformance or regulatory determination.",
+                             "templates":  {
+                                               "exec_verdict":  "This screening gives {clientName} an indicative supplier cyber exposure grade of {headlineGrade}, with the weakest ground in {weakestDomainName}. The priorities and routes to deeper assessment set out in this report focus on the lower-scoring domains.",
+                                               "exec_verdict_nogaps":  "This screening gives {clientName} an indicative supplier cyber exposure grade of {headlineGrade}, with no domain falling into the lower bands.",
+                                               "exec_scope":  "The read is based on a structured screening covering {assessedDomainCount} supplier-exposure domains, with {answeredCount} of {scorableCount} applicable questions answered.",
+                                               "exec_profile":  "Each domain is graded on the consultant's judgement of the answers given, and those grades roll up into the single headline above.",
+                                               "exec_gap_shape":  "Grades vary across the domains. {gapConcentrationSentence}{capClause}",
+                                               "exec_path_forward":  "The lower-scoring areas can be addressed through the supplier, through contract or through the deep assessments this screener points to, and the priorities in this report show where to act first.",
+                                               "exec_confidence":  "This read is based on {coveragePct} of applicable questions being answered ({confidenceLabel}).",
+                                               "capClause":  " The headline has been held down to {headlineGrade}, because it may not sit more than two grades above the weakest domain and the stronger domains cannot average it up.",
+                                               "capClauseCeiling":  " With {weakestDomainName} graded {weakestGrade}, the headline could not have been higher than {headlineGrade}.",
+                                               "capClauseUnanimous":  " The top grade is reserved for an assessment where every domain reaches it, so the headline is held at {headlineGrade}.",
+                                               "gapConcentrationFragments":  {
+                                                                                 "lowGrades":  "The lowest-graded domains are {lowGradeList}.",
+                                                                                 "lowCoverage":  "Coverage was below the threshold in {lowCoverageList}, so those domains are reported as indicative only."
+                                                                             }
+                                           },
+                             "boilerplate":  {
+                                                 "exec_weakest_domain":  "The overall grade starts from the average across the graded domains and is then held down so that it can never sit more than two grades above the weakest of them. The top grade is reserved for a set of domains that are all strong, so a single area in poor shape cannot hide behind stronger ones. With a supplier, the weakest area usually decides the exposure you inherit, and strong development practice does not offset an unmanaged remote-access path or a missed conformity deadline. For that reason the priorities below are set domain by domain.",
+                                                 "exec_indicative":  "The grade is an early read of where the exposure sits and where to look deeper first. It does not verify the supplier's controls in technical depth. That is done by the deep assessments this screener points to: 62443-4-1 for development practice, and the EU CRA and Machinery Regulation gap assessments for the regulatory position.",
+                                                 "not_determination":  "This is not a conformance assessment against a standard, and it is not a regulatory determination. It is a screening carried out on the supplier's answers at a point in time, and the grade should be confirmed by the more detailed assessments it points to."
+                                             },
+                             "consultantBlocks":  {
+                                                      "consultant_exposure_lowcov_clause":  " Coverage in one or more domains was below the threshold, so part of this picture is provisional and should be confirmed.",
+                                                      "consultant_exposure":  "[Consultant to add a short, client-specific note: what this supplier provides, how dependent operations are on it, and the operational or regulatory consequence of the weakest domains for this relationship.]",
+                                                      "consultant_top_priorities_seed":  "The most pressing areas are likely to be {autoTopPriorityHint}.",
+                                                      "consultant_top_priorities_placeholder":  "[Consultant to confirm and refine the top one or two priorities for this supplier relationship, including which deep-dive assessment to commission first and what to fix through contract.]"
+                                                  }
+                         },
+    "domain_narrative":  {
+                             "corp":  {
+                                          "purpose":  "Whether the supplier's own security is owned, certified with meaningful scope, and backed by contractual commitment and transparency.",
+                                          "why_it_matters":  "A supplier's willingness to name an owner, evidence its certificates and sign security commitments predicts how it will behave for the life of the relationship, especially during an incident, and opacity on these points is rarely confined to paperwork."
+                                      },
+                             "dev":  {
+                                         "purpose":  "Whether the products you buy are developed under a real secure development lifecycle, tested for security, and built and delivered with integrity.",
+                                         "why_it_matters":  "Product security has to be built in during development, because it cannot be added afterwards, and a compromise of the supplier's build and delivery chain reaches every customer at once. An ISA/IEC 62443-4-1 assessment verifies this domain in depth."
+                                     },
+                             "prod":  {
+                                          "purpose":  "Whether the products themselves carry the security capabilities an OT operator needs: secure defaults, per-user access control, usable logging and a practical, secure update path.",
+                                          "why_it_matters":  "Capabilities the product lacks cannot be added by policy, so shared logins, silent devices and unpatchable units define your exposure for the equipment's whole service life. These capabilities are also essential requirements that the EU CRA now makes a legal condition of market access."
+                                      },
+                             "vuln":  {
+                                          "purpose":  "Whether the supplier can receive, fix and communicate vulnerabilities, and will keep doing so for as long as the equipment serves.",
+                                          "why_it_matters":  "Every product has vulnerabilities, and the supplier's handling of them decides whether you get advisories and patches or hear nothing. Support periods, measured against OT lifespans, are among the most consequential terms in the relationship and also among the most negotiable."
+                                      },
+                             "reg":  {
+                                         "purpose":  "Whether the supplier knows which EU product regulations apply to what it sells you, is on a credible path to conformity by the deadlines, and could meet its reporting duties.",
+                                         "why_it_matters":  "From 2027 non-conforming products cannot lawfully be supplied, so if a supplier misses a CRA or Machinery Regulation deadline, the procurement and continuity problem becomes yours mid-contract. The deep gap assessments establish the actual position; this domain screens whether one is needed urgently."
+                                     },
+                             "chain":  {
+                                           "purpose":  "The exposure carried through the relationship itself: what is inside the products, what access the supplier holds into your estate, and what happens if the supplier fails or exits.",
+                                           "why_it_matters":  "Supplier remote access is one of the most common unrecorded paths into OT estates. Components nobody has listed are where the next Log4j will surface, and continuity terms cannot be obtained once a supplier is already failing. In this domain supplier risk is most directly yours to control, largely through contract."
+                                       }
+                         },
+    "templates":  {
+                      "headline":  "The overall indicative supplier exposure grade is {headlineGrade}. It starts from the average across the six domains and is held to no more than two grades above the weakest of them.",
+                      "coverage_overall":  "This grade is based on {overallCoveragePct} of applicable questions being answered.",
+                      "low_confidence_flag":  "Overall coverage is below {coverageThresholdPct}. Treat this as a low-confidence initial read to be confirmed.",
+                      "domain_result":  "{domainName}: graded {domainGrade} (based on {answered} of {scorable} questions answered).",
+                      "domain_low_coverage":  "{domainName}: insufficient evidence to grade with confidence ({answered} of {scorable} answered). Indicative grade {domainGrade}, to be confirmed.",
+                      "all_top_band":  "Every question in this domain was answered at the top band; there are no lower-scoring points to note.",
+                      "unknown_questions_intro":  "The points that could not be established in this domain were:",
+                      "unknown_question_item":  "{prompt} (not established).",
+                      "weakest_questions_intro":  "The lowest-scoring points in this domain were:",
+                      "weakest_question_item":  "{prompt} (scored {bandLabel}).",
+                      "safety_note":  "This point concerns a safety-related system and should be treated as a priority.",
+                      "headline_cap_note_unanimous":  "The top grade is awarded only where every domain reaches it, so the headline is held at {headlineGrade} even though the average is higher. The domains below the top grade are named in the results.",
+                      "headline_cap_note":  "The grade has been held down relative to the weakest domain, {weakestDomain} ({weakestGrade}), so a single weak area is not hidden by stronger ones.",
+                      "headline_cap_note_multi":  "The grade has been held down relative to the weakest domains ({weakestDomainsList}, all {weakestGrade}), so a cluster of weak areas is not hidden by stronger ones.",
+                      "weakest_named":  "The weakest domain is {weakestDomain}, graded {weakestGrade}.",
+                      "weakest_named_multi":  "The weakest domains are {weakestDomainsList}, all graded {weakestGrade}.",
+                      "priority_intro":  "Priority for attention, worst to best across the assessed domains:",
+                      "priority_item":  "{rank}. {domainName}: {domainGrade}",
+                      "priority_insufficient_intro":  "Domains where the coverage was below the threshold and so could not be graded with confidence:",
+                      "priority_insufficient_item":  "{domainName} (coverage {coveragePct})",
+                      "unknown_finding":  "{unknownCount} of {attemptedCount} attempted question(s) in this domain were answered Unknown ({unknownRatePct}). The supplier could not or would not confirm the state of those areas, and that lack of transparency is reported as a finding.",
+                      "confidence_note":  "Confidence in this grade is {confidenceLabel}, because of the share of answers that were Unknown.",
+                      "overall_unknown_finding":  "Across the screening, {unknownCount} of {attemptedCount} attempted question(s) were answered Unknown ({unknownRatePct}). The overall grade is reported with {confidenceLabel}."
+                  }
+};

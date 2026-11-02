@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 demo dataset check</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<div class="app"><div class="header"><div class="brand"><span class="sub">x</span></div>
+<span id="engagement-summary"></span><div class="spacer"></div>
+<div class="header-actions"><button id="btn-theme"></button><button id="btn-engagement"></button><button id="btn-new"></button>
+<button id="btn-load"></button><button id="btn-save"></button><button id="btn-xlsx"></button><button id="btn-docx"></button>
+<input id="file-input" type="file"/></div></div>
+<div id="sidebar" class="sidebar"></div><div id="main" class="main"></div></div>
+<div id="toast" class="toast hidden"></div>
+<pre id="out" style="font:12px monospace; white-space:pre-wrap"></pre>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: ["sl"] });</script>
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  var A = window.App, E = A.Engine, S = A.Scoring, out = [], fail = 0;
+  function ok(c, n, d) { out.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  try {
+    A.UI.init({ autosave: false });
+    E.activateInstrument("iec-62443-3-3");
+    A.TourSL.apply(E);
+
+    // ---- zones and their targets --------------------------------------
+    var targets = E.state.engagement.targets;
+    ok(targets.length === 3, "the demo divides the site into three zones", String(targets.length));
+    var byName = {};
+    targets.forEach(function (t) { byName[t.name] = t.id; });
+    var bpcs = byName["BPCS - basic process control"],
+        sis  = byName["SIS - safety instrumented system"],
+        dmz  = byName["Plant DMZ"];
+    ok(!!bpcs && !!sis && !!dmz, "the zones are named", Object.keys(byName).join(" | "));
+
+    var tp = E.state.engagement.targetProfile;
+    ok(tp.defaultTargetSL === 2, "the site target is SL 2");
+    ok(S.effectiveTargetSL(tp, "FR1", sis) === 3 && S.effectiveTargetSL(tp, "FR3", sis) === 3,
+       "the safety zone carries SL 3 for identification and integrity",
+       S.effectiveTargetSL(tp, "FR1", sis) + "/" + S.effectiveTargetSL(tp, "FR3", sis));
+    ok(S.effectiveTargetSL(tp, "FR2", sis) === 2, "and the site target everywhere else");
+    ok(S.effectiveTargetSL(tp, "FR1", bpcs) === 2, "the other zones keep the site target");
+
+    // ---- the assessment is finished in every zone ----------------------
+    var all = E.scoreAllTargets();
+    var unanswered = [];
+    var unplanned = [];
+    all.perTarget.forEach(function (t) {
+      t.result.perRequirement.forEach(function (r) {
+        if (!r.applicable) return;
+        if (!r.answered) unanswered.push(t.target.name + "/" + r.code);
+        if (!r.met && !r.action) unplanned.push(t.target.name + "/" + r.code);
+      });
+    });
+    ok(unanswered.length === 0, "every in-scope requirement is answered in every zone",
+       unanswered.slice(0, 6).join(", "));
+    ok(unplanned.length === 0, "every requirement below target carries a remediation plan",
+       unplanned.slice(0, 6).join(", "));
+
+    // The demo is shown to clients, so it must not contradict itself.
+    //
+    // The trap: a requirement that selects nothing above SL 1 is satisfied at
+    // SL 2, SL 3 and SL 4 the moment its base is met. So authoring "sl: 1"
+    // against an SL 2 target - the way a consultant writes a gap - produced a
+    // requirement the tool reports as MET, sitting beside evidence describing
+    // an absence and a remediation plan telling the client to fix it. Twelve
+    // requirements were in that state. Nothing surfaced it until the report
+    // began printing evidence for met requirements ("What is in place").
+    //
+    // Checked structurally rather than by reading the prose: the author wrote a
+    // level BELOW the zone's target AND a remediation plan - so they meant a
+    // gap - yet the zone comes out met. Authoring below target is fine on its
+    // own (a requirement that asks nothing more at SL 3 is met at SL 3 the
+    // moment SL 2 is), which is why the plan is what makes it a contradiction.
+    var authored = {};
+    (A.TourSL.rows || []).forEach(function (r) { if (typeof r.sl === "number") authored[r.id] = r.sl; });
+    var overstated = [];
+    all.perTarget.forEach(function (t) {
+      var zoneOverrides = {};
+      ((A.TourSL.zoneRows || {})[t.target.name] || []).forEach(function (r) {
+        if (typeof r.sl === "number") zoneOverrides[r.id] = r.sl;
+      });
+      t.result.perRequirement.forEach(function (r) {
+        if (!r.met || r.targetSL <= 0) return;
+        // A compensating countermeasure is met on purpose by something outside
+        // the requirement, so its evidence says the system does not do it
+        // natively. That is the point, not a contradiction.
+        if (r.compensatingCount > 0) return;
+        var wrote = (r.requirementId in zoneOverrides) ? zoneOverrides[r.requirementId]
+                                                       : authored[r.requirementId];
+        if (typeof wrote === "number" && wrote < r.targetSL && r.action) {
+          overstated.push(t.target.name + "/" + r.code + " authored SL " + wrote +
+                          " against target SL " + r.targetSL + " with a remediation plan, reported met");
+        }
+      });
+    });
+    ok(overstated.length === 0,
+       "nothing the author treated as a gap is reported as met",
+       overstated.slice(0, 4).join(" | "));
+
+    // ---- most of it is answered once, system-wide ----------------------
+    var sharedCount = E.getSharedResponses().length;
+    ok(sharedCount > 40, "the bulk of the assessment is recorded on the shared layer",
+       String(sharedCount));
+    var zoneOwn = E.state.engagement.responses.filter(function (r) { return r.targetId === bpcs; }).length;
+    ok(zoneOwn === 0, "the baseline zone records nothing of its own - it inherits everything",
+       String(zoneOwn));
+
+    function reqIn(tid, id) {
+      var t = all.perTarget.filter(function (x) { return x.target.id === tid; })[0];
+      return t.result.perRequirement.filter(function (x) { return x.requirementId === id; })[0];
+    }
+    function itemIn(tid, id, comp) {
+      return reqIn(tid, id).items.filter(function (i) { return i.componentId === comp; })[0];
+    }
+
+    // The directory case: one answer covers the zones it reaches, and the zone
+    // it does not reach overrides it.
+    ok(itemIn(bpcs, "SR1.1", "base").source === "shared" &&
+       itemIn(bpcs, "SR1.1", "base").state === "met",
+       "the directory answer is inherited by the control zone");
+    ok(itemIn(dmz, "SR1.1", "base").source === "shared", "and by the DMZ");
+    ok(itemIn(sis, "SR1.1", "base").source === "zone" &&
+       itemIn(sis, "SR1.1", "base").state === "not-met",
+       "the safety zone overrides it, because the engineering station is not on the directory");
+    ok(reqIn(sis, "SR1.1").evidenceSource === "zone" &&
+       reqIn(bpcs, "SR1.1").evidenceSource === "shared",
+       "and carries its own evidence while the others show the shared text");
+
+    // ---- what that produces -------------------------------------------
+    function fr(tid, id) {
+      var t = all.perTarget.filter(function (x) { return x.target.id === tid; })[0];
+      return t.result.perFR.filter(function (f) { return f.frId === id; })[0];
+    }
+    ok(fr(sis, "FR1").conformantAchievedSL === 0,
+       "identification floors at SL 0 in the safety zone", String(fr(sis, "FR1").conformantAchievedSL));
+    ok(fr(bpcs, "FR1").conformantAchievedSL === 1,
+       "and reaches SL 1 in the control zone", String(fr(bpcs, "FR1").conformantAchievedSL));
+    ok(fr(sis, "FR2").frTargetMet === true,
+       "the safety zone meets its use-control target, so it is not uniformly worse");
+    ok(fr(bpcs, "FR5").propUpByCompensating === true,
+       "restricted data flow is held up by a compensating measure");
+
+    // ---- one action per shared gap ------------------------------------
+    var shared = all.sharedRoadmap;
+    function action(code) { return shared.filter(function (a) { return a.code === code; })[0]; }
+    ok(shared.length > 0, "the demo produces cross-zone actions", String(shared.length));
+    ok(action("SR 6.2") && action("SR 6.2").affected.length === 3,
+       "the missing monitoring is one action covering all three zones",
+       action("SR 6.2") ? String(action("SR 6.2").affected.length) : "absent");
+    ok(action("SR 1.2") && action("SR 1.2").affected.length === 3,
+       "so is the missing device authentication",
+       action("SR 1.2") ? String(action("SR 1.2").affected.length) : "absent");
+    var sr11 = action("SR 1.1");
+    ok(sr11 && sr11.affected.length === 2,
+       "the directory action covers only the zones the directory reaches",
+       sr11 ? String(sr11.affected.length) : "absent");
+    ok(sr11 && sr11.affected.map(function (a) { return a.name; }).indexOf("SIS - safety instrumented system") === -1,
+       "the safety zone is not named by it");
+    ok(reqIn(sis, "SR1.1").gapIsShared === false && !!reqIn(sis, "SR1.1").action,
+       "the safety zone carries its own action for the same requirement instead");
+    // Each affected zone is listed against its OWN target, which is the point
+    // of naming them rather than saying "all zones".
+    var sr12 = action("SR 1.2");
+    ok(sr12 && sr12.affected.filter(function (a) { return a.targetSL === 3; }).length === 1,
+       "the affected list shows each zone's own SL-T",
+       sr12 ? sr12.affected.map(function (a) { return a.name + ":" + a.targetSL; }).join(", ") : "absent");
+
+    // ---- shared answers that do not reach every zone --------------------
+    //
+    // The site time service and the endpoint protection both stop at the
+    // safety controllers. Each is recorded once, scoped to the zones it
+    // serves, and the safety zone answers for itself.
+    ok(E.getItemCoverage("SR2.11", "base") !== null &&
+       E.getItemCoverage("SR2.11", "base").length === 2,
+       "the site time service is scoped to the zones it serves",
+       String((E.getItemCoverage("SR2.11", "base") || []).length));
+    ok(itemIn(bpcs, "SR2.11", "base").source === "shared" &&
+       itemIn(dmz, "SR2.11", "base").source === "shared",
+       "the zones it covers inherit it");
+    ok(itemIn(sis, "SR2.11", "base").source === "zone" &&
+       itemIn(sis, "SR2.11", "base").state === "met",
+       "the safety zone answers it for itself, by other means",
+       itemIn(sis, "SR2.11", "base").source + "/" + itemIn(sis, "SR2.11", "base").state);
+    ok(reqIn(sis, "SR2.11").evidence.indexOf("proof test") !== -1,
+       "with its own evidence rather than the shared paragraph");
+
+    // Endpoint protection cannot apply at all in the safety zone, so it is a
+    // justified N/A there - which excludes it rather than leaving a gap.
+    ok(itemIn(sis, "SR3.2", "base").state === "na" &&
+       itemIn(sis, "SR3.2", "base").disposition === "excluded",
+       "the safety zone records a justified N/A where the shared control cannot reach",
+       itemIn(sis, "SR3.2", "base").disposition);
+    ok(reqIn(sis, "SR3.2").applicable === false,
+       "so it drops out of that zone's score");
+    ok(itemIn(bpcs, "SR3.2", "base").state === "met",
+       "while the zones it does cover still have it");
+
+    // Coverage is per item, so scoping one answer leaves the others alone.
+    ok(E.getItemCoverage("SR1.1", "base") === null,
+       "the directory answer still covers every zone");
+
+    // ---- the system-level picture --------------------------------------
+    //
+    // The reader has to know what is true of the whole system before being
+    // handed three zone reports, and it must not claim an SL-A for a system,
+    // which 62443-3-3 does not define.
+    var roll = all.systemRollup;
+    ok(!!roll && roll.zoneCount === 3, "the engagement rolls up across the zones",
+       roll ? String(roll.zoneCount) : "absent");
+    ok(roll.zonesShort.length === 3 && roll.zonesMeetingTarget.length === 0,
+       "no zone meets its target in this demo",
+       roll.zonesMeetingTarget.length + " met / " + roll.zonesShort.length + " short");
+    var metAll = roll.metEverywhere.map(function (f) { return f.frId; }).join(",");
+    var shortAll = roll.shortEverywhere.map(function (f) { return f.frId; }).join(",");
+    var mixed = roll.mixed.map(function (f) { return f.frId; }).join(",");
+    ok(metAll === "FR4,FR5", "FR4 and FR5 are met in every zone", metAll);
+    ok(shortAll === "FR1,FR3,FR6,FR7", "FR1, FR3, FR6 and FR7 are short in every zone", shortAll);
+    ok(mixed === "FR2", "FR2 is the only mixed picture", mixed);
+    var fr2 = roll.frs.filter(function (f) { return f.frId === "FR2"; })[0];
+    ok(fr2.met.length === 1 && fr2.met[0].indexOf("SIS") === 0,
+       "and it is the safety zone that meets it", fr2.met.join(","));
+    var fr1r = roll.frs.filter(function (f) { return f.frId === "FR1"; })[0];
+    ok(fr1r.lowestAchieved === 0, "the lowest achieved level per FR is the weakest zone's",
+       String(fr1r.lowestAchieved));
+    ok(fr1r.highestTarget === 3, "and the highest target is recorded alongside it",
+       String(fr1r.highestTarget));
+
+    var sysLines = A.Report.systemRollupLines(roll, E.state.instrument).join(" ");
+    ok(/fall short of target in every assessed/.test(sysLines),
+       "the prose names the system-wide weaknesses");
+    ok(/meet their targets in every assessed/.test(sysLines),
+       "and what holds everywhere");
+    ok(/FR2 is met in .* but short in /.test(sysLines),
+       "and separates the one that differs by zone", sysLines.slice(0, 120));
+    ok(sysLines.indexOf("SL-A") === -1 && !/system (achieves|reaches) SL/.test(sysLines),
+       "and never claims a Security Level for the system as a whole");
+
+    // ---- the narrative describes what the numbers show -----------------
+    var rn = E.getReportNarrative();
+    ok(!!rn.regulatoryExposure && !!rn.topPriorities, "consultant exec-summary blocks are supplied");
+    ok(/three zones/.test(rn.regulatoryExposure), "the exposure block describes the zoned assessment");
+    ok(/SIS engineering station/.test(rn.regulatoryExposure),
+       "and names the finding that makes the safety zone different");
+
+    // ---- it renders and exports ---------------------------------------
+    E.setActiveTarget(bpcs);
+    var host = document.createElement("div");
+    A.Report.render(host, { engagement: E.state.engagement, instrument: E.state.instrument,
+      taxonomy: E.state.taxonomy, profile: E.state.profile, narrative: E.getActiveNarrative(),
+      scored: E.scoreActiveTarget(), scoredAll: all, activeTarget: E.getActiveTarget(),
+      targetProfile: E.state.engagement.targetProfile });
+    ok(host.textContent.length > 4000, "the report renders substantial content", String(host.textContent.length));
+    ok(host.textContent.indexOf("Actions that span") !== -1, "the report carries the cross-zone actions");
+    ok(host.textContent.indexOf("SIS - safety instrumented system") !== -1, "and names the zones");
+    ok(host.textContent.indexOf("The system as a whole") !== -1,
+       "the report opens the cross-zone material with the system-level picture");
+    ok(host.textContent.indexOf("The system as a whole") < host.textContent.indexOf("Actions that span"),
+       "which comes before the zone-by-zone material");
+    var wb = A.ExportXLSX.build(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, { targetId: bpcs });
+    ok(wb.SheetNames.indexOf("Shared actions") !== -1, "the workbook carries the shared actions sheet",
+       wb.SheetNames.join(","));
+
+    // Exporting a SUBSET of zones must carry the shared layer with it.
+    // Filtering responses to the chosen target ids dropped it, which left the
+    // zone that records nothing of its own - the whole point of the layer -
+    // with an entirely empty report.
+    var subset = A.UI.__filteredEngagementFor([bpcs]);
+    var sharedInSubset = subset.responses.filter(function (r) { return r.targetId === E.SHARED_TARGET_ID; }).length;
+    ok(sharedInSubset > 40, "a per-zone export keeps the shared answers", String(sharedInSubset));
+    ok(subset.targets.length === 1, "while narrowing the zones to the one selected", String(subset.targets.length));
+    var subScored = S.scoreEngagement(subset, E.state.instrument, E.state.taxonomy, E.state.profile);
+    var subBpcs = subScored.perTarget[0].result;
+    ok(subBpcs.totalAnswered === 45,
+       "so the inheriting zone still scores in a subset export", String(subBpcs.totalAnswered));
+    ok(subBpcs.roadmap.length > 0, "and still has a roadmap", String(subBpcs.roadmap.length));
+
+    // The same answers have to reach the prose: evidence a zone inherited was
+    // being looked up by target id and coming back blank.
+    var bpcsReq = reqIn(bpcs, "SR1.1");
+    ok(!!bpcsReq.evidence && bpcsReq.evidence.indexOf("Active Directory") !== -1,
+       "an inheriting zone carries the shared evidence into the report",
+       bpcsReq.evidence ? bpcsReq.evidence.slice(0, 40) : "(blank)");
+    var xlAll = A.ExportXLSX.build(subset, E.state.instrument, E.state.taxonomy, E.state.profile, { targetId: bpcs });
+    var reqSheet = XLSX.utils.sheet_to_json(xlAll.Sheets["Requirements"], { header: 1, blankrows: false });
+    var withEvidence = reqSheet.filter(function (row) {
+      return row.some(function (c) { return typeof c === "string" && c.length > 60; });
+    }).length;
+    ok(withEvidence > 30, "and into the Excel register",
+       withEvidence + " of " + reqSheet.length + " rows carry evidence");
+
+    // ---- basis of assessment --------------------------------------------
+    // A capability-SL result is a claim about what could be DEMONSTRATED, so
+    // the demo has to carry the register that backs it up rather than the
+    // "not yet recorded" prompt.
+    var basis = E.getBasisOfAssessment();
+    ok((basis.interviews || []).length >= 4, "the demo records who was interviewed",
+       String((basis.interviews || []).length));
+    ok((basis.documents || []).length >= 6, "...what was reviewed",
+       String((basis.documents || []).length));
+    ok((basis.observations || []).length >= 3, "...and what was observed",
+       String((basis.observations || []).length));
+    ok((basis.documents || []).every(function (d) { return d.reference && d.date; }),
+       "every document carries a reference and a date, so the read is repeatable");
+    ok((basis.observations || []).every(function (o) { return String(o.method || "").trim(); }),
+       "every observation records HOW it was seen, not just that it was");
+    ok((basis.documents || []).some(function (d) { return /SL-T determination|risk assessment/i.test(d.title); }),
+       "the SL-T determination is among them, since it is what the targets rest on");
+
+    // ---- the previous assessment ----------------------------------------
+    // Acme has been assessed before, so the demo shows what the tool is for:
+    // one customer file holding both visits, and this year's report able to
+    // say what has changed.
+    var all = E.assessmentsFor("iec-62443-3-3");
+    ok(all.length === 2, "the demo file holds two 62443-3-3 assessments", String(all.length));
+
+    var TSL = A.TourSL;
+    var older = all[0], newer = all[1];
+    ok(older.engagementMeta.dateOfVisit === TSL.prior.dateOfVisit,
+       "the earlier one is the 2024 visit", older.engagementMeta.dateOfVisit);
+    ok(newer.engagementMeta.dateOfVisit === TSL.metadata.dateOfVisit,
+       "the later one is this year's", newer.engagementMeta.dateOfVisit);
+    ok(E.state.activeAssessmentId === newer.id,
+       "and the tour opens on the later one, not the archive");
+
+    // Each visit is its own engagement: different opportunity, different
+    // revision. Sharing them would be the bug the split was made to prevent.
+    ok(older.engagementMeta.opportunityId !== newer.engagementMeta.opportunityId,
+       "each visit carries its own opportunity id",
+       older.engagementMeta.opportunityId + " vs " + newer.engagementMeta.opportunityId);
+    // Both are revision 1.0: a re-assessment is a NEW document at its own
+    // first revision, not a later revision of the old one. What matters is
+    // that the field is stored per assessment rather than shared.
+    ok(older.engagementMeta !== newer.engagementMeta &&
+       !!older.engagementMeta.documentRevision && !!newer.engagementMeta.documentRevision,
+       "each visit holds its own engagement record, revision included");
+
+    // Every authored delta has to LAND. A typo in an id would leave the row at
+    // this year's answer and the demo would quietly show no progress at all.
+    var rowIds = {};
+    TSL.rows.forEach(function (r) { rowIds[r.id] = true; });
+    ok(TSL.prior.deltas.every(function (d) { return rowIds[d.id]; }),
+       "every 2024 delta names a requirement the demo actually answers",
+       TSL.prior.deltas.filter(function (d) { return !rowIds[d.id]; }).map(function (d) { return d.id; }).join(","));
+    ok(TSL.prior.deltas.every(function (d) {
+         var now = TSL.rows.filter(function (r) { return r.id === d.id; })[0];
+         return now && d.sl < now.sl;
+       }), "and each was found WEAKER in 2024 than it is now, so the story is progress");
+    ok(TSL.priorRows().filter(function (r) { return r.rem; }).length === 0,
+       "the archived visit carries no remediation plan - that belonged to its own report");
+
+    // The comparison baseline is wired from the sibling, so the progress card
+    // works from this one file with no second file to load.
+    var bl = newer.baseline;
+    ok(!!bl && (bl.responses || []).length > 0, "this year's assessment carries the 2024 baseline",
+       bl ? String((bl.responses || []).length) : "none");
+    ok(bl && bl.source.dateOfVisit === TSL.prior.dateOfVisit,
+       "the baseline is dated, so the report can say what it is comparing against",
+       bl ? bl.source.dateOfVisit : "");
+    ok(bl && bl.responses !== older.responses,
+       "the baseline is a COPY - editing the archive later must not rewrite history");
+
+    // What the whole feature is for: a scored difference the report can state.
+    var diff = A.Compare.compare({
+      instrument: E.state.instrument, taxonomy: E.state.taxonomy, profile: E.state.profile,
+      family: E.state.scoringFamily,
+      baselineResponses: bl.responses, currentResponses: newer.responses,
+      targetProfile: E.state.engagement.targetProfile
+    });
+    // Compare indexes responses by requirement id alone, with no target, so on
+    // a zoned assessment a per-zone override sits on top of the system-wide
+    // answer and only one of them is compared. A delta the demo overrides in a
+    // zone is therefore invisible to the diff. That is a limitation of
+    // compare.js, not of the demo data, so the expectation says so rather than
+    // pretending all seven show up.
+    var overridden = {};
+    Object.keys(TSL.zoneRows).forEach(function (z) {
+      TSL.zoneRows[z].forEach(function (r) { overridden[r.id] = true; });
+    });
+    var visible = TSL.prior.deltas.filter(function (d) { return !overridden[d.id]; });
+    ok(visible.length > 0 && diff.summary.improved >= visible.length,
+       "the comparison reports an improvement for every delta it can see",
+       diff.summary.improved + " improved, " + visible.length + " visible of " +
+       TSL.prior.deltas.length + " authored");
+    ok(diff.summary.regressed === 0, "and nothing has gone backwards",
+       String(diff.summary.regressed));
+    ok(diff.movements && diff.movements.length > 0,
+       "the movements list is populated, which is what the progress card renders");
+  } catch (e) {
+    ok(false, "threw: " + e.message + "\n" + (e.stack || ""));
+  }
+  out.push(""); out.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = out.join("\n");
+});
+</script>
+</body></html>

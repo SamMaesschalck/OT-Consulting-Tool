@@ -1,0 +1,138 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Organisation-wide workbook, every instrument</title></head>
+<body>
+<!--
+  The organisation-wide workbook named one of its sheets after the
+  instrument's target label: "Dutyholder / sites side by side" for the three
+  ONR instruments (Excel refuses a slash) and a name over Excel's 31
+  characters for 62443-4-1 and risk appetite. SheetJS threw, and the export
+  produced nothing. The front text pluralised the whole label as well,
+  printing "dutyholder / sites" and "...governance posture)s".
+
+  This builds the organisation-wide workbook, two sites with different
+  answers, for EVERY instrument the export dialog offers it for (the rule in
+  ui.js: not capability-sl, not a layered CRA-style instrument), checks every
+  sheet name is one Excel accepts and is unique, and writes each through the
+  real download path.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, C = A.Compare;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+
+  function layered(inst) { return !!(inst && inst.layers && inst.layers.length && inst.setup && inst.setup.length); }
+
+  // One good and one poor answer per family, so the two sites differ.
+  function answers(inst, fam, prof) {
+    if (fam === "domain-letter") return [{ band: 3 }, { band: 0 }];
+    if (fam === "program-maturity-ml") return [{ ml: "ML3" }, { ml: "not-met" }];
+    if (fam === "csms-conformance") return [{ state: "in-place" }, { state: "not-in-place" }];
+    if (fam === "risk-appetite-coherence") {
+      var b = A.ScoringRiskAppetite.axisSpec(prof, "exposure").bands;
+      return [{ band: b[0] }, { band: b[b.length - 1] }];
+    }
+    return [{ state: "achieved" }, { state: "not" }];   // caf-achieved, nis2-conformance
+  }
+
+  function entriesFor(inst, fam, prof) {
+    var cat = C.catalogFor(inst, fam).slice(0, 6);
+    var pair = answers(inst, fam, prof);
+    return ["Plant A", "Plant B"].map(function (nm, si) {
+      return {
+        id: "site-" + si, name: nm,
+        responses: cat.map(function (it, i) {
+          // Half the items differ between the sites, half match.
+          var a = (i % 2 === 0) ? pair[si] : pair[0];
+          return Object.assign({ targetId: "t", requirementId: it.id, applicable: true }, a);
+        })
+      };
+    });
+  }
+
+  var BAD = /[:\\\/?*\[\]]/;
+  function checkNames(id, names) {
+    var bad = names.filter(function (n) {
+      return !n || n.length > 31 || BAD.test(n) || /^'|'$/.test(n) || n.toLowerCase() === "history";
+    });
+    ok(bad.length === 0, id + ": every sheet name is one Excel accepts", bad.join(" | ") || names.join(", "));
+    var seen = {}, dup = [];
+    names.forEach(function (n) { var k = n.toLowerCase(); if (seen[k]) dup.push(n); seen[k] = true; });
+    ok(dup.length === 0, id + ": every sheet name is unique", dup.join(", "));
+  }
+  function allText(wb) {
+    var parts = [];
+    wb.SheetNames.forEach(function (nm) {
+      var ws = wb.Sheets[nm];
+      Object.keys(ws).forEach(function (k) {
+        if (k.charAt(0) === "!") return;
+        var c = ws[k]; if (c && c.v != null) parts.push(String(c.v));
+      });
+    });
+    return parts.join("\n");
+  }
+
+  var list = E.state.instruments.filter(function (i) { return i.status !== "placeholder"; });
+  var jobs = [];
+  list.forEach(function (i0) {
+    try {
+      E.activateInstrument(i0.id);
+    } catch (e) { ok(false, i0.id + ": activates", e.message); return; }
+    var inst = E.state.instrument, fam = E.state.scoringFamily, prof = E.state.profile;
+    if (!inst || !prof) return;
+    if (fam === "capability-sl" || layered(inst)) return;   // not offered: zones, components, products
+    var opts = {
+      orgWide: true,
+      siteEntries: entriesFor(inst, fam, prof),
+      filenameHint: "orgwide-" + inst.id
+    };
+    if (fam === "caf-achieved") {
+      opts.cafProfileRegistry = E.getCAFProfileRegistry(); opts.cafProfileId = E.getActiveCAFProfileId();
+      opts.cafProfile = E.getActiveCAFProfile(); opts.cafOverlay = E.getActiveCAFOverlay();
+    }
+    if (fam === "risk-appetite-coherence") opts.riskAppetiteSetup = E.getRiskAppetiteSetup();
+    jobs.push({ id: inst.id, inst: inst, eng: E.state.engagement, tax: E.state.taxonomy, prof: prof, opts: opts });
+  });
+
+  var covered = jobs.map(function (j) { return j.id; });
+  ["onr-syaps-cyber", "onr-syaps-full", "onr-syaps-management", "iec-62443-4-1", "risk-appetite",
+   "supplier-screener", "general-ot-posture", "nis2-assessment", "ncsc-caf"].forEach(function (id) {
+    ok(covered.indexOf(id) !== -1, id + " is among the instruments offering the organisation-wide workbook", covered.join(", "));
+  });
+
+  jobs.forEach(function (j) {
+    var wb = null, err = null;
+    try { wb = A.ExportXLSX.build(j.eng, j.inst, j.tax, j.prof, j.opts); } catch (e) { err = e; }
+    ok(!err && wb, j.id + ": the organisation-wide workbook builds", err && err.message);
+    if (!wb) return;
+    checkNames(j.id, wb.SheetNames);
+    ok(["Front", "Organisation-wide", "Side by side", "Read me"].every(function (n) { return wb.SheetNames.indexOf(n) !== -1; }),
+       j.id + ": with its front, roll-up, side-by-side and read me sheets", wb.SheetNames.join(", "));
+    var txt = allText(wb);
+    ok(/Plant B/.test(txt) && /Plant A/.test(txt), j.id + ": both sites are named");
+    // The whole label with an "s" stuck on: "dutyholder / sites", "...posture)s".
+    var label = String(j.inst.targetDimensionLabel || "");
+    var naive = label.toLowerCase() + "s";
+    ok(!/\)s\b/.test(txt) && (!/[\/(]/.test(label) || txt.toLowerCase().indexOf(naive) === -1),
+       j.id + ": no label pluralised by tacking an s on the whole of it", naive);
+  });
+
+  // Through ExcelJS and the download path, one at a time (the stub is global).
+  var captured = null, real = A.Storage.downloadBlob;
+  A.Storage.downloadBlob = function (blob) { captured = blob; };
+  var chain = Promise.resolve();
+  jobs.forEach(function (j) {
+    chain = chain.then(function () {
+      captured = null;
+      return Promise.resolve(A.ExportXLSX.download(j.eng, j.inst, j.tax, j.prof, j.opts)).then(function () {
+        ok(captured && captured.size > 2000, j.id + ": the organisation-wide workbook writes to a file", captured ? captured.size + " bytes" : "nothing written");
+      }, function (e) { ok(false, j.id + ": the organisation-wide workbook writes to a file", e && e.message); });
+    });
+  });
+  chain.then(function () { A.Storage.downloadBlob = real; done(); });
+});
+</script>
+</body></html>

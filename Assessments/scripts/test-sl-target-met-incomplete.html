@@ -1,0 +1,297 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>62443-3-3 overall target met waits for every FR</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  62443-3-3 said "Overall target met: Yes" when only one of the seven
+  Foundational Requirements had been assessed. overallTargetMet was worked out
+  from the measurable FRs alone, so one FR answered and met, with six
+  untouched, was a met target on the screen tile and headline, in the Word
+  scorecard, the executive summary and the multi-zone rollup.
+
+  The target is a claim about every in-scope FR. This checks:
+    - one FR answered and met: not met, status "incomplete", and every place
+      that shows it says "Not yet" with how many FRs were assessed, never Yes;
+    - one FR answered and short: plain No (a shortfall found is a finding);
+    - every FR answered and met: met, Yes everywhere, no "Not yet";
+    - an FR out of scope (SL-T 0) does not hold the result open;
+    - two zones, one complete and met and one met so far: the rollup files
+      the second as incomplete, not as meeting its target and not as short,
+      and the screen, Word tiles, comparison table and summary say so.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true }); H.dom();</script>
+<script>
+function docXml(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      if (name === "word/document.xml") {
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+        return bytes.then(function (b) { return new TextDecoder().decode(b); });
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    return "";
+  });
+}
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function textOf(el) { return Array.prototype.map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); }
+// Each paragraph's text on its own line, grouped under each Heading 1.
+function sections(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var body = doc.getElementsByTagNameNS(W, "body")[0], out = [], cur = null;
+  Array.prototype.forEach.call(body.children, function (el) {
+    var st = el.localName === "p" && el.getElementsByTagNameNS(W, "pStyle")[0];
+    var val = st ? st.getAttribute("w:val") : "";
+    if (/^Heading1$/i.test(val)) { cur = { title: textOf(el).trim(), text: "", tables: [] }; out.push(cur); return; }
+    if (!cur) return;
+    var paras = el.localName === "p" ? [el] : Array.prototype.slice.call(el.getElementsByTagNameNS(W, "p"));
+    cur.text += "\n" + paras.map(textOf).join("\n");
+    if (el.localName === "tbl") cur.tables.push(el);
+  });
+  var all = out.map(function (s) { return s.text; }).join("\n");
+  return { list: out, all: all };
+}
+function sec(list, re) { return list.filter(function (x) { return re.test(x.title); })[0] || { title: "", text: "", tables: [] }; }
+
+// One response per requirement in the FRs named: every item first selected at
+// or below `upTo` met and every item above it not met.
+function responsesFor(inst, targetId, upTo, frs) {
+  var S = window.App.Scoring;
+  return (inst.requirements || []).filter(function (req) { return !frs || frs.indexOf(req.frId) >= 0; }).map(function (req) {
+    var comps = {};
+    S.requirementItems(req).forEach(function (it) {
+      comps[it.componentId] = { state: it.firstSL <= upTo ? "met" : "not-met" };
+    });
+    return { targetId: targetId, requirementId: req.id, components: comps };
+  });
+}
+var ALL_FRS = ["FR1", "FR2", "FR3", "FR4", "FR5", "FR6", "FR7"];
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, S = A.Scoring, R = A.Report;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  E.activateInstrument("iec-62443-3-3");
+  var inst = E.state.instrument, tax = E.state.taxonomy, prof = E.state.profile, narr = E.getActiveNarrative();
+  var MET = narr.executiveSummary.templates.verdictPhrases.met;
+  // The Word verdict's wording is export-docx.js's to choose; what is pinned
+  // here is that a met-so-far verdict is qualified, by "so far" on the met
+  // phrase or by a sentence saying not every FR has been assessed.
+  var CLAUSE_RE = /not every Foundational Requirement in scope has been assessed yet/i;
+  function qualified(t) { return t.indexOf(MET + " so far") >= 0 || CLAUSE_RE.test(t); }
+  ok(tax.frs.map(function (f) { return f.id; }).join() === ALL_FRS.join(), "set-up: the taxonomy has FR1 to FR7");
+
+  function engagementWith(targets, perZone, responses, perFR) {
+    var eng = JSON.parse(JSON.stringify(E.state.engagement));
+    eng.engagement = Object.assign({}, eng.engagement || {}, { clientName: "Acme Water" });
+    eng.targets = targets;
+    eng.targetProfile = { defaultTargetSL: 2, perFR: perFR || {}, perZone: perZone || {} };
+    eng.responses = responses;
+    eng.reportCustom = {};
+    return eng;
+  }
+  function one(id, name) { return [{ id: id || "z1", name: name || "Control system" }]; }
+  function screen(eng, targetId) {
+    var all = S.scoreEngagement(eng, inst, tax, prof);
+    var cur = all.perTarget.filter(function (t) { return t.target.id === targetId; })[0];
+    var host = document.createElement("div");
+    R.render(host, { engagement: eng, instrument: inst, taxonomy: tax, profile: prof, narrative: narr,
+      scored: cur.result, scoredAll: all, activeTarget: cur.target, targetProfile: eng.targetProfile });
+    var kpi = Array.prototype.filter.call(host.querySelectorAll(".kpi"), function (k) {
+      var l = k.querySelector(".lbl"); return l && l.textContent === "Overall target met";
+    })[0];
+    var headline = kpi ? kpi.closest(".card-b").querySelector("p.muted") : null;
+    return { host: host, all: all, scored: cur.result,
+             tile: kpi ? kpi.querySelector(".val").textContent : "",
+             tileClass: kpi ? kpi.querySelector(".val").className : "",
+             headline: headline ? headline.textContent : "" };
+  }
+  function word(eng, targetId, narrative) {
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(eng, inst, tax, prof, narrative || narr, { targetId: targetId }, function (err, blob) { res(err ? null : blob); });
+    }).then(function (blob) { return blob ? docXml(blob).then(sections) : { list: [], all: "" }; });
+  }
+
+  // ---- 1. one FR of seven answered, and met --------------------------------
+  var engOne = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ["FR1"]));
+  var v1 = screen(engOne, "z1"), s1 = v1.scored;
+  ok(s1.perFR[0].frTargetMet === true && s1.notAssessedFRs.length === 6,
+     "set-up: FR1 meets its target and six FRs are not assessed", s1.notAssessedFRs.length);
+  ok(s1.overallTargetMet === false, "one FR met of seven is not the overall target met", String(s1.overallTargetMet));
+  ok(s1.overallTargetStatus === "incomplete", "the result is incomplete", s1.overallTargetStatus);
+  ok(s1.assessedFRCount === 1 && s1.inScopeFRCount === 7, "with 1 of 7 in-scope FRs assessed",
+     s1.assessedFRCount + " of " + s1.inScopeFRCount);
+
+  // Screen: tile and headline.
+  ok(/^Not yet/.test(v1.tile) && /1 of 7 FRs assessed/.test(v1.tile), "the screen tile reads Not yet, 1 of 7 FRs assessed", v1.tile);
+  ok(!/^Yes/.test(v1.tile) && !/^No\b/.test(v1.tile), "and is neither a bare Yes nor a bare No", v1.tile);
+  ok(/\bnear\b/.test(v1.tileClass) && !/\bmet\b/.test(v1.tileClass), "and is not coloured as met", v1.tileClass);
+  ok(/Target met so far in the one FR assessed \(FR1\); 6 FRs not yet assessed\./.test(v1.headline),
+     "the headline names the one FR assessed, met so far, and says 6 are not yet assessed", v1.headline);
+  ok(v1.headline.indexOf("the 1 FR") === -1, "and never reads 'the 1 FR'", v1.headline);
+  ok(v1.headline.indexOf("Overall target met.") === -1, "and does not say the overall target is met", v1.headline);
+  var w1 = R.slTargetMetWords(s1);
+  ok(w1.value === "Not yet" && w1.detail === "1 of 7 FRs assessed", "the shared wording is Not yet, 1 of 7 FRs assessed", JSON.stringify(w1));
+
+  // ---- 2. one FR answered and short: a plain No -------------------------
+  var engShort = engagementWith(one(), {}, responsesFor(inst, "z1", 1, ["FR1"]));
+  var v2 = screen(engShort, "z1");
+  ok(v2.scored.overallTargetStatus === "short" && v2.scored.overallTargetMet === false,
+     "a shortfall found is short, whatever is left to assess", v2.scored.overallTargetStatus);
+  ok(/^No$/.test(v2.tile.trim()), "and the tile reads No", v2.tile);
+
+  // ---- 3. every FR answered and met: met -----------------------------------
+  var engAll = engagementWith(one(), {}, responsesFor(inst, "z1", 2));
+  var v3 = screen(engAll, "z1"), s3 = v3.scored;
+  ok(s3.overallTargetMet === true && s3.overallTargetStatus === "met", "every FR met is the target met", s3.overallTargetStatus);
+  ok(s3.assessedFRCount === 7 && s3.notAssessedFRs.length === 0, "with 7 of 7 assessed", String(s3.assessedFRCount));
+  ok(v3.tile.trim() === "Yes" && /\bmet\b/.test(v3.tileClass), "the screen tile reads Yes", v3.tile);
+  ok(/^Overall target met\./.test(v3.headline) && v3.headline.indexOf("so far") === -1, "and the headline says the overall target is met", v3.headline);
+
+  // ---- 4. an FR out of scope does not hold the result open ---------------
+  var engScoped = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ALL_FRS.slice(0, 6)), { FR7: 0 });
+  var s4 = S.scoreEngagement(engScoped, inst, tax, prof).perTarget[0].result;
+  ok(s4.outOfScopeFRs.length === 1 && s4.overallTargetMet === true && s4.overallTargetStatus === "met",
+     "FR7 at SL-T 0 is out of scope, and FR1 to FR6 met is the target met", s4.overallTargetStatus);
+  ok(s4.inScopeFRCount === 6 && s4.assessedFRCount === 6, "counted as 6 of 6 in scope", s4.assessedFRCount + " of " + s4.inScopeFRCount);
+
+  // ---- 4b. incomplete with an FR out of scope: the counts say why it is six ----
+  var engOut = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ["FR1"]), { FR7: 0 });
+  var v4b = screen(engOut, "z1");
+  ok(v4b.scored.overallTargetStatus === "incomplete", "FR1 met, FR7 out of scope, the rest untouched: incomplete", v4b.scored.overallTargetStatus);
+  ok(/^Not yet/.test(v4b.tile) && /1 of 6 in-scope FRs assessed/.test(v4b.tile),
+     "the tile reads Not yet, 1 of 6 in-scope FRs assessed", v4b.tile);
+  ok(/Target met so far in the one FR assessed \(FR1\); 5 FRs not yet assessed and 1 out of scope\./.test(v4b.headline),
+     "the headline accounts for all seven: 1 assessed, 5 not yet, 1 out of scope", v4b.headline);
+  ok(/1 of 7 FRs assessed/.test(v1.tile) && v1.tile.indexOf("in-scope") === -1,
+     "with nothing out of scope the tile does not say in-scope", v1.tile);
+
+  // ---- 4c. an FR whose every item is a justified N/A has been assessed ----
+  var naResp = (inst.requirements || []).filter(function (req) { return req.frId === "FR2"; }).map(function (req) {
+    var comps = {};
+    S.requirementItems(req).forEach(function (it) { comps[it.componentId] = { state: "na", note: "No such function on this system." }; });
+    return { targetId: "z1", requirementId: req.id, components: comps };
+  });
+  var engNA = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ["FR1"]).concat(naResp));
+  var v4c = screen(engNA, "z1");
+  ok(v4c.scored.overallTargetStatus === "incomplete" && v4c.scored.assessedFRCount === 2 && v4c.scored.notAssessedFRs.length === 5,
+     "FR1 met and FR2 all justified N/A: incomplete, 2 assessed, 5 not", v4c.scored.assessedFRCount + "/" + v4c.scored.notAssessedFRs.length);
+  ok(/2 of 7 FRs assessed/.test(v4c.tile), "the tile reads 2 of 7 FRs assessed", v4c.tile);
+  ok(/Target met so far in both FRs assessed \(FR1 and FR2\); 5 FRs not yet assessed\./.test(v4c.headline),
+     "the headline names both FRs assessed and says 5 are not yet assessed", v4c.headline);
+  var three = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ["FR1", "FR2", "FR3"]));
+  var v4d = screen(three, "z1");
+  ok(/Target met so far in all 3 FRs assessed; 4 FRs not yet assessed\./.test(v4d.headline),
+     "three FRs assessed are counted, not named", v4d.headline);
+  var six = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ALL_FRS.slice(0, 6)));
+  var v4e = screen(six, "z1");
+  ok(/; 1 FR not yet assessed\./.test(v4e.headline), "one FR left is singular", v4e.headline);
+
+  // ---- 5. two zones: one complete and met, one met so far --------------------
+  var zones = [ { id: "z-a", name: "Control zone" }, { id: "z-b", name: "Safety zone" } ];
+  var engTwo = engagementWith(zones, {},
+    responsesFor(inst, "z-a", 2).concat(responsesFor(inst, "z-b", 2, ["FR1"])));
+  var v5 = screen(engTwo, "z-b"), roll = v5.all.systemRollup;
+  ok(roll.zonesMeetingTarget.join() === "Control zone", "only the complete zone meets its target", roll.zonesMeetingTarget.join());
+  ok((roll.zonesIncomplete || []).join() === "Safety zone", "the other is incomplete", (roll.zonesIncomplete || []).join());
+  ok(roll.zonesShort.length === 0, "and neither is short", roll.zonesShort.join());
+  var lines = R.systemRollupLines(roll, inst).join(" ");
+  ok(/Safety zone meets its target in every Foundational Requirement assessed so far; its other Foundational Requirements have not been assessed yet\./.test(lines),
+     "the system prose says the safety zone is met so far, with its other FRs not yet assessed", lines.slice(0, 400));
+  ok(lines.indexOf("the rest") === -1, "and does not say 'the rest', which reads as the other zones", lines.slice(0, 400));
+  ok(!/All 2 assessed/.test(lines), "and does not say all assessed zones meet their target", lines.slice(0, 400));
+  ok(/Control zone meets its target Security Level across every Foundational Requirement\./.test(lines),
+     "and still says the complete zone meets its target", lines.slice(0, 400));
+  var crossRow = Array.prototype.filter.call(v5.host.querySelectorAll("tr"), function (tr) {
+    var c = tr.querySelector("td"); return c && c.textContent === "Target met";
+  })[0];
+  var crossTxt = crossRow ? crossRow.textContent : "";
+  ok(/Yes/.test(crossTxt) && /Not yet/.test(crossTxt) && /1 of 7 FRs assessed/.test(crossTxt),
+     "the screen comparison row reads Yes for one zone and Not yet, 1 of 7 FRs assessed for the other", crossTxt);
+  ok(/^Not yet/.test(v5.tile), "the safety zone's own tile reads Not yet", v5.tile);
+
+  // ---- 5b. one zone assessed, the other untouched: singular, and named ----
+  var engLone = engagementWith(zones, {}, responsesFor(inst, "z-a", 2));
+  var lone = S.scoreEngagement(engLone, inst, tax, prof).systemRollup;
+  ok(lone.zonesMeetingTarget.join() === "Control zone" && lone.zonesNotAssessed.join() === "Safety zone",
+     "set-up: one zone met, one not assessed", JSON.stringify(lone.zonesNotAssessed));
+  var loneLines = R.systemRollupLines(lone, inst).join(" ");
+  ok(/The one assessed zone or conduit, Control zone, meets its target Security Level across every Foundational Requirement\./.test(loneLines),
+     "the one assessed zone is named, in the singular", loneLines.slice(0, 300));
+  ok(!/All 1 assessed/.test(loneLines), "never 'All 1 assessed zones'", loneLines.slice(0, 300));
+  ok(/Safety zone has not been assessed and is excluded from the statements above\./.test(loneLines),
+     "and the untouched zone is called out", loneLines.slice(0, 400));
+  var engLoneShort = engagementWith(zones, {}, responsesFor(inst, "z-a", 1));
+  var loneS = R.systemRollupLines(S.scoreEngagement(engLoneShort, inst, tax, prof).systemRollup, inst).join(" ");
+  ok(/The one assessed zone or conduit, Control zone, falls short of its target Security Level\./.test(loneS) && !/None of the 1/.test(loneS),
+     "one assessed zone short reads in the singular too, never 'None of the 1'", loneS.slice(0, 300));
+
+  // ---- Word ------------------------------------------------------------------
+  word(engOne, "z1").then(function (d) {
+    ok(d.list.length > 5, "the single-zone Word report builds");
+    ok(!/Overall target met: Yes/.test(d.all), "Word never says Overall target met: Yes on one FR of seven");
+    // The caption under the value is export-docx.js's wording; the count is pinned.
+    ok(/Not yet\n[^\n]*\(1 of 7 FRs assessed\)/.test(d.all), "the scorecard tile reads Not yet, with 1 of 7 FRs assessed",
+       (d.all.match(/Not yet\n.{0,40}/) || [""])[0]);
+    ok(/Closeness \(context\)\nNot yet \(1 of 7 FRs assessed\)\n/.test(d.all), "the overall posture table reads Not yet (1 of 7 FRs assessed)",
+       (d.all.match(/Closeness \(context\)\n.{0,40}/) || [""])[0]);
+    var es = sec(d.list, /Executive summary$/);
+    ok(es.text.indexOf(MET) >= 0 && qualified(es.text), "the executive summary says met across the assessed FRs, qualified as not yet complete",
+       es.text.slice(0, 400));
+    ok(!/—|–/.test(es.text), "the executive summary carries no em or en dash");
+
+    // The label/value executive summary used when a pack has no composed one.
+    var bare = JSON.parse(JSON.stringify(narr)); delete bare.executiveSummary;
+    return word(engOne, "z1", bare);
+  }).then(function (d) {
+    var es = sec(d.list, /Executive summary$/);
+    ok(/Overall target met: Not yet \(1 of 7 FRs assessed\)\./.test(es.text),
+       "the label/value summary reads Overall target met: Not yet (1 of 7 FRs assessed)", es.text.slice(0, 400));
+    return word(engAll, "z1");
+  }).then(function (d) {
+    // The methodology appendix explains "Not yet" in quotes; no RESULT says it.
+    ok(!/(^|\n)Not yet( \(|\n|$)/.test(d.all), "control: with every FR met, no Word tile or table reads Not yet",
+       (d.all.match(/.{0,40}Not yet.{0,40}/) || [""])[0]);
+    // Pinned to the posture table's own row: its header ends "Closeness
+    // (context)" and the first value cell follows it. Any per-FR "Yes" row
+    // satisfied the looser check this replaced.
+    ok(/Closeness \(context\)\nYes\nFR\d/.test(d.all), "control: and the posture table reads Yes",
+       (d.all.match(/Closeness \(context\)\n.{0,40}/) || [""])[0]);
+    ok(/Yes\nTarget met\n/.test(d.all), "control: the scorecard tile reads Yes", (d.all.match(/.{0,20}Target met.{0,20}/) || [""])[0]);
+    var es = sec(d.list, /Executive summary$/);
+    ok(es.text.indexOf(MET) >= 0 && !qualified(es.text), "control: the summary says the target is met, with no caveat", es.text.slice(0, 300));
+    return word(engTwo, "z-b");
+  }).then(function (d) {
+    var es = sec(d.list, /Executive summary$/);
+    ok(!/Both (assessed )?zones and conduits (in scope )?meet their target Security Level/.test(es.text),
+       "multi-zone: the summary does not say both zones meet their target", es.text.slice(0, 900));
+    ok(/assessed so far|not been fully assessed/.test(es.text),
+       "multi-zone: the summary says a zone is met only so far", es.text.slice(0, 900));
+    ok(qualified(es.text), "multi-zone: and the verdict is qualified as not yet complete", es.text.slice(0, 400));
+    var glance = sec(d.list, /Results across the system/);
+    ok(/1 of 2\n.*meeting target \(1 not fully assessed\)/.test(glance.text),
+       "multi-zone: the tile reads 1 of 2 meeting target, 1 not fully assessed", (glance.text.match(/.{0,30}meeting target.{0,30}/) || [""])[0]);
+    var cmp = glance.tables.filter(function (t) { return /Overall target met/.test(textOf(t)); })[0];
+    var cmpTxt = cmp ? textOf(cmp) : "";
+    ok(/Control zoneYes/.test(cmpTxt) && /Safety zoneNot yet1 of 7 FRs assessed/.test(cmpTxt),
+       "multi-zone: the comparison table reads Yes and Not yet, 1 of 7 FRs assessed", cmpTxt.slice(0, 300));
+    var safety = sec(d.list, /Safety zone/);
+    ok(/Not yet\n[^\n]*\(1 of 7 FRs assessed\)/.test(safety.text), "multi-zone: the safety zone's scorecard tile reads Not yet");
+    var control = sec(d.list, /Control zone/);
+    ok(/Yes\nTarget met\n/.test(control.text), "multi-zone: the control zone's scorecard tile reads Yes");
+    ok(!/—|–/.test(es.text + glance.text), "multi-zone: no em or en dash in the summary or the system results");  }).then(done, function (e) { ok(false, "threw: " + (e && e.stack || e)); done(); });
+});
+</script>
+</body></html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Posture and supplier: what good looks like, switchable</title></head>
+<body>
+<!--
+  The posture and supplier Word roadmaps used to print "What good looks like:
+  Fully in place and managed" (the scale's top label) under every item: the
+  same words every time. Each question has its own description of good
+  practice, and that is what prints now, behind a report-page checkbox that
+  is on by default. This checks both reports, the default, the switch, and
+  that the generic label is gone either way.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: ["posture", "supplier"] }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"])); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = { "general-ot-posture": A.TourPosture, "supplier-screener": A.TourSupplier };
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply) m.apply(E); });
+
+  // The text of word/document.xml in the generated file.
+  function docXmlText(blob) {
+    return blob.arrayBuffer().then(function (buf) {
+      var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+      for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+      var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true);
+      for (var k = 0; k < n; k++) {
+        var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+        var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+        var local = v.getUint32(p + 42, true);
+        var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+        if (name === "word/document.xml") {
+          var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+          var data = u8.subarray(start, start + csize);
+          return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer()
+            .then(function (b) { return new TextDecoder().decode(b).replace(/<[^>]+>/g, " ").replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " "); });
+        }
+        p += 46 + nlen + xlen + clen;
+      }
+      return "";
+    });
+  }
+  function build() {
+    return new Promise(function (res) {
+      A.ExportDOCX.buildAsync(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+        { targetId: E.state.activeTargetId }, function (err, blob) {
+          if (err) { ok(false, "build error: " + (err.message || err)); res(null); return; }
+          docXmlText(blob).then(res, function () { res(null); });
+        });
+    });
+  }
+  function firstRoadmapGood() {
+    var scored = E.scoreActiveTarget();
+    var it = ((scored && scored.roadmap) || [])[0];
+    var q = it && (E.state.instrument.questions || []).filter(function (x) { return x.id === it.questionId || x.id === it.id; })[0];
+    return q && q.goodLooksLike;
+  }
+
+  var chain = Promise.resolve();
+  ["general-ot-posture", "supplier-screener"].forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      A.UI.go("report");
+      var cb = document.querySelector("#main .check-row input[type=checkbox]");
+      ok(!!cb && /what good looks like/i.test(cb.parentNode.textContent), id + ": the report page has the option");
+      ok(cb && cb.checked, id + ": and it is ticked by default");
+      var good = firstRoadmapGood();
+      ok(!!good, id + ": the first roadmap item's question has its own good-practice text");
+      return build().then(function (t) {
+        ok(t && good && t.indexOf(good.slice(0, 60)) !== -1, id + ": by default the Word roadmap shows the question's own good practice", t ? ("doc length " + t.length + "; has field label: " + (t.indexOf("What good looks like") !== -1)) : "no doc");
+        ok(t && t.indexOf("Fully in place and managed") === -1, id + ": and never the generic top-band label");
+        E.setReportNarrative({ includeGoodPractice: false });
+        return build();
+      }).then(function (t) {
+        ok(t && good && t.indexOf(good.slice(0, 60)) === -1, id + ": switched off, it is left out");
+        E.setReportNarrative({ includeGoodPractice: true });
+      });
+    });
+  });
+  chain.then(done, function (e) { ok(false, "threw: " + (e && e.message)); done(); });
+});
+</script>
+</body></html>
