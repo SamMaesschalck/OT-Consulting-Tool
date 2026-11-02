@@ -1,0 +1,20 @@
+{
+  "_note": "What the packaging and release scripts need to know about this module (packaging/module-info.ps1 reads it). The version is not here: it is the suite's, in shared/version.js. 'product' must match js/product.js.",
+  "id": "assessments",
+  "product": "OT Cyber Assessment Tool",
+  "entry": "index.html",
+  "tests": {
+    "pages": "scripts/test-*.html",
+    "virtualTimeMs": 900000,
+    "timeoutSec": 600
+  },
+  "singleHtml": {
+    "parityCheck": "check-single-html.html",
+    "inlineExtras": []
+  },
+  "electron": {
+    "appId": "com.solutionspt.ot-cyber-assessment-tool",
+    "packageName": "ot-cyber-assessment-tool",
+    "selfTest": "assessments"
+  }
+}

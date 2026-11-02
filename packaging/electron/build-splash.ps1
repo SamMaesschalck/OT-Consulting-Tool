@@ -3,21 +3,22 @@
 # Draws the loading window's picture for the portable exe (see README:
 # Loading screen).
 #
-#   powershell -ExecutionPolicy Bypass -File build-splash.ps1 -Out <path.bmp>
+#   powershell -ExecutionPolicy Bypass -File build-splash.ps1 -Out <path.bmp> [-Module risk-assessment]
 #
-# Called by build-portable-exe.ps1, so the version on it is always the one
-# being built (from ..\..\modules\assessments\js\version.js). launcher-splash\OtcatSplash
+# Called by build-portable-exe.ps1, so the product and version on it are always
+# the ones being built (the module's module.json and the suite version in
+# ..\..\shared\version.js; see ..\module-info.ps1). launcher-splash\OtcatSplash
 # shows it and animates the bar over the track drawn here, from double-click
 # until the tool is up. It is also the still image the launcher falls back to
 # if that program cannot start. Same size, layout and words as app\splash.html,
 # the app's own loading window for the other builds.
 
-param([Parameter(Mandatory = $true)][string]$Out)
+param([Parameter(Mandatory = $true)][string]$Out, [string]$Module = "assessments")
 
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $here "get-version.ps1")   # $AppVersionLabel
+. (Join-Path (Split-Path -Parent $here) "module-info.ps1") -Module $Module   # $AppProduct, $AppVersionLabel
 
 $W = 520; $H = 300; $pad = 40
 $bmp = New-Object Drawing.Bitmap($W, $H, [Drawing.Imaging.PixelFormat]::Format24bppRgb)
@@ -40,7 +41,10 @@ $logo = [Drawing.Image]::FromFile((Join-Path $here "build\icon-256.png"))
 $g.DrawImage($logo, $pad, $top, 92, 92)
 $logo.Dispose()
 $tx = $pad + 92 + 22
-$g.DrawString("OT Cyber Assessment Tool", (Font "Segoe UI Semibold" 22 $reg), $ink, $tx, $top + 22)
+# The product name at 22 px, smaller only if a longer name would not fit.
+$nameSize = 22
+while ($nameSize -gt 14 -and $g.MeasureString($AppProduct, (Font "Segoe UI Semibold" $nameSize $reg)).Width -gt ($W - $pad - $tx)) { $nameSize-- }
+$g.DrawString($AppProduct, (Font "Segoe UI Semibold" $nameSize $reg), $ink, $tx, $top + 22 + (22 - $nameSize) / 2)
 $g.DrawString($AppVersionLabel, (Font "Segoe UI" 13 $reg), $muted, $tx + 1, $top + 54)
 $g.DrawString("Starting up" + [char]0x2026, (Font "Segoe UI" 14 $reg), $ink, $pad - 2, $top + 92 + 28)
 $g.FillRectangle((Brush 0xE6 0xEE 0xF6), $pad, $top + 92 + 52, $W - 2 * $pad, 4)
@@ -53,4 +57,4 @@ $dir = Split-Path -Parent $Out
 if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force $dir | Out-Null }
 $bmp.Save($Out, [Drawing.Imaging.ImageFormat]::Bmp)
 $bmp.Dispose()
-Write-Output "Wrote $Out ($AppVersionLabel)"
+Write-Output "Wrote $Out ($AppProduct $AppVersionLabel)"

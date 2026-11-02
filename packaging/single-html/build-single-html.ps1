@@ -1,44 +1,50 @@
 # Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt.
 #
-# Builds the OT Cyber Assessment Tool as ONE self-contained HTML file, for
-# handing out. It reads the working app in ..\..\modules\assessments and never writes
-# there: the folder version stays the one that is developed and tested.
+# Builds one module as ONE self-contained HTML file, for handing out. It reads
+# the working app in ..\..\modules\<module> and never writes there: the folder
+# version stays the one that is developed and tested. Each tool stays
+# available on its own: a contractor can be given just one of these files.
 #
-#   powershell -ExecutionPolicy Bypass -File build-single-html.ps1
+#   powershell -ExecutionPolicy Bypass -File build-single-html.ps1                          # the assessment tool
+#   powershell -ExecutionPolicy Bypass -File build-single-html.ps1 -Module risk-assessment  # the risk tool
 #
-# Output: "OT Cyber Assessment Tool v<version>.html" here, e.g. "... v0.3.html". Nothing needs sending with it:
-# the licence opens in a pop-up from the app (carried in as data/shared/licence.js).
+# Output: "<product> <version label>.html" here, e.g. "OT Cyber Assessment Tool
+# v0.5.html" or "OT Cyber Risk Assessment Tool v0.5.html" (product from the
+# module's module.json, version from shared\version.js; see ..\module-info.ps1).
+# Nothing needs sending with it: the licence is embedded (the assessment tool
+# opens it in a pop-up from data/shared/licence.js; both carry it as a comment
+# at the top of the file).
 #
-# What it does, following ..\..\modules\assessments\index.html line by line:
-#   - the stylesheet link becomes an inline <style>
-#   - the header logo becomes a data: URI
+# What it does, following the module's index.html line by line:
+#   - each stylesheet link becomes an inline <style>
+#   - each <img src="....png"> becomes a data: URI
 #   - every <script src> becomes an inline <script>, in the same order
-#   - data/manifest.js keeps its instrument index, but its document.write()
-#     loader is replaced by the files it would have loaded, inlined in the
-#     order it lists them
-# The risk assessment tool and the demo tour are not included.
+#   - data/manifest.js (assessment tool) keeps its instrument index, but its
+#     document.write() loader is replaced by the files it would have loaded,
+#     inlined in the order it lists them
+#   - files the app only loads on demand, listed in module.json as
+#     singleHtml.inlineExtras (the risk tool's demo project), are inlined at
+#     the end of <head>; the app uses an inline copy when it finds one
+# The assessment tool's demo tour is not included.
 #
 # Re-run after any change to the app (and after scripts/build-data.ps1 when
-# instrument data changed), then run check-single-html.html.
+# its data changed), then run the module's check page (module.json
+# singleHtml.parityCheck, beside this script).
+param([string]$Module = "assessments")
 
 $ErrorActionPreference = "Stop"
 $here  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$app   = Join-Path (Split-Path -Parent (Split-Path -Parent $here)) "modules\assessments"
-# The version comes from js/version.js, the app's one source of it, and goes
-# in the file name so a copy says which release it is before it is opened.
-$verSrc = [IO.File]::ReadAllText((Join-Path $app "js\version.js"))
-$m = [regex]::Match($verSrc, 'var VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"')
-if (-not $m.Success) { throw "Could not read the version from js/version.js" }
-$version = $m.Groups[1].Value
-$vp = $version.Split('.')
-$versionLabel = "v" + $(if ($vp[2] -eq "0") { $vp[0] + "." + $vp[1] } else { $version })
-$outName = "OT Cyber Assessment Tool $versionLabel.html"
+. (Join-Path (Split-Path -Parent $here) "module-info.ps1") -Module $Module
+$app   = $ModuleDir
+$version = $AppVersion
+$versionLabel = $AppVersionLabel
+$outName = $AppPageName
 $out   = Join-Path $here $outName
 $utf8  = New-Object System.Text.UTF8Encoding($false)
 
 function ReadText($rel) {
   $p = Join-Path $app $rel
-  if (-not (Test-Path $p)) { throw "Missing file referenced by index.html: $rel" }
+  if (-not (Test-Path $p)) { throw "Missing file referenced by $($ModuleInfo.entry): $rel" }
   return [IO.File]::ReadAllText($p, [Text.Encoding]::UTF8)
 }
 
@@ -58,22 +64,33 @@ function InlineScript($sb, $rel, $js) {
   [void]$sb.Append("`n</script>`n")
 }
 
-$index = ReadText "index.html"
+$index = ReadText $ModuleInfo.entry
 $lines = $index -split "`r?`n"
 $sb = New-Object System.Text.StringBuilder
 $inlined = New-Object System.Collections.Generic.List[string]
+$extras = @($ModuleInfo.singleHtml.inlineExtras | Where-Object { $_ })
+$extrasDone = $false
 
 $licence = [IO.File]::ReadAllText((Join-Path $app "LICENCE.txt"), [Text.Encoding]::UTF8)
 $stamp = (Get-Date).ToString("yyyy-MM-dd HH:mm")
 
 foreach ($line in $lines) {
   # The licence also sits as a comment at the top, for anyone reading the
-  # source rather than the app (which shows it in a pop-up).
+  # source rather than the app.
   if ($line -match '^<!doctype html>') {
     [void]$sb.Append($line).Append("`n")
     [void]$sb.Append("<!--`n").Append($licence.Replace('--', '- -')).Append("`n")
-    [void]$sb.Append("Single-file build of the OT Cyber Assessment Tool $versionLabel (version $version), generated $stamp.`n-->`n")
+    [void]$sb.Append("Single-file build of the $AppProduct $versionLabel (version $version), generated $stamp.`n-->`n")
     continue
+  }
+
+  # On-demand files go in at the end of <head>, before any app code runs.
+  if (-not $extrasDone -and $line -match '^\s*</head>') {
+    foreach ($rel in $extras) {
+      InlineScript $sb $rel (ReadText $rel)
+      $inlined.Add($rel)
+    }
+    $extrasDone = $true
   }
 
   $m = [regex]::Match($line, '^\s*<link rel="stylesheet" href="([^"]+)"\s*/?>\s*$')
@@ -119,6 +136,8 @@ foreach ($line in $lines) {
 
   [void]$sb.Append($line).Append("`n")
 }
+
+if ($extras.Count -gt 0 -and -not $extrasDone) { throw "$($ModuleInfo.entry) has no </head> line to put the inline extras before" }
 
 $html = $sb.ToString()
 

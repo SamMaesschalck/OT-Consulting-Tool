@@ -1,7 +1,12 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only. */
-/* selftest.js - run the packaged app with --self-test to check it end to end.
+/* selftest-assessments.js - run the packaged assessment tool with --self-test
+ * to check it end to end.
  *
  *   "OT Cyber Assessment Tool.exe" --self-test --out=C:\path\result.txt
+ *
+ * main.js loads it for the module whose module.json says
+ * electron.selfTest "assessments"; selftest-risk-assessment.js is the risk
+ * tool's.
  *
  * Everything here is what is DIFFERENT about running inside Electron rather
  * than Edge: that the app starts from inside the package, that every

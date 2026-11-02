@@ -1,7 +1,8 @@
 # Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt.
 #
-# Runs a module's headless-Edge test pages (modules\<module>\scripts\test-*.html)
-# and reports PASS/FAIL counts per page.
+# Runs a module's headless-Edge test pages (the tests.pages glob in
+# modules\<module>\module.json, scripts\test-*.html for both modules) and
+# reports PASS/FAIL counts per page.
 #
 #   .\tools\run-tests.ps1                                  # every assessments page
 #   .\tools\run-tests.ps1 -Module risk-assessment          # every risk-assessment page
@@ -25,12 +26,22 @@ $ErrorActionPreference = "Continue"
 $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 $out  = Join-Path (Split-Path -Parent $PSScriptRoot) ("test-results\" + (Split-Path $Root -Leaf).Replace(' ', '_'))
 if (-not (Test-Path $out)) { New-Item -ItemType Directory $out -Force | Out-Null }
+# The test pages: the module manifest's tests.pages glob (module.json), or
+# scripts\test-*.html for a folder without one.
+$pagesGlob = "scripts/test-*.html"
+$manifest = Join-Path $Root "module.json"
+if (Test-Path $manifest) {
+  $mf = [IO.File]::ReadAllText($manifest, [Text.Encoding]::UTF8) | ConvertFrom-Json
+  if ($mf.tests -and $mf.tests.pages) { $pagesGlob = [string]$mf.tests.pages }
+}
+$pagesGlob = $pagesGlob.Replace('/', '\')
+$pagesDir = Join-Path $Root (Split-Path -Parent $pagesGlob)
 if (-not $Tests -or $Tests.Count -eq 0) {
-  $Tests = Get-ChildItem (Join-Path $Root "scripts\test-*.html") | ForEach-Object { $_.Name }
+  $Tests = Get-ChildItem (Join-Path $Root $pagesGlob) | ForEach-Object { $_.Name }
 }
 $totalPass = 0; $totalFail = 0; $bad = @()
 foreach ($t in $Tests) {
-  $src = Join-Path $Root "scripts\$t"
+  $src = Join-Path $pagesDir $t
   if (-not (Test-Path $src)) { Write-Output "MISSING $t"; $bad += $t; continue }
   $dom = Join-Path $out ($t -replace '\.html$', '.txt')
   if (Test-Path $dom) { Remove-Item $dom -Force }

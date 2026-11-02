@@ -11,6 +11,9 @@
 //
 //   OtcatSplash.exe <splash.bmp> <ready-flag-file> <launcher-pid>
 //
+// One source for every module's exe: the window title is the product name the
+// build stamps in (AssemblyProduct), and the picture is drawn per module.
+//
 // It shows the bitmap (logo, name, version, track drawn by build-splash.ps1),
 // animates the bar over the track, and closes when the ready flag appears
 // (the app writes it once its window is up), when the launcher exits, or
@@ -58,7 +61,7 @@ sealed class SplashForm : Form
     public SplashForm(Image image, string readyFlag, int launcherPid)
     {
         this.image = image; this.readyFlag = readyFlag; this.launcherPid = launcherPid;
-        Text = "OT Cyber Assessment Tool";
+        Text = StampedProduct();
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = image.Size;
@@ -69,6 +72,15 @@ sealed class SplashForm : Form
         frame.Interval = 16;
         frame.Tick += OnTick;
         frame.Start();
+    }
+
+    // The product being started, stamped into this program by the build
+    // (AssemblyProduct), so one source serves every module's exe.
+    static string StampedProduct()
+    {
+        var a = (System.Reflection.AssemblyProductAttribute)Attribute.GetCustomAttribute(
+            System.Reflection.Assembly.GetExecutingAssembly(), typeof(System.Reflection.AssemblyProductAttribute));
+        return a != null && !string.IsNullOrEmpty(a.Product) ? a.Product : "OT Cyber suite";
     }
 
     void OnTick(object sender, EventArgs e)

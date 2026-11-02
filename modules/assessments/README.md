@@ -299,7 +299,7 @@ Some pages carry a `#shot` hash that stops after the first render and hides the 
 
 ## Sibling app
 
-`../Risk Assessment/` is a self-contained risk assessment tool (`index.html`) with its own copy of the assets. It shares no runtime code with this app by design. The only coupling is the `spt-risk-context` interchange file (currently 1.4), which carries per-zone SL-T targets between the two.
+`../risk-assessment/` is a self-contained risk assessment tool (`index.html`) with its own copy of the assets. It shares no runtime code with this app by design. The only coupling is the `spt-risk-context` interchange file (currently 1.4), which carries per-zone SL-T targets between the two.
 
 ## Known limits
 
@@ -317,11 +317,11 @@ The notice appears in the app (sidebar foot, plus the home screen in the assessm
 
 ## Version
 
-The tool is **v0.5** (0.5.0). The one place to change it is `js/version.js`, and every release reads it from there:
+The tool is **v0.5** (0.5.0). That is the suite version, one number for every tool in the suite (this one and the risk tool), so every file in a release carries the same version. `js/version.js` is a synced copy: the one place to change it is the repository's `shared/version.js`, and `tools/sync-shared.ps1` copies it into each module (`-Check` fails on drift). `js/product.js` gives the version this module's name, so `App.Version.product` is "OT Cyber Assessment Tool". Every release reads it from there:
 
 - **In the tool:** a badge beside the name in the header, the sidebar notice, and the licence pop-up.
 - **In project files:** each saved project records `createdWithVersion` and `savedWithVersion`, so a project sent back says which release made it. A project last saved by a newer release than the one opening it gets a warning. Files from before versions were recorded are left without a `createdWithVersion` rather than being given one they never had.
 - **In releases:** the single file is named `OT Cyber Assessment Tool v0.5.html`, and the desktop exe is `OT Cyber Assessment Tool v0.5.exe` with file version 0.5.0.
 - **Never in a report.** Word and Excel exports carry no version information, either in the text or in the file properties. `scripts/test-version.html` opens real exports and fails if the version appears anywhere in them.
 
-To release a new version, edit `js/version.js`, then rebuild the single file and the exe.
+To release a new version, edit `shared/version.js`, run `tools/sync-shared.ps1`, update the pinned numbers in `scripts/test-version.html`, commit, then run `tools/release.ps1` (or build one module with `tools/build.ps1 -Module assessments -As both -SelfTest`). `module.json` is what the packaging scripts read: the product name, entry page, test pages, parity check page and the exe's app id and self-test.

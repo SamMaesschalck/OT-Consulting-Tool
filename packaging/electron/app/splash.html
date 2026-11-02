@@ -29,7 +29,7 @@
 <body>
   <div class="row">
     <img src="splash-logo.png" alt=""/>
-    <div><h1>OT Cyber Assessment Tool</h1><div class="ver" id="ver"></div></div>
+    <div><h1 id="product">OT Cyber Assessment Tool</h1><div class="ver" id="ver"></div></div>
   </div>
   <div class="status">Starting up&hellip;</div>
   <div class="bar"><span></span></div>
@@ -38,5 +38,8 @@
 <script>
   var v = new URLSearchParams(location.search).get("v");
   if (v) document.getElementById("ver").textContent = v;
+  // The product being started (main.js passes the module's name).
+  var p = new URLSearchParams(location.search).get("p");
+  if (p) { document.getElementById("product").textContent = p; document.title = p; }
 </script>
 </body></html>

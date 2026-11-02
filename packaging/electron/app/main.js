@@ -1,8 +1,15 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only. */
-/* main.js - Electron shell for the OT Cyber Assessment Tool (test build).
+/* main.js - Electron shell for one module of the OT Cyber suite (the OT Cyber
+ * Assessment Tool or the OT Cyber Risk Assessment Tool; test build).
  *
- * The app itself is the single-file build (index.html beside this file), run
- * unchanged. This shell only does what a browser tab did for it for free:
+ * The app itself is the module's single-file build (index.html beside this
+ * file), run unchanged. Which module it is comes from module.json beside this
+ * file, the module's manifest copied in by the build: its product name titles
+ * the windows, and its electron.selfTest picks the self-test
+ * (selftest-<kind>.js). Each module is packaged with its own appId and product
+ * name, so each exe keeps its own local storage (autosave) and can run
+ * alongside the other. This shell only does what a browser tab did for it for
+ * free:
  *
  *   - one window, no browser chrome, no menu bar
  *   - the unsaved-work warning: Chromium shows a "Leave site?" box when a page
@@ -22,6 +29,12 @@ const path = require("path");
 
 const SELF_TEST = process.argv.includes("--self-test");
 const INDEX = path.join(__dirname, "index.html");
+const MODULE = require("./module.json");
+const PRODUCT = MODULE.product;
+
+// The self-test runs in a profile of its own, so the demo data and unsaved
+// edits it makes never reach the user's autosave.
+if (SELF_TEST) app.setPath("userData", path.join(app.getPath("temp"), "otcat-selftest-" + MODULE.id));
 
 if (!SELF_TEST && !app.requestSingleInstanceLock()) {
   app.quit();
@@ -56,12 +69,12 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
         width: 520, height: 300, frame: false, resizable: false, movable: true,
         x: Math.round(scr.x + (scr.width - 520) / 2), y: Math.round(scr.y + (scr.height - 300) / 2),
         show: false, skipTaskbar: false, backgroundColor: "#ffffff",
-        title: "OT Cyber Assessment Tool",
+        title: PRODUCT,
         webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false }
       });
       splash.once("ready-to-show", () => { if (splash) { splash.show(); global.otcatSplash.shown = true; } });
       splash.on("closed", () => { splash = null; global.otcatSplash.closed = true; });
-      splash.loadFile(path.join(__dirname, "splash.html"), { query: { v: label } });
+      splash.loadFile(path.join(__dirname, "splash.html"), { query: { v: label, p: PRODUCT } });
     }
     const closeSplash = () => { if (splash && !splash.isDestroyed()) splash.destroy(); };
 
@@ -75,7 +88,7 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
     win = new BrowserWindow({
       width: 1440, height: 900, minWidth: 1024, minHeight: 640,
       show: false,
-      title: "OT Cyber Assessment Tool",
+      title: PRODUCT,
       backgroundColor: "#ffffff",
       webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: true }
     });
@@ -135,7 +148,7 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
 
     win.loadFile(INDEX);
 
-    if (SELF_TEST) require("./selftest")(win);
+    if (SELF_TEST) require("./selftest-" + MODULE.electron.selfTest)(win);
   });
 
   // The self-test closes the window itself mid-run, and exits when it has

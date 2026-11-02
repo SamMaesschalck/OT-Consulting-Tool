@@ -1,0 +1,159 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Check: risk tool single-file build</title></head>
+<body>
+<!--
+  Proves the risk tool's single-file build is the same app as the folder
+  version (modules/risk-assessment). Loads both in tour mode, one after the
+  other, and compares what each can tell us about itself: title, version,
+  App modules and globals, the demo project, every page of the app as it
+  renders, and the Word and Excel files it builds. Then opens the single file
+  on its own (no ?tour) to check it starts empty.
+
+  Open it in Edge after running build-single-html.ps1 -Module risk-assessment.
+  Headless runs need --allow-file-access-from-files, since it reaches into the
+  frame. Prints ALL TESTS PASSED.
+-->
+<pre id="out">running...</pre>
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+
+  // Resolves once the app is up (and, in tour mode, the demo is loaded).
+  function load(url, tour) {
+    return new Promise(function (resolve, reject) {
+      frame.onload = function () {
+        var w = frame.contentWindow, tries = 0;
+        (function wait() {
+          var up = w.RiskTool && w.RiskExports && w.docx && w.ExcelJS && w.App && w.App.Version;
+          if (up && (!tour || (w.RiskTool.state.project.suc.name || "").indexOf("Acme") === 0)) return resolve(w);
+          if (++tries > 400) return reject(new Error("app did not start: " + url));
+          setTimeout(wait, 50);
+        })();
+      };
+      frame.src = url;
+    });
+  }
+
+  function keys(o) { return o ? Object.keys(o).sort().join(",") : ""; }
+  function flat(t) { return String(t || "").replace(/\s+/g, " ").replace(/\d{1,2} \w+ \d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4}(, [\d:]+)?/g, ""); }
+
+  // Everything one copy of the app can tell us about itself.
+  function probe(w, label) {
+    var A = w.App, doc = w.document, RT = w.RiskTool, RX = w.RiskExports;
+    var errors = [];
+    w.addEventListener("error", function (e) { errors.push("error: " + (e.message || e.type)); });
+    w.addEventListener("unhandledrejection", function (e) { errors.push("rejection: " + (e.reason && e.reason.message || e.reason)); });
+    var realErr = w.console.error;
+    w.console.error = function () { errors.push("console.error: " + Array.prototype.join.call(arguments, " ")); return realErr.apply(w.console, arguments); };
+    w.confirm = function () { return true; }; w.alert = function () {};
+    var p = RT.state.project;
+    var threats = 0;
+    p.zones.concat(p.conduits).forEach(function (o) { threats += (o.threats || []).length; });
+    var r = {
+      label: label,
+      title: doc.title,
+      product: A.Version.product,
+      version: A.Version.label,
+      number: A.Version.number,
+      badge: (doc.getElementById("stage-badge") || {}).textContent || "",
+      logo: ((doc.querySelector(".brand-logo img") || {}).naturalWidth || 0) > 0,
+      legal: ((doc.querySelector(".sidebar-legal") || {}).textContent || ""),
+      modules: keys(A),
+      data: keys(A.Data),
+      assets: keys(A.Assets),
+      riskTool: keys(RT),
+      riskExports: keys(RX),
+      globals: ["RiskTool", "RiskExports", "docx", "ExcelJS", "SPT_TOUR_PROJECT"].filter(function (g) { return !!w[g]; }).join(","),
+      tour: p.suc.name + " | " + p.zones.length + " zones | " + p.conduits.length + " conduits | " + threats + " threats",
+      pages: [],
+      errors: errors
+    };
+    // Every page in the sidebar, in turn, as it renders.
+    var n = doc.querySelectorAll("#sidebar .nav-item").length;
+    for (var i = 0; i < n; i++) {
+      var item = doc.querySelectorAll("#sidebar .nav-item")[i];
+      var name = flat(item.textContent).slice(0, 40);
+      item.click();
+      r.pages.push({ name: name, len: flat(doc.getElementById("main").textContent).length });
+    }
+    r.about = (function () {
+      var t = doc.getElementById("main").textContent;   // the last page is About
+      return /Copyright and licence/.test(t) && /SolutionsPT/.test(t) ? t.length : 0;
+    })();
+    r.aboutVersion = doc.getElementById("main").textContent.indexOf(A.Version.product + " (zones & conduits) " + A.Version.label) !== -1;
+    // The deliverables, built as the app builds them.
+    return w.docx.Packer.toBlob(RX.buildWordDoc(p, {})).then(function (b) {
+      r.word = b.size;
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, { highLevelOnly: true }));
+    }).then(function (b) {
+      r.wordHL = b.size;
+      var wb = RX.buildWorkbook(p);
+      r.sheets = wb.worksheets.map(function (s) { return s.name; }).join(",");
+      return wb.xlsx.writeBuffer();
+    }).then(function (buf) {
+      r.excel = buf.byteLength;
+      return r;
+    });
+  }
+
+  function close(a, b) { return typeof a === "number" && typeof b === "number" && b > 2000 && Math.abs(a - b) <= Math.max(200, a * 0.01); }
+
+  var folder, single, bundle;
+  load("../../modules/risk-assessment/index.html?tour=1", true).then(function (w) { return probe(w, "folder"); })
+    // The file is named for the product and version the app reports, so the
+    // check always opens the build of the code it is comparing against.
+    .then(function (r) {
+      folder = r;
+      bundle = encodeURIComponent(r.product + " " + r.version) + ".html";
+      return load(bundle + "?tour=1", true);
+    })
+    .then(function (w) {
+      ok(w.location.href.indexOf(bundle) !== -1, "the single file for this version loads (" + decodeURIComponent(bundle) + ")");
+      ok(w.document.querySelectorAll("script[src],link[href],img[src]:not([src^='data:'])").length === 0,
+         "it loads nothing from beside itself: no script src, stylesheet link or image file, even with the tour open");
+      return probe(w, "single");
+    })
+    .then(function (r) {
+      single = r;
+      ok(single.title === folder.title && single.title === "OT Cyber Risk Assessment Tool", "same page title (" + single.title + ")", folder.title + " vs " + single.title);
+      ok(single.product === folder.product && single.product === single.title, "the same product name", single.product);
+      ok(single.number === folder.number && single.version === folder.version, "the same suite version (" + single.version + ")", folder.number + " vs " + single.number);
+      ok(single.badge === single.version + ", 62443-3-2-aligned" && single.badge === folder.badge, "and the header badge shows it", single.badge);
+      ok(single.logo, "the header logo shows (embedded)");
+      ok(/SolutionsPT/.test(single.legal) && single.legal === folder.legal, "the copyright notice is in the sidebar", single.legal);
+      ok(single.about > 1000 && single.about === folder.about && single.aboutVersion, "the About page carries the licence notice and the version", folder.about + " vs " + single.about);
+      ok(single.modules === folder.modules, "the same App modules are present (" + single.modules + ")", folder.modules);
+      ok(single.data === folder.data && single.assets === folder.assets, "the same App data and brand assets", single.data + " / " + single.assets);
+      ok(single.globals === folder.globals && single.globals.split(",").length === 5, "the same globals (" + single.globals + ")", folder.globals);
+      ok(single.riskTool === folder.riskTool && single.riskExports === folder.riskExports, "RiskTool and RiskExports expose the same functions");
+      ok(single.tour === folder.tour && /^Acme Petrochemicals/.test(single.tour), "the tour's demo project loads (" + single.tour + ")", folder.tour);
+      ok(single.pages.length === folder.pages.length && single.pages.length >= 8, "the same pages in the sidebar (" + single.pages.length + ")", folder.pages.length + " vs " + single.pages.length);
+      folder.pages.forEach(function (a, i) {
+        var b = single.pages[i] || {};
+        ok(b.name === a.name && b.len === a.len && b.len > 200, "page '" + a.name + "' renders identically (" + b.len + " chars)", a.len + " vs " + b.len);
+      });
+      ok(close(folder.word, single.word), "the Word report builds to the same size (" + single.word + " bytes)", folder.word + " vs " + single.word);
+      ok(close(folder.wordHL, single.wordHL), "the high-level Word report builds to the same size (" + single.wordHL + " bytes)", folder.wordHL + " vs " + single.wordHL);
+      ok(single.sheets === folder.sheets && close(folder.excel, single.excel), "the Excel workbook has the same sheets and size (" + single.excel + " bytes)", folder.excel + " vs " + single.excel);
+      ok(folder.errors.length === 0, "(the folder version ran with no script or console errors)", folder.errors.join(" | "));
+      ok(single.errors.length === 0, "no script or console errors while every page rendered and the exports built", single.errors.join(" | "));
+      // On its own, without ?tour, it starts empty: the inline demo is not used.
+      return load(bundle, false);
+    })
+    .then(function (w) {
+      ok(!!w.SPT_TOUR_PROJECT && !w.RiskTool.state.project.suc.name && w.RiskTool.state.project.zones.length === 0,
+         "opened normally it starts on an empty project, though it carries the demo for ?tour");
+      finish();
+    })
+    .catch(function (e) { ok(false, "check threw: " + e.message); finish(); });
+})();
+</script>
+</body></html>

@@ -1,9 +1,11 @@
 # Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only.
 #
-# Builds the OT Cyber Assessment Tool as ONE portable .exe (no install: it
-# unpacks itself to a temp folder each time it starts, then runs).
+# Builds one module as ONE portable .exe (no install: it unpacks itself to a
+# temp folder each time it starts, then runs): the OT Cyber Assessment Tool
+# (default) or the OT Cyber Risk Assessment Tool. Each stays available on its
+# own, so a contractor can be given just one exe.
 #
-#   powershell -ExecutionPolicy Bypass -File build-portable-exe.ps1 [-SelfTest]
+#   powershell -ExecutionPolicy Bypass -File build-portable-exe.ps1 [-Module risk-assessment] [-SelfTest]
 #
 # Uses electron-builder's "portable" target. That needs Node, so a portable
 # Node (unzipped, not installed) lives in %LOCALAPPDATA%\OTCAT-electron\tools;
@@ -12,15 +14,24 @@
 # Electron itself is NOT downloaded again: the build points electron-builder
 # at the runtime build-electron.ps1 already verified.
 #
-# Everything heavy (node_modules, staging, output) stays in %LOCALAPPDATA%,
-# outside OneDrive. The finished exe is:
-#   %LOCALAPPDATA%\OTCAT-electron\dist\OT Cyber Assessment Tool v<version>.exe  (e.g. v0.3)
-# The version comes from ..\..\modules\assessments\js\version.js (see get-version.ps1).
+# Each module's exe has its own appId and productName (from its module.json),
+# so the two keep separate local storage (autosave) and can run side by side,
+# and its own loading window naming the product.
+#
+# Everything heavy stays in %LOCALAPPDATA%\OTCAT-electron, outside OneDrive.
+# Shared by every module: cache\ (Electron download), tools\ (Node),
+# builder\ (the electron-builder staging project and its node_modules).
+# Per module, so builds never overwrite each other:
+#   %LOCALAPPDATA%\OTCAT-electron\<module>\dist\<product> v<version>.exe
+#   %LOCALAPPDATA%\OTCAT-electron\<module>\selftest-portable.txt  (-SelfTest)
+# The product comes from modules\<module>\module.json and the version from
+# ..\..\shared\version.js (see ..\module-info.ps1).
 #
 # Unsigned: Windows SmartScreen will warn until it is signed with a
 # code-signing certificate.
 
 param(
+  [string]$Module = "assessments",
   [string]$ElectronVersion = "44.7.1",
   [string]$NodeVersion = "v24.21.0",
   [string]$BuilderVersion = "26.15.3",
@@ -36,12 +47,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 $here    = Split-Path -Parent $MyInvocation.MyCommand.Path
-$root    = Join-Path $env:LOCALAPPDATA "OTCAT-electron"
+. (Join-Path (Split-Path -Parent $here) "module-info.ps1") -Module $Module   # $ModuleInfo, $ModuleDir, $AppProduct, $AppVersion, $AppVersionLabel, $AppPageName, $ElectronRoot, $ElectronOut
+$root    = $ElectronRoot
 $node    = Join-Path $root "tools\node-$NodeVersion-win-x64"
 $stage   = Join-Path $root "builder"
-$dist    = Join-Path $root "dist"
+$dist    = Join-Path $ElectronOut "dist"
 $edist   = Join-Path $root "electron-dist-$ElectronVersion"
-$product = "OT Cyber Assessment Tool"
+$product = $AppProduct
+$selfTestJs = "selftest-" + $ModuleInfo.electron.selfTest + ".js"
+if (-not (Test-Path (Join-Path $here "app\$selfTestJs"))) { throw "No self-test app\$selfTestJs for module $Module (module.json electron.selfTest)" }
 
 if (-not (Test-Path (Join-Path $node "node.exe"))) { throw "Portable Node not found at $node (see the header of this script)" }
 $env:PATH = "$node;$env:PATH"
@@ -49,24 +63,26 @@ Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
 
 # 1. The single HTML page and the verified Electron runtime (the folder build
 #    does both, and its download is checksum-checked).
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here "build-electron.ps1") -ElectronVersion $ElectronVersion
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here "build-electron.ps1") -Module $Module -ElectronVersion $ElectronVersion
 if ($LASTEXITCODE -ne 0) { throw "build-electron.ps1 failed" }
 if (-not (Test-Path (Join-Path $edist "electron.exe"))) {
   Expand-Archive (Join-Path $root "cache\electron-v$ElectronVersion-win32-x64.zip") -DestinationPath $edist
 }
 
-# 2. A staging project: the app files plus electron-builder's settings.
+# 2. A staging project: the app files plus electron-builder's settings. The
+#    staging folder (and its node_modules) is shared by every module; only
+#    the output is per module.
 if (Test-Path $stage) { Get-ChildItem $stage -Exclude "node_modules", "package-lock.json" | Remove-Item -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
-Copy-Item (Join-Path $here "app\main.js"), (Join-Path $here "app\selftest.js"), (Join-Path $here "app\splash.html") $stage
+Copy-Item (Join-Path $here "app\main.js"), (Join-Path $here "app\$selfTestJs"), (Join-Path $here "app\splash.html") $stage
+Copy-Item (Join-Path $ModuleDir "module.json") (Join-Path $stage "module.json")   # which module this is, for main.js
 Copy-Item (Join-Path $here "build\icon-256.png") (Join-Path $stage "splash-logo.png")
 # The app icon, made by build-icon.ps1 from the square "pt" mark.
 New-Item -ItemType Directory -Force (Join-Path $stage "build") | Out-Null
 Copy-Item (Join-Path $here "build\icon.ico") (Join-Path $stage "build\icon.ico")
-# What the exe shows while it unpacks, drawn for this version.
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here "build-splash.ps1") -Out (Join-Path $stage "build\splash.bmp")
+# What the exe shows while it unpacks, drawn for this product and version.
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here "build-splash.ps1") -Module $Module -Out (Join-Path $stage "build\splash.bmp")
 if ($LASTEXITCODE -ne 0) { throw "build-splash.ps1 failed" }
-. (Join-Path $here "get-version.ps1")   # $AppVersion for the stamp below
 # The animated loading window (launcher-splash\OtcatSplash.cs), compiled with
 # the .NET Framework compiler that ships with Windows, and stamped with the
 # tool's version and SolutionsPT's details like the main exe.
@@ -84,23 +100,23 @@ $asmInfo = Join-Path $stage "build\OtcatSplashInfo.cs"
 & $csc /nologo /target:winexe /optimize+ /out:"$(Join-Path $stage 'build\OtcatSplash.exe')" /win32icon:"$(Join-Path $here 'build\icon.ico')" `
   /reference:System.Windows.Forms.dll /reference:System.Drawing.dll (Join-Path $here "launcher-splash\OtcatSplash.cs") $asmInfo
 if ($LASTEXITCODE -ne 0) { throw "Compiling the loading window failed" }
-. (Join-Path $here "get-version.ps1")   # $AppVersion, $AppVersionLabel, $AppPageName
 Copy-Item (Join-Path (Split-Path -Parent $here) "single-html\$AppPageName") (Join-Path $stage "index.html")
 
-$appPkg = Get-Content (Join-Path $here "app\package.json") -Raw | ConvertFrom-Json
+# The package name and appId are the module's own: Electron keeps each app's
+# local storage under its product name, so the two exes never share autosave.
 $pkg = [ordered]@{
-  name = $appPkg.name; productName = $product; version = $AppVersion
-  description = $appPkg.description; author = "SolutionsPT"; license = "UNLICENSED"; private = $true
+  name = $ModuleInfo.electron.packageName; productName = $product; version = $AppVersion
+  description = "$product. Copyright (c) 2026 SolutionsPT. All rights reserved."; author = "SolutionsPT"; license = "UNLICENSED"; private = $true
   main = "main.js"
   devDependencies = [ordered]@{ "electron-builder" = $BuilderVersion }
   build = [ordered]@{
-    appId = "com.solutionspt.ot-cyber-assessment-tool"
+    appId = $ModuleInfo.electron.appId
     productName = $product
     copyright = "Copyright (c) 2026 SolutionsPT. All rights reserved."
     electronVersion = $ElectronVersion
     electronDist = $edist
     directories = [ordered]@{ output = $dist }
-    files = @("main.js", "selftest.js", "index.html", "splash.html", "splash-logo.png", "package.json")
+    files = @("main.js", $selfTestJs, "module.json", "index.html", "splash.html", "splash-logo.png", "package.json")
     win = [ordered]@{ target = @([ordered]@{ target = "portable"; arch = @("x64") }); icon = "build/icon.ico" }
     portable = [ordered]@{ artifactName = ('${productName} ' + $AppVersionLabel + '.exe'); splashImage = "build/splash.bmp" }
     compression = $Compression
@@ -206,7 +222,7 @@ Write-Output ("Built: {0} ({1} MB)" -f $exe.FullName, [math]::Round($exe.Length 
 
 # 4. Optional: run the finished exe's own end-to-end check.
 if ($SelfTest) {
-  $result = Join-Path $root "selftest-portable.txt"
+  $result = Join-Path $ElectronOut "selftest-portable.txt"
   if (Test-Path $result) { Remove-Item $result -Force }
   $p = Start-Process -FilePath $exe.FullName -ArgumentList @("--self-test", "--out=$result") -PassThru
   if (-not $p.WaitForExit(400000)) { try { $p.Kill() } catch {}; throw "Self-test timed out" }
@@ -220,7 +236,7 @@ if ($SelfTest) {
 if ($TimeStartup -gt 0) {
   $times = @()
   for ($i = 1; $i -le $TimeStartup; $i++) {
-    $ready = Join-Path $root "startup-ready.txt"
+    $ready = Join-Path $ElectronOut "startup-ready.txt"
     if (Test-Path $ready) { Remove-Item $ready -Force }
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $p = Start-Process -FilePath $exe.FullName -ArgumentList @("--self-test", "--startup-only", "--out=$ready") -PassThru

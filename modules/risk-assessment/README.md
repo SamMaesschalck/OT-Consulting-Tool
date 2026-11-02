@@ -1,14 +1,18 @@
-# OT Cyber Risk Assessment Tool (v0.2)
+# OT Cyber Risk Assessment Tool
 
-A single-file, offline, browser-based zones-and-conduits risk assessment that
-implements the IEC 62443-3-2 Clause 4 workflow. Open `index.html` directly
-from disk (file://). There is no backend and nothing to build.
+An offline, browser-based zones-and-conduits risk assessment that implements
+the IEC 62443-3-2 Clause 4 workflow. Open `index.html` directly from disk
+(file://). There is no backend and nothing to build to use it; for handing
+out, it is also built as one self-contained HTML file and as a portable exe
+(see Builds below).
 
-This app is a sibling of the assessment tool in `../Assessments`, not part of
-it. The two codebases are separate and are expected to diverge. When this app
-needs something the other has (theme, vendor library, logo), copy it in; never
-reference across folders and never share runtime. The only thing the two apps
-agree on is the interchange file contract described below.
+This app is a sibling of the assessment tool in `../assessments`, not part of
+it. The two codebases are separate and are expected to diverge. When both need
+the same file (vendor libraries, logo, licence, the suite version), its
+canonical copy lives in the repository's `shared/` (or `contracts/`) and
+`tools/sync-shared.ps1` copies it into each module; never reference across
+module folders and never share runtime. The only thing the two apps agree on
+at run time is the interchange file contract described below.
 
 ## Two tiers
 
@@ -127,7 +131,10 @@ switched off in the demo, so real unsaved work can never be touched.
 
 ```
 index.html                         the whole app (UI + risk engine inline)
+module.json                        the module manifest the packaging scripts read
 tour.html                          demo entry: redirects to index.html?tour
+js/version.js                      the suite version (synced copy of shared/version.js)
+js/product.js                      this module's product name
 js/exports.js                      Word + Excel deliverable builders/downloads
 js/logo.js, js/hero-asset.js       brand assets as base64 (logo, cover art) for
                                    the Word report — this app's copies
@@ -144,6 +151,7 @@ scripts/build-data.ps1             regenerates the .js mirrors after editing JSO
 scripts/test-risk-tool.html        engine + UI tests (headless Edge)
 scripts/test-tour-risk.html        tour-mode tests (seeding, autosave protection)
 scripts/test-risk-reports.html     Word/Excel deliverable tests
+scripts/test-risk-version.html     version shown in the tool, never in Word/Excel
 vendor/docx.umd.js                 Word lib — the rPr-PATCHED copy (see the
                                    Assessments app's docx patch note); exceljs
                                    drives the Excel workbook; xlsx unused
@@ -174,14 +182,64 @@ fails loudly.
 
 ## Tests
 
+From the repository root:
+
+```
+.\tools\run-tests.ps1 -Module risk-assessment
+```
+
+That runs every `scripts/test-*.html` page in headless Edge (each loads
+index.html in an iframe and prints PASS/FAIL lines plus `ALL TESTS PASSED`)
+and writes each page's output to `test-results\risk-assessment\`. To run one
+page by hand:
+
 ```
 msedge --headless --disable-gpu --allow-file-access-from-files ^
   --virtual-time-budget=15000 --dump-dom "file:///<abs-path>/scripts/test-risk-tool.html"
 ```
 
-The page loads index.html in an iframe and prints PASS/FAIL lines plus
-`ALL TESTS PASSED`. The matching import test lives in the Assessments app at
-`../Assessments/scripts/test-risk-import.html`.
+The matching import test lives in the assessment tool at
+`../assessments/scripts/test-risk-import.html`.
+
+## Version
+
+The tool shows the suite version, one number shared by every tool in the
+suite: `js/version.js` is a synced copy of `shared/version.js`, the only place
+to change it (then run `tools/sync-shared.ps1`). `js/product.js` gives this
+module its own name, so `App.Version.product` is "OT Cyber Risk Assessment
+Tool".
+
+- **In the tool:** the header badge (for example "v0.5, 62443-3-2-aligned",
+  with the full number on hover) and the About page.
+- **In the risk-context file:** `generatedBy` is `spt-risk-tool/<version>`.
+  The project file's `schema` (`spt-risk-project/0.2`) is the file format's
+  own version, not the tool's.
+- **Never in a report.** The Word and Excel deliverables carry no version, in
+  the text or the file properties. `scripts/test-risk-version.html` opens real
+  exports and fails if the version appears anywhere in them.
+
+## Builds
+
+Like every tool in the suite, this one ships on its own, so a contractor can
+be given just the risk tool. From the repository root:
+
+```
+.\tools\build.ps1 -Module risk-assessment -As html            # single HTML + parity check
+.\tools\build.ps1 -Module risk-assessment -As exe -SelfTest   # portable exe + its self-test
+```
+
+- **Single HTML:** `packaging/single-html/OT Cyber Risk Assessment Tool v0.5.html`.
+  Everything is inlined (stylesheet, logo, scripts, data and the demo project),
+  so it opens from anywhere with no files beside it; add `?tour=1` to the
+  address to open the demo. `packaging/single-html/check-single-html-risk.html`
+  proves it is the same app as this folder.
+- **Portable exe:** `%LOCALAPPDATA%\OTCAT-electron\risk-assessment\dist\OT Cyber Risk Assessment Tool v0.5.exe`,
+  with its own app id, so its autosave is separate from the assessment tool's.
+  See `packaging/electron/README.md`.
+
+`module.json` is what the packaging scripts read: the product name, the entry
+page, the test pages, the parity check page, the files only loaded on demand
+that the single HTML must carry inline, and the exe's app id and self-test.
 
 ## Out of scope for v0.x
 
