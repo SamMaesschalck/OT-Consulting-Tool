@@ -10,7 +10,7 @@
 #
 #   .\tools\release.ps1              # full run: tests, single HTML, exe, tag
 #   .\tools\release.ps1 -SkipTests   # skip the test suites (assessments alone is ~40 minutes)
-#   .\tools\release.ps1 -NoTag       # build and check, but do not tag
+#   .\tools\release.ps1 -NoTag       # build and check, but do not tag (works even if the tag exists)
 #
 # The version comes from shared\version.js (bump it, run tools\sync-shared.ps1,
 # and update the pinned numbers in modules\assessments\scripts\test-version.html,
@@ -49,7 +49,11 @@ Write-Output "Release $label ($AppVersion), tag $tag, modules: $($modules -join 
 # 1. Clean tree, new tag, release notes, no shared drift
 $dirty = git status --porcelain
 if ($dirty) { throw "The working tree has uncommitted changes. Commit or stash them first.`n$($dirty -join "`n")" }
-if (git tag --list $tag) { throw "Tag $tag already exists. Bump the version in shared\version.js first." }
+# A trial run (-NoTag) makes no tag, so an existing one does not stop it.
+if (git tag --list $tag) {
+  if (-not $NoTag) { throw "Tag $tag already exists. Bump the version in shared\version.js first." }
+  Write-Output "Tag $tag already exists; building anyway, as -NoTag makes no tag."
+}
 if (-not (Test-Path $notes)) { throw "No release notes for $AppVersion. Write docs\releases\v$AppVersion.md (see docs\releases\README.md) and commit it." }
 & (Join-Path $PSScriptRoot "sync-shared.ps1") -Check
 if ($LASTEXITCODE -ne 0) { throw "Shared files are out of step. Run tools\sync-shared.ps1 and commit." }
