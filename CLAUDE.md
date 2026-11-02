@@ -5,6 +5,8 @@ Read `README.md` for the layout and commands, and `docs/platform-architecture.md
 ## Structure
 
 - Each tool is a self-contained module under `modules/` that must keep running and shipping on its own (folder, one HTML file, portable exe). Never make a module depend on another module's code or on the suite; modules exchange data only through the versioned contracts in `contracts/`.
+- The suite shell is `platform/` (SolutionsPT OT Cyber Suite). It talks to a tool only through `js/host-bridge.js` (canonical copy `shared/host-bridge.js`) and postMessage, never by reaching into the tool. A module never requires the bridge: guard every call with `if (window.App.HostBridge)` and keep standalone behaviour unchanged. Inside the suite a tool may sit in a frame of another origin (the folder build) where file dialogs are refused, so saving must still work there (a `SecurityError` from the save dialog falls back to a download).
+- The suite's single HTML carries each tool's own single-HTML build unchanged; after a module change, rebuild and check the suite too (`tools/build.ps1 -Module suite -As html`), not only the module.
 - Files both modules use have one canonical copy in `shared/` or `contracts/`. Edit only that copy, then run `tools/sync-shared.ps1`; `-Check` must pass before a release.
 - One version for everything, in `shared/version.js`. It is shown in the tools and stamped in saved project files, and must NEVER appear in Word or Excel exports (text or document properties); `test-version.html` and `test-risk-version.html` prove it.
 - After any change to a module's `data/**/*.json`, run that module's `scripts/build-data.ps1` and commit the regenerated `.js` too.
@@ -28,5 +30,6 @@ Read `README.md` for the layout and commands, and `docs/platform-architecture.md
 ## Releases and safety
 
 - Do not rebuild or publish releases unless asked. `tools/release.ps1` builds, checks and tags; publishing is `git push origin main <tag>` plus `gh release create`.
+- Every version needs `docs/releases/v<x.y.z>.md` before release (`release.ps1` refuses without it); it is the GitHub release notes and the suite's What's new. After editing it, run `platform/scripts/build-data.ps1` and commit `platform/data/suite-data.js`.
 - Built files, `dist/`, `test-results/` and the licensed reference documents are never committed.
 - Never take screenshots of the desktop to check the UI; use headless rendering or the exe self-tests.
