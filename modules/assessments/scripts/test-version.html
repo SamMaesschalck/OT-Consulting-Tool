@@ -45,8 +45,8 @@ H.test(function (ok, done) {
   A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"])); };
 
   // ---- the one source ------------------------------------------------------
-  ok(V && V.number === "0.5.0", "the tool is version 0.5.0", V && V.number);
-  ok(V.label === "v0.5", "shown as v0.5 (a .0 patch is dropped)", V.label);
+  ok(V && V.number === "0.5.1", "the tool is version 0.5.1", V && V.number);
+  ok(V.label === "v0.5.1", "shown as v0.5.1 (a patch release shows its patch number)", V.label);
   ok(V.labelOf("0.3.1") === "v0.3.1" && V.labelOf("1.0.0") === "v1.0", "a patch release shows its patch number, a .0 does not");
   ok(V.compare("0.4.0", "0.3.0") === 1 && V.compare("0.3.0", "0.3.0") === 0 && V.compare("0.2.9", "0.3.0") === -1 &&
      V.compare("0.10.0", "0.9.0") === 1, "versions compare part by part, not as text");
@@ -61,12 +61,12 @@ H.test(function (ok, done) {
     '<div class="brand"><span class="sub">OT Cyber Assessment Tool</span></div>');
   E.loadCatalog(); A.UI.init({ autosave: false });
   var badge = document.querySelector(".header .brand .version-badge");
-  ok(badge && badge.textContent === "v0.5", "the header shows the version", badge && badge.textContent);
-  ok(/0\.5\.0/.test(badge.title), "with the full number on hover", badge.title);
+  ok(badge && badge.textContent === "v0.5.1", "the header shows the version", badge && badge.textContent);
+  ok(/0\.5\.1/.test(badge.title), "with the full number on hover", badge.title);
   var legal = document.querySelector(".sidebar-legal");
-  ok(/OT Cyber Assessment Tool v0\.5\b/.test(legal.textContent), "the sidebar notice names the version", legal.textContent);
+  ok(/OT Cyber Assessment Tool v0\.5\.1\b/.test(legal.textContent), "the sidebar notice names the version", legal.textContent);
   A.UI.openLicence();
-  ok(/OT Cyber Assessment Tool v0\.5 \(version 0\.5\.0\)/.test(document.querySelector(".licence-modal").textContent),
+  ok(/OT Cyber Assessment Tool v0\.5\.1 \(version 0\.5\.1\)/.test(document.querySelector(".licence-modal").textContent),
      "and so does the licence pop-up");
   document.querySelector(".licence-modal").click();
   A.UI.init({ autosave: false });
@@ -85,7 +85,7 @@ H.test(function (ok, done) {
   // ---- recorded in project files ------------------------------------------
   E.newProject && E.newProject();
   var pf1 = E.getProjectFile(), pf2 = E.getProjectFile();
-  ok(pf1.createdWithVersion === "0.5.0" && pf1.savedWithVersion === "0.5.0",
+  ok(pf1.createdWithVersion === "0.5.1" && pf1.savedWithVersion === "0.5.1",
      "a new project records the version it was created and saved with", JSON.stringify([pf1.createdWithVersion, pf1.savedWithVersion]));
   ok(pf1.createdAt && pf1.createdAt === pf2.createdAt, "and keeps its creation date from one save to the next (it used to be re-stamped)");
 
@@ -93,7 +93,7 @@ H.test(function (ok, done) {
                       createdAt: "2024-01-01T00:00:00.000Z" });
   var legacy = E.getProjectFile();
   ok(!("createdWithVersion" in legacy), "a file from before versions were recorded is not given one it never had");
-  ok(legacy.savedWithVersion === "0.5.0", "but records the version that saves it now");
+  ok(legacy.savedWithVersion === "0.5.1", "but records the version that saves it now");
   ok(legacy.createdAt === "2024-01-01T00:00:00.000Z", "and keeps its original creation date");
 
   E.loadProjectFile({ schemaVersion: A.Storage.SCHEMA_VERSION, project: A.Storage.defaultProject(), assessments: {},
@@ -101,9 +101,9 @@ H.test(function (ok, done) {
   ok(E.getProjectFile().createdWithVersion === "0.2.0", "a file made with an earlier version keeps saying so");
 
   var warnNew = A.UI.__newerFileWarning({ savedWithVersion: "0.6.0" });
-  ok(/saved with v0\.6 of the tool, newer than this copy \(v0\.5\)/.test(warnNew),
+  ok(/saved with v0\.6 of the tool, newer than this copy \(v0\.5\.1\)/.test(warnNew),
      "opening a project from a newer release warns", warnNew);
-  ok(A.UI.__newerFileWarning({ savedWithVersion: "0.5.0" }) === "" && A.UI.__newerFileWarning({ savedWithVersion: "0.4.1" }) === "" &&
+  ok(A.UI.__newerFileWarning({ savedWithVersion: "0.5.1" }) === "" && A.UI.__newerFileWarning({ savedWithVersion: "0.5.0" }) === "" &&
      A.UI.__newerFileWarning({}) === "", "the same, an older or an unrecorded version does not");
 
   // ---- NEVER in a report ---------------------------------------------------

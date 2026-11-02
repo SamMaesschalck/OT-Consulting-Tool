@@ -27,7 +27,7 @@
  */
 (function () {
   window.App = window.App || {};
-  var VERSION = "0.5.0";
+  var VERSION = "0.5.1";
   function label(v) {
     var p = String(v || "").split(".");
     return "v" + (p.length === 3 && p[2] === "0" ? p[0] + "." + p[1] : String(v));
