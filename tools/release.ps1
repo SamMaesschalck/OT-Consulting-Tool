@@ -93,7 +93,10 @@ foreach ($f in $files) { Copy-Item $f $out }
 foreach ($f in Get-ChildItem $out -File) {
   if ($f.Name -notmatch [regex]::Escape(" $label.")) { throw "$($f.Name) is not named for $label" }
 }
-$sums = Get-ChildItem $out -File | Sort-Object Name | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name }
+# Listed under the names GitHub gives the release assets: it replaces each
+# space with a dot, and a checksum file naming the local files would not
+# match what a reader downloads.
+$sums = Get-ChildItem $out -File | Sort-Object Name | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name.Replace(' ', '.') }
 [IO.File]::WriteAllLines((Join-Path $out "SHA256SUMS.txt"), $sums)
 Write-Output "Staged in $out :"
 Get-ChildItem $out | Sort-Object Name | ForEach-Object { "  {0}  ({1:N1} MB)" -f $_.Name, ($_.Length / 1MB) }
@@ -110,7 +113,8 @@ Write-Output ""
 Write-Output "To publish:"
 Write-Output "  git push origin main $tag"
 if (Get-Command gh -ErrorAction SilentlyContinue) {
-  Write-Output "  gh release create $tag `"$out\*`" --title `"OT Cyber suite $label`" --notes-file <notes.md>"
+  Write-Output "  gh release create $tag (Get-ChildItem `"$out`" -File).FullName --verify-tag --title `"OT Cyber tools $label`" --notes-file <notes.md>"
+  Write-Output "  (GitHub replaces spaces in the file names with dots; SHA256SUMS.txt already uses those names.)"
 } else {
   Write-Output "  then on GitHub: Releases > Draft a new release > choose tag $tag, and attach the files in $out"
 }
