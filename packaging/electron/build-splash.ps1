@@ -6,7 +6,7 @@
 #   powershell -ExecutionPolicy Bypass -File build-splash.ps1 -Out <path.bmp>
 #
 # Called by build-portable-exe.ps1, so the version on it is always the one
-# being built (from ..\Assessments\js\version.js). launcher-splash\OtcatSplash
+# being built (from ..\..\modules\assessments\js\version.js). launcher-splash\OtcatSplash
 # shows it and animates the bar over the track drawn here, from double-click
 # until the tool is up. It is also the still image the launcher falls back to
 # if that program cannot start. Same size, layout and words as app\splash.html,

@@ -1,7 +1,7 @@
 # Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt.
 #
 # Builds the OT Cyber Assessment Tool as ONE self-contained HTML file, for
-# handing out. It reads the working app in ..\Assessments and never writes
+# handing out. It reads the working app in ..\..\modules\assessments and never writes
 # there: the folder version stays the one that is developed and tested.
 #
 #   powershell -ExecutionPolicy Bypass -File build-single-html.ps1
@@ -9,7 +9,7 @@
 # Output: "OT Cyber Assessment Tool v<version>.html" here, e.g. "... v0.3.html". Nothing needs sending with it:
 # the licence opens in a pop-up from the app (carried in as data/shared/licence.js).
 #
-# What it does, following ..\Assessments\index.html line by line:
+# What it does, following ..\..\modules\assessments\index.html line by line:
 #   - the stylesheet link becomes an inline <style>
 #   - the header logo becomes a data: URI
 #   - every <script src> becomes an inline <script>, in the same order
@@ -23,7 +23,7 @@
 
 $ErrorActionPreference = "Stop"
 $here  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$app   = Join-Path (Split-Path -Parent $here) "Assessments"
+$app   = Join-Path (Split-Path -Parent (Split-Path -Parent $here)) "modules\assessments"
 # The version comes from js/version.js, the app's one source of it, and goes
 # in the file name so a copy says which release it is before it is opened.
 $verSrc = [IO.File]::ReadAllText((Join-Path $app "js\version.js"))

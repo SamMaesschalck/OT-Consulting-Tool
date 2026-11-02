@@ -15,7 +15,7 @@
 # Everything heavy (node_modules, staging, output) stays in %LOCALAPPDATA%,
 # outside OneDrive. The finished exe is:
 #   %LOCALAPPDATA%\OTCAT-electron\dist\OT Cyber Assessment Tool v<version>.exe  (e.g. v0.3)
-# The version comes from ..\Assessments\js\version.js (see get-version.ps1).
+# The version comes from ..\..\modules\assessments\js\version.js (see get-version.ps1).
 #
 # Unsigned: Windows SmartScreen will warn until it is signed with a
 # code-signing certificate.
@@ -85,7 +85,7 @@ $asmInfo = Join-Path $stage "build\OtcatSplashInfo.cs"
   /reference:System.Windows.Forms.dll /reference:System.Drawing.dll (Join-Path $here "launcher-splash\OtcatSplash.cs") $asmInfo
 if ($LASTEXITCODE -ne 0) { throw "Compiling the loading window failed" }
 . (Join-Path $here "get-version.ps1")   # $AppVersion, $AppVersionLabel, $AppPageName
-Copy-Item (Join-Path (Split-Path -Parent $here) "Single HTML\$AppPageName") (Join-Path $stage "index.html")
+Copy-Item (Join-Path (Split-Path -Parent $here) "single-html\$AppPageName") (Join-Path $stage "index.html")
 
 $appPkg = Get-Content (Join-Path $here "app\package.json") -Raw | ConvertFrom-Json
 $pkg = [ordered]@{

@@ -107,7 +107,7 @@
   }
 
   var folder, single, bundle;
-  load("../Assessments/index.html").then(function (w) { return probe(w, "folder"); })
+  load("../../modules/assessments/index.html").then(function (w) { return probe(w, "folder"); })
     // The file is named for the version the app reports, so the check always
     // opens the build of the code it is comparing against.
     .then(function (r) { folder = r; bundle = "OT%20Cyber%20Assessment%20Tool%20" + r.version + ".html"; return load(bundle); })

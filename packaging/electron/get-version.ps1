@@ -1,12 +1,12 @@
 # Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only.
 #
 # Dot-sourced by the build scripts here. Reads the tool's version from
-# ..\Assessments\js\version.js, its one source, and sets:
+# ..\..\modules\assessments\js\version.js, its one source, and sets:
 #   $AppVersion       e.g. "0.3.0"  (the exe's version number)
 #   $AppVersionLabel  e.g. "v0.3"   (what the tool shows; used in file names)
 #   $AppPageName      the single-file build's name for this version
 
-$verFile = Join-Path (Split-Path -Parent $PSScriptRoot) "Assessments\js\version.js"
+$verFile = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "modules\assessments\js\version.js"
 $verMatch = [regex]::Match([IO.File]::ReadAllText($verFile), 'var VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"')
 if (-not $verMatch.Success) { throw "Could not read the version from $verFile" }
 $AppVersion = $verMatch.Groups[1].Value

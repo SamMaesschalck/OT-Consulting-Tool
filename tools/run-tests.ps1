@@ -1,22 +1,26 @@
 # Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt.
 #
-# Runs the headless-Edge test pages (Assessments\scripts\test-*.html) and
-# reports PASS/FAIL counts per page.
+# Runs a module's headless-Edge test pages (modules\<module>\scripts\test-*.html)
+# and reports PASS/FAIL counts per page.
 #
-#   .\tools\run-tests.ps1                                  # every page
+#   .\tools\run-tests.ps1                                  # every assessments page
+#   .\tools\run-tests.ps1 -Module risk-assessment          # every risk-assessment page
 #   .\tools\run-tests.ps1 -Tests test-version.html,test-sl-partial-fr.html
 #   .\tools\run-tests.ps1 -VirtualTimeMs 900000 -TimeoutSec 600   # Word-heavy pages
 #
-# Each page's DOM is dumped to test-results\<app>\<page>.txt (git-ignored);
+# Each page's DOM is dumped to test-results\<module>\<page>.txt (git-ignored);
 # grep it for "^FAIL" to see what failed. Keep page names short: the dump
 # path counts towards Windows' 260-character limit, and a page whose dump
 # cannot be written reports "0 pass 0 fail incomplete".
 param(
-  [string]$Root = (Join-Path (Split-Path -Parent $PSScriptRoot) "Assessments"),
+  [string]$Module = "assessments",
+  [string]$Root,
   [string[]]$Tests,
   [int]$TimeoutSec = 300,
   [int]$VirtualTimeMs = 300000
 )
+if (-not $Root) { $Root = Join-Path (Split-Path -Parent $PSScriptRoot) "modules\$Module" }
+if (-not (Test-Path $Root)) { throw "No such module folder: $Root" }
 $ErrorActionPreference = "Continue"
 $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 $out  = Join-Path (Split-Path -Parent $PSScriptRoot) ("test-results\" + (Split-Path $Root -Leaf).Replace(' ', '_'))

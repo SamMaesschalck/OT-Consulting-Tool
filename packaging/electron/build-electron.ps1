@@ -9,9 +9,9 @@
 # documented manual packaging route: the app goes in resources\app, and
 # electron.exe is renamed.
 #
-# The page is the single-file build from ..\Single HTML, rebuilt first, so the
+# The page is the single-file build from ..\single-html, rebuilt first, so the
 # desktop app is always exactly what that check page verified. Nothing in
-# ..\Assessments is touched.
+# ..\..\modules\assessments is touched.
 #
 # Output (about 300 MB, so deliberately NOT under OneDrive):
 #   %LOCALAPPDATA%\OTCAT-electron\OT Cyber Assessment Tool\OT Cyber Assessment Tool.exe
@@ -29,7 +29,7 @@ $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $here    = Split-Path -Parent $MyInvocation.MyCommand.Path
-$single  = Join-Path (Split-Path -Parent $here) "Single HTML"
+$single  = Join-Path (Split-Path -Parent $here) "single-html"
 $product = "OT Cyber Assessment Tool"
 $cache   = Join-Path $OutRoot "cache"
 $dest    = Join-Path $OutRoot $product

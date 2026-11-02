@@ -7,8 +7,8 @@
  *   - the app shows it (header badge, sidebar notice, licence pop-up)
  *   - every project file it saves records it (createdWithVersion /
  *     savedWithVersion), so a project sent back says which version made it
- *   - the single-file build (Single HTML/) puts it in its file name
- *   - the desktop app (Electron App/) takes it as its exe version
+ *   - the single-file build (packaging/single-html/) puts it in its file name
+ *   - the desktop app (packaging/electron/) takes it as its exe version
  *
  * NEVER in a report. Word and Excel exports carry no version information,
  * visible or in their properties: the deliverable is the consultant's, not

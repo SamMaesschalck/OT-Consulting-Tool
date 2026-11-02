@@ -7,8 +7,8 @@
 #   .\tools\release.ps1 -SkipTests   # skip the ~40 minute test suite
 #   .\tools\release.ps1 -NoTag       # build and check, but do not tag
 #
-# The version comes from Assessments\js\version.js (bump it, and the pinned
-# numbers in Assessments\scripts\test-version.html, in a commit first).
+# The version comes from modules\assessments\js\version.js (bump it, and the
+# pinned numbers in modules\assessments\scripts\test-version.html, in a commit first).
 #
 # Steps, stopping at the first failure:
 #   1. the working tree is clean and the tag for this version does not exist
@@ -25,33 +25,35 @@ param([switch]$SkipTests, [switch]$NoTag)
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
-. (Join-Path $repo "Electron App\get-version.ps1")   # $AppVersion, $AppVersionLabel, $AppPageName
+. (Join-Path $repo "packaging\electron\get-version.ps1")   # $AppVersion, $AppVersionLabel, $AppPageName
 $tag = "v$AppVersion"
 Write-Output "Release $AppVersionLabel ($AppVersion), tag $tag"
 
 # 1. Clean tree, new tag
 $dirty = git status --porcelain
 if ($dirty) { throw "The working tree has uncommitted changes. Commit or stash them first.`n$($dirty -join "`n")" }
-if (git tag --list $tag) { throw "Tag $tag already exists. Bump the version in Assessments\js\version.js first." }
+if (git tag --list $tag) { throw "Tag $tag already exists. Bump the version in modules\assessments\js\version.js first." }
+& (Join-Path $PSScriptRoot "sync-shared.ps1") -Check
+if ($LASTEXITCODE -ne 0) { throw "Shared files are out of step. Run tools\sync-shared.ps1 and commit." }
 $commit = (git rev-parse --short HEAD).Trim()
 
 # 2. Tests
 if (-not $SkipTests) {
   Write-Output "Running the full test suite (about 40 minutes)..."
   & (Join-Path $PSScriptRoot "run-tests.ps1") -VirtualTimeMs 900000 -TimeoutSec 600
-  if ($LASTEXITCODE -ne 0) { throw "The test suite did not pass. See test-results\Assessments\." }
+  if ($LASTEXITCODE -ne 0) { throw "The test suite did not pass. See test-results\assessments\." }
 }
 
 # 3. Single HTML + parity check
 Write-Output "Building the single HTML..."
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo "Single HTML\build-single-html.ps1")
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo "packaging\single-html\build-single-html.ps1")
 if ($LASTEXITCODE -ne 0) { throw "build-single-html.ps1 failed" }
-$page = Join-Path $repo "Single HTML\$AppPageName"
+$page = Join-Path $repo "packaging\single-html\$AppPageName"
 if (-not (Test-Path $page)) { throw "The single HTML was not produced: $page" }
 
 Write-Output "Checking the single HTML against the folder app..."
 $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-$check = Join-Path $repo "Single HTML\check-single-html.html"
+$check = Join-Path $repo "packaging\single-html\check-single-html.html"
 $checkOut = Join-Path $repo "test-results\check-single-html.txt"
 New-Item -ItemType Directory -Force (Split-Path $checkOut) | Out-Null
 $prof = Join-Path $env:TEMP ("edgeprof-" + [IO.Path]::GetRandomFileName())
@@ -65,7 +67,7 @@ if ($checkText -notmatch 'ALL TESTS PASSED') { throw "check-single-html.html did
 # 4. Portable exe + self-test
 Write-Output "Building the portable exe and running its self-test..."
 Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue   # VS Code terminals set it; the exe then runs as Node
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo "Electron App\build-portable-exe.ps1") -SelfTest
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo "packaging\electron\build-portable-exe.ps1") -SelfTest
 if ($LASTEXITCODE -ne 0) { throw "build-portable-exe.ps1 failed" }
 $selftest = Join-Path $env:LOCALAPPDATA "OTCAT-electron\selftest-portable.txt"
 if (-not (Test-Path $selftest) -or ([IO.File]::ReadAllText($selftest) -notmatch 'ALL TESTS PASSED')) { throw "The exe self-test did not pass. See $selftest" }
