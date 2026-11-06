@@ -544,9 +544,14 @@ window.App.Review = (function () {
 
   // ---- taking the author to it ---------------------------------------------------
 
+  function canGo(t) {
+    var a = t.comment.anchor || {};
+    return a.kind !== "general" || /^Basis of assessment/.test(a.sectionTitle || "");
+  }
   function goTo(t) {
     var a = t.comment.anchor || {};
     var U = UI();
+    if (a.kind === "general") { U.goToBasis(); return; }
     if (a.kind === "item") {
       var target = targetByName(a.targetName);
       if (!target) { U.toast("That " + (E().state.instrument.targetDimensionLabel || "target").toLowerCase() + " is no longer in this assessment.", "warn"); return; }
@@ -619,7 +624,7 @@ window.App.Review = (function () {
 
   // ---- the card -------------------------------------------------------------------
 
-  var panelUi = null, panelFor = null;
+  var panelUi = null, panelFor = null, liveHolder = null;
   function panelState() {
     var id = E().state.activeAssessmentId;
     if (panelFor !== id) { panelUi = window.App.ReviewAuthor.newUi(); panelFor = id; qaOffers = []; }
@@ -634,6 +639,8 @@ window.App.Review = (function () {
       send: function (progress, done) { send(progress, done); },
       afterImport: afterImport,
       goTo: goTo,
+      canGo: canGo,
+      live: function () { return liveHolder && liveHolder.isConnected ? liveHolder : null; },
       acceptPlan: function (t) {
         if (failedPlans[t.comment.id]) return { can: false, why: "That wording did not reach the Word document when it was rebuilt, so copy it and use Go to." };
         return acceptPlan(t);
@@ -641,7 +648,7 @@ window.App.Review = (function () {
       accept: accept,
       stale: isStale,
       authorName: function () { return norm((E().state.engagement.engagement || {}).consultant) || "Author"; },
-      extras: function () { return qaPrompt(function () { paint(container); }); },
+      extras: function () { return qaPrompt(function () { paint(liveHolder && liveHolder.isConnected ? liveHolder : container); }); },
       toast: U.toast
     };
   }
@@ -658,6 +665,7 @@ window.App.Review = (function () {
     ]);
     body.appendChild(h("p", { class: "issue-lead", text: "Send the report for review as a pack. Each reviewer opens it in the OT Cyber Report Review Tool and sends back a small review file; import those here. Nothing on this card reaches the Word or Excel report." }));
     var holder = h("div", { class: "rv-panel" });
+    liveHolder = holder;   // Accept can redraw the page while it is checking
     body.appendChild(holder);
     paint(holder);
     // Comments are checked against the current report once it has been read.
@@ -681,6 +689,7 @@ window.App.Review = (function () {
     accept: accept,
     isStale: isStale,
     goTo: goTo,
+    canGo: canGo,
     currentDocs: currentDocs,
     cachedDocs: cachedDocs,
     resetSnapshot: resetSnapshot,

@@ -231,7 +231,88 @@ H.test(function (ok, done) {
     return docs();
   });
 
+  // ---- the Accept button itself, on the page ----------------------------------
+  step(function () {
+    E.activateInstrument("ncsc-caf");
+    E.setReportNarrative({ topPriorities: "A priorities paragraph to accept through the button on the card." });
+    A.UI.go("report");
+    return docs();
+  });
+  step(function (d) {
+    var b = DB.flatten(d[0].blocks).filter(function (x) { return /to accept through the button/.test(x.text || ""); })[0];
+    var top = d[0].blocks.filter(function (x) { return x.id === b.id; })[0] || b;
+    window.__t2 = thread({ documentIndex: 0, kind: "block", sectionKey: top.sectionKey, sectionTitle: top.sectionTitle, blockId: top.id, quote: b.text, cell: null }, b.text.replace("to accept through the button", "accepted through the button"));
+    A.UI.go("report");
+    var main = document.getElementById("main");
+    return new Promise(function (res, rej) {
+      var tries = 0;
+      (function wait() {
+        var c = main.querySelector('[data-comment-id="' + window.__t2.comment.id + '"] .rv-accept');
+        if (c) return res(c);
+        if (++tries > 400) return rej(new Error("no Accept button"));
+        setTimeout(wait, 25);
+      })();
+    });
+  });
+  step(function (btn) {
+    btn.click();
+    var main = document.getElementById("main");
+    return new Promise(function (res, rej) {
+      var tries = 0;
+      (function wait() {
+        // The page redraws while Accept checks: the panel must end up settled.
+        var n = main.querySelector(".review-card .rv-notice");
+        if (n && !main.querySelector(".review-card .rv-busy")) return res(n);
+        if (++tries > 800) return rej(new Error("the card never settled: " + main.querySelector(".review-card").textContent.slice(0, 300)));
+        setTimeout(wait, 25);
+      })();
+    });
+  });
+  step(function (notice) {
+    var main = document.getElementById("main");
+    ok(/Accepted into the narrative, and checked in the rebuilt Word document\./.test(notice.textContent), "the button accepts, and the card says it was checked in the Word document", notice.textContent);
+    ok(!main.querySelector(".review-card .rv-send").hasAttribute("disabled"), "and the card is usable again");
+    ok(window.__t2.status === "resolved", "the comment is resolved");
+    ok(/accepted through the button/.test(E.getReportNarrative().topPriorities), "and the field changed");
+  });
+
+  // ---- Go to ----------------------------------------------------------------------
+  step(function () { return docs(); });
+  step(function (d) {
+    var main = document.getElementById("main");
+    var pack = RV.packItems();
+    var it = pack.items.filter(function (i) { return i.status === "finding"; })[0];
+    // A section with a card on the report page.
+    var key = "how-to-read-this-report", b = d[0].blocks.filter(function (x) { return x.sectionKey === key && x.type === "heading"; })[0];
+    A.UI.go("engagement");
+    var t = thread(blockAnchor(b), null);
+    RV.goTo(t);
+    ok(main.querySelector('[data-section="' + key + '"]') && main.querySelector('[data-section="' + key + '"]').classList.contains("check-flash"), "Go to from a report comment opens the report page at that section's card");
+    // A section only the Word report has.
+    var dc = d[0].blocks.filter(function (x) { return x.sectionKey === "document-control-and-confidentiality" && x.type === "heading"; })[0];
+    RV.goTo(thread(blockAnchor(dc), null));
+    ok(/only in the Word report/.test(document.getElementById("toast").textContent), "and says so for a part only the Word report has", document.getElementById("toast").textContent);
+    // An item, on its capture page.
+    RV.goTo(thread({ documentIndex: 0, kind: "item", targetName: it.targetName, itemId: it.itemId, field: "evidence", quote: it.evidence }, null));
+    return new Promise(function (r) { setTimeout(r, 120); }).then(function () {
+      var row = main.querySelector('[data-req-id="' + it.itemId + '"]');
+      ok(!!row && row.classList.contains("jump-flash"), "Go to from an item comment opens its capture page and flashes it", it.itemId);
+      // A roadmap field: the plan dialogue.
+      RV.goTo(thread({ documentIndex: 0, kind: "item", targetName: it.targetName, itemId: it.itemId, field: "action", quote: it.action }, null));
+      var m = document.querySelector(".modal");
+      ok(!!m && m.textContent.indexOf(it.code) !== -1, "and from a plan field, the plan dialogue");
+      var close = m && Array.prototype.filter.call(m.querySelectorAll("button"), function (x) { return /Close|Cancel/.test(x.textContent); })[0];
+      if (close) close.click();
+      // The basis of assessment; a general comment with nowhere to go.
+      var basis = thread({ documentIndex: 0, kind: "general", sectionTitle: "Basis of assessment", quote: "" }, null);
+      ok(RV.canGo(basis) && !RV.canGo(thread({ documentIndex: 0, kind: "general", sectionTitle: "General", quote: "" }, null)), "a general comment offers Go to only where there is somewhere to go");
+      RV.goTo(basis);
+      ok(!!main.querySelector('[data-check-anchor="basis"]'), "the basis of assessment comment goes to its register");
+    });
+  });
+
   // ---- what falls back to Copy ------------------------------------------------
+  step(function () { return docs(); });
   step(function (d) {
     // Generated text: a paragraph of the methodology appendix or a results table.
     var table = d[0].blocks.filter(function (b) { return b.type === "table" && !b.front && /Results|Outcome/.test(b.sectionTitle || ""); })[0] || d[0].blocks.filter(function (b) { return b.type === "table" && !b.front; })[1];

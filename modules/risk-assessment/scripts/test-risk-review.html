@@ -12,6 +12,7 @@
   Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
 -->
 <iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<iframe id="rr" style="width:1280px;height:800px;border:0"></iframe>
 <script>
 (function () {
   var lines = [], fail = 0;
@@ -69,7 +70,7 @@
         ok(pack.engagement.scoringFamily === "risk-assessment" && pack.engagement.client === p.engagement.client && pack.facts.perTarget.length === p.zones.length + p.conduits.length, "with the engagement and facts per zone and conduit");
         ok(Array.isArray(pack.basisOfAssessment.interviews), "and the basis of assessment");
         ok(!!p.review && p.review.rounds.length === 1 && RT.isDirty(), "the round is recorded on the project, as unsaved work");
-        // The review tool's checks run on it unchanged: same contract.
+        window.__riskPack = saved.text;
         var blk = pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 40; })[0];
         var blk2 = pack.documents[1].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 40; })[0];
         var at = new Date().toISOString();
@@ -124,6 +125,33 @@
         p.suc.description = p.suc.description + " A later edit.";
         RT.touched();
         return RR.buildPack();
+      }).then(function (r) {
+        // The review tool opens a risk pack just the same: one contract.
+        window.__r2 = r;
+        return new Promise(function (res) {
+          var rf = document.getElementById("rr");
+          rf.onload = function () {
+            var rw = rf.contentWindow;
+            poll(function () { return rw.ReviewTool; }).then(function () {
+              rw.ReviewTool.loadTexts([{ name: "risk-pack.json", text: window.__riskPack }]);
+              var dd = rw.document, sel = dd.getElementById("rr-doc");
+              ok(rw.ReviewTool.state.pack && sel && sel.options.length === 2, "the review tool opens the risk pack, with a chooser for its two reports");
+              ok(dd.querySelectorAll("#rr-paper [data-block-id]").length === rw.ReviewTool.state.pack.documents[0].blocks.length, "and draws it");
+              sel.value = "1"; sel.dispatchEvent(new rw.Event("change", { bubbles: true }));
+              ok(dd.querySelectorAll("#rr-paper [data-block-id]").length === rw.ReviewTool.state.pack.documents[1].blocks.length, "and the high-level report");
+              dd.querySelector('.nav-item[data-page="checklist"]').click();
+              ok(/tolerable risk has been agreed/.test(dd.getElementById("main").textContent), "with the risk assessment's own checklist questions");
+              dd.querySelector('.nav-item[data-page="engagement"]').click();
+              ok(dd.querySelectorAll(".rr-item").length > 5, "and its threats on the Engagement page");
+              var res2 = rw.App.ReviewChecks.run(rw.ReviewTool.state.pack, {});
+              res2.forEach(function (x) { lines.push("flagged risk " + x.check + ": " + x.message + " [" + String(x.quote).slice(0, 110) + "]"); });
+              ok(res2.filter(function (x) { return x.check === "dashes" || x.check === "figures" || x.check === "numbering"; }).length === 0, "the automatic checks run on it (" + res2.length + " flagged, listed above); no false dash, figure or numbering alarm");
+              rw.ReviewTool.state.dirty = false;
+              res();
+            });
+          };
+          rf.src = "../../report-review/index.html";
+        }).then(function () { return window.__r2; });
       }).then(function (r) {
         ok(r.pack.round === 2 && r.pack.previousRound.comments.length === 4 && r.pack.previousRound.comments.some(function (c) { return c.status === "resolved"; }) && r.pack.previousRound.comments.some(function (c) { return c.replies.length === 1; }), "the next round carries statuses and replies");
         // ---- nothing reaches a deliverable --------------------------------------------

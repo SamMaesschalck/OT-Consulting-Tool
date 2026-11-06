@@ -180,10 +180,18 @@ H.test(function (ok, done) {
   }).then(function (s) {
     fileB = s.file;
     A.UI.go("report");
-    // Import both, through the card's own code path.
-    var res = RV.importTexts([{ name: fileA.name, text: fileA.text }, { name: fileB.name, text: fileB.text }]);
-    ok(res.bad === 0 && RV.store().threads.length === 5 && RV.store().files.length === 2, "two reviewers' files merge: 5 comments from 2 reviewers", JSON.stringify(res.lines));
-    ok(res.lines.some(function (l) { return /J\. Marsh \(round 1\): 4 new comments/.test(l); }), "and the card says what came in", res.lines.join(" | "));
+    // Import both at once, through the card's own file input.
+    var input = main.querySelector(".review-card .rv-file");
+    ok(input.multiple && /json/.test(input.accept), "Import review files takes several files at once");
+    var dt = new DataTransfer();
+    dt.items.add(new File([fileA.text], fileA.name, { type: "application/json" }));
+    dt.items.add(new File([fileB.text], fileB.name, { type: "application/json" }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change"));
+    return poll(function () { return RV.store().threads.length === 5 && main.querySelector(".rv-notice"); });
+  }).then(function () {
+    ok(RV.store().files.length === 2, "two reviewers' files merge: 5 comments from 2 reviewers");
+    ok(/J\. Marsh \(round 1\): 4 new comments/.test(main.querySelector(".rv-notice").textContent), "and the card says what came in", main.querySelector(".rv-notice").textContent);
     var again = RV.importTexts([{ name: fileA.name, text: fileA.text }]);
     ok(RV.store().threads.length === 5 && again.results[0].duplicate && /already imported/.test(again.lines[0]), "importing the same file twice changes nothing");
     // The reviewer edits a comment and saves again: the later save wins.

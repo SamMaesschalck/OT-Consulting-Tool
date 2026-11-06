@@ -536,7 +536,7 @@
 
   function blockAnchor(doc, d, b, cell, quote) {
     return { documentIndex: d, documentTitle: doc.title || "", kind: "block", sectionKey: b.sectionKey || "", sectionTitle: b.sectionTitle || "",
-      blockId: b.id, quote: quote != null ? quote : (b.text || ""), cell: cell || null, targetName: doc.targetName || "", itemId: "", field: "" };
+      blockId: b.id, blockType: b.type, quote: quote != null ? quote : (b.text || ""), cell: cell || null, targetName: doc.targetName || "", itemId: "", field: "" };
   }
 
   function blockNode(doc, d, b) {
@@ -546,10 +546,16 @@
     var wrap = h("div", { class: cls, "data-block-id": b.id, "data-section-key": b.sectionKey || "", tabindex: "0", role: "button", "aria-label": "Comment on this " + b.type });
     function startOnBlock(quote, cell, canSuggest) {
       if (state.composer && state.composer.editing) return;
-      if (open && !cell && !state.composer.anchor.cell) { state.composer = null; render(); return; }
-      openComposer({ anchor: blockAnchor(doc, d, b, cell, quote), severity: "should-fix", text: (open && state.composer.text) || "",
+      // Text selected with the mouse says which words the comment is about. The
+      // quote stays the whole block, which is what a later round matches on.
+      var picked = "";
+      try { picked = RC.norm(String(window.getSelection && window.getSelection())); } catch (e) {}
+      if (open && !cell && !state.composer.anchor.cell && !picked) { state.composer = null; render(); return; }
+      var anchor = blockAnchor(doc, d, b, cell, quote);
+      if (picked && picked !== RC.norm(quote)) anchor.selection = picked;
+      openComposer({ anchor: anchor, severity: "should-fix", text: (open && state.composer.text) || "",
         suggest: false, suggestion: canSuggest ? (quote || "") : "", canSuggest: canSuggest,
-        label: b.type === "table" && !cell ? "On the whole table" : (cell ? "On this cell" : "") });
+        label: anchor.selection ? "On: " + anchor.selection : (b.type === "table" && !cell ? "On the whole table" : (cell ? "On this cell" : "")) });
     }
     if (b.type === "heading") {
       var lv = Math.min(4, Math.max(1, b.level || 1));
@@ -564,7 +570,7 @@
     } else if (b.type === "image") {
       wrap.classList.add("rr-img");
       wrap.appendChild(imageNode(b, doc.media));
-      wrap.addEventListener("click", function () { startOnBlock("[chart]", null, false); });
+      wrap.addEventListener("click", function () { startOnBlock("", null, false); });
     } else if (b.type === "bullet") {
       wrap.appendChild(h("div", { class: "rr-bullet" }, [h("span", { class: "m", text: b.marker || "•" }), runsNode(b)]));
       wrap.addEventListener("click", function () { startOnBlock(b.text, null, true); });

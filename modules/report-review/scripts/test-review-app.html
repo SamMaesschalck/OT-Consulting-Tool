@@ -118,6 +118,23 @@
     ok(marked.classList.contains("has-must") && !!d.querySelector('[data-comment-id="' + c.id + '"]'), "the block is marked and its comment shows beside it");
     var hdrId = pack.documents[0].blocks.filter(function (b) { return b.type === "heading" && !b.sub && b.sectionKey === para.sectionKey; })[0].id;
     ok(/1/.test(d.querySelector('[data-section-block="' + hdrId + '"] .n').textContent), "and the outline counts it under its section");
+    // Selected words say what the comment is about; the quote stays the block.
+    var para2 = pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 60 && !b.red; })[1];
+    var pEl = d.querySelector('[data-block-id="' + para2.id + '"] p');
+    var range = d.createRange(); range.selectNodeContents(pEl);
+    var sel = w.getSelection(); sel.removeAllRanges();
+    var tn = pEl.firstChild; range.setStart(tn, 0); range.setEnd(tn, 12); sel.addRange(range);
+    d.querySelector('[data-block-id="' + para2.id + '"]').click();
+    ok(R.state.composer.anchor.selection === RC_norm(para2.text.slice(0, 12)) && R.state.composer.anchor.quote === para2.text, "selecting words keeps them on the comment, with the whole block as the quote", JSON.stringify(R.state.composer.anchor.selection));
+    sel.removeAllRanges();
+    d.querySelector(".rr-c-cancel").click();
+    // A chart has no text to quote.
+    var img = pack.documents[0].blocks.filter(function (b) { return b.type === "image" && !b.front; })[0];
+    if (img) {
+      d.querySelector('[data-block-id="' + img.id + '"]').click();
+      ok(R.state.composer.anchor.quote === "" && R.state.composer.anchor.blockType === "image" && R.state.composer.canSuggest === false, "a chart can be commented on, with no quote and no suggested wording");
+      d.querySelector(".rr-c-cancel").click();
+    }
     // A table cell, then the whole table.
     var tbl = pack.documents[0].blocks.filter(function (b) { return b.type === "table" && !b.front && b.rows.length > 2; })[0];
     d.querySelector('[data-block-id="' + tbl.id + '"] td[data-cell="1.0"]').click();
@@ -353,6 +370,7 @@
     finish();
   });
   function d_save(w) { return w.document.getElementById("btn-save").textContent; }
+  function RC_norm(s) { return String(s).replace(/\s+/g, " ").trim(); }
 })();
 </script>
 </body></html>

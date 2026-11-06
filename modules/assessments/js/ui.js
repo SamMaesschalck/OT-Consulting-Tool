@@ -9996,6 +9996,7 @@ window.App.UI = (function () {
       setTargetThen: setTargetThen,
       revealOnReport: revealOnReport,
       goToSection: goToReportSection,
+      goToBasis: function () { go2("engagement", null, '[data-check-anchor="basis"]'); },
       repaintIssueCheck: function () {
         var card = refs.main.querySelector(".issue-check");
         if (card) paintIssueCheck(card, lastIssueCheck());

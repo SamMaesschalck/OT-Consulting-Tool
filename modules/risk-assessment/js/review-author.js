@@ -20,6 +20,8 @@
  *   stale(thread)           true when the comment no longer matches the report, null if not known yet
  *   authorName()            who is replying
  *   extras()                optional, a node shown under the review summary (the QA prompt)
+ *   live()                  optional, the panel's container now, when the tool may
+ *                           have redrawn its page while something was running
  *   toast(msg, kind)
  * Nothing here is part of a report, so nothing here can reach Word or Excel.
  */
@@ -59,7 +61,7 @@
 
   function mount(container, adapter, ui) {
     ui = ui || newUi();
-    function repaint() { mount(container, adapter, ui); }
+    function repaint() { mount((adapter.live && adapter.live()) || container, adapter, ui); }
     container.innerHTML = "";
     var store = adapter.store();
 
@@ -203,6 +205,8 @@
       card.appendChild(h("div", { class: "rv-item-ref muted", text: [a.code, a.itemTitle].filter(Boolean).join(" ") + (a.field ? " (" + a.field + ")" : "") }));
     }
     if (a.quote) card.appendChild(h("blockquote", { class: "rv-quote", text: a.quote.length > 400 ? a.quote.slice(0, 400) + "…" : a.quote }));
+    else if (a.blockType === "image") card.appendChild(h("div", { class: "rv-item-ref muted", text: "On a chart or picture" }));
+    if (a.selection && a.selection !== a.quote) card.appendChild(h("div", { class: "rv-item-ref muted", text: "Selected: " + a.selection }));
     card.appendChild(h("p", { class: "rv-text", text: c.text }));
 
     var actions = [];
