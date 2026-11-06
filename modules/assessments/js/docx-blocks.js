@@ -31,7 +31,10 @@
  *                 override can address; those get sub: true and stay in their
  *                 section. A heading that does not match the next tag is one.
  *   sectionKeyOf  otherwise, a function from a heading's text to its key, and
- *                 every heading starts a section (the risk tool).
+ *                 every heading starts a section.
+ * keepShapes keeps what a preview can draw and a pack has no use for: a table of
+ * coloured cells with no text in them (the scorecard's stacked bars), with each
+ * cell's width as cell.w. A pack leaves it off, so its text and hash do not move.
  */
 (function () {
   "use strict";
@@ -245,16 +248,24 @@
                      red: bl.some(function (x) { return x.red; }) };
         if (span && Number(attrW(span, "val")) > 1) cell.span = Number(attrW(span, "val"));
         if (shd) { var fill = String(attrW(shd, "fill") || "").toUpperCase(); if (/^[0-9A-F]{6}$/.test(fill)) cell.fill = fill; }
+        if (ctx.keepShapes) {
+          var tcW = tcPr && firstChildNS(tcPr, W, "tcW");
+          var wv = tcW ? Number(attrW(tcW, "w")) : 0;
+          if (wv) cell.w = wv;
+        }
         cells.push(cell);
       });
       if (cells.length) rows.push({ cells: cells });
     });
     // One cell: a layout device, not a table to read.
-    if (rows.length === 1 && rows[0].cells.length === 1) return rows[0].cells[0].blocks;
+    if (rows.length === 1 && rows[0].cells.length === 1 && !(ctx.keepShapes && rows[0].cells[0].fill && !rows[0].cells[0].text)) return rows[0].cells[0].blocks;
     var t = { type: "table", rows: rows, red: rows.some(function (r) { return r.cells.some(function (c) { return c.red; }); }) };
     t.text = blockText(t);
-    if (!t.text.replace(/\s+/g, "") && !hasImage(t)) return [];
+    if (!t.text.replace(/\s+/g, "") && !hasImage(t) && !(ctx.keepShapes && hasFill(t))) return [];
     return [t];
+  }
+  function hasFill(t) {
+    return t.rows.some(function (r) { return r.cells.some(function (c) { return !!c.fill; }); });
   }
   function hasImage(t) {
     return t.rows.some(function (r) { return r.cells.some(function (c) { return c.blocks.some(function (b) { return b.type === "image"; }); }); });
@@ -278,7 +289,7 @@
     var doc = new DOMParser().parseFromString(documentXml, "application/xml");
     var body = doc.getElementsByTagNameNS(W, "body")[0];
     if (!body) throw new Error("The Word file has no body.");
-    var ctx = { rels: parseRels(relsXml), omitted: 0 };
+    var ctx = { rels: parseRels(relsXml), omitted: 0, keepShapes: !!opts.keepShapes };
     var flat = containerBlocks(body, ctx);
     var keyOf = opts.sectionKeyOf || slugTitle;
     var idp = opts.idPrefix || "b";
