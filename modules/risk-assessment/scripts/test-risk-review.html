@@ -148,6 +148,7 @@
               var res2 = rw.App.ReviewChecks.run(rw.ReviewTool.state.pack, {});
               res2.forEach(function (x) { lines.push("flagged risk " + x.check + ": " + x.message + " [" + String(x.quote).slice(0, 110) + "]"); });
               ok(res2.filter(function (x) { return x.check === "dashes" || x.check === "figures" || x.check === "numbering"; }).length === 0, "the automatic checks run on it (" + res2.length + " flagged, listed above); no false dash, figure or numbering alarm");
+              ok(res2.filter(function (x) { return x.check === "internal-wording"; }).length === 0, "and no wording that describes the software in either report");
               rw.ReviewTool.state.dirty = false;
               res();
             });
