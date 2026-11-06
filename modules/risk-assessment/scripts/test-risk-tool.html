@@ -206,7 +206,7 @@
     // --- UI smoke ---
     RT.loadProjectText(saved);
     var doc = w.document, navItems = doc.querySelectorAll(".nav-item");
-    ok(navItems.length === 10, "nav shows 5 stages + Basis + 2 reports + Peer review + About", "got " + navItems.length);
+    ok(navItems.length === 11, "nav shows 5 stages + Basis + Report + 2 reports + Peer review + About", "got " + navItems.length);
     function clickNav(label) { var n = doc.querySelectorAll(".nav-item"); for (var i = 0; i < n.length; i++) if (n[i].textContent.indexOf(label) >= 0) { n[i].click(); return true; } return false; }
 
     clickNav("2. High-level");

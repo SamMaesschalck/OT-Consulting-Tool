@@ -8,6 +8,7 @@
   <meta name="referrer" content="no-referrer" />
   <link rel="stylesheet" href="css/spt-theme.css" />
   <link rel="stylesheet" href="css/review-author.css" />
+  <link rel="stylesheet" href="css/report-page.css" />
   <!-- Apply the saved (or system) colour theme before first paint to avoid a
        flash. The toggle in the header updates this and persists the choice.
        Shares the "ot-theme" key with the assessment tool so the two apps agree
@@ -634,6 +635,16 @@
         FR_IDS.forEach(function (fr) { if (!(fr in c.slTargetByFR)) c.slTargetByFR[fr] = null; });
         if (typeof c.slTarget === "number") { FR_IDS.forEach(function (fr) { if (c.slTargetByFR[fr] == null) c.slTargetByFR[fr] = c.slTarget; }); delete c.slTarget; }
       });
+      // The consultant's section overrides, one set per report (js/report-page.js).
+      // Optional and additive, so the file format stays at this schema: a file
+      // without them loads as before, and an older copy of the tool keeps them.
+      if (data.reportCustom != null) {
+        if (typeof data.reportCustom !== "object" || Array.isArray(data.reportCustom)) delete data.reportCustom;
+        else ["detailed", "highLevel"].forEach(function (k) {
+          var c = data.reportCustom[k];
+          if (c != null && (typeof c !== "object" || Array.isArray(c))) delete data.reportCustom[k];
+        });
+      }
       data.schema = PROJECT_SCHEMA;
       return data;
     }
@@ -852,6 +863,10 @@
         basisCount ? h("span", { class: "badge", text: String(basisCount) }) : null
       ]));
       sec.appendChild(h("div", { class: "nav-section-title", text: "Reports" }));
+      sec.appendChild(h("div", {
+        class: "nav-item" + (state.stage === "report" ? " active" : ""),
+        onClick: function () { state.stage = "report"; render(); }
+      }, [h("span", null, ["Report", h("span", { class: "muted", style: "display:block;font-size:11px", text: "both reports, section by section" })])]));
       sec.appendChild(h("div", {
         class: "nav-item" + (state.stage === "hlreport" ? " active" : ""),
         onClick: function () { state.stage = "hlreport"; render(); }
@@ -1926,7 +1941,9 @@
       var main = $("main"); main.innerHTML = "";
       var fn = { suc: renderSuc, srs: renderSrs, zones: renderZones, risk: renderRisk, slt: renderSlt, review: renderReview, basis: renderBasis, hlreport: renderHLReport, about: renderAbout,
         // js/review.js (loaded after this script): the reports' peer review.
-        peer: function (m) { if (window.RiskReview) window.RiskReview.render(m, h, card); }
+        peer: function (m) { if (window.RiskReview) window.RiskReview.render(m, h, card); },
+        // js/report-page.js: both Word reports, to read and edit section by section.
+        report: function (m) { if (window.RiskReportPage) window.RiskReportPage.render(m, h); }
       }[state.stage];
       (fn || renderSuc)(main);
     }
@@ -2050,6 +2067,7 @@
       loadProjectText: loadProjectText, projectHasContent: projectHasContent,
       confirmRemove: confirmRemove, FR_IDS: FR_IDS,
       touched: touched, isDirty: function () { return dirty; }, flushAutosave: flushAutosave,
+      downloadWordReport: downloadWordReport,
       offerRestore: offerRestore, AUTOSAVE_KEY: AUTOSAVE_KEY,
       saveProject: saveProject, forgetProjectFile: forgetProjectFile,
       supportsFilePickers: supportsFilePickers,
@@ -2064,6 +2082,7 @@
   <script src="vendor/exceljs.min.js"></script>
   <script src="js/logo.js"></script>
   <script src="js/hero-asset.js"></script>
+  <script src="js/report-sections.js"></script>
   <script src="js/exports.js"></script>
   <!-- Peer review of the reports: packs and review files (contracts/review-*.json). -->
   <script src="data/review-pack.js"></script>
@@ -2071,6 +2090,7 @@
   <script src="js/docx-blocks.js"></script>
   <script src="js/review-core.js"></script>
   <script src="js/review-author.js"></script>
+  <script src="js/report-page.js"></script>
   <script src="js/review.js"></script>
 </body>
 </html>
