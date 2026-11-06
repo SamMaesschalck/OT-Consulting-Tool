@@ -646,14 +646,7 @@ window.App.Engine = (function () {
     var ass = activeAssessment();
     if (!ass) return;
     if (!ass.reportCustom) ass.reportCustom = {};
-    var cur = Object.assign({}, ass.reportCustom[key] || {}, patch);
-    Object.keys(cur).forEach(function (k) {
-      var v = cur[k];
-      if (v === null || v === undefined || v === "" || v === false ||
-          (Array.isArray(v) && v.length === 0)) delete cur[k];
-    });
-    if (Object.keys(cur).length) ass.reportCustom[key] = cur;
-    else delete ass.reportCustom[key];
+    window.App.ReportSections.patchSection(ass.reportCustom, key, patch);
     if (state.engagement) state.engagement.reportCustom = ass.reportCustom;
     emit("engagement-changed", state.engagement);
   }

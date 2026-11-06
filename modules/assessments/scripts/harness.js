@@ -51,6 +51,7 @@
     "js/storage.js",
     "js/compare.js",
     "js/charts.js",
+    "js/report-sections.js",
     "js/report.js"
   ];
 

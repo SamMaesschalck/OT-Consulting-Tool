@@ -106,6 +106,7 @@ tokens for smaller screens.
   compare.js                 baseline diff ("Progress since previous assessment")
   charts.js                  hand-drawn SVG radar / bars / heatmap, SVG->PNG
   report.js                  shared report chassis + consultant customisation
+  report-sections.js         what a section override means, synced from shared/ (also used by the risk tool)
   export-xlsx.js             technical workbook (ExcelJS)
   export-docx.js             client Word document
   review.js                  Send for review, Import, Accept, the Review card

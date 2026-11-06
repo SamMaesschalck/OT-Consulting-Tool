@@ -12,6 +12,7 @@
     { "from": "shared/vendor/xlsx.full.min.js", "to": ["modules/assessments/vendor/xlsx.full.min.js", "modules/risk-assessment/vendor/xlsx.full.min.js"] },
     { "from": "shared/spt-theme.css", "to": ["modules/risk-assessment/css/spt-theme.css", "modules/report-review/css/spt-theme.css"] },
     { "from": "shared/docx-blocks.js", "to": ["modules/assessments/js/docx-blocks.js", "modules/risk-assessment/js/docx-blocks.js"] },
+    { "from": "shared/report-sections.js", "to": ["modules/assessments/js/report-sections.js", "modules/risk-assessment/js/report-sections.js"] },
     { "from": "shared/review-core.js", "to": ["modules/assessments/js/review-core.js", "modules/risk-assessment/js/review-core.js", "modules/report-review/js/review-core.js"] },
     { "from": "shared/review-author.js", "to": ["modules/assessments/js/review-author.js", "modules/risk-assessment/js/review-author.js"] },
     { "from": "shared/review-author.css", "to": ["modules/assessments/css/review-author.css", "modules/risk-assessment/css/review-author.css"] },
