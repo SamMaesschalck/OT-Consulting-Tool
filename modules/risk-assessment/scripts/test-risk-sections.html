@@ -116,6 +116,12 @@
         var tabs = [].slice.call(main.querySelectorAll(".rp-tab")).map(function (b) { return b.textContent; });
         ok(tabs.join("|") === "Detailed|High level", "with both reports to choose from", tabs.join("|"));
         ok(!main.querySelector(".mode-toggle") && main.textContent.indexOf("Customise report") === -1, "and no mode to switch into");
+        // The scorecard draws, as Word does: tiles, bars and the key to them.
+        ok(main.querySelectorAll(".rp-tile").length >= 11, "the scorecard's tiles are drawn (" + main.querySelectorAll(".rp-tile").length + ")");
+        var segs = [].slice.call(main.querySelectorAll(".rp-stack .rp-seg"));
+        ok(segs.length > 3 && segs.every(function (x) { return !!x.style.background; }), "and its stacked bars, in Word's colours (" + segs.length + " segments)");
+        var marks = [].slice.call(main.querySelectorAll(".rp-legend-mark"));
+        ok(marks.length === 4 && marks.every(function (x) { return !!x.style.color; }), "and the key to them");
 
         // Each report, in turn: what is on screen is what Word prints, and every
         // section is keyed and offers Edit.

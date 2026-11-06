@@ -134,6 +134,21 @@ window.RiskReportPage = (function () {
     });
     return el;
   }
+  // The bars' legend. A block carries no run colours, and a key of four dark
+  // squares under coloured bars says nothing, so the squares take the bars' colours.
+  var LEGEND = { "Very high": "#7A1F1A", "High": "#B23A33", "Medium": "#C28A1E", "Low": "#2E7D52" };
+  function legendNode(b) {
+    var h = ui.h, p = h("p", { class: "rp-p rp-legend" });
+    String(b.text).split("■").forEach(function (part) {
+      var label = norm(part);
+      if (!label) return;
+      var mark = h("span", { class: "rp-legend-mark", text: "■" });
+      if (LEGEND[label]) mark.style.color = LEGEND[label];
+      p.appendChild(h("span", { class: "rp-legend-item" }, [mark, " " + label]));
+      p.appendChild(document.createTextNode(" "));
+    });
+    return p;
+  }
   function darkFill(fill) {
     var r = parseInt(fill.slice(0, 2), 16), g = parseInt(fill.slice(2, 4), 16), b = parseInt(fill.slice(4, 6), 16);
     return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
@@ -212,7 +227,7 @@ window.RiskReportPage = (function () {
   function blocksInto(el, blocks, media) {
     var h = ui.h;
     blocks.forEach(function (b) {
-      if (b.type === "paragraph") el.appendChild(runsInto(h("p", { class: "rp-p" }), b));
+      if (b.type === "paragraph") el.appendChild(/^■ /.test(b.text) ? legendNode(b) : runsInto(h("p", { class: "rp-p" }), b));
       else if (b.type === "bullet") {
         var last = el.lastChild;
         if (!last || last.tagName !== "UL") { last = h("ul", { class: "rp-ul" }); el.appendChild(last); }
