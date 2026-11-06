@@ -25,11 +25,17 @@ $url = "file:///" + $page.Replace('\', '/').Replace(' ', '%20') + $q
 $p = Start-Process -FilePath $edge -NoNewWindow -PassThru -RedirectStandardOutput $dump -RedirectStandardError (Join-Path $env:TEMP "review-pack-err.txt") `
   -ArgumentList @("--headless=new", "--disable-gpu", "--no-first-run", "--disable-sync", "--allow-file-access-from-files", "--user-data-dir=`"$prof`"", "--virtual-time-budget=300000", "--dump-dom", "`"$url`"")
 if (-not $p.WaitForExit(300000)) { try { $p.Kill() } catch {}; throw "The pack page timed out" }
-$text = ""
-for ($i = 0; $i -lt 120; $i++) { try { $text = [IO.File]::ReadAllText($dump); break } catch { Start-Sleep -Milliseconds 500 } }
+# The browser's helper processes can still be writing the dump when the main
+# one exits, so keep looking until the pack is there.
+$text = ""; $m = $null
+for ($i = 0; $i -lt 120; $i++) {
+  try { $text = [IO.File]::ReadAllText($dump) } catch { $text = "" }
+  $m = [regex]::Match($text, '<pre id="pack">([A-Za-z0-9+/=]+)</pre>')
+  if ($m.Success) { break }
+  Start-Sleep -Milliseconds 500
+}
 Remove-Item $dump -Force -ErrorAction SilentlyContinue
 try { Remove-Item $prof -Recurse -Force -ErrorAction Stop } catch {}
-$m = [regex]::Match($text, '<pre id="pack">([A-Za-z0-9+/=]+)</pre>')
 if (-not $m.Success) {
   $f = [regex]::Matches($text, '(?m)^FAIL.*$') | Select-Object -First 3
   throw "The pack page produced no pack. $($f -join ' ')"

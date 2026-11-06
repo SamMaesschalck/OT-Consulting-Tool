@@ -141,7 +141,7 @@
   .header .brand .sub { font-size: 12px; }
   #pack-summary { display: none; }
   .header-actions { margin-left: auto; }
-  .sidebar { border-right: 0; border-bottom: 1px solid var(--border); padding: 0; overflow-x: auto; overflow-y: hidden; }
+  .sidebar { display: flex; border-right: 0; border-bottom: 1px solid var(--border); padding: 0; overflow-x: auto; overflow-y: hidden; }
   .sidebar .nav-section { display: flex; padding: 4px; white-space: nowrap; }
   .sidebar .nav-item { padding: 6px 10px; flex: none; }
   .sidebar .nav-section-title, .sidebar .rr-outline, .sidebar .sidebar-legal { display: none; }
