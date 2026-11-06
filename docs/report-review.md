@@ -32,7 +32,9 @@ The Issue check and the export dialog warn when the report is not reviewed, when
 
 ### In the risk tool
 
-**Peer review**, in the sidebar, has the same Send for review and Import review files, with the comments list on its own page. The pack holds both Word reports (detailed and high level) and the zones and threats behind them. The risk tool's reports have no wording of their own to edit, so a suggestion is Copy and Go to.
+**Peer review**, in the sidebar, has the same Send for review and Import review files, with the comments list on its own page. The pack holds both Word reports (detailed and high level) and the zones and threats behind them.
+
+**Accept** works as in the assessment tool for a section's heading and the wording that opens it, in the report the comment is on (its `documentIndex`): the overrides are per report, because same-named sections say different things. The Word document is rebuilt to check the wording is really in it, and the change is undone if not. Other text is Copy and Go to, with the reason. **Go to** takes you to the section on the **Report** page, in that report, or to the zone or threat behind it.
 
 ## What is stored where
 
@@ -40,11 +42,13 @@ The Issue check and the export dialog warn when the report is not reviewed, when
 |---|---|---|
 | Review pack (`spt-review-pack`) | a file the author saves | the client's report text and images, the engagement behind them, earlier comments. It contains client data: handle it like the project file. |
 | Review file (`spt-review`) | a file each reviewer saves | that reviewer's comments with the short quotes they are about, checklist answers, dismissed checks, verdict. The quotes are client text, so handle it the same way. |
-| The review, on the author's side | the assessment in the project file (`assessment.review`), or the risk project (`project.review`) | rounds, the files imported, each comment with its status, reason and replies. Absent until a review starts; older files still load. Each assessment has its own. Never exported to Word or Excel: the exporters are given the engagement projection, which it is not on. |
+| The review, on the author's side | the assessment in the project file (`assessment.review`), or the risk project (`project.review`) | rounds, the files imported, each comment with its status, reason and replies. Absent until a review starts; older files still load. Each assessment has its own. Never exported to Word or Excel: the assessment tool's exporters are given the engagement projection, which it is not on, and the risk tool's never read it. |
 | Reviewer's name, list of names to look for | the reviewer's browser (`spt-review:reviewer:v1`, `spt-review:names:v1`) | never put in a review file |
 | Unsaved review work | the reviewer's browser (`spt-review:autosave:v1:<pack id>`) | the review only, not the pack; cleared on save |
 
 ## Which text accepts a suggestion
+
+In the assessment tool:
 
 | The comment is on | Goes into | Otherwise |
 |---|---|---|
@@ -55,6 +59,14 @@ The Issue check and the export dialog warn when the report is not reviewed, when
 | An item comment that names a field | that field; if the field does not print in Word, the change stands and the message says so | not if the field has changed since the review |
 | A paragraph in a section's opening run | `reportCustom[key].prose`, the whole run with the one paragraph changed | not if the section opens differently per zone, as a rewrite would replace all of them |
 | Anything else: generated text, results tables, framework text | Copy and Go to | |
+
+In the risk tool, in the overrides of the report the comment is on (`project.reportCustom.detailed` or `.highLevel`):
+
+| The comment is on | Goes into | Otherwise |
+|---|---|---|
+| A section's heading | the section's title | not a zone's or conduit's own heading, which is a name: rename it where it is entered. Not a heading repeated per zone ("Justification for ..."), as it would change them all: use Edit on the Report page, which keeps each zone's name |
+| A paragraph in a section's opening run | `reportCustom.<report>[key].prose`, the whole run with the one paragraph changed | not a section repeated per zone, as a rewrite would replace all of them |
+| Anything else: threat registers, tables, the sign-off, text after a table, the zones and threats behind the report | Copy and Go to | |
 
 ## The automatic checks
 
@@ -77,4 +89,4 @@ Not attempted, because no reliable reading exists: the counts inside results tab
 
 ## Contracts
 
-`contracts/review-pack.json` and `contracts/review-file.json` hold the shape, an example and the schemas importers accept. Importers reject anything else with a message naming both schemas, so a change of shape fails loudly. Tests: `modules/assessments/scripts/test-review-*.html`, `modules/risk-assessment/scripts/test-risk-review.html`, `modules/report-review/scripts/test-review-*.html`.
+`contracts/review-pack.json` and `contracts/review-file.json` hold the shape, an example and the schemas importers accept. Importers reject anything else with a message naming both schemas, so a change of shape fails loudly. Tests: `modules/assessments/scripts/test-review-*.html`, `modules/risk-assessment/scripts/test-risk-review.html` and `test-risk-accept.html`, `modules/report-review/scripts/test-review-*.html`.

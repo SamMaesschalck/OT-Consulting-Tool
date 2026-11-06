@@ -12,7 +12,7 @@ Offline, browser-based tools for OT cyber security work. Each tool is a module t
 | `modules/risk-assessment/` | OT Cyber Risk Assessment Tool (62443-3-2 zones and conduits). Open `index.html`. See its README. |
 | `modules/report-review/` | OT Cyber Report Review Tool: review a report and the engagement behind it from a pack the author sends, and save a review file for them to import. Open `index.html`. See its README and [docs/report-review.md](docs/report-review.md). |
 | `platform/` | The SolutionsPT OT Cyber Suite shell. Open `platform/index.html` to run the suite from the folders (the developer build: each tool is framed from `modules/`, and Save downloads there). `suite.json` lists the tools; `scripts/build-data.ps1` regenerates `data/suite-data.js`. |
-| `shared/` | The one canonical copy of files several modules use (version, licence, brand files, the design system, vendor libraries, the host bridge, the review rules). `shared/sync.json` lists where each copy goes. |
+| `shared/` | The one canonical copy of files several modules use (version, licence, brand files, the design system, vendor libraries, the host bridge, the review rules, the report section overrides). `shared/sync.json` lists where each copy goes. |
 | `contracts/` | Data contracts between modules: `risk-context-interchange.json` (`spt-risk-context`), `review-pack.json` (`spt-review-pack`) and `review-file.json` (`spt-review`). |
 | `packaging/` | `single-html/` builds a module (or the suite) into one HTML file and checks it; `electron/` builds a portable exe. `module-info.ps1` reads each module's `module.json`, or `platform/suite.json` for the suite. |
 | `tools/` | `run-tests.ps1`, `sync-shared.ps1`, `build.ps1`, `release.ps1`. |
