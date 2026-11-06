@@ -1,0 +1,73 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+// AUTO-GENERATED from data/review-file.json - do not edit; edit the .json then re-run scripts/build-data.ps1
+window.App = window.App || {};
+window.App.Data = window.App.Data || {};
+(window.App.Data.contracts = window.App.Data.contracts || {}).reviewFile = {
+  "schema": "spt-review/1.0",
+  "_note": "What a reviewer sends back. The report review tool WRITES it, one small file per reviewer; the assessment tool and the risk tool READ it. Files are merged by comment id, so reviewers can never overwrite each other, and importing a file twice changes nothing. Where the same comment arrives again, the reviewer's later save wins. The author's status, reason and replies are kept on the author's side and are never overwritten by an import. Each tool carries its own copy of this contract; bump the schema string here when the shape changes, so that a mismatch fails loudly. Importers ACCEPT the listed schemas and reject unknown ones with a clear message.",
+  "acceptedSchemas": ["spt-review/1.0"],
+  "shape": {
+    "schema": "spt-review/1.0",
+    "packId": "the pack this file answers",
+    "reviewId": "the review it belongs to",
+    "round": 1,
+    "fileId": "unique id of this reviewer's file, the same on each save, so two reviewers with one name never merge into one",
+    "reviewer": "reviewer's name",
+    "savedAt": "ISO date and time of this save",
+    "savedBy": { "product": "OT Cyber Report Review Tool", "version": "0.5.1" },
+    "verdict": { "value": "none | approved | approved-with-comments | changes-requested", "date": "YYYY-MM-DD", "note": "" },
+    "checklist": [{ "id": "common-evidence", "text": "the question as asked", "answer": "yes | no | na, or empty if not answered", "note": "" }],
+    "dismissedChecks": ["ids of automatic check results the reviewer dismissed"],
+    "confirmations": [{ "commentId": "a previous round comment the reviewer confirmed as fixed", "at": "ISO date and time" }],
+    "comments": [{
+      "id": "globally unique, generated",
+      "reviewer": "reviewer's name",
+      "createdAt": "ISO date and time",
+      "updatedAt": "ISO date and time",
+      "severity": "must-fix | should-fix | suggestion",
+      "anchor": {
+        "documentIndex": 0,
+        "documentTitle": "the document's name, for showing",
+        "kind": "block | item | general",
+        "sectionKey": "slug of the generated heading, as App.Report.sectionKey",
+        "sectionTitle": "the heading as printed",
+        "blockId": "d0-b12",
+        "quote": "the text the comment is on",
+        "cell": "{ row, col } when the comment is on one cell of a table, otherwise null",
+        "targetName": "for an item comment",
+        "itemId": "for an item comment",
+        "field": "for a suggestion on an item: evidence | notes | owner | action | impact"
+      },
+      "text": "the comment",
+      "suggestion": "suggested wording, or null",
+      "relatesTo": "the previous round comment this one raises again, or null",
+      "check": "the automatic check it came from, or null"
+    }]
+  },
+  "example": {
+    "schema": "spt-review/1.0",
+    "packId": "rp-m1a2b3-7fkq",
+    "reviewId": "rv-m1a2b3-2xmw",
+    "round": 1,
+    "fileId": "rf-m1a2b3-5tqz",
+    "reviewer": "J. Reviewer",
+    "savedAt": "2026-11-07T15:30:00.000Z",
+    "savedBy": { "product": "OT Cyber Report Review Tool", "version": "0.5.1" },
+    "verdict": { "value": "changes-requested", "date": "2026-11-07", "note": "One finding needs more evidence." },
+    "checklist": [{ "id": "common-evidence", "text": "The evidence supports the findings.", "answer": "no", "note": "See the access control finding." }],
+    "dismissedChecks": [],
+    "confirmations": [],
+    "comments": [{
+      "id": "c-m1a2b3-9dk2f7",
+      "reviewer": "J. Reviewer",
+      "createdAt": "2026-11-07T15:10:00.000Z",
+      "updatedAt": "2026-11-07T15:10:00.000Z",
+      "severity": "must-fix",
+      "anchor": { "documentIndex": 0, "documentTitle": "Works 1", "kind": "block", "sectionKey": "executive-summary", "sectionTitle": "Executive summary", "blockId": "d0-b2", "quote": "The site meets its target.", "cell": null, "targetName": "", "itemId": "", "field": "" },
+      "text": "This does not match the roadmap.",
+      "suggestion": "The site meets its target on five of seven requirements.",
+      "relatesTo": null,
+      "check": null
+    }]
+  }
+};

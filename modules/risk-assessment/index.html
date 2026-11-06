@@ -7,6 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="referrer" content="no-referrer" />
   <link rel="stylesheet" href="css/spt-theme.css" />
+  <link rel="stylesheet" href="css/review-author.css" />
   <!-- Apply the saved (or system) colour theme before first paint to avoid a
        flash. The toggle in the header updates this and persists the choice.
        Shares the "ot-theme" key with the assessment tool so the two apps agree
@@ -859,6 +860,10 @@
         class: "nav-item" + (state.stage === "review" ? " active" : ""),
         onClick: function () { state.stage = "review"; render(); }
       }, [h("span", null, ["Full report & export", h("span", { class: "muted", style: "display:block;font-size:11px", text: "zones · SL-T · risk context" })])]));
+      sec.appendChild(h("div", {
+        class: "nav-item" + (state.stage === "peer" ? " active" : ""),
+        onClick: function () { state.stage = "peer"; render(); }
+      }, [h("span", null, ["Peer review", h("span", { class: "muted", style: "display:block;font-size:11px", text: "send for review � comments" })])]));
       sec.appendChild(h("div", { class: "nav-section-title", text: "Reference" }));
       sec.appendChild(h("div", {
         class: "nav-item" + (state.stage === "about" ? " active" : ""),
@@ -1919,7 +1924,10 @@
     function render() {
       renderNav(); renderHeaderSummary();
       var main = $("main"); main.innerHTML = "";
-      var fn = { suc: renderSuc, srs: renderSrs, zones: renderZones, risk: renderRisk, slt: renderSlt, review: renderReview, basis: renderBasis, hlreport: renderHLReport, about: renderAbout }[state.stage];
+      var fn = { suc: renderSuc, srs: renderSrs, zones: renderZones, risk: renderRisk, slt: renderSlt, review: renderReview, basis: renderBasis, hlreport: renderHLReport, about: renderAbout,
+        // js/review.js (loaded after this script): the reports' peer review.
+        peer: function (m) { if (window.RiskReview) window.RiskReview.render(m, h, card); }
+      }[state.stage];
       (fn || renderSuc)(main);
     }
 
@@ -2044,7 +2052,8 @@
       touched: touched, isDirty: function () { return dirty; }, flushAutosave: flushAutosave,
       offerRestore: offerRestore, AUTOSAVE_KEY: AUTOSAVE_KEY,
       saveProject: saveProject, forgetProjectFile: forgetProjectFile,
-      supportsFilePickers: supportsFilePickers
+      supportsFilePickers: supportsFilePickers,
+      render: render, toast: toast
     };
   }());
   </script>
@@ -2056,5 +2065,12 @@
   <script src="js/logo.js"></script>
   <script src="js/hero-asset.js"></script>
   <script src="js/exports.js"></script>
+  <!-- Peer review of the reports: packs and review files (contracts/review-*.json). -->
+  <script src="data/review-pack.js"></script>
+  <script src="data/review-file.js"></script>
+  <script src="js/docx-blocks.js"></script>
+  <script src="js/review-core.js"></script>
+  <script src="js/review-author.js"></script>
+  <script src="js/review.js"></script>
 </body>
 </html>
