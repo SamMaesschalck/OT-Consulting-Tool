@@ -62,6 +62,9 @@ window.RiskExports = (function () {
     return { "low": COLOR.met, "medium": COLOR.near, "high": COLOR.gap, "very-high": COLOR.deep }[id] || "CBD5DE";
   }
   function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+  // A consultant's sentence going inside one of ours: without its own full
+  // stop, or the report prints "unattributable.. The acceptance rationale".
+  function noStop(s) { return String(s || "").replace(/[.\s]+$/, ""); }
   function slug(s) { return String(s || "risk-assessment").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "risk-assessment"; }
   function notSet(v) { return (v && String(v).trim()) ? String(v) : "(not set)"; }
   function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -532,7 +535,7 @@ window.RiskExports = (function () {
       if (S.worst) {
         findRuns.push(run(" The single highest unmitigated risk is "));
         findRuns.push(run(bandStyle(S.worst.risk).name, { bold: true, color: bandStyle(S.worst.risk).text }));
-        findRuns.push(run(": " + S.worst.t.statement + " (" + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ")."));
+        findRuns.push(run(": " + noStop(S.worst.t.statement) + " (" + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ")."));
       }
       children.push(asBody(para(findRuns), findRuns.map(function (r) { return r.__text; }).join("")));
       // The treatment position.
@@ -544,7 +547,7 @@ window.RiskExports = (function () {
         var undisp = exceed.filter(function (x) { return !x.disposition; });
         children.push(body("Of the above-tolerable threats, " + c.mitigated + " are mitigated by controls that bring the residual risk within tolerance, " + c.countermeasure + " are covered by countermeasures (" + cmEx + " existing controls and " + cmPl + " planned across the registers), " + c["sl-t"] + " are carried into the target security level as the treatment plan, and " + c.accepted + " formally accepted by the asset owner."));
         if (accepted.length) {
-          children.push(body((accepted.length > 1 ? "Accepted risks: " : "Accepted risk ") + accepted.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + x.t.statement; }).join("; ") + ". The acceptance rationale is recorded against the threat in the register and should be revisited at the next assessment."));
+          children.push(body((accepted.length > 1 ? "Accepted risks: " : "Accepted risk ") + accepted.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + noStop(x.t.statement); }).join("; ") + ". The acceptance rationale is recorded against the threat in the register and should be revisited at the next assessment."));
         }
         if (undisp.length) {
           children.push(body(undisp.length + " above-tolerable threat" + (undisp.length > 1 ? "s have" : " has") + " no disposition yet and need" + (undisp.length > 1 ? "" : "s") + " a decision: " + undisp.map(function (x) { return x.t.id + " (" + x.owner.id + ")"; }).join(", ") + ".", { bold: true, color: COLOR.gap }));
