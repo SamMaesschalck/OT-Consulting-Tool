@@ -214,7 +214,7 @@ window.App.ExportDOCX = (function () {
 
   function run(text, opts) {
     opts = opts || {};
-    return new window.docx.TextRun({
+    var r = new window.docx.TextRun({
       text: String(text == null ? "" : text),
       bold: opts.bold || false,
       italics: opts.italics || false,
@@ -222,6 +222,8 @@ window.App.ExportDOCX = (function () {
       size: opts.size,
       font: opts.font
     });
+    r.__text = String(text == null ? "" : text);
+    return r;
   }
 
   // The __tags below are read back by applyReportCustom. They have to be set
@@ -238,6 +240,8 @@ window.App.ExportDOCX = (function () {
       spacing: opts.spacing
     });
     p.__isBody = true;
+    // Read by probeSections: which text opens each section.
+    p.__text = Array.isArray(text) ? runs.map(function (r) { return (r && r.__text) || ""; }).join("") : String(text == null ? "" : text);
     return p;
   }
 
@@ -318,9 +322,12 @@ window.App.ExportDOCX = (function () {
           section.forEach(function (m) { if (m && m.__attribution) kept.push(m); });
           continue;
         }
-        out.push(c && c.title
+        var shown = c && c.title
           ? (n.__headingNum ? h1n(n.__headingNum, c.title) : (lvl === 1 ? h1(c.title) : h2(c.title)))
-          : n);
+          : n;
+        // A renamed heading keeps the key of the section it is (see probeSections).
+        if (shown !== n) shown.__sectionKey = key;
+        out.push(shown);
 
         if (c && c.prose) {
           // The generated wording that OPENS the section: the run of body
@@ -345,6 +352,27 @@ window.App.ExportDOCX = (function () {
     return result.concat(kept);
   }
 
+  // For a review: the wording that opens each section of the finished document,
+  // { key, title, texts: [...] } once per heading, by the same rule
+  // applyReportCustom uses to decide what a prose override replaces (the run of
+  // body paragraphs after the heading). Recorded when opts.sectionProbe is a
+  // list; the document itself is untouched.
+  function probeSections(sections, engagement, into) {
+    var R = window.App.Report;
+    (sections || []).forEach(function (s) {
+      var nodes = s.children || [];
+      nodes.forEach(function (n, i) {
+        if (!n || !n.__headingLevel) return;
+        var key = n.__boundaryOnly ? "" : (n.__sectionKey || (R ? R.sectionKey(n.__headingText, { engagement: engagement }) : ""));
+        var texts = [];
+        for (var k = i + 1; k < nodes.length && nodes[k] && nodes[k].__isBody; k++) {
+          if (String(nodes[k].__text || "").trim() !== "") texts.push(nodes[k].__text);
+        }
+        into.push({ key: key, title: n.__headingText, level: n.__headingLevel, boundary: !!n.__boundaryOnly, texts: texts });
+      });
+    });
+  }
+
   // Every document is built through here so a section override reaches all
   // eight assemblies rather than whichever one was remembered.
   // `opts` is the export's own options: it says whether this is a draft or a
@@ -366,6 +394,7 @@ window.App.ExportDOCX = (function () {
     // (which will not print) is not reported.
     var issues = [];
     cfg.sections.forEach(function (s) { collectPlaceholders(s.children, issues); });
+    if (opts && Array.isArray(opts.sectionProbe)) probeSections(cfg.sections, engagement, opts.sectionProbe);
     if (!isFinal(opts) && !(opts && opts.issueCheck)) markDraft(cfg.sections);
     var doc = new (window.docx.Document)(cfg);
     if (isFinal(opts) && !issues.length) lockAsFinal(doc);
@@ -564,10 +593,11 @@ window.App.ExportDOCX = (function () {
 
   // In a check nothing is written, so the charts are not drawn: a blank image
   // stands in for each, and every other line of the build runs as it would
-  // for the real export.
+  // for the real export. opts.blankCharts does the same for a build that does
+  // write a file, read only for its text (a review's current report).
   var BLANK_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
   function rasterise(svg, exportOpts, cb) {
-    if (exportOpts && exportOpts.issueCheck) {
+    if (exportOpts && (exportOpts.issueCheck || exportOpts.blankCharts)) {
       var bin = atob(BLANK_PNG), u = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
       cb(new Blob([u], { type: "image/png" }));

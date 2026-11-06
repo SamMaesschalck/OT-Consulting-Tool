@@ -1,15 +1,21 @@
 {
   "_note": "Where each canonical shared file and contract is copied into the modules (and the suite shell, platform/). Edit the canonical copy (shared/ or contracts/), then run tools/sync-shared.ps1 to copy it in; tools/sync-shared.ps1 -Check fails if any module copy differs. Modules carry their own copies so each one still runs and ships standalone. After syncing a contract .json, re-run that module's scripts/build-data.ps1 to regenerate its .js wrapper.",
   "files": [
-    { "from": "shared/LICENCE.txt", "to": ["LICENCE.txt", "modules/assessments/LICENCE.txt", "modules/risk-assessment/LICENCE.txt", "platform/LICENCE.txt"] },
-    { "from": "shared/version.js", "to": ["modules/assessments/js/version.js", "modules/risk-assessment/js/version.js", "platform/js/version.js"] },
-    { "from": "shared/brand/AVEVASelect-LogoLockup-Landscape-Positive.png", "to": ["modules/assessments/data/shared/AVEVASelect-LogoLockup-Landscape-Positive.png", "modules/risk-assessment/data/AVEVASelect-LogoLockup-Landscape-Positive.png", "platform/img/AVEVASelect-LogoLockup-Landscape-Positive.png"] },
-    { "from": "shared/host-bridge.js", "to": ["modules/assessments/js/host-bridge.js", "modules/risk-assessment/js/host-bridge.js"] },
+    { "from": "shared/LICENCE.txt", "to": ["LICENCE.txt", "modules/assessments/LICENCE.txt", "modules/risk-assessment/LICENCE.txt", "modules/report-review/LICENCE.txt", "platform/LICENCE.txt"] },
+    { "from": "shared/version.js", "to": ["modules/assessments/js/version.js", "modules/risk-assessment/js/version.js", "modules/report-review/js/version.js", "platform/js/version.js"] },
+    { "from": "shared/brand/AVEVASelect-LogoLockup-Landscape-Positive.png", "to": ["modules/assessments/data/shared/AVEVASelect-LogoLockup-Landscape-Positive.png", "modules/risk-assessment/data/AVEVASelect-LogoLockup-Landscape-Positive.png", "modules/report-review/data/AVEVASelect-LogoLockup-Landscape-Positive.png", "platform/img/AVEVASelect-LogoLockup-Landscape-Positive.png"] },
+    { "from": "shared/host-bridge.js", "to": ["modules/assessments/js/host-bridge.js", "modules/risk-assessment/js/host-bridge.js", "modules/report-review/js/host-bridge.js"] },
     { "from": "shared/brand/logo.js", "to": ["modules/assessments/js/logo.js", "modules/risk-assessment/js/logo.js"] },
     { "from": "shared/brand/hero-asset.js", "to": ["modules/assessments/js/hero-asset.js", "modules/risk-assessment/js/hero-asset.js"] },
     { "from": "shared/vendor/docx.umd.js", "to": ["modules/assessments/vendor/docx.umd.js", "modules/risk-assessment/vendor/docx.umd.js"] },
     { "from": "shared/vendor/exceljs.min.js", "to": ["modules/assessments/vendor/exceljs.min.js", "modules/risk-assessment/vendor/exceljs.min.js"] },
     { "from": "shared/vendor/xlsx.full.min.js", "to": ["modules/assessments/vendor/xlsx.full.min.js", "modules/risk-assessment/vendor/xlsx.full.min.js"] },
+    { "from": "shared/docx-blocks.js", "to": ["modules/assessments/js/docx-blocks.js", "modules/risk-assessment/js/docx-blocks.js"] },
+    { "from": "shared/review-core.js", "to": ["modules/assessments/js/review-core.js", "modules/risk-assessment/js/review-core.js", "modules/report-review/js/review-core.js"] },
+    { "from": "shared/review-author.js", "to": ["modules/assessments/js/review-author.js", "modules/risk-assessment/js/review-author.js"] },
+    { "from": "shared/review-author.css", "to": ["modules/assessments/css/review-author.css", "modules/risk-assessment/css/review-author.css"] },
+    { "from": "contracts/review-pack.json", "to": ["modules/assessments/data/shared/review-pack.json", "modules/risk-assessment/data/review-pack.json", "modules/report-review/data/review-pack.json"] },
+    { "from": "contracts/review-file.json", "to": ["modules/assessments/data/shared/review-file.json", "modules/risk-assessment/data/review-file.json", "modules/report-review/data/review-file.json"] },
     { "from": "contracts/risk-context-interchange.json", "to": ["modules/assessments/data/shared/risk-context-interchange.json", "modules/risk-assessment/data/risk-context-interchange.json"] }
   ]
 }

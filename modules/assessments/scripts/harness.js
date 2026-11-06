@@ -72,6 +72,7 @@
     if (opts.docx) { write("js/hero-asset.js"); write("js/export-docx.js"); }
     write("js/engine.js");
     write("js/ui.js");
+    ["js/docx-blocks.js", "js/review-core.js", "js/review-author.js", "js/review.js"].forEach(write);
     (opts.tours || []).forEach(function (t) { write("js/tour-" + t + "-data.js"); });
     (opts.extra || []).forEach(write);
   };

@@ -1337,10 +1337,21 @@ window.App.UI = (function () {
           if (!userPicked && remembered === "final") setIssue("final");
         });
       };
+      // The same review warnings as the Issue check. They never close Final.
+      var reviewNote = h("div", { class: "export-review-note" });
+      var paintReviewNote = function () {
+        reviewNote.innerHTML = "";
+        if (!window.App.Review) return;
+        window.App.Review.warningList().forEach(function (w) {
+          reviewNote.appendChild(h("p", { class: "export-issue-note warn", "data-review-warning": w.kind, text: w.text }));
+        });
+      };
+      if (window.App.Review) { paintReviewNote(); window.App.Review.refresh(paintReviewNote); }
       issueBlock = h("div", { class: "export-issue" }, [
         h("h3", { style: "margin:14px 0 6px; font-size:13px;", text: "Issue as" }),
         h("div", { class: "scope-choices", style: "margin-bottom:0;" }, [draftBtn, finalBtn]),
-        issueNote
+        issueNote,
+        reviewNote
       ]);
       Object.keys(checks).forEach(function (id) { checks[id].addEventListener("change", recheck); });
     }
@@ -8617,6 +8628,8 @@ window.App.UI = (function () {
           label: "Go to first", go: function () { jumpToItem(tid, un.items[0].id); } });
       }
     });
+    // Warnings only: a review never keeps Final shut (js/review.js).
+    if (window.App.Review) out = out.concat(window.App.Review.issueWarnings());
     return out;
   }
 
@@ -8776,6 +8789,17 @@ window.App.UI = (function () {
       } })]);
   }
 
+  // The report's sections are cards keyed by Report.sectionKey; a review
+  // comment goes to the card for its section. A section that only the Word
+  // document has (the document control page, for one) has no card to go to.
+  function goToReportSection(key) {
+    if (view !== "report") go("report");
+    var card = key ? refs.main.querySelector('[data-section="' + String(key).replace(/"/g, '\\"') + '"]') : null;
+    if (card) { revealNode(card); return true; }
+    toast("That part is only in the Word report, so the report page has no card for it.", "warn");
+    return false;
+  }
+
   // ---- report preview ---------------------------------------------------
 
   function renderReportPage() {
@@ -8792,6 +8816,9 @@ window.App.UI = (function () {
     // What still has to be done before a final can go out. First on the page,
     // because it is the to-do list for everything below it.
     refs.main.appendChild(buildIssueCheckCard());
+    // The review, beside the check it feeds. Not a report section: it has no
+    // key, and neither the report renderers nor the exporters ever see it.
+    if (window.App.Review) refs.main.appendChild(window.App.Review.buildCard());
 
     if (E.state.scoringFamily === "nis2-conformance") refs.main.appendChild(buildNIS2NarrativeCard());
     if (isCRA()) refs.main.appendChild(buildCRANarrativeCard());
@@ -9958,6 +9985,23 @@ window.App.UI = (function () {
       warnings: issueWarnings,
       last: lastIssueCheck,
       beginExport: beginExport
+    },
+    // What js/review.js needs from the page: the same documents an export
+    // would write, and the ways of taking the consultant to a field.
+    __review: {
+      jobs: docxJobs,
+      allTargetIds: issueAllIds,
+      jumpToItem: jumpToItem,
+      openPlanFor: openPlanFor,
+      setTargetThen: setTargetThen,
+      revealOnReport: revealOnReport,
+      goToSection: goToReportSection,
+      repaintIssueCheck: function () {
+        var card = refs.main.querySelector(".issue-check");
+        if (card) paintIssueCheck(card, lastIssueCheck());
+      },
+      toast: toast,
+      h: h
     },
     // The autosave backstop decides when a consultant is told they have unsaved
     // work. Getting that wrong in either direction is expensive - a missed

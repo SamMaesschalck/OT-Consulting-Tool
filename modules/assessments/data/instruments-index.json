@@ -14,6 +14,7 @@
                    "riskContextInterchange":  [
                                                   "shared/risk-context-interchange.json"
                                               ],
+    "reviewContracts": { "reviewPack": "shared/review-pack.json", "reviewFile": "shared/review-file.json" },
                    "engagementGuidance":  [
                                               "shared/engagement-guidance.json"
                                           ],

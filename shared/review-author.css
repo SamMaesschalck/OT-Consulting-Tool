@@ -1,0 +1,49 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* The author's side of a review (js/review-author.js). Built only from the
+   design tokens both tools share, so it follows light and dark by itself. The
+   canonical copy is shared/review-author.css. */
+.rv-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.rv-busy { margin: 6px 0; }
+.rv-notice { border: 1px solid var(--border-strong); border-left: 3px solid var(--brand-blue); border-radius: var(--radius); padding: 8px 10px; margin: 8px 0; font-size: 13px; background: var(--surface-2); }
+.rv-notice.err { border-left-color: var(--gap); }
+.rv-notice.ok { border-left-color: var(--met); }
+.rv-empty, .rv-round { margin: 6px 0; font-size: 13px; }
+.rv-files { list-style: none; margin: 6px 0 10px; padding: 0; font-size: 13px; }
+.rv-files li { padding: 5px 0; border-top: 1px solid var(--border); }
+.rv-note { color: var(--text-muted); margin-top: 2px; }
+.rv-verdict { font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--na-bg); color: var(--text); }
+.rv-verdict.v-approved, .rv-verdict.v-approved-with-comments { background: var(--met-bg); color: var(--met); }
+.rv-verdict.v-changes-requested { background: var(--gap-bg); color: var(--gap); }
+.rv-qa { border: 1px solid var(--border-strong); border-left: 3px solid var(--brand-blue); border-radius: var(--radius); padding: 8px 10px; margin: 8px 0; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rv-qa-text { flex: 1 1 260px; min-width: 0; }
+.rv-filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin: 12px 0 4px; font-size: 13px; }
+.rv-filter select { font: inherit; padding: 3px 6px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
+.rv-count { margin-left: auto; }
+.rv-group { font-size: 13px; margin: 14px 0 6px; color: var(--brand-blue-dark); }
+.rv-comment { border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 8px; background: var(--surface); font-size: 13px; }
+.rv-comment.sev-must-fix { border-left-color: var(--gap); }
+.rv-comment.sev-should-fix { border-left-color: var(--near); }
+.rv-comment.sev-suggestion { border-left-color: var(--brand-blue); }
+.rv-comment.done { opacity: .78; }
+.rv-c-head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.rv-sev { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.rv-sev.sev-must-fix { background: var(--gap-bg); color: var(--gap); }
+.rv-sev.sev-should-fix { background: var(--near-bg); color: var(--near); }
+.rv-sev.sev-suggestion { background: var(--brand-blue-tint); color: var(--brand-blue); }
+.rv-status { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--na-bg); color: var(--text-muted); }
+.rv-status.st-resolved { background: var(--met-bg); color: var(--met); }
+.rv-stale { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--near-bg); color: var(--near); }
+.rv-accepted { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--met-bg); color: var(--met); }
+.rv-item-ref { margin-top: 3px; font-size: 12px; }
+.rv-quote { margin: 6px 0; padding: 4px 10px; border-left: 2px solid var(--border-strong); color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.rv-text { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rv-suggest { margin: 6px 0; padding: 6px 10px; background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--radius); }
+.rv-s-label { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 2px; }
+.rv-s-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.rv-why { margin: 4px 0; font-size: 12px; }
+.rv-reason { margin: 4px 0; font-size: 12px; font-style: italic; }
+.rv-replyline { margin: 4px 0 4px 10px; padding-left: 8px; border-left: 2px solid var(--border); overflow-wrap: anywhere; }
+.rv-c-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.rv-inline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.rv-input { flex: 1 1 220px; min-width: 0; font: inherit; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
+.rv-c-actions .btn, .rv-inline .btn { padding: 3px 9px; font-size: 12px; }

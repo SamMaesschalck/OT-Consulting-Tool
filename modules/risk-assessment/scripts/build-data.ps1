@@ -42,6 +42,14 @@ Wrap-Assign -jsonRelPath "data/risk-context-interchange.json" `
             -jsRelPath   "data/risk-context-interchange.js" `
             -targetExpr  "window.App.Data.interchange"
 
+Wrap-Assign -jsonRelPath "data/review-pack.json" `
+            -jsRelPath   "data/review-pack.js" `
+            -targetExpr  "(window.App.Data.contracts = window.App.Data.contracts || {}).reviewPack"
+
+Wrap-Assign -jsonRelPath "data/review-file.json" `
+            -jsRelPath   "data/review-file.js" `
+            -targetExpr  "(window.App.Data.contracts = window.App.Data.contracts || {}).reviewFile"
+
 Wrap-Assign -jsonRelPath "data/engagement-guidance.json" `
             -jsRelPath   "data/engagement-guidance.js" `
             -targetExpr  "window.App.Data.engagementGuidance"

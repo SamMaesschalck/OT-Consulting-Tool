@@ -142,6 +142,22 @@ foreach ($r in $manifest.shared.riskContextInterchange) {
     -targetExpr ("window.App.Data.shared.riskContextInterchange")
 }
 
+# --- 2c-bis. Report review contracts ------------------------------------------
+# spt-review-pack (what Send for review writes) and spt-review (what reviewers
+# send back). Copied in from contracts/ by tools/sync-shared.ps1.
+
+foreach ($rc in $manifest.shared.reviewContracts.PSObject.Properties) {
+  $jsonRel = "data/" + $rc.Value
+  $jsRel   = $jsonRel -replace "\.json$", ".js"
+  Wrap-Assign -jsonRelPath $jsonRel -jsRelPath $jsRel `
+    -parentEnsures @(
+      "window.App",
+      "window.App.Data",
+      "window.App.Data.contracts"
+    ) `
+    -targetExpr ("window.App.Data.contracts." + $rc.Name)
+}
+
 # --- 2d. Shared engagement-preparation guidance ------------------------------
 # Advisory per-instrument notes: typical documents, often-forgotten items and
 # key stakeholders. Rendered on the engagement page; never pre-populates the
@@ -330,6 +346,10 @@ foreach ($c in $manifest.shared.crossReferences) {
 }
 foreach ($r in $manifest.shared.riskContextInterchange) {
   $js = $r -replace "\.json$", ".js"
+  [void]$loaderSb.AppendLine("  add('$js');")
+}
+foreach ($rc in $manifest.shared.reviewContracts.PSObject.Properties) {
+  $js = ([string]$rc.Value) -replace "\.json$", ".js"
   [void]$loaderSb.AppendLine("  add('$js');")
 }
 foreach ($g in $manifest.shared.engagementGuidance) {

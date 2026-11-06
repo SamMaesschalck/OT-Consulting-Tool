@@ -1,0 +1,165 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review pack: the blocks are the Word file</title></head>
+<body>
+<!--
+  A review pack shows the reviewer what the client will read, so the blocks must
+  be the generated Word file and nothing else. For every demo (all 20
+  instruments, as the tours seed them) this builds the Draft documents, then
+  reads word/document.xml separately and checks: every paragraph and table cell
+  is in the blocks, in order, with no extra text; red prompts are flagged exactly
+  as the Issue check counts them; each heading's section key is the one the
+  exporter's own tags give it; the watermark and the cover background are left
+  out. A renamed and a hidden section are checked too.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+function paragraphs(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml"), out = [];
+  Array.prototype.forEach.call(doc.getElementsByTagNameNS(W, "p"), function (p) {
+    var t = "";
+    Array.prototype.forEach.call(p.getElementsByTagNameNS(W, "t"), function (e) { t += e.textContent; });
+    t = t.replace(/\s+/g, "");
+    if (t) out.push(t);
+  });
+  return out;
+}
+function redTexts(xml) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml"), out = [];
+  Array.prototype.forEach.call(doc.getElementsByTagNameNS(W, "p"), function (p) {
+    var st = p.getElementsByTagNameNS(W, "pStyle")[0];
+    var styled = st && st.getAttributeNS(W, "val") === "PlaceholderText";
+    var text = "";
+    Array.prototype.forEach.call(p.getElementsByTagNameNS(W, "r"), function (r) {
+      var c = r.getElementsByTagNameNS(W, "color")[0];
+      var red = c && /^E00000$/i.test(c.getAttributeNS(W, "val"));
+      if (styled || red) Array.prototype.forEach.call(r.getElementsByTagNameNS(W, "t"), function (t) { text += t.textContent; });
+    });
+    if (styled || text) out.push(text);
+  });
+  return out;
+}
+function sameList(a, b) {
+  var x = a.slice().sort(), y = b.slice().sort();
+  return x.length === y.length && x.every(function (v, i) { return v === y[i]; });
+}
+function firstDiff(a, b) {
+  for (var i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) return "#" + i + " word: " + String(a[i]).slice(0, 90) + " blocks: " + String(b[i]).slice(0, 90);
+  return "";
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, X = A.ExportDOCX, DB = A.DocxBlocks, RV = A.Review;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var I = A.UI.__issue, SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+
+  function allIds() { return E.state.engagement.targets.map(function (t) { return t.id; }); }
+
+  // The documents, read two ways. Resolves to one entry per document.
+  // The key a heading should have, worked out here rather than taken from the
+  // probe: the slug of its printed text, without any number, target names gone.
+  function readBoth() {
+    var jobs = I.jobs(allIds(), "per"), out = [], chain = Promise.resolve();
+    jobs.forEach(function (job, i) {
+      chain = chain.then(function () {
+        var probe = [];
+        return new Promise(function (res, rej) {
+          X.buildAsync(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+            Object.assign({}, job.opts, { issueStatus: "draft", sectionProbe: probe }), function (err, blob) { if (err) rej(err); else res(blob); });
+        }).then(function (blob) {
+          return Promise.all([H.unzipText(blob), DB.fromBlob(blob, { idPrefix: "d" + i + "-b", headings: probe })]);
+        }).then(function (r) {
+          var part = r[0].filter(function (p) { return p.name === "word/document.xml"; })[0];
+          out.push({ xml: part.text, res: r[1], probe: probe, job: job });
+        });
+      });
+    });
+    return chain.then(function () { return out; });
+  }
+  function blockStream(blocks) {
+    return DB.flatten(blocks).map(function (b) { return ((b.markerText || "") + (b.text || "")).replace(/\s+/g, ""); }).filter(Boolean);
+  }
+  function headings(blocks) { return blocks.filter(function (b) { return b.type === "heading" && !b.sub; }); }
+
+  var chain = Promise.resolve(), totals = { blocks: 0, tables: 0, images: 0, red: 0 };
+  Object.keys(SEED).forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      var checkList;
+      return new Promise(function (res) { I.run(I.jobs(allIds(), "per"), function (err, list) { checkList = list || []; res(); }); })
+      .then(readBoth).then(function (docs) {
+        var allRed = [];
+        docs.forEach(function (d, i) {
+          var tag = id + " doc " + (i + 1);
+          var word = paragraphs(d.xml), mine = blockStream(d.res.blocks);
+          ok(word.join("\n") === mine.join("\n"), tag + ": every paragraph and cell of document.xml, in order, nothing extra (" + word.length + ")", firstDiff(word, mine));
+          ok(sameList(redTexts(d.xml).filter(Boolean), DB.redTexts(d.res.blocks).filter(Boolean)), tag + ": red flagged as the file has it", JSON.stringify(DB.redTexts(d.res.blocks)).slice(0, 300));
+          allRed = allRed.concat(DB.redTexts(d.res.blocks));
+          // Keys: the exporter's own tags are the oracle.
+          var hs = headings(d.res.blocks);
+          var expected = d.probe;
+          ok(hs.length === expected.length, tag + ": every tagged heading is a heading block (" + hs.length + ")", hs.length + " vs " + expected.length + ": " + firstDiff(expected.map(function (x) { return x.title; }), hs.map(function (x) { return DB.stripNumber(x.text); })));
+          var bad = [];
+          hs.forEach(function (h, k) {
+            var e = expected[k];
+            // A numbered heading's key is made without its number. A zone's own
+            // heading has no key at all: it is the zone's name.
+            var own = e && e.boundary ? "" : A.Report.sectionKey(DB.stripNumber(h.text), { engagement: d.job.engagement });
+            if (e && (h.sectionKey !== e.key || h.sectionKey !== own)) bad.push(h.text + " => " + h.sectionKey + ", expected " + own);
+          });
+          ok(bad.length === 0, tag + ": each section heading's key is App.Report.sectionKey of its text", bad.slice(0, 3).join(" | "));
+          var cur = "", drift = 0;
+          d.res.blocks.forEach(function (b) {
+            if (b.type === "heading" && !b.sub) cur = b.sectionKey;
+            if (b.sectionKey !== cur) drift++;
+          });
+          ok(drift === 0, tag + ": every block carries the key of the section it sits under, a smaller heading staying inside it");
+          ok(!/\bDRAFT\b/.test(JSON.stringify(d.res.blocks)), tag + ": the DRAFT watermark is not in the blocks");
+          ok(d.res.omittedImages <= 1, tag + ": at most the one full-page image was left out (" + d.res.omittedImages + ")");
+          var ids = {}, dup = 0; d.res.blocks.forEach(function (b) { if (ids[b.id]) dup++; ids[b.id] = 1; });
+          ok(dup === 0 && d.res.blocks.every(function (b) { return /^d\d+-b\d+$/.test(b.id); }), tag + ": every block has its own id");
+          totals.blocks += d.res.blocks.length;
+          d.res.blocks.forEach(function (b) { if (b.type === "table") totals.tables++; if (b.type === "image") totals.images++; });
+        });
+        totals.red += allRed.length;
+        ok(sameList(allRed, checkList.map(function (p) { return p.text; })), id + ": the red blocks are the Issue check's list, one for one (" + allRed.length + ")",
+           JSON.stringify(allRed).slice(0, 300) + " vs " + JSON.stringify(checkList.map(function (p) { return p.text; })).slice(0, 300));
+      });
+    });
+  });
+
+  // ---- a renamed and a hidden section ------------------------------------
+  chain = chain.then(function () {
+    E.activateInstrument("ncsc-caf");
+    return readBoth();
+  }).then(function (docs) {
+    var hs = headings(docs[0].res.blocks);
+    var pick = hs.filter(function (h) { return h.level === 1 && h.sectionKey && h.sectionKey !== "executive-summary"; });
+    var ren = pick[1], hid = pick[2];
+    var renKey = ren.sectionKey, hidKey = hid.sectionKey;
+    E.setReportSection(renKey, { title: "Renamed by the consultant" });
+    E.setReportSection(hidKey, { hidden: true });
+    return readBoth().then(function (after) {
+      var bl = after[0].res.blocks;
+      var got = bl.filter(function (b) { return b.type === "heading" && /Renamed by the consultant/.test(b.text); })[0];
+      ok(!!got && got.sectionKey === renKey, "a renamed section keeps the key of its generated heading (" + renKey + ")", got && got.sectionKey);
+      var under = bl.filter(function (b) { return b.sectionKey === renKey && b.type !== "heading"; });
+      ok(!under.length || under[0].sectionTitle === "Renamed by the consultant", "and the blocks under it carry the key and the new title");
+      ok(after[0].probe.some(function (p) { return p.key === renKey; }), "the exporter's probe reports the renamed section under its own key too");
+      ok(!bl.some(function (b) { return b.sectionKey === hidKey; }), "a hidden section has no blocks (" + hidKey + ")");
+      ok(paragraphs(after[0].xml).join("\n") === blockStream(bl).join("\n"), "and the blocks still match the file exactly");
+      E.clearReportSection(renKey); E.clearReportSection(hidKey);
+    });
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); })
+  .then(function () {
+    ok.note("totals: " + JSON.stringify(totals));
+    done();
+  });
+});
+</script>
+</body></html>

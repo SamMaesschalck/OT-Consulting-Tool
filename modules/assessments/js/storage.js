@@ -26,7 +26,9 @@
  *           },
  *           targetProfile: {...}, targets: [...], responses: [...],
  *           baseline: {...},            // a previous assessment, for the diff
- *           reportNarrative, reportSections, basisOfAssessment
+ *           reportNarrative, reportSections, basisOfAssessment,
+ *           review: {...}               // comments back from reviewers (js/review.js);
+ *                                       // absent until a review starts, never exported
  *         }
  *       },
  *       createdAt, updatedAt

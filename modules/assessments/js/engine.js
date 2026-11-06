@@ -669,6 +669,25 @@ window.App.Engine = (function () {
     return Object.keys(getReportCustom()).length > 0;
   }
 
+  // ---- review (comments from the report review tool) --------------------
+  // Per-assessment, kept on the assessment itself and deliberately NOT on the
+  // engagement projection (Storage.projectionFromProjectAndAssessment): the
+  // exporters read the projection, so a review can never reach Word or Excel.
+  // A file saved before reviews existed simply has none. See js/review.js.
+  function getReview() {
+    var ass = activeAssessment();
+    return (ass && ass.review) || null;
+  }
+  function setReview(store) {
+    var ass = activeAssessment();
+    if (!ass) return;
+    ass.review = store;
+    touchReview();
+  }
+  // The store changed: unsaved work and an autosave, but no re-render, as
+  // nothing the report page draws from the engagement has changed.
+  function touchReview() { emit("responses-changed", null); }
+
   // ---- basis of assessment (evidence register) --------------------------
   // Per-assessment (like reportNarrative): the documents reviewed, systems
   // observed and people interviewed are specific to the ACTIVE instrument's
@@ -2042,6 +2061,9 @@ window.App.Engine = (function () {
     setReportSection: setReportSection,
     clearReportSection: clearReportSection,
     hasReportCustom: hasReportCustom,
+    getReview: getReview,
+    setReview: setReview,
+    touchReview: touchReview,
     getBasisOfAssessment: getBasisOfAssessment,
     touchBasisOfAssessment: touchBasisOfAssessment,
     getBaseline: getBaseline,
