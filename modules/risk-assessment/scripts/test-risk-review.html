@@ -7,7 +7,8 @@
   The risk tool's side of a review, on the tour's demo project: Send for review
   packs both Word reports (detailed and high level) as documents, with the zones
   and threats behind them; Import merges review files, once each; suggested
-  wording is Copy plus Go to; a comment that no longer matches is marked; older
+  wording is offered on section wording (test-risk-accept.html tests Accept) and
+  Copy plus Go to elsewhere; a comment that no longer matches is marked; older
   files load; and nothing of the review reaches Word, Excel or the risk context.
   Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
 -->
@@ -71,7 +72,8 @@
         ok(Array.isArray(pack.basisOfAssessment.interviews), "and the basis of assessment");
         ok(!!p.review && p.review.rounds.length === 1 && RT.isDirty(), "the round is recorded on the project, as unsaved work");
         window.__riskPack = saved.text;
-        var blk = pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 40; })[0];
+        // In a zone's register: written from the zones and threats, so it stays Copy.
+        var blk = pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && !b.sectionKey && b.text.length > 40; })[0];
         var blk2 = pack.documents[1].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 40; })[0];
         var at = new Date().toISOString();
         function c(id, sev, anchor, sug) { return { id: id, reviewer: "J. Marsh", createdAt: at, updatedAt: at, severity: sev, anchor: anchor, text: "Text of " + id, suggestion: sug || null, relatesTo: null, check: null }; }
@@ -97,9 +99,9 @@
         ok(/J\. Marsh/.test(text) && /Changes requested/.test(text) && /Tolerable risk agreed/.test(text), "with the reviewer, the verdict and the checklist's no");
         ok(/Detailed report/.test(text) && /High-level report/.test(text), "grouped per report");
         var first = main.querySelector('[data-comment-id="c1"]');
-        ok(first.querySelector(".rv-copy") && !first.querySelector(".rv-accept"), "suggested wording is Copy, not Accept");
-        ok(/no wording to edit on its own/.test(first.textContent), "saying why");
-        ok(RR.acceptPlan().can === false, "there is no editable field");
+        ok(first.querySelector(".rv-copy") && !first.querySelector(".rv-accept"), "suggested wording on text written from the zones is Copy, not Accept");
+        ok(/written from the zones and threats/.test(first.textContent), "saying why");
+        ok(RR.acceptPlan().can === false, "with no comment there is nothing to accept");
         return new Promise(function (res) { RR.refreshDocs(res); });
       }).then(function () {
         var th = RR.store().threads;
@@ -111,9 +113,9 @@
         ok(main.querySelector('[data-comment-id="c4"] .rv-stale').textContent === "No longer matches the current report", "shown on the comment");
         // Go to
         RR.goTo(RR.store().threads[0]);
-        ok(RT.state.stage === "review", "Go to from the detailed report opens its page");
+        ok(RT.state.stage === "report" && w.RiskReportPage.state.doc === 0, "Go to from the detailed report opens it on the Report page");
         RR.goTo(RR.store().threads[1]);
-        ok(RT.state.stage === "hlreport", "and from the high-level report, its page");
+        ok(RT.state.stage === "report" && w.RiskReportPage.state.doc === 1, "and from the high-level report, that report");
         RR.goTo(RR.store().threads[2]);
         ok(RT.state.stage === "risk" || RT.state.stage === "slt", "and from an item, the risk page");
         // Statuses

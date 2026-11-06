@@ -8,9 +8,12 @@
  * (js/review-author.js); this file only says how the risk tool builds its
  * documents and where a comment takes the author.
  *
- * The risk tool's reports have no per-section wording to edit, so a suggestion
- * is Copy plus Go to. The store is project.review: absent until a review starts,
- * so older files still load, and neither export reads it.
+ * A suggestion on a section's heading or the wording that opens it can be
+ * accepted into that report's section overrides (js/report-page.js): the Word
+ * document is rebuilt to check the words are really there, and it is undone if
+ * they are not. Anything else is Copy plus Go to. The store is project.review:
+ * absent until a review starts, so older files still load, and neither export
+ * reads it.
  */
 window.RiskReview = (function () {
   "use strict";
@@ -19,6 +22,7 @@ window.RiskReview = (function () {
   function RX() { return window.RiskExports; }
   function RC() { return window.App.ReviewCore; }
   function DB() { return window.App.DocxBlocks; }
+  function RP() { return window.RiskReportPage; }
   function norm(s) { return RC().norm(s); }
   function project() { return RT().state.project; }
   function store() { var s = project().review; return s ? RC().normaliseStore(s) : null; }
@@ -36,13 +40,17 @@ window.RiskReview = (function () {
   function buildDocuments(progress) {
     var out = [], chain = Promise.resolve();
     DOCS.forEach(function (d, i) {
+      var probe = [];
       chain = chain.then(function () {
         if (progress) progress("Building the Word report " + (i + 1) + " of " + DOCS.length + "…");
-        return window.docx.Packer.toBlob(RX().buildWordDoc(project(), d.opts));
+        return window.docx.Packer.toBlob(RX().buildWordDoc(project(), Object.assign({}, d.opts, { sectionProbe: probe })));
       }).then(function (blob) {
-        return DB().fromBlob(blob, { idPrefix: "d" + i + "-b" });
+        // A section's key slugs its GENERATED heading, and a Word file only has
+        // the printed one. The build's probe says which section each heading is,
+        // renamed or not, and which are only a zone's name.
+        return DB().fromBlob(blob, { idPrefix: "d" + i + "-b", headings: probe });
       }).then(function (res) {
-        out.push({ title: d.title, targetName: "", blocks: res.blocks, media: res.media, contentHash: DB().contentHash(res.blocks) });
+        out.push({ title: d.title, targetName: "", blocks: res.blocks, media: res.media, contentHash: DB().contentHash(res.blocks), probe: probe });
       });
     });
     return chain.then(function () { return out; });
@@ -126,18 +134,29 @@ window.RiskReview = (function () {
   }
 
   // ---- comments against the current reports --------------------------------------
-  var snap = { signature: null, docs: null, building: false };
+  var snap = { signature: null, docs: null, building: null, waiting: [] };
   function signature() { var c = Object.assign({}, project()); delete c.review; delete c.savedOn; return JSON.stringify(c); }
   function cachedDocs() { return snap.docs && snap.signature === signature() ? snap.docs : null; }
-  function refreshDocs(cb) {
-    if (cachedDocs() || snap.building) { if (cb) cb(); return; }
-    snap.building = true;
+  // The reports as they are now, built if they have changed.
+  function currentDocs(cb) {
     var sig = signature();
+    if (snap.docs && snap.signature === sig) { cb(null, snap.docs); return; }
+    snap.waiting.push(cb);
+    if (snap.building === sig) return;
+    snap.building = sig;
     buildDocuments().then(function (docs) {
-      snap.building = false; snap.signature = sig; snap.docs = docs;
-      if (cb) cb();
-    }, function () { snap.building = false; if (cb) cb(); });
+      if (snap.building !== sig) return;     // something newer has started
+      snap.building = null; snap.signature = sig; snap.docs = docs;
+      var w = snap.waiting; snap.waiting = [];
+      w.forEach(function (f) { f(null, docs); });
+    }, function (e) {
+      if (snap.building !== sig) return;
+      snap.building = null;
+      var w = snap.waiting; snap.waiting = [];
+      w.forEach(function (f) { f(e); });
+    });
   }
+  function refreshDocs(cb) { currentDocs(function () { if (cb) cb(); }); }
   function isStale(t) {
     var a = t.comment.anchor || {};
     if (a.kind === "general") return false;
@@ -153,15 +172,104 @@ window.RiskReview = (function () {
       }) || DB().flatten(d.blocks).some(function (b) { return norm(b.text) === q; });
     });
   }
-  function acceptPlan() {
-    return { can: false, why: "The risk tool's reports are written from the zones and threats, with no wording to edit on its own. Copy the wording, then use Go to." };
+
+  // ---- accepting a suggestion -------------------------------------------------------
+  //
+  // Which text accepts what: a section's heading goes into its title, and a
+  // paragraph of the wording that opens a section into its prose, in the report
+  // the comment is on (its documentIndex). Everything else is written from the
+  // zones and threats, or is the numbers.
+  var NOT_EDITABLE = "This text is written from the zones and threats, so it cannot be changed here. Copy the wording, then use Go to.";
+  function docHas(doc, text) {
+    var q = norm(text);
+    return !!doc && doc.blocks.some(function (b) {
+      if (norm(DB().blockText(b)) === q) return true;
+      return b.type === "table" && b.rows.some(function (r) { return r.cells.some(function (c) { return norm(c.text) === q; }); });
+    }) || (!!doc && DB().flatten(doc.blocks).some(function (b) { return norm(b.text) === q; }));
   }
+  // How a comment's suggestion would be applied, given the current documents.
+  // { can, why, label, kind, apply(), undo(), expect: [texts], documentIndex }
+  function planAccept(t, docs) {
+    var c = t.comment, a = c.anchor || {}, sug = c.suggestion;
+    if (!sug) return { can: false };
+    if (a.kind !== "block") return { can: false, why: "This comment is on the zones and threats behind the reports, not on their wording, so copy the wording and use Go to." };
+    if (!docs) return { can: false, why: "Still checking this against the current report." };
+    var i = a.documentIndex === 1 ? 1 : 0, doc = docs[i];
+    var docId = i === 1 ? "highLevel" : "detailed";
+    if (!docHas(doc, a.quote)) return { can: false, why: "The report has changed, so this wording no longer matches what is there. Copy it and compare." };
+    var probe = doc.probe || [];
+
+    // A heading: the section's own title.
+    var isHeading = !a.cell && doc.blocks.some(function (b) { return b.type === "heading" && !b.sub && norm(b.text) === norm(a.quote); });
+    if (isHeading) {
+      if (!a.sectionKey) return { can: false, why: "This heading is a name from the assessment, not a section title. Rename it where it is entered." };
+      if (probe.some(function (s) { return s.key === a.sectionKey && s.repeat; })) {
+        return { can: false, why: "This heading is built from a zone's name, so it cannot be changed for one zone. Use Edit on the Report page to change the words around the name." };
+      }
+      var title = DB().stripNumber(sug), prevTitle = RP().sectionOf(docId, a.sectionKey).title || null;
+      return { can: true, kind: "section title", label: "Accept", documentIndex: i,
+        apply: function () { RP().setSection(docId, a.sectionKey, { title: title }); },
+        undo: function () { RP().setSection(docId, a.sectionKey, { title: prevTitle }); },
+        expect: [title] };
+    }
+
+    // A section's opening wording: a rewrite replaces the whole run, so the run
+    // is rebuilt with the one paragraph changed.
+    var runs = probe.filter(function (s) { return s.key && s.key === a.sectionKey && s.texts.some(function (x) { return norm(x) === norm(a.quote); }); });
+    if (!a.cell && runs.length) {
+      if (runs[0].repeat || runs.length > 1) {
+        return { can: false, why: "Each zone and conduit has its own wording in this section, and a rewrite here would replace all of them. Copy the wording and use Go to." };
+      }
+      var leads = runs[0].texts, prev = RP().sectionOf(docId, a.sectionKey).prose || null;
+      var keep = leads.filter(function (x) { return norm(x) !== norm(a.quote); });
+      var prose = leads.map(function (x) { return norm(x) === norm(a.quote) ? String(sug).trim() : x; }).join("\n");
+      return { can: true, kind: "section opening", label: "Accept", documentIndex: i,
+        apply: function () { RP().setSection(docId, a.sectionKey, { prose: prose }); },
+        undo: function () { RP().setSection(docId, a.sectionKey, { prose: prev }); },
+        expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }).concat(keep) };
+    }
+    return { can: false, why: NOT_EDITABLE };
+  }
+  // Remembered for this session, so the failed Accept is not offered again.
+  var failedPlans = {};
+  function acceptPlan(t) {
+    if (!t) return { can: false };
+    if (failedPlans[t.comment.id]) return { can: false, why: "That wording did not reach the Word document when it was rebuilt, so copy it and use Go to." };
+    try { return planAccept(t, cachedDocs()); }
+    catch (e) { console.error(e); return { can: false, why: "This could not be worked out, so copy the wording." }; }
+  }
+  // Apply, rebuild, check the wording is really in the Word document. If not,
+  // undo and say so; the comment stays open, with Copy.
+  function accept(t, done) {
+    currentDocs(function (err, docs) {
+      if (err) { done({ ok: false, message: "The report could not be read: " + (err.message || err) }); return; }
+      var plan = planAccept(t, docs);
+      if (!plan.can) { done({ ok: false, message: plan.why || "This cannot be applied." }); return; }
+      try { plan.apply(); }
+      catch (e) { done({ ok: false, message: "This could not be applied: " + (e.message || e) }); return; }
+      currentDocs(function (err2, after) {
+        var missing = err2 ? plan.expect : plan.expect.filter(function (x) { return !docHas(after[plan.documentIndex], x); });
+        if (missing.length) {
+          plan.undo();
+          currentDocs(function () {
+            failedPlans[t.comment.id] = true;
+            done({ ok: false, message: "That wording did not reach the Word document when it was rebuilt, so the change was undone. Copy the wording and use Go to." });
+          });
+          return;
+        }
+        t.accepted = { at: new Date().toISOString(), kind: plan.kind };
+        t.status = "resolved"; t.statusAt = t.accepted.at;
+        RT().touched();
+        done({ ok: true, message: "Accepted into the " + plan.kind + ", and checked in the rebuilt Word document." });
+      });
+    });
+  }
+
   function goTo(t) {
     var a = t.comment.anchor || {}, s = RT().state;
     if (a.kind === "item") { s.stage = /:slt$/.test(a.itemId || "") ? "slt" : "risk"; RT().render(); return; }
     if (a.kind === "general") { s.stage = "basis"; RT().render(); return; }
-    s.stage = a.documentIndex === 1 ? "hlreport" : "review";
-    RT().render();
+    RP().goTo(a.documentIndex, a.sectionKey, a.quote);
   }
 
   // ---- the page ---------------------------------------------------------------------
@@ -177,7 +285,7 @@ window.RiskReview = (function () {
       send: send,
       goTo: goTo,
       acceptPlan: acceptPlan,
-      accept: function (t, done) { done({ ok: false, message: acceptPlan().why }); },
+      accept: accept,
       stale: isStale,
       authorName: function () { return norm(project().engagement.consultant) || "Author"; },
       toast: RT().toast
@@ -199,5 +307,5 @@ window.RiskReview = (function () {
 
   return { render: render, buildPack: buildPack, packItems: packItems, buildDocuments: buildDocuments, store: store, ensureStore: ensureStore, send: send,
     importTexts: function (list) { return window.App.ReviewAuthor.importTexts(adapter(), list, null, null); },
-    isStale: isStale, acceptPlan: acceptPlan, goTo: goTo, refreshDocs: refreshDocs };
+    isStale: isStale, acceptPlan: acceptPlan, accept: accept, goTo: goTo, refreshDocs: refreshDocs };
 })();

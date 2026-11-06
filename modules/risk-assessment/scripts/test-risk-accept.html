@@ -1,0 +1,241 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Risk tool: accepting suggested wording</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Accept in the risk tool, on real packs and real Word output: a suggestion on a
+  section's heading or opening wording goes into that report's overrides (a
+  comment's documentIndex says which), the Word document is rebuilt to confirm it,
+  and it is undone if the words are not there. Everything else is Copy and Go to
+  with the reason. Go to reaches the section on the Report page, and a pack reflects
+  renamed and hidden sections with their keys.
+  Needs allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 120000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, RT, RR, RP, RX, RC, DB, RS, main, n = 0;
+    w.confirm = function () { return true; }; w.alert = function () {};
+    function P() { return RT.state.project; }
+    function norm(s) { return RC.norm(s); }
+    function thread(docIndex, b, suggestion, cell) {
+      n++;
+      return { comment: { id: "c" + n, reviewer: "J. Marsh", severity: "should-fix", text: "Reword.", suggestion: suggestion,
+        anchor: { documentIndex: docIndex, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: cell || b.text, cell: cell ? { row: 0, col: 0 } : null } },
+        status: "open", round: 1, replies: [] };
+    }
+    function docs() { return new Promise(function (res) { RR.refreshDocs(function () { RR.buildDocuments().then(res); }); }); }
+    function current() { return new Promise(function (res) { RR.refreshDocs(res); }); }
+    function accept(t) { return new Promise(function (res) { RR.accept(t, res); }); }
+    function xml(opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(P(), opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
+      });
+    }
+    function reset() { delete P().reportCustom; RT.touched(); }
+
+    poll(function () { return w.RiskTool && w.RiskReview && w.RiskReportPage && w.RiskExports && w.docx && w.RiskTool.state.project.zones.length; }).then(function () {
+      RT = w.RiskTool; RR = w.RiskReview; RP = w.RiskReportPage; RX = w.RiskExports; RC = w.App.ReviewCore; DB = w.App.DocxBlocks; RS = w.App.ReportSections; main = w.document.getElementById("main");
+      return docs();
+    }).then(function (d) {
+      var d0 = d[0], d1 = d[1];
+      function para(doc, key, re) { return doc.blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey === key && (!re || re.test(b.text)); })[0]; }
+      function head(doc, key) { return doc.blocks.filter(function (b) { return b.type === "heading" && b.sectionKey === key; })[0]; }
+
+      // ---- what each kind of text offers ---------------------------------------------------
+      var t1 = thread(0, head(d0, "executive-summary"), "Summary");
+      return current().then(function () {
+        var p = RR.acceptPlan(t1);
+        ok(p.can && p.kind === "section title", "a section's heading can be accepted into its title", JSON.stringify(p));
+        var lead = para(d0, "why-this-assessment");
+        var t2 = thread(0, lead, lead.text + " Reviewed.");
+        p = RR.acceptPlan(t2);
+        ok(p.can && p.kind === "section opening", "a paragraph of a section's opening can be accepted into its wording", p.why);
+        var cell = d0.blocks.filter(function (b) { return b.type === "table" && b.sectionKey === "high-level-risk-ranking-4-2"; })[0];
+        p = RR.acceptPlan(thread(0, cell, "Other words", cell.rows[1].cells[0].text));
+        ok(!p.can && /written from the zones and threats/.test(p.why), "a table cell is Copy, with the reason", p.why);
+        var zh = d0.blocks.filter(function (b) { return b.type === "heading" && /^Z1: /.test(b.text); })[0];
+        ok(zh.sectionKey === "", "a zone's own heading has no section key", zh.sectionKey);
+        p = RR.acceptPlan(thread(0, zh, "Z1: A new name"));
+        ok(!p.can && /a name from the assessment, not a section title/.test(p.why), "a zone's heading is refused: it is a name", p.why);
+        var zp = d0.blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey === "" && !b.front && b.text.length > 30; })[0];
+        p = RR.acceptPlan(thread(0, zp, zp.text + " Changed."));
+        ok(!p.can && /written from the zones and threats/.test(p.why), "and so is the text under it", p.why);
+        var jh = head(d0, "justification-for");
+        p = RR.acceptPlan(thread(0, jh, "Rationale for this zone"));
+        ok(!p.can && /built from a zone's name/.test(p.why), "a per-zone heading is refused for one zone", p.why);
+        var jp = para(d0, "justification-for");
+        p = RR.acceptPlan(thread(0, jp, jp.text + " Changed."));
+        ok(!p.can && /Each zone and conduit has its own wording in this section, and a rewrite here would replace all of them/.test(p.why), "and a per-zone opening, saying why", p.why);
+        var sg = d0.blocks.filter(function (b) { return b.sectionKey === "sign-off" && b.type !== "heading"; })[0];
+        p = RR.acceptPlan(thread(0, sg, "Signed off by someone else"));
+        ok(!p.can, "sign-off is not offered", p.why);
+        var so = para(d0, "what-happens-next", /signed off/);
+        p = RR.acceptPlan(thread(0, so, "The asset owner signed off everything."));
+        ok(!p.can, "nor the sign-off statement in the summary", p.why);
+        var scoreBody = para(d0, "risk-at-a-glance");
+        p = RR.acceptPlan(thread(0, scoreBody, "Other words"));
+        ok(!p.can, "text after a table is not a section's opening", p.why);
+        p = RR.acceptPlan({ comment: { id: "x", suggestion: "x", anchor: { kind: "item", documentIndex: 0, quote: "" } }, status: "open" });
+        ok(!p.can && /zones and threats behind the reports/.test(p.why), "and a comment on the engagement behind the report is Copy", p.why);
+        p = RR.acceptPlan(thread(0, { sectionKey: "x", sectionTitle: "x", id: "b", text: "Not in the report at all." }, "Other"));
+        ok(!p.can && /no longer matches/.test(p.why), "wording that has gone is not offered", p.why);
+
+        // ---- accepted into the right report --------------------------------------------------
+        return accept(t1);
+      }).then(function (res) {
+        ok(res.ok && /section title/.test(res.message) && /checked in the rebuilt Word document/.test(res.message), "Accept on a heading works and says so", res.message);
+        ok(RP.sectionOf("detailed", "executive-summary").title === "Summary", "into the detailed report's overrides");
+        ok(!RP.sectionOf("highLevel", "executive-summary").title, "and not the high-level report's");
+        ok(t1.status === "resolved" && t1.accepted && t1.accepted.kind === "section title", "the comment is resolved");
+        return Promise.all([xml({}), xml({ highLevelOnly: true })]);
+      }).then(function (both) {
+        ok(/<w:t[^>]*>Summary<\/w:t>/.test(both[0]), "Word: the detailed report has the new heading");
+        ok(!/<w:t[^>]*>Summary<\/w:t>/.test(both[1]) && /<w:t[^>]*>Executive summary<\/w:t>/.test(both[1]), "Word: the high-level report keeps its own");
+        reset();
+        return docs();
+      }).then(function (again) {
+        // The same-named section in the high-level report, by documentIndex.
+        var lead = para(again[1], "why-this-assessment");
+        ok(!!lead && lead.text !== para(again[0], "why-this-assessment").text, "the two reports' Why this assessment really differ");
+        var t = thread(1, lead, lead.text + " Reviewed for the board.");
+        return accept(t).then(function (res) {
+          ok(res.ok && /section opening/.test(res.message), "Accept on the high-level report's opening works", res.message);
+          ok(!!RP.sectionOf("highLevel", "why-this-assessment").prose && !RP.sectionOf("detailed", "why-this-assessment").prose, "into that report alone");
+          return Promise.all([xml({}), xml({ highLevelOnly: true })]);
+        });
+      }).then(function (both) {
+        ok(both[1].indexOf("Reviewed for the board.") !== -1 && both[0].indexOf("Reviewed for the board.") === -1, "Word: the suggestion prints in that report alone");
+        reset();
+        return docs();
+      }).then(function (again) {
+        // A run of several: only the paragraph commented on changes.
+        var ps = again[0].blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey === "what-we-found"; });
+        ok(ps.length >= 2, "a section with several opening paragraphs (" + ps.length + ")");
+        var t = thread(0, ps[1], "A plainer sentence about treatment.");
+        return accept(t).then(function (res) {
+          ok(res.ok, "Accept on the second paragraph", res.message);
+          return xml({}).then(function (x) {
+            ok(x.indexOf("A plainer sentence about treatment.") !== -1, "Word: it prints");
+            ok(x.indexOf("threats were registered") !== -1, "Word: the paragraph before it stays");
+            ok(x.indexOf("Of the above-tolerable threats") === -1, "Word: the one it replaced goes");
+          });
+        });
+      }).then(function () {
+        reset();
+        return docs();
+      }).then(function (again) {
+        // ---- undone on failure ----------------------------------------------------------------
+        var real = RS.applyOverrides;
+        RS.applyOverrides = function (children) { return children; };   // the wording never lands
+        var lead = para(again[0], "why-this-assessment");
+        var t = thread(0, lead, lead.text + " This will not land.");
+        return accept(t).then(function (res) {
+          RS.applyOverrides = real;
+          ok(!res.ok && /did not reach the Word document when it was rebuilt, so the change was undone/.test(res.message), "wording that does not reach Word is undone, and says so", res.message);
+          ok(!P().reportCustom, "the override is gone again", JSON.stringify(P().reportCustom));
+          ok(t.status === "open" && !t.accepted, "the comment stays open");
+          return current().then(function () {
+            var p = RR.acceptPlan(t);
+            ok(!p.can && /did not reach the Word document/.test(p.why), "and Accept is not offered again this session", p.why);
+          });
+        });
+      }).then(function () {
+        reset();
+        // ---- the comments list shows it ----------------------------------------------------------
+        var at = new Date().toISOString();
+        return docs().then(function (again) {
+          var lead = para(again[0], "why-this-assessment"), zp = again[0].blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey === "" && !b.front && b.text.length > 30; })[0];
+          return RR.buildPack().then(function (r) {
+            function c(id, b, sug) { return { id: id, reviewer: "J. Marsh", createdAt: at, updatedAt: at, severity: "should-fix", anchor: { documentIndex: 0, documentTitle: "Detailed report", kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text, cell: null }, text: "Reword " + id, suggestion: sug, relatesTo: null, check: null }; }
+            var file = { schema: RC.fileSchema(), packId: r.pack.packId, reviewId: r.pack.reviewId, round: 1, fileId: "f1", reviewer: "J. Marsh", savedAt: at, verdict: { value: "changes-requested", date: "2026-11-01", note: "" }, checklist: [], dismissedChecks: [], confirmations: [],
+              comments: [c("list-a", lead, lead.text + " Through the list."), c("list-b", zp, zp.text + " Not this one.")] };
+            RC.recordRound(r.store, r.pack);
+            var res = RR.importTexts([{ name: "a.json", text: JSON.stringify(file) }]);
+            ok(res.bad === 0, "a review file comes in", res.lines.join(" | "));
+            RT.state.stage = "peer"; RT.render();
+            return current().then(function () { RT.render(); return poll(function () { return main.querySelector('[data-comment-id="list-a"] .rv-accept'); }); });
+          });
+        });
+      }).then(function (btn) {
+        var b = main.querySelector('[data-comment-id="list-b"]');
+        ok(!b.querySelector(".rv-accept") && !!b.querySelector(".rv-copy") && !!b.querySelector(".rv-go"), "text written from the zones offers Copy and Go to");
+        ok(/written from the zones and threats/.test(b.textContent), "with the reason");
+        btn.click();
+        return poll(function () { return main.querySelector(".rv-notice.ok"); });
+      }).then(function (note) {
+        ok(/Accepted into the section opening/.test(note.textContent), "Accept from the comments list works", note.textContent);
+        ok(RP.sectionOf("detailed", "why-this-assessment").prose.indexOf(" Through the list.") !== -1, "and the wording is stored");
+        var th = RR.store().threads.filter(function (t) { return t.comment.id === "list-a"; })[0];
+        ok(th.status === "resolved" && th.accepted, "resolved, with the acceptance recorded");
+        // ---- Go to ---------------------------------------------------------------------------------
+        var lst = RR.store().threads.filter(function (t) { return t.comment.id === "list-b"; })[0];
+        RR.goTo(lst);
+        ok(RT.state.stage === "report" && RP.state.doc === 0, "Go to opens the Report page, on that report");
+        return poll(function () { return RP.idle() && !RP.state.reveal; });
+      }).then(function () {
+        var lst = RR.store().threads.filter(function (t) { return t.comment.id === "list-b"; })[0];
+        var hit = main.querySelector(".check-flash");
+        ok(!!hit && hit.textContent.indexOf(lst.comment.anchor.quote.slice(0, 30)) !== -1, "and finds text under a zone's heading, which has no section of its own");
+        var acc = RR.store().threads.filter(function (t) { return t.comment.id === "list-a"; })[0];
+        RR.goTo(acc);
+        return poll(function () { return RP.idle() && !RP.state.reveal; });
+      }).then(function () {
+        var hit = main.querySelector(".card.check-flash");
+        ok(!!hit && hit.getAttribute("data-section") === "why-this-assessment", "and a section's own comment reaches its card", hit && hit.getAttribute("data-section"));
+        var hl = { comment: { id: "hl", anchor: { documentIndex: 1, kind: "block", sectionKey: "where-to-look-first", quote: "" } } };
+        RR.goTo(hl);
+        ok(RP.state.doc === 1, "and from the high-level report, that report");
+        return poll(function () { return RP.idle() && !RP.state.reveal; });
+      }).then(function () {
+        var hit = main.querySelector(".card.check-flash");
+        ok(!!hit && hit.getAttribute("data-section") === "where-to-look-first", "to its section");
+        // ---- a pack reflects the overrides -------------------------------------------------------------
+        reset();
+        RP.setSection("detailed", "method-and-limitations", { title: "How this was done" });
+        RP.setSection("detailed", "basis-of-assessment", { hidden: true });
+        RP.setSection("highLevel", "executive-summary", { title: "Board summary" });
+        return RR.buildPack();
+      }).then(function (r) {
+        var d0 = r.pack.documents[0], d1 = r.pack.documents[1];
+        var ren = d0.blocks.filter(function (b) { return b.type === "heading" && b.text === "How this was done"; })[0];
+        ok(!!ren && ren.sectionKey === "method-and-limitations" && ren.sectionTitle === "How this was done", "a pack prints the new title, under the section's own key", ren && ren.sectionKey);
+        ok(d0.blocks.filter(function (b) { return b.sectionKey === "method-and-limitations" && b.type === "paragraph"; }).length === 2, "with its body under it");
+        ok(!d0.blocks.some(function (b) { return b.sectionKey === "basis-of-assessment"; }), "a hidden section is not in the pack");
+        ok(d1.blocks.some(function (b) { return b.sectionKey === "basis-of-assessment"; }), "but is still in the other report's");
+        ok(d1.blocks.some(function (b) { return b.type === "heading" && b.text === "Board summary" && b.sectionKey === "executive-summary"; }), "and that report's own rename is in it");
+        ok(d0.blocks.some(function (b) { return b.type === "heading" && b.text === "Executive summary"; }), "not this one's");
+        var hs = d0.blocks.filter(function (b) { return b.type === "heading"; });
+        ok(hs.every(function (b) { return !b.sub; }), "every heading matched the build's list of sections");
+        ok(hs.filter(function (b) { return !b.sectionKey; }).every(function (b) { return /^[ZC]\d+: /.test(b.text); }) && hs.filter(function (b) { return !b.sectionKey; }).length === P().zones.length + P().conduits.length, "only a zone's or conduit's own heading has no key");
+        reset();
+      });
+    }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+      try { w.onbeforeunload = null; } catch (e) {}
+      finish();
+    });
+  };
+  frame.src = "../index.html?tour=1";
+})();
+</script>
+</body></html>
