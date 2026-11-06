@@ -47,3 +47,4 @@
 .rv-inline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .rv-input { flex: 1 1 220px; min-width: 0; font: inherit; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
 .rv-c-actions .btn, .rv-inline .btn { padding: 3px 9px; font-size: 12px; }
+.export-issue-note.warn { color: var(--near); margin: 6px 0 0; }

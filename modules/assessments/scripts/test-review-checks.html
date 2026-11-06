@@ -76,6 +76,10 @@ H.test(function (ok, done) {
     var ip2 = clone(clean);
     setText(firstPara(ip2), "The remote support toolset was reviewed.");
     ok(of(RK.run(ip2, {}), "internal-wording").length === 0, "matches whole words: a toolset is not the tool", JSON.stringify(of(RK.run(ip2, {}), "internal-wording").map(function (x) { return x.quote; })));
+    var ip4 = clone(clean), rec = ip4.items.filter(function (i) { return i.evidence; })[0];
+    rec.evidence = "The engineering laptop holds the tool used to program the PLCs, and the tool is retired next year.";
+    setText(firstPara(ip4), "Evidence: " + rec.evidence);
+    ok(of(RK.run(ip4, {}), "internal-wording").length === 0, "words recorded as evidence are not the report talking about itself: in OT, the tool may be a real tool", JSON.stringify(of(RK.run(ip4, {}), "internal-wording").map(function (x) { return x.quote; })));
     var ip3 = clone(clean);
     var redp = firstPara(ip3); redp.red = true; redp.runs = [{ t: "[The tool cannot fill this in.]", b: true, i: false, red: true }]; redp.text = "[The tool cannot fill this in.]";
     ok(!of(RK.run(ip3, {}), "internal-wording").some(function (x) { return x.blockId === redp.id; }), "a red prompt is its own check, not counted twice");

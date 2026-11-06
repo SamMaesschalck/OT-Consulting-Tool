@@ -126,7 +126,7 @@
   // The crash net. One entry per pack, holding the review only: the pack itself
   // is a file the reviewer already has. Inert in the demo.
   function writeAutosave() {
-    if (TOUR_MODE || !state.review) return;
+    if (TOUR_MODE || state.demo || !state.review) return;
     if (!lsSet(KEY_AUTOSAVE + state.pack.packId, JSON.stringify({ savedOn: new Date().toISOString(), review: state.review })) && !autosaveBroken) {
       autosaveBroken = true;
       toast("Autosave is not available here (browser storage blocked or full). Save to a file regularly.", "err");
@@ -184,6 +184,7 @@
     };
   }
   function openPack(pack) {
+    state.demo = false;
     state.pack = pack;
     state.review = newReview(pack);
     state.page = "report";
@@ -193,6 +194,8 @@
     state.itemTarget = "";
     state.handle = null;
     state.restore = null;
+    state.checksAll = null;
+    state.itemsAll = false;
     if (!TOUR_MODE) {
       var raw = lsGet(KEY_AUTOSAVE + pack.packId), snap = raw ? RC.parseJson(raw) : null;
       if (snap && snap.review && snap.review.packId === pack.packId && hasWork(snap.review)) state.restore = snap;

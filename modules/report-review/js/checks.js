@@ -115,12 +115,27 @@
     });
   }
 
+  // What the consultant or client recorded, where a phrase can mean something
+  // else entirely: in OT, "the tool" is often an engineering tool ("the tool is
+  // retired at the turnaround"). A match inside such a field is left alone.
+  function recordedText(pack) {
+    var out = [];
+    function add(v) { v = norm(v); if (v.length >= 8) out.push(v); }
+    (pack.items || []).forEach(function (it) { ["evidence", "notes", "action", "impact", "owner", "title"].forEach(function (f) { add(it[f]); }); });
+    var bs = pack.basisOfAssessment || {};
+    ["interviews", "documents", "observations"].forEach(function (k) {
+      (bs[k] || []).forEach(function (r) { Object.keys(r).forEach(function (f) { add(r[f]); }); });
+    });
+    return out;
+  }
   function internal(pack, out) {
+    var recorded = recordedText(pack);
     eachText(pack, function (text, b, cell, p, d) {
-      var t = plainOf(p);
+      var t = plainOf(p), nt = norm(t);
       INTERNAL.forEach(function (w) {
         var m = w.re.exec(t);
         if (!m) return;
+        if (recorded.some(function (v) { return w.re.test(v) && nt.indexOf(v) !== -1; })) return;
         var from = Math.max(0, m.index - 50);
         out.push(result("internal-wording", keyFor(b, cell, w.label), "“" + m[0] + "” describes the tool rather than the client's position.",
           (from ? "…" : "") + t.slice(from, m.index + 60) + (m.index + 60 < t.length ? "…" : ""), b, cell, d, { fullText: text }));
