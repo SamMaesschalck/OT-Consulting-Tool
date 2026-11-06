@@ -14,6 +14,10 @@ canonical copy lives in the repository's `shared/` (or `contracts/`) and
 module folders and never share runtime. The only thing the two apps agree on
 at run time is the interchange file contract described below.
 
+## Peer review
+
+The Peer review page sends both Word reports for review as a pack, and imports the review files that come back: comments with severity, status and replies, on a page of their own. The reports have no wording of their own to edit, so a suggestion is Copy and Go to. See `docs/report-review.md` at the repository root. The review is saved in the project file (`project.review`) and never reaches the Word report, the Excel workbook or the risk context file.
+
 ## Two tiers
 
 The tool is split into two tiers, matching how 3-2 is used in practice.

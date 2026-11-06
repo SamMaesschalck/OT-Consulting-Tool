@@ -1,7 +1,7 @@
 # Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt.
 #
 # Runs a module's headless-Edge test pages (the tests.pages glob in
-# modules\<module>\module.json, scripts\test-*.html for both modules) and
+# modules\<module>\module.json, scripts\test-*.html for every module) and
 # reports PASS/FAIL counts per page.
 #
 #   .\tools\run-tests.ps1                                  # every assessments page

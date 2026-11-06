@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 SolutionsPT. All rights reserved.
 
-Desktop-app versions of each tool in the suite: the OT Cyber Assessment Tool (module `assessments`) and the OT Cyber Risk Assessment Tool (module `risk-assessment`). Each is built on its own, as its own exe, so a contractor can be given just the tool they need. Each runs its module's single-file build from `../single-html` unchanged, inside Electron's own copy of Chromium. Nothing in `../../modules` is touched.
+Desktop-app versions of each tool in the suite: the OT Cyber Report Review Tool (module `report-review`), the OT Cyber Assessment Tool (module `assessments`) and the OT Cyber Risk Assessment Tool (module `risk-assessment`). Each is built on its own, as its own exe, so a contractor can be given just the tool they need. Each runs its module's single-file build from `../single-html` unchanged, inside Electron's own copy of Chromium. Nothing in `../../modules` is touched.
 
 The SolutionsPT OT Cyber Suite (`-Module suite`) builds the same way: its page is the suite's single-file build, which carries each tool in a frame, and its manifest is `platform/suite.json` (copied in as `module.json`). Its exe is `%LOCALAPPDATA%\OTCAT-electron\suite\dist\SolutionsPT OT Cyber Suite v<version>.exe`.
 
