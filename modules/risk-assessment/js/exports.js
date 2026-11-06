@@ -662,7 +662,7 @@ window.RiskExports = (function () {
 
       // ---- SL-T ----
       children.push(h1("Target security levels (SL-T, per foundational requirement)"));
-      children.push(body("The SL-T is a vector: one target per foundational requirement, set by the consultant from the risk picture (the tool's suggestion trace is advisory). The written justification is part of the deliverable. Capability against these targets is assessed in the 62443-3-3 programme, which this assessment's risk-context export scopes."));
+      children.push(body("The SL-T is a vector: one target per foundational requirement, set by the consultant from the risk picture (the suggestions made during the assessment, and their rule trace, are advisory). The written justification is part of the deliverable. Capability against these targets is assessed in the 62443-3-3 programme, which this assessment's risk-context export scopes."));
       var frs = FRS();
       var mw = [2200].concat(frs.map(function () { return 940; }));
       var mrows = [headerRow(["Zone / conduit"].concat(frs.map(function (f) { return f.id; })), mw)];
@@ -699,7 +699,7 @@ window.RiskExports = (function () {
       children.push(body("The tolerable risk (§4.3.6) and the assessment outcome have not yet been signed off by the asset owner.", { bold: true, color: COLOR.gap }));
     }
     children.push(h1("Method and limitations"));
-    children.push(body("This assessment follows the IEC 62443-3-2 Clause 4 workflow. The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults: the standard prescribes none and requires the organisation's own risk criteria, so a client corporate matrix takes precedence where one exists. Every SL suggestion in the tool carries a full rule trace, and the consultant's per-FR SL-T with written justification is the deliverable, not the suggestion."));
+    children.push(body("This assessment follows the IEC 62443-3-2 Clause 4 workflow. The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults: the standard prescribes none and requires the organisation's own risk criteria, so a client corporate matrix takes precedence where one exists. Every SL suggestion made during the assessment carries a full rule trace, and the consultant's per-FR SL-T with written justification is the deliverable, not the suggestion."));
     children.push(body("Likelihood and impact judgements reflect the evidence recorded in the basis of assessment at the time of the engagement. The assessment is indicative and does not verify security capability; capability against the SL-T targets is established through the ISA/IEC 62443-3-3 assessment this report's risk-context export feeds."));
 
     var PO = (docx.PageOrientation) || { PORTRAIT: "portrait" };

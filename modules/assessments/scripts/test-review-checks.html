@@ -12,7 +12,7 @@
   a change to look at.
 -->
 <script src="harness.js"></script>
-<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>H.app({ xlsx: true, docx: true, tours: H.ALL_TOURS }); H.dom();</script>
 <script src="../../report-review/js/checks.js"></script>
 <script>
 H.test(function (ok, done) {
@@ -164,6 +164,28 @@ H.test(function (ok, done) {
     ok(fp2.documents.length === 1 && fp2.facts.perTarget.length === 3 && of(RK.run(fp2, {}), "figures").length === 0, "a document covering several zones has no single fact to compare, so it is left alone");
 
     ok.note("totals across the 20 demos: " + JSON.stringify(flagged));
+    // The standing rule: no deliverable describes the software. Every demo
+    // reads clean, so anything flagged here is a new sentence to rewrite.
+    ok(flagged["internal-wording"] === 0, "internal wording: none in any of the 20 demos' Word reports", String(flagged["internal-wording"]));
+    function textOf(id) { return packs[id].documents.map(function (d) { return A.DocxBlocks.flatten(d.blocks).map(function (b) { return b.text; }).join("\n"); }).join("\n"); }
+    var av = textOf("ncsc-caf-aviation");
+    ok(/expected states not available/.test(av) && /Expected states are not available for this profile, so meeting and below counts are not reported\./.test(av),
+       "a profile with no expected states says so in the client's terms");
+    ok(/Where expected states are not available for a profile, meeting and below are not reported at all\./.test(textOf("nist-800-53")),
+       "and the methodology bullet the same way");
+
+    // The Excel workbook prints the same profile line, and the automatic checks
+    // do not read Excel, so it is read here.
+    var captured = null, WORDS = /\b(the tool|this tool|placeholder|scaffold|scaffolded|scaffolding)\b/i;
+    A.Storage.downloadBlob = function (blob) { captured = blob; };
+    E.activateInstrument("ncsc-caf-aviation");
+    return Promise.resolve(A.ExportXLSX.download(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, { targetId: E.state.activeTargetId })).then(function () {
+      return captured ? H.unzipText(captured) : [];
+    }).then(function (parts) {
+      var hits = [];
+      parts.forEach(function (p) { var m = WORDS.exec(p.text.replace(/<[^>]+>/g, " ")); if (m) hits.push(p.name + ": " + m[0]); });
+      ok(parts.length > 3 && hits.length === 0, "and the Excel workbook of a profile with no expected states carries none either", hits.join(" | ") || String(parts.length));
+    });
   }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
 });
 </script>

@@ -1925,7 +1925,7 @@ window.App.ExportDOCX = (function () {
       { kind: "head", text: "Against the selected profile" },
       { kind: "bullet", text: "States are ordered Not achieved, then Partially achieved, then Achieved. An outcome meets expected when its state is at or above the expected state for the profile." },
       { kind: "bullet", text: "Meeting and below expected are reported as counts per objective and per principle. They are never combined into a single score." },
-      { kind: "bullet", text: "Where a profile is a placeholder its expected states are not loaded, so meeting and below are not reported at all." },
+      { kind: "bullet", text: "Where expected states are not available for a profile, meeting and below are not reported at all." },
       { kind: "head", text: "Roadmap" },
       { kind: "bullet", text: "The roadmap lists every applicable outcome that is below its expected state, or that is Partially or Not achieved where no profile expectation applies." }
     ],
@@ -3188,7 +3188,7 @@ window.App.ExportDOCX = (function () {
         children: [run(instrument.title)]
       }),
       body("NCSC CAF 4.0 alignment and gap analysis", { style: "Caption" }),
-      body("Selected profile: " + info.name + (info.placeholder ? " (placeholder)" : ""), { style: "Caption" }),
+      body("Selected profile: " + info.name + (info.placeholder ? " (expected states not available)" : ""), { style: "Caption" }),
       body("", { spacing: { after: 200 } }),
       fixedTable(rows, [labelW, valueW]),
       body("", { spacing: { after: 200 } })
@@ -3211,7 +3211,7 @@ window.App.ExportDOCX = (function () {
       ["Instrument",        instrument.title],
       ["Edition",           instrument.edition || ""],
       ["Content version",   instrument.contentVersion || ""],
-      ["Selected profile",  info.name + (info.placeholder ? " (placeholder)" : "")]
+      ["Selected profile",  info.name + (info.placeholder ? " (expected states not available)" : "")]
     ];
     var rows = pairs.map(function (r) {
       return new TableRow({ children: [
@@ -3615,7 +3615,7 @@ window.App.ExportDOCX = (function () {
     var cust = (engagement && engagement.reportCustom) || {};
     var boxHidden = !!(cust["not-a-formal-assessment"] && cust["not-a-formal-assessment"].hidden);
     if (bp.not_formal_caveat && boxHidden) children.push(body(bp.not_formal_caveat));
-    children.push(body("This report uses the " + info.name + " profile." + (info.placeholder ? " The profile is a placeholder and expected states have not been populated; meeting and below counts are therefore not reported." : "")));
+    children.push(body("This report uses the " + info.name + " profile." + (info.placeholder ? " Expected states are not available for this profile, so meeting and below counts are not reported." : "")));
     return children;
   }
 
@@ -3850,7 +3850,7 @@ window.App.ExportDOCX = (function () {
           var _disp = instrument.display || {};
           var _subLead = _disp.reportSubline || "NCSC CAF 4.0 alignment";
           var _profWord = _disp.profileTitle || "Profile";
-          var coverChildren = coverDesignB(engagement, instrument, { subLine: _subLead + "  ·  " + _profWord + ": " + info.name + (info.placeholder ? " (placeholder)" : "") });
+          var coverChildren = coverDesignB(engagement, instrument, { subLine: _subLead + "  ·  " + _profWord + ": " + info.name + (info.placeholder ? " (expected states not available)" : "") });
           // Prose stays portrait; the wide RESULTS tables (by objective / by
           // principle) get their own LANDSCAPE page so they have room to breathe.
           // Roadmap is prose, and the basis/above-baseline/progress tables are
