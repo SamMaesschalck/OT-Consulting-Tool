@@ -18,6 +18,13 @@
       "summary": "Run an IEC 62443-3-2 risk assessment of zones and conduits, set target security levels, and produce the Word and Excel reports and a risk context file for the assessment tool.",
       "useWhen": "Use it before a 62443-3-3 assessment, to work out what each zone and conduit needs: define the system under consideration, split it into zones and conduits, assess the threats and set target security levels. Export the risk context file and import it into the 62443-3-3 assessment in the assessment tool.",
       "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A completed demo risk assessment of a petrochemical unit. Its changes are never kept." }
+    },
+    {
+      "id": "report-review",
+      "shortName": "Report review",
+      "summary": "Review a report and the engagement behind it from a pack the author sends: comment on any paragraph, table or item, suggest wording, work through a checklist and automatic checks, and give a verdict.",
+      "useWhen": "Use it when a colleague has sent you a review pack from the assessment or risk tool. Read the report as the client will, challenge the findings as well as the wording, and save your own small review file for the author to import. Comments merge, so reviewers never overwrite each other.",
+      "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A demo pack made from a demo assessment, at its second review round. Its changes are never kept." }
     }
   ],
   "singleHtml": {

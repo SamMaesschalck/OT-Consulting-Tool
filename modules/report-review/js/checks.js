@@ -85,7 +85,6 @@
   function plainOf(p) {
     return (p.runs || []).filter(function (r) { return !r.red; }).map(function (r) { return r.t; }).join("");
   }
-  function isHeadingSkip(check, block) { return false; }
 
   function result(check, id, message, quote, b, cell, d, extra) {
     var r = { id: check + ":" + id, check: check, title: CHECKS[check].title, severity: CHECKS[check].severity, message: message,
@@ -249,27 +248,28 @@
     });
   }
 
-  // Only what can be read reliably. A roadmap table's rows are the roadmap
-  // entries where the report prints one row per entry under a heading that says
-  // so, with the first column holding the item's code. See docs/report-review.md
-  // for what is not attempted.
+  // Only sentences the Word exporter generates itself, whose number means one
+  // thing, read against the facts for the one target the document covers. A
+  // document covering several targets has no single fact to compare with, so it
+  // is left alone. docs/report-review.md lists what is not attempted.
+  var FIGURE_SENTENCES = [
+    { re: /\bthe (\d+) outcomes below their expected state\b/i, fact: "roadmapEntries", what: "outcomes below their expected state" },
+    { re: /\bopen gaps moved from \d+ to (\d+)\b/i, fact: "roadmapEntries", what: "open gaps" },
+    { re: /\bthere are (\d+) open gaps\b/i, fact: "roadmapEntries", what: "open gaps" },
+    { re: /\b(\d+) of \d+ outcomes were assessed as achieved\b/i, fact: "met", what: "outcomes achieved" }
+  ];
   function figures(pack, out) {
     var facts = (pack.facts && pack.facts.perTarget) || [];
-    if (facts.length !== (pack.documents || []).length) return;     // one document per target, or no comparison
     (pack.documents || []).forEach(function (doc, d) {
-      var fact = facts.filter(function (f) { return f.targetName === doc.targetName; })[0] || (facts.length === 1 ? facts[0] : null);
+      var fact = doc.targetName ? facts.filter(function (f) { return f.targetName === doc.targetName; })[0] : (facts.length === 1 ? facts[0] : null);
       if (!fact) return;
       (doc.blocks || []).forEach(function (b) {
         if (b.type !== "paragraph" && b.type !== "bullet") return;
-        // "The roadmap below lists 24 items" and the like: a sentence that
-        // counts the roadmap in so many words, in the roadmap's own section.
-        if (!/roadmap/i.test(b.sectionKey || "")) return;
-        var m = /\b(?:lists?|contains?|has|holds?)\s+(\d+)\s+(?:items?|entries|gaps?|actions?|outcomes?|findings?)\b/i.exec(b.text || "");
-        if (!m) return;
-        var n = Number(m[1]);
-        if (n !== fact.roadmapEntries) {
-          out.push(result("figures", b.id, "This says " + n + ", and the assessment's roadmap has " + fact.roadmapEntries + " entries.", clip(b.text), b, null, d));
-        }
+        FIGURE_SENTENCES.forEach(function (f, i) {
+          var m = f.re.exec(b.text || "");
+          if (!m || Number(m[1]) === fact[f.fact]) return;
+          out.push(result("figures", b.id + ":" + i, "This says " + m[1] + " " + f.what + ", and the assessment behind it has " + fact[f.fact] + ".", clip(b.text), b, null, d));
+        });
       });
     });
   }

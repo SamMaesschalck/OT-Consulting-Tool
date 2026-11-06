@@ -280,6 +280,7 @@ window.App.Review = (function () {
     docs.forEach(function (d) {
       d.blocks.forEach(function (b) {
         add(DB().blockText(b));
+        if (b.type === "heading") add(DB().stripNumber(b.text));
         if (b.type === "table") {
           b.rows.forEach(function (r) { r.cells.forEach(function (c) { add(c.text); }); });
         }
@@ -399,11 +400,9 @@ window.App.Review = (function () {
     if (!docContains(docs, a.quote)) return { can: false, why: "The report has changed, so this wording no longer matches what is there. Copy it and compare." };
 
     // A heading: the section's own title.
-    var isHeading = (function () {
-      var d = docs[a.documentIndex];
-      return !!(d && d.blocks.filter(function (b) { return b.id === a.blockId && b.type === "heading"; })[0]) ||
-        docs.some(function (dd) { return dd.blocks.some(function (b) { return b.type === "heading" && norm(b.text) === norm(a.quote); }); });
-    })();
+    var isHeading = !a.cell && docs.some(function (dd) {
+      return dd.blocks.some(function (b) { return b.type === "heading" && !b.sub && b.sectionKey === a.sectionKey && norm(b.text) === norm(a.quote); });
+    });
     if (isHeading) {
       if (!a.sectionKey) return { can: false, why: "This heading is a name from the assessment, not a section title. Rename it where it is entered." };
       if (headingHasTarget(a.quote)) return { can: false, why: "This heading is built from a target's name, so it cannot be renamed for one document." };

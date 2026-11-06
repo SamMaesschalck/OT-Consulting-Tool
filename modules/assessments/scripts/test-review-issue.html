@@ -1,0 +1,274 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: the Issue check warns and never blocks</title></head>
+<body>
+<!--
+  The review warns and does not block: a lone contractor with only a standalone
+  tool must never be stuck. The Issue check and the export dialog warn when a
+  report is not reviewed, when changes are requested, when must-fix comments are
+  open and when an approved report has since changed; a Final builds in every one
+  of those states. An approval offers to fill QA review by, the consultant says
+  yes or no, and an existing different value is never replaced silently. Filling
+  it in does not itself count as the report having changed. Old project files
+  with no review still load, and reviews are independent per assessment.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, xlsx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+function poll(test, ms) {
+  var end = Date.now() + (ms || 60000);
+  return new Promise(function (resolve, reject) {
+    (function go() {
+      var v; try { v = test(); } catch (e) { v = null; }
+      if (v) return resolve(v);
+      if (Date.now() > end) return reject(new Error("timed out waiting for " + test.toString().slice(0, 120)));
+      setTimeout(go, 25);
+    })();
+  });
+}
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore, X = A.ExportDOCX, I;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  I = A.UI.__issue;
+  var SEED = H.demoSeeds(), main = document.getElementById("main");
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  function ids() { return E.state.engagement.targets.map(function (t) { return t.id; }); }
+
+  function warned(kind) { return RV.warningList().filter(function (w) { return w.kind === kind; })[0]; }
+  // Final builds whatever the review says. Prompts are settled first: those
+  // are the one thing that does keep Final shut, and always have.
+  function finalBuilds(tag) {
+    return new Promise(function (res) { I.run(I.jobs(ids(), "per"), function (err, list) { res(list || []); }); }).then(function (list) {
+      list.forEach(function (p) {
+        var w = p.where;
+        if (w.kind === "narrative") { var pt = {}; pt[w.field] = "Written in the tool."; E.setReportNarrative(pt); }
+        else if (w.kind === "nextSteps") E.setReportNarrative({ nextSteps: "Agree the owners and dates with the client" });
+        else if (w.kind === "item") { var f = {}; f[w.field] = "Written in the tool."; E.setResponse(p.targetId, w.itemId, f); }
+        else if (w.kind === "basis") { E.getBasisOfAssessment().interviews.push({ name: "A. Engineer", role: "Control systems lead", date: "2026-10-01" }); E.touchBasisOfAssessment(); }
+      });
+      var job = I.jobs(ids(), "per")[0];
+      return new Promise(function (res) {
+        X.buildAsync(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(), Object.assign({}, job.opts, { issueStatus: "final" }),
+          function (err, blob) { res(err ? { err: err } : { blob: blob }); });
+      });
+    }).then(function (r) {
+      ok(!r.err && r.blob && r.blob.size > 2000, tag + ": Final still builds", r.err && r.err.message);
+      if (r.err) return;
+      return H.unzipText(r.blob).then(function (parts) {
+        var settings = parts.filter(function (p) { return p.name === "word/settings.xml"; })[0].text;
+        ok(/documentProtection/.test(settings), tag + ": and it is locked as a final as usual");
+      });
+    });
+  }
+  // What the page shows.
+  function issueLine(kind) {
+    return Array.prototype.filter.call(main.querySelectorAll(".issue-check .issue-line.warn"), function (li) { return li.classList.contains("review-warn") && kind.test(li.textContent); })[0];
+  }
+  function exportDialogText() {
+    A.UI.__issue.beginExport("docx");
+    return poll(function () { return document.querySelector(".export-modal"); }).then(function (m) {
+      return poll(function () { return !/Checking whether/.test(m.textContent); }).then(function () {
+        var t = Array.prototype.map.call(m.querySelectorAll("[data-review-warning]"), function (p) { return p.getAttribute("data-review-warning") + ": " + p.textContent; });
+        var finalBtn = m.querySelector('[data-issue="final"]');
+        var open = !finalBtn.hasAttribute("disabled");
+        var cancel = Array.prototype.filter.call(m.querySelectorAll(".modal-f .btn"), function (b) { return b.textContent === "Cancel"; })[0];
+        cancel.click();
+        return { warnings: t, finalOpen: open };
+      });
+    });
+  }
+  function fileFrom(pack, reviewer, verdict, comments, savedAt) {
+    return JSON.stringify({ schema: RC.fileSchema(), packId: pack.packId, reviewId: pack.reviewId, round: pack.round, fileId: "f-" + reviewer, reviewer: reviewer, savedAt: savedAt || new Date().toISOString(),
+      savedBy: { product: "OT Cyber Report Review Tool", version: "x" }, verdict: { value: verdict, date: "2026-11-01", note: "" }, checklist: [], dismissedChecks: [], confirmations: [], comments: comments || [] });
+  }
+  function mustFix(id, reviewer) {
+    return { id: id, reviewer: reviewer, createdAt: "2026-11-01T10:00:00Z", updatedAt: "2026-11-01T10:00:00Z", severity: "must-fix",
+      anchor: { documentIndex: 0, kind: "general", sectionTitle: "General", quote: "" }, text: "Fix this.", suggestion: null, relatesTo: null, check: null };
+  }
+
+  var pack, chain = Promise.resolve();
+  function step(fn) { chain = chain.then(fn); }
+
+  // ---- not reviewed -----------------------------------------------------------
+  step(function () {
+    E.activateInstrument("ncsc-caf");
+    ok(!E.getReview(), "a fresh assessment has no review on it");
+    ok(warned("not-reviewed") && /Not reviewed yet: no review has come back/.test(warned("not-reviewed").text), "not reviewed: warned", JSON.stringify(RV.warningList()));
+    A.UI.go("report");
+    return poll(function () { return issueLine(/Not reviewed yet/); });
+  });
+  step(function (li) {
+    ok(/Worth a look first/.test(main.querySelector(".issue-check").textContent), "the warning is under Worth a look first");
+    ok(!li.classList.contains("block"), "as a warning, not a blocker");
+    var b = li.querySelector(".issue-go");
+    ok(b && b.textContent === "Review", "and it goes to the Review card");
+    return exportDialogText();
+  });
+  step(function (d) {
+    ok(d.warnings.some(function (w) { return /^not-reviewed: Not reviewed yet/.test(w); }), "the export dialog shows the same warning", d.warnings.join(" | "));
+    return finalBuilds("not reviewed");
+  });
+
+  // ---- sent, then changes requested ------------------------------------------
+  step(function () { return RV.buildPack(); });
+  step(function (r) {
+    pack = r.pack;
+    RC.recordRound(r.store, r.pack);
+    ok(/round 1 was sent, and no review has come back/.test(warned("not-reviewed").text), "once sent, the warning says so", warned("not-reviewed").text);
+    RV.importTexts([{ name: "a.json", text: fileFrom(pack, "J. Marsh", "changes-requested", [mustFix("c-1", "J. Marsh"), mustFix("c-2", "J. Marsh")]) }]);
+    ok(!warned("not-reviewed"), "a review back clears not-reviewed");
+    ok(warned("changes-requested") && warned("changes-requested").text === "Changes requested by J. Marsh (round 1).", "changes requested: warned", JSON.stringify(RV.warningList()));
+    ok(warned("must-fix") && warned("must-fix").text === "2 must-fix review comments are still open.", "open must-fix: warned, with the count", JSON.stringify(RV.warningList()));
+    A.UI.go("report");
+    return poll(function () { return issueLine(/Changes requested by J\. Marsh/) && issueLine(/2 must-fix/); });
+  });
+  step(function () { ok(true, "the Issue check lists both"); return exportDialogText(); });
+  step(function (d) {
+    ok(d.warnings.some(function (w) { return /^changes-requested:/.test(w); }) && d.warnings.some(function (w) { return /^must-fix:/.test(w); }), "as does the export dialog", d.warnings.join(" | "));
+    return finalBuilds("changes requested and must-fix open");
+  });
+  step(function () {
+    RC.setStatus(RV.store(), "c-1", "resolved");
+    ok(warned("must-fix").text === "1 must-fix review comment is still open.", "resolving one updates the count");
+    RC.setStatus(RV.store(), "c-2", "wontchange", "Agreed with the reviewer by phone.");
+    ok(!warned("must-fix"), "and no open must-fix, no warning");
+  });
+
+  // ---- approved, QA review by --------------------------------------------------
+  step(function () {
+    E.updateMetadata({ qaReviewBy: "" });
+    return new Promise(function (res) { RV.currentDocs(function () { res(); }); });
+  });
+  step(function () { return RV.buildPack(); });
+  step(function (r) {
+    pack = r.pack;
+    ok(pack.round === 2, "the review came back, so the next pack is a new round");
+    RC.recordRound(r.store, r.pack);
+    A.UI.go("report");
+    // Through the card, so the offer is the one a consultant sees.
+    var input = main.querySelector(".review-card .rv-file");
+    ok(!!input, "the card has its import");
+    return poll(function () { return main.querySelector(".review-card .rv-import"); });
+  });
+  step(function () {
+    var A2 = window.App.ReviewAuthor;
+    // Use the real import of the shared list, then the real panel.
+    var res = RV.importTexts([{ name: "b.json", text: fileFrom(pack, "J. Marsh", "approved", [], new Date(Date.now() + 1000).toISOString()) }]);
+    ok(res.bad === 0, "an approval is imported");
+    ok(RV.qaOffers().length === 1 && RV.qaOffers()[0].reviewer === "J. Marsh", "and QA review by is offered");
+    ok(!E.state.engagement.engagement.qaReviewBy, "not filled in until the consultant says so");
+    A.UI.go("report");
+    return poll(function () { return main.querySelector(".rv-qa"); });
+  });
+  step(function (qa) {
+    ok(/J\. Marsh approved the report\. Fill in QA review by with this name\?/.test(qa.textContent), "the card asks", qa.textContent);
+    qa.querySelector(".rv-qa-yes").click();
+    ok(E.state.engagement.engagement.qaReviewBy === "J. Marsh", "yes fills it in");
+    return new Promise(function (res) { RV.currentDocs(function () { res(); }); });
+  });
+  step(function () {
+    ok(!warned("changed-since-approval"), "filling in QA review by does not count as the report changing", JSON.stringify(RV.warningList()));
+    ok(!warned("changes-requested") && !warned("not-reviewed"), "the approved round clears those", JSON.stringify(RV.warningList()));
+    E.updateMetadata({ authorisedBy: "S. Lead", issuedTo: "The client", issuedDate: "2026-11-02", documentRevision: "2.0" });
+    return new Promise(function (res) { RV.currentDocs(function () { res(); }); });
+  });
+  step(function () {
+    ok(!warned("changed-since-approval"), "nor do the other fields filled in at issue");
+    // A different value already there: asked, never replaced silently.
+    E.updateMetadata({ qaReviewBy: "S. Someone" });
+    var res = RV.importTexts([{ name: "c.json", text: fileFrom(pack, "R. Okafor", "approved-with-comments") }]);
+    ok(RV.qaOffers().length === 1 && E.state.engagement.engagement.qaReviewBy === "S. Someone", "an existing different value stays", E.state.engagement.engagement.qaReviewBy);
+    A.UI.go("report");
+    return poll(function () { return main.querySelector(".rv-qa"); });
+  });
+  step(function (qa) {
+    ok(/R\. Okafor approved the report, and QA review by already says S\. Someone\. Replace it with R\. Okafor\?/.test(qa.textContent), "and the question says so", qa.textContent);
+    qa.querySelector(".rv-qa-no").click();
+    ok(E.state.engagement.engagement.qaReviewBy === "S. Someone", "keeping it keeps it");
+    ok(!RV.qaOffers().length && !main.querySelector(".rv-qa"), "and the offer goes");
+    // A changes-requested verdict offers nothing.
+    RV.importTexts([{ name: "d.json", text: fileFrom(pack, "T. Third", "changes-requested", [], new Date(Date.now() + 2000).toISOString()) }]);
+    ok(!RV.qaOffers().length, "a request for changes offers nothing");
+    // The same reviewer's value already there offers nothing either.
+    E.updateMetadata({ qaReviewBy: "U. Fourth" });
+    RV.importTexts([{ name: "e.json", text: fileFrom(pack, "U. Fourth", "approved") }]);
+    ok(!RV.qaOffers().length, "nor an approval from whoever it already names");
+    // Back to an approved-only position for the next test.
+    var s = RV.store();
+    s.files = s.files.filter(function (f) { return f.reviewer !== "T. Third"; });
+    return exportDialogText();
+  });
+  step(function (d) {
+    ok(!d.warnings.some(function (w) { return /^changed-since-approval/.test(w); }), "the export dialog has nothing to say about a change yet", d.warnings.join(" | "));
+    return finalBuilds("approved");
+  });
+
+  // ---- approved, then changed --------------------------------------------------
+  step(function () {
+    E.setReportNarrative({ topPriorities: "A new priority paragraph, written after the approval." });
+    return new Promise(function (res) { RV.currentDocs(function () { res(); }); });
+  });
+  step(function () {
+    var w = warned("changed-since-approval");
+    ok(w && /^Approved by .* in round 2, but the report has changed since\.$/.test(w.text), "approved then changed: warned", JSON.stringify(RV.warningList()));
+    A.UI.go("report");
+    return poll(function () { return issueLine(/has changed since/); });
+  });
+  step(function () { ok(true, "on the Issue check"); return exportDialogText(); });
+  step(function (d) {
+    ok(d.warnings.some(function (w) { return /^changed-since-approval: Approved by/.test(w); }), "and in the export dialog", d.warnings.join(" | "));
+    return finalBuilds("approved then changed");
+  });
+  step(function () {
+    E.setReportNarrative({ topPriorities: "" });
+    return finalBuilds("after clearing it again");
+  });
+
+  // ---- the same content sent again is the same round --------------------------
+  step(function () { E.activateInstrument("iec-62443-4-1"); return RV.buildPack(); });
+  step(function (r) {
+    RC.recordRound(r.store, r.pack);
+    var first = r.pack;
+    return RV.buildPack().then(function (r2) {
+      ok(r2.pack.round === 1 && r2.pack.packId === first.packId, "sent again with nothing changed and nothing back, it is the same round and pack", r2.pack.round);
+      return { first: first, store: r2.store };
+    });
+  });
+  step(function (o) {
+    E.setReportNarrative({ topPriorities: "Now the content moves on." });
+    return RV.buildPack().then(function (r3) {
+      ok(r3.pack.round === 2 && r3.pack.packId !== o.first.packId, "when the content moves on, the round goes up");
+    });
+  });
+
+  // ---- independent per assessment, old files --------------------------------------
+  step(function () {
+    E.activateInstrument("ncsc-caf");
+    var withReview = E.state.activeAssessmentId;
+    ok(!!E.getReview(), "this assessment has its review");
+    var other = E.newAssessment("ncsc-caf");
+    ok(E.state.activeAssessmentId !== withReview && !E.getReview(), "a new assessment of the same instrument starts with none", E.state.activeAssessmentId);
+    ok(RV.warningList().some(function (w) { return w.kind === "not-reviewed"; }), "and its own warning");
+    var pf = JSON.parse(JSON.stringify(E.getProjectFile()));
+    ok(pf.assessments[withReview].review && pf.assessments[withReview].review.threads.length >= 2, "the project file keeps the review on its own assessment");
+    // A file from before reviews existed.
+    var old = JSON.parse(JSON.stringify(pf));
+    Object.keys(old.assessments).forEach(function (k) { delete old.assessments[k].review; });
+    E.loadProjectFile(old);
+    E.activateAssessment(withReview);
+    ok(!E.getReview() && E.state.engagement.responses.length > 0, "a file with no review data loads as before");
+    ok(RV.warningList()[0].kind === "not-reviewed", "and simply reads as not reviewed");
+    // Reloaded, the review comes back.
+    E.loadProjectFile(pf);
+    E.activateAssessment(withReview);
+    ok(E.getReview() && E.getReview().threads.length >= 2, "a saved review comes back on load");
+    A.UI.go("report");
+    return poll(function () { return main.querySelector(".review-card .rv-comment") || main.querySelector(".review-card .rv-filters"); });
+  });
+  step(function () { ok(true, "and its card shows it"); });
+  chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+</script>
+</body></html>

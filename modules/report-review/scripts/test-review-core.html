@@ -1,0 +1,133 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review rules: merging, rounds and warnings</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The rules in shared/review-core.js, on their own: what a file is, how files
+  merge so reviewers never overwrite each other, when a round moves on, and what
+  the author is warned about. The same copy runs in the assessment and risk tools.
+-->
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../data/review-pack.js"></script>
+<script src="../data/review-file.js"></script>
+<script src="../js/review-core.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  var RC = window.App.ReviewCore;
+  try {
+    ok(RC.packSchema() === "spt-review-pack/1.0" && RC.fileSchema() === "spt-review/1.0", "the contracts are loaded");
+    var a = RC.newId("c"), b = RC.newId("c");
+    ok(/^c-/.test(a) && a !== b, "ids are generated and differ", a + " " + b);
+    var seen = {}, clash = 0;
+    for (var i = 0; i < 2000; i++) { var id = RC.newId("c"); if (seen[id]) clash++; seen[id] = 1; }
+    ok(clash === 0, "2000 ids, no clash");
+
+    // ---- what a file is -------------------------------------------------------
+    var example = window.App.Data.contracts.reviewPack.example;
+    ok(RC.identify(JSON.stringify(example)).kind === "pack", "the contract's own example pack is read as a pack");
+    ok(RC.identify(JSON.stringify(window.App.Data.contracts.reviewFile.example)).kind === "review", "and its example review file as a review file");
+    ok(RC.identify("﻿" + JSON.stringify(example)).ok, "a file with a byte order mark is fine");
+    var bad = RC.identify(JSON.stringify({ schema: "spt-review-pack/2.0", packId: "x", documents: [{}] }));
+    ok(!bad.ok && /spt-review-pack\/2\.0/.test(bad.error) && /spt-review-pack\/1\.0/.test(bad.error), "a newer pack schema fails loudly, naming both", bad.error);
+    bad = RC.identify(JSON.stringify({ schema: "spt-review/2.0", packId: "x", comments: [] }));
+    ok(!bad.ok && /spt-review\/2\.0/.test(bad.error), "and so does a newer review file", bad.error);
+    ok(!RC.identify(JSON.stringify({ schema: "spt-risk-context/1.4" })).ok, "another contract is not guessed at");
+    ok(!RC.identify(JSON.stringify({ schema: "spt-review-pack/1.0", packId: "x", documents: [] })).ok, "a pack with no documents is refused");
+    ok(!RC.identify("{not json").ok && !RC.identify("").ok, "nor anything that is not JSON");
+
+    // ---- merging -------------------------------------------------------------------
+    function comment(id, who, text) {
+      return { id: id, reviewer: who, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", severity: "must-fix", anchor: { kind: "general", documentIndex: 0, quote: "" }, text: text, suggestion: null, relatesTo: null, check: null };
+    }
+    function file(fileId, who, at, comments, verdict, packId, extra) {
+      return Object.assign({ schema: RC.fileSchema(), packId: packId || "p1", reviewId: "r", round: 1, fileId: fileId, reviewer: who, savedAt: at, verdict: { value: verdict || "none", date: "", note: "" }, checklist: [], dismissedChecks: [], confirmations: [], comments: comments }, extra || {});
+    }
+    var s = RC.emptyStore();
+    ok(!RC.importFile(s, file("f", "A", "t", [])).ok, "with no pack sent, a review file has nothing to attach to");
+    var pack = { round: 1, packId: "p1", createdAt: "2026-01-01T00:00:00Z", documents: [{ title: "d", targetName: "", contentHash: "h1:a" }] };
+    RC.recordRound(s, pack);
+    var r = RC.importFile(s, file("fa", "A", "2026-01-02T00:00:00Z", [comment("c1", "A", "one"), comment("c2", "A", "two")]));
+    ok(r.ok && r.added === 2 && s.threads.length === 2 && s.threads[0].status === "open", "a file merges in, comments open");
+    r = RC.importFile(s, file("fb", "B", "2026-01-02T00:00:00Z", [comment("c3", "B", "three")]));
+    ok(r.added === 1 && s.threads.length === 3, "a second reviewer adds to the first");
+    r = RC.importFile(s, file("fc", "A", "2026-01-03T00:00:00Z", [comment("c4", "A", "someone else called A")]));
+    ok(r.added === 1 && s.threads.length === 4 && RC.findThread(s, "c1"), "two reviewers with one name stay two: neither takes the other's comments away");
+    r = RC.importFile(s, file("fa", "A", "2026-01-02T00:00:00Z", [comment("c1", "A", "one"), comment("c2", "A", "two")]));
+    ok(r.duplicate && s.threads.length === 4, "the same save imported twice changes nothing");
+    RC.setStatus(s, "c1", "resolved");
+    RC.addReply(s, "c1", "Author", "Done.");
+    r = RC.importFile(s, file("fa", "A", "2026-01-04T00:00:00Z", [comment("c1", "A", "one, reworded"), comment("c2", "A", "two")]));
+    var t1 = RC.findThread(s, "c1");
+    ok(r.updated === 1 && t1.comment.text === "one, reworded", "a later save of the same comment wins");
+    ok(t1.status === "resolved" && t1.replies.length === 1, "and leaves the author's status and replies alone");
+    r = RC.importFile(s, file("fa", "A", "2026-01-03T12:00:00Z", [comment("c1", "A", "stale wording")]));
+    ok(r.older && RC.findThread(s, "c1").comment.text === "one, reworded" && RC.findThread(s, "c2"), "an older save imported late changes nothing");
+    r = RC.importFile(s, file("fa", "A", "2026-01-05T00:00:00Z", [comment("c1", "A", "one, reworded")]));
+    ok(r.removed === 1 && !RC.findThread(s, "c2"), "a comment the reviewer took back goes");
+    r = RC.importFile(s, file("fa", "A", "2026-01-06T00:00:00Z", []));
+    ok(r.removed === 0 && RC.findThread(s, "c1") && RC.findThread(s, "c1").withdrawn, "unless the author has answered it: then it stays, marked");
+    r = RC.importFile(s, file("x", "X", "2026-01-06T00:00:00Z", [], "none", "p-other"));
+    ok(!r.ok && /different pack/.test(r.error), "a file for another pack is refused", r.error);
+    ok(!RC.importFile(s, { schema: "nope" }).ok, "and so is anything else");
+
+    // ---- status and replies ---------------------------------------------------------
+    var st = RC.emptyStore(); RC.recordRound(st, pack);
+    RC.importFile(st, file("f", "A", "2026-01-02T00:00:00Z", [comment("c1", "A", "x")]));
+    var bad2 = RC.setStatus(st, "c1", "wontchange", "   ");
+    ok(!bad2.ok && RC.findThread(st, "c1").status === "open", "won't change needs a reason", bad2.error);
+    ok(RC.setStatus(st, "c1", "wontchange", " Because. ").ok && RC.findThread(st, "c1").reason === "Because.", "and keeps it");
+    ok(RC.setStatus(st, "c1", "open").ok && RC.findThread(st, "c1").reason === "", "reopening clears it");
+    ok(!RC.addReply(st, "c1", "A", " ").ok && RC.addReply(st, "c1", "A", "Yes").ok, "an empty reply is refused");
+
+    // ---- rounds ---------------------------------------------------------------------------
+    var rs = RC.emptyStore();
+    var first = RC.nextRound(rs, [{ contentHash: "a" }]);
+    ok(first.round === 1 && first.isNew, "a first pack is round 1");
+    RC.recordRound(rs, { round: 1, packId: first.packId, createdAt: "t", documents: [{ title: "d", contentHash: "a" }] });
+    var again = RC.nextRound(rs, [{ contentHash: "a" }]);
+    ok(again.round === 1 && again.packId === first.packId && !again.isNew, "unchanged with nothing back: the same round and pack");
+    RC.recordRound(rs, { round: 1, packId: first.packId, createdAt: "t2", documents: [{ title: "d", contentHash: "a" }] });
+    ok(rs.rounds.length === 1 && rs.rounds[0].createdAt === "t2", "sending it again does not add a round");
+    var moved = RC.nextRound(rs, [{ contentHash: "b" }]);
+    ok(moved.round === 2 && moved.packId !== first.packId, "changed content: a new round and pack");
+    RC.importFile(rs, file("f", "A", "2026-01-02T00:00:00Z", [], "none", first.packId));
+    var back = RC.nextRound(rs, [{ contentHash: "a" }]);
+    ok(back.round === 2, "a review back: a new round, even with the same content");
+    ok(RC.nextRound(rs, [{ contentHash: "a" }, { contentHash: "b" }]).round === 2, "and a different number of documents counts as changed");
+
+    // ---- warnings ------------------------------------------------------------------------
+    function kinds(store, hashes) { return RC.warnings(store, hashes).map(function (w) { return w.kind; }).join(","); }
+    var w = RC.emptyStore();
+    ok(kinds(w, null) === "not-reviewed", "nothing sent: not reviewed");
+    RC.recordRound(w, { round: 1, packId: "p1", createdAt: "t", documents: [{ title: "d", contentHash: "a" }] });
+    ok(/round 1 was sent/.test(RC.warnings(w, null)[0].text), "sent: says so");
+    RC.importFile(w, file("f1", "A", "2026-01-02T00:00:00Z", [comment("c1", "A", "x")], "changes-requested"));
+    ok(kinds(w, ["a"]) === "changes-requested,must-fix", "changes requested and an open must-fix", kinds(w, ["a"]));
+    RC.setStatus(w, "c1", "resolved");
+    RC.importFile(w, file("f1", "A", "2026-01-03T00:00:00Z", [comment("c1", "A", "x")], "approved"));
+    ok(kinds(w, null) === "", "approved, the current report not yet read: nothing to say yet", kinds(w, null));
+    ok(kinds(w, ["a"]) === "", "approved and the same", kinds(w, ["a"]));
+    ok(kinds(w, ["b"]) === "changed-since-approval", "approved and changed", kinds(w, ["b"]));
+    RC.recordRound(w, { round: 2, packId: "p2", createdAt: "t", documents: [{ title: "d", contentHash: "b" }] });
+    ok(/Round 2 was sent, and no review has come back/.test(RC.warnings(w, ["b"]).map(function (x) { return x.text; }).join()), "a new round sent: waiting on it", JSON.stringify(RC.warnings(w, ["b"])));
+    var two = RC.emptyStore();
+    RC.recordRound(two, { round: 1, packId: "p1", createdAt: "t", documents: [{ title: "d", contentHash: "a" }] });
+    RC.importFile(two, file("a", "A", "2026-01-02T00:00:00Z", [], "approved"));
+    RC.importFile(two, file("b", "B", "2026-01-02T00:00:00Z", [], "changes-requested"));
+    ok(kinds(two, ["b"]) === "changes-requested", "one approves, one asks for changes: the request stands", kinds(two, ["b"]));
+
+    // ---- what a pack carries ---------------------------------------------------------------
+    var pr = RC.previousRound(s);
+    ok(pr.comments.every(function (c) { return c.comment && c.status && Array.isArray(c.replies); }), "a pack carries each comment's status and replies");
+    ok(!pr.comments.some(function (c) { return c.comment.id === "c1"; }), "but not a comment the reviewer took back");
+    ok(RC.fileSlug("Acme Water & Gas Ltd.") === "acme-water-gas-ltd" && RC.fileSlug("") === "report", "file names are plain");
+  } catch (e) { ok(false, "threw: " + e.message + " " + e.stack); }
+  lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = lines.join("\n");
+})();
+</script>
+</body></html>

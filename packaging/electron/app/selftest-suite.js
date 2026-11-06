@@ -114,9 +114,9 @@ module.exports = function selfTest(win) {
       ok(home.version === app.getVersion() && home.badge === home.label, "the exe and the suite agree on the version, and the home page shows it (" + home.label + ")",
          "exe " + app.getVersion() + ", suite " + home.version + ", badge " + home.badge);
       ok(home.logo > 0, "the header logo shows");
-      ok(home.cards.join(" | ") === "OT Cyber Assessment Tool | OT Cyber Risk Assessment Tool" && home.tours === 2, "the home page has a card for each tool, with its tour", home.cards.join(" | "));
-      ok(home.bundled === "assessments,assessments-tour,risk-assessment", "the suite carries both tools and the assessment tour", String(home.bundled));
-      ok(/^What's new in v/.test(home.notes) && home.recent && home.help === 2, "it shows What's new, Recent files and Getting started", home.notes);
+      ok(home.cards.join(" | ") === "OT Cyber Assessment Tool | OT Cyber Risk Assessment Tool | OT Cyber Report Review Tool" && home.tours === 3, "the home page has a card for each tool, with its tour", home.cards.join(" | "));
+      ok(home.bundled === "assessments,assessments-tour,risk-assessment,report-review", "the suite carries every tool and the assessment tour", String(home.bundled));
+      ok(/^What's new in v/.test(home.notes) && home.recent && home.help === 3, "it shows What's new, Recent files and Getting started", home.notes);
       const licence = await run(`(function () {
         document.getElementById("btn-licence").click();
         var t = (document.querySelector(".licence-modal .licence-text") || {}).textContent || "";
@@ -124,6 +124,19 @@ module.exports = function selfTest(win) {
         return { ok: /PROPRIETARY LICENCE/.test(t), closed: !document.querySelector(".licence-modal") };
       })()`);
       ok(licence.ok && licence.closed, "the licence opens in its pop-up and closes again");
+
+      // The report review tool in its frame, with a real pack.
+      await run(`Suite.Shell.open("report-review"); 0`);
+      const reviewUp = await until(IN("report-review", "return !!(w.ReviewTool && w.App.ReviewChecks && Suite.Shell.frames['report-review'].ready);"), 60000);
+      ok(reviewUp, "the report review tool starts in its frame");
+      const review = await run(IN("report-review", `w.confirm = function () { return true; }; w.alert = function () {};
+        w.ReviewTool.openDemo();
+        var R = w.ReviewTool, b = R.state.pack.documents[0].blocks.filter(function (x) { return x.type === "paragraph" && !x.front && x.text.length > 40; })[0];
+        R.state.review.reviewer = "Self Test";
+        R.addComment({ severity: "must-fix", anchor: { documentIndex: 0, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text, cell: null }, text: "Self-test comment." });
+        R.state.dirty = false; R.render();
+        return { title: w.document.title, hosted: w.App.HostBridge.hosted, version: w.App.Version.label, blocks: w.document.querySelectorAll("#rr-paper [data-block-id]").length, comments: R.state.review.comments.length, srcdoc: Suite.Shell.frames["report-review"].el.hasAttribute("srcdoc") };`));
+      ok(review.title === "OT Cyber Report Review Tool" && review.hosted && review.srcdoc && review.version === home.label && review.blocks > 50 && review.comments === 1, "it opens a pack, draws the report and takes a comment inside the suite", JSON.stringify(review));
 
       // Each tool in its frame.
       await run(`Suite.Shell.open("risk-assessment"); 0`);

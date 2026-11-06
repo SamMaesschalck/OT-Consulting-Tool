@@ -176,7 +176,7 @@
     // A comment this reviewer has since deleted from their own file goes,
     // unless the author has already answered it, when it stays, marked.
     store.threads = store.threads.filter(function (t) {
-      if (t.fileId !== fileId || seen[t.comment.id]) return true;
+      if (t.fileId !== fileId || t.round !== round.round || seen[t.comment.id]) return true;
       if ((t.replies && t.replies.length) || t.status !== "open") { t.withdrawn = true; return true; }
       res.removed++;
       return false;

@@ -1,0 +1,107 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: nothing reaches Word or Excel</title></head>
+<body>
+<!--
+  A review is between the author and the reviewers. The Word and Excel files are
+  built with a review on the assessment, every comment, reason, reply and name
+  carrying a marker, then opened (they are zip files) and every part searched:
+  none of it may appear, in text or properties. The same scan as test-version.html
+  checks no version number has crept in. The documents must be byte-for-byte the
+  same text with the review as without it, and the Issue check parity holds with a
+  review present. The report preview has no review section either.
+-->
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore, V = A.Version, X = A.ExportDOCX;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds(), I = A.UI.__issue;
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  var MARK = "ZZREVIEWMARKER";
+  var needles = [MARK, V.number, V.label, "spt-review", "createdWithVersion", "savedWithVersion", "packId", "fileId"];
+  function scan(parts) {
+    var hits = [];
+    parts.forEach(function (p) { needles.forEach(function (n) { if (p.text.indexOf(n) !== -1) hits.push(p.name + " has " + n); }); });
+    return hits;
+  }
+  var captured = null;
+  A.Storage.downloadBlob = function (blob) { captured = blob; };
+  function docXml(blob) {
+    return H.unzipText(blob).then(function (parts) { return { parts: parts, xml: parts.filter(function (p) { return p.name === "word/document.xml"; })[0].text }; });
+  }
+  function buildWord(id, status) {
+    var job = I.jobs(E.state.engagement.targets.map(function (t) { return t.id; }), "per")[0];
+    return new Promise(function (res, rej) {
+      X.buildAsync(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(), Object.assign({}, job.opts, { issueStatus: status || "draft" }),
+        function (err, b) { if (err) rej(err); else res(b); });
+    });
+  }
+  // Every paragraph's text: shape and picture ids in the XML differ per build.
+  function textOf(xml) {
+    var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    var d = new DOMParser().parseFromString(xml, "application/xml");
+    return Array.prototype.map.call(d.getElementsByTagNameNS(W, "p"), function (p) { return p.textContent; }).join("\n");
+  }
+
+  function stuffReview(pack) {
+    var s = RV.ensureStore();
+    RC.recordRound(s, pack);
+    var c = { id: "c-" + MARK, reviewer: "Reviewer " + MARK, createdAt: "2026-11-01T10:00:00Z", updatedAt: "2026-11-01T10:00:00Z", severity: "must-fix",
+      anchor: { documentIndex: 0, kind: "general", sectionTitle: "General " + MARK, quote: "quote " + MARK }, text: "Comment " + MARK, suggestion: "Suggestion " + MARK, relatesTo: null, check: null };
+    RC.importFile(s, { schema: RC.fileSchema(), packId: pack.packId, reviewId: pack.reviewId, round: 1, fileId: "f-" + MARK, reviewer: "Reviewer " + MARK, savedAt: new Date().toISOString(),
+      verdict: { value: "changes-requested", date: "2026-11-01", note: "Note " + MARK }, checklist: [{ id: "x", text: "q " + MARK, answer: "no", note: "n " + MARK }], dismissedChecks: [], confirmations: [], comments: [c] });
+    RC.setStatus(s, c.id, "wontchange", "Reason " + MARK);
+    RC.addReply(s, c.id, "Author " + MARK, "Reply " + MARK);
+    E.touchReview();
+  }
+
+  var cases = ["iec-62443-3-3", "ncsc-caf", "risk-appetite", "general-ot-posture", "nis2-assessment", "eu-cra"];
+  var chain = Promise.resolve();
+  cases.forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      return buildWord(id);
+    }).then(docXml).then(function (before) {
+      return RV.buildPack().then(function (r) {
+        stuffReview(r.pack);
+        ok(!!E.getReview() && E.getReview().threads.length === 1, id + ": a review is on the assessment");
+        return buildWord(id);
+      }).then(function (blob) {
+        return docXml(blob).then(function (after) {
+          ok(textOf(before.xml) === textOf(after.xml), id + ": the Word document is the same with a review as without");
+          var hits = scan(after.parts);
+          ok(hits.length === 0, id + ": nothing of the review, and no version, in the Word file", hits.slice(0, 5).join(" | "));
+          ok(after.parts.some(function (p) { return p.name === "docProps/core.xml"; }), id + ": the Word file was opened and read");
+        });
+      }).then(function () {
+        captured = null;
+        return Promise.resolve(A.ExportXLSX.download(E.state.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, { targetId: E.state.activeTargetId }));
+      }).then(function () {
+        ok(!!captured, id + ": the Excel workbook builds");
+        return H.unzipText(captured);
+      }).then(function (parts) {
+        var hits = scan(parts);
+        ok(parts.length > 3 && hits.length === 0, id + ": nothing of the review, and no version, in the Excel file", hits.slice(0, 5).join(" | "));
+        // The on-screen preview: the card, never a report section.
+        A.UI.go("report");
+        var preview = document.getElementById("main");
+        var sections = Array.prototype.map.call(preview.querySelectorAll("[data-section]"), function (n) { return n.getAttribute("data-section"); });
+        ok(sections.indexOf("review") === -1 && !preview.querySelector('[data-section-title="Review"]'), id + ": the Review card is not a report section");
+        // The Issue check's list and the build still agree with a review present.
+        return new Promise(function (res) { I.run(I.jobs(E.state.engagement.targets.map(function (t) { return t.id; }), "per"), function (err, l) { res(l || []); }); });
+      }).then(function (list) {
+        ok(!list.some(function (p) { return p.text.indexOf(MARK) !== -1; }), id + ": and the Issue check's red list has none of it");
+        var pf = JSON.stringify(E.getProjectFile());
+        ok(pf.indexOf(MARK) !== -1, id + ": the review is in the saved project file, where it belongs");
+        ok(!(MARK in {}) && JSON.stringify(E.state.engagement).indexOf(MARK) === -1, id + ": and not on the engagement the exporters are given");
+      });
+    });
+  });
+  chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+</script>
+</body></html>

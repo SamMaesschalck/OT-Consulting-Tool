@@ -123,9 +123,9 @@
     var badge = (d.querySelector("#suite-name .version-badge") || {}).textContent;
     ok(badge === label, "the header shows the suite version (" + badge + ")", badge);
     var cards = Array.prototype.map.call(d.querySelectorAll(".tool-card h2"), function (e) { return e.textContent; });
-    ok(cards.length === 2 && cards[0] === "OT Cyber Assessment Tool" && cards[1] === "OT Cyber Risk Assessment Tool", "the home page has a card for each tool (" + cards.join(", ") + ")", cards.join(" | "));
-    ok(d.querySelectorAll(".tool-card .tool-tour").length === 2 && d.querySelectorAll(".help-tool .help-tour").length === 2, "both tools' tours are offered, on the cards and in Getting started");
-    ok(d.querySelectorAll(".help-tool").length === 2 && /62443-3-3/.test(d.querySelector(".help-card").textContent), "Getting started says what each tool is for");
+    ok(cards.length === 3 && cards[0] === "OT Cyber Assessment Tool" && cards[1] === "OT Cyber Risk Assessment Tool" && cards[2] === "OT Cyber Report Review Tool", "the home page has a card for each tool, in order (" + cards.join(", ") + ")", cards.join(" | "));
+    ok(d.querySelectorAll(".tool-card .tool-tour").length === 3 && d.querySelectorAll(".help-tool .help-tour").length === 3, "every tool's tour is offered, on the cards and in Getting started");
+    ok(d.querySelectorAll(".help-tool").length === 3 && /62443-3-3/.test(d.querySelector(".help-card").textContent) && /review pack/.test(d.querySelector(".help-card").textContent), "Getting started says what each tool is for");
     ok(!/developer copy/.test(d.querySelector(".help-card").textContent), "and does not carry the folder build's note about downloads");
     ok(/appear here/.test(d.querySelector(".recent-card").textContent), "Recent files starts empty, saying what will appear");
     ok(/© 2026 SolutionsPT/.test(d.querySelector(".home-legal").textContent) && d.querySelector(".home-legal").textContent.indexOf(product + " " + label) !== -1, "the footer carries the version and the copyright notice");
@@ -152,16 +152,18 @@
     ok(!d.querySelector(".licence-modal"), "and closes again");
 
     // The tools it carries are the tools' own single files.
-    ok(w.Suite.Bundle && w.Suite.Bundle.payloads.join(",") === "assessments,assessments-tour,risk-assessment", "it carries both tools and the assessment tour (" + (w.Suite.Bundle && w.Suite.Bundle.payloads.join(", ")) + ")");
+    ok(w.Suite.Bundle && w.Suite.Bundle.payloads.join(",") === "assessments,assessments-tour,risk-assessment,report-review", "it carries every tool and the assessment tour (" + (w.Suite.Bundle && w.Suite.Bundle.payloads.join(", ")) + ")");
     function unpack(id) { return new Promise(function (res, rej) { w.Suite.Shell.payloadHtml(id, function (e, html) { if (e) rej(e); else res(html); }); }); }
     return Promise.all([unpack("assessments"), readFile("OT Cyber Assessment Tool " + label + ".html"),
                         unpack("risk-assessment"), readFile("OT Cyber Risk Assessment Tool " + label + ".html"),
-                        unpack("assessments-tour")]);
+                        unpack("assessments-tour"),
+                        unpack("report-review"), readFile("OT Cyber Report Review Tool " + label + ".html")]);
   })
   .then(function (r) {
     ok(r[0].length > 1000000 && r[0] === r[1], "the assessment tool inside is its own single file, byte for byte (" + r[0].length + " characters)", r[0].length + " vs " + r[1].length);
     ok(r[2].length > 500000 && r[2] === r[3], "the risk tool inside is its own single file, byte for byte (" + r[2].length + " characters)", r[2].length + " vs " + r[3].length);
     ok(/<title>OT Cyber Assessment Tool - demo/.test(r[4]) && /tour-sl-data\.js/.test(r[4]) && !/<script src="[^"]*"><\/script>/.test(r[4]), "the assessment tour is its tour.html, built as a single file");
+    ok(r[5].length > 500000 && r[5] === r[6], "the report review tool inside is its own single file, byte for byte (" + r[5].length + " characters)", r[5].length + " vs " + r[6].length);
 
     // ---- 3. Open the risk tool ----------------------------------------------
     S.Suite.Shell.open("risk-assessment");
@@ -357,10 +359,61 @@
     });
   })
 
+  // ---- 7b. The report review tool in the suite --------------------------------
+  .then(function (o) {
+    S.Suite.Shell.open("report-review");
+    return tool(S, "report-review").then(function (t) {
+      watch(t.w, "review");
+      var R = t.w.ReviewTool, launch = JSON.parse(t.f.el.name.replace(/^spt-suite:/, ""));
+      ok(t.f.el.hasAttribute("srcdoc") && t.d.title === "OT Cyber Report Review Tool" && t.w.App.Version.label === label, "the report review tool opens in a frame of its own, with its title and version (" + t.d.title + " " + label + ")");
+      ok(t.w.App.HostBridge.hosted && launch.module === "report-review" && launch.tour === false && !R.state.pack, "it knows it is in the suite, and starts with no pack");
+      ok(R.supportsFilePickers(), "the frame is the suite's own origin, so the file dialogs are available in it");
+      ok(/OT Cyber Report Review Tool/.test(barText(S)), "the bar names it");
+      ok(S.document.title === "OT Cyber Report Review Tool - " + product, "and the suite's title follows", S.document.title);
+      // Open a real pack and review it, through the tool's own load.
+      var packText = JSON.stringify(t.w.SPT_REVIEW_DEMO_PACK);
+      var pHandle = fakeHandle(t.w, "pack-from-author.json", packText);
+      t.w.showOpenFilePicker = function () { return Promise.resolve([pHandle]); };
+      t.d.getElementById("btn-load").click();
+      return until(function () { return R.state.pack; }, 15000, "the pack").then(function () {
+        return until(function () { return recent(S)[0].name === "pack-from-author.json"; }, 10000, "the recent entry for the pack");
+      }).then(function () {
+        var e = recent(S)[0];
+        ok(e.module === "report-review" && e.action === "open" && e.label === R.state.pack.engagement.client, "opening a pack goes on Recent files, with the customer", JSON.stringify(e));
+        ok(t.d.querySelectorAll("#rr-paper [data-block-id]").length === R.state.pack.documents[0].blocks.length, "and the report draws inside the suite");
+        var b = R.state.pack.documents[0].blocks.filter(function (x) { return x.type === "paragraph" && !x.front && x.text.length > 40; })[0];
+        R.state.review.reviewer = "Suite Check";
+        R.addComment({ severity: "must-fix", anchor: { documentIndex: 0, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text, cell: null }, text: "From the suite check." });
+        return until(function () { return t.f.dirty; }, 10000, "the review dirty signal");
+      }).then(function () {
+        ok(/Unsaved changes/.test(barText(S)), "a comment shows as unsaved changes in the bar");
+        var h = fakeHandle(t.w, "my-review.json");
+        t.w.showSaveFilePicker = function () { return Promise.resolve(h); };
+        return new Promise(function (res) { R.saveReview(null, res); }).then(function (r) {
+          ok(r.ok && r.method === "file" && JSON.parse(h.store.text).comments.length === 1, "the review file saves in place from inside the frame", JSON.stringify(r).slice(0, 200));
+          return until(function () { return recent(S)[0].name === "my-review.json" && !t.f.dirty; }, 10000, "the recent entry for the review file");
+        }).then(function () {
+          ok(recent(S)[0].action === "save" && recent(S)[0].hasHandle, "and goes on Recent files; the bar no longer shows unsaved changes");
+          var dl = catchDownloads(t.w);
+          var err = new t.w.Error("refused"); err.name = "SecurityError";
+          t.w.showSaveFilePicker = function () { return Promise.reject(err); };
+          return new Promise(function (res) { R.saveReview({ shiftKey: true }, res); }).then(function (r2) {
+            ok(r2.ok && r2.method === "download" && dl.length === 1, "when the save dialog is refused, it downloads instead", JSON.stringify(r2).slice(0, 200));
+            S.Suite.Shell.open("assessments");
+            S.Suite.Shell.open("report-review");
+            ok(t.f.el.contentWindow === t.w && R.state.review.comments.length === 1, "switching away and back finds it as it was");
+            o.review = t;
+            return o;
+          });
+        });
+      });
+    });
+  })
+
   // ---- 8. Theme, tours, and the unsaved-work guard ---------------------------
   .then(function (o) {
     S.Suite.Shell.setTheme("dark");
-    return until(function () { return o.risk.d.documentElement.getAttribute("data-theme") === "dark" && o.as.d.documentElement.getAttribute("data-theme") === "dark"; }, 5000, "dark in every tool")
+    return until(function () { return o.risk.d.documentElement.getAttribute("data-theme") === "dark" && o.as.d.documentElement.getAttribute("data-theme") === "dark" && o.review.d.documentElement.getAttribute("data-theme") === "dark"; }, 5000, "dark in every tool")
       .then(function () {
         ok(/Light/.test(o.risk.d.getElementById("btn-theme").textContent), "a theme change in the suite reaches every open tool, buttons and all");
         o.as.d.getElementById("btn-theme").click();   // a tool's own toggle
@@ -372,6 +425,17 @@
         return tool(S, "risk-assessment/tour");
       }).then(function (t) {
         return until(function () { return /^Acme Petrochemicals/.test(t.w.RiskTool.state.project.suc.name || ""); }, 15000, "the risk tour's demo").then(function () {
+          S.Suite.Shell.home();
+          S.document.querySelector(".tool-card[data-module='report-review'] .tool-tour").click();
+          return tool(S, "report-review/tour").then(function (rt) {
+            return until(function () { return rt.w.ReviewTool.state.pack; }, 15000, "the review tour's pack").then(function () {
+              ok(rt.w.ReviewTool.state.pack.round === 2 && rt.d.getElementById("rr-demo-note"), "the review tool's tour opens in a frame of its own, with the demo pack");
+              ok(o.review.w.ReviewTool.state.review.reviewer === "Suite Check", "leaving the consultant's own review alone");
+              S.Suite.Shell.home();
+              S.document.querySelector(".tool-card[data-module='risk-assessment'] .tool-tour").click();
+            });
+          });
+        }).then(function () {
           ok(true, "the risk tool's tour opens in a frame of its own with the demo project (" + t.w.RiskTool.state.project.suc.name + ")");
           ok(o.risk.w.RiskTool.state.project.suc.name === "Reopened unit 3", "leaving the consultant's own risk project alone");
           ok(/Tour/.test(barText(S)), "the bar marks it as the tour");

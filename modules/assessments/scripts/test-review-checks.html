@@ -1,0 +1,166 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: the automatic checks on real demos</title></head>
+<body>
+<!--
+  The automatic checks (modules/report-review/js/checks.js, loaded here from its
+  own module) run on real packs built from every demo. Each check gets one
+  positive and one clean negative on real demo data, and every check runs over all
+  20 demos, with what it flags printed in the page ("flagged ...") so that false
+  alarms are read and argued with, not assumed away. The pinned counts at the end
+  of the page are there because a false alarm costs trust: a new flag on a demo is
+  a change to look at.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script src="../../report-review/js/checks.js"></script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RK = A.ReviewChecks;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+  function of(list, check) { return list.filter(function (r) { return r.check === check; }); }
+  var packs = {}, chain = Promise.resolve(), flagged = {};
+  Object.keys(RK.CHECKS).forEach(function (k) { flagged[k] = 0; });
+  Object.keys(SEED).forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      return RV.buildPack();
+    }).then(function (r) {
+      packs[id] = r.pack;
+      var res = RK.run(r.pack, {});
+      Object.keys(RK.CHECKS).forEach(function (k) {
+        var rows = of(res, k);
+        flagged[k] += rows.length;
+        if (rows.length) ok.note("flagged " + id + " " + k + " x" + rows.length + ": " + rows.slice(0, 4).map(function (x) { return x.message + " [" + String(x.quote).slice(0, 120) + "]"; }).join(" || "));
+      });
+      ok(res.every(function (x) { return x.id && x.check && x.title && x.message; }), id + ": checks ran, each result complete (" + res.length + ")");
+    });
+  });
+  chain = chain.then(function () {
+    var base = "general-ot-posture", P = packs[base];
+    function firstPara(pack) { return pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 40; })[0]; }
+    function setText(b, t) { b.text = t; b.runs = [{ t: t, b: false, i: false, red: false }]; }
+
+    // ---- red prompts ---------------------------------------------------
+    var clean = packs[base];
+    ok(of(RK.run(clean, {}), "red-prompts").length === 0, "red prompts: a finished demo has none");
+    ok(of(RK.run(packs["ncsc-caf"], {}), "red-prompts").length === 1, "the CAF demo really has one left in, as the Issue check says");
+    var pr = clone(clean), para = firstPara(pr);
+    para.red = true; para.runs = [{ t: "[Consultant to write this.]", b: true, i: false, red: true }]; para.text = "[Consultant to write this.]";
+    var rr = of(RK.run(pr, {}), "red-prompts");
+    ok(rr.length === 1 && rr[0].blockId === para.id && /Consultant to write/.test(rr[0].quote), "and finds one left in, with the block to jump to");
+
+    // ---- dashes ----------------------------------------------------------
+    var dp = clone(clean), dpara = firstPara(dp);
+    setText(dpara, "A sentence — with an em dash in it.");
+    var dr = of(RK.run(dp, {}), "dashes");
+    ok(dr.length === of(RK.run(clean, {}), "dashes").length + 1 && dr.some(function (x) { return x.blockId === dpara.id && /em dash/.test(x.message); }), "dashes: finds an em dash");
+    var hy = clone(clean); setText(firstPara(hy), "A sentence - with a spaced hyphen in it.");
+    ok(of(RK.run(hy, {}), "dashes").length === of(RK.run(clean, {}), "dashes").length, "and lets a spaced hyphen through");
+    var cellp = clone(clean);
+    var tbl = cellp.documents[0].blocks.filter(function (b) { return b.type === "table" && !b.front; })[0];
+    setText(tbl.rows[0].cells[0].blocks[0], "–");
+    ok(of(RK.run(cellp, {}), "dashes").length === of(RK.run(clean, {}), "dashes").length, "and a lone dash in a cell, the house mark for empty");
+
+    // ---- internal wording -------------------------------------------------
+    var ip = clone(clean);
+    setText(firstPara(ip), "This figure was worked out by the tool from a scaffold.");
+    var ir = of(RK.run(ip, {}), "internal-wording");
+    ok(ir.length === 2 && /the tool/.test(ir[0].message) && /scaffold/.test(ir[1].message), "internal wording: finds \"the tool\" and \"scaffold\"", JSON.stringify(ir.map(function (x) { return x.message; })));
+    var ip2 = clone(clean);
+    setText(firstPara(ip2), "The remote support toolset was reviewed.");
+    ok(of(RK.run(ip2, {}), "internal-wording").length === 0, "matches whole words: a toolset is not the tool", JSON.stringify(of(RK.run(ip2, {}), "internal-wording").map(function (x) { return x.quote; })));
+    var ip3 = clone(clean);
+    var redp = firstPara(ip3); redp.red = true; redp.runs = [{ t: "[The tool cannot fill this in.]", b: true, i: false, red: true }]; redp.text = "[The tool cannot fill this in.]";
+    ok(!of(RK.run(ip3, {}), "internal-wording").some(function (x) { return x.blockId === redp.id; }), "a red prompt is its own check, not counted twice");
+
+    // ---- another client's name ---------------------------------------------
+    var other = clean.engagement.client === "Acme Petrochemicals" ? "Harbour Water Utilities" : "Acme Petrochemicals";
+    var np = clone(clean); setText(firstPara(np), "As we found at " + other + ", the same applies here.");
+    var nr = of(RK.run(np, {}), "other-names");
+    ok(nr.length === 1 && nr[0].message.indexOf(other) !== -1, "other names: finds a demo client's name", JSON.stringify(nr));
+    ok(of(RK.run(clean, {}), "other-names").length === 0, "and none in the demo's own report, whose own name is not another client's");
+    var np2 = clone(clean); setText(firstPara(np2), "As we found at Brookside Foods, the same applies here.");
+    ok(of(RK.run(np2, {}), "other-names").length === 0, "a name not on the list is not flagged");
+    ok(of(RK.run(np2, { names: ["Brookside Foods"] }), "other-names").length === 1, "until the reviewer adds it to their list");
+    var np3 = clone(clean);
+    var fi = np3.items.filter(function (i) { return i.evidence; })[0]; fi.evidence = "Pasted from " + other + "'s report.";
+    var nr3 = of(RK.run(np3, {}), "other-names");
+    ok(nr3.length === 1 && nr3[0].kind === "item" && nr3[0].itemId === fi.itemId, "and it looks in the engagement too, with the item to jump to");
+
+    // ---- client name ----------------------------------------------------------
+    ok(of(RK.run(clean, {}), "client-name").length === 0, "client name: a demo is consistent");
+    var cp = clone(clean); cp.engagement.client = "";
+    var cr = of(RK.run(cp, {}), "client-name");
+    ok(cr.length === 1 && /No client name is set/.test(cr[0].message), "finds it not set");
+    var cp2 = clone(clean); cp2.engagement.client = "A Client Not In This Report";
+    ok(/is not printed anywhere/.test(of(RK.run(cp2, {}), "client-name")[0].message), "finds it not printed");
+    var cp3 = clone(clean); setText(firstPara(cp3), "The findings at " + clean.engagement.client.toLowerCase() + " were discussed.");
+    var cr3 = of(RK.run(cp3, {}), "client-name");
+    ok(cr3.length === 1 && /Printed as/.test(cr3[0].message), "finds it printed another way", JSON.stringify(cr3));
+    var cp4 = clone(clean); setText(firstPara(cp4), clean.engagement.client.toUpperCase() + " IN CAPITALS ON A COVER");
+    ok(of(RK.run(cp4, {}), "client-name").length === 0, "all capitals is styling, and not flagged");
+
+    // ---- findings with no evidence ----------------------------------------------
+    ok(of(RK.run(clean, {}), "no-evidence").length === 0, "no evidence: the demo's findings all have some");
+    var ep = clone(clean), f1 = ep.items.filter(function (i) { return i.status === "finding"; })[0]; f1.evidence = "  ";
+    var er = of(RK.run(ep, {}), "no-evidence");
+    ok(er.length === 1 && er[0].itemId === f1.itemId && er[0].kind === "item", "finds one with none, with the item to jump to");
+    var ep2 = clone(clean), m1 = ep2.items.filter(function (i) { return i.status === "met"; })[0]; m1.evidence = "";
+    ok(of(RK.run(ep2, {}), "no-evidence").length === 0, "something met with no evidence is not a finding with none");
+
+    // ---- unanswered ---------------------------------------------------------------
+    var u0 = packs["iec-62443-3-3"];
+    ok(of(RK.run(u0, {}), "unanswered").length === 0, "unanswered: a complete demo has none");
+    var up = clone(clean), u1 = up.items[0]; u1.status = "unanswered";
+    var ur = of(RK.run(up, {}), "unanswered");
+    ok(ur.length === 1 && ur[0].itemId === u1.itemId, "finds one");
+    var up2 = clone(clean); up2.items.forEach(function (i) { i.status = "unanswered"; });
+    var ur2 = of(RK.run(up2, {}), "unanswered");
+    ok(ur2.length === 1 && new RegExp("^" + up2.items.length + " items").test(ur2[0].message), "and rolls many up into one line per target, not hundreds", ur2[0].message);
+    var up3 = clone(clean), n1 = up3.items[0]; n1.status = "na";
+    ok(of(RK.run(up3, {}), "unanswered").length === of(RK.run(clean, {}), "unanswered").length, "not applicable is an answer");
+
+    // ---- document control --------------------------------------------------------
+    var dcp = clone(clean);
+    Object.keys(dcp.engagement.documentControl).forEach(function (k) { dcp.engagement.documentControl[k] = "Set"; });
+    ok(of(RK.run(dcp, {}), "doc-control").length === 0, "document control: all filled in, nothing flagged");
+    dcp.engagement.documentControl.qaReviewBy = "";
+    var dcr = of(RK.run(dcp, {}), "doc-control");
+    ok(dcr.length === 1 && /QA review by/.test(dcr[0].message) && !/authorised/.test(dcr[0].message), "a blank field is named", dcr[0].message);
+
+    // ---- section numbering ---------------------------------------------------------
+    var numbered = Object.keys(packs).filter(function (id) {
+      return packs[id].documents[0].blocks.filter(function (b) { return b.type === "heading" && b.level === 1 && /^\d+ /.test(b.text); }).length > 2;
+    })[0];
+    ok(!!numbered, "numbering: a demo has numbered sections (" + numbered + ")");
+    var clean2 = packs[numbered];
+    ok(of(RK.run(clean2, {}), "numbering").length === 0, "with no gaps");
+    var gp = clone(clean2), hs = gp.documents[0].blocks.filter(function (b) { return b.type === "heading" && b.level === 1 && /^\d+ /.test(b.text); });
+    gp.documents[0].blocks = gp.documents[0].blocks.filter(function (b) { return b !== hs[1]; });
+    var gr = of(RK.run(gp, {}), "numbering");
+    ok(gr.length === 1 && gr[0].blockId === hs[2].id && /missing/.test(gr[0].message), "takes a section out and it says which is missing", JSON.stringify(gr));
+
+    // ---- figures -----------------------------------------------------------------------
+    var fp = clone(packs["ncsc-caf"]);
+    ok(of(RK.run(fp, {}), "figures").length === 0, "figures: the demo's report agrees with its facts");
+    var fact = fp.facts.perTarget[0].roadmapEntries;
+    var road = fp.documents[0].blocks.filter(function (b) { return /outcomes below their expected state/.test(b.text || ""); })[0];
+    ok(!!road && new RegExp("the " + fact + " outcomes below").test(road.text), "the real sentence says " + fact);
+    setText(road, road.text.replace("the " + fact + " outcomes", "the " + (fact + 5) + " outcomes"));
+    var fr = of(RK.run(fp, {}), "figures");
+    ok(fr.length === 1 && new RegExp("has " + fact + "\\.").test(fr[0].message) && fr[0].blockId === road.id, "a roadmap count that disagrees with the facts is flagged", JSON.stringify(fr));
+    var fp2 = clone(packs["iec-62443-3-3"]);
+    ok(fp2.documents.length === 1 && fp2.facts.perTarget.length === 3 && of(RK.run(fp2, {}), "figures").length === 0, "a document covering several zones has no single fact to compare, so it is left alone");
+
+    ok.note("totals across the 20 demos: " + JSON.stringify(flagged));
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+</script>
+</body></html>
