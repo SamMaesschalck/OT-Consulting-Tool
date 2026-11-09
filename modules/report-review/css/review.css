@@ -1,0 +1,236 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* The report review tool's own styles, on top of the shared design system
+   (spt-theme.css). The document itself stays white paper in both themes: it is
+   the client's page, and its table shading comes from the Word file. */
+
+.stage-badge { font-size: 11px; margin-left: 4px; }
+/* the client, site and round give way first; whose review it is never does */
+#pack-summary { color: #C9D8E5; font-size: 13px; min-width: 0; display: flex; gap: 0 4px; white-space: nowrap; }
+#pack-summary .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#pack-summary .who { flex: none; }
+#btn-theme, .header .brand .sub { white-space: nowrap; }
+.btn.sm { padding: 3px 9px; font-size: 12px; }
+.btn-unsaved { box-shadow: 0 0 0 2px #F5B841 inset; }
+.hidden { display: none !important; }
+.muted { color: var(--text-muted); }
+.small { font-size: 12px; }
+/* read by a screen reader, not shown */
+.rr-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* the toast's one action, such as Undo */
+.rr-toast-act { margin-left: 10px; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
+/* keyboard focus, wherever a click works */
+.nav-item:focus-visible, .rr-outline-item:focus-visible, .rr-linkbtn:focus-visible, .rr-stat-go:focus-visible, .rr-table td[tabindex]:focus-visible, .rr-toast-act:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+
+/* ---- sidebar ---- */
+.rr-outline { padding: 0 0 8px; }
+.rr-outline-item { display: flex; gap: 6px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; color: var(--text); font: inherit; font-size: 12.5px; padding: 3px 16px; cursor: pointer; }
+.rr-outline-item:hover { background: var(--surface-2); }
+.rr-outline-item.lvl2 { padding-left: 28px; color: var(--text-muted); }
+.rr-outline-item .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rr-outline-item .n { flex: none; font-size: 11px; font-weight: 700; background: var(--brand-blue-tint); color: var(--brand-blue); border-radius: 999px; padding: 0 6px; }
+/* each section: a tick to mark it read, then the link to it */
+.rr-outline-row { display: flex; align-items: baseline; padding-left: 10px; }
+.rr-outline-row .rr-read { flex: none; margin: 0; cursor: pointer; }
+.rr-outline-row .rr-outline-item { padding-left: 6px; }
+.rr-outline-row .rr-outline-item.lvl2 { padding-left: 18px; }
+.rr-outline-row.read .rr-outline-item .t { color: var(--text-muted); }
+.sidebar-legal { font-size: 11px; color: var(--text-soft); padding: 12px 16px; line-height: 1.4; }
+
+/* ---- welcome ---- */
+.rr-drop { border: 2px dashed var(--border-strong); border-radius: var(--radius-lg); padding: 32px 20px; text-align: center; background: var(--surface); margin-bottom: 16px; }
+.rr-drop.over { border-color: var(--brand-blue); background: var(--brand-blue-tint); }
+.rr-drop .btn { margin: 6px; }
+.rr-steps { margin: 0; padding-left: 20px; }
+.rr-steps li { margin: 4px 0; }
+
+/* ---- banners ---- */
+.rr-banner { border: 1px solid var(--border-strong); border-left: 3px solid var(--brand-blue); border-radius: var(--radius); background: var(--surface); padding: 8px 12px; margin-bottom: 12px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rr-banner .t { flex: 1 1 260px; min-width: 0; }
+.autosave-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---- the document ---- */
+/* Kept in view at every width, so the find box, its count and Previous/Next
+   stay to hand. The negative top takes up .main's top padding, which sticky
+   positioning otherwise leaves as a strip the report shows through. */
+.rr-toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 12px; font-size: 13px;
+  position: sticky; top: -24px; z-index: 5; background: var(--surface-2); padding: 6px 0; }
+.rr-toolbar select, .rr-toolbar input[type=search] { font: inherit; padding: 4px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); min-width: 0; max-width: 100%; }
+.rr-paper { background: #FFF; color: #1A2533; border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 36px 44px; box-shadow: 0 1px 3px rgba(10,30,50,.08); max-width: 920px; margin-left: auto; margin-right: auto; font-size: 13.5px; line-height: 1.5; }
+.rr-cover { border-bottom: 1px solid #C8D2DD; padding-bottom: 18px; margin-bottom: 18px; }
+.rr-block { position: relative; border-radius: 3px; padding: 2px 6px; margin: 0 -6px 6px; cursor: pointer; border-left: 3px solid transparent; }
+.rr-block:hover { background: #F0F5FA; }
+.rr-block:focus-visible { outline: 2px solid #0F5FA6; outline-offset: 1px; }
+.rr-block.has-comment { border-left-color: #0F5FA6; }
+.rr-block.has-must { border-left-color: #B23A33; }
+.rr-block.open { background: #E6EEF6; }
+.rr-block.flash { animation: rr-flash 1.8s ease-out; }
+@keyframes rr-flash { 0%, 40% { background: #FCE9B8; } 100% { background: transparent; } }
+.rr-block h1, .rr-block h2, .rr-block h3, .rr-block h4 { margin: 10px 0 4px; color: #0A3D62; line-height: 1.25; }
+.rr-block h1 { font-size: 20px; }
+.rr-block h2 { font-size: 16px; }
+.rr-block h3, .rr-block h4 { font-size: 14px; }
+.rr-block p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rr-bullet { display: flex; gap: 8px; }
+.rr-bullet .m { flex: none; }
+.rr-red { color: #E00000; font-weight: 600; }
+/* a run's own colour from the Word file, such as a key's swatch: chart
+   colours, the same on either theme (the paper is white in both) */
+.rr-swatch { font-weight: 700; }
+/* the author's note sent with the pack */
+.rr-request { border: 1px solid var(--border); border-left: 3px solid var(--text-soft); border-radius: var(--radius); background: var(--surface); padding: 6px 12px; margin-bottom: 12px; font-size: 13px; }
+.rr-request-note { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 2px; }
+/* go to a section, and mark the one in view read: shown where the sidebar
+   outline has no room */
+.rr-jump, .rr-markread { display: none; }
+.rr-markread { gap: 4px; align-items: center; white-space: nowrap; cursor: pointer; }
+.rr-markread input { margin: 0; }
+/* find in the report (the exe has no find bar of its own) */
+.rr-findbox { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rr-findbox input[type=search] { width: 14em; }
+mark.rr-find { background: #FCE9B8; color: inherit; border-radius: 2px; padding: 0; }
+mark.rr-find.cur { background: #F2B035; outline: 1px solid #B07A10; }
+.rr-prompt-flag { display: inline-block; font-size: 10px; font-weight: 700; color: #FFF; background: #E00000; border-radius: 3px; padding: 0 5px; margin-right: 6px; vertical-align: 1px; }
+.rr-img img { max-width: 100%; height: auto; display: block; }
+.rr-tablewrap { overflow-x: auto; }
+.rr-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.rr-table td { border: 1px solid #C8D2DD; padding: 3px 6px; vertical-align: top; overflow-wrap: anywhere; }
+.rr-table td:hover { outline: 1px solid #0F5FA6; outline-offset: -1px; }
+.rr-table td.picked { outline: 2px solid #0F5FA6; outline-offset: -2px; }
+.rr-table td.prev { outline: 2px dashed #B7791F; outline-offset: -2px; }
+.rr-table td.prev.picked { outline: 2px solid #0F5FA6; }
+.rr-table td p { margin: 0 0 3px; white-space: pre-wrap; }
+.rr-table td p:last-child { margin-bottom: 0; }
+
+/* comments beside a block: the app's own colours, so they sit on the paper */
+.rr-side { margin: 4px 0 10px; color: var(--text); font-size: 13px; cursor: default; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; }
+.rr-comment { border-left: 3px solid var(--border-strong); padding: 2px 0 2px 8px; margin: 4px 0; }
+.rr-comment.sev-must-fix { border-left-color: var(--gap); }
+.rr-comment.sev-should-fix { border-left-color: var(--near); }
+.rr-comment.sev-suggestion { border-left-color: var(--brand-blue); }
+.rr-comment .text, .rr-comment .quote, .rr-comment .sug { white-space: pre-wrap; overflow-wrap: anywhere; }
+.rr-comment .quote { color: var(--text-muted); font-style: italic; margin: 2px 0; }
+.rr-comment .sug { background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--radius); padding: 3px 7px; margin: 3px 0; }
+.rr-head { display: flex; flex-wrap: wrap; gap: 3px 8px; align-items: center; }
+.rr-sev { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.rr-sev.sev-must-fix { background: var(--gap-bg); color: var(--gap); }
+.rr-sev.sev-should-fix { background: var(--near-bg); color: var(--near); }
+.rr-sev.sev-suggestion { background: var(--brand-blue-tint); color: var(--brand-blue); }
+.rr-chip { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--na-bg); color: var(--text-muted); }
+.rr-chip.resolved, .rr-chip.met { background: var(--met-bg); color: var(--met); }
+.rr-chip.open, .rr-chip.finding { background: var(--gap-bg); color: var(--gap); }
+.rr-chip.wontchange, .rr-chip.to-assess, .rr-chip.unanswered { background: var(--near-bg); color: var(--near); }
+.rr-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.rr-linkbtn { background: none; border: 0; color: var(--brand-blue); font: inherit; font-size: 12px; cursor: pointer; padding: 0; text-decoration: underline; }
+.rr-prev { background: var(--surface-2); }
+.rr-colleague { border-left-style: dashed; }
+.rr-replies { margin: 3px 0 0 8px; padding-left: 8px; border-left: 2px solid var(--border); }
+/* an earlier round's comment whose text has changed: what it was, what it reads now */
+.rr-chip.changed { background: var(--near-bg); color: var(--near); }
+.rr-lbl { font-style: normal; font-weight: 600; color: var(--text-muted); }
+.rr-now { margin: 2px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rr-now ins { text-decoration: none; background: var(--met-bg); color: var(--met); border-radius: 2px; padding: 0 2px; }
+.rr-now del { background: var(--gap-bg); color: var(--gap); border-radius: 2px; padding: 0 2px; }
+.rr-gone { color: var(--gap); font-weight: 600; }
+
+/* ---- the composer ---- */
+.rr-composer { display: grid; gap: 8px; }
+.rr-composer textarea, .rr-note input, .rr-composer select { font: inherit; width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
+.rr-composer textarea { min-height: 62px; resize: vertical; }
+.rr-composer.flash { animation: rr-flash 1.4s ease-out; }
+.rr-sev-help { margin-top: -4px; }
+.rr-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.rr-seg button { font: inherit; font-size: 12px; font-weight: 600; padding: 3px 10px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); border-radius: 999px; cursor: pointer; }
+.rr-seg button.on { color: #FFF; border-color: var(--brand-blue); background: var(--brand-blue); }
+.rr-seg button.on.must-fix, .rr-seg button.on.no { background: var(--gap); border-color: var(--gap); }
+.rr-seg button.on.should-fix, .rr-seg button.on.na { background: var(--near); border-color: var(--near); }
+.rr-seg button.on.yes { background: var(--met); border-color: var(--met); }
+
+/* ---- engagement ---- */
+.rr-group-h { font-size: 13px; color: var(--brand-blue-dark); margin: 16px 0 6px; font-weight: 700; }
+.rr-target-h { font-size: 15px; margin: 18px 0 4px; }
+.rr-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+.rr-item.flash { animation: rr-flash 1.8s ease-out; }
+.rr-item-h { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.rr-item-h .code { font-weight: 700; }
+.rr-item-h .ttl { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+.rr-kv { display: grid; grid-template-columns: 110px 1fr; gap: 2px 10px; margin-top: 6px; }
+.rr-kv dt { color: var(--text-muted); }
+.rr-kv dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rr-kv .blank { color: var(--text-soft); font-style: italic; }
+
+/* ---- checklist, checks, summary ---- */
+.rr-q { padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+.rr-q:first-child { border-top: 0; }
+.rr-note { grid-column: 1 / -1; }
+.rr-check { padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.rr-check:first-child { border-top: 0; }
+.rr-check .quote { color: var(--text-muted); margin-top: 2px; overflow-wrap: anywhere; }
+.rr-check.dismissed { opacity: .6; }
+.rr-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.rr-stat { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 14px; background: var(--surface-2); font-size: 12px; color: var(--text-muted); }
+.rr-stat strong { display: block; font-size: 20px; color: var(--text); }
+button.rr-stat-go { font: inherit; font-size: 12px; text-align: left; cursor: pointer; color: var(--text-muted); }
+button.rr-stat-go:hover { border-color: var(--brand-blue); }
+.rr-save-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-bottom: 6px; }
+/* checks with nothing found, folded into one card */
+.rr-clean { display: grid; gap: 2px; }
+.rr-clean-item summary { cursor: pointer; font-size: 13px; padding: 2px 0; }
+.rr-clean-item p { margin: 2px 0 6px 16px; }
+/* parts of the page only a printout has */
+.rr-print-only { display: none; }
+.rr-print-table { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 12px; }
+.rr-print-table th, .rr-print-table td { border: 1px solid #BBB; padding: 3px 6px; text-align: left; vertical-align: top; }
+.rr-print-table .rr-ans { min-width: 7em; white-space: nowrap; }
+.rr-verdicts { display: grid; gap: 6px; margin-bottom: 10px; }
+.rr-verdict { display: flex; gap: 8px; align-items: flex-start; border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 8px 10px; cursor: pointer; font-size: 13px; background: var(--surface); }
+.rr-verdict.on { border-color: var(--brand-blue); background: var(--brand-blue-tint); }
+.rr-warn { border-left: 3px solid var(--near); background: var(--near-bg); padding: 6px 10px; border-radius: var(--radius); font-size: 13px; margin: 8px 0; }
+
+/* ---- the name prompt ---- */
+.rr-modal-back { position: fixed; inset: 0; background: rgba(10,25,40,.5); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+.rr-modal { background: var(--surface); color: var(--text); border-radius: var(--radius-lg); padding: 18px 20px; width: 100%; max-width: 420px; box-sizing: border-box; font-size: 14px; }
+.rr-modal h2 { margin: 0 0 8px; font-size: 16px; }
+.rr-modal .btn-row { justify-content: flex-end; }
+.rr-modal p { margin: 0 0 12px; }
+.rr-modal-choices { display: grid; gap: 8px; }
+.rr-modal-choices .btn { width: 100%; text-align: left; white-space: normal; }
+.rr-modal input { font: inherit; width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); margin: 8px 0 12px; }
+.rr-licence { white-space: pre-wrap; font-size: 12px; max-height: 320px; overflow: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+
+/* ---- narrow screens ---- */
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; grid-template-areas: "header" "sidebar" "main"; height: 100dvh; }
+  .header { flex-wrap: wrap; padding: 6px 10px; gap: 6px 10px; height: auto; }
+  .header .brand .brand-logo img { height: 24px; }
+  .header .brand .sub { font-size: 12px; }
+  #pack-summary { display: none; }
+  .header-actions { margin-left: auto; }
+  .sidebar { display: flex; border-right: 0; border-bottom: 1px solid var(--border); padding: 0; overflow-x: auto; overflow-y: hidden; }
+  .sidebar .nav-section { display: flex; padding: 4px; white-space: nowrap; }
+  .sidebar .nav-item { padding: 6px 10px; flex: none; }
+  .sidebar .nav-section-title, .sidebar .rr-outline, .sidebar .sidebar-legal { display: none; }
+  .main { padding: 12px 16px; }
+  .rr-paper { padding: 16px 14px; }
+  .rr-kv { grid-template-columns: 1fr; }
+  .rr-q { grid-template-columns: 1fr; }
+  /* the active tab's count would otherwise touch its label */
+  .sidebar .nav-item .badge { margin-left: 6px; }
+  /* no outline in the sidebar here: a Go to section list and a tick to mark
+     the section in view read, kept in view */
+  .rr-jump { display: inline-block; }
+  .rr-markread { display: inline-flex; }
+  .rr-toolbar { top: -12px; }
+}
+
+/* ---- printing Summary and verdict: the review as a working note ---- */
+@media print {
+  .rr-print-only { display: block; }
+  /* the verdict and its note print in the header block instead */
+  .rr-banner, .rr-composer, .rr-actions, .btn, .no-print, .toast, .rr-verdicts, #main .field, .rr-warn, .page-sub, .rr-sum-title { display: none !important; }
+  /* the toolbar is in view on screen only */
+  .rr-toolbar { position: static; }
+  .rr-linkbtn { color: inherit; text-decoration: none; font-weight: 600; }
+  button.rr-stat-go { color: inherit; }
+  .rr-check, .rr-comment { break-inside: avoid; }
+  .rr-print-table th, .rr-print-table td { border-color: #888; }
+}

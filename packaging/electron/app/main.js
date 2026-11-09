@@ -1,6 +1,9 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only. */
 /* main.js - Electron shell for one module of the OT Cyber suite (the OT Cyber
- * Assessment Tool or the OT Cyber Risk Assessment Tool; test build).
+ * Assessment Tool, the OT Cyber Risk Assessment Tool or the OT Cyber Report
+ * Review Tool), or for
+ * the SolutionsPT OT Cyber Suite itself, whose page holds each tool in a
+ * frame (its manifest, platform/suite.json, is copied in as module.json).
  *
  * The app itself is the module's single-file build (index.html beside this
  * file), run unchanged. Which module it is comes from module.json beside this
@@ -17,6 +20,7 @@
  *     open, so the app's guard would make the window impossible to close.
  *     We ask the question ourselves and close if the answer is yes.
  *   - Word/Excel downloads get a proper Save As dialog, starting in Documents
+ *   - Ctrl+P prints, as it would in a browser (there is no menu to do it)
  *   - links to websites open in the user's browser, never inside the app
  *   - only one copy runs at a time (both would share one autosave store)
  *
@@ -112,7 +116,13 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
         defaultId: 1, cancelId: 1,
         title: "Unsaved changes",
         message: "You have unsaved changes.",
-        detail: "Changes since your last Save are not in your project file. The tool will offer its autosave copy next time it starts, but only Save updates the file itself."
+        // In the suite the warning can come from the suite page or from a
+        // tool's own frame; Electron raises this event for either.
+        detail: MODULE.id === "suite"
+          ? "A tool in the suite has changes since its last Save that are not in its file. Each tool offers its autosave copy the next time it starts (the Report Review Tool when you open the same pack again), but only Save updates the file itself."
+          : MODULE.id === "report-review"
+            ? "Changes since your last Save are not in your review file. The review tool will offer your autosaved review when you open the same pack again, but only Save updates your review file."
+            : "Changes since your last Save are not in your project file. The tool will offer its autosave copy next time it starts, but only Save updates the file itself."
       });
       if (choice === 0) event.preventDefault();  // preventDefault here means "let it close"
     });
@@ -129,6 +139,20 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
       }
     });
 
+    // With no menu there is no Ctrl+P. Print the page in front: in the suite,
+    // the tool's frame that has the focus, so the tool prints on its own (with
+    // its own print styles) rather than as a window inside the suite's page.
+    // The page's own print() is used, so the system dialog offers Save as PDF.
+    win.webContents.on("before-input-event", (event, input) => {
+      if (input.type !== "keyDown" || input.alt || input.shift || !(input.control || input.meta)) return;
+      if (String(input.key).toLowerCase() !== "p") return;
+      event.preventDefault();
+      const wc = win.webContents;
+      const frame = wc.focusedFrame || wc.mainFrame;
+      global.otcatPrint = { at: Date.now(), frame: frame === wc.mainFrame ? "main" : "frame" };   // for the self-test
+      frame.executeJavaScript("window.print()", true).catch(() => { try { wc.print(); } catch (e) {} });
+    });
+
     // Word and Excel exports arrive as downloads. Ask where to save them,
     // starting in Documents with the app's own file name.
     session.defaultSession.on("will-download", (e, item) => {
@@ -138,7 +162,12 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
         return;
       }
       const ext = path.extname(name).slice(1).toLowerCase();
-      const kinds = { docx: "Word document", xlsx: "Excel workbook", json: "Project file" };
+      // A .json is named by the names the tools give their files.
+      const json = /-review-pack-round-\d+/i.test(name) ? "Review pack"
+        : /-review-round-\d+-/i.test(name) ? "Review file"
+        : /-risk-context\.json$/i.test(name) ? "Risk context file"
+        : "Project file";
+      const kinds = { docx: "Word document", xlsx: "Excel workbook", json: json };
       item.setSaveDialogOptions({
         title: "Save " + (kinds[ext] || "file"),
         defaultPath: path.join(app.getPath("documents"), name),

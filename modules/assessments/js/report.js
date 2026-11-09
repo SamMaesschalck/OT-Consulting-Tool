@@ -910,18 +910,14 @@ window.App.Report = (function () {
   // active target's name is stripped first: "Posture summary - BPCS" and
   // "Posture summary - SIS" are one section seen from two zones, and a rename
   // should follow the zone switch rather than stick to whichever zone was open.
+  // The algorithm is shared with the risk tool (shared/report-sections.js).
   function sectionKey(title, opts) {
-    var t = String(title || "");
     var names = [];
     if (opts && opts.activeTarget && opts.activeTarget.name) names.push(opts.activeTarget.name);
     if (opts && opts.engagement && opts.engagement.targets) {
       (opts.engagement.targets || []).forEach(function (tg) { if (tg && tg.name) names.push(tg.name); });
     }
-    // Longest first, so a zone called "BPCS" does not chew a hole in the middle
-    // of a zone called "BPCS - basic process control".
-    names.sort(function (a, b) { return b.length - a.length; });
-    names.forEach(function (n) { t = t.split(n).join(" "); });
-    return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return window.App.ReportSections.sectionKey(title, names);
   }
 
   function reportCustom(opts) {
@@ -931,19 +927,9 @@ window.App.Report = (function () {
     return reportCustom(opts)[key] || {};
   }
 
-  // Apply a stored order to computed rows. Anything the consultant has not
-  // placed keeps its computed position AFTER the ordered ones, so a finding
-  // raised since the order was set appears at the end rather than vanishing.
+  // Apply a stored order to computed rows (shared/report-sections.js).
   function applyOrder(rows, order, idOf) {
-    if (!order || !order.length || !rows || rows.length < 2) return rows || [];
-    var pos = {};
-    order.forEach(function (id, i) { pos[id] = i; });
-    var placed = [], rest = [];
-    rows.forEach(function (r) {
-      if (pos[idOf(r)] !== undefined) placed.push(r); else rest.push(r);
-    });
-    placed.sort(function (a, b) { return pos[idOf(a)] - pos[idOf(b)]; });
-    return placed.concat(rest);
+    return window.App.ReportSections.applyOrder(rows, order, idOf);
   }
 
   // The priority order the report and the Word document both print: computed

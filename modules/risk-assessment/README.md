@@ -14,6 +14,23 @@ canonical copy lives in the repository's `shared/` (or `contracts/`) and
 module folders and never share runtime. The only thing the two apps agree on
 at run time is the interchange file contract described below.
 
+## Report page
+
+The Report page shows both Word reports, Detailed and High level, section by section, and edits them the way the assessment tool's report page does: no mode and no panel. Edit is on every section's header, and edits in place: the heading becomes a field and the opening paragraphs become a box holding those same sentences. Hide this section and Back to the generated version sit at the foot of the card. Saving text identical to the generated version stores nothing, so an untouched section never reads as edited. A hidden section is dimmed on the page, so it can be put back; only Word drops it.
+
+- **What is on the page is the Word report.** It is read back from a real Word build through `js/docx-blocks.js`, and rebuilt after each edit, with a visible refreshing state. To keep that quick the build leaves out the cover art and the logo header, so the page shows the body only.
+- **The store** is `project.reportCustom = { detailed: {...}, highLevel: {...} }`, each in the assessment tool's shape, `{ <sectionKey>: { title, hidden, prose, order } }`. Two sets, because same-named sections say different things. It is absent until something is changed and removed again when nothing is left, so a project with no overrides saves as it always did, and the file format stays `spt-risk-project/0.2`. It rides the normal save and autosave and reaches only the Word reports, never Excel or the risk context file.
+- **The key and the pass that applies it to Word are shared with the assessment tool** (`js/report-sections.js`, canonical copy `shared/report-sections.js`). A key slugs the generated heading, so a rename does not orphan its override. A rewrite replaces only the run of plain paragraphs opening a section: tables, figures, the scope and tolerable risk lines and the sign-off statement stay.
+- **Per-zone repeats.** The "Justification for ..." sections are one section across the zones and conduits. Its title is the words before the name, which every one of them keeps, and Hide takes them all. A rewrite is refused and the page says why: each has its own wording, written on the SL-T page.
+- **A zone's or conduit's own heading in the registers is its name,** not a section title: it has no Edit, and is renamed where it is entered. Hiding one zone's register would leave the summary's counts including a zone the report no longer prints.
+- **Ranked lists.** "Where to focus first" (Detailed) and "Where to look first" (High level) can be reordered by dragging or with the arrows, and Word follows. Rows nobody placed come after the placed ones. The ranking table is sorted by risk band and stays so: that order is what it reports.
+
+## Peer review
+
+The Peer review page sends both Word reports for review as a pack, and imports the review files that come back: comments with severity, status and replies, on a page of their own. A suggestion on a section's heading or opening wording can be accepted into that report's overrides, rebuilt to check it is really in Word, and undone if not; other text is Copy and Go to, with the reason, and Go to reaches the section on the Report page. See `docs/report-review.md` at the repository root. An accepted change can be undone from the comment. Go to on a threat, or on a zone's target levels, scrolls to it and highlights it. With no zones or conduits the pack holds only the high-level report. Send for review can carry a note and a needed-by date for the reviewers. The review is saved in the project file (`project.review`) and never reaches the Word report, the Excel workbook or the risk context file.
+
+Once a review has started, the Word downloads (detailed and high level) and the Excel download ask once when changes are requested, must-fix comments are open, a sent round has had no review back, or the report has changed since approval; they never stop the download. The Report, Review & export and high-level report pages show the same warnings in a Peer review card. The Engagement details card has a QA review by field (printed in document control in both Word reports), which an approval offers to fill in with the reviewer's name. Recording the asset owner's sign-off does not count as a change since approval.
+
 ## Two tiers
 
 The tool is split into two tiers, matching how 3-2 is used in practice.
@@ -136,9 +153,17 @@ tour.html                          demo entry: redirects to index.html?tour
 js/version.js                      the suite version (synced copy of shared/version.js)
 js/product.js                      this module's product name
 js/exports.js                      Word + Excel deliverable builders/downloads
+js/report-page.js                  the Report page: both Word reports, section by
+                                   section, edited in place
+js/report-sections.js              what a section override means, shared with the
+                                   assessment tool (synced from shared/)
+js/docx-blocks.js                  reads a generated Word file back into blocks
+                                   (synced from shared/)
+js/review.js                       Peer review: packs, review files and Accept
 js/logo.js, js/hero-asset.js       brand assets as base64 (logo, cover art) for
                                    the Word report — this app's copies
 css/spt-theme.css                  this app's copy of the SolutionsPT theme
+css/report-page.css                the Report page, in the assessment tool's classes
 data/slt-suggestion-rules.json     house risk model AS DATA (severity/likelihood
                                    scales, risk matrix, risk->SL, FRs, tolerable
                                    risk, exposure modifiers) + generated .js
@@ -152,6 +177,9 @@ scripts/test-risk-tool.html        engine + UI tests (headless Edge)
 scripts/test-tour-risk.html        tour-mode tests (seeding, autosave protection)
 scripts/test-risk-reports.html     Word/Excel deliverable tests
 scripts/test-risk-version.html     version shown in the tool, never in Word/Excel
+scripts/test-risk-sections.html    the Report page, on real Word output, against
+                                   risk-word-baseline.js (the text with no overrides)
+scripts/test-risk-accept.html      accepting suggested wording, and Go to
 vendor/docx.umd.js                 Word lib — the rPr-PATCHED copy (see the
                                    Assessments app's docx patch note); exceljs
                                    drives the Excel workbook; xlsx unused

@@ -1,0 +1,147 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Check: report review tool single-file build</title></head>
+<body>
+<!--
+  Proves the report review tool's single-file build is the same app as the folder
+  version (modules/report-review). Loads both in tour mode, one after the other,
+  and compares what each can tell us about itself: title, version, App modules and
+  globals, the demo pack, every page of the app as it renders, the automatic
+  checks' results, and the review file it writes. Then opens the single file on
+  its own (no ?tour) to check it starts empty.
+
+  Open it in Edge after running build-single-html.ps1 -Module report-review.
+  Headless runs need --allow-file-access-from-files, since it reaches into the
+  frame. Prints ALL TESTS PASSED.
+-->
+<pre id="out">running...</pre>
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+
+  function load(url, tour) {
+    return new Promise(function (resolve, reject) {
+      frame.onload = function () {
+        var w = frame.contentWindow, tries = 0;
+        (function wait() {
+          var up = w.ReviewTool && w.App && w.App.Version && w.App.ReviewCore && w.App.ReviewChecks;
+          if (up && (!tour || w.ReviewTool.state.pack)) return resolve(w);
+          if (++tries > 400) return reject(new Error("app did not start: " + url));
+          setTimeout(wait, 50);
+        })();
+      };
+      frame.src = url;
+    });
+  }
+  function keys(o) { return o ? Object.keys(o).sort().join(",") : ""; }
+  function flat(t) { return String(t || "").replace(/\s+/g, " ").replace(/\d{1,2} \w+ \d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4}(, [\d:]+)?/g, ""); }
+
+  function probe(w, label) {
+    var A = w.App, doc = w.document, R = w.ReviewTool;
+    var errors = [];
+    w.addEventListener("error", function (e) { errors.push("error: " + (e.message || e.type)); });
+    w.addEventListener("unhandledrejection", function (e) { errors.push("rejection: " + (e.reason && e.reason.message || e.reason)); });
+    var realErr = w.console.error;
+    w.console.error = function () { errors.push("console.error: " + Array.prototype.join.call(arguments, " ")); return realErr.apply(w.console, arguments); };
+    w.confirm = function () { return true; }; w.alert = function () {};
+    try { w.localStorage.setItem(R.KEY_REVIEWER, "Check Reviewer"); } catch (e) {}
+    var pack = R.state.pack;
+    var r = {
+      label: label,
+      title: doc.title,
+      product: A.Version.product,
+      version: A.Version.label,
+      number: A.Version.number,
+      badge: (doc.getElementById("version-badge") || {}).textContent || "",
+      logo: ((doc.querySelector(".brand-logo img") || {}).naturalWidth || 0) > 0,
+      legal: ((doc.querySelector(".sidebar-legal") || {}).textContent || ""),
+      modules: keys(A),
+      data: keys(A.Data),
+      contracts: keys(A.Data.contracts),
+      reviewTool: keys(R),
+      core: keys(A.ReviewCore),
+      globals: ["ReviewTool", "SPT_REVIEW_DEMO_PACK"].filter(function (g) { return !!w[g]; }).join(","),
+      pack: pack.engagement.client + " | round " + pack.round + " | " + pack.documents.length + " documents | " + pack.documents[0].blocks.length + " blocks | " + pack.items.length + " items | " + pack.documents[0].contentHash,
+      checks: A.ReviewChecks.run(pack, {}).map(function (x) { return x.id; }).join("|"),
+      images: doc.querySelectorAll("#rr-paper img").length,
+      pages: [],
+      errors: errors
+    };
+    ["report", "engagement", "checklist", "checks", "previous", "summary", "about"].forEach(function (p) {
+      var item = doc.querySelector('.nav-item[data-page="' + p + '"]');
+      if (item) item.click();
+      r.pages.push({ name: p, len: flat(doc.getElementById("main").textContent).length });
+    });
+    r.about = /Copyright and licence/.test(doc.getElementById("main").textContent) && doc.getElementById("main").textContent.indexOf(A.Version.product + " " + A.Version.label) !== -1;
+    // Comment, save: the file it writes.
+    var b = pack.documents[0].blocks.filter(function (x) { return x.type === "paragraph" && !x.front && x.text.length > 40; })[0];
+    R.state.review.reviewer = "Check Reviewer";
+    R.addComment({ severity: "must-fix", anchor: { documentIndex: 0, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text, cell: null }, text: "From the parity check.", suggestion: b.text + " Reworded." });
+    var captured = null;
+    w.showSaveFilePicker = function (o) {
+      return Promise.resolve({ name: o.suggestedName, kind: "file", createWritable: function () {
+        return Promise.resolve({ write: function (t) { captured = String(t); return Promise.resolve(); }, close: function () { return Promise.resolve(); } });
+      } });
+    };
+    return new Promise(function (res) { R.saveReview(null, res); }).then(function (out) {
+      var f = JSON.parse(captured);
+      r.saved = out.ok && out.method === "file" && f.schema === "spt-review/1.0" && f.comments.length === 1 && f.packId === pack.packId;
+      r.savedName = out.name;
+      return r;
+    });
+  }
+
+  var folder, single, bundle;
+  load("../../modules/report-review/index.html?tour=1", true).then(function (w) { return probe(w, "folder"); })
+    .then(function (r) {
+      folder = r;
+      bundle = encodeURIComponent(r.product + " " + r.version) + ".html";
+      return load(bundle + "?tour=1", true);
+    })
+    .then(function (w) {
+      ok(w.location.href.indexOf(bundle) !== -1, "the single file for this version loads (" + decodeURIComponent(bundle) + ")");
+      ok(w.document.querySelectorAll("script[src],link[href],img[src]:not([src^='data:'])").length === 0, "it loads nothing from beside itself: no script src, stylesheet link or image file, even with the tour open");
+      return probe(w, "single");
+    })
+    .then(function (r) {
+      single = r;
+      ok(single.title === folder.title && single.title === "OT Cyber Report Review Tool", "same page title (" + single.title + ")", folder.title + " vs " + single.title);
+      ok(single.product === folder.product && single.product === single.title, "the same product name", single.product);
+      ok(single.number === folder.number && single.version === folder.version, "the same suite version (" + single.version + ")", folder.number + " vs " + single.number);
+      ok(single.badge === single.version && single.badge === folder.badge, "and the header badge shows it", single.badge);
+      ok(single.logo, "the header logo shows (embedded)");
+      ok(/SolutionsPT/.test(single.legal) && single.legal === folder.legal, "the copyright notice is in the sidebar", single.legal);
+      ok(single.about && folder.about, "the About page carries the licence notice and the version");
+      ok(single.modules === folder.modules, "the same App modules are present (" + single.modules + ")", folder.modules);
+      ok(single.data === folder.data && single.contracts === folder.contracts && /reviewFile/.test(single.contracts), "the same App data and contracts", single.data + " / " + single.contracts);
+      ok(single.globals === folder.globals && single.globals.split(",").length === 2, "the same globals (" + single.globals + ")", folder.globals);
+      ok(single.reviewTool === folder.reviewTool && single.core === folder.core, "ReviewTool and ReviewCore expose the same functions");
+      ok(single.pack === folder.pack && /round 2/.test(single.pack), "the demo pack loads (" + single.pack + ")", folder.pack);
+      ok(single.checks === folder.checks, "the automatic checks find the same things (" + single.checks.split("|").length + ")", folder.checks + " vs " + single.checks);
+      ok(single.images === folder.images && single.images > 0, "the report's charts draw (" + single.images + ")");
+      ok(single.pages.length === folder.pages.length && single.pages.length === 7, "the same pages (" + single.pages.length + ")", folder.pages.length + " vs " + single.pages.length);
+      folder.pages.forEach(function (a, i) {
+        var b = single.pages[i] || {};
+        ok(b.name === a.name && b.len === a.len && b.len > 200, "page '" + a.name + "' renders identically (" + b.len + " chars)", a.len + " vs " + b.len);
+      });
+      ok(single.saved && folder.saved && single.savedName === folder.savedName, "the review file saves the same (" + single.savedName + ")", folder.savedName + " vs " + single.savedName);
+      ok(folder.errors.length === 0, "(the folder version ran with no script or console errors)", folder.errors.join(" | "));
+      ok(single.errors.length === 0, "no script or console errors while every page rendered and the file saved", single.errors.join(" | "));
+      try { localStorage.removeItem("spt-review:reviewer:v1"); } catch (e) {}
+      return load(bundle, false);
+    })
+    .then(function (w) {
+      ok(!!w.SPT_REVIEW_DEMO_PACK && !w.ReviewTool.state.pack && /Open a review pack/.test(w.document.getElementById("main").textContent), "opened normally it starts empty, though it carries the demo for ?tour");
+      finish();
+    })
+    .catch(function (e) { ok(false, "check threw: " + e.message); finish(); });
+})();
+</script>
+</body></html>

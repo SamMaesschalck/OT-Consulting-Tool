@@ -2,6 +2,8 @@
 /packaging/single-html/*.html
 !/packaging/single-html/check-single-html.html
 !/packaging/single-html/check-single-html-risk.html
+!/packaging/single-html/check-single-html-suite.html
+!/packaging/single-html/check-single-html-review.html
 /packaging/electron/*.exe
 /packaging/electron/*.zip
 /dist/

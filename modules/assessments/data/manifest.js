@@ -18,6 +18,7 @@ window.App.Data.index = {
                    "riskContextInterchange":  [
                                                   "shared/risk-context-interchange.json"
                                               ],
+    "reviewContracts": { "reviewPack": "shared/review-pack.json", "reviewFile": "shared/review-file.json" },
                    "engagementGuidance":  [
                                               "shared/engagement-guidance.json"
                                           ],
@@ -349,6 +350,8 @@ window.App.Data.index = {
   add('shared/scoring-profiles.js');
   add('shared/cross-references.js');
   add('shared/risk-context-interchange.js');
+  add('shared/review-pack.js');
+  add('shared/review-file.js');
   add('shared/engagement-guidance.js');
   add('shared/cra-product-classification.js');
   add('shared/machinery-classification.js');

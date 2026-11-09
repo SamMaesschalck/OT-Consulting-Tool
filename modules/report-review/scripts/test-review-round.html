@@ -1,0 +1,239 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: earlier rounds, found again</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Round 2 and later in the reviewer's app. The author changes the report between
+  rounds, and block ids are positional, so an earlier comment must be found by
+  its words: on the paragraph as rewritten (with a word diff), on its section
+  heading when nothing is close, beside the right picture and table cell, and on
+  an item whose site was renamed (targetId). Raise it again anchors the new
+  comment where the text is now and allows suggested wording; the confirm button
+  fits what the author did. Each variant of the demo pack is opened as a real
+  pack. Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script src="../data/demo-pack.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  var errors = [];
+  function clean() { try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); } catch (e) {} }
+  // A fresh tool with this variant of the demo pack open, as a real pack.
+  function open(pack) {
+    // Leaving, as if the close warning were answered.
+    try { frame.contentWindow.ReviewTool.state.dirty = false; } catch (e) {}
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () {
+          w.localStorage.setItem(w.ReviewTool.KEY_REVIEWER, "S. Reviewer");
+          w.ReviewTool.loadTexts([{ name: "pack.json", text: JSON.stringify(pack) }]);
+          res(w);
+        });
+      };
+      frame.src = "../index.html";
+    });
+  }
+  function demo() { return JSON.parse(JSON.stringify(window.SPT_REVIEW_DEMO_PACK)); }
+  function blocks(p) { return p.documents[0].blocks; }
+  function byId(p, id) { return blocks(p).filter(function (b) { return b.id === id; })[0]; }
+  function prev(p, id) { return p.previousRound.comments.filter(function (x) { return x.comment.id === id; })[0]; }
+  function renumber(p) { blocks(p).forEach(function (b, i) { b.id = "d0-b" + (i + 1); }); }
+  function nav(w, id) { w.document.querySelector('.nav-item[data-page="' + id + '"]').click(); }
+  function type(w, el, v, ev) { el.value = v; el.dispatchEvent(new w.Event(ev || "input", { bubbles: true })); }
+  // The block a comment card sits beside: cards follow their block in the paper.
+  function besideBlock(w, prevId) { return besideOf(w, '#rr-paper [data-prev-id="' + prevId + '"]'); }
+  function besideOf(w, sel) {
+    var cards = w.document.querySelectorAll(sel);
+    if (cards.length !== 1) return cards.length + " cards";
+    var side = cards[0].closest(".rr-side"), el = side.previousElementSibling;
+    while (el && !el.hasAttribute("data-block-id")) el = el.previousElementSibling;
+    return el ? el.getAttribute("data-block-id") : "none";
+  }
+  function addPrev(p, id, anchor, status) {
+    var base = JSON.parse(JSON.stringify(prev(p, "c-demo-2")));
+    base.comment.id = id; base.comment.text = "Earlier point " + id + "."; base.status = status || "open"; base.reason = ""; base.replies = [];
+    Object.keys(anchor).forEach(function (k) { base.comment.anchor[k] = anchor[k]; });
+    p.previousRound.comments.push(base);
+  }
+  var W, R, P, oldQuote, imgs, sr, tid;
+  // A section that throws (on code without these fixes) fails, and the next runs.
+  function guard(name, fn) { return function (w) { try { fn(w); } catch (e) { ok(false, "section " + name + " threw: " + (e && e.message)); } }; }
+  clean();
+
+  // ---- 1. a fixed paragraph: the comment stays beside it, with what changed ----
+  P = demo();
+  oldQuote = byId(P, "d0-b14").text;
+  byId(P, "d0-b14").text = oldQuote.replace("This assessment finds", "This assessment found") + " The furthest from target is the BPCS zone.";
+  byId(P, "d0-b14").runs = [{ t: byId(P, "d0-b14").text }];
+  open(P).then(guard("1", function (w) {
+    W = w; R = w.ReviewTool; var d = w.document;
+    ok(besideBlock(w, "c-demo-1") === "d0-b14", "an earlier comment on a paragraph the author rewrote still shows beside it", besideBlock(w, "c-demo-1"));
+    var card = d.querySelector('#rr-paper [data-prev-id="c-demo-1"]');
+    ok(card && /Text changed since round 1/.test(card.textContent), "with a Text changed since round 1 chip");
+    ok(card && card.querySelector(".rr-now ins") && /found/.test(card.querySelector(".rr-now ins").textContent) && /finds/.test(card.querySelector(".rr-now del").textContent), "and a word diff: finds struck, found added");
+    ok(besideBlock(w, "c-demo-2") === "d0-b11" && !/Text changed/.test(d.querySelector('#rr-paper [data-prev-id="c-demo-2"]').textContent), "an unchanged heading's comment shows as before, with no chip");
+    nav(w, "previous");
+    var pc = d.querySelector('[data-prev-id="c-demo-1"]');
+    ok(/In: Executive summary/.test(pc.textContent), "the Previous round card names the section");
+    ok(/Now reads:/.test(pc.textContent) && /furthest from target is the BPCS zone/.test(pc.querySelector(".rr-now").textContent), "and says what the paragraph reads now");
+    ok(/^Was: /.test(pc.querySelector(".quote").textContent), "with the old wording labelled Was");
+    // Status-aware actions.
+    ok(pc.querySelector(".rr-confirm") && pc.querySelector(".rr-confirm").textContent === "Confirm it is fixed", "a resolved point offers Confirm it is fixed");
+    var wc = d.querySelector('[data-prev-id="c-demo-2"]');
+    ok(wc.querySelector(".rr-confirm") && wc.querySelector(".rr-confirm").textContent === "Accept the reason", "a Won't change point offers Accept the reason");
+    wc.querySelector(".rr-confirm").click();
+    wc = d.querySelector('[data-prev-id="c-demo-2"]');
+    ok(R.state.review.confirmations.some(function (x) { return x.commentId === "c-demo-2"; }) && /You accepted the reason/.test(wc.textContent) && wc.querySelector(".rr-confirm").textContent === "Take back", "which records the same confirmation, worded for a reason");
+    var oc = d.querySelector('[data-prev-id="c-demo-3"]');
+    ok(!oc.querySelector(".rr-confirm") && !!oc.querySelector(".rr-raise"), "an open point has nothing to confirm, only Raise it again");
+    // Go to.
+    pc.querySelector(".rr-prev-go").click();
+    ok(R.state.page === "report" && d.querySelector('.rr-block.flash[data-block-id="d0-b14"]'), "Go to takes you to the rewritten paragraph and flashes it");
+    nav(w, "previous");
+    d.querySelector('[data-prev-id="c-demo-3"] .rr-prev-go').click();
+    ok(R.state.page === "engagement" && d.querySelector('.rr-item.flash[data-item-id="SR1.1"]'), "and an item comment's Go to takes you to the item");
+    ok(d.querySelector('.rr-item[data-item-id="SR1.1"] [data-prev-id="c-demo-3"]'), "where an old anchor without a target id still finds it by name");
+
+  })).then(function () {
+    // ---- 2. a paragraph added earlier moves every id -----------------------------
+    P = demo();
+    var extra = JSON.parse(JSON.stringify(byId(P, "d0-b14")));
+    extra.text = "A new opening paragraph the author added in round 2."; extra.runs = [{ t: extra.text }];
+    blocks(P).splice(13, 0, extra);
+    renumber(P);
+    return open(P);
+  }).then(guard("2", function (w) {
+    W = w; R = w.ReviewTool; var d = w.document;
+    ok(byId(P, "d0-b15").text === oldQuote && besideBlock(w, "c-demo-1") === "d0-b15", "after a paragraph is added, the earlier comment is beside its text (now d0-b15)", besideBlock(w, "c-demo-1"));
+    d.querySelector('#rr-paper [data-prev-id="c-demo-1"] .rr-raise').click();
+    var comp = R.state.composer;
+    ok(comp && comp.anchor.blockId === "d0-b15" && comp.relatesTo === "c-demo-1", "Raise it again opens on that paragraph, not on the new one at its old id", comp && comp.anchor.blockId);
+    var box = d.querySelector(".rr-composer .rr-c-suggest");
+    ok(!!box, "and allows suggested wording");
+    box.checked = true; box.dispatchEvent(new w.Event("change", { bubbles: true }));
+    ok(d.querySelector(".rr-c-sug").value === oldQuote, "starting from the paragraph as it reads now");
+    type(w, d.querySelector(".rr-c-text"), "Still does not lead with the zone.");
+    d.querySelector(".rr-c-add").click();
+    var c = R.state.review.comments[R.state.review.comments.length - 1];
+    ok(c.relatesTo === "c-demo-1" && c.anchor.blockId === "d0-b15" && c.anchor.quote === oldQuote, "the saved comment is on d0-b15 with its current text as the quote", JSON.stringify(c.anchor).slice(0, 160));
+    ok(besideOf(w, '#rr-paper [data-comment-id="' + c.id + '"]') === "d0-b15", "and shows beside it, not beside d0-b14", besideOf(w, '#rr-paper [data-comment-id="' + c.id + '"]'));
+    nav(w, "previous");
+    ok(/You raised this again/.test(d.querySelector('[data-prev-id="c-demo-1"]').textContent), "the Previous round card says it was raised again");
+
+  })).then(function () {
+    // ---- 3. rewritten beyond recognition, and gone altogether ----------------------
+    P = demo();
+    byId(P, "d0-b14").text = "Zebra quokka marmalade."; byId(P, "d0-b14").runs = [{ t: "Zebra quokka marmalade." }];
+    var b16 = byId(P, "d0-b16").text;
+    byId(P, "d0-b16").text = b16 + " Two zones were reviewed on site."; byId(P, "d0-b16").runs = [{ t: byId(P, "d0-b16").text }];
+    addPrev(P, "c-shifted", { sectionKey: "executive-summary", sectionTitle: "Executive summary", blockId: "d0-b3", blockType: "paragraph", quote: b16 });
+    addPrev(P, "c-gone", { sectionKey: "a-section-that-went", sectionTitle: "A section that went", blockId: "d0-b200", blockType: "paragraph", quote: "Words nobody will find in this report again." });
+    return open(P);
+  }).then(guard("3", function (w) {
+    W = w; R = w.ReviewTool; var d = w.document;
+    ok(besideBlock(w, "c-demo-1") === "d0-b13", "a paragraph with no close match now: the comment shows on its section heading", besideBlock(w, "c-demo-1"));
+    ok(/Text changed since round 1/.test(d.querySelector('#rr-paper [data-prev-id="c-demo-1"]').textContent), "marked as changed");
+    ok(besideBlock(w, "c-shifted") === "d0-b16" && /Text changed/.test(d.querySelector('#rr-paper [data-prev-id="c-shifted"]').textContent), "a paragraph both moved and lightly rewritten is found by its words", besideBlock(w, "c-shifted"));
+    ok(!d.querySelector('#rr-paper [data-prev-id="c-gone"]'), "a comment whose section has gone is not put somewhere wrong");
+    nav(w, "previous");
+    ok(/No close match/.test(d.querySelector('[data-prev-id="c-demo-1"]').textContent), "the Previous round card says there is no close match");
+    var g = d.querySelector('[data-prev-id="c-gone"]');
+    ok(/no longer in the report/.test(g.textContent) && !g.querySelector(".rr-prev-go"), "and says when it is no longer in the report, with no Go to");
+    d.querySelector('[data-prev-id="c-demo-1"] .rr-raise').click();
+    ok(R.state.composer.anchor.blockId === "d0-b13" && R.state.composer.anchor.quote === "" && /section heading/.test(R.state.composer.label), "raising it again goes on the section heading with no quote, and says why");
+    d.querySelector(".rr-c-cancel").click();
+    d.querySelector('[data-prev-id="c-gone"] .rr-raise').click();
+    ok(R.state.composer.anchor.blockId === "" && R.state.composer.anchor.quote === "" && R.state.composer.anchor.sectionTitle === "A section that went", "a gone one keeps only its section");
+    d.querySelector(".rr-c-cancel").click();
+
+  })).then(function () {
+    // ---- 4. pictures and table cells ------------------------------------------------
+    P = demo();
+    imgs = blocks(P).filter(function (b) { return b.type === "image" && !b.front; });
+    addPrev(P, "c-img-media", { sectionKey: imgs[1].sectionKey, sectionTitle: imgs[1].sectionTitle, blockId: "d0-b5", blockType: "image", quote: "", media: imgs[1].media });
+    addPrev(P, "c-img-place", { sectionKey: imgs[2].sectionKey, sectionTitle: imgs[2].sectionTitle, blockId: imgs[2].id, blockType: "image", quote: "" });
+    var tbl = byId(P, "d0-b12");
+    addPrev(P, "c-cell", { sectionKey: tbl.sectionKey, sectionTitle: tbl.sectionTitle, blockId: "d0-b12", blockType: "table", quote: "Status", cell: { row: 1, col: 0 } }, "wontchange");
+    addPrev(P, "c-cell-moved", { sectionKey: tbl.sectionKey, sectionTitle: tbl.sectionTitle, blockId: "d0-b12", blockType: "table", quote: "Draft", cell: { row: 2, col: 1 } });
+    addPrev(P, "c-cell-gone", { sectionKey: tbl.sectionKey, sectionTitle: tbl.sectionTitle, blockId: "d0-b12", blockType: "table", quote: "Reviewed by the plant manager", cell: { row: 2, col: 1 } });
+    return open(P);
+  }).then(guard("4", function (w) {
+    var d = w.document; W = w; R = w.ReviewTool;
+    ok(besideBlock(w, "c-img-media") === imgs[1].id, "a picture's comment is found by its media key, wherever its old id now points", besideBlock(w, "c-img-media"));
+    ok(besideBlock(w, "c-img-place") === imgs[2].id, "an older picture comment with no media key is found by its place, once, not beside every picture", besideBlock(w, "c-img-place"));
+    ok(besideBlock(w, "c-cell") === "d0-b12" && d.querySelector('[data-block-id="d0-b12"] td[data-cell="1.0"]').classList.contains("prev"), "a table cell's earlier comment shows on the table, and the cell is marked");
+    ok(/On a cell:/.test(d.querySelector('#rr-paper [data-prev-id="c-cell"]').textContent), "labelled as being on a cell");
+    ok(besideBlock(w, "c-cell-moved") === "d0-b12" && d.querySelector('[data-block-id="d0-b12"] td[data-cell="1.1"]').classList.contains("prev") && !d.querySelector('[data-block-id="d0-b12"] td[data-cell="2.1"]').classList.contains("prev"), "a cell whose row moved is marked where its text is now");
+    ok(besideBlock(w, "c-cell-gone") !== "d0-b12" && d.querySelectorAll('[data-block-id="d0-b12"] td.prev').length === 2, "a cell whose text changed is not pinned on whatever cell is at its old place");
+    // New comments on a picture carry its media key (S6).
+    d.querySelector('[data-block-id="' + imgs[0].id + '"]').click();
+    ok(R.state.composer && R.state.composer.anchor.media === imgs[0].media && R.state.composer.anchor.blockType === "image", "a new comment on a picture carries its media key");
+    d.querySelector(".rr-c-cancel").click();
+    d.querySelector('#rr-paper [data-prev-id="c-cell"] .rr-raise').click();
+    ok(R.state.composer.anchor.cell && R.state.composer.anchor.cell.row === 1 && R.state.composer.anchor.quote === "Status" && R.state.composer.canSuggest !== false, "raising a cell comment again stays on the cell, and can suggest wording");
+    d.querySelector(".rr-c-cancel").click();
+
+  })).then(function () {
+    // ---- 5. an item whose site was renamed, and whose evidence changed ----------------
+    P = demo();
+    var ids = {};
+    P.items.forEach(function (i) { if (!ids[i.targetName]) ids[i.targetName] = "t-" + (Object.keys(ids).length + 1); i.targetId = ids[i.targetName]; });
+    var old = "BPCS - basic process control";
+    prev(P, "c-demo-3").comment.anchor.targetId = ids[old];
+    P.items.forEach(function (i) { if (i.targetName === old) i.targetName = "BPCS basic process control (Unit 2)"; });
+    sr = P.items.filter(function (i) { return i.itemId === "SR1.1" && i.targetId === ids[old]; })[0];
+    sr.evidence = sr.evidence.replace("one working day", "two working days") + " Policy ref AD-07.";
+    tid = ids[old];
+    return open(P);
+  }).then(guard("5", function (w) {
+    var d = w.document, o = { sr: sr, tid: tid }; W = w; R = w.ReviewTool;
+    nav(w, "engagement");
+    var item = d.querySelector('.rr-item[data-item-id="SR1.1"][data-target-id="' + o.tid + '"]');
+    ok(item && item.getAttribute("data-target") === "BPCS basic process control (Unit 2)" && item.querySelector('[data-prev-id="c-demo-3"]'), "an earlier item comment follows its site through a rename, by target id");
+    var pc = item.querySelector('[data-prev-id="c-demo-3"]');
+    ok(/Text changed since round 1/.test(pc.textContent) && /AD-07/.test(pc.querySelector(".rr-now").textContent), "and shows the field's new wording");
+    item.querySelector(".rr-item-comment").click();
+    ok(R.state.composer.anchor.targetId === o.tid, "a new item comment carries the target id");
+    d.querySelector(".rr-c-cancel").click();
+    pc.querySelector(".rr-raise").click();
+    var a = R.state.composer.anchor;
+    ok(a.targetId === o.tid && a.targetName === "BPCS basic process control (Unit 2)" && a.quote === o.sr.evidence && a.field === "evidence", "raising it again takes the current name and evidence", JSON.stringify(a).slice(0, 200));
+    ok(!!d.querySelector('.rr-item[data-item-id="SR1.1"][data-target-id="' + o.tid + '"] .rr-composer .rr-c-field'), "and opens on the item, with suggested wording per field");
+    d.querySelector(".rr-c-cancel").click();
+    nav(w, "previous");
+    d.querySelector('[data-prev-id="c-demo-3"] .rr-prev-go').click();
+    ok(R.state.page === "engagement" && d.querySelector('.rr-item.flash[data-target-id="' + o.tid + '"][data-item-id="SR1.1"]'), "Go to finds the renamed site's item");
+    var dashy = [];
+    ["previous", "report"].forEach(function (pg) { nav(w, pg); Array.prototype.forEach.call(d.querySelectorAll(".rr-prev .rr-head, .rr-prev-where, .rr-prev .rr-actions, .rr-prev .small.muted"), function (n) { if (/[–—]/.test(n.textContent)) dashy.push(n.textContent); }); });
+    ok(dashy.length === 0, "no em or en dashes in the new wording", dashy.join(" | "));
+    ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+  })).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+    try { W.ReviewTool.state.dirty = false; } catch (e) {}
+    clean();
+    finish();
+  });
+})();
+</script>
+</body></html>

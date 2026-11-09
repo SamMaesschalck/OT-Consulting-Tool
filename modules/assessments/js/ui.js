@@ -648,6 +648,10 @@ window.App.UI = (function () {
   // covers the whole session including tour pages, which do not autosave.
   var dirtySinceSave = false;
   function updateSaveButton() {
+    // The suite, when it hosts the tool, marks tools with unsaved changes in
+    // its bar and warns before it closes (js/host-bridge.js; absent or
+    // standalone, nothing happens).
+    if (window.App.HostBridge) window.App.HostBridge.setDirty(dirtySinceSave);
     var b = $("btn-save");
     if (!b) return;
     b.textContent = dirtySinceSave ? "Save*" : "Save";
@@ -656,6 +660,18 @@ window.App.UI = (function () {
   }
   function markDirty() { if (!dirtySinceSave) { dirtySinceSave = true; updateSaveButton(); } }
   function markClean() { dirtySinceSave = false; updateSaveButton(); }
+
+  // In the suite, a project file saved or opened goes on its Recent files
+  // list: the name, the customer and when, never the contents. The handle,
+  // when the browser gave one, stays in this tool's own storage (see
+  // js/host-bridge.js). Standalone, nothing happens.
+  function noteRecentFile(action, name, handle) {
+    var HB = window.App.HostBridge;
+    if (!HB || !HB.hosted || !name) return;
+    var pf = E.getProjectFile();
+    HB.recent({ action: action, name: name, handle: handle || null,
+                label: (pf && pf.project && pf.project.clientName) || "" });
+  }
 
   // ---- version ----------------------------------------------------------
   // Shown in the tool so anyone can say which release they are on. Never in a
@@ -835,8 +851,13 @@ window.App.UI = (function () {
           // this session another window set aside as offered work.
           clearAutosave();
           dropOfferedFrom(sessionId);
+          noteRecentFile("save", res.name, res.method === "file" ? STG.currentFileHandle() : null);
           if (res.method === "file") {
             toast("Saved to " + res.name + ".");
+          } else if (res.blocked) {
+            // The browser has the save dialog but would not show it here (the
+            // tool is inside another page), so the save went to Downloads.
+            toast("Downloaded " + res.name + ". Saving back into the same file is not available here, so each save downloads a new copy.", "warn", 9000);
           } else if (!noInPlaceHintShown) {
             noInPlaceHintShown = true;
             toast("Downloaded " + res.name + ". This browser can't overwrite the file from an offline page, so it adds \"(1)\", \"(2)\". For one-click overwrite of the same file, open this tool in Edge or Chrome. (In Firefox you can also turn on Settings → \"Always ask you where to save files\" and choose Replace.)", "warn", 12000);
@@ -894,9 +915,9 @@ window.App.UI = (function () {
     // a confirm() used it up, so a consultant who paused before pressing OK got
     // a "must be handling a user gesture" error, or no dialog at all. The
     // button in this panel is a fresh click, however long they read for.
-    function askBeforeLoad(go) {
+    function askBeforeLoad(go, goLabel) {
       closeModal();
-      var goBtn = h("button", { class: "btn primary load-guard-go", text: "Choose a file" });
+      var goBtn = h("button", { class: "btn primary load-guard-go", text: goLabel || "Choose a file" });
       var modal = h("div", { class: "modal-backdrop load-guard-modal" }, [
         h("div", { class: "modal", role: "dialog", "aria-modal": "true" }, [
           h("div", { class: "modal-h" }, [h("h2", { text: "Load another project?" })]),
@@ -927,7 +948,10 @@ window.App.UI = (function () {
           // Belt and braces for the gesture rule above: say what to do, not
           // what the browser said.
           if (res.needsGesture) { toast("The file dialog did not open. Click Load again to choose the file.", "warn"); return; }
-          if (applyLoadedProject(res)) STG.adoptProjectFile(res.handle, (E.state.project || {}).projectId);
+          if (applyLoadedProject(res)) {
+            STG.adoptProjectFile(res.handle, (E.state.project || {}).projectId);
+            noteRecentFile("open", res.fileName, res.handle);
+          }
         });
       } else {
         $("file-input").click();
@@ -939,10 +963,36 @@ window.App.UI = (function () {
       STG.loadProjectFromFile(file, function (res) {
         // A plain file input yields no handle: forget any previous one so Save
         // can't overwrite a DIFFERENT project's file with this one's content.
-        if (applyLoadedProject(res)) STG.forgetProjectFile();
+        if (applyLoadedProject(res)) { STG.forgetProjectFile(); noteRecentFile("open", file.name, null); }
       });
       ev.target.value = "";
     });
+    // In the suite: reopening a file from its Recent files list. The bridge
+    // hands over the file the consultant chose to reopen (and its handle,
+    // when the browser kept one, so Save writes back to it); it goes through
+    // the same checks as Load.
+    if (window.App.HostBridge && window.App.HostBridge.hosted) {
+      window.App.HostBridge.register({
+        loadButton: "btn-load",
+        applyTheme: applyTheme,
+        openFile: function (file, handle) {
+          function go() {
+            STG.loadProjectFromFile(file, function (res) {
+              if (res.ok) {
+                if (res.data && res.data.project && typeof res.data.project === "object") STG.ensureProjectId(res.data.project);
+                res.fileName = file.name;
+              }
+              if (!applyLoadedProject(res)) return;
+              if (handle) STG.adoptProjectFile(handle, (E.state.project || {}).projectId);
+              else STG.forgetProjectFile();
+              noteRecentFile("open", file.name, handle);
+            });
+          }
+          if (dirtySinceSave && projectHasContent(E.getProjectFile())) askBeforeLoad(go, "Open " + file.name);
+          else go();
+        }
+      });
+    }
     $("btn-engagement").addEventListener("click", openEngagementModal);
     // Excel / Word exports go through the export-scope flow: with several
     // sites/products a chooser asks which to include (default all); with one
@@ -1082,7 +1132,6 @@ window.App.UI = (function () {
     var narrative = E.getActiveNarrative();
     var targets = E.state.engagement.targets.filter(function (t) { return ids.indexOf(t.id) !== -1; });
     if (!targets.length) return;
-    var includesActive = ids.indexOf(E.state.activeTargetId) !== -1;
 
     var fileWord = kind === "xlsx" ? "workbook" : "Word document";
     setExportBusy(true);
@@ -1108,10 +1157,12 @@ window.App.UI = (function () {
     if (exportCoversWholeEngagement(kind)) {
       var engagement = filteredEngagementFor(ids);
       var opts = baseExportOpts();
-      // The comparison baseline is captured against the active target; carry it
-      // only when that target is in scope.
-      if (includesActive) opts.progress = progressExportPayload();
-      opts.targetId = includesActive ? E.state.activeTargetId : ids[0];
+      // The same progress target as the Word document (docxJobs), never the
+      // one selected on screen.
+      var pt = progressTargetOf(targets);
+      opts.targetId = pt.id;
+      var pw = progressExportPayload(pt.id);
+      if (pw) opts.progress = pw;
       toast("Generating the " + fileWord + (targets.length > 1 ? " (covering " + targets.length + " " + pluralLabel(targetNoun()) + ")" : "") + "…");
       var wp = window.App.ExportXLSX.download(engagement, inst, tax, prof, opts);
       (wp && wp.then ? wp : Promise.resolve()).then(
@@ -1136,7 +1187,7 @@ window.App.UI = (function () {
       var opts = baseExportOpts();
       opts.targetId = t.id;
       opts.filenameHint = exportFileBase(t.name);
-      if (t.id === E.state.activeTargetId) opts.progress = progressExportPayload();
+      if (carriesProgress(t)) opts.progress = progressExportPayload(t.id);
       var p = window.App.ExportXLSX.download(E.state.engagement, inst, tax, prof, opts);
       (p && p.then ? p : Promise.resolve()).then(function () { setTimeout(next, 350); },
         function () { setTimeout(next, 350); });
@@ -1230,6 +1281,7 @@ window.App.UI = (function () {
     // is remembered on the assessment; a new one starts as a draft.
     var issueAs = "draft", issueBlock = null, blocked = true, checkSeq = 0, userPicked = false;
     var recheck = function () {};
+    var paintReviewNote = null;
     if (kind === "docx") {
       var remembered = E.getReportNarrative().issueAs === "final" ? "final" : "draft";
       var draftBtn = h("button", { type: "button", class: "scope-choice active", "data-issue": "draft" }, [
@@ -1258,6 +1310,7 @@ window.App.UI = (function () {
       recheck = function () {
         var ids = selectedIds();
         var seq = ++checkSeq;
+        if (paintReviewNote) paintReviewNote();
         setBlocked(true);
         issueNote.className = "export-issue-note muted";
         issueNote.textContent = ids.length ? "Checking whether the report is ready to issue…" : "";
@@ -1287,10 +1340,35 @@ window.App.UI = (function () {
           if (!userPicked && remembered === "final") setIssue("final");
         });
       };
+      // The same review warnings as the Issue check, for the shape and the
+      // ticks chosen: a review packs the per-target documents of this
+      // assessment, so the organisation-wide roll-up was never in front of a
+      // reviewer, and a whole-engagement report of fewer targets is not the
+      // one they read. They never close Final.
+      var reviewNote = h("div", { class: "export-review-note" });
+      paintReviewNote = function () {
+        reviewNote.innerHTML = "";
+        if (!window.App.Review) return;
+        var RV = window.App.Review, list = RV.warningList();
+        var lines = [];
+        if (shape === "org" && canOrgWide) {
+          lines.push({ kind: "org-not-reviewed", text: "The organisation-wide report has not been reviewed. Send for review packs this " + noun + "'s own report, not the roll-up across " + pluralLabel(noun) + "." });
+          // Those hashes belong to a different document.
+          list = list.filter(function (w) { return w.kind !== "changed-since-approval"; });
+        } else if (whole && RV.store && RV.store() && selectedIds().length && selectedIds().length < targets.length) {
+          lines.push({ kind: "subset-not-reviewed", text: "The review covered all " + targets.length + " " + pluralLabel(noun) + ". This report covers " + selectedIds().length +
+            ", so its summary and scores are not what the reviewers read." });
+        }
+        lines.concat(list).forEach(function (w) {
+          reviewNote.appendChild(h("p", { class: "export-issue-note warn", "data-review-warning": w.kind, text: w.text }));
+        });
+      };
+      if (window.App.Review) { paintReviewNote(); window.App.Review.refresh(paintReviewNote); }
       issueBlock = h("div", { class: "export-issue" }, [
         h("h3", { style: "margin:14px 0 6px; font-size:13px;", text: "Issue as" }),
         h("div", { class: "scope-choices", style: "margin-bottom:0;" }, [draftBtn, finalBtn]),
-        issueNote
+        issueNote,
+        reviewNote
       ]);
       Object.keys(checks).forEach(function (id) { checks[id].addEventListener("change", recheck); });
     }
@@ -8365,7 +8443,6 @@ window.App.UI = (function () {
   function docxJobs(ids, shape) {
     var targets = E.state.engagement.targets.filter(function (t) { return ids.indexOf(t.id) !== -1; });
     if (!targets.length) return [];
-    var includesActive = ids.indexOf(E.state.activeTargetId) !== -1;
     if (shape === "org") {
       var oOpts = baseExportOpts();
       oOpts.orgWide = true;
@@ -8377,19 +8454,47 @@ window.App.UI = (function () {
     }
     if (exportCoversWholeEngagement("docx")) {
       var opts = baseExportOpts();
-      // The comparison baseline is captured against the active target; carry it
-      // only when that target is in scope.
-      if (includesActive) opts.progress = progressExportPayload();
-      opts.targetId = includesActive ? E.state.activeTargetId : ids[0];
+      var pt = progressTargetOf(targets);
+      opts.targetId = pt.id;
+      var pw = progressExportPayload(pt.id);
+      if (pw) opts.progress = pw;
       return [{ engagement: filteredEngagementFor(ids), opts: opts, name: null, targetId: null }];
     }
     return targets.map(function (t) {
       var o = baseExportOpts();
       o.targetId = t.id;
       o.filenameHint = exportFileBase(t.name);
-      if (t.id === E.state.activeTargetId) o.progress = progressExportPayload();
+      if (carriesProgress(t)) o.progress = progressExportPayload(t.id);
       return { engagement: E.state.engagement, opts: o, name: t.name, targetId: t.id };
     });
+  }
+
+  // Which documents carry "Progress since previous assessment". Never the
+  // target selected on screen: the same content must build the same documents,
+  // whichever site or zone happens to be open (a review approval is checked
+  // against them). A target the baseline names, by a pinned mapping or by its
+  // own name, is compared; with one target, it always is; and when the
+  // baseline names none of several, the first is, as the comparison itself
+  // falls back to the baseline's first target.
+  function baselineNames(t) {
+    var b = E.getBaseline();
+    if (!b || !t) return false;
+    var bts = b.targets || [];
+    var pin = b.targetMap && b.targetMap[t.id];
+    if (pin && bts.some(function (x) { return x.id === pin; })) return true;
+    var name = String(t.name || "").trim().toLowerCase();
+    return bts.some(function (x) { return String(x.name || "").trim().toLowerCase() === name; });
+  }
+  function carriesProgress(t) {
+    if (!E.getBaseline()) return false;
+    var all = E.state.engagement.targets || [];
+    if (all.length <= 1 || baselineNames(t)) return true;
+    return !all.some(baselineNames) && !!all[0] && all[0].id === t.id;
+  }
+  // A whole-engagement document has one progress section: the first target in
+  // scope that the baseline names, else the first in scope.
+  function progressTargetOf(targets) {
+    return targets.filter(baselineNames)[0] || targets[0];
   }
 
   // Runs the Word check over a list of jobs, one after another. cb(err, list)
@@ -8567,6 +8672,8 @@ window.App.UI = (function () {
           label: "Go to first", go: function () { jumpToItem(tid, un.items[0].id); } });
       }
     });
+    // Warnings only: a review never keeps Final shut (js/review.js).
+    if (window.App.Review) out = out.concat(window.App.Review.issueWarnings());
     return out;
   }
 
@@ -8726,6 +8833,24 @@ window.App.UI = (function () {
       } })]);
   }
 
+  // The report's sections are cards keyed by Report.sectionKey; a review
+  // comment goes to the card for its section. A section that only the Word
+  // document has (the document control page, for one) has no card to go to:
+  // js/review.js looks for the place it is edited first, and passes quiet so
+  // the miss is its to explain.
+  function goToReportSection(key, anchor, quiet) {
+    if (view !== "report") go("report");
+    var card = key ? refs.main.querySelector('[data-section="' + String(key).replace(/"/g, '\\"') + '"]') : null;
+    if (card) { revealNode(card); return true; }
+    if (!quiet) toast("That part is only in the Word report, so the report page has no card for it.", "warn");
+    return false;
+  }
+  // The report page's section keys, rendering the page first if need be.
+  function reportSectionKeys() {
+    if (view !== "report") go("report");
+    return [].slice.call(refs.main.querySelectorAll("[data-section]")).map(function (c) { return c.getAttribute("data-section"); });
+  }
+
   // ---- report preview ---------------------------------------------------
 
   function renderReportPage() {
@@ -8742,6 +8867,9 @@ window.App.UI = (function () {
     // What still has to be done before a final can go out. First on the page,
     // because it is the to-do list for everything below it.
     refs.main.appendChild(buildIssueCheckCard());
+    // The review, beside the check it feeds. Not a report section: it has no
+    // key, and neither the report renderers nor the exporters ever see it.
+    if (window.App.Review) refs.main.appendChild(window.App.Review.buildCard());
 
     if (E.state.scoringFamily === "nis2-conformance") refs.main.appendChild(buildNIS2NarrativeCard());
     if (isCRA()) refs.main.appendChild(buildCRANarrativeCard());
@@ -8812,6 +8940,11 @@ window.App.UI = (function () {
     }
     window.App.Report.render(container, reportOpts);
     decorateCustomiseControls(container);
+    var wordOnly = buildWordOnlyChangesCard();
+    if (wordOnly) {
+      var after = refs.main.querySelector('[data-check-anchor="review"]') || refs.main.querySelector(".issue-check");
+      if (after) after.parentNode.insertBefore(wordOnly, after.nextSibling); else refs.main.insertBefore(wordOnly, container);
+    }
 
     // Re-assessment comparison. With a baseline loaded this is a real finding
     // and shows what has moved; with none it is a prompt to load a file, which
@@ -8864,7 +8997,7 @@ window.App.UI = (function () {
     ctxCb.checked = rn.includeVerdictContext === true;
     ctxCb.addEventListener("change", function () { E.setReportNarrative({ includeVerdictContext: ctxCb.checked }); markDirty(); });
 
-    return h("div", { class: "card" }, [
+    return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
         h("p", { class: "muted", style: "margin-top:0;", text: "The Word executive summary is written from the verdict and the two positions. These two paragraphs are yours; anything left blank shows in the export as a placeholder to complete." }),
@@ -8897,7 +9030,7 @@ window.App.UI = (function () {
     expoTa.value = rn.regulatoryExposure || "";
     expoTa.addEventListener("change", function () { E.setReportNarrative({ regulatoryExposure: expoTa.value }); });
 
-    return h("div", { class: "card" }, [
+    return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
         h("p", { class: "muted", style: "margin-top:0;", text: "The Word executive summary is composed automatically from the scores, classification, gaps and remediation plans. These two paragraphs are the consultant's own words; anything left blank shows in the export as a placeholder to complete." }),
@@ -8970,7 +9103,7 @@ window.App.UI = (function () {
     var mf = methodField();
     if (mf) kids.push(mf);
     if (!kids.length) return null;
-    return h("div", { class: "card" }, [
+    return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
         h("p", { class: "muted", style: "margin-top:0;", text: "The rest of the Word report is composed from the assessment. These are the consultant's own words; anything left blank prints in red in the export for you to complete." })
@@ -9023,6 +9156,54 @@ window.App.UI = (function () {
         editSection(key, card, head, cardBody);
       }
     });
+  }
+
+  // A section override whose section has no card on this page (an Accept from
+  // a review can put one on the document control page, say) would otherwise be
+  // invisible and could never be undone. They are listed together, each with
+  // what changed and the way back. Runs after the cards are drawn.
+  function buildWordOnlyChangesCard() {
+    var custom = E.getReportCustom ? E.getReportCustom() : {};
+    var onPage = {};
+    [].slice.call(refs.main.querySelectorAll("[data-section]")).forEach(function (c) { onPage[c.getAttribute("data-section")] = true; });
+    var keys = Object.keys(custom).filter(function (k) {
+      var c = custom[k];
+      return !onPage[k] && c && typeof c === "object" && (c.title || c.prose || c.hidden || (c.order && c.order.length));
+    });
+    if (!keys.length) return null;
+    // The Word heading, from the last read of the documents when there is one.
+    var docs = window.App.Review && window.App.Review.cachedDocs ? window.App.Review.cachedDocs() : null;
+    function titleOf(k) {
+      var t = null;
+      (docs || []).forEach(function (d) { (d.probe || []).forEach(function (p) { if (!t && p.key === k && p.title) t = p.title; }); });
+      if (t) return t;
+      var s = k.replace(/-/g, " ");
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    var rows = keys.map(function (k) {
+      var c = custom[k], what = [];
+      if (c.title) what.push("renamed to \"" + c.title + "\"");
+      if (c.prose) what.push("opening rewritten");
+      if (c.hidden) what.push("hidden");
+      if (c.order && c.order.length) what.push("reordered");
+      var kids = [
+        h("div", { class: "wo-head" }, [
+          h("strong", { text: titleOf(k) }),
+          h("span", { class: "muted", text: ": " + what.join(", ") + "." })
+        ])
+      ];
+      if (c.prose) kids.push(h("p", { class: "wo-prose muted", text: String(c.prose) }));
+      kids.push(h("button", { type: "button", class: "inherited-edit wo-back", text: "Back to the generated version",
+        onClick: function () { E.clearReportSection(k); renderReportPage(); } }));
+      return h("li", { class: "wo-row", "data-word-only": k }, kids);
+    });
+    return h("div", { class: "card word-only-changes", "data-check-anchor": "word-only" }, [
+      h("div", { class: "card-h" }, [h("h2", { text: "Changes to sections only in the Word report" })]),
+      h("div", { class: "card-b" }, [
+        h("p", { class: "issue-lead", text: "These sections print in the Word report but have no card on this page, so their changes are listed here. A rewritten opening is fixed text: any figures in it no longer update." }),
+        h("ul", { class: "wo-list" }, rows)
+      ])
+    ]);
   }
 
   // Editing happens IN the report, not beside it: the heading becomes a field
@@ -9251,7 +9432,7 @@ window.App.UI = (function () {
     priTa.value = rn.topPriorities || "";
     priTa.addEventListener("change", function () { E.setReportNarrative({ topPriorities: priTa.value }); });
 
-    return h("div", { class: "card" }, [
+    return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
         h("p", { class: "muted", style: "margin-top:0;", text: "These fields complete the consultant sections of the executive summary in the Word report. Anything left blank shows there as a placeholder to complete." }),
@@ -9453,11 +9634,12 @@ window.App.UI = (function () {
   // this instrument become the baseline (App.Compare snapshot stored on the
   // assessment) and every scored item is compared against today's answers.
 
-  function computeComparison() {
+  // For one target: the one named, or the active one (the on-screen card).
+  function computeComparison(targetId) {
     var C = window.App.Compare;
     if (!C) return null;
     var baseline = E.getBaseline();
-    var t = E.getActiveTarget();
+    var t = targetId ? (E.state.engagement.targets || []).filter(function (x) { return x.id === targetId; })[0] : E.getActiveTarget();
     if (!baseline || !t) return null;
     var btid = C.baselineTargetIdFor(baseline, t);
     var baseResponses = C.scopeResponses(baseline.responses || [], btid);
@@ -9479,19 +9661,20 @@ window.App.UI = (function () {
     var versionMismatch = !!(baseline.instrumentContentVersion && E.state.instrument.contentVersion
       && baseline.instrumentContentVersion !== E.state.instrument.contentVersion);
     var baselineTarget = (baseline.targets || []).filter(function (x) { return x.id === btid; })[0] || null;
-    return { baseline: baseline, baselineTargetId: btid, baselineTargetName: baselineTarget ? baselineTarget.name : "", cmp: cmp, versionMismatch: versionMismatch };
+    return { baseline: baseline, baselineTargetId: btid, baselineTargetName: baselineTarget ? baselineTarget.name : "", cmp: cmp, versionMismatch: versionMismatch, target: t };
   }
 
-  // Flat payload for the Excel/Word exports (no DOM, no engine references).
-  function progressExportPayload() {
-    var res = computeComparison();
+  // Flat payload for the Excel/Word exports (no DOM, no engine references),
+  // for the target named, or the active one.
+  function progressExportPayload(targetId) {
+    var res = computeComparison(targetId);
     if (!res) return null;
     return {
       sourceLine: window.App.Compare.sourceLine(res.baseline),
       versionMismatch: res.versionMismatch,
       baselineContentVersion: res.baseline.instrumentContentVersion || "",
       currentContentVersion: E.state.instrument.contentVersion || "",
-      targetName: (E.getActiveTarget() || {}).name || "",
+      targetName: (res.target || {}).name || "",
       baselineTargetName: res.baselineTargetName,
       summary: res.cmp.summary,
       gaps: res.cmp.gaps,
@@ -9676,7 +9859,7 @@ window.App.UI = (function () {
       ]));
     }
 
-    return h("div", { class: "card" }, [
+    return h("div", { class: "card", "data-check-anchor": "progress" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Progress since previous assessment" })]),
       h("div", { class: "card-b" }, kids),
       fileIn
@@ -9908,6 +10091,31 @@ window.App.UI = (function () {
       warnings: issueWarnings,
       last: lastIssueCheck,
       beginExport: beginExport
+    },
+    // What js/review.js needs from the page: the same documents an export
+    // would write, and the ways of taking the consultant to a field.
+    __review: {
+      jobs: docxJobs,
+      allTargetIds: issueAllIds,
+      jumpToItem: jumpToItem,
+      openPlanFor: openPlanFor,
+      setTargetThen: setTargetThen,
+      revealOnReport: revealOnReport,
+      goToSection: goToReportSection,
+      sectionKeys: reportSectionKeys,
+      // A selector on the report page: true when it is there and shown.
+      revealIfThere: function (selector) {
+        if (view !== "report") go("report");
+        return revealNode(refs.main.querySelector(selector));
+      },
+      openEngagement: function (focus) { openEngagementModal(focus ? { focus: focus } : null); },
+      goToBasis: function () { go2("engagement", null, '[data-check-anchor="basis"]'); },
+      repaintIssueCheck: function () {
+        var card = refs.main.querySelector(".issue-check");
+        if (card) paintIssueCheck(card, lastIssueCheck());
+      },
+      toast: toast,
+      h: h
     },
     // The autosave backstop decides when a consultant is told they have unsaved
     // work. Getting that wrong in either direction is expensive - a missed

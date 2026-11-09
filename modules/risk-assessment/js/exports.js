@@ -62,6 +62,9 @@ window.RiskExports = (function () {
     return { "low": COLOR.met, "medium": COLOR.near, "high": COLOR.gap, "very-high": COLOR.deep }[id] || "CBD5DE";
   }
   function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+  // A consultant's sentence going inside one of ours: without its own full
+  // stop, or the report prints "unattributable.. The acceptance rationale".
+  function noStop(s) { return String(s || "").replace(/[.\s]+$/, ""); }
   function slug(s) { return String(s || "risk-assessment").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "risk-assessment"; }
   function notSet(v) { return (v && String(v).trim()) ? String(v) : "(not set)"; }
   function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -72,6 +75,21 @@ window.RiskExports = (function () {
     "accepted": "Risk accepted (recorded)",
     "sl-t": "Carried into the SL-T"
   };
+
+  // The sentences the asset owner's sign-off prints outside the Sign-off
+  // section and document control: [executive summary, Sign-off section when not
+  // yet signed]. One place, because a review's content hash leaves them out
+  // (js/review.js): signing off after an approval is not a change to what was
+  // reviewed.
+  function signOffTexts(p) {
+    var a = p.approval || {};
+    return [
+      a.approved
+        ? "The asset owner, " + a.name + " (" + a.role + "), signed off the tolerable risk and this outcome on " + a.date + ": “" + a.statement + "”"
+        : "The tolerable risk and assessment outcome have not yet been signed off by the asset owner.",
+      "The tolerable risk (§4.3.6) and the assessment outcome have not yet been signed off by the asset owner."
+    ];
+  }
 
   // Everything the report tells is derived once here, shared by both formats.
   function summarise(p) {
@@ -115,23 +133,47 @@ window.RiskExports = (function () {
     var eng = p.engagement || {};
     var rt = RT();
 
+    // The consultant's overrides of this report's sections, kept apart from the
+    // other report's because same-named sections say different things. See
+    // shared/report-sections.js for the store and how it applies.
+    var RS = window.App.ReportSections;
+    var custom = (p.reportCustom && p.reportCustom[opts.highLevelOnly ? "highLevel" : "detailed"]) || {};
+    // Only a heading tagged with a target's name has one stripped: a zone that
+    // happens to be called "Risk" must not move the key of "Risk at a glance".
+    function keyOf(n) { return RS.sectionKey(n.__headingText, n.__targetName ? [n.__targetName] : []); }
+    function orderOf(title) { var c = custom[RS.sectionKey(title)]; return c ? c.order : null; }
+    // What a ranked list printed, by id, for the preview's drag and arrows.
+    function noteList(title, ids) { if (opts.listProbe) opts.listProbe[RS.sectionKey(title)] = ids; }
+
     // ---- primitives (this app's copy of the Assessments idiom) ----
+    // The __tags are read back by the section pass (shared/report-sections.js):
+    // a built docx paragraph is write-only, so they are set here, as it is made.
     function run(text, o) {
       o = o || {};
-      return new docx.TextRun({ text: String(text == null ? "" : text), bold: !!o.bold, italics: !!o.italics, color: o.color || COLOR.text, size: o.size || 21, font: o.font || FONT });
+      var r = new docx.TextRun({ text: String(text == null ? "" : text), bold: !!o.bold, italics: !!o.italics, color: o.color || COLOR.text, size: o.size || 21, font: o.font || FONT });
+      r.__text = String(text == null ? "" : text);
+      return r;
     }
     function para(children, o) {
       o = o || {};
       return new docx.Paragraph({ children: children, spacing: o.spacing || { after: 120 }, alignment: o.alignment });
     }
-    function body(text, o) { o = o || {}; return para([run(text, o)], o); }
+    function asBody(p, text) { p.__isBody = true; p.__text = String(text == null ? "" : text); return p; }
+    function body(text, o) { o = o || {}; return asBody(para([run(text, o)], o), text); }
+    // A statement of record inside a section's opening: not wording to rewrite,
+    // and still there when the wording around it is rewritten.
+    function pinned(p) { p.__isBody = false; p.__keepInRun = true; return p; }
     function heading(text, level, o) {
       o = o || {};
-      return new docx.Paragraph({
+      var p = new docx.Paragraph({
         heading: level,
         spacing: { before: o.before != null ? o.before : 280, after: 120 },
         children: [run(text, { bold: true, color: o.color || COLOR.blueDark, size: o.size || (level === docx.HeadingLevel.HEADING_1 ? 30 : 24) })]
       });
+      p.__headingText = text;
+      p.__headingLevel = level === docx.HeadingLevel.HEADING_1 ? 1 : 2;
+      p.__make = function (t) { return heading(t, level, o); };   // the same heading with other words
+      return p;
     }
     function h1(t) { return heading(t, docx.HeadingLevel.HEADING_1); }
     function h2(t) { return heading(t, docx.HeadingLevel.HEADING_2, { size: 24, before: 220 }); }
@@ -179,7 +221,13 @@ window.RiskExports = (function () {
       var st = bandStyle(bandId);
       return textCell(st.name, width, { fill: st.fill, color: st.text, bold: true, valign: "center" });
     }
-    function pageBreak() { return new docx.Paragraph({ children: [new docx.PageBreak()] }); }
+    // Tagged as closing a level 2 section, so hiding the sub-section it follows
+    // leaves the break in place, while hiding the level 1 section takes it too.
+    function pageBreak() {
+      var p = new docx.Paragraph({ children: [new docx.PageBreak()] });
+      p.__headingLevel = 2; p.__boundaryOnly = true;
+      return p;
+    }
 
     // ---- brand assets: logo header + Design-B cover (copied design) ----
     function logoImageRun(targetWidthPx) {
@@ -334,9 +382,10 @@ window.RiskExports = (function () {
           { color: COLOR.deep, label: "Very high" }, { color: COLOR.gap, label: "High" },
           { color: COLOR.near, label: "Medium" }, { color: COLOR.met, label: "Low" }
         ]));
-        var topRanked = p.srs.highLevelAssets.filter(function (a) { return a.name; }).slice().sort(function (a, b4) {
+        var topRanked = RS.applyOrder(p.srs.highLevelAssets.filter(function (a) { return a.name; }).slice().sort(function (a, b4) {
           return (S.bandRank[rt.riskFor(b4.consequence, b4.likelihood)] || 0) - (S.bandRank[rt.riskFor(a.consequence, a.likelihood)] || 0);
-        }).slice(0, 3);
+        }), orderOf("Where to look first"), function (a) { return a.id; }).slice(0, 3);
+        noteList("Where to look first", topRanked.map(function (a) { return a.id; }));
         if (topRanked.length) {
           out.push(h2("Where to look first"));
           topRanked.forEach(function (a, i) {
@@ -380,10 +429,13 @@ window.RiskExports = (function () {
         return { t: v == null ? "—" : "SL" + v, color: v != null ? COLOR.navy : COLOR.soft, label: f.id, fill: COLOR.subBg, size: 28 };
       })));
       // Focus cards: undispositioned above-tolerable first, then worst risks.
-      var focus = S.threats.filter(function (x) { return x.exceeds && !x.disposition; })
+      function focusId(x) { return x.owner.id + ":" + x.t.id; }
+      var focus = RS.applyOrder(S.threats.filter(function (x) { return x.exceeds && !x.disposition; })
         .concat(S.threats.filter(function (x) { return x.exceeds && x.disposition; })
-          .sort(function (a, b6) { return (S.bandRank[b6.risk] || 0) - (S.bandRank[a.risk] || 0); }))
+          .sort(function (a, b6) { return (S.bandRank[b6.risk] || 0) - (S.bandRank[a.risk] || 0); })),
+        orderOf("Where to focus first"), focusId)
         .slice(0, 3);
+      noteList("Where to focus first", focus.map(focusId));
       if (focus.length) {
         out.push(h2("Where to focus first"));
         focus.forEach(function (x, i) {
@@ -398,7 +450,7 @@ window.RiskExports = (function () {
     var subLine = opts.highLevelOnly
       ? "IEC 62443-3-2 §4.2: relative system risk ranking"
       : "IEC 62443-3-2 Clause 4: zones, conduits and target security levels";
-    var coverChildren = coverDesignB(titleLines, subLine);
+    var coverChildren = opts.preview ? [] : coverDesignB(titleLines, subLine);
 
     // ---- document control ----
     var children = [];
@@ -409,6 +461,9 @@ window.RiskExports = (function () {
       ["Consultant", notSet(eng.consultant)],
       ["Assessment date", notSet(eng.assessmentDate)],
       ["Document revision", notSet(eng.revision)],
+      // Exactly this label: a review's content hash leaves the row out
+      // (shared/docx-blocks.js), as an approval is what fills it in.
+      ["QA review by", notSet(eng.qaReviewBy)],
       ["Confidentiality", notSet(eng.confidentiality)],
       ["Method", "IEC 62443-3-2 Clause 4 workflow; SolutionsPT house risk matrix and risk-to-SL mapping (shown with every suggestion; the consultant's per-FR SL-T and written justification are the deliverable)"],
       ["Asset-owner sign-off", p.approval.approved ? (p.approval.name + " (" + p.approval.role + "), " + p.approval.date) : "Not yet signed off"]
@@ -498,9 +553,9 @@ window.RiskExports = (function () {
       if (S.worst) {
         findRuns.push(run(" The single highest unmitigated risk is "));
         findRuns.push(run(bandStyle(S.worst.risk).name, { bold: true, color: bandStyle(S.worst.risk).text }));
-        findRuns.push(run(": " + S.worst.t.statement + " (" + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ")."));
+        findRuns.push(run(": " + noStop(S.worst.t.statement) + " (" + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ")."));
       }
-      children.push(para(findRuns));
+      children.push(asBody(para(findRuns), findRuns.map(function (r) { return r.__text; }).join("")));
       // The treatment position.
       if (exceed.length) {
         var c = S.dispositionCounts;
@@ -510,7 +565,7 @@ window.RiskExports = (function () {
         var undisp = exceed.filter(function (x) { return !x.disposition; });
         children.push(body("Of the above-tolerable threats, " + c.mitigated + " are mitigated by controls that bring the residual risk within tolerance, " + c.countermeasure + " are covered by countermeasures (" + cmEx + " existing controls and " + cmPl + " planned across the registers), " + c["sl-t"] + " are carried into the target security level as the treatment plan, and " + c.accepted + " formally accepted by the asset owner."));
         if (accepted.length) {
-          children.push(body((accepted.length > 1 ? "Accepted risks: " : "Accepted risk ") + accepted.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + x.t.statement; }).join("; ") + ". The acceptance rationale is recorded against the threat in the register and should be revisited at the next assessment."));
+          children.push(body((accepted.length > 1 ? "Accepted risks: " : "Accepted risk ") + accepted.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + noStop(x.t.statement); }).join("; ") + ". The acceptance rationale is recorded against the threat in the register and should be revisited at the next assessment."));
         }
         if (undisp.length) {
           children.push(body(undisp.length + " above-tolerable threat" + (undisp.length > 1 ? "s have" : " has") + " no disposition yet and need" + (undisp.length > 1 ? "" : "s") + " a decision: " + undisp.map(function (x) { return x.t.id + " (" + x.owner.id + ")"; }).join(", ") + ".", { bold: true, color: COLOR.gap }));
@@ -533,11 +588,15 @@ window.RiskExports = (function () {
       children.push(body("This assessment is a snapshot. It should be revisited when the system, its connectivity or the threat landscape changes materially, after any security-relevant incident, and periodically in any case. The registers in the companion workbook are structured so that the next assessment starts from this one rather than from scratch."));
     }
     if (p.approval.approved) {
-      children.push(body("The asset owner, " + p.approval.name + " (" + p.approval.role + "), signed off the tolerable risk and this outcome on " + p.approval.date + ": “" + p.approval.statement + "”", { italics: true }));
+      children.push(pinned(body(signOffTexts(p)[0], { italics: true })));
     } else {
-      children.push(body("The tolerable risk and assessment outcome have not yet been signed off by the asset owner.", { color: COLOR.gap, bold: true }));
+      children.push(pinned(body(signOffTexts(p)[0], { color: COLOR.gap, bold: true })));
     }
-    children.push(body("Consultant note: tailor this summary before issue. Add the business context and engagement drivers, confirm the wording of any risk acceptances with the asset owner, and set out the agreed next steps. Delete this note.", { color: COLOR.note, italics: true }));
+    // In the wording that opens its section, so deleting that line in the box
+    // deletes the note; left in, it stays red (see the section pass below).
+    var CONSULTANT_NOTE = "Consultant note: tailor this summary before issue. Add the business context and engagement drivers, confirm the wording of any risk acceptances with the asset owner, and set out the agreed next steps. Delete this note.";
+    function consultantNote() { return body(CONSULTANT_NOTE, { color: COLOR.note, italics: true }); }
+    children.push(consultantNote());
     children.push(pageBreak());
 
     // ---- the scorecard page ----
@@ -618,7 +677,11 @@ window.RiskExports = (function () {
       children.push(body("Each zone and conduit below lists its registered threats with the consultant's likelihood × impact judgement against the house matrix, the comparison to tolerable risk, and the recorded disposition. Countermeasures marked “existing” are controls already in place; the rest are planned remediations."));
       S.owners.forEach(function (row) {
         var o = row.o;
-        children.push(h2(o.id + ": " + (o.name || "(unnamed " + row.kind.toLowerCase() + ")") + (row.kind === "Conduit" ? "  (" + (o.fromZone || "?") + " → " + (o.toZone || "external") + ")" : "")));
+        // A zone's own heading is its name, not a section title: it closes the
+        // section before it and is renamed where the zone is entered.
+        var ownerHead = h2(o.id + ": " + (o.name || "(unnamed " + row.kind.toLowerCase() + ")") + (row.kind === "Conduit" ? "  (" + (o.fromZone || "?") + " → " + (o.toZone || "external") + ")" : ""));
+        ownerHead.__boundaryOnly = true;
+        children.push(ownerHead);
         var meta = [];
         if (o.fn) meta.push("Function: " + o.fn);
         if (o.description) meta.push(o.description);
@@ -640,7 +703,10 @@ window.RiskExports = (function () {
             var disp = x.disposition ? DISPOSITION_LABEL[x.disposition] : (x.exceeds ? "NO DISPOSITION: needs a decision" : "Within tolerable risk");
             trows.push(new docx.TableRow({ children: [
               textCell(x.t.id + "  " + x.t.statement + (x.t.source ? "  (" + x.t.source + ")" : "") + (x.t.affectedFR.length ? "  [" + x.t.affectedFR.join(", ") + "]" : ""), tw[0]),
-              textCell(cap(x.t.likelihood || "—") + " × " + cap(x.t.impact || "—"), tw[1]),
+              // An unrated threat says so in words: a dash beside a rating reads as
+              // a typo, and the review tool's dash check would report it as one.
+              textCell((x.t.likelihood || x.t.impact) ? (x.t.likelihood ? cap(x.t.likelihood) : "Not rated") + " × " + (x.t.impact ? cap(x.t.impact) : "Not rated") : "Not rated",
+                tw[1], (x.t.likelihood && x.t.impact) ? {} : { color: COLOR.muted }),
               bandCell(x.risk, tw[2]),
               x.residual ? bandCell(x.residual, tw[3]) : textCell("—", tw[3]),
               textCell(disp, tw[4], x.exceeds && !x.disposition ? { bold: true, color: COLOR.gap } : {})
@@ -662,7 +728,7 @@ window.RiskExports = (function () {
 
       // ---- SL-T ----
       children.push(h1("Target security levels (SL-T, per foundational requirement)"));
-      children.push(body("The SL-T is a vector: one target per foundational requirement, set by the consultant from the risk picture (the tool's suggestion trace is advisory). The written justification is part of the deliverable. Capability against these targets is assessed in the 62443-3-3 programme, which this assessment's risk-context export scopes."));
+      children.push(body("The SL-T is a vector: one target per foundational requirement, set by the consultant from the risk picture (the suggestions made during the assessment, and their rule trace, are advisory). The written justification is part of the deliverable. Capability against these targets is assessed in the 62443-3-3 programme, which this assessment's risk-context export scopes."));
       var frs = FRS();
       var mw = [2200].concat(frs.map(function () { return 940; }));
       var mrows = [headerRow(["Zone / conduit"].concat(frs.map(function (f) { return f.id; })), mw)];
@@ -681,7 +747,12 @@ window.RiskExports = (function () {
       S.owners.forEach(function (row) {
         var o = row.o;
         if ((o.justification || "").trim()) {
-          children.push(h2("Justification for " + o.id + (o.name ? " " + o.name : "")));
+          // One section across the zones, each with its own wording: the title
+          // and Hide apply to all of them, and a rewrite to none.
+          var whose = o.id + (o.name ? " " + o.name : "");
+          var justHead = h2("Justification for " + whose);
+          justHead.__targetName = whose; justHead.__noProse = true;
+          children.push(justHead);
           children.push(body(o.justification));
         }
       });
@@ -696,21 +767,45 @@ window.RiskExports = (function () {
         ["Statement", p.approval.statement]
       ]));
     } else {
-      children.push(body("The tolerable risk (§4.3.6) and the assessment outcome have not yet been signed off by the asset owner.", { bold: true, color: COLOR.gap }));
+      children.push(pinned(body(signOffTexts(p)[1], { bold: true, color: COLOR.gap })));
     }
     children.push(h1("Method and limitations"));
-    children.push(body("This assessment follows the IEC 62443-3-2 Clause 4 workflow. The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults: the standard prescribes none and requires the organisation's own risk criteria, so a client corporate matrix takes precedence where one exists. Every SL suggestion in the tool carries a full rule trace, and the consultant's per-FR SL-T with written justification is the deliverable, not the suggestion."));
+    children.push(body("This assessment follows the IEC 62443-3-2 Clause 4 workflow. The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults: the standard prescribes none and requires the organisation's own risk criteria, so a client corporate matrix takes precedence where one exists. Every SL suggestion made during the assessment carries a full rule trace, and the consultant's per-FR SL-T with written justification is the deliverable, not the suggestion."));
     children.push(body("Likelihood and impact judgements reflect the evidence recorded in the basis of assessment at the time of the engagement. The assessment is indicative and does not verify security capability; capability against the SL-T targets is established through the ISA/IEC 62443-3-3 assessment this report's risk-context export feeds."));
+
+    // ---- the consultant's section overrides ----
+    // The tree before them says what the generated wording is, and the tree after
+    // them what prints. keepHidden is for the Report page, which dims a hidden
+    // section so it can be put back; every real export leaves it out.
+    if (opts.generatedProbe) RS.probeSections(children, keyOf, opts.generatedProbe);
+    children = RS.applyOverrides(children, custom, {
+      keyOf: keyOf,
+      heading: function (n, title) {
+        // A repeat keeps its own zone's name after the words the consultant chose.
+        var made = n.__make(n.__targetName ? title + " " + n.__targetName : title);
+        made.__targetName = n.__targetName; made.__noProse = n.__noProse;
+        return made;
+      },
+      body: function (line) { return line === CONSULTANT_NOTE ? consultantNote() : body(line); },
+      keepHidden: !!opts.keepHidden
+    });
+    if (opts.sectionProbe) RS.probeSections(children, keyOf, opts.sectionProbe);
 
     var PO = (docx.PageOrientation) || { PORTRAIT: "portrait" };
     var A4_W = 11906, A4_H = 16838;
+    var bodySection = { properties: { page: { size: { width: A4_W, height: A4_H, orientation: PO.PORTRAIT }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } } }, children: children };
+    // The Report page rebuilds after every edit and reads only the body, so it
+    // leaves out the cover art and the logo header, the slow part to pack.
+    if (opts.preview) return new docx.Document({ sections: [bodySection] });
+    bodySection.headers = brandHeaders();
+    bodySection.footers = brandFootersDoc();
     return new docx.Document({
       creator: eng.consultant || "OT Cyber Risk Assessment Tool",
       title: (opts.highLevelOnly ? "High-Level OT Cyber Risk Assessment" : "OT Cyber Risk Assessment") + " - " + (p.suc.name || "SuC"),
       description: subLine,
       sections: [
         { properties: { page: { size: { width: A4_W, height: A4_H, orientation: PO.PORTRAIT }, margin: { top: 0, right: 0, bottom: 0, left: 0, header: 0, footer: 0, gutter: 0 } } }, children: coverChildren },
-        { properties: { page: { size: { width: A4_W, height: A4_H, orientation: PO.PORTRAIT }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } } }, headers: brandHeaders(), footers: brandFootersDoc(), children: children }
+        bodySection
       ]
     });
   }
@@ -906,6 +1001,10 @@ window.RiskExports = (function () {
     buildWordDoc: buildWordDoc,
     buildWorkbook: buildWorkbook,
     summarise: summarise,
+    // For the review pack (js/review.js): the names the reports print.
+    DISPOSITION_LABEL: DISPOSITION_LABEL,
+    bandName: function (id) { return bandStyle(id).name; },
+    signOffTexts: signOffTexts,
     downloadWord: downloadWord,
     downloadExcel: downloadExcel
   };

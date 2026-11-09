@@ -69,6 +69,8 @@ systems observed) backs the findings. Remediation plans (priority, owner,
 action, business impact) can be recorded against any item, gap or not, and
 removed again.
 
+**Review.** The report page's Review card sends the report for review as a pack and imports what reviewers send back: comments with severity, suggested wording accepted in one click where the text can be changed in the tool, status and replies. See `docs/report-review.md` at the repository root. Accepted wording can be undone from the comment, and changes to sections that only the Word report has are listed on the report page, each with Back to the generated version. Send for review can carry a note and a needed-by date for the reviewers. A pack sent from a copy of the project that was never saved can be imported again to reconnect its review files. The review is saved on the assessment and never reaches the Word or Excel exports. The Issue check and export dialog warn about it, and never block Final; with QA review by filled in and nothing ever sent, the review is taken as done outside the tools.
+
 **Reporting.** An on-screen preview, a client Word document and a technical
 Excel workbook, all from the same result. The consultant can rename, hide,
 rewrite and reorder report sections, add glossary terms and edit the proposed
@@ -104,8 +106,11 @@ tokens for smaller screens.
   compare.js                 baseline diff ("Progress since previous assessment")
   charts.js                  hand-drawn SVG radar / bars / heatmap, SVG->PNG
   report.js                  shared report chassis + consultant customisation
+  report-sections.js         what a section override means, synced from shared/ (also used by the risk tool)
   export-xlsx.js             technical workbook (ExcelJS)
   export-docx.js             client Word document
+  review.js                  Send for review, Import, Accept, the Review card
+  docx-blocks.js, review-core.js, review-author.js   shared review code, synced from shared/
   engine.js                  engagement engine; assessments, targets, responses
   ui.js                      view layer: sidebar, capture pages, wizards, modals
   hero-asset.js, logo.js     branding assets for the Word cover

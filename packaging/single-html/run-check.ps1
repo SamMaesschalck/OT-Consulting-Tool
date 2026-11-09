@@ -35,7 +35,10 @@ for ($i = 0; $i -lt 120; $i++) { try { $text = [IO.File]::ReadAllText($outFile);
 try { Remove-Item $prof -Recurse -Force -ErrorAction Stop } catch {}
 $pass = ([regex]::Matches($text, '(^|>)PASS ', 'Multiline')).Count
 $fail = ([regex]::Matches($text, '(^|>)FAIL ', 'Multiline')).Count
-$all  = $text -match 'ALL TESTS PASSED'
+# The verdict is the page's last result line. The page's own source is in the
+# dump too, and it mentions "ALL TESTS PASSED" (in its comments and code), so
+# only a line that starts with it counts, and any FAIL line fails the run.
+$all  = ([regex]::IsMatch($text, '(?m)^ALL TESTS PASSED')) -and $fail -eq 0 -and $pass -gt 0
 Write-Output ("{0} ({1}): {2} pass, {3} fail{4}" -f $pageName, $AppPageName, $pass, $fail, $(if ($all) { ", ALL TESTS PASSED" } else { "" }))
 if (-not $all) {
   ([regex]::Matches($text, '(?m)^FAIL .*$') | Select-Object -First 20) | ForEach-Object { "  " + $_.Value }

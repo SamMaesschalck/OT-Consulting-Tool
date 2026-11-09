@@ -1,0 +1,321 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: the whole round trip, through real files</title></head>
+<body>
+<!--
+  The whole trip through real file shapes, using the buttons a person would. The
+  assessment tool writes a pack through Send for review; the report review tool
+  (the real page, in a frame) opens that text, two reviewers comment by clicking
+  on blocks, with every severity, a suggestion, a checklist and a verdict, and
+  each saves a review file; those files are imported back through the Review
+  card, one of them twice. Statuses, replies, filters and Go to are then used, and
+  the next round's pack is opened in the review tool to see them all there. A pack
+  and a review file of an unknown schema are refused in both directions.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="rr" style="width:1280px;height:800px;border:0"></iframe>
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+function poll(test, ms) {
+  var end = Date.now() + (ms || 60000);
+  return new Promise(function (resolve, reject) {
+    (function go() {
+      var v; try { v = test(); } catch (e) { v = null; }
+      if (v) return resolve(v);
+      if (Date.now() > end) return reject(new Error("timed out waiting for " + test.toString().slice(0, 120)));
+      setTimeout(go, 25);
+    })();
+  });
+}
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  var frame = document.getElementById("rr"), main = document.getElementById("main");
+  var savedPack = null;
+  window.showSaveFilePicker = function (o) {
+    return Promise.resolve({ name: o.suggestedName, kind: "file", createWritable: function () {
+      return Promise.resolve({ write: function (t) { savedPack = { name: o.suggestedName, text: String(t) }; return Promise.resolve(); }, close: function () { return Promise.resolve(); } });
+    } });
+  };
+  function loadRR() {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        poll(function () { return w.ReviewTool; }).then(function () { res(w); });
+      };
+      frame.src = "../../report-review/index.html";
+    });
+  }
+  function saveFrom(w) {
+    var captured = null;
+    w.showSaveFilePicker = function (o) {
+      var h = { name: o.suggestedName, kind: "file", createWritable: function () {
+        return Promise.resolve({ write: function (t) { captured = { name: o.suggestedName, text: String(t) }; return Promise.resolve(); }, close: function () { return Promise.resolve(); } });
+      } };
+      return Promise.resolve(h);
+    };
+    return new Promise(function (res) { w.ReviewTool.saveReview(null, function (r) { res({ r: r, file: captured }); }); });
+  }
+  // Click a block, type a comment, press the buttons.
+  function commentOn(w, blockId, severity, text, suggestion) {
+    var d = w.document;
+    d.querySelector('[data-block-id="' + blockId + '"]').click();
+    var box = d.querySelector(".rr-c-text");
+    if (!box) throw new Error("the composer did not open on " + blockId);
+    box.value = text; box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    d.querySelector('.rr-composer [data-severity="' + severity + '"]').click();
+    if (suggestion != null) {
+      var cb = d.querySelector(".rr-c-suggest");
+      cb.checked = true; cb.dispatchEvent(new w.Event("change", { bubbles: true }));
+      var sug = d.querySelector(".rr-c-sug");
+      sug.value = suggestion; sug.dispatchEvent(new w.Event("input", { bubbles: true }));
+    }
+    d.querySelector(".rr-c-add").click();
+  }
+
+  var pack1, fileA, fileB, W1;
+  E.activateInstrument("ncsc-caf");
+  A.UI.go("report");
+  poll(function () { return main.querySelector(".rv-send"); }).then(function () {
+    var card = main.querySelector(".review-card");
+    ok(!!card && !card.hasAttribute("data-section"), "the report page has a Review card, which is not a report section");
+    ok(/Send for review/.test(card.textContent) && /Import review files/.test(card.textContent), "with Send for review and Import review files");
+    ok(card.compareDocumentPosition(main.querySelector(".issue-check")) & Node.DOCUMENT_POSITION_PRECEDING, "next to the Issue check, below it");
+    main.querySelector(".rv-send").click();
+    return poll(function () { return savedPack && main.querySelector(".rv-notice.ok"); }, 120000);
+  }).then(function () {
+    pack1 = JSON.parse(savedPack.text);
+    ok(/^[a-z0-9-]+-review-pack-round-1\.json$/.test(savedPack.name), "the pack is saved under a plain name (" + savedPack.name + ")");
+    ok(pack1.schema === "spt-review-pack/1.0" && pack1.round === 1 && /^rp-/.test(pack1.packId), "it is schema spt-review-pack/1.0, round 1");
+    ok(pack1.sourceTool.product === "OT Cyber Assessment Tool" && pack1.sourceTool.version === A.Version.number, "and says which tool and version wrote it");
+    ok(pack1.engagement.client && pack1.engagement.instrumentId === "ncsc-caf" && pack1.engagement.scoringFamily === "caf-achieved" && "qaReviewBy" in pack1.engagement.documentControl, "it holds the engagement summary and document control");
+    ok(pack1.documents.length === 1 && pack1.documents[0].blocks.length > 50 && /^h1:/.test(pack1.documents[0].contentHash), "and one document per file an export would write, with a content hash");
+    ok(pack1.items.length > 20 && pack1.items.some(function (i) { return i.status === "finding" && i.evidence && i.answer && i.action; }), "and the items behind it: answers, evidence and plans");
+    ok(Array.isArray(pack1.basisOfAssessment.interviews) && Array.isArray(pack1.basisOfAssessment.documents) && pack1.facts.perTarget.length === 1 && pack1.facts.perTarget[0].groups.length > 0, "and the basis of assessment and the facts");
+    ok(!pack1.previousRound.comments.length, "a first round has nothing to carry");
+    return loadRR();
+  }).then(function (w) {
+    W1 = w;
+    try { w.localStorage.removeItem(w.ReviewTool.KEY_REVIEWER); } catch (e) {}
+    ok(w.document.title === "OT Cyber Report Review Tool" && /Open a review pack/.test(w.document.getElementById("main").textContent), "the review tool starts on its welcome page, from file://");
+    ok(w.ReviewTool.loadTexts([{ name: savedPack.name, text: savedPack.text }]) === 1, "it opens the pack the assessment tool wrote");
+    ok(/Acme|Northbridge|Harbour|Castlefield|\w/.test(w.document.getElementById("pack-summary").textContent), "and shows whose it is");
+    var blocks = pack1.documents[0].blocks;
+    var paras = blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 40; });
+    window.__paras = paras;
+    // The name is asked for once.
+    w.document.querySelector('[data-block-id="' + paras[0].id + '"]').click();
+    var input = w.document.getElementById("rr-name-input");
+    ok(!!input, "the first comment asks for the reviewer's name");
+    input.value = "J. Marsh";
+    w.document.getElementById("rr-name-ok").click();
+    ok(w.localStorage.getItem(w.ReviewTool.KEY_REVIEWER) === "J. Marsh", "and remembers it");
+    w.ReviewTool.state.composer = null; w.ReviewTool.render();
+    commentOn(w, paras[0].id, "must-fix", "This summary overstates the position.", null);
+    commentOn(w, paras[1].id, "should-fix", "Plainer wording, please.", paras[1].text + " Plainly.");
+    commentOn(w, paras[2].id, "suggestion", "Could lead with the outcome.", null);
+    ok(w.ReviewTool.state.review.comments.length === 3 && w.ReviewTool.isDirty(), "three comments, one of each severity, and the page knows they are unsaved");
+    ok(w.document.getElementById("btn-save").textContent === "Save*", "Save shows they are unsaved");
+    // An item comment with a suggestion on a field, on the Engagement page.
+    w.document.querySelector('.nav-item[data-page="engagement"]').click();
+    w.document.querySelector('[data-filter="findings"]').click();
+    var first = w.document.querySelector(".rr-item");
+    var itemId = first.getAttribute("data-item-id");
+    first.querySelector(".rr-item-comment").click();
+    return poll(function () { return w.document.querySelector(".rr-composer .rr-c-field"); }).then(function () {
+      var d = w.document;
+      var box = d.querySelector(".rr-c-text"); box.value = "Name the source document."; box.dispatchEvent(new w.Event("input", { bubbles: true }));
+      var sel = d.querySelector(".rr-c-field"); sel.value = "evidence"; sel.dispatchEvent(new w.Event("change", { bubbles: true }));
+      var sug = d.querySelector(".rr-c-sug");
+      ok(sug && sug.value.length > 5, "suggesting wording for a field starts from what is recorded");
+      sug.value += " (Source: network diagram rev 4.)"; sug.dispatchEvent(new w.Event("input", { bubbles: true }));
+      d.querySelector(".rr-c-add").click();
+      var c = w.ReviewTool.state.review.comments[3];
+      ok(c.anchor.kind === "item" && c.anchor.itemId === itemId && c.anchor.field === "evidence" && !!c.suggestion, "an item comment names its target, item and field");
+      // The checklist.
+      d.querySelector('.nav-item[data-page="checklist"]').click();
+      var qs = d.querySelectorAll(".rr-q");
+      ok(qs.length >= 6, "the checklist has the common items and those for this type of report (" + qs.length + ")");
+      ok(/not read as a formal|profile/.test(d.getElementById("main").textContent), "including the CAF profile question");
+      d.querySelector('[data-q="common-evidence"] [data-answer="yes"]').click();
+      d.querySelector('[data-q="common-scope"] [data-answer="no"]').click();
+      var note = d.querySelector('[data-q="common-scope"] .rr-note input'); note.value = "The boundary is not stated."; note.dispatchEvent(new w.Event("change", { bubbles: true }));
+      // The verdict.
+      d.querySelector('.nav-item[data-page="summary"]').click();
+      d.querySelector('[data-verdict="changes-requested"] input').click();
+      var vn = d.getElementById("rr-verdict-note"); vn.value = "One finding and the summary need work."; vn.dispatchEvent(new w.Event("change", { bubbles: true }));
+      return saveFrom(w);
+    });
+  }).then(function (s) {
+    fileA = s.file;
+    var f = JSON.parse(fileA.text);
+    ok(s.r.ok && /review-round-1-j-marsh\.json$/.test(fileA.name), "the review file saves under the reviewer's name (" + fileA.name + ")");
+    ok(f.schema === "spt-review/1.0" && f.packId === pack1.packId && f.round === 1 && f.reviewer === "J. Marsh" && !!f.savedAt, "it is spt-review/1.0, naming the pack and the reviewer");
+    ok(f.comments.length === 4 && f.comments.every(function (c) { return /^c-/.test(c.id) && c.reviewer === "J. Marsh"; }), "with all four comments, each with its own id");
+    ok(f.verdict.value === "changes-requested" && f.verdict.note && /^\d{4}-\d{2}-\d{2}$/.test(f.verdict.date), "the verdict and its date");
+    ok(f.checklist.some(function (c) { return c.id === "common-scope" && c.answer === "no" && c.note && c.text; }), "and the checklist answers, each with its question");
+    ok(fileA.text.length < 20000, "it is small: no report text beyond the quotes (" + fileA.text.length + " characters)");
+    ok(!W1.ReviewTool.isDirty(), "saving clears the unsaved mark");
+    // Reopening: load the pack, then the review file, and carry on.
+    return loadRR();
+  }).then(function (w) {
+    ok(w.ReviewTool.loadTexts([{ name: "r.json", text: fileA.text }]) === 0 || !w.ReviewTool.state.review, "a review file with no pack open is not taken");
+    w.ReviewTool.loadTexts([{ name: "a.json", text: fileA.text }, { name: "p.json", text: savedPack.text }]);
+    ok(w.ReviewTool.state.review && w.ReviewTool.state.review.comments.length === 4 && !w.ReviewTool.isDirty(), "loading the pack and the review file together carries on where it was left");
+    // A second reviewer, on the same pack: a fresh start of the tool, another name.
+    w.localStorage.setItem(w.ReviewTool.KEY_REVIEWER, "R. Okafor");
+    return loadRR();
+  }).then(function (w) {
+    w.ReviewTool.loadTexts([{ name: "p.json", text: savedPack.text }]);
+    commentOn(w, window.__paras[3].id, "must-fix", "A second reviewer's point.", null);
+    w.document.querySelector('.nav-item[data-page="summary"]').click();
+    w.document.querySelector('[data-verdict="approved-with-comments"] input').click();
+    return saveFrom(w);
+  }).then(function (s) {
+    fileB = s.file;
+    A.UI.go("report");
+    // Import both at once, through the card's own file input.
+    var input = main.querySelector(".review-card .rv-file");
+    ok(input.multiple && /json/.test(input.accept), "Import review files takes several files at once");
+    var dt = new DataTransfer();
+    dt.items.add(new File([fileA.text], fileA.name, { type: "application/json" }));
+    dt.items.add(new File([fileB.text], fileB.name, { type: "application/json" }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change"));
+    return poll(function () { return RV.store().threads.length === 5 && main.querySelector(".rv-notice"); });
+  }).then(function () {
+    ok(RV.store().files.length === 2, "two reviewers' files merge: 5 comments from 2 reviewers");
+    ok(/J\. Marsh \(round 1\): 4 new comments/.test(main.querySelector(".rv-notice").textContent), "and the card says what came in", main.querySelector(".rv-notice").textContent);
+    var again = RV.importTexts([{ name: fileA.name, text: fileA.text }]);
+    ok(RV.store().threads.length === 5 && again.results[0].duplicate && /already imported/.test(again.lines[0]), "importing the same file twice changes nothing");
+    // The reviewer edits a comment and saves again: the later save wins.
+    var later = JSON.parse(fileA.text);
+    later.savedAt = new Date(Date.parse(later.savedAt) + 60000).toISOString();
+    later.comments[0].text = "Reworded by the reviewer.";
+    later.comments.pop();    // and takes one back
+    var re = RV.importTexts([{ name: fileA.name, text: JSON.stringify(later) }]);
+    ok(re.results[0].updated === 1 && re.results[0].removed === 1 && RC.findThread(RV.store(), later.comments[0].id).comment.text === "Reworded by the reviewer.", "a later save of the same file wins, and a comment taken back goes", JSON.stringify(re.lines));
+    ok(RV.store().threads.length === 4, "leaving 4 comments");
+    var older = JSON.parse(fileA.text);
+    var oldRes = RV.importTexts([{ name: fileA.name, text: fileA.text }]);
+    ok(oldRes.results[0].older && RC.findThread(RV.store(), later.comments[0].id).comment.text === "Reworded by the reviewer.", "an older save imported afterwards changes nothing");
+    // Refused files, with a clear message.
+    var bad1 = RV.importTexts([{ name: "x.json", text: JSON.stringify({ schema: "spt-review/9.9", packId: "p", comments: [] }) }]);
+    ok(bad1.bad === 1 && /spt-review\/9\.9/.test(bad1.lines[0]) && /reads spt-review\/1\.0/.test(bad1.lines[0]), "a review file of an unknown schema is refused, saying which it is", bad1.lines[0]);
+    var bad2 = RV.importTexts([{ name: "y.json", text: "not json" }]);
+    ok(bad2.bad === 1 && /could not be read/.test(bad2.lines[0]), "a file that is not JSON is refused");
+    var bad3 = RV.importTexts([{ name: "z.json", text: JSON.stringify(Object.assign({}, later, { packId: "rp-other" })) }]);
+    ok(bad3.bad === 1 && /different pack/.test(bad3.lines[0]), "a review file for another pack is refused", bad3.lines[0]);
+    // A pack is not a review file: this assessment's own is already on its
+    // rounds (importing it re-registers a round sent from an unsaved copy),
+    // and another client's is refused.
+    var bad4 = RV.importTexts([{ name: "p.json", text: savedPack.text }]);
+    ok(bad4.bad === 0 && /already registered/.test(bad4.lines[0]), "this assessment's own pack is already registered, and nothing changes", bad4.lines[0]);
+    var otherPack = JSON.parse(savedPack.text); otherPack.packId = "rp-other-client"; otherPack.engagement.client = "Someone Else Ltd";
+    var bad5 = RV.importTexts([{ name: "q.json", text: JSON.stringify(otherPack) }]);
+    ok(bad5.bad === 1 && /not this assessment/.test(bad5.lines[0]), "and another client's pack is refused", bad5.lines[0]);
+    ok(RV.store().threads.length === 4, "none of which changed anything");
+
+    // The list, on the card.
+    A.UI.go("report");
+    return poll(function () { return main.querySelector(".rv-comment"); });
+  }).then(function () {
+    var cards = main.querySelectorAll(".rv-comment");
+    ok(cards.length === 4, "the card lists the open comments (" + cards.length + ")");
+    var txt = main.querySelector(".review-card").textContent;
+    ok(/J\. Marsh/.test(txt) && /R\. Okafor/.test(txt) && /Must fix/.test(txt) && /Should fix/.test(txt) && /Suggested wording/.test(txt), "showing reviewer, severity and suggested wording");
+    ok(/Changes requested/.test(txt) && /Approved with comments/.test(txt), "and each reviewer's verdict");
+    ok(main.querySelectorAll(".rv-group").length >= 1, "grouped by section");
+    // Filters
+    function setFilter(idx, val) {
+      var s = main.querySelectorAll(".rv-filters select")[idx];
+      s.value = val; s.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    setFilter(1, "must-fix");
+    ok(main.querySelectorAll(".rv-comment").length === 2, "filtering by severity");
+    setFilter(1, "");
+    setFilter(2, "R. Okafor");
+    ok(main.querySelectorAll(".rv-comment").length === 1, "and by reviewer");
+    setFilter(2, "");
+    // Won't change needs a reason.
+    var c0 = main.querySelector(".rv-comment"), id0 = c0.getAttribute("data-comment-id");
+    c0.querySelector(".rv-wont").click();
+    c0 = main.querySelector('[data-comment-id="' + id0 + '"]');
+    c0.querySelector(".rv-wont-save").click();
+    ok(RC.findThread(RV.store(), id0).status === "open", "won't change needs a reason");
+    c0 = main.querySelector('[data-comment-id="' + id0 + '"]');
+    c0.querySelector(".rv-wont-reason").value = "It is the client's own wording.";
+    c0.querySelector(".rv-wont-save").click();
+    var t0 = RC.findThread(RV.store(), id0);
+    ok(t0.status === "wontchange" && t0.reason === "It is the client's own wording.", "and records it");
+    ok(!main.querySelector('[data-comment-id="' + id0 + '"]'), "the open filter then leaves it out");
+    var c1 = main.querySelector(".rv-comment"), id1 = c1.getAttribute("data-comment-id");
+    c1.querySelector(".rv-reply").click();
+    c1 = main.querySelector('[data-comment-id="' + id1 + '"]');
+    c1.querySelector(".rv-reply-text").value = "Done, please check.";
+    c1.querySelector(".rv-reply-save").click();
+    main.querySelector('[data-comment-id="' + id1 + '"] .rv-resolve').click();
+    var t1 = RC.findThread(RV.store(), id1);
+    ok(t1.status === "resolved" && t1.replies.length === 1 && t1.replies[0].text === "Done, please check." && !!t1.replies[0].author, "replying and resolving are recorded");
+    window.__ids = [id0, id1];
+    // Go to: a comment on the report goes to the section, one on an item to its capture page.
+    var item = RV.store().threads.filter(function (t) { return t.comment.anchor.kind === "item"; })[0];
+    ok(!item, "the item comment was the one taken back");
+    // Saved in the project file.
+    var pf = E.getProjectFile();
+    var ass = pf.assessments[pf.activeAssessmentId];
+    ok(ass.review && ass.review.threads.length === 4 && ass.review.rounds.length === 1, "the review is saved on the assessment, in the project file");
+    ok(!E.state.engagement.review, "and is not on the engagement the exporters read");
+
+    // ---- the next round -------------------------------------------------------
+    savedPack = null;
+    E.setReportNarrative({ method: "A changed method paragraph for the next round." });
+    A.UI.go("report");
+    return poll(function () { return main.querySelector(".rv-send"); });
+  }).then(function () {
+    main.querySelector(".rv-send").click();
+    return poll(function () { return savedPack; }, 120000);
+  }).then(function () {
+    var p2 = JSON.parse(savedPack.text);
+    ok(p2.round === 2 && p2.packId !== pack1.packId && p2.reviewId === pack1.reviewId, "the content moved on, so the next pack is round 2 of the same review");
+    var cs = p2.previousRound.comments;
+    ok(cs.length === 4 && cs.some(function (c) { return c.status === "wontchange" && c.reason; }) && cs.some(function (c) { return c.status === "resolved" && c.replies.length === 1; }), "and carries every comment's status, reason and replies");
+    ok(p2.previousRound.verdicts.length === 2, "and the verdicts so far");
+    window.__p2 = savedPack;
+    return loadRR();
+  }).then(function (w) {
+    w.ReviewTool.loadTexts([{ name: "p2.json", text: window.__p2.text }]);
+    var d = w.document;
+    ok(/round 2/.test(d.getElementById("pack-summary").textContent), "the review tool opens round 2");
+    var nav = d.querySelector('.nav-item[data-page="previous"]');
+    ok(!!nav, "with a Previous round page");
+    ok(d.querySelectorAll('.rr-paper [data-prev-id]').length >= 1, "and earlier comments shown on the blocks they were about");
+    nav.click();
+    var t = d.getElementById("main").textContent;
+    ok(d.querySelectorAll("[data-prev-id]").length === 4 && /Won't change/.test(t) && /It is the client's own wording/.test(t) && /Done, please check/.test(t) && /Resolved/.test(t), "showing each status, the reason and the author's reply");
+    d.querySelector('[data-prev-id="' + window.__ids[1] + '"] .rr-confirm').click();
+    ok(w.ReviewTool.state.review.confirmations.length === 1 && w.ReviewTool.isDirty(), "a reviewer can confirm a fix");
+    return saveFrom(w);
+  }).then(function (s) {
+    var res = RV.importTexts([{ name: s.file.name, text: s.file.text }]);
+    ok(res.bad === 0 && RC.findThread(RV.store(), window.__ids[1]).confirmedBy.length === 1, "and the author sees who confirmed it");
+    // Pack refusal in the review tool.
+    return loadRR();
+  }).then(function (w) {
+    var msgs = [];
+    var toastEl = w.document.getElementById("toast");
+    w.ReviewTool.loadTexts([{ name: "b.json", text: JSON.stringify({ schema: "spt-review-pack/9.9", packId: "x", documents: [{}] }) }]);
+    ok(!w.ReviewTool.state.pack && /spt-review-pack\/9\.9/.test(toastEl.textContent) && /reads spt-review-pack\/1\.0/.test(toastEl.textContent), "a pack of an unknown schema is refused by the review tool, saying which it is", toastEl.textContent);
+    w.ReviewTool.loadTexts([{ name: "c.json", text: JSON.stringify({ schema: "spt-risk-context/1.4" }) }]);
+    ok(!w.ReviewTool.state.pack && /not a review pack or a review file/.test(toastEl.textContent), "and so is any other file", toastEl.textContent);
+    try { w.localStorage.removeItem(w.ReviewTool.KEY_REVIEWER); } catch (e) {}
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+</script>
+</body></html>

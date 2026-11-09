@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SolutionsPT OT Cyber Suite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <link rel="stylesheet" href="css/suite.css" />
+  <!-- The saved (or system) colour theme, before first paint. The same
+       "ot-theme" setting as the tools, so the suite and every tool in it
+       agree on light or dark. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("ot-theme");
+        if (t !== "dark" && t !== "light") {
+          t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <!--
+    The suite shell. The home page lists the tools; opening one shows it in a
+    frame under a slim bar (Home, the tool's name, and a switcher). A tool
+    stays open, hidden, when another is shown, so switching never loses work.
+
+    In the folder (developer) build each frame is the tool's own page,
+    ../modules/<id>/index.html. In the single-file build and the exe each tool
+    is its own single-file build, carried in this file and opened as a
+    same-origin frame (srcdoc) the first time it is needed. See js/suite.js
+    and docs/platform-architecture.md.
+  -->
+  <div class="suite" id="suite">
+    <div id="suite-bar" class="suite-bar hidden" role="navigation" aria-label="Suite"></div>
+    <div id="stage" class="stage">
+      <div id="home" class="home">
+        <div class="header">
+          <div class="brand">
+            <span class="brand-logo"><img src="img/AVEVASelect-LogoLockup-Landscape-Positive.png" alt="SolutionsPT - AVEVA Select UK &amp; Ireland" /></span>
+            <span class="sub" id="suite-name">OT Cyber Suite</span>
+          </div>
+          <div class="spacer"></div>
+          <div class="header-actions">
+            <button id="btn-theme" class="btn ghost" type="button" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
+            <button id="btn-licence" class="btn ghost" type="button" title="Read the licence">Licence</button>
+          </div>
+        </div>
+        <main id="home-main" class="home-main"></main>
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script src="js/version.js"></script>
+  <script src="js/product.js"></script>
+  <script src="data/suite-data.js"></script>
+  <script src="js/suite.js"></script>
+</body>
+</html>

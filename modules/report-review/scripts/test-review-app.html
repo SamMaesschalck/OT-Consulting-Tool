@@ -1,0 +1,399 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: the reviewer's app, standalone</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The review tool on its own, from file://, in a frame, using the page as a person
+  would: the welcome page, the demo pack, each page, comments on a paragraph, a
+  table cell and an item, suggested wording, the checklist, the automatic checks'
+  three actions, the previous round, the verdict, Save in place, the download
+  fallback, reopening, autosave, unsaved work, drag and drop, themes and narrow
+  widths, and that it touches no other module's stored data. Needs
+  --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  var errors = [];
+  function load(q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () { res(w); });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+  function fakeHandle(w, name) {
+    var st = { text: null, writes: 0 };
+    return { kind: "file", name: name, store: st,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      requestPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () { return Promise.resolve({ write: function (t) { st.text = String(t); st.writes++; return Promise.resolve(); }, close: function () { return Promise.resolve(); } }); },
+      getFile: function () { return Promise.resolve(new w.File([st.text || "{}"], name, { type: "application/json" })); } };
+  }
+  function main(w) { return w.document.getElementById("main"); }
+  function nav(w, id) { w.document.querySelector('.nav-item[data-page="' + id + '"]').click(); }
+  function type(w, el, v, ev) { el.value = v; el.dispatchEvent(new w.Event(ev || "input", { bubbles: true })); }
+
+  var R, W, pack;
+  // A clean start for what this page checks, without touching anything else.
+  try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); localStorage.setItem("spt-risk-tool:autosave:v1", "untouched"); } catch (e) {}
+
+  load().then(function (w) {
+    W = w; R = w.ReviewTool;
+    var d = w.document;
+    ok(d.title === "OT Cyber Report Review Tool", "it starts from file://, titled for itself", d.title);
+    ok(w.App.Version.product === d.title && d.getElementById("version-badge").textContent === w.App.Version.label, "with the suite's version (" + w.App.Version.label + ")");
+    ok(/Open a review pack/.test(main(w).textContent) && /Try the demo/.test(main(w).textContent) && d.getElementById("rr-drop"), "on a welcome page with Load, a drop area and the demo");
+    ok(d.getElementById("btn-save").hasAttribute("disabled"), "Save has nothing to do yet");
+    ok(/handle it as you would the project file/.test(main(w).textContent), "it says a pack holds client data");
+    d.querySelector('.nav-item[data-page="about"]').click();
+    ok(/Copyright and licence/.test(main(w).textContent) && /PROPRIETARY LICENCE/.test(main(w).textContent) && main(w).textContent.indexOf(w.App.Version.product + " " + w.App.Version.label) !== -1, "the About page carries the licence and the version");
+    ok(/spt-review-pack\/1\.0/.test(main(w).textContent) && /spt-review\/1\.0/.test(main(w).textContent), "and the contracts it reads and writes");
+    return load("?tour=1");
+  }).then(function (w) {
+    W = w; R = w.ReviewTool;
+    return poll(function () { return R.state.pack; }).then(function () { pack = R.state.pack; });
+  }).then(function () {
+    var w = W, d = w.document;
+    ok(pack.schema === "spt-review-pack/1.0" && pack.round === 2, "the tour opens the demo pack: round 2 of a real demo");
+    ok(/demo pack/.test(d.getElementById("rr-demo-note").textContent), "and says it is the demo");
+    // ---- the report ---------------------------------------------------------
+    var paper = d.getElementById("rr-paper");
+    ok(!!paper && paper.querySelectorAll("[data-block-id]").length === pack.documents[0].blocks.length, "every block is on the page (" + pack.documents[0].blocks.length + ")");
+    ok(paper.querySelectorAll("table").length > 5 && paper.querySelectorAll("img").length > 0, "tables and charts draw");
+    ok(/SolutionsPT Ltd/.test(paper.querySelector(".rr-cover").textContent) && !paper.querySelector(".rr-cover img[width='824']"), "the cover reads as text");
+    var redFlag = paper.querySelector(".rr-prompt-flag");
+    ok(!!redFlag && !!paper.querySelector(".rr-red"), "a red prompt is flagged where it stands");
+    ok(d.querySelectorAll(".rr-outline-item").length > 5, "the outline lists the sections");
+    ok(paper.querySelectorAll("[data-prev-id]").length >= 1 && /Agreed: the sentence that follows/.test(paper.textContent), "and an earlier comment shows on its block, with the author's reply");
+    // Clicking a paragraph asks for the name first.
+    var para = pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 60 && !b.red; })[0];
+    var blockEl = d.querySelector('[data-block-id="' + para.id + '"]');
+    blockEl.click();
+    ok(!!d.getElementById("rr-name-input"), "the first comment asks for a name");
+    type(w, d.getElementById("rr-name-input"), "S. Reviewer");
+    d.getElementById("rr-name-ok").click();
+    ok(!!d.querySelector(".rr-composer"), "then opens the comment box");
+    ok(w.localStorage.getItem(R.KEY_REVIEWER) === "S. Reviewer", "and the browser remembers the name");
+    ok(R.state.review.reviewer === "S. Reviewer", "which goes on the review");
+    ok(R.state.composer.severity === "should-fix", "a comment starts as should fix");
+    // An empty comment is refused.
+    d.querySelector(".rr-c-add").click();
+    ok(R.state.review.comments.length === 0, "an empty comment is not added");
+    type(w, d.querySelector(".rr-c-text"), "This overstates the position.");
+    d.querySelector('.rr-composer [data-severity="must-fix"]').click();
+    var box = d.querySelector(".rr-c-suggest"); box.checked = true; box.dispatchEvent(new w.Event("change", { bubbles: true }));
+    var sug = d.querySelector(".rr-c-sug");
+    ok(sug && sug.value === para.text, "suggested wording starts from the block's own text");
+    type(w, sug, para.text + " Reworded.");
+    d.querySelector(".rr-c-add").click();
+    var c = R.state.review.comments[0];
+    ok(c && c.severity === "must-fix" && c.suggestion === para.text + " Reworded." && c.anchor.blockId === para.id && c.anchor.sectionKey === para.sectionKey && c.anchor.quote === para.text, "the comment holds severity, suggestion, block, section key and quote");
+    ok(/^c-/.test(c.id) && c.reviewer === "S. Reviewer" && !!c.createdAt, "with its own id, the reviewer and when");
+    ok(R.isDirty() && d.getElementById("btn-save").textContent === "Save*", "the work is unsaved, and Save says so");
+    var marked = d.querySelector('[data-block-id="' + para.id + '"]');
+    ok(marked.classList.contains("has-must") && !!d.querySelector('[data-comment-id="' + c.id + '"]'), "the block is marked and its comment shows beside it");
+    var hdrId = pack.documents[0].blocks.filter(function (b) { return b.type === "heading" && !b.sub && b.sectionKey === para.sectionKey; })[0].id;
+    ok(/1/.test(d.querySelector('[data-section-block="' + hdrId + '"] .n').textContent), "and the outline counts it under its section");
+    // Selected words say what the comment is about; the quote stays the block.
+    var para2 = pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 60 && !b.red; })[1];
+    var pEl = d.querySelector('[data-block-id="' + para2.id + '"] p');
+    var range = d.createRange(); range.selectNodeContents(pEl);
+    var sel = w.getSelection(); sel.removeAllRanges();
+    var tn = pEl.firstChild; range.setStart(tn, 0); range.setEnd(tn, 12); sel.addRange(range);
+    d.querySelector('[data-block-id="' + para2.id + '"]').click();
+    ok(R.state.composer.anchor.selection === RC_norm(para2.text.slice(0, 12)) && R.state.composer.anchor.quote === para2.text, "selecting words keeps them on the comment, with the whole block as the quote", JSON.stringify(R.state.composer.anchor.selection));
+    sel.removeAllRanges();
+    d.querySelector(".rr-c-cancel").click();
+    // A chart has no text to quote.
+    var img = pack.documents[0].blocks.filter(function (b) { return b.type === "image" && !b.front; })[0];
+    if (img) {
+      d.querySelector('[data-block-id="' + img.id + '"]').click();
+      ok(R.state.composer.anchor.quote === "" && R.state.composer.anchor.blockType === "image" && R.state.composer.canSuggest === false, "a chart can be commented on, with no quote and no suggested wording");
+      d.querySelector(".rr-c-cancel").click();
+    }
+    // A table cell, then the whole table.
+    var tbl = pack.documents[0].blocks.filter(function (b) { return b.type === "table" && !b.front && b.rows.length > 2; })[0];
+    d.querySelector('[data-block-id="' + tbl.id + '"] td[data-cell="1.0"]').click();
+    ok(R.state.composer.anchor.cell && R.state.composer.anchor.cell.row === 1 && R.state.composer.anchor.quote === tbl.rows[1].cells[0].text, "clicking a table cell comments on that cell");
+    type(w, d.querySelector(".rr-c-text"), "Check this cell.");
+    d.querySelector(".rr-c-add").click();
+    d.querySelector('[data-block-id="' + tbl.id + '"] .rr-tablewrap').parentNode.click();
+    ok(R.state.composer.anchor.cell === null && R.state.composer.anchor.quote === tbl.text && R.state.composer.canSuggest === false, "clicking the table's edge comments on the whole table");
+    d.querySelector(".rr-c-cancel").click();
+    // Editing and deleting.
+    var cellC = R.state.review.comments[1];
+    d.querySelector('[data-comment-id="' + cellC.id + '"] .rr-linkbtn').click();
+    type(w, d.querySelector(".rr-c-text"), "Edited.");
+    d.querySelector(".rr-c-add").click();
+    ok(R.state.review.comments[1].text === "Edited." && R.state.review.comments.length === 2, "a comment can be edited");
+    d.querySelector('[data-comment-id="' + cellC.id + '"] .rr-del').click();
+    ok(R.state.review.comments.length === 1, "and deleted");
+
+    // ---- the engagement -------------------------------------------------------
+    nav(w, "engagement");
+    var count = function () { return d.getElementById("rr-item-count").textContent; };
+    ok(new RegExp("of " + pack.items.length + " items").test(count()) && d.querySelectorAll(".rr-item").length > 10, "the Engagement page lists the items (" + pack.items.length + ")", count());
+    d.querySelector('[data-filter="findings"]').click();
+    var findings = pack.items.filter(function (i) { return i.status === "finding"; }).length;
+    ok(new RegExp("Showing " + findings + " of").test(count()), "filtering to findings shows them (" + findings + ")", count());
+    d.querySelector('[data-filter="noevidence"]').click();
+    var noev = pack.items.filter(function (i) { return i.status !== "na" && !i.evidence.trim(); }).length;
+    ok(new RegExp("Showing " + noev + " of").test(count()), "and to items with no evidence (" + noev + ")", count());
+    d.querySelector('[data-filter="findings"]').click();
+    var sel = d.getElementById("rr-item-target");
+    ok(sel && sel.options.length === 4, "several targets give a chooser");
+    type(w, sel, pack.items[0].targetName, "change");
+    ok(Array.prototype.every.call(d.querySelectorAll(".rr-item"), function (n) { return n.getAttribute("data-target") === pack.items[0].targetName; }), "which narrows the list to one");
+    var it = d.querySelector(".rr-item");
+    var iid = it.getAttribute("data-item-id");
+    it.querySelector(".rr-item-comment").click();
+    ok(!!d.querySelector(".rr-composer .rr-c-field"), "commenting on an item offers suggested wording per field");
+    type(w, d.querySelector(".rr-c-text"), "Which document?");
+    type(w, d.querySelector(".rr-c-field"), "evidence", "change");
+    ok(d.querySelector(".rr-c-sug").value.length > 3, "starting from what is recorded");
+    d.querySelector(".rr-c-add").click();
+    var ic = R.state.review.comments[1];
+    ok(ic.anchor.kind === "item" && ic.anchor.itemId === iid && ic.anchor.field === "evidence" && ic.anchor.quote.length > 3 && !!ic.anchor.code, "the comment names the item and field", JSON.stringify(ic.anchor));
+    ok(/People interviewed/.test(main(w).textContent) && /Documents reviewed/.test(main(w).textContent) && /Systems observed/.test(main(w).textContent), "the basis of assessment is on the page");
+    d.querySelector(".rr-basis-comment").click();
+    type(w, d.querySelector(".rr-c-text"), "An interview is missing.");
+    d.querySelector(".rr-c-add").click();
+    ok(R.state.review.comments[2].anchor.kind === "general" && R.state.review.comments[2].anchor.sectionTitle === "Basis of assessment", "and can be commented on");
+
+    // ---- the checklist ----------------------------------------------------------
+    nav(w, "checklist");
+    var qs = d.querySelectorAll(".rr-q");
+    // Counted from the checklist data, which the team edits.
+    var CL = w.App.Data.checklists, eg = pack.engagement, skipQ = (CL.skip || {})[eg.instrumentId] || [];
+    var wantQ = (CL.common || []).length + ((CL.families || {})[eg.scoringFamily] || []).filter(function (q) { return skipQ.indexOf(q.id) === -1; }).length + ((CL.instruments || {})[eg.instrumentId] || []).length;
+    ok(qs.length === wantQ && wantQ > (CL.common || []).length && /target (security )?levels are justified/.test(main(w).textContent), "the checklist has the common items and those for 62443-3-3 (" + qs.length + ")");
+    d.querySelector('[data-q="common-evidence"] [data-answer="no"]').click();
+    type(w, d.querySelector('[data-q="common-evidence"] .rr-note input'), "See the comment.", "change");
+    d.querySelector('[data-q="common-scope"] [data-answer="yes"]').click();
+    d.querySelector('[data-q="common-language"] [data-answer="na"]').click();
+    var ans = R.state.review.checklist;
+    ok(ans.length === 3 && ans[0].id === "common-evidence" && ans[0].answer === "no" && ans[0].note === "See the comment." && /evidence/.test(ans[0].text), "answers hold the question, the answer and the note");
+    d.querySelector('[data-q="common-language"] [data-answer="na"]').click();
+    ok(ans.filter(function (a) { return a.id === "common-language"; })[0].answer === "", "pressing an answer again clears it");
+
+    // ---- the automatic checks -------------------------------------------------------
+    nav(w, "checks");
+    var active = R.activeChecks();
+    var nChecks = Object.keys(w.App.ReviewChecks.CHECKS).length;
+    // Each check that applies once: a card of its own when it found something,
+    // or a line in the one "Nothing found" card.
+    var placed = Array.prototype.map.call(d.querySelectorAll("#main [data-check-card], #main [data-check-clean]"), function (n) { return n.getAttribute("data-check-card") || n.getAttribute("data-check-clean"); });
+    var applies = Object.keys(w.App.ReviewChecks.CHECKS).filter(function (id) { return !/^risk-/.test(id); });
+    ok(nChecks >= 10 && placed.length === applies.length && applies.every(function (id) { return placed.indexOf(id) !== -1; }), "every check has its place on the page (" + applies.length + ")", placed.join());
+    var red = active.filter(function (r) { return r.check === "red-prompts"; })[0];
+    ok(!!red, "the demo's red prompt is found");
+    var row = d.querySelector('[data-check-id="' + red.id + '"]');
+    row.querySelector(".rr-check-comment").click();
+    var cc = R.state.review.comments[R.state.review.comments.length - 1];
+    ok(cc.check === red.id && cc.severity === "must-fix" && cc.anchor.blockId === red.blockId, "Make it a comment carries the check, its severity and the block");
+    ok(/Comment added/.test(d.querySelector('[data-check-id="' + red.id + '"]').textContent), "and the row says so");
+    d.querySelector('[data-check-id="' + red.id + '"] .rr-check-dismiss').click();
+    ok(R.state.review.dismissedChecks.indexOf(red.id) !== -1 && R.activeChecks().length === active.length - 1, "Dismiss takes it off the list and records it");
+    var dc = R.activeChecks().filter(function (r) { return r.check === "doc-control"; })[0];
+    d.querySelector('[data-check-id="' + dc.id + '"] .rr-check-go').click();
+    ok(R.state.page === "report" && d.querySelector(".rr-block.flash"), "Go to jumps to the block, and flashes it");
+    nav(w, "checks");
+    // The reviewer's names, kept in the browser.
+    type(w, d.getElementById("rr-names"), "Brookside Foods, Plant A", "change");
+    ok(JSON.parse(w.localStorage.getItem(R.KEY_NAMES)).length === 2, "the reviewer's list of names stays in the browser");
+    ok(R.activeChecks().filter(function (r) { return r.check === "other-names"; }).length === 0, "a name that is the client's own site is not flagged");
+    type(w, d.getElementById("rr-names"), "Solutions", "change");
+    w.localStorage.setItem(R.KEY_NAMES, "[]");
+
+    // ---- the previous round ----------------------------------------------------------
+    nav(w, "previous");
+    ok(d.querySelectorAll("[data-prev-id]").length === 3 && /Won't change/.test(main(w).textContent) && /client's template/.test(main(w).textContent) && /Resolved/.test(main(w).textContent), "Previous round lists the earlier comments, statuses and reasons");
+    ok(/Changes requested/.test(main(w).textContent), "and the verdicts so far");
+    d.querySelector('[data-prev-id="c-demo-1"] .rr-confirm').click();
+    ok(R.state.review.confirmations.length === 1 && R.state.review.confirmations[0].commentId === "c-demo-1", "a fix can be confirmed");
+    ok(!d.querySelector('[data-prev-id="c-demo-1"] .rr-raise'), "a confirmed point is not offered Raise it again as well");
+    d.querySelector('[data-prev-id="c-demo-1"] .rr-confirm').click();
+    ok(R.state.review.confirmations.length === 0 && !!d.querySelector('[data-prev-id="c-demo-1"] .rr-raise'), "until the confirmation is taken back");
+    d.querySelector('[data-prev-id="c-demo-1"] .rr-raise').click();
+    ok(!!d.querySelector(".rr-composer"), "a point can be raised again");
+    type(w, d.querySelector(".rr-c-text"), "Not fixed in section two.");
+    d.querySelector(".rr-c-add").click();
+    var rg = R.state.review.comments[R.state.review.comments.length - 1];
+    ok(rg.relatesTo === "c-demo-1", "linked to the comment it raises");
+    ok(!d.querySelector('[data-prev-id="c-demo-1"] .rr-confirm') && /You raised this again/.test(d.querySelector('[data-prev-id="c-demo-1"]').textContent), "and a point raised again is not offered Confirm it is fixed as well");
+    // The printout lists what became of each earlier comment.
+    d.querySelector('[data-prev-id="c-demo-2"] .rr-confirm').click();
+    ok(R.state.review.confirmations.length === 1, "another point's reason accepted");
+    nav(w, "summary");
+    var pr = function (id) { var r = d.querySelector('#rr-print-prev [data-prev-row="' + id + '"]'); return r ? r.lastChild.textContent : ""; };
+    ok(pr("c-demo-1") === "Raised again" && pr("c-demo-2") === "Reason accepted" && pr("c-demo-3") === "Not looked at", "the printout lists each earlier comment with what became of it", pr("c-demo-1") + " | " + pr("c-demo-2") + " | " + pr("c-demo-3"));
+    // The risk checklist asks what the method needs: a conduit may have no
+    // threats when the report says why, as the risk tool does not require them.
+    var cov = ((w.App.Data.checklists.families || {})["risk-assessment"] || []).filter(function (q) { return q.id === "risk-coverage"; })[0];
+    ok(cov && !/Every zone and conduit has its threats/.test(cov.text) && /each conduit has threats or a stated reason/.test(cov.text), "the risk checklist does not ask for threats on every conduit", cov && cov.text);
+    nav(w, "previous");
+
+    // ---- summary and verdict ----------------------------------------------------------
+    nav(w, "summary");
+    ok(!!d.getElementById("rr-sum-must") && Number(d.getElementById("rr-sum-must").textContent) >= 2, "the summary counts by severity");
+    d.querySelector('[data-verdict="approved"] input').click();
+    ok(R.state.review.verdict.value === "approved" && /^\d{4}-\d{2}-\d{2}$/.test(R.state.review.verdict.date), "the verdict is recorded with today's date");
+    ok(/must-fix comment/.test(main(w).textContent), "approving with must-fix comments warns");
+    d.querySelector('[data-verdict="changes-requested"] input').click();
+    ok(!d.querySelector(".rr-warn"), "not otherwise");
+    type(w, d.getElementById("rr-verdict-note"), "Two things to fix.", "change");
+    ok(R.state.review.verdict.note === "Two things to fix.", "with a note");
+
+    // ---- saving --------------------------------------------------------------------------
+    ok(R.supportsFilePickers() === (typeof w.showSaveFilePicker === "function"), "file dialogs are used where the browser has them");
+    var h1 = fakeHandle(w, "my-review.json"), picks = 0;
+    w.showSaveFilePicker = function () { picks++; return Promise.resolve(h1); };
+    return new Promise(function (res) { R.saveReview(null, res); }).then(function (r) {
+      ok(r.ok && r.method === "file" && picks === 1 && h1.store.writes === 1, "Save asks once and writes the file");
+      var f = JSON.parse(h1.store.text);
+      ok(f.schema === "spt-review/1.0" && f.packId === pack.packId && f.round === 2 && f.reviewer === "S. Reviewer" && /^rf-/.test(f.fileId), "it is spt-review/1.0 for this pack");
+      ok(f.comments.length === R.state.review.comments.length && f.confirmations.length === 1 && f.dismissedChecks.length === 1, "with everything in it");
+      ok(f.verdict.value === "changes-requested" && f.verdict.note === "Two things to fix.", "and the verdict");
+      ok(JSON.stringify(f).indexOf("Brookside") === -1, "the reviewer's list of names is not in it");
+      ok(!R.isDirty() && d_save(w) === "Save", "saving clears the unsaved mark");
+      // Save in place.
+      R.addComment({ severity: "suggestion", anchor: R.state.review.comments[0].anchor, text: "One more." });
+      ok(R.isDirty(), "a further change is unsaved again");
+      return new Promise(function (res) { R.saveReview(null, res); });
+    }).then(function (r) {
+      ok(r.ok && picks === 1 && h1.store.writes === 2, "the next Save overwrites in place, with no dialog");
+      return new Promise(function (res) { R.saveReview({ shiftKey: true }, res); });
+    }).then(function (r) {
+      ok(picks === 2, "Shift+click asks where");
+      // A refused dialog downloads.
+      var got = [];
+      w.HTMLAnchorElement.prototype.click = function () { got.push(this.download); };
+      var err = new w.Error("refused"); err.name = "SecurityError";
+      w.showSaveFilePicker = function () { return Promise.reject(err); };
+      return new Promise(function (res) { R.saveReview({ shiftKey: true }, res); }).then(function (r2) {
+        ok(r2.ok && r2.method === "download" && got.length === 1 && /-review-round-2-s-reviewer\.json$/.test(got[0]), "a refused dialog falls back to a download", JSON.stringify(r2) + got.join());
+        delete w.HTMLAnchorElement.prototype.click;
+        window.__file = h1.store.text;
+      });
+    });
+  }).then(function () {
+    // ---- reopening, restoring -------------------------------------------------------------
+    var packText = JSON.stringify(pack);
+    return load().then(function (w) {
+      W = w; R = w.ReviewTool;
+      var d = w.document;
+      R.loadTexts([{ name: "pack.json", text: packText }]);
+      ok(R.state.review.comments.length === 0 && !R.isDirty(), "the pack alone starts a clean review");
+      R.loadTexts([{ name: "mine.json", text: window.__file }]);
+      ok(R.state.review.comments.length >= 3 && !R.isDirty() && R.state.review.reviewer === "S. Reviewer", "then loading the review file carries on");
+      var wrong = JSON.parse(window.__file); wrong.packId = "rp-other";
+      R.loadTexts([{ name: "wrong.json", text: JSON.stringify(wrong) }]);
+      ok(/different pack/.test(d.getElementById("toast").textContent) && R.state.review.packId === pack.packId, "a review file for another pack is refused", d.getElementById("toast").textContent);
+      R.loadTexts([{ name: "bad.json", text: "{}" }]);
+      ok(/not a review pack or a review file/.test(d.getElementById("toast").textContent), "and anything else");
+      // Drag and drop.
+      var dt = new w.DataTransfer();
+      dt.items.add(new w.File([packText], "dropped.json", { type: "application/json" }));
+      d.dispatchEvent(new w.DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+      return poll(function () { return R.state.review.comments.length === 0 && R.state.page === "report"; }).then(function () {
+        ok(true, "a pack dropped on the page opens");
+        // Autosave: keyed by pack, in this tool's own space.
+        R.addComment({ severity: "suggestion", anchor: { kind: "general", sectionTitle: "General", documentIndex: 0, quote: "" }, text: "Autosaved thought." });
+        R.writeAutosave();
+        var key = R.KEY_AUTOSAVE + pack.packId;
+        ok(/^spt-review:autosave:v1:/.test(key) && !!w.localStorage.getItem(key), "unsaved work goes to the autosave backstop, under this tool's own key");
+        ok(JSON.parse(w.localStorage.getItem(key)).review.comments.length === 1 && JSON.parse(w.localStorage.getItem(key)).pack === undefined, "holding the review, not the pack");
+        var ev = new w.Event("beforeunload", { cancelable: true });
+        w.dispatchEvent(ev);
+        ok(ev.defaultPrevented, "closing with unsaved work warns");
+        R.state.dirty = false;   // leaving, as if the warning were answered
+        return load();
+      });
+    });
+  }).then(function (w) {
+    W = w; R = w.ReviewTool;
+    var d = w.document;
+    R.loadTexts([{ name: "pack.json", text: JSON.stringify(pack) }]);
+    ok(!!d.getElementById("rr-restore"), "opening that pack again offers the autosaved work");
+    d.getElementById("rr-restore-yes").click();
+    ok(R.state.review.comments.length === 1 && R.isDirty() && !d.getElementById("rr-restore"), "restoring brings it back, still unsaved");
+    var key = R.KEY_AUTOSAVE + pack.packId;
+    w.showSaveFilePicker = function () { return Promise.resolve(fakeHandle(w, "x.json")); };
+    return new Promise(function (res) { R.saveReview(null, res); }).then(function () {
+      ok(!w.localStorage.getItem(key), "and a save clears the backstop");
+      R.state.dirty = false;
+      ok(w.localStorage.getItem("spt-risk-tool:autosave:v1") === "untouched", "another tool's stored data is untouched");
+      var own = Object.keys(w.localStorage).filter(function (k) { return /review/.test(k); });
+      ok(own.every(function (k) { return /^spt-review:/.test(k); }), "every key it keeps starts spt-review:", own.join());
+      // Demo mode writes no autosave.
+      return load("?tour=1");
+    });
+  }).then(function (w) {
+    W = w; R = w.ReviewTool;
+    return poll(function () { return R.state.pack; }).then(function () {
+      var key = R.KEY_AUTOSAVE + R.state.pack.packId;
+      R.addComment({ severity: "suggestion", anchor: { kind: "general", sectionTitle: "General", documentIndex: 0, quote: "" }, text: "In the demo." });
+      R.writeAutosave();
+      ok(!w.localStorage.getItem(key), "the demo never writes to the autosave backstop");
+      R.state.dirty = false;
+      // Themes and widths.
+      var d = w.document, html = d.documentElement;
+      w.ReviewTool.state.page = "report"; w.ReviewTool.render();
+      var darkBefore = html.getAttribute("data-theme");
+      d.getElementById("btn-theme").click();
+      ok(html.getAttribute("data-theme") !== darkBefore && w.localStorage.getItem("ot-theme") === html.getAttribute("data-theme"), "the theme toggles, under the shared key");
+      html.setAttribute("data-theme", "dark");
+      ok(w.getComputedStyle(d.getElementById("rr-paper")).backgroundColor === "rgb(255, 255, 255)", "the document stays white paper in dark mode");
+      ok(w.getComputedStyle(d.querySelector(".card, .rr-banner")).backgroundColor !== "rgb(255, 255, 255)", "while the rest goes dark");
+      html.setAttribute("data-theme", "light");
+      frame.style.width = "420px";
+      ["report", "engagement", "checklist", "checks", "previous", "summary", "about"].forEach(function (p) {
+        R.state.page = p; R.render();
+        var over = d.documentElement.scrollWidth - d.documentElement.clientWidth;
+        var main2 = d.getElementById("main");
+        ok(over <= 0 && main2.scrollWidth - main2.clientWidth <= 1, "at 420px wide the " + p + " page has no sideways scroll", "page " + over + ", main " + (main2.scrollWidth - main2.clientWidth));
+      });
+      frame.style.width = "1280px";
+      // No dashes anywhere the tool writes for itself. The demo report's own
+      // text is the exporter's business, and the checks page reports on it.
+      var dashy = [];
+      ["checklist", "summary", "about"].forEach(function (p) {
+        R.state.page = p; R.render();
+        if (/[–—]/.test(d.getElementById("main").textContent.replace(/PROPRIETARY[\s\S]*$/, ""))) dashy.push(p);
+      });
+      ok(dashy.length === 0, "no em or en dashes in the tool's own wording", dashy.join());
+      ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+    });
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+    try { localStorage.removeItem("spt-risk-tool:autosave:v1"); localStorage.removeItem("spt-review:reviewer:v1"); localStorage.removeItem("spt-review:names:v1"); } catch (e) {}
+    finish();
+  });
+  function d_save(w) { return w.document.getElementById("btn-save").textContent; }
+  function RC_norm(s) { return String(s).replace(/\s+/g, " ").trim(); }
+})();
+</script>
+</body></html>

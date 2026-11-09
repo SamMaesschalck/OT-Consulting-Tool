@@ -102,8 +102,9 @@ window.docx = (function () {
     var cards = [].slice.call(main().querySelectorAll(".card"));
     // A wrapper with no heading of its own is not a section; neither are the
     // capture cards the report page puts around the report.
-    // The issue check is the tool's to-do list for the report, not part of it.
-    var CAPTURE = /^(Progress since previous assessment|Executive summary: consultant input|Basis of assessment|Word report options|Issue check)$/;
+    // The issue check is the tool's to-do list for the report, not part of it,
+    // and so is the review card beside it.
+    var CAPTURE = /^(Progress since previous assessment|Executive summary: consultant input|Basis of assessment|Word report options|Issue check|Review|Changes to sections only in the Word report)$/;
     var sections = cards.filter(function (c) {
       var head = [].slice.call(c.children).filter(function (x) { return x.classList && x.classList.contains("card-h"); })[0];
       var h2 = head && head.getElementsByTagName("h2")[0];

@@ -1,0 +1,218 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Risk tool: Send for review and Import review files</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The risk tool's side of a review, on the tour's demo project: Send for review
+  packs both Word reports (detailed and high level) as documents, with the zones
+  and threats behind them; Import merges review files, once each; suggested
+  wording is offered on section wording (test-risk-accept.html tests Accept) and
+  Copy plus Go to elsewhere; a comment that no longer matches is marked; older
+  files load; and nothing of the review reaches Word, Excel or the risk context.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<iframe id="rr" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 60000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+  function unzipAll(w, blob) {
+    return w.App.DocxBlocks.unzip(blob).then(function (ps) {
+      return ps.map(function (p) { return { name: p.name, text: /\.(xml|rels)$/.test(p.name) ? new TextDecoder().decode(p.bytes) : "" }; });
+    });
+  }
+  frame.onload = function () {
+    var w = frame.contentWindow, d;
+    w.confirm = function () { return true; }; w.alert = function () {};
+    var saved = null;
+    w.showSaveFilePicker = function (o) {
+      return Promise.resolve({ name: o.suggestedName, kind: "file", createWritable: function () {
+        return Promise.resolve({ write: function (t) { saved = { name: o.suggestedName, text: String(t) }; return Promise.resolve(); }, close: function () { return Promise.resolve(); } });
+      } });
+    };
+    poll(function () { return w.RiskTool && w.RiskReview && w.RiskExports && w.RiskTool.state.project.zones.length; }).then(function () {
+      d = w.document;
+      var RT = w.RiskTool, RR = w.RiskReview, RC = w.App.ReviewCore, DB = w.App.DocxBlocks, main = d.getElementById("main");
+      var p = RT.state.project;
+      ok(!p.review, "a project has no review until one starts");
+      var nav = Array.prototype.filter.call(d.querySelectorAll("#sidebar .nav-item"), function (n) { return /Peer review/.test(n.textContent); })[0];
+      ok(!!nav, "the sidebar has a Peer review page");
+      nav.click();
+      ok(/Send for review/.test(main.textContent) && /Import review files/.test(main.textContent), "with Send for review and Import review files");
+      ok(/Not reviewed yet/.test(main.textContent), "and says it is not reviewed yet");
+      main.querySelector(".rv-send").click();
+      return poll(function () { return saved && main.querySelector(".rv-notice.ok"); }, 90000).then(function () {
+        var pack = JSON.parse(saved.text);
+        ok(pack.schema === "spt-review-pack/1.0" && pack.round === 1 && pack.sourceTool.product === "OT Cyber Risk Assessment Tool", "the pack is spt-review-pack/1.0, from the risk tool");
+        ok(/review-pack-round-1\.json$/.test(saved.name), "under a plain name (" + saved.name + ")");
+        ok(pack.documents.length === 2 && pack.documents[0].title === "Detailed report" && pack.documents[1].title === "High-level report", "both Word reports are in it as documents");
+        ok(pack.documents.every(function (x) { return x.blocks.length > 20 && /^h1:/.test(x.contentHash); }) && pack.documents[0].contentHash !== pack.documents[1].contentHash, "each with its own blocks and hash");
+        var heads = pack.documents[0].blocks.filter(function (b) { return b.type === "heading"; });
+        ok(heads.length > 3 && heads.every(function (h) { return !h.sub; }) && heads[0].sectionKey === "document-control", "sections are keyed by their headings (" + heads[0].sectionKey + ")");
+        ok(pack.items.length > 9 && pack.items.some(function (i) { return i.status === "finding" || i.status === "met"; }) && pack.items.some(function (i) { return i.code === "SL-T"; }), "the threats and target levels are the items (" + pack.items.length + ")");
+        ok(pack.engagement.scoringFamily === "risk-assessment" && pack.engagement.client === p.engagement.client && pack.facts.perTarget.length === p.zones.length + p.conduits.length, "with the engagement and facts per zone and conduit");
+        ok(Array.isArray(pack.basisOfAssessment.interviews), "and the basis of assessment");
+        ok(!!p.review && p.review.rounds.length === 1 && RT.isDirty(), "the round is recorded on the project, as unsaved work");
+        window.__riskPack = saved.text;
+        // In a zone's register: written from the zones and threats, so it stays Copy.
+        var blk = pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && !b.sectionKey && b.text.length > 40; })[0];
+        var blk2 = pack.documents[1].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 40; })[0];
+        var at = new Date().toISOString();
+        function c(id, sev, anchor, sug) { return { id: id, reviewer: "J. Marsh", createdAt: at, updatedAt: at, severity: sev, anchor: anchor, text: "Text of " + id, suggestion: sug || null, relatesTo: null, check: null }; }
+        var file = { schema: RC.fileSchema(), packId: pack.packId, reviewId: pack.reviewId, round: 1, fileId: "f1", reviewer: "J. Marsh", savedAt: at, verdict: { value: "changes-requested", date: "2026-11-01", note: "" }, checklist: [{ id: "risk-tolerable", text: "Tolerable risk agreed.", answer: "no", note: "" }], dismissedChecks: [], confirmations: [], comments: [
+          c("c1", "must-fix", { documentIndex: 0, documentTitle: "Detailed report", kind: "block", sectionKey: blk.sectionKey, sectionTitle: blk.sectionTitle, blockId: blk.id, quote: blk.text, cell: null }, blk.text + " Better."),
+          c("c2", "should-fix", { documentIndex: 1, documentTitle: "High-level report", kind: "block", sectionKey: blk2.sectionKey, sectionTitle: blk2.sectionTitle, blockId: blk2.id, quote: blk2.text, cell: null }),
+          c("c3", "suggestion", { documentIndex: 0, kind: "item", targetName: pack.items[0].targetName, itemId: pack.items[0].itemId, code: pack.items[0].code, itemTitle: pack.items[0].title, quote: "" }),
+          c("c4", "should-fix", { documentIndex: 0, kind: "block", sectionKey: "x", sectionTitle: "Gone", blockId: "d0-b1", quote: "Wording that has gone from the report.", cell: null })
+        ] };
+        window.__riskFile = JSON.stringify(file);
+        var res = RR.importTexts([{ name: "a.json", text: JSON.stringify(file) }]);
+        ok(res.bad === 0 && RR.store().threads.length === 4, "a review file merges in", res.lines.join(" | "));
+        res = RR.importTexts([{ name: "a.json", text: JSON.stringify(file) }]);
+        ok(res.results[0].duplicate && RR.store().threads.length === 4, "importing it twice changes nothing");
+        res = RR.importTexts([{ name: "b.json", text: JSON.stringify({ schema: "spt-review/9.9", packId: "x", comments: [] }) }]);
+        ok(res.bad === 1 && /spt-review\/9\.9/.test(res.lines[0]), "an unknown schema is refused, saying which", res.lines[0]);
+        res = RR.importTexts([{ name: "c.json", text: JSON.stringify(Object.assign({}, file, { packId: "rp-other" })) }]);
+        ok(res.bad === 1 && /different pack/.test(res.lines[0]), "and a file for another pack");
+        RT.state.stage = "peer"; RT.render();
+        return poll(function () { return main.querySelector(".rv-comment"); });
+      }).then(function () {
+        var text = main.textContent;
+        ok(main.querySelectorAll(".rv-comment").length === 4, "the comments list is on its own page");
+        ok(/J\. Marsh/.test(text) && /Changes requested/.test(text) && /Tolerable risk agreed/.test(text), "with the reviewer, the verdict and the checklist's no");
+        ok(/Detailed report/.test(text) && /High-level report/.test(text), "grouped per report");
+        var first = main.querySelector('[data-comment-id="c1"]');
+        ok(first.querySelector(".rv-copy") && !first.querySelector(".rv-accept"), "suggested wording on text written from the zones is Copy, not Accept");
+        ok(/written from the zones and threats/.test(first.textContent), "saying why");
+        ok(RR.acceptPlan().can === false, "with no comment there is nothing to accept");
+        return new Promise(function (res) { RR.refreshDocs(res); });
+      }).then(function () {
+        var th = RR.store().threads;
+        ok(RR.isStale(th[3]) === true && RR.isStale(th[0]) === false && RR.isStale(th[1]) === false, "a comment that no longer matches is marked; the others are not");
+        ok(RR.isStale(th[2]) === false, "and an item still there is not");
+        RT.state.stage = "peer"; RT.render();
+        return poll(function () { return main.querySelector(".rv-stale"); });
+      }).then(function () {
+        ok(main.querySelector('[data-comment-id="c4"] .rv-stale').textContent === "No longer matches the current report", "shown on the comment");
+        // Go to
+        RR.goTo(RR.store().threads[0]);
+        ok(RT.state.stage === "report" && w.RiskReportPage.state.doc === 0, "Go to from the detailed report opens it on the Report page");
+        RR.goTo(RR.store().threads[1]);
+        ok(RT.state.stage === "report" && w.RiskReportPage.state.doc === 1, "and from the high-level report, that report");
+        RR.goTo(RR.store().threads[2]);
+        ok(RT.state.stage === "risk" || RT.state.stage === "slt", "and from an item, the risk page");
+        // Statuses
+        RT.state.stage = "peer"; RT.render();
+        RC.setStatus(RR.store(), "c1", "resolved");
+        RC.addReply(RR.store(), "c2", "A. Author", "Noted.");
+        saved = null;
+        p = RT.state.project;
+        p.suc.description = p.suc.description + " A later edit.";
+        RT.touched();
+        return RR.buildPack();
+      }).then(function (r) {
+        // The review tool opens a risk pack just the same: one contract.
+        window.__r2 = r;
+        return new Promise(function (res) {
+          var rf = document.getElementById("rr");
+          rf.onload = function () {
+            var rw = rf.contentWindow;
+            poll(function () { return rw.ReviewTool; }).then(function () {
+              rw.ReviewTool.loadTexts([{ name: "risk-pack.json", text: window.__riskPack }]);
+              var dd = rw.document, sel = dd.getElementById("rr-doc");
+              ok(rw.ReviewTool.state.pack && sel && sel.options.length === 2, "the review tool opens the risk pack, with a chooser for its two reports");
+              ok(dd.querySelectorAll("#rr-paper [data-block-id]").length === rw.ReviewTool.state.pack.documents[0].blocks.length, "and draws it");
+              sel.value = "1"; sel.dispatchEvent(new rw.Event("change", { bubbles: true }));
+              ok(dd.querySelectorAll("#rr-paper [data-block-id]").length === rw.ReviewTool.state.pack.documents[1].blocks.length, "and the high-level report");
+              dd.querySelector('.nav-item[data-page="checklist"]').click();
+              ok(/tolerable risk has been agreed/.test(dd.getElementById("main").textContent), "with the risk assessment's own checklist questions");
+              dd.querySelector('.nav-item[data-page="engagement"]').click();
+              ok(dd.querySelectorAll(".rr-item").length > 5, "and its threats on the Engagement page");
+              var res2 = rw.App.ReviewChecks.run(rw.ReviewTool.state.pack, {});
+              res2.forEach(function (x) { lines.push("flagged risk " + x.check + ": " + x.message + " [" + String(x.quote).slice(0, 110) + "]"); });
+              ok(res2.filter(function (x) { return x.check === "dashes" || x.check === "figures" || x.check === "numbering"; }).length === 0, "the automatic checks run on it (" + res2.length + " flagged, listed above); no false dash, figure or numbering alarm");
+              ok(res2.filter(function (x) { return x.check === "internal-wording"; }).length === 0, "and no wording that describes the software in either report");
+              rw.ReviewTool.state.dirty = false;
+              res();
+            });
+          };
+          rf.src = "../../report-review/index.html";
+        }).then(function () { return window.__r2; });
+      }).then(function (r) {
+        ok(r.pack.round === 2 && r.pack.previousRound.comments.length === 4 && r.pack.previousRound.comments.some(function (c) { return c.status === "resolved"; }) && r.pack.previousRound.comments.some(function (c) { return c.replies.length === 1; }), "the next round carries statuses and replies");
+        // ---- nothing reaches a deliverable --------------------------------------------
+        var p2 = RT.state.project, RX = w.RiskExports;
+        var MARK = ["Text of c1", "J. Marsh", "spt-review", "packId", w.App.Version.number, w.App.Version.label];
+        function scan(parts) {
+          var hits = [];
+          parts.forEach(function (x) { MARK.forEach(function (m) { if (x.text.indexOf(m) !== -1) hits.push(x.name + " has " + m); }); });
+          return hits;
+        }
+        return w.docx.Packer.toBlob(RX.buildWordDoc(p2, {})).then(function (b) { return unzipAll(w, b); }).then(function (parts) {
+          var hits = scan(parts);
+          ok(parts.length > 3 && hits.length === 0, "nothing of the review, and no version, in the Word report", hits.slice(0, 4).join(" | "));
+          return w.docx.Packer.toBlob(RX.buildWordDoc(p2, { highLevelOnly: true }));
+        }).then(function (b) { return unzipAll(w, b); }).then(function (parts) {
+          var hits = scan(parts);
+          ok(hits.length === 0, "nor the high-level report", hits.slice(0, 4).join(" | "));
+          return RX.buildWorkbook(p2).xlsx.writeBuffer();
+        }).then(function (buf) { return unzipAll(w, new w.Blob([buf])); }).then(function (parts) {
+          var hits = scan(parts);
+          ok(parts.length > 3 && hits.length === 0, "nor the Excel workbook", hits.slice(0, 4).join(" | "));
+          var ctx = JSON.stringify(w.RiskTool.buildRiskContext ? w.RiskTool.buildRiskContext() : {});
+          ok(ctx.indexOf("Text of c1") === -1 && ctx.indexOf("J. Marsh") === -1, "nor the risk context file");
+          // A saved project keeps it, and an older one loads.
+          var saved2 = JSON.parse(JSON.stringify(RT.state.project));
+          ok(saved2.review && saved2.review.threads.length === 4, "the review is in the saved project");
+          var loaded = RT.loadProjectText(JSON.stringify(saved2));
+          ok(loaded && RR.store() && RR.store().threads.length === 4, "and comes back on load");
+          var old = JSON.parse(JSON.stringify(saved2)); delete old.review;
+          ok(RT.loadProjectText(JSON.stringify(old)) && !RR.store(), "a file with no review loads as before");
+          RT.state.stage = "peer"; RT.render();
+          ok(/Nothing has been sent yet/.test(w.document.getElementById("main").textContent), "and starts from nothing");
+          // ---- a copy saved before Send for review: the pack puts the round back ----------
+          var lone = RR.importTexts([{ name: "a.json", text: window.__riskFile }]);
+          ok(lone.bad === 1 && /import the pack file here first/.test(lone.lines[0]) && !/Open the assessment it/.test(lone.lines[0]) && !RR.store(), "a review file alone is refused, saying to import the pack first", lone.lines[0]);
+          var both = RR.importTexts([{ name: "p.json", text: window.__riskPack }, { name: "a.json", text: window.__riskFile }]);
+          ok(both.bad === 0 && !!RT.state.project.review && RR.store().rounds.length === 1 && RR.store().threads.length === 4, "and the pack with it puts the round back on the project, and the file merges", both.lines.join(" | "));
+          var foreign = JSON.parse(window.__riskPack); foreign.engagement.client = "Another Client Ltd";
+          ok(RR.importTexts([{ name: "x.json", text: JSON.stringify(foreign) }]).bad === 1, "a pack for another client is refused");
+          // ---- Go to leaves Peer review: a way back on the page it went to ------------------
+          var main2 = w.document.getElementById("main");
+          RT.state.stage = "peer"; RT.render();
+          return poll(function () { return main2.querySelector('[data-comment-id="c2"] .rv-go'); }).then(function (go) {
+            go.click();
+            var bar = w.document.getElementById("rv-back-page");
+            ok(RT.state.stage === "report" && !!bar && bar.parentNode === w.document.body, "Go to leaves Peer review, with Back to the comment on the page it went to");
+            bar.querySelector(".rv-back-go").click();
+            ok(RT.state.stage === "peer" && !w.document.getElementById("rv-back-page") && !!main2.querySelector('[data-comment-id="c2"]'), "and Back returns to Peer review, at the comment");
+          });
+        });
+      });
+    }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+      try { w.RiskTool.touched && (w.onbeforeunload = null); } catch (e) {}
+      finish();
+    });
+  };
+  frame.src = "../index.html?tour=1";
+})();
+</script>
+</body></html>

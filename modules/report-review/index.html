@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>OT Cyber Report Review Tool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <link rel="stylesheet" href="css/spt-theme.css" />
+  <link rel="stylesheet" href="css/review.css" />
+  <!-- Apply the saved (or system) colour theme before first paint to avoid a
+       flash. Shares the "ot-theme" key with the other tools. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("ot-theme");
+        if (t !== "dark" && t !== "light") {
+          t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="brand">
+        <span class="brand-logo"><img src="data/AVEVASelect-LogoLockup-Landscape-Positive.png" alt="SolutionsPT - AVEVA Select UK &amp; Ireland" /></span>
+        <span class="sub">OT Cyber Report Review Tool <span id="version-badge" class="stage-badge"></span></span>
+      </div>
+      <span id="pack-summary" class="engagement-summary"></span>
+      <div class="spacer"></div>
+      <div class="header-actions no-print">
+        <button id="btn-theme" class="btn ghost" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
+        <button id="btn-load" class="btn ghost" title="Open a review pack, or a review file saved earlier">Load</button>
+        <button id="btn-save" class="btn ghost" title="Save your review file (Shift+click: Save as)">Save</button>
+        <input id="file-input" type="file" accept="application/json,.json" multiple class="hidden" />
+      </div>
+    </div>
+    <div id="sidebar" class="sidebar no-print"></div>
+    <div id="main" class="main"></div>
+  </div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="js/version.js"></script>
+  <script src="js/product.js"></script>
+  <script src="js/host-bridge.js"></script>
+  <script src="data/review-pack.js"></script>
+  <script src="data/review-file.js"></script>
+  <script src="data/checklists.js"></script>
+  <script src="data/licence.js"></script>
+  <script src="js/review-core.js"></script>
+  <script src="js/checks.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

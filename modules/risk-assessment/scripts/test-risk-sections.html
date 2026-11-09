@@ -1,0 +1,507 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Risk tool: per-section report editing</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The Report page, on the tour's demo project and on real Word output (the tests
+  unzip the file and read document.xml; nothing here is a mock, so the two
+  documented traps, write-only paragraphs and a pass that must recurse, are tested
+  where they would bite). In spirit it is the assessment tool's
+  test-report-customise-all.html, once per report: every section keyed and
+  offering Edit; rename, rewrite and hide reach Word; identical text stores
+  nothing; Back to the generated version clears; a rename does not orphan its
+  override; detailed and high-level overrides stay independent; per-zone repeats
+  refuse a rewrite; a reorder reaches Word; and it all survives the project file.
+  risk-word-baseline.js holds the demo's Word text from before this feature: with
+  no overrides, the text must not move.
+  Needs allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script src="risk-word-baseline.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 120000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+  function norm(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim(); }
+  // The text of document.xml, one line per paragraph, entities as written.
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var t = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+      if (t.replace(/\s+/g, "")) out.push(t);
+    }
+    return out;
+  }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;"); }
+
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, RT, RP, RX, DB, RS, d, main;
+    w.confirm = function () { return true; }; w.alert = function () {};
+    function P() { return RT.state.project; }
+    function wordXml(opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(P(), opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
+      });
+    }
+    function wordBlocks(opts) {
+      var probe = [];
+      return w.docx.Packer.toBlob(RX.buildWordDoc(P(), Object.assign({}, opts || {}, { sectionProbe: probe }))).then(function (b) {
+        return DB.fromBlob(b, { idPrefix: "t", headings: probe });
+      }).then(function (r) { return r.blocks.filter(function (x) { return !x.front; }); });
+    }
+    function card(key) { return main.querySelector('.card[data-section="' + key + '"]'); }
+    function cardOwn(key, sel) {
+      var c = card(key);
+      return [].slice.call(c.querySelectorAll(sel)).filter(function (e) { var p = e.parentNode; while (p && !(p.classList && p.classList.contains("rp-section"))) p = p.parentNode; return p === c; });
+    }
+    function clickIn(scope, label) {
+      var b = [].slice.call(scope.querySelectorAll("button")).filter(function (x) { return (x.textContent || "").trim() === label; })[0];
+      if (b) b.click();
+      return !!b;
+    }
+    function settled() { return poll(function () { return RP.idle(); }); }
+    function openReport(i) {
+      RT.state.stage = "report"; RP.state.doc = i; RP.state.open = null; RT.render();
+      return settled();
+    }
+    function edit(key) { card(key).querySelector(".sect-edit").click(); return card(key); }
+    function type(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); return settled(); }
+    function reset() {
+      delete P().reportCustom;
+      RP.state.open = null;
+      RT.touched();
+    }
+
+    poll(function () { return w.RiskTool && w.RiskReportPage && w.RiskExports && w.docx && w.ExcelJS && w.RiskTool.state.project.zones.length; }).then(function () {
+      RT = w.RiskTool; RP = w.RiskReportPage; RX = w.RiskExports; DB = w.App.DocxBlocks; RS = w.App.ReportSections; d = w.document; main = d.getElementById("main");
+
+      // ---- with no overrides, Word has not moved --------------------------------
+      ok(!P().reportCustom, "a project has no overrides until one is made");
+      return wordXml({}).then(function (xml) {
+        var now = paragraphsOf(xml), was = window.RISK_WORD_BASELINE.detailed;
+        var at = -1; for (var i = 0; i < Math.max(now.length, was.length); i++) { if (now[i] !== was[i]) { at = i; break; } }
+        ok(at === -1, "the detailed Word report's text is what it was before this feature (" + now.length + " paragraphs)", at === -1 ? "" : "line " + at + ": " + String(now[at]).slice(0, 120) + " / " + String(was[at]).slice(0, 120));
+        return wordXml({ highLevelOnly: true });
+      }).then(function (xml) {
+        var now = paragraphsOf(xml), was = window.RISK_WORD_BASELINE.highLevel;
+        var at = -1; for (var i = 0; i < Math.max(now.length, was.length); i++) { if (now[i] !== was[i]) { at = i; break; } }
+        ok(at === -1, "and the high-level report's (" + now.length + " paragraphs)", at === -1 ? "" : "line " + at + ": " + String(now[at]).slice(0, 120) + " / " + String(was[at]).slice(0, 120));
+
+        // ---- the page ---------------------------------------------------------------
+        var nav = [].slice.call(d.querySelectorAll("#sidebar .nav-item")).filter(function (n) { return /^Report/.test(n.textContent); })[0];
+        ok(!!nav, "the sidebar has a Report page");
+        nav.click();
+        ok(/Report preview/.test(main.textContent), "it opens as Report preview");
+        ok(/Refreshing the preview/.test(main.querySelector(".rp-status").textContent), "and says it is refreshing while it builds");
+        return settled();
+      }).then(function () {
+        ok(main.querySelector(".rp-status").textContent === "", "and stops saying so when it has");
+        var tabs = [].slice.call(main.querySelectorAll(".rp-tab")).map(function (b) { return b.textContent; });
+        ok(tabs.join("|") === "Detailed|High level", "with both reports to choose from", tabs.join("|"));
+        ok(!main.querySelector(".mode-toggle") && main.textContent.indexOf("Customise report") === -1, "and no mode to switch into");
+        // The scorecard draws, as Word does: tiles, bars and the key to them.
+        ok(main.querySelectorAll(".rp-tile").length >= 11, "the scorecard's tiles are drawn (" + main.querySelectorAll(".rp-tile").length + ")");
+        var segs = [].slice.call(main.querySelectorAll(".rp-stack .rp-seg"));
+        ok(segs.length > 3 && segs.every(function (x) { return !!x.style.background; }), "and its stacked bars, in Word's colours (" + segs.length + " segments)");
+        var marks = [].slice.call(main.querySelectorAll(".rp-legend-mark"));
+        ok(marks.length === 4 && marks.every(function (x) { return !!x.style.color; }), "and the key to them");
+
+        // Each report, in turn: what is on screen is what Word prints, and every
+        // section is keyed and offers Edit.
+        var chain = Promise.resolve();
+        [0, 1].forEach(function (i) {
+          var tag = RP.DOCS[i].label + ": ";
+          chain = chain.then(function () { return openReport(i); }).then(function () {
+            return wordBlocks(RP.DOCS[i].opts);
+          }).then(function (blocks) {
+            var heads = blocks.filter(function (b) { return b.type === "heading"; });
+            var named = heads.filter(function (b) { return b.sectionKey; });
+            var keyed = {}, all = [].slice.call(main.querySelectorAll(".rp-doc .card[data-section]"));
+            all.forEach(function (c) { keyed[c.getAttribute("data-section")] = true; });
+            var missing = named.filter(function (h) { return !keyed[h.sectionKey]; });
+            ok(all.length >= 8 && missing.length === 0, tag + "every section Word prints is keyed on screen (" + all.length + ")", missing.map(function (h) { return h.text; }).join(" | "));
+            ok(all.every(function (c) { return !!c.querySelector(".card-h .sect-edit") && c.querySelector(".sect-edit").textContent === "Edit"; }), tag + "and offers Edit");
+            ok(Object.keys(keyed).length === all.length, tag + "with one card per key");
+            ok(!main.querySelector(".card.editing") && !main.querySelector(".section-hidden"), tag + "and nothing edited or hidden to start with");
+            // On screen against the Word file, text for text.
+            var fromWord = DB.flatten(blocks).filter(function (b) { return b.type !== "heading"; }).map(function (b) { return norm(b.text); }).filter(Boolean);
+            var shown = main.querySelector(".rp-doc").textContent.replace(/\s+/g, " ");
+            var absent = fromWord.filter(function (t) { return shown.indexOf(t) === -1; });
+            ok(absent.length === 0, tag + "and every paragraph and cell Word prints is on the page (" + fromWord.length + ")", absent.slice(0, 3).join(" | "));
+          });
+        });
+        return chain;
+      }).then(function () {
+        // ---- the same gestures, on both reports -----------------------------------------
+        var chain = Promise.resolve();
+        var CASES = [
+          { i: 0, opts: {}, rename: "system-under-consideration-and-requirements", hide: "method-and-limitations" },
+          { i: 1, opts: { highLevelOnly: true }, rename: "why-this-assessment", hide: "what-happens-next" }
+        ];
+        CASES.forEach(function (c) {
+          var id = RP.DOCS[c.i].id, tag = RP.DOCS[c.i].label + ": ", generatedTitle, generatedProse, firstLine;
+          chain = chain.then(function () { reset(); return openReport(c.i); }).then(function () {
+            var cd = edit(c.rename);
+            generatedTitle = cd.getAttribute("data-section-title");
+            generatedProse = cd.getAttribute("data-generated-prose");
+            firstLine = generatedProse.split("\n")[0];
+            ok(cd.classList.contains("editing"), tag + "Edit opens the section in place");
+            ok(cd.querySelector(".sect-edit").textContent === "Done", tag + "the button becomes Done");
+            var ti = cardOwn(c.rename, ".sect-title-input")[0], pa = cardOwn(c.rename, ".sect-prose-input")[0];
+            ok(!!ti && ti.value === generatedTitle, tag + "the heading becomes a field holding the title", ti && ti.value);
+            ok(!!pa && pa.value === generatedProse && generatedProse.length > 20, tag + "and the opening paragraphs a box holding those same sentences");
+            ok(!cardOwn(c.rename, ".card-h h2").length, tag + "the heading is swapped, not duplicated");
+            ok(cardOwn(c.rename, "p.rp-p").every(function (p) { return p.textContent !== firstLine; }), tag + "and so is the wording");
+            ok(cardOwn(c.rename, ".sect-actions button").map(function (b) { return b.textContent; }).join("|") === "Hide this section", tag + "with Hide this section at the foot, and nothing to go back from yet");
+            ok(pa.offsetHeight > 40 && pa.scrollHeight <= pa.offsetHeight + 4, tag + "and the box grown to the text", pa.offsetHeight + " / " + pa.scrollHeight);
+            // Identical text stores nothing.
+            var dirty0 = JSON.stringify(P().reportCustom || null);
+            pa.value = generatedProse + "\n";
+            pa.dispatchEvent(new w.Event("change", { bubbles: true }));
+            ti.value = generatedTitle;
+            ti.dispatchEvent(new w.Event("change", { bubbles: true }));
+            ok(JSON.stringify(P().reportCustom || null) === dirty0 && !P().reportCustom, tag + "text identical to the generated version stores nothing");
+            return settled();
+          }).then(function () {
+            ok(card(c.rename).querySelector(".sect-edit").textContent === "Done" && !card(c.rename).querySelector(".sect-edit.changed"), tag + "so the section does not read as edited");
+            // Rename.
+            var ti = cardOwn(c.rename, ".sect-title-input")[0];
+            return type(ti, "Renamed for " + c.i);
+          }).then(function () {
+            ok(RP.sectionOf(id, c.rename).title === "Renamed for " + c.i, tag + "a rename is stored");
+            ok(!!card(c.rename), tag + "and the card keeps its key, so the override is not orphaned");
+            ok(cardOwn(c.rename, ".sect-title-input")[0].value === "Renamed for " + c.i, tag + "and the field holds it after the rebuild");
+            ok(RT.isDirty(), tag + "it counts as unsaved work");
+            // Rewrite, after the rename: the key is still the generated heading's.
+            var pa = cardOwn(c.rename, ".sect-prose-input")[0];
+            ok(pa.value === generatedProse, tag + "the wording box still holds the generated text after the rename");
+            return type(pa, "MARKER-" + c.i + " first paragraph.\nMARKER-" + c.i + " second paragraph.");
+          }).then(function () {
+            ok(/^MARKER/.test(RP.sectionOf(id, c.rename).prose), tag + "a rewrite is stored, on the same section");
+            ok(cardOwn(c.rename, ".sect-prose-input")[0].value.indexOf("MARKER-" + c.i + " second") !== -1, tag + "and stays in the box");
+            ok(clickIn(card(c.rename), "Done"), tag + "Done closes it");
+            ok(card(c.rename).querySelector(".sect-edit").textContent === "Edited", tag + "and it now reads as Edited");
+            ok(main.textContent.indexOf("MARKER-" + c.i + " second paragraph.") !== -1, tag + "and shows on the page");
+            return wordXml(c.opts);
+          }).then(function (xml) {
+            var paras = paragraphsOf(xml);
+            ok(paras.indexOf("Renamed for " + c.i) !== -1, tag + "Word: the rename prints");
+            ok(paras.indexOf(esc(generatedTitle)) === -1, tag + "Word: the old title does not");
+            ok(paras.indexOf("MARKER-" + c.i + " first paragraph.") !== -1 && paras.indexOf("MARKER-" + c.i + " second paragraph.") !== -1, tag + "Word: the rewrite prints as two paragraphs");
+            ok(xml.indexOf(esc(firstLine)) === -1, tag + "Word: the old opening does not");
+            // Hide.
+            edit(c.hide);
+            ok(clickIn(card(c.hide), "Hide this section"), tag + "Hide this section is offered");
+            ok(RP.sectionOf(id, c.hide).hidden === true, tag + "it is stored");
+            return settled();
+          }).then(function () {
+            ok(card(c.hide).classList.contains("section-hidden"), tag + "a hidden section stays on the page, dimmed, so it can be put back");
+            ok(/Hidden: left out of the Word document/.test(card(c.hide).querySelector(".card-h").textContent), tag + "and says so");
+            ok(cardOwn(c.hide, ".sect-actions button").map(function (b) { return b.textContent; }).join("|") === "Hidden (click to show)|Back to the generated version", tag + "with the way back at the foot", cardOwn(c.hide, ".sect-actions button").map(function (b) { return b.textContent; }).join("|"));
+            return wordXml(c.opts);
+          }).then(function (xml) {
+            var title = esc(card(c.hide).getAttribute("data-section-title"));
+            ok(paragraphsOf(xml).indexOf(title) === -1, tag + "Word: a hidden section is dropped, heading and body", title);
+            // Back to the generated version.
+            ok(clickIn(card(c.hide), "Back to the generated version"), tag + "Back to the generated version is offered");
+            ok(!RP.sectionOf(id, c.hide).hidden, tag + "it clears the override");
+            return settled();
+          }).then(function () {
+            ok(!card(c.hide).classList.contains("section-hidden"), tag + "and the section is back");
+            edit(c.rename);
+            ok(clickIn(card(c.rename), "Back to the generated version"), tag + "the rename and rewrite go back the same way");
+            ok(!P().reportCustom, tag + "and with nothing left the project has no overrides at all", JSON.stringify(P().reportCustom));
+            return settled();
+          }).then(function () {
+            return wordXml(c.opts);
+          }).then(function (xml) {
+            ok(paragraphsOf(xml).indexOf(esc(generatedTitle)) !== -1 && xml.indexOf(esc(firstLine)) !== -1, tag + "Word: the generated text is back");
+          });
+        });
+        return chain;
+      }).then(function () {
+        // ---- the recursion trap, on real Word output -------------------------------------
+        reset();
+        RP.setSection("detailed", "what-we-found", { title: "Our findings" });
+        RP.setSection("detailed", "what-this-report-is", { hidden: true });
+        RP.setSection("detailed", "executive-summary", { title: "Summary for the board" });
+        RP.setSection("detailed", "operating-environment-assumptions", { title: "Assumptions" });
+        return wordBlocks({});
+      }).then(function (bl) {
+        var hs = bl.filter(function (b) { return b.type === "heading"; }).map(function (b) { return b.text; });
+        ok(hs.indexOf("Summary for the board") !== -1, "an h1 renamed");
+        ok(hs.indexOf("Our findings") !== -1, "an h2 nested under that h1 renamed: the pass recursed, so the h1 did not swallow it");
+        ok(hs.indexOf("What this report is") === -1 && hs.indexOf("Why this assessment") !== -1, "a nested h2 hidden, its sibling kept");
+        ok(hs.indexOf("Assumptions") !== -1, "an h2 under another h1 renamed");
+        var found = bl.filter(function (b) { return b.type === "heading" && b.text === "Our findings"; })[0];
+        ok(found.sectionKey === "what-we-found", "a renamed heading keeps the key of its section", found.sectionKey);
+        ok(bl.some(function (b) { return b.sectionKey === "what-we-found" && b.type === "paragraph" && /threats were registered/.test(b.text); }), "and its body stays under it");
+        RP.setSection("detailed", "executive-summary", { hidden: true });
+        return wordBlocks({});
+      }).then(function (bl) {
+        var hs = bl.filter(function (b) { return b.type === "heading"; }).map(function (b) { return b.text; });
+        ok(hs.indexOf("Summary for the board") === -1 && hs.indexOf("Our findings") === -1, "hiding the h1 takes its nested sections with it");
+        ok(hs.indexOf("Risk at a glance") !== -1 && hs[0] === "Document control", "and nothing outside it");
+        reset();
+        // What a rewrite leaves alone.
+        RP.setSection("detailed", "system-under-consideration-and-requirements", { prose: "A new description." });
+        RP.setSection("detailed", "high-level-risk-ranking-4-2", { prose: "A new opening for the ranking." });
+        RP.setSection("detailed", "what-happens-next", { prose: "Our own next steps." });
+        return wordBlocks({});
+      }).then(function (bl) {
+        var sec = bl.filter(function (b) { return b.sectionKey === "system-under-consideration-and-requirements"; });
+        ok(sec.some(function (b) { return b.text === "A new description."; }) && sec.some(function (b) { return /^Scope: /.test(b.text); }) && sec.some(function (b) { return /^Tolerable risk: /.test(b.text); }), "a rewrite replaces only the opening wording: scope and tolerable risk stay");
+        var rank = bl.filter(function (b) { return b.sectionKey === "high-level-risk-ranking-4-2"; });
+        ok(rank.some(function (b) { return b.text === "A new opening for the ranking."; }) && rank.some(function (b) { return b.type === "table"; }), "and a table under it survives");
+        var next = bl.filter(function (b) { return b.sectionKey === "what-happens-next" && b.type === "paragraph"; }).map(function (b) { return b.text; });
+        ok(next[0] === "Our own next steps." && /signed off/.test(next[1]) && next.length === 2, "the sign-off statement in a rewritten opening is not touched", JSON.stringify(next).slice(0, 200));
+        ok(next.join(" ").indexOf("Consultant note") === -1, "and deleting the consultant note in the box deletes it from Word");
+        reset();
+        return openReport(0);
+      }).then(function () {
+        var c = edit("what-happens-next"), box = cardOwn("what-happens-next", ".sect-prose-input")[0];
+        ok(/Consultant note: tailor this summary/.test(box.value), "the red consultant note is in the box, to be deleted there");
+        ok(!/signed off/.test(box.value), "the sign-off statement is not");
+        ok(cardOwn("what-happens-next", "p.rp-p").some(function (p) { return /signed off/.test(p.textContent); }), "it stays on the page beside the box");
+        return type(box, box.value.replace(/^The output/, "An edited output"));
+      }).then(function () {
+        return wordBlocks({});
+      }).then(function (bl) {
+        var note = DB.flatten(bl).filter(function (b) { return /^Consultant note: tailor/.test(b.text); })[0];
+        ok(!!note && note.red === true, "left in a rewrite, it still prints red, as what it is");
+        reset();
+        ok(cardOwn("what-happens-next", ".sect-prose-input").length === 1, "the box is still open after the rebuild");
+        RP.state.open = null;
+        return openReport(0);
+      }).then(function () {
+        // ---- a section with nothing to rewrite ---------------------------------------------
+        ["document-control", "sign-off", "risk-at-a-glance"].forEach(function (k) {
+          var c = edit(k);
+          ok(cardOwn(k, ".sect-title-input").length === 1 && cardOwn(k, ".sect-prose-input").length === 0, k + ": the title and Hide, no wording box");
+          ok(/no opening wording to rewrite/.test(cardOwn(k, ".sect-note").map(function (x) { return x.textContent; }).join(" ")), k + ": saying why");
+          ok(clickIn(c, "Done"), k + ": and Done");
+        });
+        var signed = JSON.stringify(P().approval);
+        RP.setSection("detailed", "sign-off", { title: "Asset owner approval" });
+        ok(JSON.stringify(P().approval) === signed, "renaming the sign-off section does not touch the sign-off");
+        return wordBlocks({});
+      }).then(function (bl) {
+        var sec = bl.filter(function (b) { return b.sectionKey === "sign-off"; });
+        ok(sec[0].text === "Asset owner approval" && /Signed off by|signed off/.test(sec.slice(1).map(function (b) { return b.text; }).join(" ")), "and what it records still prints under the new title");
+        reset();
+        return openReport(0);
+      }).then(function () {
+        // ---- a section repeated per zone ------------------------------------------------------
+        var key = "justification-for", c = card(key), zones = P().zones.concat(P().conduits).filter(function (o) { return (o.justification || "").trim(); });
+        ok(!!c && c.getAttribute("data-repeat") === "1", "the per-zone justifications are one section (" + zones.length + " zones and conduits)");
+        ok(c.getAttribute("data-section-title") === "Justification for", "titled without a zone's name", c.getAttribute("data-section-title"));
+        ok(zones.every(function (o) { return c.textContent.indexOf(o.justification.trim().slice(0, 60)) !== -1; }), "showing each one's own wording");
+        edit(key);
+        ok(!cardOwn(key, ".sect-prose-input").length, "a rewrite is not offered");
+        ok(cardOwn(key, "[data-no-rewrite]").length === 1 && /has its own wording here, so a rewrite in one box would replace all of them/.test(cardOwn(key, "[data-no-rewrite]")[0].textContent), "saying why on screen");
+        return type(cardOwn(key, ".sect-title-input")[0], "SL-T rationale for");
+      }).then(function () {
+        return wordBlocks({});
+      }).then(function (bl) {
+        var hs = bl.filter(function (b) { return b.type === "heading" && b.sectionKey === "justification-for"; }).map(function (b) { return b.text; });
+        var zones = P().zones.concat(P().conduits).filter(function (o) { return (o.justification || "").trim(); });
+        ok(hs.length === zones.length && hs.every(function (t, i) { return t === "SL-T rationale for " + zones[i].id + " " + zones[i].name; }), "Word: the title applies to each, keeping each zone's own name", hs.slice(0, 2).join(" | "));
+        // A stored rewrite (a hand-edited file) still must not replace them all.
+        RP.setSection("detailed", "justification-for", { prose: "Replaces every zone?" });
+        return wordXml({});
+      }).then(function (xml) {
+        var zones = P().zones.concat(P().conduits).filter(function (o) { return (o.justification || "").trim(); });
+        ok(xml.indexOf("Replaces every zone?") === -1 && zones.every(function (o) { return xml.indexOf(esc(o.justification.trim()).slice(0, 60)) !== -1; }), "Word: a stored rewrite of a repeat changes nothing");
+        RP.clearSection("detailed", "justification-for");
+        RP.setSection("detailed", "justification-for", { hidden: true });
+        return wordBlocks({});
+      }).then(function (bl) {
+        ok(!bl.some(function (b) { return b.sectionKey === "justification-for"; }), "Word: Hide takes all of them");
+        ok(bl.some(function (b) { return b.sectionKey === "target-security-levels-sl-t-per-foundational-requirement" && b.type === "table"; }), "and leaves the SL-T table before them");
+        reset();
+        // A zone's own heading is its name.
+        return openReport(0);
+      }).then(function () {
+        var heads = [].slice.call(card("zones-conduits-and-the-detailed-risk-assessment").querySelectorAll(".rp-subhead"));
+        ok(heads.length === P().zones.length + P().conduits.length, "each zone's register heading is in its parent section (" + heads.length + ")");
+        ok(heads.every(function (h) { return h.querySelector("button") === null; }), "as a name, with no Edit of its own");
+        edit("zones-conduits-and-the-detailed-risk-assessment");
+        ok(/names of the zones and conduits/.test(cardOwn("zones-conduits-and-the-detailed-risk-assessment", ".sect-note").map(function (x) { return x.textContent; }).join(" ")), "and the parent says where to rename them");
+        // Keys do not move when a zone is named like a fixed heading.
+        ok(RS.sectionKey("Justification for Z1 Unit 300 BPCS", ["Z1 Unit 300 BPCS"]) === "justification-for", "the key strips the zone's name");
+        var saved = P().zones[0].name;
+        P().zones[0].name = "Risk";
+        RT.touched();
+        RP.setSection("detailed", "risk-at-a-glance", { title: "Risk in brief" });
+        return wordBlocks({}).then(function (bl) {
+          ok(bl.some(function (b) { return b.type === "heading" && b.text === "Risk in brief" && b.sectionKey === "risk-at-a-glance"; }), "a zone called Risk does not move the key of Risk at a glance");
+          ok(bl.some(function (b) { return b.type === "heading" && b.text === "Z1: Risk" && b.sectionKey === ""; }), "and its own heading stays a name");
+          P().zones[0].name = saved;
+          reset();
+        });
+      }).then(function () {
+        // ---- the two reports stay independent -------------------------------------------------
+        RP.setSection("detailed", "executive-summary", { title: "Detailed summary" });
+        RP.setSection("highLevel", "executive-summary", { title: "High-level summary" });
+        RP.setSection("detailed", "why-this-assessment", { prose: "Detailed reason." });
+        RP.setSection("highLevel", "method-and-limitations", { hidden: true });
+        ok(Object.keys(P().reportCustom).join() === "detailed,highLevel", "two stores, one per report", Object.keys(P().reportCustom).join());
+        return Promise.all([wordBlocks({}), wordBlocks({ highLevelOnly: true })]);
+      }).then(function (both) {
+        function heads(b) { return b.filter(function (x) { return x.type === "heading"; }).map(function (x) { return x.text; }); }
+        function all(b) { return DB.flatten(b).map(function (x) { return x.text; }).join("\n"); }
+        ok(heads(both[0]).indexOf("Detailed summary") !== -1 && heads(both[0]).indexOf("High-level summary") === -1, "the detailed report takes its own title");
+        ok(heads(both[1]).indexOf("High-level summary") !== -1 && heads(both[1]).indexOf("Detailed summary") === -1, "the high-level report takes its own");
+        ok(all(both[0]).indexOf("Detailed reason.") !== -1 && all(both[1]).indexOf("Detailed reason.") === -1, "a rewrite in one does not reach the other");
+        ok(heads(both[0]).indexOf("Method and limitations") !== -1 && heads(both[1]).indexOf("Method and limitations") === -1, "and nor does a hide");
+        reset();
+        return openReport(0);
+      }).then(function () {
+        // ---- reorder, by arrows and by dragging, on both ranked lists --------------------------
+        function cards(bl, key) { return bl.filter(function (b) { return b.sectionKey === key && b.type === "table" && b.rows.length === 1; }).map(function (b) { return b.rows[0].cells.map(function (c) { return c.text; }).join("|"); }); }
+        var chain = Promise.resolve();
+        [{ i: 0, key: "where-to-focus-first", opts: {} }, { i: 1, key: "where-to-look-first", opts: { highLevelOnly: true } }].forEach(function (c) {
+          var id = RP.DOCS[c.i].id, tag = RP.DOCS[c.i].label + " " + c.key + ": ", before, names;
+          function rows() { return [].slice.call(card(c.key).querySelectorAll("[data-reorder-id]")); }
+          chain = chain.then(function () { reset(); return openReport(c.i); }).then(function () { return wordBlocks(c.opts); }).then(function (bl) {
+            before = cards(bl, c.key);
+            ok(before.length >= 2, tag + "the demo has a list to rank (" + before.length + ")");
+            ok(rows().length === before.length && !rows()[0].querySelector(".reorder-btn"), tag + "listed on the page, with no arrows until Edit");
+            names = rows().map(function (r) { return r.querySelector(".priority-name").textContent; });
+            edit(c.key);
+            ok(rows().every(function (r) { return r.classList.contains("reordering") && r.getAttribute("draggable") === "true"; }), tag + "Edit makes each row draggable");
+            ok(rows()[0].querySelectorAll(".reorder-btn").length === 2 && rows()[0].querySelector(".reorder-btn").disabled, tag + "with up and down arrows");
+            var ids = rows().map(function (r) { return r.getAttribute("data-reorder-id"); });
+            rows()[0].querySelectorAll(".reorder-btn")[1].click();
+            ok(JSON.stringify(RP.sectionOf(id, c.key).order) === JSON.stringify([ids[1], ids[0]].concat(ids.slice(2))), tag + "an arrow stores the order", JSON.stringify(RP.sectionOf(id, c.key).order));
+            return settled();
+          }).then(function () { return wordBlocks(c.opts); }).then(function (bl) {
+            var after = cards(bl, c.key);
+            var nameOf = function (x) { return x.split("|")[1]; };
+            ok(nameOf(after[0]) === names[1] && nameOf(after[1]) === names[0], tag + "Word: the arrow's order prints", after.join(" // "));
+            ok(/^1\|/.test(after[0]) && /^2\|/.test(after[1]), tag + "Word: renumbered from the top");
+            ok(rows()[0].querySelector(".priority-name").textContent === names[1], tag + "and the page follows");
+            // Drag the last row above the first.
+            var last = rows()[rows().length - 1], first = rows()[0];
+            function fire(el, t) { var e = new w.Event(t, { bubbles: true, cancelable: true }); el.dispatchEvent(e); }
+            fire(last, "dragstart"); fire(first, "dragover");
+            ok(first.classList.contains("drop-target"), tag + "dragging over a row marks where it will land");
+            var expectFirst = last.querySelector(".priority-name").textContent;
+            fire(first, "drop");
+            return settled().then(function () { return wordBlocks(c.opts); }).then(function (bl2) {
+              ok(cards(bl2, c.key)[0].split("|")[1] === expectFirst, tag + "Word: a dragged row lands where it was dropped", cards(bl2, c.key)[0]);
+            });
+          }).then(function () {
+            ok(clickIn(card(c.key), "Back to the generated version"), tag + "Back to the generated version restores the computed order");
+            return settled();
+          }).then(function () { return wordBlocks(c.opts); }).then(function (bl) {
+            ok(JSON.stringify(cards(bl, c.key)) === JSON.stringify(before), tag + "Word: as it was");
+          });
+        });
+        return chain.then(function () {
+          // applyOrder's rule, on the risk tool's own list: a row nobody placed
+          // comes after the placed ones and fills the three the card prints.
+          var rows = ["a", "b", "c", "d"], idOf = function (x) { return x; };
+          ok(RS.applyOrder(rows, ["c"], idOf).join("") === "cabd", "a row not in a stored order comes after the ordered ones");
+        });
+      }).then(function () {
+        // ---- the project file ----------------------------------------------------------------
+        reset();
+        RP.setSection("detailed", "executive-summary", { title: "Saved detailed title" });
+        RP.setSection("highLevel", "method-and-limitations", { hidden: true });
+        var saved = JSON.stringify(P());
+        ok(JSON.parse(saved).schema === "spt-risk-project/0.2", "the file format's schema has not moved: the field is optional");
+        ok(RT.loadProjectText(saved), "a project with overrides loads");
+        ok(RP.sectionOf("detailed", "executive-summary").title === "Saved detailed title" && RP.sectionOf("highLevel", "method-and-limitations").hidden === true, "and they come back, per report");
+        return wordBlocks({}).then(function (bl) {
+          ok(bl.some(function (b) { return b.type === "heading" && b.text === "Saved detailed title"; }), "and reach Word");
+          var old = JSON.parse(saved); delete old.reportCustom;
+          ok(RT.loadProjectText(JSON.stringify(old)) && !P().reportCustom, "a file from before them loads with none");
+          var junk = JSON.parse(saved); junk.reportCustom = "nonsense";
+          ok(RT.loadProjectText(JSON.stringify(junk)) && !P().reportCustom, "a store that is not one is dropped");
+          var junk2 = JSON.parse(saved); junk2.reportCustom = { detailed: [1, 2] };
+          ok(RT.loadProjectText(JSON.stringify(junk2)) && !P().reportCustom.detailed, "and so is one report's");
+          ok(RT.loadProjectText(JSON.stringify(old)), "back to the demo");
+          ok(!RT.isDirty(), "loaded, nothing is unsaved");
+          RP.setSection("detailed", "executive-summary", { title: "Autosave me" });
+          ok(RT.isDirty(), "an edit marks the project dirty, like any other");
+          RT.flushAutosave();
+          // Autosave is inert in tour mode, so the snapshot itself is proved by the
+          // shape it would write: the store is on the project.
+          ok(JSON.parse(JSON.stringify(RT.state)).project.reportCustom.detailed["executive-summary"].title === "Autosave me", "and rides with the project autosave writes");
+          reset();
+        });
+      }).then(function () {
+        // ---- nothing leaks ------------------------------------------------------------------------
+        var MARK = "OVERRIDE-MARKER-XYZ";
+        RP.setSection("detailed", "executive-summary", { title: MARK + " title" });
+        RP.setSection("detailed", "why-this-assessment", { prose: MARK + " prose." });
+        RP.setSection("highLevel", "what-we-found", { prose: MARK + " high level." });
+        var V = w.App.Version;
+        function unzipAll(blob) { return DB.unzip(blob).then(function (ps) { return ps.map(function (x) { return { name: x.name, text: /\.(xml|rels)$/.test(x.name) ? new w.TextDecoder().decode(x.bytes) : "" }; }); }); }
+        return RX.buildWorkbook(P()).xlsx.writeBuffer().then(function (buf) { return unzipAll(new w.Blob([buf])); }).then(function (parts) {
+          var hits = parts.filter(function (x) { return x.text.indexOf(MARK) !== -1; }).map(function (x) { return x.name; });
+          ok(parts.length > 3 && hits.length === 0, "no override reaches the Excel workbook", hits.join(" | "));
+          var ctx = JSON.stringify(RT.buildRiskContext());
+          ok(ctx.indexOf(MARK) === -1 && ctx.indexOf("reportCustom") === -1, "nor the risk context file");
+          return Promise.all([w.docx.Packer.toBlob(RX.buildWordDoc(P(), {})), w.docx.Packer.toBlob(RX.buildWordDoc(P(), { highLevelOnly: true }))]);
+        }).then(function (blobs) { return Promise.all(blobs.map(unzipAll)); }).then(function (docs) {
+          docs.forEach(function (parts, i) {
+            var hits = [];
+            parts.forEach(function (x) { [V.number, V.label].forEach(function (m) { if (x.text.indexOf(m) !== -1) hits.push(x.name + " has " + m); }); });
+            ok(hits.length === 0, RP.DOCS[i].label + ": no version in the Word file, with overrides", hits.join(" | "));
+          });
+          reset();
+        });
+      }).then(function () {
+        // ---- a build that fails says so, and the page survives -------------------------------------
+        var real = RX.buildWordDoc;
+        RX.buildWordDoc = function () { throw new Error("no build today"); };
+        RP.setSection("detailed", "executive-summary", { title: "During a failure" });
+        RT.state.stage = "report"; RP.state.doc = 0; RT.render();
+        return poll(function () { return main.querySelector(".rp-error"); }).then(function (el) {
+          ok(/no build today/.test(el.textContent), "a failed build says so on the page");
+          ok(!!card("executive-summary"), "and keeps the last good version");
+          RX.buildWordDoc = real;
+          reset();
+          RT.render();
+          return settled();
+        });
+      }).then(function () {
+        ok(!main.querySelector(".rp-error"), "and recovers when the build does");
+        // ---- a new, empty project ---------------------------------------------------------------
+        d.getElementById("btn-new").click();
+        ok(!P().reportCustom, "a new project has no overrides");
+        RT.state.stage = "report"; RT.render();
+        return settled().then(function () {
+          ok(!main.querySelector(".rp-error") && !!card("document-control") && !!card("executive-summary"), "and its report reads, empty, without an error");
+          ok(!card("justification-for") && !main.querySelector("[data-reorder-list]"), "with no repeats or ranked lists to offer");
+          RT.state.stage = "suc"; RT.render();
+        });
+      });
+    }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+      try { w.onbeforeunload = null; } catch (e) {}
+      finish();
+    });
+  };
+  frame.src = "../index.html?tour=1";
+})();
+</script>
+</body></html>

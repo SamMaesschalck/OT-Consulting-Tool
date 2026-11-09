@@ -1,0 +1,183 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: find, save stamps, the suite and moved reports</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The reviewer's tool, for what joins it to the other tools: the Report page's
+  own find (Ctrl+F, which the exe needs); a save is never stamped earlier than
+  the last; in the suite, Recent files is told what each file is and a saved
+  review file can be given straight to the author's tool; an earlier comment
+  follows its report when the report's place in the pack moves; an item with
+  detail rows and no evidence shows no empty evidence row; and the demo pack
+  carries the key swatches' colours.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  var errors = [];
+  function load(q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () { res(w); });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+  function type(w, el, v) { el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+  function txt(w, sel) { var n = w.document.querySelector(sel); return n ? n.textContent : ""; }
+
+  var W, R, D, demo;
+  try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); localStorage.setItem("spt-review:reviewer:v1", "I. Tester"); } catch (e) {}
+
+  load("?tour=1").then(function (w) {
+    W = w; R = w.ReviewTool; D = w.document;
+    return poll(function () { return R.state.pack; });
+  }).then(function () {
+    var w = W, d = D;
+    demo = JSON.parse(JSON.stringify(R.state.pack));
+
+    // ---- the demo pack carries the key swatches' colours (#11) -------------------
+    var sw = [];
+    demo.documents[0].blocks.forEach(function (b) { (b.runs || []).forEach(function (r) { if (r.c) sw.push(r); }); });
+    ok(sw.length > 0 && sw.every(function (r) { return /^[0-9A-F]{6}$/.test(r.c) && /^[■●▲◆▪]\s*$/.test(r.t); }), "the demo pack keeps its key swatches' colours, and only theirs", sw.length + " " + JSON.stringify(sw[0]));
+    ok(d.querySelectorAll("#rr-paper .rr-swatch").length === sw.length, "and the report shows them in colour");
+
+    // ---- find in the report (#21) --------------------------------------------------
+    var box = d.getElementById("rr-report-find");
+    ok(box && d.getElementById("rr-find-next") && d.getElementById("rr-find-prev"), "the Report page has a find box with Next and Previous");
+    var e = new w.KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true, cancelable: true });
+    d.dispatchEvent(e);
+    ok(e.defaultPrevented && d.activeElement === box, "Ctrl+F on the Report page goes to it");
+    type(w, box, "zone");
+    return wait(400).then(function () {
+      var marks = d.querySelectorAll("#rr-paper mark.rr-find");
+      ok(marks.length > 2 && d.querySelectorAll("#rr-paper mark.rr-find.cur").length === 1 && /^1 of \d+$/.test(txt(w, "#rr-find-count")), "typing marks every match in the report and counts them", marks.length + " " + txt(w, "#rr-find-count"));
+      ok(!d.querySelector(".rr-side mark.rr-find"), "but not in the comments beside it");
+      d.getElementById("rr-find-next").click();
+      ok(/^2 of /.test(txt(w, "#rr-find-count")) && d.querySelectorAll("#rr-paper mark.rr-find")[1].classList.contains("cur"), "Next moves to the next match");
+      d.getElementById("rr-find-prev").click(); d.getElementById("rr-find-prev").click();
+      ok(new RegExp("^" + marks.length + " of ").test(txt(w, "#rr-find-count")), "and Previous goes round from the first to the last");
+      R.render(true);
+      ok(d.querySelectorAll("#rr-paper mark.rr-find").length === marks.length && d.getElementById("rr-report-find").value === "zone", "the search survives a redraw");
+      var esc = new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+      d.getElementById("rr-report-find").dispatchEvent(esc);
+      ok(!d.querySelector("#rr-paper mark.rr-find") && d.getElementById("rr-report-find").value === "", "Escape clears it");
+      type(w, d.getElementById("rr-report-find"), "qqxqqzz");
+      return wait(400);
+    }).then(function () {
+      ok(txt(w, "#rr-find-count") === "Not found" && !d.querySelector("#rr-paper mark.rr-find"), "a word not in the report says so");
+      d.querySelector('.nav-item[data-page="summary"]').click();
+      var f2 = new w.KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true, cancelable: true });
+      d.dispatchEvent(f2);
+      ok(!f2.defaultPrevented, "elsewhere Ctrl+F is left to the browser");
+      ok(!d.getElementById("rr-handback"), "the demo never offers to give its file to an author");
+
+      // ---- a real pack, in the suite ---------------------------------------------------
+      var recents = [], handed = null;
+      w.App.HostBridge = { hosted: true, canHandoff: true, launch: {}, setDirty: function () {}, recent: function (x) { recents.push(x); },
+        handoff: function (to, name, text) { handed = { to: to, name: name, text: text }; return true; }, openRecent: function () {} };
+      var p = JSON.parse(JSON.stringify(demo));
+      p.packId = "rp-int-" + Date.now();
+      R.loadTexts([{ name: "client-pack.json", text: JSON.stringify(p) }]);
+      ok(recents.length === 1 && recents[0].kind === "Review pack" && recents[0].name === "client-pack.json", "Recent files is told a pack is a review pack", JSON.stringify(recents));
+      R.addComment({ severity: "suggestion", anchor: { kind: "general", documentIndex: 0, documentTitle: "", sectionTitle: "General", quote: "" }, text: "A point." });
+      // A save is never stamped before the last, whatever the clock says.
+      var later = new Date(Date.now() + 86400000).toISOString();
+      R.state.review.savedAt = later;
+      w.showSaveFilePicker = undefined;
+      var dl = [];
+      w.App.ReviewCore.downloadText = function (text, name) { dl.push({ text: text, name: name }); };
+      var res = null;
+      R.saveReview(null, function (r) { res = r; });
+      return poll(function () { return res; }).then(function () {
+        ok(res.ok && Date.parse(R.state.review.savedAt) > Date.parse(later), "a save after one stamped later is stamped later still", R.state.review.savedAt + " vs " + later);
+        ok(JSON.parse(dl[0].text).savedAt === R.state.review.savedAt, "and the file carries that stamp");
+        var sv = recents.filter(function (x) { return x.action === "save"; })[0];
+        ok(sv && sv.kind === "Review file", "Recent files is told a saved review is a review file", JSON.stringify(sv));
+        d.querySelector('.nav-item[data-page="summary"]').click();
+        var hb = d.getElementById("rr-handback");
+        ok(hb && /Give it to the OT Cyber Assessment Tool/.test(hb.textContent), "in the suite, a saved review can be given to the author's tool", hb && hb.textContent);
+        hb.click();
+        ok(handed && handed.to === "OT Cyber Assessment Tool" && handed.name === dl[0].name && JSON.parse(handed.text).comments.length === 1, "which hands over the file just saved", JSON.stringify(handed && { to: handed.to, name: handed.name }));
+        R.addComment({ severity: "suggestion", anchor: { kind: "general", documentIndex: 0, documentTitle: "", sectionTitle: "General", quote: "" }, text: "Another." });
+        R.render(true);
+        ok(!d.getElementById("rr-handback"), "not while there is unsaved work the file does not hold");
+        w.App.HostBridge.canHandoff = false; R.state.dirty = false; R.render(true);
+        ok(!d.getElementById("rr-handback"), "and never where the suite says no (a tour)");
+        delete w.App.HostBridge;
+        R.render(true);
+        ok(!d.getElementById("rr-handback"), "nor in the tool on its own");
+        R.state.dirty = false;
+
+        // ---- an earlier comment follows its report to its new place (#48) ------------
+        var q = JSON.parse(JSON.stringify(demo)), doc = q.documents[0];
+        var para = doc.blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 60 && !b.red; })[3];
+        var other = JSON.parse(JSON.stringify(doc)); other.title = "Detailed report";
+        doc.title = "High-level report";
+        q.documents = [other, doc];
+        q.packId = "rp-int2-" + Date.now();
+        q.previousRound = { comments: [{ comment: { id: "pv1", reviewer: "Earlier", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", severity: "should-fix",
+          anchor: { documentIndex: 0, documentTitle: "High-level report", kind: "block", sectionKey: para.sectionKey, sectionTitle: para.sectionTitle, blockId: para.id, blockType: "paragraph", quote: para.text, cell: null },
+          text: "On the high-level report.", suggestion: null, relatesTo: null, check: null }, status: "resolved", reason: "", replies: [], round: 1, confirmedBy: [] }], verdicts: [] };
+        R.loadTexts([{ name: "two-reports.json", text: JSON.stringify(q) }]);
+        d.querySelector('.nav-item[data-page="report"]').click();
+        var sel = d.getElementById("rr-doc");
+        sel.value = "0"; sel.dispatchEvent(new w.Event("change"));
+        var on0 = d.querySelectorAll('#rr-paper [data-prev-id="pv1"]').length;
+        sel = d.getElementById("rr-doc"); sel.value = "1"; sel.dispatchEvent(new w.Event("change"));
+        var on1 = d.querySelectorAll('#rr-paper [data-prev-id="pv1"]').length;
+        ok(on0 === 0 && on1 === 1, "an earlier comment on the high-level report shows beside it, though that report is now second", on0 + " / " + on1);
+        d.querySelector('.nav-item[data-page="previous"]').click();
+        ok(/In: .* - High-level report/.test(txt(w, '[data-prev-id="pv1"]')), "and the Previous round page names that report", txt(w, '[data-prev-id="pv1"]').slice(0, 160));
+
+        // ---- an item whose detail rows carry what it says (#42) ----------------------
+        var r2 = JSON.parse(JSON.stringify(demo));
+        r2.packId = "rp-int3-" + Date.now();
+        r2.engagement.fieldLabels = { answer: "Target levels", expected: null, evidence: "Threat source", notes: "Risk acceptance", action: null, impact: null, priority: null, owner: null };
+        var it = r2.items[0];
+        it.status = "recorded"; it.evidence = ""; it.details = [["Justification", "Safety function in this zone."]];
+        var it2 = r2.items[1];
+        it2.status = "recorded"; it2.evidence = ""; delete it2.details;
+        R.state.dirty = false;
+        R.loadTexts([{ name: "risk-like.json", text: JSON.stringify(r2) }]);
+        d.querySelector('.nav-item[data-page="engagement"]').click();
+        function dts(i) { var el = Array.prototype.filter.call(d.querySelectorAll(".rr-item"), function (n) { return n.getAttribute("data-item-id") === i.itemId && n.getAttribute("data-target") === i.targetName; })[0];
+          return el ? Array.prototype.map.call(el.querySelectorAll("dt"), function (n) { return n.textContent; }) : []; }
+        var a1 = dts(it), a2 = dts(it2);
+        ok(a1.indexOf("Threat source") === -1 && a1.indexOf("Justification") !== -1, "an item with detail rows and no evidence shows no empty evidence row", a1.join());
+        ok(a2.indexOf("Threat source") !== -1, "one with nothing else to go on still shows it as not recorded", a2.join());
+        R.state.dirty = false;
+        ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+      });
+    });
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+    try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); } catch (e) {}
+    finish();
+  });
+})();
+</script>
+</body></html>

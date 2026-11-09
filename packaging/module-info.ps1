@@ -20,7 +20,15 @@
 #   $ElectronOut       %LOCALAPPDATA%\OTCAT-electron\<id>: this module's own
 #                      builds and self-test results, so modules never overwrite
 #                      each other's
+#   $ModuleManifest    the manifest's path (modules\<id>\module.json, or
+#                      platform\suite.json for the suite)
+#   $IsSuite           true for -Module suite
 #   $AllModules        the id of every module that has a module.json
+#
+# The suite shell (platform\) builds like a module: -Module suite reads
+# platform\suite.json, which has the same fields (id, product, entry,
+# singleHtml, electron) plus the tools it carries. It is not in $AllModules,
+# which lists the tools themselves.
 #
 # One version for the whole suite: shared\version.js is the only place it is
 # set, and every module carries a synced copy (tools\sync-shared.ps1). A module
@@ -30,13 +38,22 @@ param([string]$Module = "assessments")
 $_repo = Split-Path -Parent $PSScriptRoot
 $AllModules = @(Get-ChildItem (Join-Path $_repo "modules") -Directory |
   Where-Object { Test-Path (Join-Path $_.FullName "module.json") } | ForEach-Object { $_.Name })
-$ModuleDir = Join-Path $_repo "modules\$Module"
-$_manifest = Join-Path $ModuleDir "module.json"
-if (-not (Test-Path $_manifest)) { throw "No module '$Module' (no $_manifest). Modules: $($AllModules -join ', ')" }
+$IsSuite = ($Module -eq "suite")
+if ($IsSuite) {
+  $ModuleDir = Join-Path $_repo "platform"
+  $_manifest = Join-Path $ModuleDir "suite.json"
+  $_where = "platform"
+} else {
+  $ModuleDir = Join-Path $_repo "modules\$Module"
+  $_manifest = Join-Path $ModuleDir "module.json"
+  $_where = "modules\$Module"
+}
+if (-not (Test-Path $_manifest)) { throw "No module '$Module' (no $_manifest). Modules: $($AllModules -join ', '), and the suite" }
+$ModuleManifest = $_manifest
 $ModuleInfo = [IO.File]::ReadAllText($_manifest, [Text.Encoding]::UTF8) | ConvertFrom-Json
-if ($ModuleInfo.id -ne $Module) { throw "modules\$Module\module.json says its id is '$($ModuleInfo.id)'" }
+if ($ModuleInfo.id -ne $Module) { throw "$_manifest says its id is '$($ModuleInfo.id)'" }
 $AppProduct = [string]$ModuleInfo.product
-if (-not $AppProduct) { throw "modules\$Module\module.json has no product name" }
+if (-not $AppProduct) { throw "$_manifest has no product name" }
 
 # The suite version, from the canonical copy; the module's copy must match it.
 $_verRx = 'var VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"'
@@ -45,7 +62,7 @@ $_verMatch = [regex]::Match($_shared, $_verRx)
 if (-not $_verMatch.Success) { throw "Could not read the version from shared\version.js" }
 $_modVer = Join-Path $ModuleDir "js\version.js"
 if (-not (Test-Path $_modVer) -or [IO.File]::ReadAllText($_modVer) -ne $_shared) {
-  throw "modules\$Module\js\version.js is not the same as shared\version.js. Run tools\sync-shared.ps1."
+  throw "$_where\js\version.js is not the same as shared\version.js. Run tools\sync-shared.ps1."
 }
 $AppVersion = $_verMatch.Groups[1].Value
 $_verParts = $AppVersion.Split('.')
@@ -55,7 +72,7 @@ $AppVersionLabel = "v" + $(if ($_verParts[2] -eq "0") { $_verParts[0] + "." + $_
 $_prod = Join-Path $ModuleDir "js\product.js"
 $_prodMatch = [regex]::Match($(if (Test-Path $_prod) { [IO.File]::ReadAllText($_prod) } else { "" }), 'name: "([^"]+)"')
 if (-not $_prodMatch.Success -or $_prodMatch.Groups[1].Value -ne $AppProduct) {
-  throw "modules\$Module\js\product.js does not name the product in module.json ('$AppProduct')"
+  throw "$_where\js\product.js does not name the product in $(Split-Path -Leaf $_manifest) ('$AppProduct')"
 }
 
 $AppPageName = "$AppProduct $AppVersionLabel.html"

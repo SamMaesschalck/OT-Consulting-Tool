@@ -214,7 +214,7 @@ window.App.ExportDOCX = (function () {
 
   function run(text, opts) {
     opts = opts || {};
-    return new window.docx.TextRun({
+    var r = new window.docx.TextRun({
       text: String(text == null ? "" : text),
       bold: opts.bold || false,
       italics: opts.italics || false,
@@ -222,6 +222,8 @@ window.App.ExportDOCX = (function () {
       size: opts.size,
       font: opts.font
     });
+    r.__text = String(text == null ? "" : text);
+    return r;
   }
 
   // The __tags below are read back by applyReportCustom. They have to be set
@@ -238,6 +240,8 @@ window.App.ExportDOCX = (function () {
       spacing: opts.spacing
     });
     p.__isBody = true;
+    // Read by probeSections: which text opens each section.
+    p.__text = Array.isArray(text) ? runs.map(function (r) { return (r && r.__text) || ""; }).join("") : String(text == null ? "" : text);
     return p;
   }
 
@@ -262,15 +266,9 @@ window.App.ExportDOCX = (function () {
   //
   // The mirror of Report.decorateSections, over the document's heading tree
   // instead of the DOM. Both slug the GENERATED heading (Report.sectionKey), so
-  // an override set on a card on screen lands on the matching Word section.
-  //
-  //   hidden  the heading and everything under it, up to the next heading of
-  //           the same or a higher level, is dropped. On screen it is only
-  //           dimmed - the consultant still has to be able to put it back.
-  //   title   the heading is rebuilt with the new text at the same level.
-  //   prose   the run of body paragraphs OPENING the section is replaced.
-  //           Tables, charts and bullets are left alone: prose is the part
-  //           that is a judgement call, the numbers are not.
+  // an override set on a card on screen lands on the matching Word section. The
+  // pass itself is shared with the risk tool (shared/report-sections.js); what
+  // is this exporter's own is how it keys, and rebuilds, its headings.
   //
   // A licence attribution (__attribution) inside a hidden section is kept:
   // the framework text it covers is still in the document. It goes into
@@ -279,70 +277,28 @@ window.App.ExportDOCX = (function () {
   function applyReportCustom(children, engagement, rescued) {
     var R = window.App.Report;
     if (!R || !R.reportCustom) return children;
-    var custom = R.reportCustom({ engagement: engagement });
-    if (!custom || !Object.keys(custom).length) return children;
     var keyOpts = { engagement: engagement };
-    var kept = [];
+    return window.App.ReportSections.applyOverrides(children, R.reportCustom({ engagement: engagement }), {
+      keyOf: function (n) { return R.sectionKey(n.__headingText, keyOpts); },
+      heading: function (n, title) {
+        return n.__headingNum ? h1n(n.__headingNum, title) : (n.__headingLevel === 1 ? h1(title) : h2(title));
+      },
+      body: function (line) { return body(line); },
+      rescued: rescued
+    });
+  }
 
-    // Recursive: an h2 nested under an h1 is its own section and has to be
-    // visited in its own right. Walking flat would let the first h1 swallow
-    // every h2 below it, which is exactly what it did until it was caught.
-    function walk(nodes) {
-      var out = [], i = 0;
-      while (i < nodes.length) {
-        var n = nodes[i];
-        if (!n || !n.__headingLevel) { out.push(n); i++; continue; }
-
-        var lvl = n.__headingLevel;
-        // A boundary-only heading (a zone's own section in the multi-zone
-        // report) closes the section before it but is never looked up: its
-        // text is a zone name, which sectionKey strips to nothing, so every
-        // zone would share one key and an override on it would take all of
-        // them. A heading whose key slugs to nothing cannot be addressed for
-        // the same reason.
-        var key = n.__boundaryOnly ? "" : R.sectionKey(n.__headingText, keyOpts);
-        var c = key ? custom[key] : null;
-
-        // Everything belonging to this section: up to the next heading at the
-        // same level or above.
-        var end = i + 1;
-        while (end < nodes.length) {
-          var m = nodes[end];
-          if (m && m.__headingLevel && m.__headingLevel <= lvl) break;
-          end++;
-        }
-        var section = nodes.slice(i + 1, end);
-        i = end;
-
-        if (c && c.hidden) {                             // heading and subtree
-          section.forEach(function (m) { if (m && m.__attribution) kept.push(m); });
-          continue;
-        }
-        out.push(c && c.title
-          ? (n.__headingNum ? h1n(n.__headingNum, c.title) : (lvl === 1 ? h1(c.title) : h2(c.title)))
-          : n);
-
-        if (c && c.prose) {
-          // The generated wording that OPENS the section: the run of body
-          // paragraphs before the first table, chart, bullet or sub-heading.
-          var k = 0;
-          while (k < section.length && section[k] && section[k].__isBody) k++;
-          section = section.slice(k);
-          var paras = [];
-          String(c.prose).split(/\n/).forEach(function (line) {
-            if (line.trim() !== "") paras.push(body(line.trim()));
-          });
-          section = paras.concat(section);
-        }
-
-        out = out.concat(walk(section));
-      }
-      return out;
-    }
-    var result = walk(children);
-    if (!kept.length) return result;
-    if (rescued) { rescued.push.apply(rescued, kept); return result; }
-    return result.concat(kept);
+  // For a review: the wording that opens each section of the finished document,
+  // { key, title, texts: [...] } once per heading, by the same rule
+  // applyReportCustom uses to decide what a prose override replaces (the run of
+  // body paragraphs after the heading). Recorded when opts.sectionProbe is a
+  // list; the document itself is untouched.
+  function probeSections(sections, engagement, into) {
+    var R = window.App.Report;
+    function keyOf(n) { return R ? R.sectionKey(n.__headingText, { engagement: engagement }) : ""; }
+    (sections || []).forEach(function (s) {
+      window.App.ReportSections.probeSections(s.children || [], keyOf, into);
+    });
   }
 
   // Every document is built through here so a section override reaches all
@@ -366,6 +322,7 @@ window.App.ExportDOCX = (function () {
     // (which will not print) is not reported.
     var issues = [];
     cfg.sections.forEach(function (s) { collectPlaceholders(s.children, issues); });
+    if (opts && Array.isArray(opts.sectionProbe)) probeSections(cfg.sections, engagement, opts.sectionProbe);
     if (!isFinal(opts) && !(opts && opts.issueCheck)) markDraft(cfg.sections);
     var doc = new (window.docx.Document)(cfg);
     if (isFinal(opts) && !issues.length) lockAsFinal(doc);
@@ -564,10 +521,11 @@ window.App.ExportDOCX = (function () {
 
   // In a check nothing is written, so the charts are not drawn: a blank image
   // stands in for each, and every other line of the build runs as it would
-  // for the real export.
+  // for the real export. opts.blankCharts does the same for a build that does
+  // write a file, read only for its text (a review's current report).
   var BLANK_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
   function rasterise(svg, exportOpts, cb) {
-    if (exportOpts && exportOpts.issueCheck) {
+    if (exportOpts && (exportOpts.issueCheck || exportOpts.blankCharts)) {
       var bin = atob(BLANK_PNG), u = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
       cb(new Blob([u], { type: "image/png" }));
@@ -1895,7 +1853,7 @@ window.App.ExportDOCX = (function () {
       { kind: "head", text: "Against the selected profile" },
       { kind: "bullet", text: "States are ordered Not achieved, then Partially achieved, then Achieved. An outcome meets expected when its state is at or above the expected state for the profile." },
       { kind: "bullet", text: "Meeting and below expected are reported as counts per objective and per principle. They are never combined into a single score." },
-      { kind: "bullet", text: "Where a profile is a placeholder its expected states are not loaded, so meeting and below are not reported at all." },
+      { kind: "bullet", text: "Where expected states are not available for a profile, meeting and below are not reported at all." },
       { kind: "head", text: "Roadmap" },
       { kind: "bullet", text: "The roadmap lists every applicable outcome that is below its expected state, or that is Partially or Not achieved where no profile expectation applies." }
     ],
@@ -3158,7 +3116,7 @@ window.App.ExportDOCX = (function () {
         children: [run(instrument.title)]
       }),
       body("NCSC CAF 4.0 alignment and gap analysis", { style: "Caption" }),
-      body("Selected profile: " + info.name + (info.placeholder ? " (placeholder)" : ""), { style: "Caption" }),
+      body("Selected profile: " + info.name + (info.placeholder ? " (expected states not available)" : ""), { style: "Caption" }),
       body("", { spacing: { after: 200 } }),
       fixedTable(rows, [labelW, valueW]),
       body("", { spacing: { after: 200 } })
@@ -3181,7 +3139,7 @@ window.App.ExportDOCX = (function () {
       ["Instrument",        instrument.title],
       ["Edition",           instrument.edition || ""],
       ["Content version",   instrument.contentVersion || ""],
-      ["Selected profile",  info.name + (info.placeholder ? " (placeholder)" : "")]
+      ["Selected profile",  info.name + (info.placeholder ? " (expected states not available)" : "")]
     ];
     var rows = pairs.map(function (r) {
       return new TableRow({ children: [
@@ -3585,7 +3543,7 @@ window.App.ExportDOCX = (function () {
     var cust = (engagement && engagement.reportCustom) || {};
     var boxHidden = !!(cust["not-a-formal-assessment"] && cust["not-a-formal-assessment"].hidden);
     if (bp.not_formal_caveat && boxHidden) children.push(body(bp.not_formal_caveat));
-    children.push(body("This report uses the " + info.name + " profile." + (info.placeholder ? " The profile is a placeholder and expected states have not been populated; meeting and below counts are therefore not reported." : "")));
+    children.push(body("This report uses the " + info.name + " profile." + (info.placeholder ? " Expected states are not available for this profile, so meeting and below counts are not reported." : "")));
     return children;
   }
 
@@ -3820,7 +3778,7 @@ window.App.ExportDOCX = (function () {
           var _disp = instrument.display || {};
           var _subLead = _disp.reportSubline || "NCSC CAF 4.0 alignment";
           var _profWord = _disp.profileTitle || "Profile";
-          var coverChildren = coverDesignB(engagement, instrument, { subLine: _subLead + "  ·  " + _profWord + ": " + info.name + (info.placeholder ? " (placeholder)" : "") });
+          var coverChildren = coverDesignB(engagement, instrument, { subLine: _subLead + "  ·  " + _profWord + ": " + info.name + (info.placeholder ? " (expected states not available)" : "") });
           // Prose stays portrait; the wide RESULTS tables (by objective / by
           // principle) get their own LANDSCAPE page so they have room to breathe.
           // Roadmap is prose, and the basis/above-baseline/progress tables are

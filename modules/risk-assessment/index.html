@@ -7,6 +7,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="referrer" content="no-referrer" />
   <link rel="stylesheet" href="css/spt-theme.css" />
+  <link rel="stylesheet" href="css/review-author.css" />
+  <link rel="stylesheet" href="css/report-page.css" />
   <!-- Apply the saved (or system) colour theme before first paint to avoid a
        flash. The toggle in the header updates this and persists the choice.
        Shares the "ot-theme" key with the assessment tool so the two apps agree
@@ -137,9 +139,12 @@
   <div id="toast" class="toast hidden"></div>
 
   <!-- The suite version (js/version.js, copied in from shared/version.js) and
-       this module's product name (js/product.js). -->
+       this module's product name (js/product.js). js/host-bridge.js (copied
+       in from shared/) lets the suite host the tool; standalone it does
+       nothing, and the tool runs the same without it. -->
   <script src="js/version.js"></script>
   <script src="js/product.js"></script>
+  <script src="js/host-bridge.js"></script>
   <script src="data/slt-suggestion-rules.js"></script>
   <script src="data/risk-context-interchange.js"></script>
   <script src="data/engagement-guidance.js"></script>
@@ -171,8 +176,11 @@
     // made inert, so the demo can neither overwrite nor clear a consultant's
     // real unsaved-work snapshot. An iframe-based tour is not possible on
     // plain file:// (cross-window access between file pages is blocked unless
-    // the browser runs with --allow-file-access-from-files).
-    var TOUR_MODE = /[?&]tour(=|&|$)/.test(location.search);
+    // the browser runs with --allow-file-access-from-files). The suite opens
+    // the tour by launching the tool with { tour: true } (js/host-bridge.js),
+    // since a page it builds in memory can carry no query string.
+    var TOUR_MODE = /[?&]tour(=|&|$)/.test(location.search) ||
+      !!(window.App.HostBridge && window.App.HostBridge.launch.tour);
 
     var FRS = RULES.foundationalRequirements;           // [{id,fr,name}]
     var FR_IDS = FRS.map(function (f) { return f.id; });
@@ -225,7 +233,8 @@
         },
         // Engagement details for the report deliverables (Word/Excel document
         // control). Optional; blanks render as "(not set)" in the exports.
-        engagement: { client: "", consultant: "", assessmentDate: "", revision: "", confidentiality: "" },
+        // qaReviewBy: who did the internal QA review (an approval offers to fill it).
+        engagement: { client: "", consultant: "", assessmentDate: "", revision: "", confidentiality: "", qaReviewBy: "" },
         // Evidence basis for the engagement: who we spoke to, what we read, what we saw.
         basisOfAssessment: { interviews: [], documents: [], observations: [] },
         // Asset-owner sign-off of the tolerable risk and the assessment outcome (§4.3.6 / §4).
@@ -353,6 +362,11 @@
     var dirty = false, autosaveTimer = null, autosaveBroken = false;
 
     function updateSaveButton() {
+      // The suite, when it hosts the tool, marks tools with unsaved changes
+      // in its bar and warns before it closes (js/host-bridge.js; absent or
+      // standalone, nothing happens). A tour is a demo whose changes are never
+      // kept, so it never reports any.
+      if (window.App.HostBridge) window.App.HostBridge.setDirty(dirty && !TOUR_MODE);
       var b = document.getElementById("btn-save");
       if (!b) return;
       if (dirty) { b.textContent = "Save*"; b.classList.add("btn-unsaved"); b.title = "Unsaved changes: Save overwrites the project's file in place (Shift+click: Save as…)"; }
@@ -425,7 +439,28 @@
     var projectHandle = null;
     var IDB_NAME = "spt-risk-files", IDB_STORE = "handles", IDB_KEY = "project";
 
-    function supportsFilePickers() { return typeof window.showSaveFilePicker === "function"; }
+    // The browser refuses the file dialogs to a page framed by a page of
+    // another origin (the suite's folder build frames this file:// page, and
+    // the browser counts every file:// page as an origin of its own). There
+    // Save downloads and Load uses the file input, as in a browser without
+    // the dialogs. Standalone, or framed by a page of the same origin (the
+    // suite's single-file build), the dialogs are used as normal.
+    function inForeignFrame() {
+      try { return window.top !== window.self && !window.top.location.href; } catch (e) { return true; }
+    }
+    function supportsFilePickers() { return typeof window.showSaveFilePicker === "function" && !inForeignFrame(); }
+
+    // In the suite, a project file saved or opened goes on its Recent files
+    // list: the name, the customer and when, never the contents. The handle,
+    // when the browser gave one, stays in this tool's own storage (see
+    // js/host-bridge.js). Standalone, nothing happens.
+    function noteRecentFile(action, name, handle) {
+      var HB = window.App.HostBridge;
+      if (!HB || !HB.hosted || !name || TOUR_MODE) return;   // a tour saves nothing worth reopening
+      var p = state.project || {};
+      HB.recent({ action: action, name: name, handle: handle || null,
+                  label: ((p.engagement && p.engagement.client) || (p.suc && p.suc.name) || "") });
+    }
 
     // Handle persistence is a convenience, never a dependency: all failures
     // (no IndexedDB, non-cloneable handle, private mode) are swallowed.
@@ -483,19 +518,26 @@
       var text = JSON.stringify(state.project, null, 2);
       var suggested = slug(state.project.suc.name) + "-risk-project.json";
 
-      if (!supportsFilePickers()) {
+      function download(blocked) {
         downloadBlob(text, suggested);
         markClean();
-        toast("Risk project saved (downloaded).");
-        onDone({ ok: true, method: "download" });
-        return;
+        toast(blocked ? "Risk project saved (downloaded as " + suggested + "). Saving back into the same file is not available here, so each save downloads a new copy."
+                      : "Risk project saved (downloaded).");
+        noteRecentFile("save", suggested, null);
+        onDone({ ok: true, method: "download", name: suggested, blocked: !!blocked });
       }
+
+      if (!supportsFilePickers()) { download(inForeignFrame()); return; }
 
       function pick() {
         window.showSaveFilePicker({
           suggestedName: suggested,
           types: [{ description: "OT risk project", accept: { "application/json": [".json"] } }]
         }).then(function (h) { writeTo(h, false); }, function (e) {
+          // Refused for a security reason (a frame the browser will not show
+          // the dialog in, or the click that asked for it has expired): the
+          // work still has to reach a file, so it downloads instead.
+          if (e && e.name === "SecurityError") { download(true); return; }
           if (!(e && e.name === "AbortError")) toast("Save failed: " + ((e && e.message) || "save dialog failed"), "err");
           onDone({ ok: false, aborted: !!(e && e.name === "AbortError") });
         });
@@ -517,6 +559,7 @@
             persistHandle(handle);
             markClean();
             toast("Saved to " + handle.name + ".");
+            noteRecentFile("save", handle.name, handle);
             onDone({ ok: true, method: "file", name: handle.name });
           }).catch(function (e) {
             if (canFallback) pick();
@@ -541,7 +584,7 @@
         handle.getFile().then(function (f) {
           var reader = new FileReader();
           reader.onload = function () {
-            if (loadProjectText(String(reader.result))) { projectHandle = handle; persistHandle(handle); }
+            if (loadProjectText(String(reader.result))) { projectHandle = handle; persistHandle(handle); noteRecentFile("open", handle.name, handle); }
           };
           reader.onerror = function () { toast("Could not read the file.", "err"); };
           reader.readAsText(f);
@@ -567,8 +610,8 @@
       ["knownThreats", "mandatorySecurityFunctions", "regulatory", "highLevelAssets"].forEach(function (k) { if (!Array.isArray(data.srs[k])) data.srs[k] = []; });
       if (!data.basisOfAssessment || typeof data.basisOfAssessment !== "object") data.basisOfAssessment = { interviews: [], documents: [], observations: [] };
       ["interviews", "documents", "observations"].forEach(function (k) { if (!Array.isArray(data.basisOfAssessment[k])) data.basisOfAssessment[k] = []; });
-      if (!data.engagement || typeof data.engagement !== "object") data.engagement = { client: "", consultant: "", assessmentDate: "", revision: "", confidentiality: "" };
-      ["client", "consultant", "assessmentDate", "revision", "confidentiality"].forEach(function (k) { if (typeof data.engagement[k] !== "string") data.engagement[k] = ""; });
+      if (!data.engagement || typeof data.engagement !== "object") data.engagement = { client: "", consultant: "", assessmentDate: "", revision: "", confidentiality: "", qaReviewBy: "" };
+      ["client", "consultant", "assessmentDate", "revision", "confidentiality", "qaReviewBy"].forEach(function (k) { if (typeof data.engagement[k] !== "string") data.engagement[k] = ""; });
       if (!data.approval || typeof data.approval !== "object") data.approval = { name: "", role: "", date: "", statement: "", approved: false };
       ["name", "role", "date", "statement"].forEach(function (k) { if (typeof data.approval[k] !== "string") data.approval[k] = ""; });
       data.approval.approved = !!data.approval.approved;
@@ -594,6 +637,16 @@
         FR_IDS.forEach(function (fr) { if (!(fr in c.slTargetByFR)) c.slTargetByFR[fr] = null; });
         if (typeof c.slTarget === "number") { FR_IDS.forEach(function (fr) { if (c.slTargetByFR[fr] == null) c.slTargetByFR[fr] = c.slTarget; }); delete c.slTarget; }
       });
+      // The consultant's section overrides, one set per report (js/report-page.js).
+      // Optional and additive, so the file format stays at this schema: a file
+      // without them loads as before, and an older copy of the tool keeps them.
+      if (data.reportCustom != null) {
+        if (typeof data.reportCustom !== "object" || Array.isArray(data.reportCustom)) delete data.reportCustom;
+        else ["detailed", "highLevel"].forEach(function (k) {
+          var c = data.reportCustom[k];
+          if (c != null && (typeof c !== "object" || Array.isArray(c))) delete data.reportCustom[k];
+        });
+      }
       data.schema = PROJECT_SCHEMA;
       return data;
     }
@@ -813,6 +866,10 @@
       ]));
       sec.appendChild(h("div", { class: "nav-section-title", text: "Reports" }));
       sec.appendChild(h("div", {
+        class: "nav-item" + (state.stage === "report" ? " active" : ""),
+        onClick: function () { state.stage = "report"; render(); }
+      }, [h("span", null, ["Report", h("span", { class: "muted", style: "display:block;font-size:11px", text: "both reports, section by section" })])]));
+      sec.appendChild(h("div", {
         class: "nav-item" + (state.stage === "hlreport" ? " active" : ""),
         onClick: function () { state.stage = "hlreport"; render(); }
       }, [h("span", null, ["High-level report", h("span", { class: "muted", style: "display:block;font-size:11px", text: "§4.2 standalone" })])]));
@@ -820,6 +877,10 @@
         class: "nav-item" + (state.stage === "review" ? " active" : ""),
         onClick: function () { state.stage = "review"; render(); }
       }, [h("span", null, ["Full report & export", h("span", { class: "muted", style: "display:block;font-size:11px", text: "zones · SL-T · risk context" })])]));
+      sec.appendChild(h("div", {
+        class: "nav-item" + (state.stage === "peer" ? " active" : ""),
+        onClick: function () { state.stage = "peer"; render(); }
+      }, [h("span", null, ["Peer review", h("span", { class: "muted", style: "display:block;font-size:11px", text: "send for review · comments" })])]));
       sec.appendChild(h("div", { class: "nav-section-title", text: "Reference" }));
       sec.appendChild(h("div", {
         class: "nav-item" + (state.stage === "about" ? " active" : ""),
@@ -861,11 +922,13 @@
       return textField(label, arr.join("\n"), function (v) { onChange(lines(v)); }, { textarea: true, placeholder: placeholder, hint: "One per line." });
     }
 
-    function card(title, sub, bodyKids, headExtra) {
+    // attrs: optional extra attributes, such as data-owner-id, which a review
+    // comment's Go to scrolls to.
+    function card(title, sub, bodyKids, headExtra, attrs) {
       var head = [h("h2", { text: title })];
       if (sub) head.push(h("span", { class: "sub", text: sub }));
       if (headExtra) head.push(headExtra);
-      return h("div", { class: "card" }, [h("div", { class: "card-h" }, head), h("div", { class: "card-b" }, bodyKids)]);
+      return h("div", Object.assign({ class: "card" }, attrs || {}), [h("div", { class: "card-h" }, head), h("div", { class: "card-b" }, bodyKids)]);
     }
 
     function frChips(selected, onToggle) {
@@ -1010,7 +1073,10 @@
           textField("Assessment date", eng.assessmentDate, function (v) { eng.assessmentDate = v; touched(); }, { placeholder: "e.g. 2026-07-04" }),
           textField("Document revision", eng.revision, function (v) { eng.revision = v; touched(); }, { placeholder: "e.g. 1.0" })
         ]),
-        textField("Confidentiality", eng.confidentiality, function (v) { eng.confidentiality = v; touched(); }, { placeholder: "e.g. Confidential - Client Restricted" })
+        h("div", { class: "grid-2" }, [
+          textField("Confidentiality", eng.confidentiality, function (v) { eng.confidentiality = v; touched(); }, { placeholder: "e.g. Confidential - Client Restricted" }),
+          textField("QA review by", eng.qaReviewBy, function (v) { eng.qaReviewBy = v; touched(); }, { placeholder: "who reviewed the report before issue" })
+        ])
       ]));
 
       // Preparation guidance (advisory; never pre-populates the registers below).
@@ -1304,7 +1370,7 @@
       var box = h("div", null, []);
       owner.threats.forEach(function (t, ti) {
         var band = threatRisk(t), exceeds = exceedsTolerable(band, tolerable);
-        box.appendChild(h("div", { class: "threat-card" }, [
+        box.appendChild(h("div", { class: "threat-card", "data-threat-id": t.id }, [
           h("div", { class: "threat-head" }, [
             h("span", { class: "tid", text: t.id }),
             h("span", null, [riskPill(band), exceeds ? h("span", { class: "pill flag", style: "margin-left:6px", text: "exceeds tolerable" }) : null]),
@@ -1402,7 +1468,7 @@
           h("div", { class: "hint no-print", style: "margin-bottom:6px", text: "Mark controls already in place as “existing” to take credit for them; leave planned remediations unmarked. Both travel with the export." }),
           cmEditor(owner, project)
         ])
-      ], head.length ? h("span", null, head) : null);
+      ], head.length ? h("span", null, head) : null, { "data-owner-id": owner.id });
     }
 
     function renderRisk(main) {
@@ -1476,7 +1542,7 @@
         ? h("span", { class: "pill neutral", text: "SL-T unset" })
         : (needsJust ? h("span", { class: "pill flag", text: "SL-T≤" + tgt + " · needs justification" })
                      : h("span", { class: "pill exceeds", text: "SL-T≤" + tgt }));
-      return card(label, null, body, headPill);
+      return card(label, null, body, headPill, { "data-owner-id": owner.id });
     }
 
     function renderSlt(main) {
@@ -1683,6 +1749,9 @@
         h("button", { class: "btn", text: "Print high-level report", onClick: function () { window.print(); } }),
         h("button", { class: "btn", text: "Edit the ranking", onClick: function () { state.stage = "srs"; render(); } })
       ]));
+      // The peer review's warnings, once a review has started (js/review.js).
+      var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
+      if (rvCard) main.appendChild(rvCard);
 
       // SuC + high-level context
       var sk = [];
@@ -1717,6 +1786,8 @@
 
       var probs = exportProblems();
       if (probs.length) main.appendChild(card("Completeness", probs.length + " item" + (probs.length === 1 ? "" : "s") + " outstanding", [h("ul", { class: "muted" }, probs.slice(0, 30).map(function (t) { return h("li", { text: t }); }))]));
+      var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
+      if (rvCard) main.appendChild(rvCard);
 
       // SuC + SRS
       var sk = [];
@@ -1803,23 +1874,44 @@
       toast("Report libraries not loaded: open the app from its folder so vendor/ and js/ are alongside index.html.", "err");
       return false;
     }
-    function reportGuard() {
-      var probs = exportProblems();
-      if (!probs.length) return true;
-      return confirm("The assessment is incomplete:\n\n- " + probs.slice(0, 20).join("\n- ") + (probs.length > 20 ? "\n…and " + (probs.length - 20) + " more" : "") + "\n\nGenerate the report anyway?");
+    // One question before a download, never a block. The completeness list is
+    // about zones and threats, so the high-level report (the zone-free §4.2
+    // deliverable) skips it; the peer review's warnings (js/review.js) apply to
+    // every download, once a review has started.
+    function reportGuard(opts) {
+      opts = opts || {};
+      var probs = opts.highLevelOnly ? [] : exportProblems();
+      var rw = window.RiskReview ? window.RiskReview.exportWarningTexts() : [];
+      if (!probs.length && !rw.length) return true;
+      var parts = [];
+      if (probs.length) parts.push("The assessment is incomplete:\n\n- " + probs.slice(0, 20).join("\n- ") + (probs.length > 20 ? "\n…and " + (probs.length - 20) + " more" : ""));
+      if (rw.length) parts.push("Peer review:\n\n- " + rw.join("\n- "));
+      return confirm(parts.join("\n\n") + "\n\nGenerate the report anyway?");
+    }
+    // Whether the report has changed since a review approved it needs the
+    // reports as they are now: built first when they are not to hand.
+    function reviewChecked(go) {
+      var RR = window.RiskReview;
+      if (RR && RR.needsDocs && RR.needsDocs()) { toast("Checking the report against its review…"); RR.refreshDocs(go); }
+      else go();
     }
     function downloadWordReport(opts) {
+      opts = opts || {};
       if (!reportsAvailable()) return;
-      if (!opts.highLevelOnly && !reportGuard()) return;
-      window.RiskExports.downloadWord(opts, function (err) {
-        toast(err ? ("Word report failed: " + (err && err.message)) : "Word report downloaded.", err ? "err" : undefined);
+      reviewChecked(function () {
+        if (!reportGuard(opts)) return;
+        window.RiskExports.downloadWord(opts, function (err) {
+          toast(err ? ("Word report failed: " + (err && err.message)) : "Word report downloaded.", err ? "err" : undefined);
+        });
       });
     }
     function downloadExcelReport() {
       if (!reportsAvailable()) return;
-      if (!reportGuard()) return;
-      window.RiskExports.downloadExcel(function (err) {
-        toast(err ? ("Excel workbook failed: " + (err && err.message)) : "Excel workbook downloaded.", err ? "err" : undefined);
+      reviewChecked(function () {
+        if (!reportGuard({})) return;
+        window.RiskExports.downloadExcel(function (err) {
+          toast(err ? ("Excel workbook failed: " + (err && err.message)) : "Excel workbook downloaded.", err ? "err" : undefined);
+        });
       });
     }
 
@@ -1880,7 +1972,12 @@
     function render() {
       renderNav(); renderHeaderSummary();
       var main = $("main"); main.innerHTML = "";
-      var fn = { suc: renderSuc, srs: renderSrs, zones: renderZones, risk: renderRisk, slt: renderSlt, review: renderReview, basis: renderBasis, hlreport: renderHLReport, about: renderAbout }[state.stage];
+      var fn = { suc: renderSuc, srs: renderSrs, zones: renderZones, risk: renderRisk, slt: renderSlt, review: renderReview, basis: renderBasis, hlreport: renderHLReport, about: renderAbout,
+        // js/review.js (loaded after this script): the reports' peer review.
+        peer: function (m) { if (window.RiskReview) window.RiskReview.render(m, h, card); },
+        // js/report-page.js: both Word reports, to read and edit section by section.
+        report: function (m) { if (window.RiskReportPage) window.RiskReportPage.render(m, h); }
+      }[state.stage];
       (fn || renderSuc)(main);
     }
 
@@ -1908,15 +2005,37 @@
       reader.onload = function () {
         // A plain file input yields no handle: forget any previous one so Save
         // can't overwrite a DIFFERENT project's file with this one's content.
-        if (loadProjectText(String(reader.result))) forgetProjectFile();
+        if (loadProjectText(String(reader.result))) { forgetProjectFile(); noteRecentFile("open", file.name, null); }
       };
       reader.onerror = function () { toast("Could not read the file.", "err"); };
       reader.readAsText(file); ev.target.value = "";
     });
+    // In the suite: reopening a file from its Recent files list. The bridge
+    // hands over the file the consultant chose to reopen (and its handle,
+    // when the browser kept one, so Save writes back to it); it goes through
+    // the same checks as Load.
+    if (window.App.HostBridge && window.App.HostBridge.hosted) {
+      window.App.HostBridge.register({
+        loadButton: "btn-load",
+        applyTheme: applyTheme,
+        openFile: function (file, handle) {
+          var reader = new FileReader();
+          reader.onload = function () {
+            if (!loadProjectText(String(reader.result))) return;
+            if (handle) { projectHandle = handle; persistHandle(handle); } else forgetProjectFile();
+            noteRecentFile("open", file.name, handle);
+          };
+          reader.onerror = function () { toast("Could not read the file.", "err"); };
+          reader.readAsText(file);
+        }
+      });
+    }
 
     // Warn before leaving with unsaved work, and flush the crash-net first so a
     // confirmed leave (or a tab crash) can still be recovered on next open.
+    // A tour is a demo: nothing to keep, so no warning.
     window.addEventListener("beforeunload", function (e) {
+      if (TOUR_MODE) return;
       flushAutosave();
       if (dirty && projectHasContent(state.project)) { e.preventDefault(); e.returnValue = ""; return ""; }
     });
@@ -1983,9 +2102,11 @@
       loadProjectText: loadProjectText, projectHasContent: projectHasContent,
       confirmRemove: confirmRemove, FR_IDS: FR_IDS,
       touched: touched, isDirty: function () { return dirty; }, flushAutosave: flushAutosave,
+      downloadWordReport: downloadWordReport, downloadExcelReport: downloadExcelReport,
       offerRestore: offerRestore, AUTOSAVE_KEY: AUTOSAVE_KEY,
       saveProject: saveProject, forgetProjectFile: forgetProjectFile,
-      supportsFilePickers: supportsFilePickers
+      supportsFilePickers: supportsFilePickers,
+      render: render, toast: toast
     };
   }());
   </script>
@@ -1996,6 +2117,15 @@
   <script src="vendor/exceljs.min.js"></script>
   <script src="js/logo.js"></script>
   <script src="js/hero-asset.js"></script>
+  <script src="js/report-sections.js"></script>
   <script src="js/exports.js"></script>
+  <!-- Peer review of the reports: packs and review files (contracts/review-*.json). -->
+  <script src="data/review-pack.js"></script>
+  <script src="data/review-file.js"></script>
+  <script src="js/docx-blocks.js"></script>
+  <script src="js/review-core.js"></script>
+  <script src="js/review-author.js"></script>
+  <script src="js/report-page.js"></script>
+  <script src="js/review.js"></script>
 </body>
 </html>

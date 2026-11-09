@@ -33,7 +33,7 @@ H.test(function (ok, done) {
   E.updateMetadata({ clientName: "Acme Water" });
   A.UI.go("report");
 
-  var input = [].slice.call(document.getElementById("main").querySelectorAll("input[type=file]"))[0];
+  var input = [].slice.call(document.getElementById("main").querySelectorAll("input[type=file]:not(.rv-file)"))[0];
   ok(!!input, "the report offers a previous-assessment file input");
   if (!input) { done(); return; }
 

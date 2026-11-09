@@ -43,10 +43,18 @@
     ok(p.suc.name.indexOf("Acme Petrochemicals") === 0, "?tour boots with the demo project loaded");
     ok(w.localStorage.getItem(KEY) === SENTINEL, "the consultant's autosave snapshot survives the tour boot untouched");
     ok(!w.document.querySelector(".autosave-bar"), "no restore offer is shown in tour mode");
-    // Autosave stays inert even when the demo is edited.
+    // Autosave stays inert even when the demo is edited. A tour is a demo: no
+    // unsaved changes are told to the suite, and closing it does not warn.
+    var told = [], HBk = w.App.HostBridge, was = HBk && HBk.setDirty;
+    if (HBk) HBk.setDirty = function (d) { told.push(d); };
     RT.touched();
+    if (HBk) HBk.setDirty = was;
     RT.flushAutosave();
     ok(w.localStorage.getItem(KEY) === SENTINEL, "editing the demo never writes the autosave snapshot");
+    ok(HBk && told.length > 0 && told.every(function (d) { return d === false; }), "an edited tour never reports unsaved changes to the suite", JSON.stringify(told));
+    var bu = new w.Event("beforeunload", { cancelable: true });
+    w.dispatchEvent(bu);
+    ok(!bu.defaultPrevented, "and closing it does not warn");
 
     // ---- completeness of the demo ----
     ok(p.srs.highLevelAssets.length === 6, "high-level ranking has 6 systems");

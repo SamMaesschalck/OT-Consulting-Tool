@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Build a review pack from a demo</title></head>
+<body>
+<!--
+  Not a test (tools/run-tests.ps1 runs test-*.html only). Builds a review pack
+  from a demo, through the same code as Send for review, and prints it
+  base64-encoded in #pack. modules/report-review/scripts/build-demo-pack.ps1
+  uses it to make the review tool's demo pack:
+
+    dump-review-pack.html?id=iec-62443-3-3&demo=1
+
+  With demo=1 the pack is round 2 of a review, so the demo shows a reviewer what
+  a later round looks like: a first round's comments, with the author's replies
+  and statuses, and one red prompt left in. Without it, it is a plain round 1.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<pre id="pack"></pre>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore;
+  var q = new URLSearchParams(location.search), id = q.get("id") || "iec-62443-3-3", demo = q.get("demo") === "1";
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  E.activateInstrument(id);
+
+  function finish(pack) {
+    document.getElementById("pack").textContent = btoa(unescape(encodeURIComponent(JSON.stringify(pack))));
+    ok(pack.documents.length > 0, "built a pack of " + pack.documents.length + " documents, " + pack.items.length + " items");
+    done();
+  }
+  var chain = Promise.resolve();
+  if (demo) {
+    chain = chain.then(function () { return RV.buildPack(); }).then(function (r) {
+      var s = r.store, first = r.pack;
+      RC.recordRound(s, first);
+      var blocks = first.documents[0].blocks;
+      function find(fn) { return blocks.filter(fn)[0]; }
+      var summary = find(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 80; });
+      var head = find(function (b) { return b.type === "heading" && !b.sub && b.sectionKey; });
+      var finding = first.items.filter(function (i) { return i.status === "finding"; })[0];
+      function anchor(b) { return { documentIndex: 0, documentTitle: first.documents[0].title, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text, cell: null, targetName: "", itemId: "", field: "" }; }
+      var at = "2026-05-29T14:10:00.000Z";
+      var file = {
+        schema: RC.fileSchema(), packId: first.packId, reviewId: first.reviewId, round: 1, fileId: "f-demo-1", reviewer: "J. Marsh", savedAt: at,
+        savedBy: { product: "OT Cyber Report Review Tool", version: "0.5.1" },
+        verdict: { value: "changes-requested", date: "2026-05-29", note: "Two points on the summary and one finding need work before this goes out." },
+        checklist: [], dismissedChecks: [], confirmations: [],
+        comments: [
+          { id: "c-demo-1", reviewer: "J. Marsh", createdAt: at, updatedAt: at, severity: "must-fix", anchor: anchor(summary), text: "The client asked for this to say which zone is furthest from target. Please lead with that.", suggestion: null, relatesTo: null, check: null },
+          { id: "c-demo-2", reviewer: "J. Marsh", createdAt: at, updatedAt: at, severity: "suggestion", anchor: anchor(head), text: "Could this heading be plainer?", suggestion: null, relatesTo: null, check: null },
+          { id: "c-demo-3", reviewer: "J. Marsh", createdAt: at, updatedAt: at, severity: "should-fix",
+            anchor: { documentIndex: 0, documentTitle: first.documents[0].title, kind: "item", sectionKey: "", sectionTitle: "", blockId: "", quote: finding.evidence, cell: null, targetName: finding.targetName, itemId: finding.itemId, field: "evidence", code: finding.code, itemTitle: finding.title },
+            text: "Name the document this evidence came from.", suggestion: null, relatesTo: null, check: null }
+        ]
+      };
+      RC.importFile(s, file);
+      RC.setStatus(s, "c-demo-1", "resolved");
+      RC.addReply(s, "c-demo-1", first.engagement.consultant || "Author", "Agreed: the sentence that follows now names the zone.");
+      RC.setStatus(s, "c-demo-2", "wontchange", "It is the section title the client's template uses.");
+      RC.addReply(s, "c-demo-3", first.engagement.consultant || "Author", "Asked the client for the document reference; still open.");
+      E.setReportNarrative({ topPriorities: "" });
+      return RV.buildPack();
+    }).then(function (r) { return r.pack; });
+  } else {
+    chain = chain.then(function () { return RV.buildPack(); }).then(function (r) { return r.pack; });
+  }
+  chain.then(finish).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); done(); });
+});
+</script>
+</body></html>

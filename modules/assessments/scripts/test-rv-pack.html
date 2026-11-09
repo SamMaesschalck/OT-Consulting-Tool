@@ -1,0 +1,154 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: what the pack carries</title></head>
+<body>
+<!--
+  What the assessment tool puts in a pack, beyond the report itself. The
+  author's note and needed-by date travel as the pack's request only when
+  something was typed, and the round remembers them. Every item carries its
+  target's id as well as its name. A CAF-family item shows its expected state
+  under the chosen profile (and none under a placeholder profile), and a
+  maturity item its target level by name. The comments list heads two groups of
+  one site, and one group in two zones, differently. And a pack this copy of
+  the project has no record of can be recognised as this engagement's, or found
+  on another assessment in the file.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+function poll(test, ms) {
+  var end = Date.now() + (ms || 60000);
+  return new Promise(function (resolve, reject) {
+    (function go() {
+      var v; try { v = test(); } catch (e) { v = null; }
+      if (v) return resolve(v);
+      if (Date.now() > end) return reject(new Error("timed out waiting for " + test.toString().slice(0, 120)));
+      setTimeout(go, 25);
+    })();
+  });
+}
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds(), main = document.getElementById("main");
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  var saved = null;
+  window.showSaveFilePicker = function (o) {
+    return Promise.resolve({ name: o.suggestedName, kind: "file", createWritable: function () {
+      return Promise.resolve({ write: function (t) { saved = { name: o.suggestedName, text: String(t) }; return Promise.resolve(); }, close: function () { return Promise.resolve(); } });
+    } });
+  };
+  var chain = Promise.resolve();
+  function step(fn) { chain = chain.then(fn); }
+
+  // ---- the author's note -------------------------------------------------------
+  step(function () { E.activateInstrument("ncsc-caf"); return RV.buildPack(); });
+  step(function (r) {
+    ok(!("request" in r.pack), "a pack sent with nothing typed has no request");
+    return RV.buildPack(null, { note: "  Sections 4 and 5 are rewritten.  ", neededBy: " Thursday " });
+  });
+  step(function (r) {
+    ok(r.pack.request && r.pack.request.note === "Sections 4 and 5 are rewritten." && r.pack.request.neededBy === "Thursday", "a note and a needed-by date go in as the request, trimmed", JSON.stringify(r.pack.request));
+    return RV.buildPack(null, { note: "Only a note.", neededBy: "" });
+  });
+  step(function (r) {
+    ok(r.pack.request && r.pack.request.note === "Only a note." && !("neededBy" in r.pack.request), "an empty needed-by is left out");
+    ok(RC.checkPack ? RC.checkPack(r.pack).ok !== false : true, "and the pack still passes the importer's own check");
+    // Through the card, as the author would.
+    A.UI.go("report");
+    return poll(function () { return main.querySelector(".review-card .rv-send"); });
+  });
+  step(function () {
+    var box = main.querySelector(".review-card .rv-request textarea");
+    ok(!!box, "the card has a box for a note to the reviewers");
+    box.value = "Please look at the roadmap first."; box.dispatchEvent(new Event("input"));
+    saved = null;
+    main.querySelector(".review-card .rv-send").click();
+    return poll(function () { return saved && main.querySelector(".review-card .rv-notice.ok"); }, 120000);
+  });
+  step(function () {
+    var p = JSON.parse(saved.text);
+    ok(p.request && p.request.note === "Please look at the roadmap first.", "Send for review puts the typed note in the pack", JSON.stringify(p.request));
+    var round = RC.lastRound(RV.store());
+    ok(round.request && round.request.note === "Please look at the roadmap first.", "and the round remembers it");
+    ok(!/roadmap first/.test(JSON.stringify(E.state.engagement)), "the note is not on the engagement the exporters read");
+
+    // ---- every item carries its target's id ----------------------------------
+    ok(p.items.length > 20 && p.items.every(function (i) { return i.targetId === E.state.engagement.targets[0].id && i.targetName === E.state.engagement.targets[0].name; }), "every item carries its target's id beside its name");
+
+    // ---- expected state, CAF family -----------------------------------------
+    E.setCAFProfile("caf-general");
+    var items = RV.packItems().items.filter(function (i) { return i.status !== "na"; });
+    ok(items.length > 20 && items.every(function (i) { return i.expected === "Achieved"; }), "under the general CAF profile every outcome in scope shows its expected state", items.slice(0, 3).map(function (i) { return i.code + "=" + i.expected; }).join(", "));
+    E.setCAFProfile("caf-dft-rail-basic");
+    var ph = RV.packItems().items;
+    ok(ph.every(function (i) { return !i.expected; }), "a placeholder regulator profile sets none, so none is shown");
+    E.setCAFProfile("caf-general");
+    // ---- and the maturity family names its level ------------------------------
+    // The target overlay is off by default; switched on, with a target set on
+    // one requirement, that item names the level.
+    E.activateInstrument("iec-62443-2-1-2024");
+    var inst = E.state.instrument, wasOverlay = inst.targetOverlay;
+    inst.targetOverlay = Object.assign({}, wasOverlay || {}, { enabled: true });
+    var req = RV.packItems().items[0];
+    E.setResponse(req.targetId, req.itemId, { targetMl: "ML3" });
+    var ml = RV.packItems().items.filter(function (i) { return i.itemId === req.itemId; })[0];
+    inst.targetOverlay = wasOverlay;
+    ok(!!ml && /^ML3 \S/.test(ml.expected), "a maturity item with a target shows the level by name, not its bare id", ml && ml.expected);
+  });
+
+  // ---- comment groups: one heading per target and group ---------------------------
+  step(function () {
+    E.activateInstrument("iec-62443-3-3");
+    var items = RV.packItems().items;
+    var ts = E.state.engagement.targets;
+    ok(ts.length >= 2, "the 3-3 demo has several zones");
+    // Two groups of one zone, and one group in two zones.
+    var a = items.filter(function (i) { return i.targetId === ts[0].id; })[0];
+    var b = items.filter(function (i) { return i.targetId === ts[0].id && i.groupName !== a.groupName; })[0];
+    var c = items.filter(function (i) { return i.targetId === ts[1].id && i.groupName === a.groupName; })[0];
+    var s = RV.ensureStore();
+    if (!s.rounds.length) s.rounds.push({ round: 1, packId: "rp-groups", createdAt: new Date().toISOString(), documents: [] });
+    [a, b, c].forEach(function (it, k) {
+      s.threads.push({ comment: { id: "c-grp-" + k, reviewer: "J. Marsh", createdAt: "2026-11-01T10:00:00Z", updatedAt: "2026-11-01T10:00:00Z", severity: "should-fix",
+        anchor: { documentIndex: 0, kind: "item", targetName: it.targetName, targetId: it.targetId, groupName: it.groupName, itemId: it.itemId, field: "", quote: "", code: it.code, itemTitle: it.title },
+        text: "On this item.", suggestion: null, relatesTo: null, check: null }, round: 1, savedAt: "2026-11-01T10:00:00Z", fileId: "f1", status: "open", reason: "", replies: [], confirmedBy: [] });
+    });
+    A.UI.go("report");
+    return poll(function () { return main.querySelectorAll(".review-card .rv-group").length >= 3 && main.querySelectorAll(".review-card .rv-group"); });
+  });
+  step(function (heads) {
+    var texts = Array.prototype.map.call(heads, function (x) { return x.textContent; });
+    var uniq = texts.filter(function (t, i) { return texts.indexOf(t) === i; });
+    ok(texts.length === 3 && uniq.length === 3, "each target and group has its own heading", texts.join(" | "));
+    var ts = E.state.engagement.targets;
+    ok(texts.some(function (t) { return t.indexOf(ts[1].name) !== -1; }), "and a comment on the second zone is headed with that zone's name");
+  });
+
+  // ---- a pack this copy has no record of ------------------------------------------
+  step(function () {
+    E.activateInstrument("ncsc-caf");
+    return RV.buildPack();
+  });
+  step(function (r) {
+    ok(RV.packMatches(r.pack) === true, "a pack of this engagement is recognised as its own");
+    var other = JSON.parse(JSON.stringify(r.pack)); other.engagement.client = "Someone Else Ltd";
+    ok(RV.packMatches(other) === false, "one for another client is not");
+    var inst = JSON.parse(JSON.stringify(r.pack)); inst.engagement.instrumentId = "nist-800-53";
+    ok(RV.packMatches(inst) === false, "nor one for another instrument");
+    // Another assessment in the file sent it.
+    var here = E.state.activeAssessmentId;
+    var twin = E.newAssessment("ncsc-caf", { label: "2028 re-assessment" });
+    E.setReview({ reviewId: "rv-twin", rounds: [{ round: 1, packId: "rp-twin-1", createdAt: new Date().toISOString(), documents: [] }], files: [], threads: [] });
+    E.activateAssessment(here);
+    var hint = RV.packHint("rp-twin-1");
+    ok(!!hint && /2028 re-assessment/.test(hint) && /switch to it/.test(hint) && !/[–—]/.test(hint), "a review file for another assessment in the file names it", hint);
+    ok(RV.packHint("rp-nowhere") === null, "and says nothing when no assessment sent that pack");
+    ok(twin && twin.id !== here, "the two assessments are separate");
+  });
+  chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+</script>
+</body></html>

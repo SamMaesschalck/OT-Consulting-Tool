@@ -646,14 +646,7 @@ window.App.Engine = (function () {
     var ass = activeAssessment();
     if (!ass) return;
     if (!ass.reportCustom) ass.reportCustom = {};
-    var cur = Object.assign({}, ass.reportCustom[key] || {}, patch);
-    Object.keys(cur).forEach(function (k) {
-      var v = cur[k];
-      if (v === null || v === undefined || v === "" || v === false ||
-          (Array.isArray(v) && v.length === 0)) delete cur[k];
-    });
-    if (Object.keys(cur).length) ass.reportCustom[key] = cur;
-    else delete ass.reportCustom[key];
+    window.App.ReportSections.patchSection(ass.reportCustom, key, patch);
     if (state.engagement) state.engagement.reportCustom = ass.reportCustom;
     emit("engagement-changed", state.engagement);
   }
@@ -668,6 +661,25 @@ window.App.Engine = (function () {
   function hasReportCustom() {
     return Object.keys(getReportCustom()).length > 0;
   }
+
+  // ---- review (comments from the report review tool) --------------------
+  // Per-assessment, kept on the assessment itself and deliberately NOT on the
+  // engagement projection (Storage.projectionFromProjectAndAssessment): the
+  // exporters read the projection, so a review can never reach Word or Excel.
+  // A file saved before reviews existed simply has none. See js/review.js.
+  function getReview() {
+    var ass = activeAssessment();
+    return (ass && ass.review) || null;
+  }
+  function setReview(store) {
+    var ass = activeAssessment();
+    if (!ass) return;
+    ass.review = store;
+    touchReview();
+  }
+  // The store changed: unsaved work and an autosave, but no re-render, as
+  // nothing the report page draws from the engagement has changed.
+  function touchReview() { emit("responses-changed", null); }
 
   // ---- basis of assessment (evidence register) --------------------------
   // Per-assessment (like reportNarrative): the documents reviewed, systems
@@ -2042,6 +2054,9 @@ window.App.Engine = (function () {
     setReportSection: setReportSection,
     clearReportSection: clearReportSection,
     hasReportCustom: hasReportCustom,
+    getReview: getReview,
+    setReview: setReview,
+    touchReview: touchReview,
     getBasisOfAssessment: getBasisOfAssessment,
     touchBasisOfAssessment: touchBasisOfAssessment,
     getBaseline: getBaseline,

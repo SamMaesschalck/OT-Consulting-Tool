@@ -1,0 +1,122 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Suite hand-off: the author's review card</title></head>
+<body>
+<pre id="out">running...</pre>
+<div id="card"></div>
+<!--
+  The suite half of shared/review-author.js, with a stand-in host bridge:
+  after Send for review the card offers "Open it in the Report Review Tool"
+  only inside the suite (not standalone, not on a tour), and a review file the
+  Report Review Tool hands back is imported as Import review files would.
+  Run with tools/run-tests.ps1 -Root platform -Tests test-handoff.html.
+-->
+<script>
+  // A stand-in for js/host-bridge.js in a tool the suite hosts.
+  window.App = window.App || {};
+  window.STUB = { handed: [], listeners: [], notices: [] };
+  window.App.HostBridge = {
+    hosted: true, launch: { module: "assessments", frame: "assessments", tour: false }, canHandoff: true,
+    handoff: function (to, name, text) { STUB.handed.push({ to: to, name: name, text: text }); return true; },
+    onOpenText: function (fn) { STUB.listeners.push(fn); },
+    notice: function (m) { STUB.notices.push(m); }
+  };
+</script>
+<script src="../../shared/version.js"></script>
+<script src="../../modules/report-review/data/review-pack.js"></script>
+<script src="../../modules/report-review/data/review-file.js"></script>
+<script src="../../shared/review-core.js"></script>
+<script src="../../shared/review-author.js"></script>
+<script src="../../modules/report-review/data/demo-pack.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  var RC = window.App.ReviewCore, RA = window.App.ReviewAuthor;
+  var B = window.App.HostBridge;
+  try {
+    var pack = JSON.parse(JSON.stringify(window.SPT_REVIEW_DEMO_PACK));
+    ok(STUB.listeners.length === 1, "in the suite, the card listens for review files handed back from when it loads");
+
+    // A review file for the demo pack, as the Report Review Tool saves one.
+    var file = JSON.parse(JSON.stringify(window.App.Data.contracts.reviewFile.example));
+    file.packId = pack.packId; file.reviewId = pack.reviewId; file.round = pack.round;
+    file.fileId = "rf-test-1"; file.reviewer = "Pat Reviewer"; file.savedAt = "2026-11-09T10:00:00.000Z";
+    file.comments = [{ id: "c-handback-1", reviewer: "Pat Reviewer", createdAt: file.savedAt, updatedAt: file.savedAt, severity: "should-fix",
+      anchor: { kind: "general", documentIndex: 0, sectionKey: "", sectionTitle: "", blockId: "", quote: "", cell: null, targetName: "", itemId: "", field: "" },
+      text: "Handed back in the suite.", suggestion: null, relatesTo: null, check: null }];
+    var fileText = JSON.stringify(file);
+
+    // Before any card has been drawn there is nowhere to import into.
+    var took = STUB.listeners[0]("pat-review.json", fileText);
+    ok(took === true && STUB.notices.length === 1 && /Import review files/.test(STUB.notices[0]), "a review file handed back before the card is drawn says where to import it", STUB.notices[0]);
+    ok(STUB.listeners[0]("pack.json", JSON.stringify(pack)) === false, "a file that is not a review file is left for the tool's own hooks");
+
+    var store = RC.emptyStore();
+    RC.recordRound(store, pack);
+    var toasts = [], touched = 0, sendResult = null;
+    var adapter = {
+      store: function () { return store; },
+      touch: function () { touched++; },
+      send: function (progress, done) { done(sendResult); },
+      goTo: function () {}, acceptPlan: function () { return { can: false, why: "" }; }, accept: function () {},
+      stale: function () { return false; }, authorName: function () { return "Author"; },
+      toast: function (m, k) { toasts.push({ m: m, k: k }); }
+    };
+    var host = document.getElementById("card");
+    var ui = RA.newUi();
+    RA.mount(host, adapter, ui);
+
+    // ---- Send for review, then open the pack in the review tool ----------------
+    sendResult = { ok: true, message: "Round 2 pack saved as acme-review-pack-round-2.json.", pack: pack, name: "acme-review-pack-round-2.json" };
+    host.querySelector(".rv-send").click();
+    var btn = host.querySelector(".rv-handoff");
+    ok(!!btn && /Report Review Tool/.test(btn.textContent), "in the suite, a sent pack can be opened in the Report Review Tool");
+    if (btn) btn.click();
+    var hd = STUB.handed[0];
+    ok(hd && hd.to === "report-review" && hd.name === "acme-review-pack-round-2.json" && JSON.parse(hd.text).packId === pack.packId,
+      "the button hands that pack, under its file name, to the review tool", hd && hd.to + " " + hd.name);
+
+    sendResult = { ok: true, message: "Round 2 pack saved as x.json.", pack: pack };
+    host.querySelector(".rv-send").click();
+    host.querySelector(".rv-handoff").click();
+    ok(STUB.handed[1] && /-review-pack-round-2\.json$/.test(STUB.handed[1].name), "a tool that does not say the file name gets the name the tools give a pack", STUB.handed[1] && STUB.handed[1].name);
+
+    sendResult = { ok: false, message: "The pack was not saved." };
+    host.querySelector(".rv-send").click();
+    ok(!host.querySelector(".rv-handoff"), "a pack that was not saved offers nothing");
+
+    B.canHandoff = false;
+    sendResult = { ok: true, message: "Saved.", pack: pack };
+    host.querySelector(".rv-send").click();
+    ok(!host.querySelector(".rv-handoff"), "on a tour (no hand-off), the button is not shown");
+    B.canHandoff = true;
+
+    var saved = window.App.HostBridge;
+    window.App.HostBridge = undefined;
+    host.querySelector(".rv-send").click();
+    ok(!host.querySelector(".rv-handoff") && /Saved\./.test(host.textContent), "standalone, the card is as it was: the message, and no button");
+    window.App.HostBridge = saved;
+    ok(STUB.listeners.length === 1, "drawing the card again does not listen twice");
+
+    // ---- a review file handed back -------------------------------------------
+    took = STUB.listeners[0]("pat-review.json", fileText);
+    var t = RC.findThread(store, "c-handback-1");
+    ok(took === true && !!t && store.files.length === 1 && touched > 0, "a review file handed back is imported into the card last drawn", JSON.stringify(store.files.map(function (f) { return f.reviewer; })));
+    ok(toasts.length && /Pat Reviewer \(round 2\): 1 new comment/.test(toasts[toasts.length - 1].m), "and the author is told what came in", toasts.length && toasts[toasts.length - 1].m);
+    ok(/1 new comment/.test(host.querySelector(".rv-notice").textContent) && /Handed back in the suite/.test(host.textContent), "the card is redrawn with the comment");
+    STUB.listeners[0]("pat-review.json", fileText);
+    ok(store.threads.length === 1 && /already imported/.test(toasts[toasts.length - 1].m), "handing the same file back again changes nothing, as with Import");
+
+    var other = JSON.parse(fileText); other.packId = "rp-someone-else";
+    STUB.listeners[0]("other.json", JSON.stringify(other));
+    ok(toasts[toasts.length - 1].k === "err" && /different pack/.test(toasts[toasts.length - 1].m), "a file for another pack is refused, as with Import", toasts[toasts.length - 1].m);
+  } catch (e) {
+    ok(false, "the page ran to the end", e && e.stack || e);
+  }
+  lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+  document.getElementById("out").textContent = lines.join("\n");
+})();
+</script>
+</body>
+</html>

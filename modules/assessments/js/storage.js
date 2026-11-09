@@ -26,7 +26,9 @@
  *           },
  *           targetProfile: {...}, targets: [...], responses: [...],
  *           baseline: {...},            // a previous assessment, for the diff
- *           reportNarrative, reportSections, basisOfAssessment
+ *           reportNarrative, reportSections, basisOfAssessment,
+ *           review: {...}               // comments back from reviewers (js/review.js);
+ *                                       // absent until a review starts, never exported
  *         }
  *       },
  *       createdAt, updatedAt
@@ -399,8 +401,18 @@ window.App.Storage = (function () {
   var projectHandle = null, projectHandleId = null;
   var IDB_NAME = "otcat-files", IDB_STORE = "handles", IDB_KEY = "project";
 
+  // The browser refuses the file dialogs to a page framed by a page of another
+  // origin (the suite's folder build frames each tool's own file:// page, and
+  // the browser counts every file:// page as an origin of its own). There the
+  // tool saves by download and loads through the file input, as it does in a
+  // browser without the dialogs. Standalone, or framed by a page of the same
+  // origin (the suite's single-file build), the dialogs are used as normal.
+  function inForeignFrame() {
+    try { return window.top !== window.self && !window.top.location.href; } catch (e) { return true; }
+  }
+
   function supportsFilePickers() {
-    return typeof window.showSaveFilePicker === "function";
+    return typeof window.showSaveFilePicker === "function" && !inForeignFrame();
   }
 
   // Handle persistence is a convenience, never a dependency: every failure
@@ -474,6 +486,7 @@ window.App.Storage = (function () {
   }
 
   function currentFileName() { return projectHandle ? projectHandle.name : null; }
+  function currentFileHandle() { return projectHandle; }
 
   // Forget the current file (New project, or a legacy file-input load where no
   // handle exists) so a later Save can never overwrite the WRONG project file.
@@ -481,7 +494,9 @@ window.App.Storage = (function () {
 
   // Save the project, overwriting its file where possible.
   // opts: { saveAs: true } forces the save dialog (a fresh copy / snapshot).
-  // onResult({ ok, method: "file"|"download", name, aborted, error })
+  // onResult({ ok, method: "file"|"download", name, aborted, error, blocked })
+  // blocked: the download was used because the browser refused the save
+  // dialog here (a frame), not because it has none.
   function saveProjectToFile(projectFile, opts, onResult) {
     opts = opts || {}; onResult = onResult || function () {};
     projectFile.updatedAt = nowISO();
@@ -492,11 +507,12 @@ window.App.Storage = (function () {
     var text = JSON.stringify(projectFile, null, 2);
     var suggested = suggestedProjectFilename(projectFile);
 
-    if (!supportsFilePickers()) {
+    function download(blocked) {
       downloadBlob(new Blob([text], { type: "application/json" }), suggested);
-      onResult({ ok: true, method: "download", name: suggested });
-      return;
+      onResult({ ok: true, method: "download", name: suggested, blocked: !!blocked });
     }
+
+    if (!supportsFilePickers()) { download(inForeignFrame()); return; }
 
     function pick() {
       // Open where the consultant keeps their projects. Left to itself the
@@ -514,6 +530,10 @@ window.App.Storage = (function () {
       function ask(o, retry) {
         window.showSaveFilePicker(o).then(function (h) { writeTo(h, false); }, function (e) {
           if (e && e.name === "AbortError") { onResult({ ok: false, aborted: true }); return; }
+          // Refused for a security reason (a frame the browser will not show
+          // the dialog in, or the click that asked for it has expired): the
+          // work still has to reach a file, so it downloads instead.
+          if (e && e.name === "SecurityError") { download(true); return; }
           // A remembered directory that has since gone (a moved OneDrive
           // folder, a disconnected drive) must never be the reason a save is
           // impossible: drop the hint and ask again plainly.
@@ -703,6 +723,7 @@ window.App.Storage = (function () {
     adoptProjectFile: adoptProjectFile,
     supportsFilePickers: supportsFilePickers,
     currentFileName: currentFileName,
+    currentFileHandle: currentFileHandle,
     forgetProjectFile: forgetProjectFile,
     loadProjectFromFile: loadProjectFromFile,
     suggestedProjectFilename: suggestedProjectFilename,

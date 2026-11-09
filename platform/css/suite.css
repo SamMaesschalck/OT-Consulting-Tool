@@ -1,0 +1,362 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* SolutionsPT OT Cyber Suite - the shell's styles.
+   The tokens, header, buttons, cards, dialogs and the light and dark palettes
+   match the modules' design system (modules/assessments/css/app.css), so the
+   suite and the tools inside it read as one product. The shell keeps its own
+   copy rather than loading a module's: a module's styles are the module's. */
+
+:root {
+  --brand-blue:        #0F5FA6;
+  --brand-blue-dark:   #0A3D62;
+  --brand-blue-tint:   #E6EEF6;
+
+  --surface:           #FFFFFF;
+  --surface-2:         #F4F7FA;
+  --surface-3:         #ECF1F6;
+  --border:            #E2E8F0;
+  --border-strong:     #C8D2DD;
+
+  --text:              #1A2533;
+  --text-muted:        #5A6B7B;
+  --text-soft:         #8595A5;
+
+  --met:               #2E7D52;
+  --met-bg:            #E5F1EA;
+  --near:              #C28A1E;
+  --near-bg:           #F7EFD9;
+  --near-text:         #7A5410;
+  --gap:               #B23A33;
+
+  --radius:            4px;
+  --radius-lg:         6px;
+  --shadow-sm:         0 1px 1px rgba(20,33,52,0.04);
+
+  --header-h:          56px;
+  --bar-h:             38px;
+  --header-bg:         #0A3D62;
+  --bar-bg:            #07273E;
+  --font:              "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono:              Consolas, "Cascadia Mono", Menlo, monospace;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --brand-blue:        #4C97DE;
+  --brand-blue-dark:   #9CC6EE;
+  --brand-blue-tint:   #1C3346;
+
+  --surface:           #1B2430;
+  --surface-2:         #131A22;
+  --surface-3:         #232E3C;
+  --border:            #2C3947;
+  --border-strong:     #3D4C5C;
+
+  --text:              #E6EDF3;
+  --text-muted:        #A6B6C5;
+  --text-soft:         #7E8D9C;
+
+  --met:               #4FB07E;
+  --met-bg:            #18352A;
+  --near:              #D7A53C;
+  --near-bg:           #38301A;
+  --near-text:         #E9C46F;
+  --gap:               #DB6A62;
+
+  --shadow-sm:         0 1px 1px rgba(0,0,0,0.35);
+
+  color-scheme: dark;
+}
+:root[data-theme="dark"] .btn.primary:hover { background: #3B82C4; border-color: #3B82C4; }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font-family: inherit; font-size: 14px; color: var(--text); }
+a { color: var(--brand-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hidden { display: none !important; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- Layout ----------
+   The bar (only while a tool is open) above the stage. The stage holds the
+   home page and one frame per opened tool, stacked; only one is visible.
+   Hidden frames stay laid out at full size (visibility, not display), so a
+   tool that measures itself while in the background still gets real sizes. */
+.suite { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+.stage { position: relative; flex: 1 1 auto; min-height: 0; }
+.home { position: absolute; inset: 0; overflow-y: auto; background: var(--surface-2); }
+/* A file being dragged over the home page: it can be dropped anywhere. */
+body.drop-over .home { box-shadow: inset 0 0 0 3px var(--brand-blue); }
+.tool-frame {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: 0; display: block; background: var(--surface-2);
+  visibility: hidden;
+}
+.tool-frame.active { visibility: visible; }
+.stage-loading {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: 14px; background: var(--surface-2);
+}
+
+/* ---------- Header (home page) ----------
+   The same navy header as the modules, in both themes. */
+.header {
+  position: sticky; top: 0; z-index: 5;
+  min-height: var(--header-h);
+  background: var(--header-bg);
+  color: #FFF;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  border-bottom: 1px solid #07273E;
+}
+.header .brand { display: flex; align-items: center; gap: 12px; font-weight: 600; letter-spacing: 0.2px; font-size: 15px; min-width: 0; }
+.header .brand-logo { display: inline-flex; align-items: center; background: #FFF; border-radius: var(--radius); padding: 5px 10px; flex: 0 0 auto; }
+.header .brand-logo img { display: block; height: 34px; width: auto; }
+.header .sub { font-weight: 400; color: #C9D8E5; font-size: 13px; white-space: nowrap; }
+.header .version-badge {
+  display: inline-block; margin-left: 8px; padding: 1px 7px;
+  border: 1px solid rgba(255,255,255,0.35); border-radius: 999px;
+  font-size: 11px; line-height: 16px; color: #FFF; vertical-align: 1px;
+}
+.header .spacer { flex: 1; }
+.header-actions { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text);
+  padding: 6px 12px; border-radius: var(--radius); cursor: pointer; font-weight: 500;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:active { background: var(--surface-3); }
+.btn.primary { background: var(--brand-blue); color: #FFF; border-color: var(--brand-blue); }
+.btn.primary:hover { background: var(--brand-blue-dark); border-color: var(--brand-blue-dark); }
+.btn.ghost { background: transparent; border-color: transparent; color: #FFF; }
+.btn.ghost:hover { background: rgba(255,255,255,0.08); }
+.btn:focus-visible, .link-btn:focus-visible, .bar-btn:focus-visible, .recent-open:focus-visible {
+  outline: 2px solid var(--brand-blue); outline-offset: 2px;
+}
+.header .btn:focus-visible, .suite-bar .bar-btn:focus-visible { outline-color: #9CC6EE; }
+.link-btn {
+  border: 0; padding: 0; background: none; font: inherit;
+  color: var(--brand-blue); cursor: pointer; text-decoration: none;
+}
+.link-btn:hover { text-decoration: underline; }
+
+/* ---------- The suite bar (a tool is open) ----------
+   Slim, so the tool keeps its room; the tool's own header sits under it. */
+.suite-bar {
+  flex: 0 0 auto;
+  height: var(--bar-h);
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 8px 0 6px;
+  background: var(--bar-bg);
+  color: #DCE7F1;
+  font-size: 13px;
+  border-bottom: 1px solid #041A2A;
+  overflow: hidden;
+}
+.bar-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 28px; padding: 0 10px;
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius);
+  color: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.bar-btn:hover { background: rgba(255,255,255,0.09); color: #FFF; }
+.bar-home { font-weight: 600; color: #FFF; }
+.bar-home svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.bar-sep { color: #6F8AA3; padding: 0 2px; user-select: none; }
+.bar-current { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 0 6px; color: #FFF; font-weight: 600; }
+.bar-current .bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-current .bar-name-short { display: none; }
+.bar-tag {
+  font-size: 11px; font-weight: 600; padding: 0 7px; line-height: 18px; border-radius: 999px;
+  background: rgba(255,255,255,0.14); color: #FFF; white-space: nowrap;
+}
+.bar-tag.dirty { background: rgba(245,184,65,0.18); color: #F5C766; box-shadow: inset 0 0 0 1px rgba(245,184,65,0.55); }
+.bar-spacer { flex: 1 1 auto; min-width: 8px; }
+.bar-switch { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.bar-switch::-webkit-scrollbar { display: none; }
+.bar-switch-label { color: #9DB3C7; padding: 0 6px 0 2px; white-space: nowrap; }
+.bar-tab .dot {
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1.5px #7E98B0;
+}
+.bar-tab .dot.open { background: #7FC7A0; box-shadow: none; }
+.bar-tab .dot.dirty { background: #F5B841; box-shadow: none; }
+
+/* ---------- Home page ---------- */
+.home-main { max-width: 1180px; margin: 0 auto; padding: 28px 32px 40px; }
+.page-title { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+.page-sub { color: var(--text-muted); margin: 0 0 20px; max-width: 780px; }
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.tool-card {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand-blue);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.tool-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.tool-card h2 { margin: 0; font-size: 17px; line-height: 1.3; color: var(--brand-blue-dark); }
+.tool-card p { margin: 0; color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
+.tool-chips { display: flex; flex-wrap: wrap; gap: 4px; flex: 0 0 auto; justify-content: flex-end; }
+.chip {
+  display: inline-block; font-size: 11px; font-weight: 600; line-height: 18px;
+  padding: 0 8px; border-radius: 999px; white-space: nowrap;
+  background: var(--surface-3); color: var(--text-muted);
+}
+.chip.open { background: var(--met-bg); color: var(--met); }
+.chip.dirty { background: var(--near-bg); color: var(--near-text); }
+.tool-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: auto; padding-top: 8px; }
+
+.home-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "recent help" "notes help";
+  column-gap: 16px;
+  align-items: start;
+}
+.home-cols .recent-card { grid-area: recent; }
+.home-cols .help-card { grid-area: help; }
+.home-cols .notes-card { grid-area: notes; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 16px;
+  min-width: 0;
+}
+.card-h {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.card-h h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.card-h .card-h-note { color: var(--text-muted); font-size: 12px; }
+.card-b { padding: 14px 18px 16px; }
+.card-b > :first-child { margin-top: 0; }
+.card-b > :last-child { margin-bottom: 0; }
+.muted { color: var(--text-muted); }
+.small { font-size: 12px; }
+
+/* Recent files */
+.recent-list { list-style: none; margin: 0; padding: 0; }
+.recent-item + .recent-item { border-top: 1px solid var(--border); }
+.recent-open {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  padding: 10px 18px; background: none; border: 0; text-align: left; cursor: pointer; color: var(--text);
+}
+.recent-open:hover { background: var(--surface-2); }
+.recent-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.recent-name { font-weight: 600; overflow-wrap: anywhere; }
+.recent-meta { font-size: 12px; color: var(--text-muted); }
+.recent-go { flex: 0 0 auto; font-size: 13px; color: var(--brand-blue); white-space: nowrap; }
+.recent-empty { margin: 0; padding: 14px 18px 4px; color: var(--text-muted); }
+.recent-foot { padding: 10px 18px 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
+
+/* Getting started */
+.help-tool + .help-tool { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.help-tool h3 { margin: 0 0 4px; font-size: 14px; color: var(--brand-blue-dark); }
+.help-tool p { margin: 0 0 8px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.help-links { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; }
+.help-tips { margin: 16px 0 0; padding: 14px 0 0 18px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }
+.help-tips li + li { margin-top: 6px; }
+
+/* What's new: release notes, rendered from Markdown */
+.notes { font-size: 13.5px; line-height: 1.55; }
+.notes h2, .notes h3, .notes h4 { color: var(--brand-blue-dark); margin: 18px 0 6px; line-height: 1.3; }
+.notes h2 { font-size: 15px; }
+.notes h3, .notes h4 { font-size: 14px; }
+.notes p { margin: 0 0 10px; }
+.notes ul { margin: 0 0 12px; padding-left: 20px; }
+.notes li + li { margin-top: 4px; }
+.notes code {
+  font-family: var(--mono); font-size: 12px; padding: 1px 4px; border-radius: 3px;
+  background: var(--surface-3);
+}
+.notes .table-wrap { overflow-x: auto; margin: 0 0 12px; }
+.notes table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.notes th, .notes td { text-align: left; vertical-align: top; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.notes th { font-weight: 600; color: var(--text-muted); background: var(--surface-2); }
+
+.home-legal { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
+.home-legal p { margin: 0 0 4px; }
+
+/* ---------- Dialog ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,30,50,0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+}
+.modal {
+  background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border);
+  width: min(720px, 100%); max-height: calc(100vh - 48px); display: flex; flex-direction: column;
+  box-shadow: 0 6px 30px rgba(15,30,50,0.18);
+}
+.modal-h { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.modal-h h2 { margin: 0; font-size: 16px; }
+.modal-b { padding: 18px; overflow: auto; }
+.modal-f { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+.licence-version { margin: 0 0 12px; }
+.licence-text { margin: 0; white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.5; color: var(--text); }
+
+.toast {
+  position: fixed; bottom: 20px; right: 20px; max-width: 360px; z-index: 60;
+  background: var(--text); color: #FFF; padding: 10px 14px; border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(15,30,50,0.2);
+}
+:root[data-theme="dark"] .toast { color: #131A22; }
+.toast.err { background: var(--gap); color: #FFF; }
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 980px) {
+  .home-cols { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "recent" "help" "notes"; }
+}
+@media (max-width: 720px) {
+  .home-main { padding: 20px 16px 32px; }
+  .header { padding: 0 12px; gap: 10px; }
+  .header .brand { gap: 8px; }
+  .header .brand-logo { padding: 4px 7px; }
+  .header .brand-logo img { height: 26px; }
+  .tool-grid { grid-template-columns: minmax(0, 1fr); }
+  .bar-switch-label, .bar-suite-name { display: none; }
+}
+@media (max-width: 520px) {
+  .header { flex-wrap: wrap; padding: 8px 12px; row-gap: 6px; }
+  .header .spacer { display: none; }
+  .header-actions { margin-left: auto; }
+  .header .btn.ghost { padding: 6px 8px; }
+  .page-title { font-size: 20px; }
+  .card-b, .card-h { padding-left: 14px; padding-right: 14px; }
+  .recent-open { padding: 10px 14px; }
+  .bar-current .bar-name-full { display: none; }
+  .bar-current .bar-name-short { display: inline; }
+}

@@ -1,0 +1,146 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* The Report page (js/report-page.js). The first part is the assessment tool's
+   rules for editing a report section, with the same class names (its
+   css/app.css), so the two tools' report pages look and behave alike. It is built
+   only from the design tokens the tools share, so it follows light and dark. */
+
+/* ---- consultant customisation of report sections ---------------------- */
+.sect-edit {
+  margin-left: auto; font-size: 11.5px; font-weight: 600;
+  padding: 3px 9px; border-radius: 4px; cursor: pointer;
+  background: var(--surface); border: 1px dashed var(--border); color: var(--muted);
+}
+.sect-edit:hover { border-style: solid; border-color: var(--brand-blue); color: var(--brand-blue); }
+.sect-edit.changed { border-style: solid; border-color: var(--brand-blue); color: var(--brand-blue); }
+.sect-edit.open { background: var(--brand-blue); border-color: var(--brand-blue); color: #FFF; }
+
+/* Editing happens in place: the heading becomes a field and the wording
+   becomes a box holding those same sentences, sized to the text. */
+.card.editing { box-shadow: inset 0 0 0 2px var(--brand-blue); }
+
+.sect-title-input {
+  flex: 1; margin: -4px 0;
+  font: inherit; font-size: 16px; font-weight: 600; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 7px;
+}
+.sect-title-input:focus { outline: none; border-color: var(--brand-blue); }
+
+.sect-prose-input {
+  display: block; width: 100%; margin: 0 0 12px;
+  font: inherit; color: var(--text); line-height: 1.55;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px 10px;
+  resize: vertical; overflow: hidden;
+}
+.sect-prose-input:focus { outline: none; border-color: var(--brand-blue); }
+
+.sect-actions {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+
+.reorder-grip { display: inline-flex; gap: 3px; margin-left: 10px; }
+.priority-row.reordering { display: flex; cursor: grab; }
+.priority-row.reordering .priority-name { flex: 1; }
+/* Same feedback as the remediation roadmap, so reordering looks and behaves
+   the same wherever a list can be reordered. */
+.priority-row.reordering.dragging { opacity: .45; cursor: grabbing; }
+.priority-row.reordering.drop-target { box-shadow: inset 0 2px 0 0 var(--brand-blue); }
+.priority-row.reordering .reorder-btn { cursor: pointer; }
+.reorder-btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 3px; width: 24px; height: 22px; cursor: pointer; line-height: 1;
+}
+.reorder-btn:hover:not(:disabled) { border-color: var(--brand-blue); color: var(--brand-blue); }
+.reorder-btn:disabled { opacity: .35; cursor: default; }
+
+.card.section-hidden { opacity: .45; }
+.section-hidden-tag {
+  margin-left: 10px; font-size: 11px; font-weight: 600;
+  color: var(--note, #B23A33); text-transform: none;
+}
+
+.inherited-edit {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--brand-blue);
+  cursor: pointer;
+}
+.inherited-edit:hover { color: var(--brand-blue-dark); text-decoration: underline; }
+
+.check-flash { animation: jumpFlash 2.2s ease-out; }
+
+/* What those two boxes finally look like in the assessment tool, whose general
+   input rules (app.css, which this tool's theme does not have) win over the
+   above: plain text, at the page's size, in the usual field border. */
+.card .sect-title-input, .card .sect-prose-input {
+  font: inherit; font-size: 14px; font-weight: 400;
+  padding: 7px 10px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  outline: none; transition: border-color 0.12s, box-shadow 0.12s;
+}
+.card .sect-title-input:focus, .card .sect-prose-input:focus {
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 2px var(--brand-blue-tint);
+}
+.card .sect-title-input { flex: 1 1 200px; min-width: 0; max-width: 100%; }
+.card .sect-prose-input { line-height: 1.55; }
+
+/* ---- this page --------------------------------------------------------- */
+.rp-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.rp-tabs { display: inline-flex; gap: 4px; }
+.rp-status { font-size: 12.5px; color: var(--text-muted); }
+.rp-spacer { flex: 1; }
+.rp-doc { transition: opacity .15s; }
+.rp-doc.rp-busy { opacity: .6; }
+.rp-error { border: 1px solid var(--gap); background: var(--gap-bg); color: var(--text); border-radius: var(--radius); padding: 8px 10px; font-size: 13px; }
+.rp-section { min-width: 0; }
+.rp-section .card-h { flex-wrap: wrap; }
+.rp-section .rp-section { margin: 14px 0 0; box-shadow: none; }
+.rp-section .rp-section > .card-h { padding: 10px 14px; }
+.rp-section .rp-section > .card-h h2 { font-size: 14px; }
+.rp-section .rp-section > .card-b { padding: 12px 14px; }
+.rp-section .rp-section.editing { box-shadow: inset 0 0 0 2px var(--brand-blue); }
+.rp-p { margin: 0 0 8px; line-height: 1.55; }
+.rp-b { font-weight: 600; }
+.rp-i { font-style: italic; }
+.rp-red { color: var(--gap); }
+.rp-ul { margin: 0 0 10px; padding-left: 20px; line-height: 1.5; }
+.rp-subhead { margin: 16px 0 6px; font-size: 13.5px; font-weight: 600; color: var(--text); }
+.rp-img { max-width: 100%; height: auto; }
+.sect-note { font-size: 12.5px; margin: 0 0 10px; }
+.rp-tablewrap { overflow-x: auto; margin: 0 0 12px; }
+.rp-table td { vertical-align: top; }
+.rp-table td .rp-p { margin: 0; line-height: 1.4; }
+.rp-table td .rp-p + .rp-p { margin-top: 4px; }
+.rp-tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; }
+.rp-tile { flex: 1 1 110px; min-width: 0; padding: 10px 8px; border-radius: var(--radius); text-align: center; background: var(--surface-2); }
+.rp-tile-v { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.rp-tile-l { font-size: 11.5px; margin-top: 2px; opacity: .85; }
+.rp-stack { display: grid; grid-template-columns: minmax(120px, 32%) 1fr; gap: 6px 12px; align-items: center; margin: 0 0 10px; font-size: 12.5px; }
+.rp-stack-label { min-width: 0; overflow-wrap: anywhere; }
+.rp-bar { display: flex; height: 12px; border-radius: 2px; overflow: hidden; background: var(--surface-3); }
+.rp-seg { display: block; flex: 1 1 0; min-width: 2px; }
+.rp-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; }
+.rp-section .priority-list { margin: 0 0 8px; }
+.rp-section .priority-row .muted { font-size: 12.5px; }
+@media (max-width: 640px) {
+  .rp-stack { grid-template-columns: 1fr; gap: 2px 0; }
+  .rp-stack .rp-bar { margin-bottom: 6px; }
+  .rp-section .priority-row { grid-template-columns: 24px 1fr; }
+  .rp-section .priority-row .muted { grid-column: 2; }
+  .rp-section .priority-row.reordering { flex-wrap: wrap; }
+  .priority-row.reordering .priority-name { flex: 1 1 calc(100% - 40px); }
+}
+
+/* ---- the peer review's warnings on the Report, Review & export and
+   high-level report pages (js/review.js warningsCard) ------------------------ */
+.rv-warn-card .rv-warnings { margin: 0 0 8px; padding-left: 18px; font-size: 13px; }
+.rv-warn-card .rv-warnings li { margin: 2px 0; }
+.rv-warn-card .rv-warn-foot { margin: 0; }
