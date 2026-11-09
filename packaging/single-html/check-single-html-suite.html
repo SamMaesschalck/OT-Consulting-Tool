@@ -134,7 +134,7 @@
     // What's new
     var notes = d.querySelector(".notes-card");
     var nt = notes ? notes.textContent : "";
-    ok(notes && notes.querySelector("h2").textContent === "What's new in v0.5.1", "What's new shows the v0.5.1 release notes", notes && notes.querySelector("h2").textContent);
+    ok(notes && notes.querySelector("h2").textContent === "What's new in " + label, "What's new shows this version's release notes", notes && notes.querySelector("h2").textContent);
     ok(notes && notes.querySelectorAll(".notes li").length >= 5 && notes.querySelector(".notes strong"),
        "rendered from Markdown: bullets and bold", nt.slice(0, 200));
     // Only the "What's new" section: which file to download, checksums and
