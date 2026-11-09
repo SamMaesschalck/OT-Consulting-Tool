@@ -256,7 +256,7 @@
       ok(e.module === "risk-assessment" && e.name === riskFile && e.action === "save" && e.hasHandle &&
          e.label === R.state.project.engagement.client && /^Acme/.test(e.label) && !isNaN(Date.parse(e.when)),
          "Recent files records the save: tool, file name, customer and when", JSON.stringify(e));
-      ok(Object.keys(e).sort().join(",") === "action,hasHandle,label,module,name,when", "and nothing of the file's contents");
+      ok(Object.keys(e).sort().join(",") === "action,hasHandle,kind,label,module,name,when", "and nothing of the file's contents (kind is a label such as Review pack)");
       ok(!/Unsaved changes/.test(barText(S)), "the bar no longer shows unsaved changes once saved");
 
       // The save dialog refused (a frame the browser will not show it in):

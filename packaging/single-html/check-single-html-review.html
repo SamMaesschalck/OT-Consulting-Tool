@@ -99,6 +99,9 @@
   }
 
   var folder, single, bundle;
+  // The Report page names the reviewer, so both copies must start with it set
+  // (probe() setting it after the first draw made only the second show it).
+  try { localStorage.setItem("spt-review:reviewer:v1", "Check Reviewer"); } catch (e) {}
   load("../../modules/report-review/index.html?tour=1", true).then(function (w) { return probe(w, "folder"); })
     .then(function (r) {
       folder = r;
