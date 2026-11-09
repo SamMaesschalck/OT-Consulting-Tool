@@ -63,7 +63,9 @@
     r = RC.importFile(s, file("fa", "A", "2026-01-04T00:00:00Z", [comment("c1", "A", "one, reworded"), comment("c2", "A", "two")]));
     var t1 = RC.findThread(s, "c1");
     ok(r.updated === 1 && t1.comment.text === "one, reworded", "a later save of the same comment wins");
-    ok(t1.status === "resolved" && t1.replies.length === 1, "and leaves the author's status and replies alone");
+    ok(t1.replies.length === 1, "and leaves the author's replies alone");
+    ok(t1.status === "open" && t1.reopened && t1.reopened.from === "resolved", "but a resolved comment whose wording the reviewer changed is open again");
+    RC.setStatus(s, "c1", "resolved");
     r = RC.importFile(s, file("fa", "A", "2026-01-03T12:00:00Z", [comment("c1", "A", "stale wording")]));
     ok(r.older && RC.findThread(s, "c1").comment.text === "one, reworded" && RC.findThread(s, "c2"), "an older save imported late changes nothing");
     r = RC.importFile(s, file("fa", "A", "2026-01-05T00:00:00Z", [comment("c1", "A", "one, reworded")]));
@@ -125,9 +127,319 @@
     ok(pr.comments.every(function (c) { return c.comment && c.status && Array.isArray(c.replies); }), "a pack carries each comment's status and replies");
     ok(!pr.comments.some(function (c) { return c.comment.id === "c1"; }), "but not a comment the reviewer took back");
     ok(RC.fileSlug("Acme Water & Gas Ltd.") === "acme-water-gas-ltd" && RC.fileSlug("") === "report", "file names are plain");
+
+    // ---- what an import keeps of the reviewer's QA record -----------------------------------
+    var q = RC.emptyStore(); RC.recordRound(q, pack);
+    RC.importFile(q, file("fq", "Q", "2026-01-02T00:00:00Z", [], "approved", "p1", {
+      checklist: [{ id: "a", text: "A?", answer: "yes", note: "fine" }, { id: "b", text: "B?", answer: "no", note: "" }],
+      checklistTotal: 9, dismissedChecks: ["dashes:d0-b3"], dismissedCheckTitles: { "dashes:d0-b3": "Em or en dashes", junk: 4 } }));
+    var qf = q.files[0];
+    ok(qf.checklistTotal === 9 && qf.checklist.length === 2, "an import keeps how many checklist questions there were", JSON.stringify(qf));
+    ok(qf.dismissedChecks.join() === "dashes:d0-b3" && qf.dismissedCheckTitles["dashes:d0-b3"] === "Em or en dashes" && !("junk" in qf.dismissedCheckTitles), "and the checks the reviewer dismissed, with what they said");
+    RC.importFile(q, file("fq2", "R", "2026-01-02T00:00:00Z", [], "approved", "p1", { dismissedChecks: undefined }));
+    var qf2 = q.files[1];
+    ok(qf2.checklistTotal === null && Array.isArray(qf2.dismissedChecks) && !qf2.dismissedChecks.length && JSON.stringify(qf2.dismissedCheckTitles) === "{}", "a file from before those fields imports as before");
+
+    // ---- the author's note, and the pack's names for fields, kept on the round ---------------
+    var nq = RC.emptyStore();
+    RC.recordRound(nq, { round: 1, packId: "pn", createdAt: "t", documents: [{ title: "d", contentHash: "a" }], request: { note: " Look at section 4. ", neededBy: " Friday " },
+      engagement: { fieldLabels: { evidence: "Threat source", owner: null } } });
+    ok(nq.rounds[0].request && nq.rounds[0].request.note === "Look at section 4." && nq.rounds[0].request.neededBy === "Friday", "a round keeps the author's note and date", JSON.stringify(nq.rounds[0]));
+    ok(nq.rounds[0].fieldLabels.evidence === "Threat source" && nq.rounds[0].fieldLabels.owner === null, "and the pack's names for item fields");
+    RC.recordRound(nq, { round: 1, packId: "pn", createdAt: "t2", documents: [{ title: "d", contentHash: "a" }], request: { note: "  ", neededBy: "" } });
+    ok(!("request" in nq.rounds[0]) && !("fieldLabels" in nq.rounds[0]), "an empty note, or none, records nothing");
+
+    // ---- QA review by, when no review went through the tools ---------------------------------
+    var qa = RC.emptyStore();
+    ok(kinds(qa, null) === "not-reviewed", "nothing sent and QA review by empty: not reviewed");
+    ok(RC.warnings(qa, null, { qaReviewBy: "A N Other" }).length === 0, "nothing sent but QA review by filled in: reviewed outside the tools, no warning");
+    ok(RC.warnings(qa, null, { qaReviewBy: "   " })[0].kind === "not-reviewed", "a blank QA review by does not count");
+    RC.recordRound(qa, { round: 1, packId: "pq", createdAt: "t", documents: [{ title: "d", contentHash: "a" }] });
+    ok(/round 1 was sent/.test(RC.warnings(qa, null, { qaReviewBy: "A N Other" })[0].text), "once a round is sent, waiting for it still warns");
+
+    // ---- a reviewer who changes a comment the author has closed ------------------------------
+    var ro = RC.emptyStore(); RC.recordRound(ro, pack);
+    var sug = comment("s1", "Bob", "Tighten this."); sug.severity = "suggestion";
+    RC.importFile(ro, file("fb", "Bob", "2026-01-02T10:00:00Z", [sug], "approved-with-comments"));
+    RC.setStatus(ro, "s1", "resolved");
+    var esc = comment("s1", "Bob", "Actually this is wrong."); esc.severity = "must-fix"; esc.updatedAt = "2026-01-02T11:00:00Z";
+    var rr = RC.importFile(ro, file("fb", "Bob", "2026-01-02T12:00:00Z", [esc], "approved-with-comments"));
+    var ts = RC.findThread(ro, "s1");
+    ok(rr.reopened === 1 && ts.status === "open" && ts.reopened && ts.reopened.from === "resolved", "a closed comment the reviewer changed is open again, saying what it was", JSON.stringify(rr) + " " + JSON.stringify(ts.reopened));
+    ok(RC.openMustFix(ro).length === 1 && /must-fix review comment is still open/.test(RC.warnings(ro, ["h1:a"]).map(function (x) { return x.text; }).join()), "and its must fix is counted");
+    RC.setStatus(ro, "s1", "wontchange", "Client's wording.");
+    ok(!ts.reopened, "answering it clears the marker");
+    var resave = JSON.parse(JSON.stringify(esc)); resave.updatedAt = "2026-01-02T13:00:00Z";
+    rr = RC.importFile(ro, file("fb", "Bob", "2026-01-02T13:00:00Z", [resave], "approved-with-comments"));
+    ok(rr.reopened === 0 && ts.status === "wontchange" && ts.reason === "Client's wording.", "a re-save that changes nothing it says leaves the author's answer alone");
+
+    // ---- one reviewer's request is not lost when another answers the next round -------------
+    var mr = RC.emptyStore();
+    RC.recordRound(mr, { round: 1, packId: "m1", createdAt: "t", documents: [{ title: "d", contentHash: "a" }] });
+    RC.importFile(mr, file("ma", "Alice", "2026-01-02T00:00:00Z", [], "approved", "m1"));
+    RC.importFile(mr, file("mb", "Bob", "2026-01-02T00:00:00Z", [], "changes-requested", "m1"));
+    RC.recordRound(mr, { round: 2, packId: "m2", createdAt: "t", documents: [{ title: "d", contentHash: "b" }] });
+    RC.importFile(mr, file("ma2", "Alice", "2026-01-05T00:00:00Z", [], "approved", "m2", { round: 2 }));
+    var mw = RC.warnings(mr, ["b"]);
+    ok(mw.some(function (x) { return x.kind === "changes-requested" && /Bob in round 1.*has not reviewed round 2/.test(x.text); }), "Bob's request in round 1 stands while only Alice has answered round 2", JSON.stringify(mw));
+    ok(!mw.some(function (x) { return x.kind === "changed-since-approval"; }) && kinds(mr, ["c"]).indexOf("changed-since-approval") === -1, "and Alice's approval is not read as the whole picture");
+    RC.importFile(mr, file("mb2", "Bob", "2026-01-06T00:00:00Z", [], "approved", "m2", { round: 2 }));
+    ok(!RC.warnings(mr, ["b"]).some(function (x) { return x.kind === "changes-requested"; }), "once Bob approves round 2 the line goes", JSON.stringify(RC.warnings(mr, ["b"])));
+
+    // ---- save order by time, not by text ---------------------------------------------------
+    var so = RC.emptyStore(); RC.recordRound(so, pack);
+    RC.importFile(so, file("fs", "S", undefined, [comment("o1", "S", "first")]));
+    rr = RC.importFile(so, file("fs", "S", "2026-11-09T10:00:00Z", [comment("o1", "S", "first"), comment("o2", "S", "second")]));
+    ok(!rr.older && rr.added === 1 && RC.findThread(so, "o2"), "after a file with no save time, a dated save of it still merges", JSON.stringify(rr));
+    var tz = RC.emptyStore(); RC.recordRound(tz, pack);
+    RC.importFile(tz, file("ft", "T", "2026-11-09T10:30:00+01:00", [comment("z1", "T", "one")]));
+    rr = RC.importFile(tz, file("ft", "T", "2026-11-09T10:00:00Z", [comment("z1", "T", "one, later")]));
+    ok(!rr.older && RC.findThread(tz, "z1").comment.text === "one, later", "save times are compared as times, whatever zone they are written in", JSON.stringify(rr));
+
+    // ---- a confirmation the reviewer takes back -------------------------------------------
+    var cf = RC.emptyStore(); RC.recordRound(cf, pack);
+    RC.importFile(cf, file("c1f", "Alice", "2026-01-02T00:00:00Z", [comment("k1", "Alice", "one"), comment("k2", "Alice", "two")]));
+    RC.recordRound(cf, { round: 2, packId: "p2", createdAt: "t", documents: [{ title: "d", contentHash: "b" }] });
+    RC.importFile(cf, file("c2f", "Alice", "2026-01-05T00:00:00Z", [], "none", "p2", { round: 2, confirmations: [{ commentId: "k1", at: "x" }, { commentId: "k2", at: "x" }] }));
+    ok(RC.findThread(cf, "k1").confirmedBy.join() === "Alice", "a confirmation is recorded");
+    RC.importFile(cf, file("c2f", "Alice", "2026-01-05T01:00:00Z", [], "none", "p2", { round: 2, confirmations: [{ commentId: "k2", at: "x" }] }));
+    ok(RC.findThread(cf, "k1").confirmedBy.length === 0 && RC.findThread(cf, "k2").confirmedBy.join() === "Alice", "taken back and saved again, it goes; the other stays");
+    RC.recordRound(cf, { round: 3, packId: "p3", createdAt: "t", documents: [{ title: "d", contentHash: "c" }] });
+    RC.importFile(cf, file("c3f", "Alice", "2026-01-07T00:00:00Z", [], "approved", "p3", { round: 3, confirmations: [] }));
+    ok(RC.findThread(cf, "k2").confirmedBy.join() === "Alice", "a later round's file that does not repeat it leaves an earlier confirmation alone");
+
+    // ---- severities say what they mean ----------------------------------------------------
+    ok(RC.SEVERITIES.every(function (x) { return x.help && x.help.length > 20; }) && /Issue check/.test(RC.SEVERITIES[0].help), "each severity carries its meaning");
+
+    // ---- the files people open by mistake, and damaged ones -----------------------------
+    var wf = RC.identify("PK\u0003\u0004word/document.xml");
+    ok(!wf.ok && /Word or Excel file/.test(wf.error) && /review pack \(\.json\)/.test(wf.error), "a Word or Excel file is named as one", wf.error);
+    var pf = RC.identify("%PDF-1.7 ...");
+    ok(!pf.ok && /This is a PDF/.test(pf.error), "and so is a PDF", pf.error);
+    ok(/could not be read/.test(RC.identify("{not json").error), "anything else that is not JSON could not be read");
+    var noEng = JSON.parse(JSON.stringify(example)); delete noEng.engagement;
+    ok(/no engagement details/.test(RC.identify(JSON.stringify(noEng)).error || ""), "a pack with no engagement is refused");
+    var noBlocks = JSON.parse(JSON.stringify(example)); delete noBlocks.documents[0].blocks;
+    ok(/no report text/.test(RC.identify(JSON.stringify(noBlocks)).error || ""), "and one whose document has no report text");
+    var dmg = file("fd", "D", "t", [comment("d1", "D", "fine"), { id: "d2", text: "no anchor" }]);
+    ok(/damaged/.test(RC.identify(JSON.stringify(dmg)).error || "") && !RC.importFile(RC.emptyStore(), dmg).ok, "a review file with a comment that cannot be read is refused");
+
+    // ---- a pack sent from an older copy of the project ----------------------------------
+    var older = RC.emptyStore();
+    var nf = RC.importFile(older, file("fo", "O", "2026-01-02T00:00:00Z", [comment("o1", "O", "one")], "none", "pA"));
+    ok(!nf.ok && nf.noPack && /import the pack file here first/.test(nf.error), "with no pack, the refusal says the pack file can be imported first", nf.error);
+    var pA = JSON.parse(JSON.stringify(example)); pA.packId = "pA"; pA.reviewId = "rvA"; pA.round = 2;
+    var ad1 = RC.adoptPack(older, pA, false);
+    ok(!ad1.ok && ad1.error.indexOf(example.engagement.client) !== -1, "a pack the tool says is not this assessment's is refused, naming its client", ad1.error);
+    ad1 = RC.adoptPack(older, pA, true);
+    ok(ad1.ok && !ad1.already && older.reviewId === "rvA" && older.rounds.length === 1 && older.rounds[0].round === 2, "one that is, is registered as its round", JSON.stringify(older.rounds));
+    ok(RC.adoptPack(older, pA, true).already && older.rounds.length === 1, "registering it twice changes nothing");
+    var pB = JSON.parse(JSON.stringify(pA)); pB.packId = "pB"; pB.round = 1;
+    ok(RC.adoptPack(older, pB, true).ok && older.rounds.map(function (x) { return x.round; }).join() === "1,2", "an earlier round is put in its place");
+    var pC = JSON.parse(JSON.stringify(pA)); pC.packId = "pC"; pC.reviewId = "rvOther";
+    ok(!RC.adoptPack(older, pC, true).ok, "a pack of a different review is refused");
+    ok(RC.importFile(older, file("fo", "O", "2026-01-02T00:00:00Z", [comment("o1", "O", "one")], "none", "pA")).added === 1, "and the review file then imports");
+
+    // ---- the same file, under another name ------------------------------------------------
+    var rn = RC.emptyStore(); RC.recordRound(rn, pack);
+    RC.importFile(rn, file("fn", "Ann", "2026-01-02T00:00:00Z", [comment("n1", "Ann", "one")]));
+    var rnr = RC.importFile(rn, file("fn", "Bob", "2026-01-03T00:00:00Z", [comment("n1", "Bob", "one")]));
+    ok(rnr.ok && rnr.renamedFrom === "Ann", "a file saved again under another name says whose it was", JSON.stringify(rnr));
+    ok(!RC.importFile(rn, file("fn", "Bob", "2026-01-04T00:00:00Z", [comment("n1", "Bob", "one")])).renamedFrom, "and only when the name changed");
   } catch (e) { ok(false, "threw: " + e.message + " " + e.stack); }
-  lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
-  document.getElementById("out").textContent = lines.join("\n");
+
+  // ---- the author's card (shared/review-author.js) ------------------------------------------
+  // The card is not part of this module; the canonical copy is loaded when
+  // the page runs from the repository, and skipped when it is not there.
+  var sc = document.createElement("script");
+  sc.src = "../../../shared/review-author.js";
+  sc.onload = function () { try { cardTests(); } catch (e) { ok(false, "card threw: " + e.message + " " + e.stack); } finish(); };
+  sc.onerror = function () { lines.push("SKIP the author's card: shared/review-author.js is not beside this module"); finish(); };
+  document.body.appendChild(sc);
+
+  function cardTests() {
+    var RA = window.App.ReviewAuthor;
+    function cm(id, who, sev, anchor, text, extra) {
+      return Object.assign({ id: id, reviewer: who, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", severity: sev, anchor: anchor, text: text, suggestion: null, relatesTo: null, check: null }, extra || {});
+    }
+    function blk(n, section, quote) { return { kind: "block", documentIndex: 0, documentTitle: "Report", sectionKey: section, sectionTitle: section, blockId: "d0-b" + n, quote: quote || "" }; }
+    function mk(store, over) {
+      var log = { sent: null, went: null, undone: null };
+      var ad = Object.assign({
+        store: function () { return store; }, touch: function () {},
+        send: function (p, done, opts) { log.sent = opts; RC.recordRound(store, { round: 1, packId: "pc", createdAt: "2026-01-01T00:00:00Z", documents: [{ title: "Report", contentHash: "a" }], request: opts }); done({ ok: true, message: "Sent." }); },
+        goTo: function (t) { log.went = t.comment.id; }, acceptPlan: function () { return { can: false, why: "" }; },
+        accept: function (t, done) { done({ ok: true, message: "" }); },
+        undoAccept: function (t, done) { log.undone = t.comment.id; done({ ok: true, message: "Put back." }); },
+        stale: function () { return true; }, authorName: function () { return "Au"; }, toast: function () {}
+      }, over || {});
+      var box = document.createElement("div"); document.body.appendChild(box);
+      var ui = RA.newUi();
+      RA.mount(box, ad, ui);
+      return { box: box, ui: ui, log: log, ad: ad, again: function () { RA.mount(box, ad, ui); } };
+    }
+    function setSel(box, idx, v) { var s = box.querySelectorAll(".rv-filters select")[idx]; s.value = v; s.dispatchEvent(new Event("change")); }
+
+    // Send for review, with a note and a date.
+    var s0 = RC.emptyStore();
+    var m0 = mk(s0);
+    var note = m0.box.querySelector(".rv-req-note"), due = m0.box.querySelector(".rv-req-due");
+    ok(note && due && m0.box.querySelector(".rv-request"), "Send for review offers a note and a date for the reviewers");
+    note.value = "Please look at section 4."; note.dispatchEvent(new Event("input"));
+    due.value = "Friday"; due.dispatchEvent(new Event("input"));
+    m0.box.querySelector(".rv-send").click();
+    ok(m0.log.sent && m0.log.sent.note === "Please look at section 4." && m0.log.sent.neededBy === "Friday", "and passes them to the tool", JSON.stringify(m0.log.sent));
+    ok(/Needed by Friday/.test(m0.box.querySelector(".rv-round").textContent) && /Please look at section 4/.test(m0.box.textContent), "the card then shows the date and the note under the round");
+    ok(m0.box.querySelector(".rv-req-note").value === "", "and the box is empty for the next pack");
+
+    // A store with comments.
+    var s = RC.emptyStore();
+    RC.recordRound(s, { round: 1, packId: "p1", createdAt: "t", documents: [{ title: "Report", contentHash: "a" }], engagement: { fieldLabels: { evidence: "Threat source" } } });
+    RC.importFile(s, file("fa", "Ann", "2026-01-02T00:00:00Z", [
+      cm("e1", "Ann", "should-fix", blk(3, "Method", "The site has a firewall."), "Earlier point."),
+      cm("a1", "Ann", "suggestion", blk(5, "Summary", "The plant meets its target on all seven requirements today."), "Fix the count.", { suggestion: "The plant meets its target on five of seven requirements today." }),
+      cm("i1", "Ann", "should-fix", { kind: "item", documentIndex: 0, targetName: "Zone A", groupName: "Zone", code: "T1", itemTitle: "Malware", field: "evidence", quote: "" }, "Which actor?"),
+      cm("i2", "Ann", "should-fix", { kind: "item", documentIndex: 0, targetName: "Zone B", groupName: "Zone", code: "T1", itemTitle: "Malware", quote: "" }, "And here?")
+    ], "approved", "p1", { checklist: [{ id: "x", text: "Numbers agree", answer: "yes", note: "checked" }, { id: "y", text: "Evidence supports it", answer: "no", note: "see T1" }],
+      checklistTotal: 9, dismissedChecks: ["dashes:d0-b3"], dismissedCheckTitles: { "dashes:d0-b3": "Em or en dashes: a dash in the summary" } }));
+    RC.setStatus(s, "e1", "resolved");
+    RC.findThread(s, "a1").accepted = { at: "t", kind: "section opening", revert: { what: "section", key: "summary", field: "prose", prev: "x" }, applied: "y" };
+    RC.setStatus(s, "a1", "resolved");
+    RC.recordRound(s, { round: 2, packId: "p2", createdAt: "t2", documents: [{ title: "Report", contentHash: "b" }] });
+    RC.importFile(s, file("fa2", "Ann", "2026-01-05T00:00:00Z", [
+      cm("r1", "Ann", "must-fix", blk(4, "Method", "The site has two firewalls."), "Still not right.", { relatesTo: "e1" })
+    ], "changes-requested", "p2", { round: 2 }));
+    var m = mk(s);
+
+    // The checklist and the dismissed checks.
+    var files = m.box.querySelector(".rv-files").textContent;
+    ok(/Checklist: 2 of 9 answered, 1 no/.test(files), "each reviewer's checklist reads how much was answered", files);
+    ok(/Yes: Numbers agree/.test(files) && /checked/.test(files) && m.box.querySelector(".rv-checklist li"), "with every answer and note behind an expander");
+    ok(/Em or en dashes: a dash in the summary/.test(files), "and the checks they dismissed");
+    ok(/Approved with 7 checklist questions not answered/.test(files), "an approval with questions unanswered is pointed out");
+
+    // Raised again, and the link to the earlier comment.
+    var r1 = m.box.querySelector('[data-comment-id="r1"]');
+    ok(r1 && /Raised again from round 1/.test(r1.textContent) && /Earlier point\./.test(r1.textContent) && /The site has a firewall/.test(r1.textContent), "a comment raised again says which round, what was said and on what wording", r1 && r1.textContent);
+    ok(!m.box.querySelector('[data-comment-id="e1"]'), "the earlier, resolved comment is not in the Open list");
+    r1.querySelector(".rv-raised-go").click();
+    var e1 = m.box.querySelector('[data-comment-id="e1"]');
+    ok(e1 && e1.classList.contains("rv-flash") && m.ui.status === "", "Show the earlier comment widens the filter, finds it and flashes it");
+
+    // The stale badge is for open comments only.
+    ok(r1 = m.box.querySelector('[data-comment-id="r1"] .rv-stale'), "an open comment that no longer matches is marked");
+    ok(!m.box.querySelector('[data-comment-id="a1"] .rv-stale') && !m.box.querySelector('[data-comment-id="e1"] .rv-stale'), "an accepted or resolved one is not");
+
+    // Undo the accepted wording, and what Reopen does.
+    var a1 = m.box.querySelector('[data-comment-id="a1"]');
+    ok(a1.querySelector(".rv-undo") && /Undo the accepted wording/.test(a1.querySelector(".rv-undo").textContent), "an accepted comment offers to undo the wording");
+    ok(/does not change the report text/.test(a1.querySelector(".rv-reopen").getAttribute("title") || ""), "and Reopen says it leaves the text as it is");
+    a1.querySelector(".rv-undo").click();
+    ok(m.log.undone === "a1" && /Put back/.test(m.box.querySelector(".rv-notice").textContent), "Undo goes to the tool and the card says what happened");
+    var noUndo = mk(s, { undoAccept: null });
+    setSel(noUndo.box, 0, "");
+    ok(!noUndo.box.querySelector(".rv-undo"), "a tool with no undo shows no button");
+    noUndo.box.remove();
+
+    // A closed comment folds what it is on away.
+    e1 = m.box.querySelector('[data-comment-id="e1"]');
+    ok(e1.querySelector(".rv-more") && !e1.querySelector(".rv-more").open && e1.querySelector(".rv-more .rv-quote") && e1.querySelector(":scope > .rv-text"), "a resolved comment shows its text and folds the quote away");
+
+    // The suggestion as a change.
+    var diff = a1 = m.box.querySelector('[data-comment-id="a1"] .rv-diff');
+    ok(diff && diff.querySelectorAll(".rv-ins").length === 1 && diff.querySelectorAll(".rv-del").length === 1 && diff.querySelector(".rv-ins").textContent === "five of" && diff.querySelector(".rv-del").textContent === "all", "a suggestion shows the words changed, marked", diff && diff.innerHTML);
+    ok(m.box.querySelector('[data-comment-id="a1"] .rv-full .rv-s-text'), "with the full wording one click away");
+
+    // Engagement groups: per target and group, never merged under the first zone.
+    var heads = Array.prototype.map.call(m.box.querySelectorAll(".rv-group"), function (x) { return x.textContent; });
+    ok(heads.filter(function (x) { return /Engagement: Zone A - Zone/.test(x); }).length === 1 && heads.filter(function (x) { return /Engagement: Zone B - Zone/.test(x); }).length === 1, "comments on two zones are listed under each zone's own heading", heads.join(" | "));
+    ok(/\(threat source\)/.test(m.box.querySelector('[data-comment-id="i1"]').textContent), "an item field is called what the pack calls it", m.box.querySelector('[data-comment-id="i1"]').textContent);
+    var s2 = RC.emptyStore(); RC.recordRound(s2, pack);
+    RC.importFile(s2, file("fx", "X", "2026-01-02T00:00:00Z", [cm("j1", "X", "should-fix", { kind: "item", documentIndex: 0, targetName: "Site 1", groupName: "Identify", code: "A1", itemTitle: "x", field: "action", quote: "" }, "a"),
+      cm("j2", "X", "should-fix", { kind: "item", documentIndex: 0, targetName: "Site 1", groupName: "Protect", code: "B1", itemTitle: "y", field: "evidence", quote: "" }, "b")]));
+    var m2 = mk(s2);
+    var h2 = Array.prototype.map.call(m2.box.querySelectorAll(".rv-group"), function (x) { return x.textContent; });
+    ok(h2.length === 2 && h2[0] !== h2[1], "two groups of one site get two different headings", h2.join(" | "));
+    ok(/\(recommended action\)/.test(m2.box.querySelector('[data-comment-id="j1"]').textContent) && /\(evidence\)/.test(m2.box.querySelector('[data-comment-id="j2"]').textContent), "and a pack with no labels keeps the tool's names");
+    m2.box.remove();
+
+    // With many comments the groups start closed, and Go to has a way back.
+    var big = RC.emptyStore(); RC.recordRound(big, pack);
+    var many = [];
+    for (var k = 0; k < 32; k++) many.push(cm("g" + k, "G", k % 3 ? "should-fix" : "must-fix", blk(k + 1, "Section " + (k % 8), "Text " + k), "Comment " + k));
+    RC.importFile(big, file("fg", "G", "2026-01-02T00:00:00Z", many));
+    var mb = mk(big);
+    var boxes = mb.box.querySelectorAll(".rv-groupbox");
+    ok(boxes.length === 8 && Array.prototype.every.call(boxes, function (b) { return !b.open; }) && mb.box.querySelectorAll(".rv-comment").length === 32, "with 32 comments the 8 sections start closed, every comment still there");
+    ok(/must fix/.test(boxes[0].querySelector("summary").textContent), "each heading says how many must fix");
+    boxes[2].open = true; boxes[2].dispatchEvent(new Event("toggle"));
+    mb.again();
+    ok(mb.box.querySelectorAll(".rv-groupbox")[2].open && !mb.box.querySelectorAll(".rv-groupbox")[1].open, "a group the author opened stays open through a repaint");
+    mb.box.querySelector('[data-comment-id="g9"] .rv-go').click();
+    ok(mb.log.went === "g9" && mb.box.querySelector(".rv-back-go"), "after Go to there is a way back");
+    mb.box.querySelector(".rv-back-go").click();
+    var g9 = mb.box.querySelector('[data-comment-id="g9"]');
+    ok(g9.classList.contains("rv-flash") && g9.closest(".rv-groupbox").open && !mb.box.querySelector(".rv-back-go"), "which opens its group and finds the comment");
+    ok(m.box.querySelectorAll(".rv-groupbox").length && Array.prototype.every.call(mk(s).box.querySelectorAll(".rv-groupbox"), function (b) { return b.open; }), "with only a few comments the groups start open");
+
+    // The import line names comments the reviewer changed after the author closed them.
+    var ri = RC.emptyStore(); RC.recordRound(ri, pack);
+    var ad = { store: function () { return ri; }, touch: function () {} };
+    RA.importTexts(ad, [{ name: "a.json", text: JSON.stringify(file("fr", "R", "2026-01-02T00:00:00Z", [comment("w1", "R", "one")])) }]);
+    RC.setStatus(ri, "w1", "resolved");
+    var line = RA.importTexts(ad, [{ name: "a.json", text: JSON.stringify(file("fr", "R", "2026-01-03T00:00:00Z", [comment("w1", "R", "one, but worse")])) }]).lines[0];
+    ok(/1 reopened because the reviewer changed it/.test(line), "the import says a closed comment was reopened", line);
+    var mr2 = mk(ri);
+    ok(/Changed by the reviewer after you marked it Resolved/.test(mr2.box.querySelector('[data-comment-id="w1"]').textContent), "and the comment says so");
+
+    // Each severity says what it means on hover.
+    ok(/Issue check warns/.test(m.box.querySelector('[data-comment-id="r1"] .rv-sev').getAttribute("title") || ""), "a comment's severity says what it means");
+
+    // A file saved again under another name is named in the import line.
+    var rn2 = RC.emptyStore(); RC.recordRound(rn2, pack);
+    var adn = { store: function () { return rn2; }, touch: function () {} };
+    RA.importTexts(adn, [{ name: "a.json", text: JSON.stringify(file("fh", "Ann", "2026-01-02T00:00:00Z", [comment("h1", "Ann", "one")])) }]);
+    var hl = RA.importTexts(adn, [{ name: "a.json", text: JSON.stringify(file("fh", "Bob", "2026-01-03T00:00:00Z", [comment("h1", "Bob", "one")])) }]).lines[0];
+    ok(/This file was Ann's and is now saved as Bob\./.test(hl), "a handed-over file says whose it was", hl);
+
+    // A pack re-registered from an older copy of the project, then its review
+    // file, in one import and in either order.
+    var pk = JSON.parse(JSON.stringify(window.App.Data.contracts.reviewPack.example)); pk.packId = "pK"; pk.round = 1;
+    var sk = RC.emptyStore(), matched = null;
+    var adk = { store: function () { return sk; }, touch: function () {}, packMatches: function (p) { matched = p.packId; return true; } };
+    var rk = RA.importTexts(adk, [
+      { name: "review.json", text: JSON.stringify(file("fk", "K", "2026-01-02T00:00:00Z", [comment("k9", "K", "one")], "none", "pK")) },
+      { name: "pack.json", text: JSON.stringify(pk) }]);
+    ok(matched === "pK" && /pack\.json: round 1 pack re-registered with this assessment/.test(rk.lines[0]) && rk.bad === 0 && RC.findThread(sk, "k9"), "a pack and its review file import together, the pack first", rk.lines.join(" | "));
+    ok(/already registered/.test(RA.importTexts(adk, [{ name: "pack.json", text: JSON.stringify(pk) }]).lines[0]), "the same pack again is already registered");
+    var adNo = { store: function () { return RC.emptyStore(); }, touch: function () {} };
+    ok(/this is a review pack/.test(RA.importTexts(adNo, [{ name: "pack.json", text: JSON.stringify(pk) }]).lines[0]), "a tool that cannot tell whose a pack is keeps refusing it");
+    var adNot = { store: function () { return RC.emptyStore(); }, touch: function () {}, packMatches: function () { return false; } };
+    ok(/not this assessment/.test(RA.importTexts(adNot, [{ name: "pack.json", text: JSON.stringify(pk) }]).lines[0]), "and a pack for another assessment is refused");
+    var adHint = { store: function () { return sk; }, touch: function () {}, packHint: function (id) { return id === "pZ" ? "This file is for the 2028 assessment in this project: switch to it, then import the file." : ""; } };
+    var hz = RA.importTexts(adHint, [{ name: "z.json", text: JSON.stringify(file("fz", "Z", "2026-01-02T00:00:00Z", [], "none", "pZ")) }]).lines[0];
+    ok(/^z\.json: This file is for the 2028 assessment/.test(hz), "a review file for another of the project's assessments says which", hz);
+
+    // Report comments group by the report's title, so a report that moved
+    // (a risk pack's high-level report, first alone, later second) stays one group.
+    var sd = RC.emptyStore();
+    RC.recordRound(sd, { round: 1, packId: "q1", createdAt: "t", documents: [{ title: "High-level report", contentHash: "a" }] });
+    RC.importFile(sd, file("fq1", "Q", "2026-01-02T00:00:00Z", [cm("q1c", "Q", "should-fix", { kind: "block", documentIndex: 0, documentTitle: "High-level report", sectionKey: "scope", sectionTitle: "Scope", blockId: "d0-b4", quote: "x" }, "one")], "none", "q1"));
+    RC.recordRound(sd, { round: 2, packId: "q2", createdAt: "t2", documents: [{ title: "Detailed report", contentHash: "b" }, { title: "High-level report", contentHash: "c" }] });
+    RC.importFile(sd, file("fq2", "Q", "2026-01-05T00:00:00Z", [
+      cm("q2c", "Q", "should-fix", { kind: "block", documentIndex: 1, documentTitle: "High-level report", sectionKey: "scope", sectionTitle: "Scope", blockId: "d1-b4", quote: "y" }, "two"),
+      cm("q3c", "Q", "should-fix", { kind: "block", documentIndex: 0, documentTitle: "Detailed report", sectionKey: "scope", sectionTitle: "Scope", blockId: "d0-b9", quote: "z" }, "three")], "none", "q2", { round: 2 }));
+    var md = mk(sd);
+    var hd = Array.prototype.map.call(md.box.querySelectorAll(".rv-group"), function (x) { return x.textContent; });
+    ok(hd.length === 2 && /Scope - Detailed report/.test(hd[0]) && /Scope - High-level report/.test(hd[1]) &&
+      md.box.querySelectorAll(".rv-groupbox")[1].querySelectorAll(".rv-comment").length === 2, "a report's comments stay together when its place in the pack moves", hd.join(" | "));
+    md.box.remove();
+  }
+
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
 })();
 </script>
 </body></html>

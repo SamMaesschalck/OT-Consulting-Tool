@@ -69,7 +69,7 @@ systems observed) backs the findings. Remediation plans (priority, owner,
 action, business impact) can be recorded against any item, gap or not, and
 removed again.
 
-**Review.** The report page's Review card sends the report for review as a pack and imports what reviewers send back: comments with severity, suggested wording accepted in one click where the text can be changed in the tool, status and replies. See `docs/report-review.md` at the repository root. The review is saved on the assessment and never reaches the Word or Excel exports. The Issue check and export dialog warn about it, and never block Final.
+**Review.** The report page's Review card sends the report for review as a pack and imports what reviewers send back: comments with severity, suggested wording accepted in one click where the text can be changed in the tool, status and replies. See `docs/report-review.md` at the repository root. Accepted wording can be undone from the comment, and changes to sections that only the Word report has are listed on the report page, each with Back to the generated version. Send for review can carry a note and a needed-by date for the reviewers. A pack sent from a copy of the project that was never saved can be imported again to reconnect its review files. The review is saved on the assessment and never reaches the Word or Excel exports. The Issue check and export dialog warn about it, and never block Final; with QA review by filled in and nothing ever sent, the review is taken as done outside the tools.
 
 **Reporting.** An on-screen preview, a client Word document and a technical
 Excel workbook, all from the same result. The consultant can rename, hide,

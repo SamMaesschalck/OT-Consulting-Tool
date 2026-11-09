@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: a pack put back, and the way back from Go to</title></head>
+<body>
+<!--
+  Two things an author meets after the first round. A project saved before the
+  first Send for review, then reopened, has no review on the assessment:
+  importing the pack and its review files must start one and keep the round
+  and the comments on it, in the project file, not in a stand-in nothing
+  keeps. And Go to on a comment whose place is on another page (an item, its
+  plan, the basis) must still leave a way back to the comment, which opens the
+  report page at it.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+function poll(test, ms) {
+  var end = Date.now() + (ms || 60000);
+  return new Promise(function (resolve, reject) {
+    (function go() { var v; try { v = test(); } catch (e) { v = null; } if (v) return resolve(v); if (Date.now() > end) return reject(new Error("timed out " + test.toString().slice(0, 100))); setTimeout(go, 25); })();
+  });
+}
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+H.test(function (ok, done) {
+  run(ok).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+async function run(ok) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  var saved = null, main = document.getElementById("main");
+  window.showSaveFilePicker = function (o) {
+    return Promise.resolve({ name: o.suggestedName, kind: "file", createWritable: function () {
+      return Promise.resolve({ write: function (t) { saved = { name: o.suggestedName, text: String(t) }; return Promise.resolve(); }, close: function () { return Promise.resolve(); } });
+    } });
+  };
+  E.activateInstrument("ncsc-caf");
+  await new Promise(function (r) { RV.send(function () {}, r, {}); });
+  var pack = JSON.parse(saved.text), at = new Date().toISOString();
+  function comment(id, anchor) { return { id: id, reviewer: "R. One", createdAt: at, updatedAt: at, severity: "must-fix", anchor: anchor, text: "Fix " + id + ".", suggestion: null, relatesTo: null, check: null }; }
+  var it = pack.items[0];
+  var file = { schema: RC.fileSchema(), packId: pack.packId, reviewId: pack.reviewId, round: 1, fileId: "f-adopt", reviewer: "R. One", savedAt: at,
+    verdict: { value: "changes-requested", date: "", note: "" }, checklist: [], dismissedChecks: [], confirmations: [],
+    comments: [
+      comment("c-gen", { documentIndex: 0, kind: "general", sectionTitle: "General", quote: "" }),
+      comment("c-item", { documentIndex: 0, kind: "item", targetName: it.targetName, targetId: it.targetId, itemId: it.itemId, code: it.code, itemTitle: it.title, groupName: it.groupName, quote: "", field: "" })
+    ] };
+
+  // ---- a project saved before the first Send for review (#36) --------------------
+  E.setReview(null);
+  ok(!E.getReview(), "the reopened copy has no review on the assessment");
+  var r = RV.importTexts([{ name: "p.json", text: saved.text }, { name: "f.json", text: JSON.stringify(file) }]);
+  ok(r.bad === 0 && /re-registered/.test(r.lines[0]) && /2 new comments/.test(r.lines[1]), "importing the pack and its review file says it worked", r.lines.join(" | "));
+  var st = E.getReview();
+  ok(!!st && st.rounds.length === 1 && st.rounds[0].packId === pack.packId && st.threads.length === 2, "and the round and the comments are on the assessment", JSON.stringify(st && { rounds: st.rounds.length, threads: st.threads.length }));
+  var pf = E.getProjectFile(), ass = pf.assessments[pf.activeAssessmentId];
+  ok(!!ass.review && (ass.review.threads || []).length === 2, "and in the project file");
+  E.setReview(null);
+  var other = JSON.parse(saved.text); other.engagement.client = "Someone Else Ltd";
+  var r2 = RV.importTexts([{ name: "o.json", text: JSON.stringify(other) }]);
+  ok(r2.bad === 1 && !E.getReview(), "a pack for another client starts no review", r2.lines.join(" | "));
+  RV.importTexts([{ name: "p.json", text: saved.text }, { name: "f.json", text: JSON.stringify(file) }]);
+
+  // ---- Go to that leaves the report page (#34) -----------------------------------
+  A.UI.go("report");
+  await poll(function () { return main.querySelector('[data-comment-id="c-item"] .rv-go'); });
+  var ci = main.querySelector('[data-comment-id="c-item"]');
+  var box = ci.closest("details"); if (box) box.open = true;
+  ci.querySelector(".rv-go").click();
+  await poll(function () { return document.getElementById("rv-back-page"); }, 5000).catch(function () {});
+  ok(!main.querySelector(".review-card [data-comment-id]"), "Go to on an item comment leaves the report page");
+  var bar = document.getElementById("rv-back-page");
+  if (!bar) ok.note("view: " + (A.UI.__view ? A.UI.__view() : "?") + "; card holder connected: " + !!document.querySelector(".rv-panel") + "; back in card: " + !!document.querySelector(".rv-back"));
+  ok(!!bar && !!bar.querySelector(".rv-back-go") && bar.classList.contains("rv-back") && bar.parentNode === document.body, "and a Back to the comment bar is on the page it went to (the card's own bar, fixed in place)");
+  bar.querySelector(".rv-back-go").click();
+  await poll(function () { return main.querySelector('[data-comment-id="c-item"]'); });
+  await wait(100);
+  var again = main.querySelector('[data-comment-id="c-item"]');
+  ok(!document.getElementById("rv-back-page") && !!again && (!again.closest("details") || again.closest("details").open), "Back opens the report page at the comment, and the bar goes");
+  // Close takes it away without moving.
+  main.querySelector('[data-comment-id="c-item"] .rv-go').click();
+  await poll(function () { return document.getElementById("rv-back-page"); }, 5000).catch(function () {});
+  var bar2 = document.getElementById("rv-back-page");
+  ok(!!bar2, "the bar is back after another Go to");
+  bar2.querySelector(".rv-back-close").click();
+  ok(!document.getElementById("rv-back-page") && !main.querySelector(".review-card [data-comment-id]"), "Close takes it away and stays where it is");
+}
+</script>
+</body></html>

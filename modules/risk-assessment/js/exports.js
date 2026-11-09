@@ -76,6 +76,21 @@ window.RiskExports = (function () {
     "sl-t": "Carried into the SL-T"
   };
 
+  // The sentences the asset owner's sign-off prints outside the Sign-off
+  // section and document control: [executive summary, Sign-off section when not
+  // yet signed]. One place, because a review's content hash leaves them out
+  // (js/review.js): signing off after an approval is not a change to what was
+  // reviewed.
+  function signOffTexts(p) {
+    var a = p.approval || {};
+    return [
+      a.approved
+        ? "The asset owner, " + a.name + " (" + a.role + "), signed off the tolerable risk and this outcome on " + a.date + ": “" + a.statement + "”"
+        : "The tolerable risk and assessment outcome have not yet been signed off by the asset owner.",
+      "The tolerable risk (§4.3.6) and the assessment outcome have not yet been signed off by the asset owner."
+    ];
+  }
+
   // Everything the report tells is derived once here, shared by both formats.
   function summarise(p) {
     var rt = RT();
@@ -446,6 +461,9 @@ window.RiskExports = (function () {
       ["Consultant", notSet(eng.consultant)],
       ["Assessment date", notSet(eng.assessmentDate)],
       ["Document revision", notSet(eng.revision)],
+      // Exactly this label: a review's content hash leaves the row out
+      // (shared/docx-blocks.js), as an approval is what fills it in.
+      ["QA review by", notSet(eng.qaReviewBy)],
       ["Confidentiality", notSet(eng.confidentiality)],
       ["Method", "IEC 62443-3-2 Clause 4 workflow; SolutionsPT house risk matrix and risk-to-SL mapping (shown with every suggestion; the consultant's per-FR SL-T and written justification are the deliverable)"],
       ["Asset-owner sign-off", p.approval.approved ? (p.approval.name + " (" + p.approval.role + "), " + p.approval.date) : "Not yet signed off"]
@@ -570,9 +588,9 @@ window.RiskExports = (function () {
       children.push(body("This assessment is a snapshot. It should be revisited when the system, its connectivity or the threat landscape changes materially, after any security-relevant incident, and periodically in any case. The registers in the companion workbook are structured so that the next assessment starts from this one rather than from scratch."));
     }
     if (p.approval.approved) {
-      children.push(pinned(body("The asset owner, " + p.approval.name + " (" + p.approval.role + "), signed off the tolerable risk and this outcome on " + p.approval.date + ": “" + p.approval.statement + "”", { italics: true })));
+      children.push(pinned(body(signOffTexts(p)[0], { italics: true })));
     } else {
-      children.push(pinned(body("The tolerable risk and assessment outcome have not yet been signed off by the asset owner.", { color: COLOR.gap, bold: true })));
+      children.push(pinned(body(signOffTexts(p)[0], { color: COLOR.gap, bold: true })));
     }
     // In the wording that opens its section, so deleting that line in the box
     // deletes the note; left in, it stays red (see the section pass below).
@@ -685,7 +703,10 @@ window.RiskExports = (function () {
             var disp = x.disposition ? DISPOSITION_LABEL[x.disposition] : (x.exceeds ? "NO DISPOSITION: needs a decision" : "Within tolerable risk");
             trows.push(new docx.TableRow({ children: [
               textCell(x.t.id + "  " + x.t.statement + (x.t.source ? "  (" + x.t.source + ")" : "") + (x.t.affectedFR.length ? "  [" + x.t.affectedFR.join(", ") + "]" : ""), tw[0]),
-              textCell(cap(x.t.likelihood || "—") + " × " + cap(x.t.impact || "—"), tw[1]),
+              // An unrated threat says so in words: a dash beside a rating reads as
+              // a typo, and the review tool's dash check would report it as one.
+              textCell((x.t.likelihood || x.t.impact) ? (x.t.likelihood ? cap(x.t.likelihood) : "Not rated") + " × " + (x.t.impact ? cap(x.t.impact) : "Not rated") : "Not rated",
+                tw[1], (x.t.likelihood && x.t.impact) ? {} : { color: COLOR.muted }),
               bandCell(x.risk, tw[2]),
               x.residual ? bandCell(x.residual, tw[3]) : textCell("—", tw[3]),
               textCell(disp, tw[4], x.exceeds && !x.disposition ? { bold: true, color: COLOR.gap } : {})
@@ -746,7 +767,7 @@ window.RiskExports = (function () {
         ["Statement", p.approval.statement]
       ]));
     } else {
-      children.push(pinned(body("The tolerable risk (§4.3.6) and the assessment outcome have not yet been signed off by the asset owner.", { bold: true, color: COLOR.gap })));
+      children.push(pinned(body(signOffTexts(p)[1], { bold: true, color: COLOR.gap })));
     }
     children.push(h1("Method and limitations"));
     children.push(body("This assessment follows the IEC 62443-3-2 Clause 4 workflow. The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults: the standard prescribes none and requires the organisation's own risk criteria, so a client corporate matrix takes precedence where one exists. Every SL suggestion made during the assessment carries a full rule trace, and the consultant's per-FR SL-T with written justification is the deliverable, not the suggestion."));
@@ -980,6 +1001,10 @@ window.RiskExports = (function () {
     buildWordDoc: buildWordDoc,
     buildWorkbook: buildWorkbook,
     summarise: summarise,
+    // For the review pack (js/review.js): the names the reports print.
+    DISPOSITION_LABEL: DISPOSITION_LABEL,
+    bandName: function (id) { return bandStyle(id).name; },
+    signOffTexts: signOffTexts,
     downloadWord: downloadWord,
     downloadExcel: downloadExcel
   };

@@ -11,7 +11,7 @@ window.Suite.Data = {
                         "name":  "OT Cyber Assessment Tool",
                         "shortName":  "Assessments",
                         "summary":  "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and more, with an on-screen report, a Word report and an Excel tracker.",
-                        "useWhen":  "Use it when the question is how well a site, system, product or supplier meets a framework or standard. Choose the framework, record answers and evidence, then issue the Word report and Excel tracker. One project file can hold several assessments for the same customer, such as this year\u0027s review and a later re-assessment.",
+                        "useWhen":  "Use it when the question is how well a site, system, product or supplier meets a framework or standard. Choose the framework, record answers and evidence, then issue the Word report and Excel tracker. One project file can hold several assessments for the same customer, such as this year\u0027s review and a later re-assessment. Send for review on the report page writes a pack for the Report Review Tool, and Import review files brings the comments back.",
                         "entry":  "../modules/assessments/index.html",
                         "payload":  "assessments",
                         "tour":  {
@@ -27,7 +27,7 @@ window.Suite.Data = {
                         "name":  "OT Cyber Risk Assessment Tool",
                         "shortName":  "Risk assessment",
                         "summary":  "Run an IEC 62443-3-2 risk assessment of zones and conduits, set target security levels, and produce the Word and Excel reports and a risk context file for the assessment tool.",
-                        "useWhen":  "Use it before a 62443-3-3 assessment, to work out what each zone and conduit needs: define the system under consideration, split it into zones and conduits, assess the threats and set target security levels. Export the risk context file and import it into the 62443-3-3 assessment in the assessment tool.",
+                        "useWhen":  "Use it before a 62443-3-3 assessment, to work out what each zone and conduit needs: define the system under consideration, split it into zones and conduits, assess the threats and set target security levels. Export the risk context file and import it into the 62443-3-3 assessment in the assessment tool. Send for review on the Peer review page writes a pack for the Report Review Tool, and Import review files brings the comments back.",
                         "entry":  "../modules/risk-assessment/index.html",
                         "payload":  "risk-assessment",
                         "tour":  {

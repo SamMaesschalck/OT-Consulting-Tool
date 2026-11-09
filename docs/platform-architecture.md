@@ -52,7 +52,7 @@ From stage 2, the manifest also declares what the module **produces** and **cons
 
 Inside the suite, each module runs in its own frame. The two existing tools both define the same global object and load the same libraries, so they cannot share one page. The frame also guarantees a module behaves the same in both settings.
 
-**The suite shell (first version, built).** A home page with a card per tool, "Recent files", "Getting started" (what each tool is for, and its guided tour) and "What's new" (the newest `docs/releases/v*.md`), plus the version and the licence pop-up. Opening a tool shows it in a frame under a slim bar: home, the tool's name, and a switcher for the other tools. A tool's frame is created the first time it is opened and then stays alive, hidden, when another is shown, so switching never loses work. Each tool still saves and loads its own project file from its own header; the shared customer workspace file is a later step.
+**The suite shell (first version, built).** A home page with a card per tool, "Recent files", "Getting started" (what each tool is for, and its guided tour) and "What's new" (the newest `docs/releases/v*.md`), plus the version and the licence pop-up. Opening a tool shows it in a frame under a slim bar: home, the tool's name, and a switcher for the other tools. A tool's frame is created the first time it is opened and then stays alive, hidden, when another is shown, so switching never loses work. Each tool still saves and loads its own files from its own header (a project file, or in the Report Review Tool a review pack and review file); the shared customer workspace file is a later step.
 
 **Where a tool's page comes from, and the origin rules that follow.** Chromium gives every `file://` page an origin of its own, so:
 
@@ -72,14 +72,25 @@ Inside the suite, each module runs in its own frame. The two existing tools both
 |---|---|---|---|
 | tool | `ready` | product, version, number, title, dirty, reopen, theme | the tool has started |
 | tool | `dirty` | dirty | unsaved changes appear or are saved (drives the bar and the close warning) |
-| tool | `recent` | action (`save` or `open`), name, label, hasHandle, when | a project file was saved or opened |
+| tool | `recent` | action (`save` or `open`), name, label, kind (optional, such as "Review pack"), hasHandle, when | a file was saved or opened |
 | tool | `theme` | theme | the tool's own theme toggle was used |
+| tool | `handoff` | to (a tool's id or product name), name, text | open a file this tool has just written in another tool |
+| tool | `drop` | files | files dropped on the tool's page that the tool did not take itself |
 | shell | `theme` | theme | follow the suite's theme |
 | shell | `open-recent` | name, label | reopen a file from Recent files |
+| shell | `open-text` | name, text | open a file handed over or dropped |
 
-**Recent files** live in the shell's localStorage (`spt-suite:recent:v1`, newest first, at most 12, one entry per tool and file name): tool, file name, customer or project label, saved or opened, and when; never the contents. Where the browser gave the tool a file handle, the bridge keeps it in the tool's own IndexedDB (`spt-suite-recent`). Choosing a recent file opens its tool and sends `open-recent`: with a handle, the tool offers "Reopen" and the click inside the tool's frame asks for access (a browser only grants file access in answer to a click on that same page, and a click in the shell does not count for the frame); without one, the tool highlights its Load button and names the file.
+`handoff`, `drop` and `open-text` are the only messages that carry a file's contents; the shell passes them straight on and never keeps them. In the tool, the bridge offers an `open-text` file to any listener added with `HostBridge.onOpenText` (the author's review card takes a review file this way), then to the tool's `openText` hook, then to its `openFile` hook as a file, so any tool that can reopen a recent file can open one handed over or dropped.
 
-**Unsaved work.** Each tool's own `beforeunload` warning still runs in its frame, and the shell adds its own while any tool reports unsaved changes (a frame that was never clicked in may not be allowed to warn). The bar and the home page cards mark tools with unsaved changes. In the exe, Electron raises `will-prevent-unload` for the shell page or a tool's frame alike, and `packaging/electron/app/main.js` asks the question; the suite's exe self-test checks both paths.
+**Recent files** live in the shell's localStorage (`spt-suite:recent:v1`, newest first, at most 12, one entry per tool and file name): tool, file name, customer or project label, what sort of file it is, saved or opened, and when; never the contents. A Report review entry is labelled "Review pack" or "Review file" (what the tool says, or read from the names it gives its files). Where the browser gave the tool a file handle, the bridge keeps it in the tool's own IndexedDB (`spt-suite-recent`). Choosing a recent file opens its tool and sends `open-recent`: with a handle, the tool offers "Reopen" and the click inside the tool's frame asks for access (a browser only grants file access in answer to a click on that same page, and a click in the shell does not count for the frame); without one, the tool highlights its Load button and names the file. The Report Review Tool holds a review file opened before its pack until the pack is opened.
+
+**Handing files between tools.** After Send for review, the author's review card (in the assessment and risk tools) offers "Open it in the Report Review Tool", which hands the pack to that tool so the author can see it as a reviewer will. After a save, the Report Review Tool's Summary offers "Give it to the <tool the pack came from>", which hands the review file back; that tool imports it into its review card as Import review files would. Both are optional and guarded: standalone, and on a tour, nothing is shown.
+
+**Dropped files.** A file dropped on the home page or the bar, or on a tool that does not take dropped files itself (the bridge catches it on the tool's window, after the tool's own handlers), goes to the shell, which reads its schema and opens it in the tool that reads it: a review pack or review file in the Report Review Tool, a project file in the assessment or risk tool. A review file dropped on the assessment or risk tool itself (not its tour) is the author bringing it in, so it goes back to that tool, whose review card imports it (or says where to). Anything else gets a message. Without this the browser would open the file in place of the suite, and the exe would do nothing.
+
+**Unsaved work.** Each tool's own `beforeunload` warning still runs in its frame, and the shell adds its own while any tool reports unsaved changes (a frame that was never clicked in may not be allowed to warn). The bar and the home page cards mark tools with unsaved changes. A tour is a demo whose changes are never kept: the shell ignores its unsaved changes and its saves (no bar tag, no close warning, nothing in Recent files), and the tools do not report them or warn in the tour's own frame. In the exe, Electron raises `will-prevent-unload` for the shell page or a tool's frame alike, and `packaging/electron/app/main.js` asks the question; the suite's exe self-test checks both paths. The exe has no menu, so `main.js` also gives it Ctrl+P, which prints the tool in front (in the suite, the frame that has the focus). Ctrl+F is left to the page: with no find bar in the exe, the Report Review Tool's Report page has a find of its own that Ctrl+F goes to.
+
+The shell's own test pages are `platform/scripts/test-shell.html` (the folder build with the real tools: tours, Recent files, hand-off, dropped files, wording) and `test-handoff.html` (the review card's hand-off), run with `tools/run-tests.ps1 -Root platform`.
 
 Later in stage 2 the bridge also carries the tool's data to the shell for the customer workspace file, and contracts (the risk context) between tools directly.
 
@@ -142,7 +153,7 @@ The version is shown in each tool and recorded in saved project files. It never 
 
 ## Known gaps
 
-- The risk tool's notice says "see LICENCE.txt", but its single HTML and exe have no file beside them (the licence is only embedded as a comment). It needs a licence pop-up like the assessment tool's. (Inside the suite, the suite's licence pop-up covers both tools.)
+- The risk tool's notice says "see LICENCE.txt", but its single HTML and exe have no file beside them (the licence is only embedded as a comment). It needs a licence pop-up like the assessment tool's. (Inside the suite, the suite's licence pop-up covers every tool.)
 - In the folder build of the suite the tools cannot save in place (the browser refuses file dialogs in a frame of another origin), so Save downloads a new copy each time. The suite's home page says so in that build.
 - Risk tool project files do not record which version saved them, unlike assessment project files.
 - The example in `contracts/risk-context-interchange.json` still shows `generatedBy: spt-risk-tool/0.2`; the risk tool now writes the suite version there.

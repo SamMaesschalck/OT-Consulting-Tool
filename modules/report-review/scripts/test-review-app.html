@@ -187,7 +187,10 @@
     // ---- the checklist ----------------------------------------------------------
     nav(w, "checklist");
     var qs = d.querySelectorAll(".rr-q");
-    ok(qs.length === 7 && /target levels are justified/.test(main(w).textContent), "the checklist has the common items and those for 62443-3-3 (" + qs.length + ")");
+    // Counted from the checklist data, which the team edits.
+    var CL = w.App.Data.checklists, eg = pack.engagement, skipQ = (CL.skip || {})[eg.instrumentId] || [];
+    var wantQ = (CL.common || []).length + ((CL.families || {})[eg.scoringFamily] || []).filter(function (q) { return skipQ.indexOf(q.id) === -1; }).length + ((CL.instruments || {})[eg.instrumentId] || []).length;
+    ok(qs.length === wantQ && wantQ > (CL.common || []).length && /target (security )?levels are justified/.test(main(w).textContent), "the checklist has the common items and those for 62443-3-3 (" + qs.length + ")");
     d.querySelector('[data-q="common-evidence"] [data-answer="no"]').click();
     type(w, d.querySelector('[data-q="common-evidence"] .rr-note input'), "See the comment.", "change");
     d.querySelector('[data-q="common-scope"] [data-answer="yes"]').click();
@@ -200,7 +203,12 @@
     // ---- the automatic checks -------------------------------------------------------
     nav(w, "checks");
     var active = R.activeChecks();
-    ok(Object.keys(w.App.ReviewChecks.CHECKS).length === 10 && d.querySelectorAll("#main .card").length === 10, "every check has its place on the page");
+    var nChecks = Object.keys(w.App.ReviewChecks.CHECKS).length;
+    // Each check that applies once: a card of its own when it found something,
+    // or a line in the one "Nothing found" card.
+    var placed = Array.prototype.map.call(d.querySelectorAll("#main [data-check-card], #main [data-check-clean]"), function (n) { return n.getAttribute("data-check-card") || n.getAttribute("data-check-clean"); });
+    var applies = Object.keys(w.App.ReviewChecks.CHECKS).filter(function (id) { return !/^risk-/.test(id); });
+    ok(nChecks >= 10 && placed.length === applies.length && applies.every(function (id) { return placed.indexOf(id) !== -1; }), "every check has its place on the page (" + applies.length + ")", placed.join());
     var red = active.filter(function (r) { return r.check === "red-prompts"; })[0];
     ok(!!red, "the demo's red prompt is found");
     var row = d.querySelector('[data-check-id="' + red.id + '"]');
@@ -227,12 +235,27 @@
     ok(/Changes requested/.test(main(w).textContent), "and the verdicts so far");
     d.querySelector('[data-prev-id="c-demo-1"] .rr-confirm').click();
     ok(R.state.review.confirmations.length === 1 && R.state.review.confirmations[0].commentId === "c-demo-1", "a fix can be confirmed");
+    ok(!d.querySelector('[data-prev-id="c-demo-1"] .rr-raise'), "a confirmed point is not offered Raise it again as well");
+    d.querySelector('[data-prev-id="c-demo-1"] .rr-confirm').click();
+    ok(R.state.review.confirmations.length === 0 && !!d.querySelector('[data-prev-id="c-demo-1"] .rr-raise'), "until the confirmation is taken back");
     d.querySelector('[data-prev-id="c-demo-1"] .rr-raise').click();
     ok(!!d.querySelector(".rr-composer"), "a point can be raised again");
     type(w, d.querySelector(".rr-c-text"), "Not fixed in section two.");
     d.querySelector(".rr-c-add").click();
     var rg = R.state.review.comments[R.state.review.comments.length - 1];
     ok(rg.relatesTo === "c-demo-1", "linked to the comment it raises");
+    ok(!d.querySelector('[data-prev-id="c-demo-1"] .rr-confirm') && /You raised this again/.test(d.querySelector('[data-prev-id="c-demo-1"]').textContent), "and a point raised again is not offered Confirm it is fixed as well");
+    // The printout lists what became of each earlier comment.
+    d.querySelector('[data-prev-id="c-demo-2"] .rr-confirm').click();
+    ok(R.state.review.confirmations.length === 1, "another point's reason accepted");
+    nav(w, "summary");
+    var pr = function (id) { var r = d.querySelector('#rr-print-prev [data-prev-row="' + id + '"]'); return r ? r.lastChild.textContent : ""; };
+    ok(pr("c-demo-1") === "Raised again" && pr("c-demo-2") === "Reason accepted" && pr("c-demo-3") === "Not looked at", "the printout lists each earlier comment with what became of it", pr("c-demo-1") + " | " + pr("c-demo-2") + " | " + pr("c-demo-3"));
+    // The risk checklist asks what the method needs: a conduit may have no
+    // threats when the report says why, as the risk tool does not require them.
+    var cov = ((w.App.Data.checklists.families || {})["risk-assessment"] || []).filter(function (q) { return q.id === "risk-coverage"; })[0];
+    ok(cov && !/Every zone and conduit has its threats/.test(cov.text) && /each conduit has threats or a stated reason/.test(cov.text), "the risk checklist does not ask for threats on every conduit", cov && cov.text);
+    nav(w, "previous");
 
     // ---- summary and verdict ----------------------------------------------------------
     nav(w, "summary");

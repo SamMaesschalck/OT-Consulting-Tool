@@ -1,0 +1,97 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: Go to lands for every demo</title></head>
+<body>
+<!--
+  Go to on a comment about the report used to dead-end with "only in the Word
+  report" for most sections in twelve instruments, even where the consultant
+  edits that text somewhere else. For every demo, each section of the Word
+  report is put through App.Review.goTo with the toast counted. Every section
+  the consultant writes or can edit (document control, executive summary, basis
+  of assessment, method, progress, next steps, terms, findings and roadmaps)
+  must land somewhere, and so must every paragraph or table row that opens with
+  an item's code. Only text written from the framework may say it is only in
+  the Word report, and then it names the section.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  var toasts = [];
+  A.UI.__review.toast = function (msg) { toasts.push(msg); };
+
+  // The consultant's own text, or text the tool lets them edit.
+  var MUST = /^document-control|^executive-summary$|^basis-of-assessment$|^people-interviewed$|^documents-reviewed$|^systems-observed$|^method-and-limitations$|^progress-since-previous-assessment$|^change-since-the-previous-assessment$|^proposed-next-steps$|^terms-used-in-the-findings$|^findings-by-|^fr\d+-|^scope-and-method$|roadmap/;
+  var seq = 0;
+  function thread(anchor) {
+    return { comment: { id: "c-goto-" + (++seq), reviewer: "J. Marsh", severity: "suggestion", anchor: anchor, text: "x", suggestion: null }, status: "open", replies: [] };
+  }
+  function closeModals() {
+    Array.prototype.forEach.call(document.querySelectorAll(".modal-f .btn"), function (b) { if (/^(Cancel|Close)$/.test(b.textContent)) b.click(); });
+  }
+  function opensWithCode(text, catalog) {
+    var s = RC.norm(text);
+    return catalog.filter(function (c) {
+      var code = RC.norm(c.code || c.id);
+      return code.length >= 2 && /[a-z.]/i.test(code) && s.indexOf(code + " ") === 0;
+    })[0] || null;
+  }
+
+  var ids = Object.keys(SEED), chain = Promise.resolve(), summary = [];
+  ids.forEach(function (id) {
+    chain = chain.then(function () {
+      E.activateInstrument(id);
+      return new Promise(function (res, rej) { RV.currentDocs(function (e, d) { if (e) rej(e); else res(d); }); });
+    }).then(function (docs) {
+      var catalog = A.Compare.catalogFor(E.state.instrument, E.state.scoringFamily);
+      var seen = {}, tried = 0, landed = 0, missMust = [], missItem = [], unnamed = [], itemTried = 0, nowhere = [];
+      docs.forEach(function (d, di) {
+        d.blocks.forEach(function (b) {
+          if (b.front || !b.sectionKey) return;
+          var anchor = { documentIndex: di, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text || "", cell: null, targetName: "", itemId: "", field: "" };
+          // One go per section, from its first block.
+          var k = di + "|" + b.sectionKey;
+          if (!seen[k]) {
+            seen[k] = true; tried++;
+            toasts = [];
+            var went = RV.goTo(thread(anchor));
+            closeModals();
+            if (went) landed++;
+            else {
+              nowhere.push(b.sectionTitle);
+              if (MUST.test(b.sectionKey)) missMust.push(b.sectionKey);
+              if (!toasts.length || toasts[0].indexOf("\"" + b.sectionTitle + "\"") === -1) unnamed.push(b.sectionKey);
+            }
+          }
+          // A finding: a paragraph, or a table row, opening with an item's code.
+          var texts = b.type === "table" ? b.rows.map(function (r, ri) { return { text: r.cells[0] && r.cells[0].text, row: ri }; }) : [{ text: b.text, row: null }];
+          texts.forEach(function (x) {
+            if (itemTried >= 6 || !x.text) return;
+            var item = opensWithCode(x.text, catalog);
+            if (!item) return;
+            itemTried++;
+            var a2 = Object.assign({}, anchor, x.row != null ? { quote: x.text, cell: { row: x.row, col: 0 } } : {});
+            var went2 = RV.goTo(thread(a2));
+            closeModals();
+            if (!went2) missItem.push(item.code || item.id);
+          });
+        });
+      });
+      ok(!missMust.length, id + ": every section the consultant writes or edits lands somewhere", missMust.join(", "));
+      ok(!missItem.length, id + ": every finding that opens with an item's code lands (" + itemTried + " tried)", missItem.join(", "));
+      ok(!unnamed.length, id + ": what has nowhere to go says so, naming the section", unnamed.join(", "));
+      summary.push(id + " " + landed + "/" + tried + " (only in Word: " + nowhere.join(" | ") + ")");
+    }).catch(function (e) { ok(false, id + ": threw " + (e && e.message) + " " + (e && e.stack)); });
+  });
+  chain.then(function () {
+    ok(true, "sections that land, per demo: " + summary.join("; "));
+  }).then(done);
+});
+</script>
+</body></html>

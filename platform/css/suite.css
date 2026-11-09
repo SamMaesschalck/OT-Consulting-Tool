@@ -99,6 +99,8 @@ a:hover { text-decoration: underline; }
 .suite { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
 .stage { position: relative; flex: 1 1 auto; min-height: 0; }
 .home { position: absolute; inset: 0; overflow-y: auto; background: var(--surface-2); }
+/* A file being dragged over the home page: it can be dropped anywhere. */
+body.drop-over .home { box-shadow: inset 0 0 0 3px var(--brand-blue); }
 .tool-frame {
   position: absolute; inset: 0; width: 100%; height: 100%;
   border: 0; display: block; background: var(--surface-2);

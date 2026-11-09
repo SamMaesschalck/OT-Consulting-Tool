@@ -1,0 +1,282 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Risk tool: review pack, warnings and QA review by</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The risk tool's review, second page (test-risk-review.html is the first), on the
+  tour's demo project:
+  - the pack names its fields as the risk tool does (fieldLabels), prints band and
+    disposition names, lists only the countermeasures that address a threat, adds
+    likelihood, impact, FRs and the SL-T suggestion and justification as details,
+    and carries each zone's id (targetId) and the author's note (request);
+  - the content hash leaves out the asset owner's sign-off and QA review by, and
+    still sees a real change;
+  - an unrated threat prints "Not rated", not a dash beside a rating;
+  - QA review by is in Word's document control, the pack, and offered on approval;
+  - the review's warnings show on the Peer review page as soon as the reports are
+    rebuilt, on the other report pages, and in the question before every Word or
+    Excel download, which they never stop;
+  - Go to on a threat or a zone's SL-T lands on it and flashes it;
+  - renaming a zone does not orphan its comments;
+  - with no zones the pack holds the high-level report only, and Accept and its
+    undo write to that report's overrides.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 120000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 140)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, RT, RR, RX, RC, RP, main;
+    var confirms = [], downloads = [], saved = null;
+    w.confirm = function (t) { confirms.push(String(t)); return true; }; w.alert = function () {};
+    w.showSaveFilePicker = function (o) {
+      return Promise.resolve({ name: o.suggestedName, kind: "file", createWritable: function () {
+        return Promise.resolve({ write: function (t) { saved = { name: o.suggestedName, text: String(t) }; return Promise.resolve(); }, close: function () { return Promise.resolve(); } });
+      } });
+    };
+    function P() { return RT.state.project; }
+    function zone(id) { return P().zones.concat(P().conduits).filter(function (z) { return z.id === id; })[0]; }
+    function item(pack, id) { return pack.items.filter(function (i) { return i.itemId === id; })[0]; }
+    function detail(i, label) { var r = (i.details || []).filter(function (d) { return d[0] === label; })[0]; return r ? r[1] : null; }
+    function build() { return RR.buildDocuments(); }
+    function hashes(d) { return d.map(function (x) { return x.contentHash; }).join(","); }
+    function rowValue(doc, label) {
+      var v = null;
+      doc.blocks.forEach(function (b) {
+        if (b.type !== "table") return;
+        b.rows.forEach(function (r) { if (r.cells.length === 2 && r.cells[0].text === label) v = r.cells[1].text; });
+      });
+      return v;
+    }
+    function cells(doc) {
+      var out = [];
+      doc.blocks.forEach(function (b) { if (b.type === "table") b.rows.forEach(function (r) { r.cells.forEach(function (c) { out.push(c.text); }); }); });
+      return out;
+    }
+    function warned(kind) { return main.querySelector('[data-review-warning="' + kind + '"]'); }
+    var at = new Date().toISOString(), n = 0;
+    function comment(sev, anchor) { n++; return { id: "k" + n, reviewer: "x", createdAt: at, updatedAt: at, severity: sev, anchor: anchor, text: "Comment " + n, suggestion: null, relatesTo: null, check: null }; }
+    function reviewFile(reviewer, verdict, comments) {
+      var round = RR.store().rounds[RR.store().rounds.length - 1];
+      return { name: reviewer + ".json", text: JSON.stringify({ schema: RC.fileSchema(), packId: round.packId, reviewId: RR.store().reviewId, round: round.round,
+        fileId: "f-" + reviewer, reviewer: reviewer, savedAt: new Date().toISOString(), verdict: { value: verdict, date: "2026-11-09", note: "" },
+        checklist: [], dismissedChecks: [], confirmations: [], comments: (comments || []).map(function (c) { c.reviewer = reviewer; return c; }) }) };
+    }
+
+    poll(function () { return w.RiskTool && w.RiskReview && w.RiskReportPage && w.RiskExports && w.docx && w.RiskTool.state.project.zones.length; }).then(function () {
+      RT = w.RiskTool; RR = w.RiskReview; RX = w.RiskExports; RC = w.App.ReviewCore; RP = w.RiskReportPage; main = w.document.getElementById("main");
+      w.RiskExports.downloadWord = function (opts, done) { downloads.push(opts && opts.highLevelOnly ? "word-hl" : "word"); if (done) done(null); };
+      w.RiskExports.downloadExcel = function (done) { downloads.push("excel"); if (done) done(null); };
+
+      // ---- no review yet: no question before the high-level report --------------------
+      RT.downloadWordReport({ highLevelOnly: true });
+      return poll(function () { return downloads.length === 1; }, 5000);
+    }).then(function () {
+      ok(confirms.length === 0 && downloads[0] === "word-hl", "with no review started, the high-level download asks nothing", confirms.join(" | "));
+
+      // ---- the pack -----------------------------------------------------------------
+      return RR.buildPack(null, { note: "  First round: please look hard at section 4.  ", neededBy: "Thursday 12 November" });
+    }).then(function (r) {
+      var pack = r.pack, fl = pack.engagement.fieldLabels || {};
+      ok(fl.evidence === "Threat source" && fl.notes === "Risk acceptance" && fl.priority === "Disposition" && fl.answer === "Risk", "the pack names the fields as the risk tool does", JSON.stringify(fl));
+      ok(fl.owner === null && fl.impact === null, "and has no owner or impact field per threat");
+      ok(pack.items.every(function (i) { return i.targetId && pack.items.length && i.itemId.indexOf(i.targetId + ":") === 0; }), "every item carries its zone or conduit's id (targetId)");
+      var t1 = item(pack, "Z1:T1"), t2 = item(pack, "Z1:T2");
+      ok(/^(Low|Medium|High|Very high)(, residual (low|medium|high|very high))?$/.test(t1.answer) && t1.expected === "Medium", "risk and tolerable risk are band names, not ids", t1.answer + " / " + t1.expected);
+      var labels = Object.keys(RX.DISPOSITION_LABEL).map(function (k) { return RX.DISPOSITION_LABEL[k]; });
+      ok(pack.items.filter(function (i) { return i.code !== "SL-T"; }).every(function (i) { return !i.priority || labels.indexOf(i.priority) >= 0 || /^No disposition/.test(i.priority); }) && labels.indexOf(t1.priority) >= 0,
+        "the disposition is the name the report prints", t1.priority);
+      ok(/M2 /.test(t2.action) && /M3 /.test(t2.action) && !/M1 /.test(t2.action), "a threat on SI lists only the countermeasures that address SI (not M1, which covers IAC, UC and RDF)", t2.action);
+      ok(/\[existing\]|\[planned\]/.test(t2.action), "each marked existing or planned");
+      ok(detail(t1, "Likelihood × impact") === "High × Serious" && detail(t1, "Affected FRs") === "IAC, RDF" && detail(t1, "Residual likelihood × impact") === "Low × Serious", "likelihood, impact, FRs and the residual rating are detail rows", JSON.stringify(t1.details));
+      ok(t1.owner === "" && t1.impact === "", "and nothing is put under owner or impact");
+      var s1 = item(pack, "Z1:slt");
+      ok(s1.evidence === "" && detail(s1, "Justification") === zone("Z1").justification.trim() && /^IAC SL\d/.test(detail(s1, "Suggested SL-T")), "an SL-T item shows the suggestion and the justification as details, not as a threat source", JSON.stringify(s1.details));
+      ok(/^IAC SL3, UC SL2/.test(s1.answer), "and the set vector with SL levels", s1.answer);
+      var over = pack.items.filter(function (i) { return i.status === "finding"; });
+      ok(over.length && over.every(function (i) { return i.priority === "" || labels.indexOf(i.priority) >= 0; }), "a finding's disposition is a name, or empty when there is none (as the review tool's check reads it)");
+      ok(Object.prototype.hasOwnProperty.call(pack.engagement.documentControl, "qaReviewBy"), "document control in the pack has QA review by");
+      ok(pack.request && pack.request.note === "First round: please look hard at section 4." && pack.request.neededBy === "Thursday 12 November", "the author's note and date go in the pack", JSON.stringify(pack.request));
+      return RR.buildPack(null, { note: " ", neededBy: "" });
+    }).then(function (r) {
+      ok(!("request" in r.pack), "and with nothing typed there is no request at all");
+
+      // ---- the content hash ---------------------------------------------------------
+      return build();
+    }).then(function (d) {
+      window.__h0 = hashes(d);
+      ok(d.every(function (x) { return x.blocks.some(function (b) { return b.type === "heading" && b.sectionKey === "sign-off"; }); }), "both reports have the Sign-off section (key sign-off)");
+      ok(rowValue(d[0], "QA review by") === "(not set)" && rowValue(d[1], "QA review by") === "(not set)", "document control in both reports has a QA review by row", rowValue(d[0], "QA review by"));
+      P().approval.approved = false; RT.touched();
+      return build();
+    }).then(function (d) {
+      ok(hashes(d) === window.__h0, "withdrawing the asset owner's sign-off leaves both reports' content hash as it was");
+      P().approval.approved = true; P().approval.name = "N. Other"; P().approval.date = "2026-11-09"; P().engagement.qaReviewBy = "A. Checker"; RT.touched();
+      return build();
+    }).then(function (d) {
+      ok(hashes(d) === window.__h0, "so does signing off under another name and date, and filling in QA review by");
+      ok(rowValue(d[0], "QA review by") === "A. Checker" && rowValue(d[1], "QA review by") === "A. Checker", "which prints in both reports");
+      ok(/N\. Other/.test(rowValue(d[0], "Asset-owner sign-off")), "while the sign-off still prints");
+      P().approval.name = "R. Calder"; P().approval.date = "2026-07-04"; P().engagement.qaReviewBy = "";
+      zone("Z1").threats[2].likelihood = "";   // T3 unrated
+      RT.touched();
+      return build();
+    }).then(function (d) {
+      ok(d[0].contentHash !== window.__h0.split(",")[0], "a threat's rating is a real change to the hash");
+      var cs = cells(d[0]);
+      ok(cs.indexOf("Not rated × Serious") >= 0, "an unrated threat prints Not rated in words");
+      ok(!cs.some(function (c) { return /[—–]/.test(c) && !/^[—–\s]*$/.test(c); }), "and no table cell mixes a dash with other text", cs.filter(function (c) { return /[—–]/.test(c) && !/^[—–\s]*$/.test(c); }).slice(0, 3).join(" | "));
+      zone("Z1").threats[2].likelihood = "low"; RT.touched();
+      return build();
+    }).then(function (d) {
+      ok(hashes(d) === window.__h0, "and putting it back puts the hash back");
+
+      // ---- Send for review with a note ----------------------------------------------
+      return new Promise(function (res) { RR.send(function () {}, res, { note: "Please check the SL-T section.", neededBy: "Friday" }); });
+    }).then(function (res) {
+      var last = RR.store().rounds[RR.store().rounds.length - 1];
+      ok(res.ok && saved && JSON.parse(saved.text).request.note === "Please check the SL-T section.", "Send for review passes the note into the pack it saves", res.message);
+      ok(last.request && last.request.note === "Please check the SL-T section." && last.request.neededBy === "Friday", "and the round records it");
+
+      // ---- an approval: QA review by --------------------------------------------------
+      var r = RR.importTexts([reviewFile("A. Reviewer", "approved")]);
+      ok(r.bad === 0, "an approval imports", r.lines.join(" | "));
+      ok(RR.qaOffers().length === 1 && RR.qaOffers()[0].reviewer === "A. Reviewer", "and offers to fill in QA review by");
+      RT.state.stage = "peer"; RT.render();
+      var qa = main.querySelector(".rv-qa");
+      ok(qa && /A\. Reviewer approved the report\. Fill in QA review by/.test(qa.textContent), "the Peer review page asks", qa ? qa.textContent : "none");
+      qa.querySelector(".rv-qa-yes").click();
+      ok(P().engagement.qaReviewBy === "A. Reviewer" && !main.querySelector(".rv-qa"), "Fill in sets it, and the question goes");
+      RR.importTexts([reviewFile("A. Reviewer", "approved")]);
+      ok(RR.qaOffers().length === 0, "importing the same file again does not ask again");
+      return new Promise(function (res) { RR.refreshDocs(res); });
+    }).then(function () {
+      ok(RR.exportWarnings().length === 0, "approved and unchanged: no warnings", JSON.stringify(RR.exportWarnings()));
+      P().approval.name = "Someone Else"; RT.touched();
+      return new Promise(function (res) { RR.refreshDocs(res); });
+    }).then(function () {
+      ok(!RR.exportWarnings().some(function (x) { return x.kind === "changed-since-approval"; }), "recording a different sign-off after the approval is not a change to what was reviewed");
+      P().approval.name = "R. Calder";
+
+      // ---- the Peer review page follows the rebuild -------------------------------------
+      P().suc.description = P().suc.description + " A later edit.";
+      RT.touched();
+      RT.state.stage = "peer"; RT.render();
+      ok(!warned("changed-since-approval"), "straight after an edit the page cannot yet say the report changed");
+      return poll(function () { return warned("changed-since-approval"); }, 60000).then(function () { return true; }, function () { return false; });
+    }).then(function (seen) {
+      ok(seen, "and says so once the reports are rebuilt, without leaving the page");
+      // The other report pages.
+      RT.state.stage = "review"; RT.render();
+      ok(main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "Review & export shows the review's warnings");
+      RT.state.stage = "hlreport"; RT.render();
+      ok(main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "and the high-level report page");
+      RT.state.stage = "report"; RT.render();
+      ok(main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "and the Report page");
+
+      // ---- changes requested: every download asks, none is stopped ---------------------------
+      var r = RR.importTexts([reviewFile("B. Reviewer", "changes-requested", [
+        comment("must-fix", { documentIndex: 0, kind: "item", targetName: "Unit 300 BPCS", targetId: "Z1", itemId: "Z1:T2", code: "T2", itemTitle: "x", quote: "" })
+      ])]);
+      ok(r.bad === 0 && RR.qaOffers().length === 0, "a changes-requested file imports, with no QA offer", r.lines.join(" | "));
+      confirms = []; downloads = [];
+      RT.downloadWordReport({});
+      return poll(function () { return downloads.length === 1; }, 60000);
+    }).then(function () {
+      ok(confirms.length === 1 && /Changes requested by B\. Reviewer/.test(confirms[0]) && /must-fix/.test(confirms[0]), "the detailed Word download asks, naming the requested changes and the open must-fix", confirms[0]);
+      RT.downloadWordReport({ highLevelOnly: true });
+      return poll(function () { return downloads.length === 2; }, 60000);
+    }).then(function () {
+      ok(confirms.length === 2 && /Changes requested/.test(confirms[1]) && /must-fix/.test(confirms[1]), "so does the high-level Word download", confirms[1]);
+      ok(!/incomplete|No zones defined/.test(confirms[1]), "without the zone completeness list, which is not about that report");
+      RT.downloadExcelReport();
+      return poll(function () { return downloads.length === 3; }, 60000);
+    }).then(function () {
+      ok(confirms.length === 3 && /Changes requested/.test(confirms[2]), "and the Excel download", confirms[2]);
+      ok(downloads.join(",") === "word,word-hl,excel", "and each went ahead: the review only warns", downloads.join(","));
+
+      // ---- Go to lands on the threat or the zone ----------------------------------------
+      RR.goTo({ comment: { anchor: { kind: "item", itemId: "Z1:T2", targetName: "Unit 300 BPCS", targetId: "Z1" } } });
+      var el = main.querySelector('[data-owner-id="Z1"] [data-threat-id="T2"]');
+      ok(RT.state.stage === "risk" && el && el.classList.contains("check-flash"), "Go to on a threat opens the risk page and flashes that threat");
+      ok(main.querySelectorAll(".check-flash").length === 1, "and nothing else");
+      RR.goTo({ comment: { anchor: { kind: "item", itemId: "C2:T9", targetName: "Vendor remote access", targetId: "C2" } } });
+      el = main.querySelector('[data-owner-id="C2"] [data-threat-id="T9"]');
+      ok(el && el.classList.contains("check-flash"), "and a conduit's threat");
+      RR.goTo({ comment: { anchor: { kind: "item", itemId: "Z2:slt", targetName: "Safety Instrumented System", targetId: "Z2" } } });
+      el = main.querySelector('[data-owner-id="Z2"]');
+      ok(RT.state.stage === "slt" && el && el.classList.contains("check-flash") && !main.querySelector('[data-owner-id="Z1"]').classList.contains("check-flash"), "Go to on a zone's SL-T opens the SL-T page and flashes that zone");
+      var toasted = 0, toast = RT.toast; RT.toast = function () { toasted++; };
+      try { RR.goTo({ comment: { anchor: { kind: "item", itemId: "Z9:T1", targetName: "Gone" } } }); } catch (e) { toasted = -1; }
+      RT.toast = toast;
+      ok(toasted === 1, "a zone that has gone says so", String(toasted));
+
+      // ---- renaming a zone ------------------------------------------------------------
+      var th = RR.store().threads.filter(function (t) { return t.comment.anchor.itemId === "Z1:T2"; })[0];
+      ok(th && RR.isStale(th) === false, "a comment on a threat matches it");
+      zone("Z1").name = "Unit 300 DCS"; RT.touched();
+      ok(RR.isStale(th) === false, "and still does after the zone is renamed");
+      zone("Z1").name = "Unit 300 BPCS"; RT.touched();
+
+      // ---- no zones: the high-level report alone ------------------------------------------
+      window.__project = JSON.stringify(P());
+      P().zones = []; P().conduits = []; RT.touched();
+      RT.state.stage = "peer"; RT.render();
+      ok(/holding the high-level report and its basis of assessment/.test(main.textContent), "with no zones the Peer review page says the pack holds the high-level report");
+      return RR.buildPack();
+    }).then(function (r) {
+      ok(r.pack.documents.length === 1 && r.pack.documents[0].title === "High-level report", "and so it does", r.pack.documents.map(function (x) { return x.title; }).join(", "));
+      var head = r.pack.documents[0].blocks.filter(function (b) { return b.type === "heading" && b.sectionKey === "executive-summary"; })[0];
+      window.__t = { comment: { id: "acc1", reviewer: "J. Marsh", severity: "suggestion", text: "Retitle.", suggestion: "Summary for the board",
+        anchor: { documentIndex: 0, documentTitle: "High-level report", kind: "block", sectionKey: head.sectionKey, sectionTitle: head.text, blockId: head.id, quote: head.text, cell: null } },
+        status: "open", round: 1, replies: [] };
+      return new Promise(function (res) { RR.refreshDocs(res); });
+    }).then(function () {
+      var t = window.__t, plan = RR.acceptPlan(t);
+      ok(plan.can && plan.kind === "section title", "a heading in it can be accepted", JSON.stringify(plan));
+      return new Promise(function (res) { RR.accept(t, res); });
+    }).then(function (res) {
+      var rc = P().reportCustom || {}, t = window.__t;
+      ok(res.ok && rc.highLevel && rc.highLevel["executive-summary"] && rc.highLevel["executive-summary"].title === "Summary for the board" && !rc.detailed, "Accept writes to the high-level report's overrides, though it is the pack's first document", JSON.stringify(rc));
+      ok(t.accepted && t.accepted.revert && t.accepted.revert.report === "highLevel" && t.accepted.revert.field === "title" && t.accepted.applied === "Summary for the board", "and records what it replaced", JSON.stringify(t.accepted));
+      return new Promise(function (res2) { RR.undoAccept(t, res2); });
+    }).then(function (res) {
+      var t = window.__t;
+      ok(res.ok && !P().reportCustom && !t.accepted && t.status === "open", "Undo the accepted wording puts the generated title back and opens the comment", res.message);
+      return new Promise(function (res2) { RR.accept(t, res2); });
+    }).then(function () {
+      var t = window.__t;
+      RP.setSection("highLevel", "executive-summary", { title: "Edited by hand" });
+      return new Promise(function (res2) { RR.undoAccept(t, res2); });
+    }).then(function (res) {
+      ok(!res.ok && /edited since/.test(res.message) && P().reportCustom.highLevel["executive-summary"].title === "Edited by hand", "and refuses when the section has been edited since", res.message);
+      RT.loadProjectText(window.__project);
+      ok(P().zones.length > 0 && RR.qaOffers().length === 0, "a project loaded afresh starts with no QA offers");
+    }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+      try { w.onbeforeunload = null; } catch (e) {}
+      finish();
+    });
+  };
+  frame.src = "../index.html?tour=1";
+})();
+</script>
+</body></html>

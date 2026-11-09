@@ -5,6 +5,7 @@ window.App.Data = window.App.Data || {};
 (window.App.Data.contracts = window.App.Data.contracts || {}).reviewPack = {
   "schema": "spt-review-pack/1.0",
   "_note": "What an author sends for review. The assessment tool and the risk tool WRITE it (Send for review); the report review tool READS it. It holds the text the client will receive, read back from the generated Word file, and the engagement behind it, so a reviewer can challenge a finding as well as its wording. A pack contains client data: handle it like the project file. Each tool carries its own copy of this contract; bump the schema string here when the shape changes, so that a mismatch fails loudly. Importers ACCEPT the listed schemas and reject unknown ones with a clear message.",
+  "_optional": "Within spt-review-pack/1.0 these fields are OPTIONAL and additive, so a pack without them loads and shows exactly as before, and a reader that does not know them ignores them: engagement.fieldLabels, items[].targetId, items[].details, request and documents[].blocks[].runs[].c. Nothing in request ever reaches Word or Excel.",
   "acceptedSchemas": ["spt-review-pack/1.0"],
   "shape": {
     "schema": "spt-review-pack/1.0",
@@ -21,15 +22,17 @@ window.App.Data = window.App.Data || {};
       "instrumentTitle": "title of the framework",
       "scoringFamily": "capability-sl, caf-achieved, domain-letter, program-maturity-ml, nis2-conformance, csms-conformance, risk-appetite-coherence; risk tool: risk-assessment",
       "targetLabel": "what one target is called: Zone, Site, Product...",
-      "documentControl": { "documentRevision": "", "qaReviewBy": "", "authorisedBy": "", "issuedTo": "", "issuedDate": "", "confidentiality": "" }
+      "documentControl": { "documentRevision": "", "qaReviewBy": "", "authorisedBy": "", "issuedTo": "", "issuedDate": "", "confidentiality": "" },
+      "fieldLabels": "OPTIONAL. What this pack calls each item field, shown to the reviewer and the author in place of the assessment names: { answer, expected, evidence, notes, action, impact, priority, owner }, each a display label such as \"Threat source\", or null when the pack has no such field (its row is hidden and it is not offered for suggested wording or as a filter). A field left out, or the whole object absent, keeps the assessment label (Answer, Target, Evidence, Notes, Action, Business impact, Priority, Owner)."
     },
+    "request": "OPTIONAL. The author's note to the reviewers, sent with this pack: { note: free text, neededBy: free text such as \"Thursday 12 November\" }. Present only when something was filled in; either part may be empty. Shown to the reviewer in the review tool; never in Word or Excel.",
     "documents": [{
       "title": "the report's name, shown to the reviewer",
       "targetName": "the target this document covers, or empty for a document covering all of them",
       "contentHash": "hash of the client's text (App.DocxBlocks.contentHash), leaving out the cover and the document control fields that change on issue",
       "media": { "image1.png": "data:image/png;base64,..." },
       "blocks": [
-        { "id": "d0-b1", "type": "heading", "level": 1, "text": "Executive summary", "runs": [{ "t": "Executive summary", "b": false, "i": false, "red": false }], "red": false, "front": false, "sectionKey": "executive-summary", "sectionTitle": "Executive summary" },
+        { "id": "d0-b1", "type": "heading", "level": 1, "text": "Executive summary", "runs": [{ "t": "Executive summary", "b": false, "i": false, "red": false, "c": "OPTIONAL. A 6-hex colour, only on a key swatch run (a lone shape such as a square in a chart colour), so the reviewer sees the key as printed" }], "red": false, "front": false, "sectionKey": "executive-summary", "sectionTitle": "Executive summary" },
         { "id": "d0-b2", "type": "paragraph", "text": "...", "runs": [], "red": false, "front": false, "sectionKey": "executive-summary", "sectionTitle": "Executive summary" },
         { "id": "d0-b3", "type": "bullet", "marker": "•", "markerText": "•  ", "text": "...", "runs": [], "red": false, "front": false, "sectionKey": "", "sectionTitle": "" },
         { "id": "d0-b4", "type": "table", "text": "all cell text", "red": false, "rows": [{ "cells": [{ "blocks": [{ "type": "paragraph", "text": "", "runs": [], "red": false }], "text": "", "red": false, "fill": "E5F1EA", "span": 2 }] }], "front": false, "sectionKey": "", "sectionTitle": "" },
@@ -38,6 +41,7 @@ window.App.Data = window.App.Data || {};
     }],
     "items": [{
       "targetName": "zone, site or product name",
+      "targetId": "OPTIONAL. The authoring tool's own id for the target. A comment anchor that carries it is matched to the item by targetId when both have one, otherwise by targetName, so two targets with one name stay apart",
       "itemId": "requirement id in the instrument",
       "code": "SR 1.1",
       "title": "requirement title",
@@ -51,7 +55,8 @@ window.App.Data = window.App.Data || {};
       "impact": "business impact",
       "priority": "priority band, if set",
       "status": "finding | met | recorded | to-assess | unanswered | na",
-      "shared": "true when the answer comes from the system-wide layer rather than this target"
+      "shared": "true when the answer comes from the system-wide layer rather than this target",
+      "details": "OPTIONAL. Extra read-only rows shown after the standard ones: [[label, value], ...], for example [[\"Likelihood x impact\", \"Likely x Serious\"], [\"Affected FRs\", \"IAC, SI\"]]. Not offered for suggested wording."
     }],
     "basisOfAssessment": { "interviews": [{ "name": "", "role": "", "date": "" }], "documents": [{ "title": "", "reference": "", "date": "" }], "observations": [{ "name": "", "method": "" }] },
     "facts": {
@@ -83,6 +88,7 @@ window.App.Data = window.App.Data || {};
     "items": [],
     "basisOfAssessment": { "interviews": [], "documents": [], "observations": [] },
     "facts": { "perTarget": [] },
-    "previousRound": { "comments": [], "verdicts": [] }
+    "previousRound": { "comments": [], "verdicts": [] },
+    "request": { "note": "First round. The executive summary is new; the findings are as agreed on site.", "neededBy": "Thursday 12 November" }
   }
 };

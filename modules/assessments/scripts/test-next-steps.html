@@ -106,9 +106,10 @@ window.docx = (function () {
     A.UI.go("report");
     ok(!!nsCard(), "card: the next steps are a section of the report itself");
     // The executive-summary input card (exposure, priorities, method) has boxes
-    // of its own; none of them is a copy of the next steps.
+    // of its own, and so does the Review card (a note to the reviewers, never in
+    // the report); none of them is a copy of the next steps.
     ok([].slice.call(document.querySelectorAll("#main textarea")).filter(function (t) {
-         return !t.closest('[data-check-anchor^="narrative-"]'); }).length === 0,
+         return !t.closest('[data-check-anchor^="narrative-"]') && !t.closest(".rv-request"); }).length === 0,
        "card: nothing is editable until you ask - no capture copy at the top of the page");
     ok(mainText().indexOf("suggested starting point") !== -1, "card: labelled as a suggestion, not the consultant's words");
     ok(E.getReportNarrative().nextSteps == null, "card: rendering the page stores nothing");

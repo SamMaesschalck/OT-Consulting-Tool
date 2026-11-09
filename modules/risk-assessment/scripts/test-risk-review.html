@@ -83,6 +83,7 @@
           c("c3", "suggestion", { documentIndex: 0, kind: "item", targetName: pack.items[0].targetName, itemId: pack.items[0].itemId, code: pack.items[0].code, itemTitle: pack.items[0].title, quote: "" }),
           c("c4", "should-fix", { documentIndex: 0, kind: "block", sectionKey: "x", sectionTitle: "Gone", blockId: "d0-b1", quote: "Wording that has gone from the report.", cell: null })
         ] };
+        window.__riskFile = JSON.stringify(file);
         var res = RR.importTexts([{ name: "a.json", text: JSON.stringify(file) }]);
         ok(res.bad === 0 && RR.store().threads.length === 4, "a review file merges in", res.lines.join(" | "));
         res = RR.importTexts([{ name: "a.json", text: JSON.stringify(file) }]);
@@ -187,6 +188,23 @@
           ok(RT.loadProjectText(JSON.stringify(old)) && !RR.store(), "a file with no review loads as before");
           RT.state.stage = "peer"; RT.render();
           ok(/Nothing has been sent yet/.test(w.document.getElementById("main").textContent), "and starts from nothing");
+          // ---- a copy saved before Send for review: the pack puts the round back ----------
+          var lone = RR.importTexts([{ name: "a.json", text: window.__riskFile }]);
+          ok(lone.bad === 1 && /import the pack file here first/.test(lone.lines[0]) && !/Open the assessment it/.test(lone.lines[0]) && !RR.store(), "a review file alone is refused, saying to import the pack first", lone.lines[0]);
+          var both = RR.importTexts([{ name: "p.json", text: window.__riskPack }, { name: "a.json", text: window.__riskFile }]);
+          ok(both.bad === 0 && !!RT.state.project.review && RR.store().rounds.length === 1 && RR.store().threads.length === 4, "and the pack with it puts the round back on the project, and the file merges", both.lines.join(" | "));
+          var foreign = JSON.parse(window.__riskPack); foreign.engagement.client = "Another Client Ltd";
+          ok(RR.importTexts([{ name: "x.json", text: JSON.stringify(foreign) }]).bad === 1, "a pack for another client is refused");
+          // ---- Go to leaves Peer review: a way back on the page it went to ------------------
+          var main2 = w.document.getElementById("main");
+          RT.state.stage = "peer"; RT.render();
+          return poll(function () { return main2.querySelector('[data-comment-id="c2"] .rv-go'); }).then(function (go) {
+            go.click();
+            var bar = w.document.getElementById("rv-back-page");
+            ok(RT.state.stage === "report" && !!bar && bar.parentNode === w.document.body, "Go to leaves Peer review, with Back to the comment on the page it went to");
+            bar.querySelector(".rv-back-go").click();
+            ok(RT.state.stage === "peer" && !w.document.getElementById("rv-back-page") && !!main2.querySelector('[data-comment-id="c2"]'), "and Back returns to Peer review, at the comment");
+          });
         });
       });
     }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {

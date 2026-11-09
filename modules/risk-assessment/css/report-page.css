@@ -138,3 +138,9 @@
   .rp-section .priority-row.reordering { flex-wrap: wrap; }
   .priority-row.reordering .priority-name { flex: 1 1 calc(100% - 40px); }
 }
+
+/* ---- the peer review's warnings on the Report, Review & export and
+   high-level report pages (js/review.js warningsCard) ------------------------ */
+.rv-warn-card .rv-warnings { margin: 0 0 8px; padding-left: 18px; font-size: 13px; }
+.rv-warn-card .rv-warnings li { margin: 2px 0; }
+.rv-warn-card .rv-warn-foot { margin: 0; }

@@ -6,6 +6,7 @@ window.App.Data.contracts = window.App.Data.contracts || {};
 window.App.Data.contracts.reviewFile = {
   "schema": "spt-review/1.0",
   "_note": "What a reviewer sends back. The report review tool WRITES it, one small file per reviewer; the assessment tool and the risk tool READ it. Files are merged by comment id, so reviewers can never overwrite each other, and importing a file twice changes nothing. Where the same comment arrives again, the reviewer's later save wins. The author's status, reason and replies are kept on the author's side and are never overwritten by an import. Each tool carries its own copy of this contract; bump the schema string here when the shape changes, so that a mismatch fails loudly. Importers ACCEPT the listed schemas and reject unknown ones with a clear message.",
+  "_optional": "Within spt-review/1.0 these fields are OPTIONAL and additive, so a file without them imports exactly as before: checklistTotal, dismissedCheckTitles, anchor.targetId (on item comments, and on comments made from an automatic check on an item) and anchor.media. A raised-again comment (relatesTo set) is anchored to where the text is now, not where it was, and may carry suggested wording.",
   "acceptedSchemas": ["spt-review/1.0"],
   "shape": {
     "schema": "spt-review/1.0",
@@ -18,7 +19,9 @@ window.App.Data.contracts.reviewFile = {
     "savedBy": { "product": "OT Cyber Report Review Tool", "version": "0.5.1" },
     "verdict": { "value": "none | approved | approved-with-comments | changes-requested", "date": "YYYY-MM-DD", "note": "" },
     "checklist": [{ "id": "common-evidence", "text": "the question as asked", "answer": "yes | no | na, or empty if not answered", "note": "" }],
+    "checklistTotal": "OPTIONAL. How many checklist questions the reviewer was asked when this was saved (after the checklist skip list for this instrument), so the author can see \"7 of 9 answered\"; checklist holds only the questions the reviewer touched",
     "dismissedChecks": ["ids of automatic check results the reviewer dismissed"],
+    "dismissedCheckTitles": "OPTIONAL. { check result id: what the check said, as the reviewer saw it }, for each dismissed check, so the author can read what was dismissed without the check engine. The review tool writes \"<check title> (in <section>[ - <report>]): <what it said>\"",
     "confirmations": [{ "commentId": "a previous round comment the reviewer confirmed as fixed", "at": "ISO date and time" }],
     "comments": [{
       "id": "globally unique, generated",
@@ -38,15 +41,17 @@ window.App.Data.contracts.reviewFile = {
         "selection": "the words selected, when the reviewer selected some, or absent",
         "cell": "{ row, col } when the comment is on one cell of a table, otherwise null",
         "targetName": "for an item comment, the target; for a block comment, the document's target",
+        "targetId": "OPTIONAL. The pack item's targetId, when the pack gave one. Matched by targetId when both sides have it, otherwise by targetName",
+        "media": "OPTIONAL. For a comment on an image, the image's media key in the pack (documents[].media), so it can be found again in a later round",
         "itemId": "for an item comment",
         "code": "for an item comment, the item's code",
         "itemTitle": "for an item comment, the item's title",
         "groupName": "for an item comment, the item's group",
-        "field": "for a suggestion on an item: evidence | notes | owner | action | impact"
+        "field": "for a suggestion on an item: evidence | notes | owner | action | impact (the pack's engagement.fieldLabels says what to call it)"
       },
       "text": "the comment",
       "suggestion": "suggested wording, or null",
-      "relatesTo": "the previous round comment this one raises again, or null",
+      "relatesTo": "the previous round comment this one raises again, or null. Its anchor is where that text is now: the same wording found in the current pack, else the nearest match in the same section, else the section heading with an empty quote",
       "check": "the automatic check it came from, or null"
     }]
   },
@@ -61,7 +66,9 @@ window.App.Data.contracts.reviewFile = {
     "savedBy": { "product": "OT Cyber Report Review Tool", "version": "0.5.1" },
     "verdict": { "value": "changes-requested", "date": "2026-11-07", "note": "One finding needs more evidence." },
     "checklist": [{ "id": "common-evidence", "text": "The evidence supports the findings.", "answer": "no", "note": "See the access control finding." }],
+    "checklistTotal": 9,
     "dismissedChecks": [],
+    "dismissedCheckTitles": {},
     "confirmations": [],
     "comments": [{
       "id": "c-m1a2b3-9dk2f7",

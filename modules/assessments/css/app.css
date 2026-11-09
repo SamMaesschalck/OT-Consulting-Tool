@@ -1576,6 +1576,12 @@ select.slt-cell:focus { outline: none; border-color: var(--brand-blue); }
   margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);
 }
 
+/* Overrides on sections that only the Word report has, listed with the way back. */
+.wo-list { list-style: none; margin: 0; padding: 0; }
+.wo-row { padding: 8px 0; border-top: 1px solid var(--border); }
+.wo-row:first-child { border-top: 0; }
+.wo-prose { margin: 4px 0 6px; font-size: 12.5px; white-space: pre-line; overflow-wrap: anywhere; }
+
 .terms-editor h3 { margin: 18px 0 0; font-size: 14px; }
 .term-row {
   display: grid; grid-template-columns: 200px 1fr auto; gap: 10px;

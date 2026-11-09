@@ -1,0 +1,472 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: keeping the reviewer's work safe</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The reviewer's work, kept: a review file opened over unsaved comments adds
+  them rather than dropping them; unsaved work this browser kept is offered back
+  whichever order the pack and the review file are opened in, and is never
+  written over while on offer; a quick save leaves no stale copy behind; a
+  colleague's file is not taken on as yours; the name prompt can be cancelled;
+  a review file opened before its pack waits for it; a real pack in the tour's
+  window is treated as real; and the files people drop by mistake get a clear
+  message. Each section starts from a fresh page, so one failure does not hide
+  the rest. Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script src="../data/demo-pack.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  var errors = [], confirms = 0, confirmAnswer = true, downloads = [];
+  var W, R, D;
+  function load(q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        confirms = 0; confirmAnswer = true; downloads = [];
+        w.confirm = function () { confirms++; return confirmAnswer; }; w.alert = function () {};
+        w.HTMLAnchorElement.prototype.click = function () { if (this.download) downloads.push(this.download); };
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () { W = w; R = w.ReviewTool; D = w.document; res(w); });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+  function fakeHandle(name) {
+    var st = { text: null, writes: 0 };
+    return { kind: "file", name: name, store: st,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      requestPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () { return Promise.resolve({ write: function (t) { st.text = String(t); st.writes++; return Promise.resolve(); }, close: function () { return Promise.resolve(); } }); },
+      getFile: function () { return Promise.resolve(new W.File([st.text || "{}"], name, { type: "application/json" })); } };
+  }
+  function toastText() { return D.getElementById("toast").textContent; }
+  function stored() { var v = localStorage.getItem("spt-review:autosave:v1:" + PID); return v ? JSON.parse(v) : null; }
+  function storedTexts() { var s = stored(); return s ? s.review.comments.map(function (c) { return c.text; }) : []; }
+  function texts() { return R.state.review ? R.state.review.comments.map(function (c) { return c.text; }) : []; }
+  function nav(id) { D.querySelector('.nav-item[data-page="' + id + '"]').click(); }
+  function clean() { try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); } catch (e) {} }
+  // Leaving a page with nothing to warn about.
+  function settle() { if (R) { R.state.dirty = false; } }
+
+  // A real (not demo) pack: the demo pack under a pack id of its own.
+  var pack = JSON.parse(JSON.stringify(window.SPT_REVIEW_DEMO_PACK));
+  var PID = "rp-safe-" + Date.now().toString(36);
+  pack.packId = PID;
+  var PACK = JSON.stringify(pack);
+  var para = pack.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 60 && !b.red; })[0];
+  var GEN = { kind: "general", sectionTitle: "General", documentIndex: 0, quote: "" };
+  function cmt(id, text, at, who, anchor) {
+    return { id: id, reviewer: who || "Me Myself", createdAt: at, updatedAt: at, severity: "should-fix", anchor: anchor || GEN, text: text, suggestion: null, relatesTo: null, check: null };
+  }
+  function rfile(o) {
+    var f = { schema: "spt-review/1.0", packId: PID, reviewId: "", round: pack.round, fileId: "rf-mine", reviewer: "Me Myself",
+      savedAt: "2026-11-01T10:00:00.000Z", savedBy: { product: "x", version: "0" }, verdict: { value: "none", date: "", note: "" },
+      checklist: [], dismissedChecks: [], confirmations: [], comments: [cmt("c-saved", "Saved earlier.", "2026-11-01T09:00:00.000Z")] };
+    Object.keys(o || {}).forEach(function (k) { f[k] = o[k]; });
+    return f;
+  }
+  var FILE = JSON.stringify(rfile());
+  function seedAutosave(extraTexts, savedOn) {
+    var r = rfile();
+    extraTexts.forEach(function (t, i) { r.comments.push(cmt("c-un-" + i, t, "2026-11-02T09:0" + i + ":00.000Z")); });
+    localStorage.setItem("spt-review:autosave:v1:" + PID, JSON.stringify({ savedOn: savedOn || "2026-11-02T10:00:00.000Z", review: r }));
+  }
+  // Each section: a clean store, the browser's name, then a fresh page.
+  function fresh(q, name) {
+    settle();
+    clean();
+    if (name !== null) localStorage.setItem("spt-review:reviewer:v1", name || "Me Myself");
+    return load(q);
+  }
+
+  var sections = [
+    ["unsaved comments, then a review file (findings 1, 53, 61)", function () {
+      return fresh().then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        R.addComment({ severity: "must-fix", anchor: GEN, text: "Live work." });
+        R.writeAutosave();
+        R.loadTexts([{ name: "mine.json", text: FILE }]);
+        ok(!!D.getElementById("rr-merge-no") && confirms === 0, "opening a review file over unsaved comments asks first, in the page (never confirm())", "native asks " + confirms);
+        D.getElementById("rr-merge-no").click();
+        ok(texts().join() === "Live work." && R.isDirty() && storedTexts().indexOf("Live work.") !== -1, "and Leave everything as it is leaves everything as it was, autosave included", texts().join() + " / " + storedTexts().join());
+        var h1 = fakeHandle("mine.json");
+        R.loadTexts([{ name: "mine.json", text: FILE, handle: h1 }]);
+        D.getElementById("rr-merge-yes").click();
+        ok(texts().indexOf("Saved earlier.") !== -1 && texts().indexOf("Live work.") !== -1 && texts().length === 2, "Yes adds the unsaved comments to the file", texts().join());
+        ok(R.isDirty() && R.state.review.fileId === "rf-mine" && R.state.handle === h1, "still unsaved, and Save writes back to that file");
+        ok(/unsaved work added/.test(toastText()), "and says so", toastText());
+        return wait(1000).then(function () { ok(storedTexts().length === 2, "the crash copy then holds both", storedTexts().join()); });
+      });
+    }],
+    ["a quick save (finding 66)", function () {
+      return fresh().then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        var h2 = fakeHandle("mine.json");
+        W.showSaveFilePicker = function () { return Promise.resolve(h2); };
+        R.addComment({ severity: "suggestion", anchor: GEN, text: "Quick." });
+        return new Promise(function (res) { R.saveReview(null, res); }).then(function (r) {
+          ok(r.ok && !stored(), "a save clears the crash copy");
+          return wait(1200);
+        }).then(function () {
+          ok(!stored(), "and a write that was still waiting does not put it back", JSON.stringify(stored()));
+        });
+      });
+    }],
+    ["pack and file together, after a crash (findings 52, 62)", function () {
+      return fresh().then(function () {
+        seedAutosave(["UNSAVED one."]);
+        var h3 = fakeHandle("mine.json");
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }, { name: "mine.json", text: FILE, handle: h3 }]);
+        var bar = D.getElementById("rr-restore");
+        ok(!!bar && /not in the review file you opened/.test(bar.textContent), "the unsaved work is offered over the file");
+        ok(storedTexts().indexOf("UNSAVED one.") !== -1, "and is still stored");
+        ok(/Unsaved work that is not in it/.test(toastText()), "the message points at it", toastText());
+        D.getElementById("rr-restore-yes").click();
+        ok(texts().indexOf("UNSAVED one.") !== -1 && texts().indexOf("Saved earlier.") !== -1 && R.state.handle === h3 && R.state.review.fileId === "rf-mine" && R.isDirty(), "Restore adds it to the file, which Save still writes", texts().join());
+      });
+    }],
+    ["pack, then file, after a crash (findings 52, 62)", function () {
+      return fresh().then(function () {
+        seedAutosave(["UNSAVED one."]);
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        ok(!!D.getElementById("rr-restore"), "the pack alone offers the unsaved work");
+        R.loadTexts([{ name: "mine.json", text: FILE }]);
+        ok(!!D.getElementById("rr-restore") && !!stored() && texts().join() === "Saved earlier.", "then the file: still offered, still stored, the file as saved");
+        ok(confirms === 0, "with nothing to ask, since nothing unsaved was open");
+      });
+    }],
+    ["a stored copy the file already holds", function () {
+      return fresh().then(function () {
+        localStorage.setItem("spt-review:autosave:v1:" + PID, JSON.stringify({ savedOn: "2026-11-01T09:59:00.000Z", review: rfile() }));
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }, { name: "mine.json", text: FILE }]);
+        ok(!D.getElementById("rr-restore") && !stored(), "is not offered, and is cleared");
+      });
+    }],
+    ["work added while Restore is on offer (finding 7)", function () {
+      return fresh().then(function () {
+        seedAutosave(["OLD WORK"]);
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        R.addComment({ severity: "suggestion", anchor: GEN, text: "NEW WORK" });
+        R.writeAutosave();
+        ok(storedTexts().indexOf("OLD WORK") !== -1 && storedTexts().indexOf("NEW WORK") !== -1 && stored().review.fileId === "rf-mine", "the stored copy keeps the old work as well as the new, as the review it was", storedTexts().join());
+        D.getElementById("rr-restore-yes").click();
+        ok(texts().indexOf("OLD WORK") !== -1 && texts().indexOf("NEW WORK") !== -1 && R.state.review.fileId === "rf-mine", "and Restore keeps both", texts().join());
+      });
+    }],
+    ["Discard, and nothing unsaved (findings 7, 66)", function () {
+      return fresh().then(function () {
+        seedAutosave(["OLD WORK"]);
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        R.writeAutosave();
+        ok(storedTexts().indexOf("OLD WORK") !== -1 && storedTexts().length === 2, "with nothing unsaved, the offered copy is not written over", storedTexts().join());
+        R.addComment({ severity: "suggestion", anchor: GEN, text: "NEW WORK" });
+        D.getElementById("rr-restore-no").click();
+        ok(storedTexts().join() === "NEW WORK" && texts().join() === "NEW WORK", "Discard drops the old work and keeps the new protected", storedTexts().join());
+      });
+    }],
+    ["a colleague's review file (findings 8, 54, 63)", function () {
+      return fresh().then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        var mineId = R.state.review.fileId;
+        ok(/as Me Myself/.test(D.getElementById("pack-summary").textContent), "the header says whose review is open", D.getElementById("pack-summary").textContent);
+        var anchor = { documentIndex: 0, documentTitle: "", kind: "block", sectionKey: para.sectionKey || "", sectionTitle: para.sectionTitle || "", blockId: para.id, blockType: "paragraph", quote: para.text, cell: null, targetName: "", itemId: "", field: "" };
+        var col = JSON.stringify(rfile({ fileId: "rf-colleague", reviewer: "A Colleague", comments: [cmt("c-col", "Colleague says.", "2026-11-01T09:00:00.000Z", "A Colleague", anchor), cmt("c-other", "Someone else.", "2026-11-01T09:00:00.000Z", "Other Person")] }));
+        var hc = fakeHandle("colleague.json");
+        R.loadTexts([{ name: "colleague.json", text: col, handle: hc }]);
+        ok(!!D.getElementById("rr-whose-mine") && /A Colleague's review file/.test(D.querySelector(".rr-modal").textContent), "opening it asks whose it is");
+        D.getElementById("rr-whose-mine").click();
+        ok(R.state.review.fileId === mineId && R.state.review.reviewer === "Me Myself" && R.state.handle === null && R.state.review.comments.length === 0, "Mine keeps your own review: your file id, your name, no handle to theirs");
+        ok(!!D.getElementById("rr-colleague") && !!D.querySelector('[data-colleague-id="c-col"]'), "their comments show read only, beside the report");
+        R.addComment({ severity: "suggestion", anchor: GEN, text: "Mine." });
+        W.showSaveFilePicker = undefined;
+        return new Promise(function (res) { R.saveReview(null, res); }).then(function (r) {
+          var f = JSON.parse(r.text);
+          ok(r.ok && f.reviewer === "Me Myself" && f.fileId === mineId && hc.store.writes === 0 && /me-myself\.json$/.test(downloads[downloads.length - 1] || ""), "and Save writes your own file, never theirs", downloads.join());
+          nav("summary");
+          ok(/A Colleague's comments/.test(D.getElementById("main").textContent), "Summary lists their comments too");
+          R.loadTexts([{ name: "colleague.json", text: col, handle: hc }]);
+          D.getElementById("rr-whose-cancel").click();
+          ok(!D.querySelector(".rr-modal") && R.state.review.fileId === mineId, "Cancel changes nothing");
+          R.loadTexts([{ name: "colleague.json", text: col, handle: hc }]);
+          D.dispatchEvent(new W.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          ok(!D.querySelector(".rr-modal") && R.state.review.fileId === mineId, "and so does Escape");
+          // Carrying on as them: a handover, or your own file under another spelling.
+          R.state.dirty = false;
+          R.loadTexts([{ name: "colleague.json", text: col, handle: hc }]);
+          D.getElementById("rr-whose-theirs").click();
+          ok(R.state.review.fileId === "rf-colleague" && R.state.handle === hc && localStorage.getItem("spt-review:reviewer:v1") === "A Colleague", "carrying on as them opens their file, and the browser takes the name");
+          nav("summary");
+          Array.prototype.filter.call(D.querySelectorAll("#main .rr-linkbtn"), function (b) { return b.textContent === "Change your name"; })[0].click();
+          R.addComment({ severity: "suggestion", anchor: GEN, text: "Added since." });
+          D.getElementById("rr-name-input").value = "Me Myself";
+          D.getElementById("rr-name-ok").click();
+          ok(!!D.getElementById("rr-rename-keep") && /already saved as A Colleague/.test(D.querySelector(".rr-modal").textContent), "changing name after carrying on as them asks about the comments their file held");
+          D.getElementById("rr-rename-keep").click();
+          var by = {}; R.state.review.comments.forEach(function (c) { by[c.text] = c.reviewer; });
+          ok(by["Colleague says."] === "A Colleague" && by["Someone else."] === "Other Person" && by["Added since."] === "Me Myself" && R.state.review.reviewer === "Me Myself",
+            "and by default leaves their comments under their name, renaming only what was added since", JSON.stringify(by));
+        });
+      });
+    }],
+    ["a colleague's file in a browser with no name yet", function () {
+      return fresh("", null).then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        var alice = JSON.stringify(rfile({ fileId: "rf-alice", reviewer: "Alice Smith", comments: [cmt("c-a1", "Alice's must-fix.", "2026-11-01T09:00:00.000Z", "Alice Smith")] }));
+        R.loadTexts([{ name: "alice.json", text: alice }]);
+        ok(!!D.getElementById("rr-whose-theirs") && /does not know your name/.test(D.querySelector(".rr-modal").textContent) && !localStorage.getItem("spt-review:reviewer:v1"),
+          "it asks whether you are them, rather than taking their name in silence");
+        D.getElementById("rr-whose-mine").click();
+        ok(!!D.getElementById("rr-name-input"), "someone else is asked for their own name");
+        D.getElementById("rr-name-input").value = "Bob Jones";
+        D.getElementById("rr-name-ok").click();
+        ok(R.state.colleague && R.state.colleague.reviewer === "Alice Smith" && R.state.review.fileId !== "rf-alice" && localStorage.getItem("spt-review:reviewer:v1") === "Bob Jones",
+          "and sees their comments read only, in a review of their own");
+        R.addComment({ severity: "suggestion", anchor: GEN, text: "Bob's." });
+        ok(R.state.review.comments[0].reviewer === "Bob Jones", "what they add is under their own name");
+        // Said yes by mistake, then corrected the name.
+        settle(); localStorage.removeItem("spt-review:reviewer:v1");
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        R.loadTexts([{ name: "alice.json", text: alice }]);
+        D.getElementById("rr-whose-theirs").click();
+        ok(R.state.review.fileId === "rf-alice" && localStorage.getItem("spt-review:reviewer:v1") === "Alice Smith", "Yes carries on as them");
+        nav("summary");
+        D.getElementById("rr-rename").click();
+        D.getElementById("rr-name-input").value = "Bob Jones";
+        D.getElementById("rr-name-ok").click();
+        D.getElementById("rr-rename-keep").click();
+        ok(R.state.review.comments.filter(function (c) { return c.id === "c-a1"; })[0].reviewer === "Alice Smith", "and a change of name after it leaves Alice's comment as hers");
+      });
+    }],
+    ["your own file under another spelling", function () {
+      return fresh().then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        R.loadTexts([{ name: "mine.json", text: JSON.stringify(rfile({ reviewer: "M. Myself", comments: [cmt("c-m1", "Mine, earlier.", "2026-11-01T09:00:00.000Z", "M. Myself")] })) }]);
+        D.getElementById("rr-whose-theirs").click();
+        nav("summary");
+        D.getElementById("rr-rename").click();
+        D.getElementById("rr-name-input").value = "Me Myself";
+        D.getElementById("rr-name-ok").click();
+        D.getElementById("rr-rename-also").click();
+        ok(R.state.review.comments[0].reviewer === "Me Myself" && R.isDirty(), "They are mine puts the new name on what the file held too");
+      });
+    }],
+    ["carrying on as them, with unsaved comments (finding 5)", function () {
+      return fresh().then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        R.addComment({ severity: "should-fix", anchor: GEN, text: "Mine, unsaved." });
+        var col = JSON.stringify(rfile({ fileId: "rf-colleague", reviewer: "A Colleague", comments: [cmt("c-col", "Colleague says.", "2026-11-01T09:00:00.000Z", "A Colleague")] }));
+        R.loadTexts([{ name: "colleague.json", text: col }]);
+        D.getElementById("rr-whose-theirs").click();
+        ok(!!D.getElementById("rr-merge-yes") && confirms === 0, "the question about the unsaved comments is asked in the page too", "native asks " + confirms);
+        D.getElementById("rr-merge-yes").click();
+        var who = R.state.review.comments.map(function (c) { return c.reviewer; });
+        ok(R.state.review.fileId === "rf-colleague" && who.length === 2 && who.every(function (n) { return n === "A Colleague"; }), "and the comments carried in take the file's name, so one file never holds two names", who.join());
+      });
+    }],
+    ["someone else's unsaved work in this browser (H2)", function () {
+      function seedTheirs() {
+        var r = rfile({ fileId: "rf-alice2", reviewer: "Alice Smith", comments: [cmt("c-al", "Alice, unsaved.", "2026-11-02T09:00:00.000Z", "Alice Smith")] });
+        localStorage.setItem("spt-review:autosave:v1:" + PID, JSON.stringify({ savedOn: "2026-11-02T10:00:00.000Z", review: r }));
+      }
+      return fresh("", "Bob Jones").then(function () {
+        seedTheirs();
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        ok(/Unsaved work by Alice Smith/.test(D.getElementById("rr-restore").textContent), "it is offered under their name", D.getElementById("rr-restore").textContent);
+        D.getElementById("rr-restore-yes").click();
+        ok(!!D.getElementById("rr-whose-mine") && /Alice Smith's unsaved work/.test(D.querySelector(".rr-modal").textContent), "Restore asks whose it is");
+        D.getElementById("rr-whose-mine").click();
+        R.addComment({ severity: "suggestion", anchor: GEN, text: "Bob's." });
+        ok(R.state.colleague && R.state.colleague.reviewer === "Alice Smith" && R.state.review.reviewer === "Bob Jones" && R.state.review.fileId !== "rf-alice2" && R.state.review.comments[0].reviewer === "Bob Jones",
+          "Mine shows it read only and keeps your own identity", R.state.review.reviewer + " " + R.state.review.fileId);
+        settle();
+        seedTheirs();
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        D.getElementById("rr-restore-yes").click();
+        D.getElementById("rr-whose-theirs").click();
+        ok(R.state.review.fileId === "rf-alice2" && R.state.review.reviewer === "Alice Smith" && localStorage.getItem("spt-review:reviewer:v1") === "Alice Smith" && texts().indexOf("Alice, unsaved.") !== -1,
+          "Theirs restores it as their review, and the browser takes their name");
+      });
+    }],
+    ["a review file that cannot be drawn (H3)", function () {
+      return fresh().then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        var p0 = R.state.pack;
+        R.addComment({ severity: "should-fix", anchor: GEN, text: "One." });
+        R.writeAutosave();
+        R.addComment({ severity: "should-fix", anchor: GEN, text: "Two." });
+        var badSug = rfile(); badSug.comments[0].suggestion = { text: 3 };
+        R.loadTexts([{ name: "bad.json", text: JSON.stringify(badSug) }]);
+        ok(/damaged/.test(toastText()) && R.state.pack === p0 && texts().join() === "One.,Two.", "a comment whose suggestion is not text is refused as damaged, nothing lost", toastText());
+        var nullList = rfile({ checklist: [null, { id: "q1", answer: "yes", note: "" }] });
+        R.loadTexts([{ name: "nulls.json", text: JSON.stringify(nullList) }]);
+        D.getElementById("rr-merge-yes").click();
+        nav("checklist"); nav("summary");
+        ok(R.state.pack === p0 && texts().indexOf("Saved earlier.") !== -1 && texts().indexOf("Two.") !== -1, "an empty checklist entry is dropped and the file opens");
+        // Anything else that fails to draw: the file is taken off, the work kept.
+        settle(); clean(); localStorage.setItem("spt-review:reviewer:v1", "Me Myself");
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        R.addComment({ severity: "should-fix", anchor: GEN, text: "One." });
+        R.writeAutosave();
+        R.addComment({ severity: "should-fix", anchor: GEN, text: "Two." });
+        nav("summary");   // where the file's comment is drawn
+        var orig = W.Element.prototype.appendChild;
+        W.Element.prototype.appendChild = function (n) {
+          if (n && n.getAttribute && n.getAttribute("data-comment-id") === "c-saved") throw new Error("cannot draw");
+          return orig.call(this, n);
+        };
+        try {
+          R.loadTexts([{ name: "mine.json", text: FILE }]);
+          D.getElementById("rr-merge-yes").click();
+        } finally { W.Element.prototype.appendChild = orig; }
+        ok(!!R.state.pack && texts().join() === "One.,Two." && R.isDirty() && /not opened. Your work is as it was/.test(toastText()), "the pack stays open with the work as it was, and says so", toastText());
+        ok(storedTexts().join() === "One.,Two.", "and the crash copy holds both comments", storedTexts().join());
+      });
+    }],
+    ["another pack opened while the question is up (H5)", function () {
+      return fresh("", "Bob Jones").then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        var alice = JSON.stringify(rfile({ fileId: "rf-alice5", reviewer: "Alice Smith" }));
+        R.loadTexts([{ name: "alice.json", text: alice }]);
+        ok(!!D.getElementById("rr-whose-theirs"), "the question is up");
+        var other = JSON.parse(PACK); other.packId = PID + "-q";
+        R.loadTexts([{ name: "other.json", text: JSON.stringify(other) }]);
+        ok(!D.querySelector(".rr-modal") && R.state.pack.packId === PID + "-q" && R.state.review.packId === PID + "-q" && R.state.review.reviewer === "Bob Jones",
+          "opening another pack closes it, and nothing of that file reaches the new pack", R.state.review.packId + " " + R.state.review.reviewer);
+      });
+    }],
+    ["the name prompt (finding 16)", function () {
+      return fresh("", null).then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        var blk = function () { return D.querySelector('[data-block-id="' + para.id + '"]'); };
+        blk().click();
+        ok(!!D.getElementById("rr-name-cancel"), "it has a Cancel");
+        D.getElementById("rr-name-cancel").click();
+        ok(!D.querySelector(".rr-modal-back") && !R.state.composer && R.state.review.comments.length === 0, "which closes it, with no comment box open");
+        blk().click();
+        D.dispatchEvent(new W.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        ok(!D.querySelector(".rr-modal-back") && !R.state.composer, "Escape closes it too");
+        blk().click();
+        D.querySelector(".rr-modal-back").click();
+        ok(!D.querySelector(".rr-modal-back") && !R.state.composer, "and so does a click outside it");
+        W.showSaveFilePicker = undefined;
+        var before = downloads.length, got = null;
+        R.saveReview(null, function (r) { got = r; });
+        D.getElementById("rr-name-cancel").click();
+        return wait(50).then(function () {
+          ok(got && got.ok === false && got.cancelled === true && downloads.length === before, "cancelling the name on Save reports a save that did not happen", JSON.stringify(got));
+        });
+      });
+    }],
+    ["a review file before its pack (finding 55)", function () {
+      return fresh().then(function () {
+        localStorage.setItem("spt-review:seen:v1:" + PID, JSON.stringify({ packName: "safe-pack.json", packRound: pack.round }));
+        var n = R.loadTexts([{ name: "mine.json", text: FILE }]);
+        ok(n === 1 && !!R.state.pendingReview && !R.state.pack, "it is kept");
+        ok(!!D.getElementById("rr-pending") && /safe-pack\.json/.test(D.getElementById("rr-pending").textContent) && /safe-pack\.json/.test(toastText()), "and names the pack it needs", toastText());
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        ok(R.state.review.fileId === "rf-mine" && texts().join() === "Saved earlier." && !R.state.pendingReview && !D.getElementById("rr-pending"), "opening the pack then opens the review file with it");
+        ok(JSON.parse(localStorage.getItem("spt-review:seen:v1:" + PID)).reviewName === "mine.json", "and the browser notes the file's name for this pack");
+      });
+    }],
+    ["the pack alone, when a review file exists (finding 55)", function () {
+      return fresh().then(function () {
+        localStorage.setItem("spt-review:seen:v1:" + PID, JSON.stringify({ reviewName: "theirs.json", savedAt: "2026-11-01T10:00:00.000Z", reviewer: "Someone Else" }));
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        ok(!D.getElementById("rr-saved-hint"), "not at a file someone else saved in this browser");
+        localStorage.setItem("spt-review:seen:v1:" + PID, JSON.stringify({ reviewName: "mine.json", savedAt: "2026-11-01T10:00:00.000Z", reviewer: "Me Myself" }));
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        var hint = D.getElementById("rr-saved-hint");
+        ok(!!hint && /mine\.json/.test(hint.textContent), "points at the review file this browser has for it");
+        D.getElementById("rr-saved-no").click();
+        ok(!D.getElementById("rr-saved-hint"), "which can be put aside");
+        W.showSaveFilePicker = undefined;
+        return new Promise(function (res) { R.saveReview(null, res); }).then(function (r) {
+          ok(JSON.parse(localStorage.getItem("spt-review:seen:v1:" + PID)).reviewName === r.name, "a save notes the new file's name", localStorage.getItem("spt-review:seen:v1:" + PID));
+        });
+      });
+    }],
+    ["files dropped by mistake (finding 71)", function () {
+      return fresh().then(function () {
+        R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
+        var p0 = R.state.pack;
+        R.loadTexts([{ name: "report.docx", text: "PK\u0003\u0004word/document.xml" }]);
+        ok(/Word or Excel file/.test(toastText()) && R.state.pack === p0, "a Word file says so", toastText());
+        R.loadTexts([{ name: "notes.txt", text: "hello" }]);
+        ok(/could not be read/.test(toastText()) && !/as JSON/.test(toastText()), "anything that is not JSON says it could not be read", toastText());
+        var noEng = JSON.parse(PACK); delete noEng.engagement; noEng.packId = "rp-bad-1";
+        R.loadTexts([{ name: "bad.json", text: JSON.stringify(noEng) }]);
+        ok(/no engagement details/.test(toastText()) && R.state.pack === p0, "a pack with no engagement is refused", toastText());
+        var noBlocks = JSON.parse(PACK); delete noBlocks.documents[0].blocks; noBlocks.packId = "rp-bad-2";
+        R.loadTexts([{ name: "bad.json", text: JSON.stringify(noBlocks) }]);
+        ok(/no report text/.test(toastText()) && R.state.pack === p0, "so is one whose document has no text", toastText());
+        R.loadTexts([{ name: "junk.json", text: JSON.stringify(rfile({ comments: ["a", 5, null] })) }]);
+        ok(/damaged/.test(toastText()) && R.state.review.fileId !== "rf-mine", "and a review file whose comments cannot be read", toastText());
+        var broken = JSON.parse(PACK); broken.packId = "rp-bad-3"; broken.documents[0].blocks = [null];
+        R.loadTexts([{ name: "broken.json", text: JSON.stringify(broken) }]);
+        ok(!R.state.pack && /could not be shown/.test(toastText()) && /Open a review pack/.test(D.getElementById("main").textContent), "a pack that cannot be drawn is closed again, never a blank page", toastText());
+      });
+    }],
+    ["the tour's window (findings 58, 59, 70)", function () {
+      return fresh("?tour=1").then(function () {
+        return poll(function () { return R.state.pack && R.state.demo; });
+      }).then(function () {
+        var dirtySent = [];
+        W.App.HostBridge.setDirty = function (v) { dirtySent.push(v); };
+        R.addComment({ severity: "suggestion", anchor: GEN, text: "In the demo." });
+        var ev = new W.Event("beforeunload", { cancelable: true });
+        W.dispatchEvent(ev);
+        ok(!ev.defaultPrevented && dirtySent.indexOf(true) === -1, "demo work is not reported as unsaved, nor warned about on close", dirtySent.join());
+        W.showSaveFilePicker = undefined;
+        return new Promise(function (res) { R.saveReview(null, res); }).then(function () {
+          ok(/demo review, so there is no author/.test(toastText()), "saving the demo says there is no author to send it to", toastText());
+          R.loadTexts([{ name: "real.json", text: PACK }]);
+          ok(!R.state.demo && !D.getElementById("rr-demo-note"), "a real pack opened there is not called a demo");
+          ok(/tour's window/.test(toastText()) && /the Report Review Tool is the place for real work/.test(toastText()), "and the message says where real work belongs, naming the tool as everywhere else", toastText());
+          R.addComment({ severity: "suggestion", anchor: GEN, text: "Real in the tour." });
+          R.writeAutosave();
+          ok(storedTexts().indexOf("Real in the tour.") !== -1 && dirtySent[dirtySent.length - 1] === true, "it gets the crash net, and its unsaved work is reported");
+          var ev2 = new W.Event("beforeunload", { cancelable: true });
+          W.dispatchEvent(ev2);
+          ok(ev2.defaultPrevented, "and closing warns");
+        });
+      });
+    }]
+  ];
+
+  var chain = Promise.resolve();
+  sections.forEach(function (s) {
+    chain = chain.then(function () {
+      lines.push("-- " + s[0]);
+      return s[1]();
+    }).catch(function (e) { ok(false, s[0] + " threw: " + (e && e.message)); });
+  });
+  chain.then(function () {
+    ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+    settle();
+    clean();
+    finish();
+  });
+})();
+</script>
+</body></html>

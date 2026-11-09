@@ -177,6 +177,7 @@ H.test(function (ok, done) {
     nsLines = list.map(function (b) { return b.text; });
     ok(list.length >= 2 && E.getReportNarrative().nextSteps == null, "the next steps are still the scaffold (" + list.length + " lines)");
     var t = thread(blockAnchor(list[0]), "Agree the first action with the site manager by the end of the month.");
+    window.__tns = t;
     var plan = RV.acceptPlan(t);
     ok(plan.can && plan.kind === "narrative", "a next step can be accepted", JSON.stringify(plan));
     return acceptIt(t).then(function (res) { ok(res.ok, "accepted", res.message); });
@@ -288,10 +289,18 @@ H.test(function (ok, done) {
     var t = thread(blockAnchor(b), null);
     RV.goTo(t);
     ok(main.querySelector('[data-section="' + key + '"]') && main.querySelector('[data-section="' + key + '"]').classList.contains("check-flash"), "Go to from a report comment opens the report page at that section's card");
-    // A section only the Word report has.
+    // A section only the Word report has, edited elsewhere: the document
+    // control page is the engagement details.
     var dc = d[0].blocks.filter(function (x) { return x.sectionKey === "document-control-and-confidentiality" && x.type === "heading"; })[0];
-    RV.goTo(thread(blockAnchor(dc), null));
-    ok(/only in the Word report/.test(document.getElementById("toast").textContent), "and says so for a part only the Word report has", document.getElementById("toast").textContent);
+    ok(RV.goTo(thread(blockAnchor(dc), null)) === "engagement", "Go to on the document control page opens the engagement details");
+    var em = document.querySelector(".modal");
+    ok(!!em && /QA review by/.test(em.textContent), "where its fields are filled in");
+    var emClose = em && Array.prototype.filter.call(em.querySelectorAll("button"), function (x) { return /Close|Cancel/.test(x.textContent); })[0];
+    if (emClose) emClose.click();
+    // Text written from the framework, with nowhere to edit it, says so by name.
+    var sm = d[0].blocks.filter(function (x) { return x.sectionKey === "scoring-methodology" && x.type === "heading"; })[0];
+    ok(!!sm && RV.goTo(thread(blockAnchor(sm), null)) === null, "Go to on the scoring methodology goes nowhere");
+    ok(/"Scoring methodology" is only in the Word report/.test(document.getElementById("toast").textContent), "and says so, naming the section", document.getElementById("toast").textContent);
     // An item, on its capture page.
     RV.goTo(thread({ documentIndex: 0, kind: "item", targetName: it.targetName, itemId: it.itemId, field: "evidence", quote: it.evidence }, null));
     return new Promise(function (r) { setTimeout(r, 120); }).then(function () {
@@ -381,6 +390,103 @@ H.test(function (ok, done) {
       ok(t.status === "open" && !t.accepted, "the comment stays open");
       return new Promise(function (r) { RV.currentDocs(function () { r(); }); });
     });
+  });
+
+  // ---- a site renamed after the review: item comments follow it -----------------
+  var rn = {};
+  step(function () {
+    var pack = RV.packItems();
+    var tgt = E.state.engagement.targets[0];
+    ok(pack.items.length && pack.items.every(function (i) { return i.targetId && E.state.engagement.targets.some(function (t) { return t.id === i.targetId; }); }), "each pack item carries its target's id");
+    var it = pack.items.filter(function (i) { return i.evidence && i.targetId === tgt.id && RC.norm(i.evidence).length > 12; })[0];
+    rn = { it: it, tid: tgt.id, oldName: tgt.name };
+    rn.withId = thread({ documentIndex: 0, kind: "item", targetName: tgt.name, targetId: tgt.id, itemId: it.itemId, field: "evidence", quote: it.evidence, code: it.code, itemTitle: it.title }, it.evidence + " Checked after the rename.");
+    rn.noId = thread({ documentIndex: 0, kind: "item", targetName: tgt.name, itemId: it.itemId, field: "evidence", quote: it.evidence, code: it.code, itemTitle: it.title }, it.evidence + " An older comment.");
+    E.renameTarget(tgt.id, "Leeds works");
+    ok(RV.isStale(rn.withId) === false, "after the site is renamed, a comment carrying its id still matches");
+    var p = RV.acceptPlan(rn.withId);
+    ok(p.can && p.kind === "evidence", "and can still be accepted", JSON.stringify(p));
+    ok(RV.goTo(rn.withId) === "item:" + it.itemId, "and Go to still reaches the item");
+    var p2 = RV.acceptPlan(rn.noId);
+    ok(!p2.can && /can no longer be found/.test(p2.why) && !/does not name one field/.test(p2.why), "an older comment with only the old name says the site cannot be found, not that it names no field", p2.why);
+    return acceptIt(rn.withId);
+  });
+  step(function (res) {
+    ok(res.ok && /Checked after the rename\./.test(E.findResponse(rn.tid, rn.it.itemId).evidence), "accepted on the renamed site", res.message);
+    ok(rn.withId.accepted.revert.what === "item" && rn.withId.accepted.revert.prev === rn.it.evidence, "recording the evidence it replaced");
+    return new Promise(function (r) { RV.undoAccept(rn.withId, r); });
+  });
+  step(function (res) {
+    ok(res.ok && E.findResponse(rn.tid, rn.it.itemId).evidence === rn.it.evidence && rn.withId.status === "open", "Undo puts the evidence back and opens the comment", res.message);
+    E.renameTarget(rn.tid, rn.oldName);
+    ok(RV.isStale(rn.noId) === false && RV.acceptPlan(rn.noId).can, "an older comment still resolves by name while the name matches");
+    var s = RV.store(); s.threads = s.threads.filter(function (t) { return t !== rn.withId && t !== rn.noId; });
+    // The scaffolded next steps accepted earlier: Undo scaffolds them again.
+    ok(window.__tns.accepted && window.__tns.accepted.revert.what === "narrative" && window.__tns.accepted.revert.prev === null, "the next steps comment recorded that they were scaffolded");
+    return new Promise(function (r) { RV.undoAccept(window.__tns, r); });
+  });
+  step(function (res) {
+    ok(res.ok && E.getReportNarrative().nextSteps == null, "Undo scaffolds the next steps again", res.message);
+    return docs();
+  });
+
+  // ---- Word-only sections: recorded, listed, and undone -------------------------
+  var wo = {};
+  step(function (d) {
+    var s = d[0].probe.filter(function (p) { return p.key === "where-to-focus-first" && p.texts.length; })[0];
+    ok(!!s, "CAF's Word report opens 'Where to focus first' with prose");
+    wo.lead = s.texts[0];
+    var b = d[0].blocks.filter(function (x) { return x.sectionKey === s.key && RC.norm(x.text) === RC.norm(wo.lead); })[0];
+    wo.t1 = thread(blockAnchor(b), "Start with the outcomes that carry the most risk to the plant.");
+    return acceptIt(wo.t1);
+  });
+  step(function (res) {
+    ok(res.ok, "accepted into a section only the Word report has", res.message);
+    var acc = wo.t1.accepted;
+    ok(acc && acc.revert && acc.revert.what === "section" && acc.revert.key === "where-to-focus-first" && acc.revert.field === "prose" && acc.revert.prev === null && /Start with the outcomes/.test(acc.applied), "the comment records what it replaced", JSON.stringify(acc));
+    ok(JSON.parse(JSON.stringify(acc)).revert.key === "where-to-focus-first", "in a form that survives the project file");
+    return docs();
+  });
+  step(function (d) {
+    var head = d[0].blocks.filter(function (b) { return b.type === "heading" && !b.sub && b.sectionKey === "document-control-and-confidentiality"; })[0];
+    ok(!!head, "the document control page has a heading");
+    wo.t2 = thread(blockAnchor(head), "Renamed by reviewer");
+    return acceptIt(wo.t2);
+  });
+  step(function (res) {
+    ok(res.ok && E.getReportSection("document-control-and-confidentiality").title === "Renamed by reviewer", "and a rename of the document control heading", res.message);
+    A.UI.go("report");
+    var main = document.getElementById("main");
+    var card = main.querySelector('[data-check-anchor="word-only"]');
+    ok(!!card && !card.hasAttribute("data-section"), "the report page lists changes to sections only in the Word report");
+    ok(!!card && !!card.querySelector('[data-word-only="where-to-focus-first"]') && !!card.querySelector('[data-word-only="document-control-and-confidentiality"]'), "naming both", card && card.textContent);
+    ok(!!card && /Renamed by reviewer/.test(card.textContent) && /opening rewritten/.test(card.textContent) && /Where to focus first/.test(card.textContent), "with the Word heading and what changed", card && card.textContent);
+    ok(!!card && main.querySelector('[data-check-anchor="review"]').nextSibling === card, "under the Review card");
+    ok(!card || !/[–—]/.test(card.textContent), "with no em or en dashes");
+    var sel = main.querySelector(".review-card .rv-filters select");
+    sel.value = ""; sel.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(!!main.querySelector('[data-comment-id="' + wo.t2.comment.id + '"] .rv-undo'), "an accepted comment offers Undo the accepted wording");
+    return new Promise(function (r) { RV.undoAccept(wo.t2, r); });
+  });
+  step(function (res) {
+    ok(res.ok && !E.getReportSection("document-control-and-confidentiality").title, "Undo puts the generated heading back", res.message);
+    ok(wo.t2.status === "open" && !wo.t2.accepted, "and opens the comment again");
+    // Edited since: Undo refuses, and keeps the edit.
+    E.setReportSection("where-to-focus-first", { prose: "The consultant rewrote it again by hand." });
+    return new Promise(function (r) { RV.undoAccept(wo.t1, r); });
+  });
+  step(function (res) {
+    ok(!res.ok && /edited since/.test(res.message) && E.getReportSection("where-to-focus-first").prose === "The consultant rewrote it again by hand.", "Undo refuses when the text was edited since, and keeps the edit", res.message);
+    A.UI.go("report");
+    var main = document.getElementById("main");
+    ok(!main.querySelector('[data-word-only="document-control-and-confidentiality"]'), "an undone change leaves the list");
+    main.querySelector('[data-word-only="where-to-focus-first"] .wo-back').click();
+    ok(!E.getReportSection("where-to-focus-first").prose, "Back to the generated version clears the other");
+    ok(!document.getElementById("main").querySelector('[data-check-anchor="word-only"]'), "and with nothing left the list goes");
+    return wordParas();
+  });
+  step(function (ps) {
+    ok(ps.indexOf(RC.norm(wo.lead)) !== -1 && !ps.some(function (p) { return /rewrote it again by hand/.test(p); }), "the generated opening is back in the Word document");
   });
   chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
 });

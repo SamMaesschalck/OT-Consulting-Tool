@@ -233,7 +233,8 @@
         },
         // Engagement details for the report deliverables (Word/Excel document
         // control). Optional; blanks render as "(not set)" in the exports.
-        engagement: { client: "", consultant: "", assessmentDate: "", revision: "", confidentiality: "" },
+        // qaReviewBy: who did the internal QA review (an approval offers to fill it).
+        engagement: { client: "", consultant: "", assessmentDate: "", revision: "", confidentiality: "", qaReviewBy: "" },
         // Evidence basis for the engagement: who we spoke to, what we read, what we saw.
         basisOfAssessment: { interviews: [], documents: [], observations: [] },
         // Asset-owner sign-off of the tolerable risk and the assessment outcome (§4.3.6 / §4).
@@ -363,8 +364,9 @@
     function updateSaveButton() {
       // The suite, when it hosts the tool, marks tools with unsaved changes
       // in its bar and warns before it closes (js/host-bridge.js; absent or
-      // standalone, nothing happens).
-      if (window.App.HostBridge) window.App.HostBridge.setDirty(dirty);
+      // standalone, nothing happens). A tour is a demo whose changes are never
+      // kept, so it never reports any.
+      if (window.App.HostBridge) window.App.HostBridge.setDirty(dirty && !TOUR_MODE);
       var b = document.getElementById("btn-save");
       if (!b) return;
       if (dirty) { b.textContent = "Save*"; b.classList.add("btn-unsaved"); b.title = "Unsaved changes: Save overwrites the project's file in place (Shift+click: Save as…)"; }
@@ -454,7 +456,7 @@
     // js/host-bridge.js). Standalone, nothing happens.
     function noteRecentFile(action, name, handle) {
       var HB = window.App.HostBridge;
-      if (!HB || !HB.hosted || !name) return;
+      if (!HB || !HB.hosted || !name || TOUR_MODE) return;   // a tour saves nothing worth reopening
       var p = state.project || {};
       HB.recent({ action: action, name: name, handle: handle || null,
                   label: ((p.engagement && p.engagement.client) || (p.suc && p.suc.name) || "") });
@@ -608,8 +610,8 @@
       ["knownThreats", "mandatorySecurityFunctions", "regulatory", "highLevelAssets"].forEach(function (k) { if (!Array.isArray(data.srs[k])) data.srs[k] = []; });
       if (!data.basisOfAssessment || typeof data.basisOfAssessment !== "object") data.basisOfAssessment = { interviews: [], documents: [], observations: [] };
       ["interviews", "documents", "observations"].forEach(function (k) { if (!Array.isArray(data.basisOfAssessment[k])) data.basisOfAssessment[k] = []; });
-      if (!data.engagement || typeof data.engagement !== "object") data.engagement = { client: "", consultant: "", assessmentDate: "", revision: "", confidentiality: "" };
-      ["client", "consultant", "assessmentDate", "revision", "confidentiality"].forEach(function (k) { if (typeof data.engagement[k] !== "string") data.engagement[k] = ""; });
+      if (!data.engagement || typeof data.engagement !== "object") data.engagement = { client: "", consultant: "", assessmentDate: "", revision: "", confidentiality: "", qaReviewBy: "" };
+      ["client", "consultant", "assessmentDate", "revision", "confidentiality", "qaReviewBy"].forEach(function (k) { if (typeof data.engagement[k] !== "string") data.engagement[k] = ""; });
       if (!data.approval || typeof data.approval !== "object") data.approval = { name: "", role: "", date: "", statement: "", approved: false };
       ["name", "role", "date", "statement"].forEach(function (k) { if (typeof data.approval[k] !== "string") data.approval[k] = ""; });
       data.approval.approved = !!data.approval.approved;
@@ -920,11 +922,13 @@
       return textField(label, arr.join("\n"), function (v) { onChange(lines(v)); }, { textarea: true, placeholder: placeholder, hint: "One per line." });
     }
 
-    function card(title, sub, bodyKids, headExtra) {
+    // attrs: optional extra attributes, such as data-owner-id, which a review
+    // comment's Go to scrolls to.
+    function card(title, sub, bodyKids, headExtra, attrs) {
       var head = [h("h2", { text: title })];
       if (sub) head.push(h("span", { class: "sub", text: sub }));
       if (headExtra) head.push(headExtra);
-      return h("div", { class: "card" }, [h("div", { class: "card-h" }, head), h("div", { class: "card-b" }, bodyKids)]);
+      return h("div", Object.assign({ class: "card" }, attrs || {}), [h("div", { class: "card-h" }, head), h("div", { class: "card-b" }, bodyKids)]);
     }
 
     function frChips(selected, onToggle) {
@@ -1069,7 +1073,10 @@
           textField("Assessment date", eng.assessmentDate, function (v) { eng.assessmentDate = v; touched(); }, { placeholder: "e.g. 2026-07-04" }),
           textField("Document revision", eng.revision, function (v) { eng.revision = v; touched(); }, { placeholder: "e.g. 1.0" })
         ]),
-        textField("Confidentiality", eng.confidentiality, function (v) { eng.confidentiality = v; touched(); }, { placeholder: "e.g. Confidential - Client Restricted" })
+        h("div", { class: "grid-2" }, [
+          textField("Confidentiality", eng.confidentiality, function (v) { eng.confidentiality = v; touched(); }, { placeholder: "e.g. Confidential - Client Restricted" }),
+          textField("QA review by", eng.qaReviewBy, function (v) { eng.qaReviewBy = v; touched(); }, { placeholder: "who reviewed the report before issue" })
+        ])
       ]));
 
       // Preparation guidance (advisory; never pre-populates the registers below).
@@ -1363,7 +1370,7 @@
       var box = h("div", null, []);
       owner.threats.forEach(function (t, ti) {
         var band = threatRisk(t), exceeds = exceedsTolerable(band, tolerable);
-        box.appendChild(h("div", { class: "threat-card" }, [
+        box.appendChild(h("div", { class: "threat-card", "data-threat-id": t.id }, [
           h("div", { class: "threat-head" }, [
             h("span", { class: "tid", text: t.id }),
             h("span", null, [riskPill(band), exceeds ? h("span", { class: "pill flag", style: "margin-left:6px", text: "exceeds tolerable" }) : null]),
@@ -1461,7 +1468,7 @@
           h("div", { class: "hint no-print", style: "margin-bottom:6px", text: "Mark controls already in place as “existing” to take credit for them; leave planned remediations unmarked. Both travel with the export." }),
           cmEditor(owner, project)
         ])
-      ], head.length ? h("span", null, head) : null);
+      ], head.length ? h("span", null, head) : null, { "data-owner-id": owner.id });
     }
 
     function renderRisk(main) {
@@ -1535,7 +1542,7 @@
         ? h("span", { class: "pill neutral", text: "SL-T unset" })
         : (needsJust ? h("span", { class: "pill flag", text: "SL-T≤" + tgt + " · needs justification" })
                      : h("span", { class: "pill exceeds", text: "SL-T≤" + tgt }));
-      return card(label, null, body, headPill);
+      return card(label, null, body, headPill, { "data-owner-id": owner.id });
     }
 
     function renderSlt(main) {
@@ -1742,6 +1749,9 @@
         h("button", { class: "btn", text: "Print high-level report", onClick: function () { window.print(); } }),
         h("button", { class: "btn", text: "Edit the ranking", onClick: function () { state.stage = "srs"; render(); } })
       ]));
+      // The peer review's warnings, once a review has started (js/review.js).
+      var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
+      if (rvCard) main.appendChild(rvCard);
 
       // SuC + high-level context
       var sk = [];
@@ -1776,6 +1786,8 @@
 
       var probs = exportProblems();
       if (probs.length) main.appendChild(card("Completeness", probs.length + " item" + (probs.length === 1 ? "" : "s") + " outstanding", [h("ul", { class: "muted" }, probs.slice(0, 30).map(function (t) { return h("li", { text: t }); }))]));
+      var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
+      if (rvCard) main.appendChild(rvCard);
 
       // SuC + SRS
       var sk = [];
@@ -1862,23 +1874,44 @@
       toast("Report libraries not loaded: open the app from its folder so vendor/ and js/ are alongside index.html.", "err");
       return false;
     }
-    function reportGuard() {
-      var probs = exportProblems();
-      if (!probs.length) return true;
-      return confirm("The assessment is incomplete:\n\n- " + probs.slice(0, 20).join("\n- ") + (probs.length > 20 ? "\n…and " + (probs.length - 20) + " more" : "") + "\n\nGenerate the report anyway?");
+    // One question before a download, never a block. The completeness list is
+    // about zones and threats, so the high-level report (the zone-free §4.2
+    // deliverable) skips it; the peer review's warnings (js/review.js) apply to
+    // every download, once a review has started.
+    function reportGuard(opts) {
+      opts = opts || {};
+      var probs = opts.highLevelOnly ? [] : exportProblems();
+      var rw = window.RiskReview ? window.RiskReview.exportWarningTexts() : [];
+      if (!probs.length && !rw.length) return true;
+      var parts = [];
+      if (probs.length) parts.push("The assessment is incomplete:\n\n- " + probs.slice(0, 20).join("\n- ") + (probs.length > 20 ? "\n…and " + (probs.length - 20) + " more" : ""));
+      if (rw.length) parts.push("Peer review:\n\n- " + rw.join("\n- "));
+      return confirm(parts.join("\n\n") + "\n\nGenerate the report anyway?");
+    }
+    // Whether the report has changed since a review approved it needs the
+    // reports as they are now: built first when they are not to hand.
+    function reviewChecked(go) {
+      var RR = window.RiskReview;
+      if (RR && RR.needsDocs && RR.needsDocs()) { toast("Checking the report against its review…"); RR.refreshDocs(go); }
+      else go();
     }
     function downloadWordReport(opts) {
+      opts = opts || {};
       if (!reportsAvailable()) return;
-      if (!opts.highLevelOnly && !reportGuard()) return;
-      window.RiskExports.downloadWord(opts, function (err) {
-        toast(err ? ("Word report failed: " + (err && err.message)) : "Word report downloaded.", err ? "err" : undefined);
+      reviewChecked(function () {
+        if (!reportGuard(opts)) return;
+        window.RiskExports.downloadWord(opts, function (err) {
+          toast(err ? ("Word report failed: " + (err && err.message)) : "Word report downloaded.", err ? "err" : undefined);
+        });
       });
     }
     function downloadExcelReport() {
       if (!reportsAvailable()) return;
-      if (!reportGuard()) return;
-      window.RiskExports.downloadExcel(function (err) {
-        toast(err ? ("Excel workbook failed: " + (err && err.message)) : "Excel workbook downloaded.", err ? "err" : undefined);
+      reviewChecked(function () {
+        if (!reportGuard({})) return;
+        window.RiskExports.downloadExcel(function (err) {
+          toast(err ? ("Excel workbook failed: " + (err && err.message)) : "Excel workbook downloaded.", err ? "err" : undefined);
+        });
       });
     }
 
@@ -2000,7 +2033,9 @@
 
     // Warn before leaving with unsaved work, and flush the crash-net first so a
     // confirmed leave (or a tab crash) can still be recovered on next open.
+    // A tour is a demo: nothing to keep, so no warning.
     window.addEventListener("beforeunload", function (e) {
+      if (TOUR_MODE) return;
       flushAutosave();
       if (dirty && projectHasContent(state.project)) { e.preventDefault(); e.returnValue = ""; return ""; }
     });
@@ -2067,7 +2102,7 @@
       loadProjectText: loadProjectText, projectHasContent: projectHasContent,
       confirmRemove: confirmRemove, FR_IDS: FR_IDS,
       touched: touched, isDirty: function () { return dirty; }, flushAutosave: flushAutosave,
-      downloadWordReport: downloadWordReport,
+      downloadWordReport: downloadWordReport, downloadExcelReport: downloadExcelReport,
       offerRestore: offerRestore, AUTOSAVE_KEY: AUTOSAVE_KEY,
       saveProject: saveProject, forgetProjectFile: forgetProjectFile,
       supportsFilePickers: supportsFilePickers,

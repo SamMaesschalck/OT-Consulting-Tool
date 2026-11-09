@@ -67,6 +67,25 @@ H.test(function (ok, done) {
     var tbl = cellp.documents[0].blocks.filter(function (b) { return b.type === "table" && !b.front; })[0];
     setText(tbl.rows[0].cells[0].blocks[0], "–");
     ok(of(RK.run(cellp, {}), "dashes").length === of(RK.run(clean, {}), "dashes").length, "and a lone dash in a cell, the house mark for empty");
+    // A lone dash standing for one side of a value, as the risk register prints
+    // an unrated likelihood: the gap is the rating, not the style.
+    var lip = clone(clean), ltb = lip.documents[0].blocks.filter(function (b) { return b.type === "table" && !b.front; })[0];
+    setText(ltb.rows[0].cells[0].blocks[0], "— × Serious");
+    ok(of(RK.run(lip, {}), "dashes").length === of(RK.run(clean, {}), "dashes").length, "and a lone dash for one side of a likelihood by impact cell");
+    setText(ltb.rows[0].cells[0].blocks[0], "Serious — on reflection × 2");
+    ok(of(RK.run(lip, {}), "dashes").length === of(RK.run(clean, {}), "dashes").length + 1, "while a dash in words in such a cell is still found");
+    // Two paragraphs in one cell are two results, with ids of their own: the
+    // first keeps the id it always had, so saved dismissals still match.
+    var two = clone(clean), ttb = two.documents[0].blocks.filter(function (b) { return b.type === "table" && !b.front; })[0];
+    var tc = ttb.rows[0].cells[0];
+    tc.blocks = [clone(tc.blocks[0]), clone(tc.blocks[0])];
+    setText(tc.blocks[0], "One line — with a dash."); setText(tc.blocks[1], "Another line – with a dash.");
+    var tr = of(RK.run(two, {}), "dashes").filter(function (x) { return x.blockId === ttb.id; });
+    ok(tr.length === 2 && tr[0].id !== tr[1].id && tr[0].id === "dashes:" + ttb.id + ":0.0" && tr[1].id === "dashes:" + ttb.id + ":0.0.1",
+      "two dashed paragraphs in one cell give two results with their own ids", JSON.stringify(tr.map(function (x) { return x.id; })));
+    ok(tr.every(function (x) { return x.cell && x.cell.row === 0 && x.cell.col === 0 && !("para" in x.cell); }), "both anchored to the cell as before");
+    var allIds = RK.run(two, {}).map(function (x) { return x.id; });
+    ok(allIds.every(function (id, i) { return allIds.indexOf(id) === i; }), "and no two results share an id");
 
     // ---- internal wording -------------------------------------------------
     var ip = clone(clean);
@@ -97,6 +116,12 @@ H.test(function (ok, done) {
     var fi = np3.items.filter(function (i) { return i.evidence; })[0]; fi.evidence = "Pasted from " + other + "'s report.";
     var nr3 = of(RK.run(np3, {}), "other-names");
     ok(nr3.length === 1 && nr3[0].kind === "item" && nr3[0].itemId === fi.itemId, "and it looks in the engagement too, with the item to jump to");
+    // The report's own client, site or consultant hides a demo name only when it
+    // holds that name: a site called "Harbour" is not Harbour Water Utilities.
+    var np4 = clone(np); np4.engagement.site = other.split(" ")[0];
+    ok(of(RK.run(np4, {}), "other-names").length === 1, "a site named with one word of a demo name does not hide it (" + np4.engagement.site + ")");
+    var np5 = clone(np); np5.engagement.site = other + " Ltd";
+    ok(of(RK.run(np5, {}), "other-names").length === 0, "while a site whose name holds the demo name does");
 
     // ---- client name ----------------------------------------------------------
     ok(of(RK.run(clean, {}), "client-name").length === 0, "client name: a demo is consistent");
@@ -118,6 +143,22 @@ H.test(function (ok, done) {
     ok(er.length === 1 && er[0].itemId === f1.itemId && er[0].kind === "item", "finds one with none, with the item to jump to");
     var ep2 = clone(clean), m1 = ep2.items.filter(function (i) { return i.status === "met"; })[0]; m1.evidence = "";
     ok(of(RK.run(ep2, {}), "no-evidence").length === 0, "something met with no evidence is not a finding with none");
+    // The target travels by id as well as name, so a renamed site still finds it.
+    var ep3 = clone(ep), f3 = ep3.items.filter(function (i) { return i.itemId === f1.itemId && i.targetName === f1.targetName; })[0]; f3.targetId = "t-renamed";
+    var er3 = of(RK.run(ep3, {}), "no-evidence");
+    ok(er3.length === 1 && er3[0].targetId === "t-renamed" && er3[0].targetName === f1.targetName, "the item's anchor carries its target's id");
+    ok(RK.run(clean, {}).every(function (x) { return "targetId" in x; }), "and every result has the field, empty where there is no target");
+    // A pack names its own fields: the check uses that name, and leaves out a
+    // field the pack does not have, or a risk pack, where the field is not evidence.
+    var ep4 = clone(ep); ep4.engagement.fieldLabels = { evidence: "Source document" };
+    var er4 = of(RK.run(ep4, {}), "no-evidence");
+    ok(er4.length === 1 && /no source document is recorded/.test(er4[0].message) && /source document/.test(er4[0].title), "a pack's own name for the field is used", er4[0] && er4[0].message);
+    var ep5 = clone(ep); ep5.engagement.fieldLabels = { evidence: null };
+    ok(of(RK.run(ep5, {}), "no-evidence").length === 0, "a pack with no evidence field gets no such check");
+    var ep6 = clone(ep); ep6.engagement.scoringFamily = "risk-assessment";
+    ok(of(RK.run(ep6, {}), "no-evidence").length === 0, "nor does a risk pack, whose field holds the threat source");
+    var un6 = clone(clean); un6.items[0].status = "unanswered"; un6.items[0].targetId = "t-x";
+    ok(of(RK.run(un6, {}), "unanswered")[0].targetId === "t-x", "unanswered carries the target's id too");
 
     // ---- unanswered ---------------------------------------------------------------
     var u0 = packs["iec-62443-3-3"];
@@ -136,8 +177,10 @@ H.test(function (ok, done) {
     Object.keys(dcp.engagement.documentControl).forEach(function (k) { dcp.engagement.documentControl[k] = "Set"; });
     ok(of(RK.run(dcp, {}), "doc-control").length === 0, "document control: all filled in, nothing flagged");
     dcp.engagement.documentControl.qaReviewBy = "";
+    ok(of(RK.run(dcp, {}), "doc-control").length === 0, "a blank QA review by is not flagged: approval is what fills it in");
+    dcp.engagement.documentControl.authorisedBy = "";
     var dcr = of(RK.run(dcp, {}), "doc-control");
-    ok(dcr.length === 1 && /QA review by/.test(dcr[0].message) && !/authorised/.test(dcr[0].message), "a blank field is named", dcr[0].message);
+    ok(dcr.length === 1 && /authorised by/.test(dcr[0].message) && !/QA review/.test(dcr[0].message), "a blank field is named", dcr[0].message);
 
     // ---- section numbering ---------------------------------------------------------
     var numbered = Object.keys(packs).filter(function (id) {
@@ -150,6 +193,21 @@ H.test(function (ok, done) {
     gp.documents[0].blocks = gp.documents[0].blocks.filter(function (b) { return b !== hs[1]; });
     var gr = of(RK.run(gp, {}), "numbering");
     ok(gr.length === 1 && gr[0].blockId === hs[2].id && /missing/.test(gr[0].message), "takes a section out and it says which is missing", JSON.stringify(gr));
+    // A consultant's renamed, unnumbered heading that starts with a figure is
+    // one run, not a number run and a title: it is not read as a section number.
+    var yp = clone(clean2), yh = yp.documents[0].blocks.filter(function (b) { return b.type === "heading" && b.level === 1 && /^\d+\s/.test(b.text) && (b.runs || []).length > 1; });
+    function plainH(id, t) { return { type: "heading", level: 1, id: id, text: t, runs: [{ t: t, b: false, i: false, red: false }], sectionKey: "x-" + id, sectionTitle: t }; }
+    var at = yp.documents[0].blocks.indexOf(yh[1]);
+    yp.documents[0].blocks.splice(at, 0, plainH("y1", "2028 targets"), plainH("y2", "3 zones in scope"));
+    ok(of(RK.run(yp, {}), "numbering").length === 0, "a heading renamed to start with a year or a count is not a section number", JSON.stringify(of(RK.run(yp, {}), "numbering").map(function (x) { return x.message; })));
+    var bp = clone(clean2), bh = bp.documents[0].blocks.filter(function (b) { return b.type === "heading" && b.level === 1 && /^\d+\s/.test(b.text) && (b.runs || []).length > 1; });
+    ok(bh.length > 2 && yh.length > 2, "the numbered demo has its numbered sections to move about (" + bh.length + ")");
+    ok.note("numbered headings as runs: " + JSON.stringify(bh.map(function (b) { return b.runs.map(function (r) { return r.t; }); })));
+    var moved = clone(bh[bh.length - 1]); moved.id = "moved";
+    bp.documents[0].blocks.splice(bp.documents[0].blocks.indexOf(bh[1]), 0, moved);
+    var br = of(RK.run(bp, {}), "numbering");
+    ok(br.every(function (x) { return !/sections? \d+ to \d+ are missing/.test(x.message) || Number(/sections (\d+) to (\d+)/.exec(x.message)[1]) <= Number(/sections (\d+) to (\d+)/.exec(x.message)[2]); }) &&
+       !br.some(function (x) { return x.blockId === bh[1].id; }), "numbering that goes back is not given impossible arithmetic", JSON.stringify(br.map(function (x) { return x.message; })));
 
     // ---- figures -----------------------------------------------------------------------
     var fp = clone(packs["ncsc-caf"]);
@@ -167,6 +225,8 @@ H.test(function (ok, done) {
     // The standing rule: no deliverable describes the software. Every demo
     // reads clean, so anything flagged here is a new sentence to rewrite.
     ok(flagged["internal-wording"] === 0, "internal wording: none in any of the 20 demos' Word reports", String(flagged["internal-wording"]));
+    // The risk checks read only the risk tool's packs (test-risk-checks.html).
+    ok(flagged["risk-no-disposition"] === 0 && flagged["risk-slt-justification"] === 0, "the risk checks raise nothing on an assessment demo");
     function textOf(id) { return packs[id].documents.map(function (d) { return A.DocxBlocks.flatten(d.blocks).map(function (b) { return b.text; }).join("\n"); }).join("\n"); }
     var av = textOf("ncsc-caf-aviation");
     ok(/expected states not available/.test(av) && /Expected states are not available for this profile, so meeting and below counts are not reported\./.test(av),

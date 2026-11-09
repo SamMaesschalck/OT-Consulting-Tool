@@ -110,6 +110,22 @@ H.test(function (ok, done) {
     ok(d.warnings.some(function (w) { return /^not-reviewed: Not reviewed yet/.test(w); }), "the export dialog shows the same warning", d.warnings.join(" | "));
     return finalBuilds("not reviewed");
   });
+  // QA review by filled in with nothing sent: reviewed outside the tools.
+  step(function () {
+    E.updateMetadata({ qaReviewBy: "A. N. Other" });
+    ok(!warned("not-reviewed"), "with QA review by filled in and nothing sent, there is no not-reviewed warning", JSON.stringify(RV.warningList()));
+    A.UI.go("report");
+    return poll(function () { return main.querySelector(".issue-check .issue-line"); });
+  });
+  step(function () {
+    ok(!issueLine(/Not reviewed yet/), "nor on the Issue check");
+    return exportDialogText();
+  });
+  step(function (d) {
+    ok(!d.warnings.some(function (w) { return /^not-reviewed/.test(w); }), "nor in the export dialog", d.warnings.join(" | "));
+    E.updateMetadata({ qaReviewBy: "" });
+    ok(!!warned("not-reviewed"), "emptied again, the warning is back");
+  });
 
   // ---- sent, then changes requested ------------------------------------------
   step(function () { return RV.buildPack(); });
@@ -117,6 +133,9 @@ H.test(function (ok, done) {
     pack = r.pack;
     RC.recordRound(r.store, r.pack);
     ok(/round 1 was sent, and no review has come back/.test(warned("not-reviewed").text), "once sent, the warning says so", warned("not-reviewed").text);
+    E.updateMetadata({ qaReviewBy: "A. N. Other" });
+    ok(warned("not-reviewed") && /round 1 was sent/.test(warned("not-reviewed").text), "and QA review by does not clear it once a round has been sent");
+    E.updateMetadata({ qaReviewBy: "" });
     RV.importTexts([{ name: "a.json", text: fileFrom(pack, "J. Marsh", "changes-requested", [mustFix("c-1", "J. Marsh"), mustFix("c-2", "J. Marsh")]) }]);
     ok(!warned("not-reviewed"), "a review back clears not-reviewed");
     ok(warned("changes-requested") && warned("changes-requested").text === "Changes requested by J. Marsh (round 1).", "changes requested: warned", JSON.stringify(RV.warningList()));
@@ -259,7 +278,11 @@ H.test(function (ok, done) {
     E.loadProjectFile(old);
     E.activateAssessment(withReview);
     ok(!E.getReview() && E.state.engagement.responses.length > 0, "a file with no review data loads as before");
-    ok(RV.warningList()[0].kind === "not-reviewed", "and simply reads as not reviewed");
+    // It still names a QA reviewer from the steps above, which counts as a
+    // review done outside the tools; without one it reads as not reviewed.
+    ok(!RV.warningList().some(function (w) { return w.kind === "not-reviewed"; }), "with QA review by filled in it is taken as reviewed outside the tools");
+    E.updateMetadata({ qaReviewBy: "" });
+    ok(RV.warningList()[0].kind === "not-reviewed", "and without, simply reads as not reviewed");
     // Reloaded, the review comes back.
     E.loadProjectFile(pf);
     E.activateAssessment(withReview);
@@ -268,6 +291,53 @@ H.test(function (ok, done) {
     return poll(function () { return main.querySelector(".review-card .rv-comment") || main.querySelector(".review-card .rv-filters"); });
   });
   step(function () { ok(true, "and its card shows it"); });
+
+  // ---- export shapes no reviewer saw ---------------------------------------------
+  function cancelModal(m) {
+    var cancel = Array.prototype.filter.call(m.querySelectorAll(".modal-f .btn"), function (b) { return b.textContent === "Cancel"; })[0];
+    cancel.click();
+  }
+  step(function () {
+    // A second site assessment of the same instrument, answered, makes the
+    // organisation-wide roll-up available.
+    var first = E.state.activeAssessmentId;
+    E.newAssessment("ncsc-caf", { dateOfVisit: "2031-05-05" });
+    var cat = A.Compare.catalogFor(E.state.instrument, E.state.scoringFamily);
+    E.setResponse(E.state.activeTargetId, cat[0].id, { notes: "A second site, answered." });
+    E.activateAssessment(first);
+    A.UI.__issue.beginExport("docx");
+    return poll(function () { return document.querySelector(".export-modal"); });
+  });
+  step(function (m) {
+    var choice = function (re) { return Array.prototype.filter.call(m.querySelectorAll(".scope-choice"), function (b) { return re.test(b.textContent); })[0]; };
+    var orgBtn = choice(/organisation-wide/), perBtn = choice(/^One Word document per/);
+    ok(!!orgBtn && !!perBtn, "the export dialog offers the organisation-wide roll-up");
+    ok(!m.querySelector('[data-review-warning="org-not-reviewed"]'), "the per-site shape does not say the roll-up was not reviewed");
+    orgBtn.click();
+    var line = m.querySelector('[data-review-warning="org-not-reviewed"]');
+    ok(!!line && /organisation-wide report has not been reviewed/.test(line.textContent) && !/[–—]/.test(line.textContent), "choosing the roll-up says it has not been reviewed", line && line.textContent);
+    perBtn.click();
+    ok(!m.querySelector('[data-review-warning="org-not-reviewed"]'), "and back on the per-site shape, the line goes");
+    cancelModal(m);
+  });
+  // A whole-engagement report of fewer zones than the review covered.
+  step(function () {
+    E.activateInstrument("iec-62443-3-3");
+    RV.ensureStore();
+    A.UI.__issue.beginExport("docx");
+    return poll(function () { return document.querySelector(".export-modal"); });
+  });
+  step(function (m) {
+    ok(!m.querySelector('[data-review-warning="subset-not-reviewed"]'), "with every zone ticked, nothing is said about a subset");
+    var boxes = m.querySelectorAll('input[type="checkbox"]');
+    ok(boxes.length > 1, "the dialog lists the zones");
+    boxes[0].checked = false; boxes[0].dispatchEvent(new Event("change"));
+    var line = m.querySelector('[data-review-warning="subset-not-reviewed"]');
+    ok(!!line && /The review covered all \d+ /.test(line.textContent), "unticking one says the report is not the one the reviewers read", line && line.textContent);
+    boxes[0].checked = true; boxes[0].dispatchEvent(new Event("change"));
+    ok(!m.querySelector('[data-review-warning="subset-not-reviewed"]'), "and ticking it again takes that back");
+    cancelModal(m);
+  });
   chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
 });
 </script>

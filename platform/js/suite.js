@@ -7,7 +7,8 @@
  * same global names, so they could not share one page, and the frame keeps
  * every tool's behaviour identical inside and outside the suite. A tool that
  * is left stays open and hidden, so switching never loses work. Each tool
- * still saves and loads its own project file.
+ * still saves and loads its own files: a project file in the assessment and
+ * risk tools, a review pack and review file in the Report Review Tool.
  *
  * Where the tools come from:
  *   - the folder (developer) build frames each tool's own page,
@@ -24,13 +25,17 @@
  *
  * The shell and the tools talk only through postMessage (protocol
  * "spt-suite/1", see shared/host-bridge.js): a tool says when it has started,
- * when it has unsaved changes and when it saved or opened a project file; the
- * shell passes on theme changes and asks a tool to reopen a recent file.
- * Nothing in a tool requires the shell.
+ * when it has unsaved changes and when it saved or opened a file; the shell
+ * passes on theme changes and asks a tool to reopen a recent file. A tool can
+ * also hand a file it has just written to another tool (the author's review
+ * pack to the Report Review Tool), and a file dropped anywhere in the suite is
+ * opened in the tool that reads it, never in place of the suite. Nothing in a
+ * tool requires the shell. A tour's frame is a demo: its unsaved changes and
+ * its saves are not counted, and it hands nothing on.
  *
  * Recent files ("spt-suite:recent:v1" in localStorage, newest first, at most
- * 12) hold the file name, the tool, the customer or project label and when,
- * never the contents.
+ * 12) hold the file name, the tool, the customer or project label, what sort
+ * of file it is and when, never the contents.
  */
 (function () {
   "use strict";
@@ -132,7 +137,7 @@
 
   function createFrame(t) {
     var f = { key: t.key, module: t.module, tour: t.tour, el: null, loading: null,
-              loaded: false, ready: false, dirty: false, product: "", version: "", pending: null };
+              loaded: false, ready: false, dirty: false, product: "", version: "", queue: [] };
     frames[t.key] = f;
     var el = document.createElement("iframe");
     el.className = "tool-frame";
@@ -176,6 +181,19 @@
     try { f.el.contentWindow.postMessage({ protocol: PROTOCOL, from: "suite", type: type, data: data || {} }, "*"); } catch (e) {}
   }
 
+  // Opens a tool and sends it a message, held until the tool has started.
+  // A later reopen request replaces one still waiting.
+  function deliver(key, type, data) {
+    var f = openTool(key);
+    if (!f) return null;
+    if (f.ready) send(f, type, data);
+    else {
+      if (type === "open-recent") f.queue = f.queue.filter(function (q) { return q.type !== "open-recent"; });
+      f.queue.push({ type: type, data: data });
+    }
+    return f;
+  }
+
   function show(key) {
     current = key;
     Object.keys(frames).forEach(function (k) {
@@ -217,19 +235,29 @@
     var f = frameFor(ev.source);
     if (!f) return;
     var d = m.data || {};
+    // A tour is a demo whose changes are never kept: its unsaved changes do
+    // not count (no bar tag, no close warning) and its saves are not recent files.
     if (m.type === "ready") {
       f.ready = true;
       f.product = String(d.product || "");
       f.version = String(d.version || "");
-      f.dirty = !!d.dirty;
+      f.dirty = !f.tour && !!d.dirty;
       if (d.theme && d.theme !== theme()) send(f, "theme", { theme: theme() });
-      if (f.pending) { send(f, "open-recent", f.pending); f.pending = null; }
+      var queue = f.queue;
+      f.queue = [];
+      queue.forEach(function (q) { send(f, q.type, q.data); });
     } else if (m.type === "dirty") {
-      f.dirty = !!d.dirty;
+      f.dirty = !f.tour && !!d.dirty;
     } else if (m.type === "recent") {
-      addRecent(f, d);
+      if (!f.tour) addRecent(f, d);
     } else if (m.type === "theme") {
       setTheme(d.theme, f);
+    } else if (m.type === "handoff") {
+      handoff(f, d);
+      return;
+    } else if (m.type === "drop") {
+      openDropped(Array.isArray(d.files) ? d.files : [], f);
+      return;
     } else {
       return;
     }
@@ -267,6 +295,7 @@
       name: String(d.name).slice(0, 260),
       label: String(d.label || "").slice(0, 200),
       action: d.action === "save" ? "save" : "open",
+      kind: String(d.kind || "").slice(0, 40),
       when: typeof d.when === "string" ? d.when : new Date().toISOString(),
       hasHandle: !!d.hasHandle
     };
@@ -281,11 +310,134 @@
   // Switches to the file's tool and asks it to reopen the file: in one click
   // where the browser kept access to it, otherwise by pointing at Load.
   function openRecent(entry) {
-    var f = openTool(entry.module);
-    if (!f) return;
-    var ask = { name: entry.name, label: entry.label || "" };
-    if (f.ready) send(f, "open-recent", ask); else f.pending = ask;
+    deliver(entry.module, "open-recent", { name: entry.name, label: entry.label || "" });
   }
+
+  // What sort of file a recent entry is, for the list: what the tool said,
+  // or, for the Report Review Tool, read from the names it gives its files.
+  function recentKind(e) {
+    if (e.kind) return e.kind;
+    if (e.module !== "report-review") return "";
+    if (/-review-pack-round-\d+/i.test(e.name)) return "Review pack";
+    if (/-review-round-\d+-/i.test(e.name)) return "Review file";
+    return "";
+  }
+
+  // ---- files handed over, and files dropped on the suite ----------------------
+  //
+  // The contents go straight to the tool that opens them (open-text, see
+  // shared/host-bridge.js) and are never kept here. postMessage carries them
+  // across origins, so this works in the folder build as well.
+
+  var FILE_MAX = 100 * 1024 * 1024;   // well above the largest review pack
+
+  // Which tool opens a file, from what it says it is. null: not one of ours.
+  function fileKind(text) {
+    var d = null;
+    try { d = JSON.parse(text); } catch (e) { d = null; }
+    if (!d || typeof d !== "object" || Array.isArray(d)) return null;
+    var s = typeof d.schema === "string" ? d.schema : "";
+    if (/^spt-review-pack\//.test(s)) return { module: "report-review", what: "review pack" };
+    if (/^spt-review\//.test(s)) return { module: "report-review", what: "review file" };
+    if (/^spt-risk-project\//.test(s)) return { module: "risk-assessment", what: "project file" };
+    if (/^spt-risk-context\//.test(s)) return { module: null, what: "risk context file",
+      hint: "Import it in the 62443-3-3 assessment in the OT Cyber Assessment Tool." };
+    if (!s && typeof d.schemaVersion === "string") return { module: "assessments", what: "project file" };
+    return null;
+  }
+
+  function moduleFor(to) {
+    to = String(to || "");
+    if (modulesById[to]) return modulesById[to];
+    for (var i = 0; i < D.modules.length; i++) if (D.modules[i].name === to) return D.modules[i];
+    return null;
+  }
+
+  // A tool hands over a file it has just written: the author's pack to the
+  // Report Review Tool, or a reviewer's file back to the tool the pack came from.
+  function handoff(from, d) {
+    if (from.tour) { toast("This is a tour, so its files stay in it.", "err"); return; }
+    var m = moduleFor(d.to);
+    if (!m || m.id === from.module.id || !moduleAvailable(m) || typeof d.text !== "string" || d.text.length > FILE_MAX) {
+      toast("That file could not be passed to the other tool. Open it there with Load.", "err");
+      return;
+    }
+    deliver(m.id, "open-text", { name: String(d.name || "file.json").slice(0, 260), text: d.text });
+  }
+
+  // The tools that send review packs and import the review files that come back.
+  var AUTHOR_TOOLS = { "assessments": true, "risk-assessment": true };
+
+  // Files dropped on the suite, or on a tool that does not take them itself
+  // (from: that tool's frame). Each goes to the tool that reads it; a tool
+  // other than the Report Review Tool takes one project file at a time. A
+  // review file dropped on the author's own tool (not its tour) is the author
+  // bringing it in: it goes to that tool, whose review card imports it.
+  function openDropped(files, from) {
+    var author = from && !from.tour && AUTHOR_TOOLS[from.module.id] ? from.module : null;
+    files = (files || []).filter(function (x) { return x && typeof x.name === "string"; });
+    if (!files.length) return Promise.resolve([]);
+    return Promise.all(files.map(function (file) {
+      if (typeof file.size === "number" && file.size > FILE_MAX) return Promise.resolve({ name: file.name, text: null });
+      return Promise.resolve().then(function () { return file.text(); })
+        .then(function (text) { return { name: file.name, text: text }; }, function () { return { name: file.name, text: null }; });
+    })).then(function (got) {
+      var byTool = {}, order = [], notes = [], projects = {};
+      got.forEach(function (g) {
+        var k = g.text === null ? null : fileKind(g.text);
+        var toAuthor = !!(author && k && k.what === "review file");
+        var m = toAuthor ? author : k && k.module ? modulesById[k.module] : null;
+        if (k && !k.module) { notes.push(g.name + " is a " + k.what + ". " + k.hint); return; }
+        if (!m || !moduleAvailable(m)) {
+          notes.push(g.name + (/^PK/.test(g.text || "") ? " is a Word or Excel file, which the suite does not open."
+            : " is not a file the suite opens. Open it with Load in its own tool."));
+          return;
+        }
+        if (!byTool[m.id]) { byTool[m.id] = []; order.push(m.id); }
+        if (m.id !== "report-review" && !toAuthor) {
+          if (projects[m.id]) { notes.push(g.name + " was left out: drop one project file at a time."); return; }
+          projects[m.id] = true;
+        }
+        byTool[m.id].push(g);
+      });
+      // Review packs before review files, as the review tool would sort them.
+      if (byTool["report-review"]) byTool["report-review"].sort(function (a, b) {
+        return (fileKind(a.text).what === "review pack" ? 0 : 1) - (fileKind(b.text).what === "review pack" ? 0 : 1);
+      });
+      // In the author's tool, a project file before the review files for it.
+      if (author && byTool[author.id]) byTool[author.id].sort(function (a, b) {
+        return (fileKind(a.text).what === "review file" ? 1 : 0) - (fileKind(b.text).what === "review file" ? 1 : 0);
+      });
+      // The first tool is shown last, so it is the one in front.
+      order.slice().reverse().forEach(function (id) {
+        byTool[id].forEach(function (g) { deliver(id, "open-text", { name: g.name, text: g.text }); });
+      });
+      if (notes.length) toast(notes.join(" "), "err");
+      return order;
+    });
+  }
+
+  function isFileDrag(e) {
+    var t = e.dataTransfer && e.dataTransfer.types;
+    return !!t && Array.prototype.indexOf.call(t, "Files") !== -1;
+  }
+  // Without these the browser opens a file dropped on the home page or the
+  // bar in place of the suite, and the exe silently does nothing.
+  document.addEventListener("dragover", function (e) {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = "copy"; } catch (x) {}
+    document.body.classList.add("drop-over");
+  });
+  document.addEventListener("dragleave", function (e) {
+    if (!e.relatedTarget) document.body.classList.remove("drop-over");
+  });
+  document.addEventListener("drop", function (e) {
+    document.body.classList.remove("drop-over");
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    openDropped(Array.prototype.slice.call(e.dataTransfer.files || []));
+  });
 
   function when(iso) {
     var d = new Date(iso);
@@ -337,7 +489,7 @@
         h("div", { class: "modal-h" }, [h("h2", { text: "Licence" })]),
         h("div", { class: "modal-b" }, [
           h("p", { class: "licence-version muted small",
-            text: D.product + " " + V.label + " (version " + V.number + "). The licence covers both tools in the suite." }),
+            text: D.product + " " + V.label + " (version " + V.number + "). The licence covers every tool in the suite." }),
           D.licence ? h("pre", { class: "licence-text", text: D.licence })
                     : h("p", { text: LEGAL_NOTICE + " The full licence text is missing from this copy; ask your SolutionsPT engagement contact for it." })
         ]),
@@ -461,7 +613,7 @@
       h("span", { class: "bar-name bar-name-full", text: f.module.name }),
       h("span", { class: "bar-name bar-name-short", text: f.module.shortName || f.module.name }),
       f.tour ? h("span", { class: "bar-tag", text: "Tour" }) : null,
-      f.dirty ? h("span", { class: "bar-tag dirty", title: "This tool has changes that are not saved to its project file.", text: "Unsaved changes" }) : null
+      f.dirty ? h("span", { class: "bar-tag dirty", title: "This tool has changes that are not saved to its file yet.", text: "Unsaved changes" }) : null
     ]));
     bar.appendChild(h("span", { class: "bar-spacer" }));
 
@@ -517,11 +669,13 @@
     var list = readRecent();
     var body;
     if (!list.length) {
-      body = h("p", { class: "recent-empty", text: "Project files you open or save in a tool appear here, so you can go back to one in a click." });
+      body = h("p", { class: "recent-empty", text: "Project files, review packs and review files you open or save in a tool appear here, so you can go back to one in a click." });
     } else {
       body = h("ul", { class: "recent-list" }, list.map(function (e) {
         var m = modulesById[e.module];
         var meta = [m.name];
+        var kind = recentKind(e);
+        if (kind) meta.push(kind);
         if (e.label) meta.push(e.label);
         var w = when(e.when);
         if (w) meta.push((e.action === "save" ? "Saved " : "Opened ") + w);
@@ -544,14 +698,15 @@
       ]),
       body,
       h("div", { class: "recent-foot" }, [
-        "Only the file name, the customer and the date are kept here, never what a file contains. Opening one switches to its tool, which offers to reopen the file where the browser still has access to it, or shows you where to load it from."
+        "Only the file name, the customer and the date are kept here, never what a file contains. Opening one switches to its tool, which offers to reopen the file where the browser still has access to it, or shows you where to load it from. A review file opened before its pack waits for the pack."
       ])
     ]);
   }
 
   function helpCard() {
     var tips = [
-      "Each tool saves and loads its own project file with Save and Load in its own header, just as it does on its own.",
+      "Each tool saves and loads its own files with the buttons in its own header, just as it does on its own: a project file in the assessment and risk tools, a review pack and your review file in the Report Review Tool.",
+      "You can also drop a project file, review pack or review file anywhere on the suite: it opens in the tool that reads it.",
       "Switching keeps your work: a tool you leave stays open in the background until you close the suite.",
       "The bar at the top marks a tool with unsaved changes, and the suite asks before it closes while any tool has them."
     ];
@@ -629,6 +784,8 @@
     current: function () { return current; },
     frames: frames,
     openRecent: openRecent,
+    openDropped: openDropped,
+    fileKind: fileKind,
     readRecent: readRecent,
     clearRecent: clearRecent,
     payloadHtml: payloadHtml,

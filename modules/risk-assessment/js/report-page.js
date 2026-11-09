@@ -541,6 +541,9 @@ window.RiskReportPage = (function () {
       ui.tabs, ui.status, h("span", { class: "rp-spacer" }),
       h("button", { class: "btn", text: "Download Word report", onClick: function () { RT().downloadWordReport(DOCS[ui.doc].opts); } })
     ]));
+    // The peer review's warnings, once a review has started (js/review.js).
+    var rv = window.RiskReview ? window.RiskReview.warningsCard(h) : null;
+    if (rv) main.appendChild(rv);
     ui.holder = h("div", { class: "rp-holder" });
     main.appendChild(ui.holder);
     drawTabs();

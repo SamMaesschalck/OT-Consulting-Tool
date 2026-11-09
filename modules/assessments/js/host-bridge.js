@@ -28,11 +28,17 @@
  *   module -> suite (from: "module")
  *     ready   { product, version, number, title, dirty, reopen }   once, when the module has started
  *     dirty   { dirty }                                          unsaved changes appeared or were saved
- *     recent  { action: "save"|"open", name, label, hasHandle, when }   a project file was saved or opened
+ *     recent  { action: "save"|"open", name, label, kind, hasHandle, when }   a file was saved or opened
  *     theme   { theme: "light"|"dark" }                          the module's own theme toggle was used
+ *     handoff { to, name, text }                                 open a file this module just wrote in another
+ *                                                                tool of the suite (to: its id or product name)
+ *     drop    { files: [File] }                                  files dropped on the module's page that the
+ *                                                                module did not take itself
  *   suite -> module (from: "suite")
  *     theme        { theme }                                     follow the suite's theme
  *     open-recent  { name, label }                               reopen a recent file (see openRecent)
+ *     open-text    { name, text }                                open a file handed over by another tool or
+ *                                                                dropped on the suite (see openText)
  *
  * Recent files never carry file contents: the suite keeps only the name, the
  * customer or project label and when. Where the browser gave the module a file
@@ -40,6 +46,10 @@
  * in this module's own IndexedDB ("spt-suite-recent"), so reopening can be one
  * click. That click has to happen inside the module's frame: the browser only
  * lets a page ask for file access in answer to a click on that same page.
+ *
+ * handoff, drop and open-text are the only messages that carry a file's
+ * contents. They go straight to the tool that opens the file and are never
+ * kept: not in Recent files, not in any storage.
  */
 (function () {
   "use strict";
@@ -225,6 +235,39 @@
     });
   }
 
+  // ---- files handed over or dropped in the suite ---------------------------
+  // The contents arrive with the message, so no file access is needed. Who
+  // takes it, in order: a listener added with onOpenText that says it has
+  // (the author's review card takes a review file this way), the module's
+  // openText hook, then its openFile hook given the text as a file, so a
+  // module that can reopen a recent file can open one handed over as well.
+  var textListeners = [];
+  function openText(d) {
+    var name = d && d.name ? String(d.name) : "file.json";
+    var text = d && typeof d.text === "string" ? d.text : null;
+    if (text === null) return;
+    for (var i = 0; i < textListeners.length; i++) {
+      try { if (textListeners[i](name, text) === true) return; } catch (e) {}
+    }
+    if (typeof hooks.openText === "function") { hooks.openText(name, text); return; }
+    if (typeof hooks.openFile === "function") {
+      var file = null;
+      try { file = new File([text], name, { type: "application/json" }); } catch (e) { file = null; }
+      if (file) { hooks.openFile(file, null); return; }
+    }
+    pointAtLoad(name, null);
+  }
+
+  // A file dragged onto the module's page that the module does not take
+  // itself (it did not call preventDefault) would make the browser open the
+  // file in place of the tool, and in the exe nothing would happen at all. In
+  // the suite it goes to the suite instead, which opens it in the tool that
+  // reads it. Only file drags: dragging text into a box is left alone.
+  function isFileDrag(e) {
+    var t = e.dataTransfer && e.dataTransfer.types;
+    return !!t && Array.prototype.indexOf.call(t, "Files") !== -1;
+  }
+
   // ---- messages from the suite ----------------------------------------------
   if (hosted) {
     window.addEventListener("message", function (ev) {
@@ -239,7 +282,22 @@
         else document.documentElement.setAttribute("data-theme", d.theme);
       } else if (m.type === "open-recent") {
         openRecent(d);
+      } else if (m.type === "open-text") {
+        openText(d);
       }
+    });
+    // Listened for on the window, so the module's own handlers (on the
+    // document or lower) run first and can take the file themselves.
+    window.addEventListener("dragover", function (e) {
+      if (e.defaultPrevented || !isFileDrag(e)) return;
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = "copy"; } catch (x) {}
+    });
+    window.addEventListener("drop", function (e) {
+      if (e.defaultPrevented || !isFileDrag(e)) return;
+      e.preventDefault();
+      var files = Array.prototype.slice.call(e.dataTransfer.files || []);
+      if (files.length) post("drop", { files: files });
     });
     // The module's own theme toggle: tell the suite, which keeps every open
     // tool and its own pages on the same theme.
@@ -259,6 +317,8 @@
     launch: launch || {},
     // What the module offers the suite, all optional:
     //   openFile(file, handle)  open a project file the consultant chose to reopen
+    //                           (handle is null for a file handed over or dropped)
+    //   openText(name, text)    open a file handed over or dropped, in place of openFile
     //   applyTheme(theme)       switch theme the module's own way (button label too)
     //   loadButton              the id of the module's Load button ("btn-load")
     register: function (h) {
@@ -272,9 +332,10 @@
       dirty = d;
       if (readySent) post("dirty", { dirty: d });
     },
-    // info: { action: "save"|"open", name, label, handle }. The handle, when
-    // there is one, stays in this module's storage; only the name, label and
-    // time go to the suite.
+    // info: { action: "save"|"open", name, label, handle, kind }. The handle,
+    // when there is one, stays in this module's storage; only the name, label,
+    // kind (optional, what sort of file it is, such as "Review pack") and time
+    // go to the suite.
     recent: function (info) {
       if (!hosted || !info || !info.name) return;
       var hasHandle = !!(info.handle && typeof info.handle.getFile === "function");
@@ -282,10 +343,29 @@
       post("recent", {
         action: info.action === "save" ? "save" : "open",
         name: String(info.name), label: info.label ? String(info.label) : "",
+        kind: info.kind ? String(info.kind) : "",
         hasHandle: hasHandle, when: new Date().toISOString()
       });
     },
     openRecent: function (entry) { if (hosted) openRecent(entry); },
+    // Whether this module may hand files to another tool: in the suite, and
+    // not on a tour, whose files stay in the tour.
+    canHandoff: hosted && !launch.tour,
+    // Opens a file this module has just written in another tool of the suite
+    // (to: that tool's id, such as "report-review", or its product name).
+    // Returns false, and does nothing, where that is not possible.
+    handoff: function (to, name, text) {
+      if (!hosted || launch.tour || !to || typeof text !== "string") return false;
+      post("handoff", { to: String(to), name: String(name || "file.json"), text: text });
+      return true;
+    },
+    // fn(name, text) is offered every file handed over or dropped before the
+    // module's own hooks are; it returns true when it has dealt with it.
+    onOpenText: function (fn) {
+      if (hosted && typeof fn === "function" && textListeners.indexOf(fn) === -1) textListeners.push(fn);
+    },
+    // A short message in the module's frame, in the bridge's own banner.
+    notice: function (message) { if (hosted && message) showBanner(String(message), []); },
     // Test seam: fn(name, cb) answers in place of the handle store.
     __setHandleLookup: function (fn) { handleLookup = typeof fn === "function" ? fn : findHandle; }
   };

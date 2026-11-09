@@ -121,9 +121,14 @@
       var c = rPr && firstChildNS(rPr, W, "color");
       var red = styled || !!(c && String(attrW(c, "val") || "").toUpperCase() === RED);
       var b = onOff(rPr, "b"), i = onOff(rPr, "i");
+      // A key's swatch (a lone shape character in a chart colour) keeps its
+      // colour, so the reviewer can tell the key's entries apart. Other
+      // colours are styling and are not kept. The hash reads text only.
+      var hex = c ? String(attrW(c, "val") || "").toUpperCase() : "";
+      var swatch = !red && /^[0-9A-F]{6}$/.test(hex) && hex !== "000000" && /^[■●▲◆▪]\s*$/.test(t) ? hex : "";
       var last = runs[runs.length - 1];
-      if (last && last.b === b && last.i === i && last.red === red) last.t += t;
-      else runs.push({ t: t, b: b, i: i, red: red });
+      if (last && last.b === b && last.i === i && last.red === red && !last.c && !swatch) last.t += t;
+      else { var run = { t: t, b: b, i: i, red: red }; if (swatch) run.c = swatch; runs.push(run); }
     }
     function readRun(r) {
       var rPr = firstChildNS(r, W, "rPr");

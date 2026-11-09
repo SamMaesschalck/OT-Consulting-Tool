@@ -1,0 +1,366 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: drafts, keyboard, labels and the Summary</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The reviewer's tool as a reviewer moves around it: a half-written comment
+  survives clicks elsewhere and a change of page; Edit on Summary opens there;
+  Delete has Undo; the pages work from the keyboard; severities say what they
+  mean; the Summary says what is left and where the last save went, and
+  prints; the checks page puts what it found first; the item search works as
+  you type; narrow windows keep a Go to section list; a two-report pack names
+  the report everywhere; a pack's own field names, extra rows and the
+  author's note show; coloured key swatches keep their colour; the saved file
+  carries the checklist total and the dismissed checks' words.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  var errors = [];
+  function load(q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () { res(w); });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+  function fakeHandle(w, name) {
+    var st = { text: null, writes: 0 };
+    return { kind: "file", name: name, store: st,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      requestPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () { return Promise.resolve({ write: function (t) { st.text = String(t); st.writes++; return Promise.resolve(); }, close: function () { return Promise.resolve(); } }); } };
+  }
+  function type(w, el, v, ev) { el.value = v; el.dispatchEvent(new w.Event(ev || "input", { bubbles: true })); }
+  function key(w, el, k) { var e = new w.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e; }
+  function txt(w, sel) { var n = w.document.querySelector(sel); return n ? n.textContent : ""; }
+
+  var W, R, D, demo;
+  try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); localStorage.setItem("spt-review:reviewer:v1", "U. Tester"); } catch (e) {}
+
+  load("?tour=1").then(function (w) {
+    W = w; R = w.ReviewTool; D = w.document;
+    return poll(function () { return R.state.pack; });
+  }).then(function () {
+    var w = W, d = D;
+    demo = JSON.parse(JSON.stringify(R.state.pack));
+    var paras = demo.documents[0].blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 60 && !b.red; });
+    var A = paras[0], B = paras[1];
+    function block(id) { return d.querySelector('[data-block-id="' + id + '"]'); }
+    // ---- #2 / #24: a half-written comment is kept ------------------------------------
+    block(A.id).click();
+    type(w, d.querySelector(".rr-c-text"), "Half-written");
+    block(B.id).click();
+    ok(R.state.composer && R.state.composer.anchor.blockId === A.id && R.state.composer.text === "Half-written", "clicking another paragraph keeps the half-written comment where it was", JSON.stringify(R.state.composer && R.state.composer.anchor.blockId));
+    ok(/Add or cancel the comment you are writing/.test(txt(w, "#toast")), "and says to finish or cancel it first", txt(w, "#toast"));
+    block(A.id).click();
+    ok(R.state.composer && R.state.composer.text === "Half-written" && !!d.querySelector(".rr-composer"), "clicking its own paragraph again does not close it");
+    d.querySelector('.nav-item[data-page="checklist"]').click();
+    ok(R.state.page === "checklist" && R.state.composer && R.state.composer.text === "Half-written", "changing page keeps it");
+    ok(!!d.getElementById("rr-draft") && /unfinished comment/.test(txt(w, "#rr-draft")), "and the other page says there is an unfinished comment");
+    d.querySelector('.nav-item[data-page="engagement"]').click();
+    d.querySelector(".rr-item .rr-item-comment").click();
+    ok(R.state.composer.anchor.kind === "block" && R.state.composer.anchor.blockId === A.id, "an item's Comment does not replace it");
+    d.getElementById("rr-draft-go").click();
+    ok(R.state.page === "report" && d.querySelector(".rr-composer .rr-c-text").value === "Half-written", "Go to it brings it back, as written");
+    // Cancel ends it on purpose, and the next click opens where it is.
+    d.querySelector(".rr-c-cancel").click();
+    ok(!R.state.composer && d.activeElement === block(A.id), "Cancel ends it, and puts the keyboard back on its paragraph", d.activeElement && d.activeElement.outerHTML.slice(0, 80));
+    block(B.id).click();
+    ok(R.state.composer && R.state.composer.anchor.blockId === B.id, "then another paragraph opens as usual");
+    // A suggestion still as prefilled is not work to keep.
+    var sbox = d.querySelector(".rr-c-suggest"); sbox.checked = true; sbox.dispatchEvent(new w.Event("change", { bubbles: true }));
+    ok(!R.composerHasDraft(), "a suggested wording still as it started is not a draft");
+    block(A.id).click();
+    ok(R.state.composer.anchor.blockId === A.id, "so a click elsewhere just moves the box");
+    d.querySelector(".rr-c-cancel").click();
+
+    // ---- #27: severities say what they mean ------------------------------------------
+    block(A.id).click();
+    var sevs = d.querySelectorAll(".rr-composer [data-severity]");
+    ok(sevs.length === 3 && Array.prototype.every.call(sevs, function (b) { return b.title.length > 20; }), "each severity button says what it means");
+    ok(/change it unless/i.test(txt(w, ".rr-sev-help")), "and the chosen one's meaning shows under them", txt(w, ".rr-sev-help"));
+    d.querySelector('.rr-composer [data-severity="must-fix"]').click();
+    ok(/not fit to send/.test(txt(w, ".rr-sev-help")) && d.querySelector('.rr-composer [data-severity="must-fix"]').getAttribute("aria-pressed") === "true" && d.querySelector('.rr-composer [data-severity="should-fix"]').getAttribute("aria-pressed") === "false", "choosing another changes it, and the buttons say which is pressed");
+    type(w, d.querySelector(".rr-c-text"), "First comment.");
+    d.querySelector(".rr-c-add").click();
+    var c1 = R.state.review.comments[0];
+
+    // ---- #9: the keyboard ------------------------------------------------------------
+    ok(d.getElementById("toast").getAttribute("role") === "status" && d.getElementById("toast").getAttribute("aria-live") === "polite", "messages are announced");
+    ok(!block(A.id).hasAttribute("aria-label") && block(A.id).getAttribute("aria-describedby") === "rr-block-hint" && !!d.getElementById("rr-block-hint"), "a paragraph is read by its own words, with a hint");
+    var nav = d.querySelector('.nav-item[data-page="checks"]');
+    key(w, nav, "Enter");
+    ok(R.state.page === "checks", "Enter on a page in the sidebar opens it");
+    ok(d.activeElement && d.activeElement.classList.contains("nav-item") && d.activeElement.getAttribute("data-page") === "checks", "and the keyboard stays on that page's entry, not back at the top", d.activeElement && d.activeElement.tagName);
+    key(w, d.querySelector('.nav-item[data-page="report"]'), " ");
+    ok(R.state.page === "report" && d.activeElement.getAttribute("data-page") === "report", "and so does Space");
+    var cells = d.querySelectorAll("#rr-paper td[tabindex]");
+    ok(cells.length > 20, "table cells can take the keyboard (" + cells.length + ")");
+    key(w, cells[3], "Enter");
+    ok(R.state.composer && !!R.state.composer.anchor.cell, "and Enter on one comments on that cell");
+    d.querySelector(".rr-c-cancel").click();
+    key(w, block(B.id), " ");
+    ok(R.state.composer && R.state.composer.anchor.blockId === B.id, "Space on a paragraph comments on it");
+    d.querySelector(".rr-c-cancel").click();
+
+    // ---- #4: Delete, with Undo ----------------------------------------------------------
+    var before = R.state.review.comments.length;
+    d.querySelector('[data-comment-id="' + c1.id + '"] .rr-del').click();
+    ok(R.state.review.comments.length === before - 1 && /Comment deleted/.test(txt(w, "#toast")) && !!d.querySelector("#toast .rr-toast-act"), "Delete removes it and offers Undo");
+    d.querySelector("#toast .rr-toast-act").click();
+    ok(R.state.review.comments.length === before && R.state.review.comments[0] === c1 && R.state.review.comments[0].id === c1.id, "Undo puts the same comment back where it was");
+
+    // ---- #3: Edit on Summary opens there ------------------------------------------------
+    R.addComment({ severity: "suggestion", anchor: { documentIndex: 0, documentTitle: "", kind: "general", sectionKey: "", sectionTitle: "Document control", blockId: "", quote: "", cell: null, targetName: "", itemId: "", field: "" }, text: "QA review by is blank." });
+    d.querySelector('.nav-item[data-page="summary"]').click();
+    var gen = R.state.review.comments[R.state.review.comments.length - 1];
+    d.querySelector('[data-sum-comment="' + gen.id + '"] .rr-edit').click();
+    var comp = d.querySelector('#main [data-sum-comment="' + gen.id + '"] .rr-composer');
+    ok(!!comp && comp.querySelector(".rr-c-text").value === "QA review by is blank.", "Edit on Summary opens the comment there, even one only Summary shows");
+    type(w, comp.querySelector(".rr-c-text"), "Fill in QA review by.");
+    comp.querySelector(".rr-c-add").click();
+    ok(gen.text === "Fill in QA review by." && R.state.page === "summary" && R.state.review.comments.filter(function (x) { return x.id === gen.id; }).length === 1, "and Save comment keeps you on Summary");
+
+    // ---- #12 / #25: what is left to do, and the save -----------------------------------
+    ok(/0\/3/.test(txt(w, "#rr-sum-prev")), "Summary counts the earlier comments looked at", txt(w, "#rr-sum-prev"));
+    d.querySelector('.rr-stat-go[data-go="previous"]').click();
+    ok(R.state.page === "previous", "and the count goes to them");
+    d.querySelector('[data-prev-id="c-demo-1"] .rr-confirm').click();
+    ok(/^1\/3$/.test(txt(w, '.nav-item[data-page="previous"] .badge')), "the sidebar counts what you have looked at", txt(w, '.nav-item[data-page="previous"] .badge'));
+    d.querySelector('.nav-item[data-page="summary"]').click();
+    ok(/^1\/3/.test(txt(w, "#rr-sum-prev")), "confirming one counts it", txt(w, "#rr-sum-prev"));
+    ok(!!d.getElementById("rr-no-verdict"), "with no verdict, a line says that is fine for now but not for sending");
+    // Severities explained on the verdict: the demo pack has a QA review by field.
+    ok(/QA review by/.test(txt(w, '[data-verdict="approved"]')), "an approval says the author can put your name in QA review by, when the report has that field");
+    // In document order: a comment on an earlier paragraph comes first.
+    var early = demo.documents[0].blocks.filter(function (b) { return b.type === "heading" && !b.front; })[0];
+    R.addComment({ severity: "suggestion", anchor: { documentIndex: 0, documentTitle: "", kind: "block", sectionKey: early.sectionKey, sectionTitle: early.sectionTitle, blockId: early.id, blockType: "heading", quote: early.text, cell: null, targetName: "", itemId: "", field: "" }, text: "Earliest." });
+    R.render();
+    var order = Array.prototype.map.call(d.querySelectorAll("[data-sum-comment]"), function (n) { return n.getAttribute("data-sum-comment"); });
+    var earliest = R.state.review.comments[R.state.review.comments.length - 1];
+    ok(order[0] === earliest.id && order[order.length - 1] === gen.id, "All your comments are in the order the report prints them, general ones last");
+    ok(!!d.querySelector('[data-sum-comment="' + earliest.id + '"] .rr-sum-quote'), "each with the words it is on");
+    // Print.
+    var printed = 0; w.print = function () { printed++; };
+    d.getElementById("rr-print").click();
+    ok(printed === 1, "Print or save as PDF prints the page");
+    ok(/Acme Petrochemicals/.test(txt(w, "#rr-print-head")) && /U\. Tester/.test(txt(w, "#rr-print-head")) && /Round/.test(txt(w, "#rr-print-head")) && !!d.getElementById("rr-print-checklist"), "with a header naming the client, the round and the reviewer, and the checklist");
+    ok(w.getComputedStyle(d.getElementById("rr-print-head")).display === "none", "which the screen does not show");
+    // What the printout leaves out: the page's own title (the header block names
+    // it), the card's "as ..." beside the Reviewer row, and the sections read.
+    var printHides = [];
+    Array.prototype.forEach.call(d.styleSheets, function (ss) {
+      var rules; try { rules = ss.cssRules; } catch (e) { return; }
+      Array.prototype.forEach.call(rules || [], function (r) {
+        if (r.media && /print/.test(r.media.mediaText)) Array.prototype.forEach.call(r.cssRules, function (x) { if (/display:\s*none/.test(x.cssText)) printHides.push(x.selectorText); });
+      });
+    });
+    var hidden = function (el) { return !!el && printHides.some(function (sel) { return sel.split(",").some(function (s) { try { return el.matches(s.trim()); } catch (e) { return false; } }); }); };
+    ok(hidden(d.querySelector("#main h1.page-title")) && hidden(d.querySelector("#main .card-h .sub")), "the printout leaves out the page title and the card's 'as' line, which the header block already gives");
+    ok(!d.getElementById("rr-sum-read") || hidden(d.getElementById("rr-sum-read").parentNode), "and the sections marked read, a note to self");
+    ok(!!d.querySelector("#rr-print-checklist th.rr-ans") && w.getComputedStyle(d.querySelector("#rr-print-checklist th.rr-ans")).whiteSpace === "nowrap", "the checklist's Answer column does not wrap");
+    // Save, and where it went.
+    var hd = fakeHandle(w, "acme-review.json");
+    w.showSaveFilePicker = function () { return Promise.resolve(hd); };
+    return new Promise(function (res) { R.saveReview(null, res); }).then(function () {
+      ok(/Saved to acme-review\.json at \d\d:\d\d\./.test(txt(w, "#rr-saved-at")), "after a save, Summary says which file and when", txt(w, "#rr-saved-at"));
+      ok(/acme-review\.json/.test(d.getElementById("btn-save").title), "and so does the Save button's tip");
+      // A save with a comment still being written says it is not in the file.
+      d.querySelector('.nav-item[data-page="report"]').click();
+      block(B.id).click();
+      type(w, d.querySelector(".rr-c-text"), "Not yet added.");
+      return new Promise(function (res) { R.saveReview(null, res); });
+    }).then(function () {
+      ok(/still writing is not in it/.test(txt(w, "#toast")), "saving with a comment still open says it is not in the file", txt(w, "#toast"));
+      d.querySelector(".rr-c-cancel").click();
+    });
+  }).then(function () {
+    var w = W, d = D;
+    // ---- #13: the checks page puts what it found first --------------------------------
+    d.querySelector('.nav-item[data-page="checks"]').click();
+    var cards = Array.prototype.slice.call(d.querySelectorAll("#main .card"));
+    var firstClean = cards.indexOf(d.getElementById("rr-checks-clean")), lastHit = -1;
+    cards.forEach(function (c, i) { if (c.hasAttribute("data-check-card")) lastHit = i; });
+    ok(cards[0].hasAttribute("data-check-card") && firstClean > lastHit && lastHit >= 1, "checks that found something come first, the clean ones folded into one card after them");
+    ok(d.querySelectorAll("#rr-checks-clean details").length >= 4 && d.querySelectorAll("#rr-names").length === 1, "each clean check opens to say what it looked for, and the names list stays on the page");
+    // ---- #22: the file says how many questions there were, and what was dismissed --
+    var red = R.activeChecks().filter(function (r) { return r.check === "red-prompts"; })[0];
+    d.querySelector('[data-check-id="' + red.id + '"] .rr-check-dismiss').click();
+    var hd = fakeHandle(w, "x.json");
+    w.showSaveFilePicker = function () { return Promise.resolve(hd); };
+    R.state.handle = null;
+    return new Promise(function (res) { R.saveReview({ shiftKey: true }, res); }).then(function () {
+      var f = JSON.parse(hd.store.text), total = d.querySelectorAll(".rr-q").length;
+      d.querySelector('.nav-item[data-page="checklist"]').click();
+      total = d.querySelectorAll(".rr-q").length;
+      ok(f.checklistTotal === total && total > 5, "the saved file says how many checklist questions there were (" + total + ")", f.checklistTotal);
+      ok(typeof f.dismissedCheckTitles[red.id] === "string" && /Red prompts left in/.test(f.dismissedCheckTitles[red.id]) && /Executive summary/.test(f.dismissedCheckTitles[red.id]), "and what each dismissed check said", f.dismissedCheckTitles[red.id]);
+    });
+  }).then(function () {
+    var w = W, d = D;
+    // ---- #14: search as you type; the basis of assessment is a click away ---------------
+    d.querySelector('.nav-item[data-page="engagement"]').click();
+    var s = d.getElementById("rr-item-search");
+    var all = d.getElementById("rr-item-count").textContent;
+    s.focus();
+    type(w, s, "Human user identification");
+    return wait(400).then(function () {
+      var now = d.getElementById("rr-item-count").textContent;
+      ok(now !== all && /Showing [1-9]\d* of/.test(now), "the item search narrows the list as you type", now);
+      ok(d.activeElement && d.activeElement.id === "rr-item-search" && d.activeElement.value === "Human user identification", "with the caret still in the box");
+      type(w, d.getElementById("rr-item-search"), "");
+      return wait(400);
+    }).then(function () {
+      ok(!!d.getElementById("rr-basis") && !!d.getElementById("rr-basis-link"), "the basis of assessment has a link to it above the list");
+      var adts = Array.prototype.map.call(d.querySelectorAll(".rr-item dt"), function (n) { return n.textContent; });
+      ok(adts.indexOf("Evidence") !== -1 && adts.indexOf("Owner") !== -1 && adts.indexOf("Target") !== -1, "an assessment pack keeps the assessment field names (Evidence, Target, Owner)");
+      ok(txt(w, '[data-filter="noevidence"]') === "No evidence", "and its No evidence filter");
+      ok(!d.getElementById("rr-request"), "a pack with no note from the author shows none");
+      // ---- #15: a narrow window keeps a Go to section list -------------------------------
+      frame.style.width = "768px";
+      d.querySelector('.nav-item[data-page="report"]').click();
+      var j = d.getElementById("rr-jump");
+      var secs = demo.documents[0].blocks.filter(function (b) { return b.type === "heading" && !b.sub; });
+      ok(!!j && w.getComputedStyle(j).display !== "none" && j.options.length === secs.length + 1, "at 768px a Go to section list is in the toolbar, one entry per section", j && j.options.length + " vs " + (secs.length + 1));
+      ok(w.getComputedStyle(d.querySelector(".rr-toolbar")).position === "sticky", "and the toolbar stays in view");
+      ok(/Acme Petrochemicals, Plant A/.test(txt(w, ".page-sub")) && /round 2/.test(txt(w, ".page-sub")), "the client and round stay in view under the title", txt(w, ".page-sub"));
+      var target = secs[Math.floor(secs.length / 2)];
+      j.value = target.id; j.dispatchEvent(new w.Event("change", { bubbles: true }));
+      var el = d.querySelector('[data-block-id="' + target.id + '"]'), mainTop = d.getElementById("main").getBoundingClientRect().top;
+      var tbr = d.querySelector(".rr-toolbar").getBoundingClientRect(), top = el.getBoundingClientRect().top;
+      ok(top >= tbr.bottom - 1 && top < tbr.bottom + 40 && j.value === "", "choosing a section puts its heading just below the toolbar, not under it", top + " vs toolbar bottom " + tbr.bottom);
+      ok(Math.abs(tbr.top - mainTop) <= 1, "and the toolbar sits flush at the top, with nothing showing above it", tbr.top + " vs " + mainTop);
+      // #25 at this width: the outline's ticks are hidden, so the toolbar has one.
+      var tick = d.getElementById("rr-mark-read");
+      ok(!!tick && !!tick.offsetParent && w.getComputedStyle(d.querySelector(".rr-outline") || d.body).display !== "block", "a Read tick is in the toolbar where the outline is hidden");
+      tick.checked = true; tick.dispatchEvent(new w.Event("change", { bubbles: true }));
+      ok(!!(R.state.read && R.state.read["0|" + target.id]) && /✓$/.test(j.querySelector('option[value="' + target.id + '"]').textContent), "and marks the section in view read, which the Go to list then shows");
+      var act = d.querySelector(".nav-item.active"), badge = act && act.querySelector(".badge");
+      ok(!!badge && badge.getBoundingClientRect().left - act.firstChild.getBoundingClientRect().right >= 4, "the active tab's count does not touch its label");
+      frame.style.width = "1280px";
+      ok(!d.getElementById("rr-mark-read").offsetParent, "wide, the outline's ticks do that job instead");
+      ok(w.getComputedStyle(d.getElementById("rr-jump")).display === "none", "wide, the sidebar outline does that job instead");
+      R.state.dirty = false;
+    });
+  }).then(function () {
+    // ---- at 1024px: find stays to hand, and whose review it is stays in view ----------
+    var w = W, d = D;
+    frame.style.width = "1024px";
+    d.querySelector('.nav-item[data-page="report"]').click();
+    type(w, d.getElementById("rr-report-find"), "the");
+    return wait(400).then(function () {
+      for (var i = 0; i < 12; i++) key(w, d.getElementById("rr-report-find"), "Enter");
+      var mr = d.getElementById("main").getBoundingClientRect(), fr = d.getElementById("rr-report-find").getBoundingClientRect();
+      ok(/^13 of \d+/.test(txt(w, "#rr-find-count")) && d.getElementById("main").scrollTop > 300, "Next moves down the report", txt(w, "#rr-find-count") + " at " + d.getElementById("main").scrollTop);
+      ok(fr.top >= mr.top - 1 && fr.bottom <= mr.bottom, "and the find box, its count and Previous/Next stay in view", fr.top + " vs " + mr.top);
+      key(w, d.getElementById("rr-report-find"), "Escape");
+      var who = d.getElementById("pack-who"), ps = d.getElementById("pack-summary");
+      ok(!!who && /^as U\. Tester$/.test(who.textContent) && who.scrollWidth <= who.clientWidth + 1 && who.getBoundingClientRect().right <= d.querySelector(".header-actions").getBoundingClientRect().left,
+        "the header shows whose review is open in full, giving way on the client and round instead", who && who.textContent);
+      ok(/as U\. Tester/.test(ps.title), "with the whole line as its tip");
+      ok(/You are reviewing as U\. Tester\./.test(txt(w, ".page-sub")), "and the Report page's subtitle, which a narrow window keeps, says it too", txt(w, ".page-sub"));
+      ok(w.getComputedStyle(d.getElementById("btn-theme")).whiteSpace === "nowrap", "the theme button keeps its icon beside its label");
+      frame.style.width = "1280px";
+    });
+  }).then(function () {
+    // ---- a real two-report pack with its own field names, rows and note ------------------
+    var p = JSON.parse(JSON.stringify(demo));
+    p.packId = "rp-ux-" + Date.now();
+    var second = JSON.parse(JSON.stringify(p.documents[0]));
+    p.documents[0].title = "Detailed report"; second.title = "High-level report";
+    // Each report's blocks carry their own prefix, as the authoring tools write them.
+    second.blocks.forEach(function (b) { b.id = b.id.replace(/^d0-/, "d1-"); });
+    p.documents.push(second);
+    // A key whose swatches are coloured runs, as the Word file has them.
+    p.documents[0].blocks.splice(30, 0, { id: "d0-key", type: "paragraph", sectionKey: p.documents[0].blocks[29].sectionKey, sectionTitle: p.documents[0].blocks[29].sectionTitle,
+      text: "■ meets target ■ one level below", runs: [{ t: "■ ", c: "2E7D32" }, { t: "meets target " }, { t: "■ ", c: "C77700" }, { t: "one level below" }] });
+    p.engagement.fieldLabels = { answer: "Risk", expected: "Tolerable risk", evidence: "Threat source", notes: "Risk acceptance", action: "Countermeasures", impact: null, priority: "Disposition", owner: null };
+    p.items[0].details = [["Likelihood x impact", "Likely x Serious"], ["Affected FRs", "IAC, SI"]];
+    p.engagement.documentControl = { documentRevision: "1.0", confidentiality: "Confidential" };
+    p.request = { note: "Round 2. Section 4 is rewritten.", neededBy: "Thursday 12 November" };
+    p.previousRound = null;
+    return load().then(function (w) {
+      W = w; R = w.ReviewTool; D = w.document;
+      var d = D;
+      R.loadTexts([{ name: "two.json", text: JSON.stringify(p) }]);
+      ok(R.state.pack && R.state.pack.documents.length === 2, "a two-report pack opens");
+      // #23: the author's note
+      ok(/Section 4 is rewritten/.test(txt(w, "#rr-request")) && /Needed by Thursday 12 November/.test(txt(w, "#rr-request")), "the author's note and date show on the Report page", txt(w, "#rr-request"));
+      // #11: swatches
+      var sw = d.querySelectorAll('[data-block-id="d0-key"] .rr-swatch');
+      ok(sw.length === 2 && w.getComputedStyle(sw[0]).color === "rgb(46, 125, 50)" && w.getComputedStyle(sw[1]).color === "rgb(199, 119, 0)", "a key's coloured swatches keep their colours from the Word file");
+      ok(Array.prototype.every.call(sw, function (n) { return n.textContent === "■ "; }), "and the words beside them stay in the text colour");
+      // #47: which report, everywhere
+      ok(/the Detailed report, round 2/.test(txt(w, ".page-sub")), "the Report page says which report it is", txt(w, ".page-sub"));
+      var red0 = p.documents[0].blocks.filter(function (b) { return b.red; })[0];
+      function anc(di) { return { documentIndex: di, documentTitle: p.documents[di].title, kind: "block", sectionKey: red0.sectionKey, sectionTitle: red0.sectionTitle, blockId: di ? red0.id.replace(/^d0-/, "d1-") : red0.id, blockType: red0.type, quote: red0.text, cell: null, targetName: "", itemId: "", field: "" }; }
+      R.addComment({ severity: "must-fix", anchor: anc(0), text: "In the detailed one." });
+      R.addComment({ severity: "must-fix", anchor: anc(1), text: "In the high-level one." });
+      R.render();
+      var opts = Array.prototype.map.call(d.getElementById("rr-doc").options, function (o) { return o.textContent; });
+      ok(/\(1 comment\)/.test(opts[0]) && /\(1 comment\)/.test(opts[1]), "each report in the Document list counts its comments", opts.join(" | "));
+      d.querySelector('.nav-item[data-page="summary"]').click();
+      var wh = Array.prototype.map.call(d.querySelectorAll(".rr-sum-where"), function (n) { return n.textContent; });
+      ok(wh.length === 2 && wh[0] !== wh[1] && /- Detailed report$/.test(wh[0]) && /- High-level report$/.test(wh[1]), "Summary names the report each comment is on", wh.join(" | "));
+      ok(/Section 4 is rewritten/.test(txt(w, "#rr-request")), "and shows the author's note too");
+      ok(!/QA review by/.test(txt(w, '[data-verdict="approved"]')), "a pack with no QA review by field does not promise the name will go there", txt(w, '[data-verdict="approved"]'));
+      d.querySelector('.nav-item[data-page="checks"]').click();
+      var rows = R.activeChecks().filter(function (r) { return r.check === "red-prompts"; });
+      var ins = rows.map(function (r) { return txt(w, '[data-check-id="' + r.id + '"] .rr-check-where'); });
+      ok(rows.length === 2 && ins[0] !== ins[1] && /Detailed report/.test(ins[0]) && /High-level report/.test(ins[1]), "the same red prompt in each report is told apart", ins.join(" | "));
+      // #10 / #19 / #42: the pack's own field names
+      d.querySelector('.nav-item[data-page="engagement"]').click();
+      var it = d.querySelector('.rr-item[data-item-id="' + p.items[0].itemId + '"]');
+      var dts = Array.prototype.map.call(it.querySelectorAll("dt"), function (n) { return n.textContent; });
+      ok(dts.indexOf("Threat source") !== -1 && dts.indexOf("Evidence") === -1 && dts.indexOf("Risk") !== -1 && dts.indexOf("Tolerable risk") !== -1, "items show the pack's own field names", dts.join());
+      ok(dts.indexOf("Owner") === -1 && dts.indexOf("Impact") === -1, "and leave out the fields it does not have", dts.join());
+      ok(dts.indexOf("Likelihood x impact") !== -1 && /Likely x Serious/.test(it.textContent) && dts.indexOf("Affected FRs") !== -1, "with its extra rows after them");
+      ok(txt(w, '[data-filter="noevidence"]') === "No threat source", "the filter takes the pack's name for the field", txt(w, '[data-filter="noevidence"]'));
+      it.querySelector(".rr-item-comment").click();
+      var fo = Array.prototype.map.call(d.querySelectorAll(".rr-c-field option"), function (o) { return o.textContent; });
+      ok(fo.indexOf("Suggest wording for: threat source") !== -1 && !fo.some(function (t) { return /owner|impact/.test(t); }), "and so does the suggestion picker, without the missing fields", fo.join(" | "));
+      d.querySelector(".rr-c-cancel").click();
+      // #25: sections ticked as read
+      d.querySelector('.nav-item[data-page="report"]').click();
+      var tick = d.querySelector(".rr-read");
+      tick.checked = true; tick.dispatchEvent(new w.Event("change", { bubbles: true }));
+      ok(JSON.parse(w.localStorage.getItem(R.KEY_READ + p.packId)).length === 1, "a section can be ticked as read, kept in this browser");
+      ok(/1 of \d+ read/.test(txt(w, ".rr-outline .nav-section-title")), "the outline counts them", txt(w, ".rr-outline .nav-section-title"));
+      d.querySelector('.nav-item[data-page="summary"]').click();
+      ok(/^1\/\d+/.test(txt(w, "#rr-sum-read")), "and Summary shows how far through you are", txt(w, "#rr-sum-read"));
+      R.state.dirty = false;
+      ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+    });
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+    try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); } catch (e) {}
+    finish();
+  });
+})();
+</script>
+</body></html>

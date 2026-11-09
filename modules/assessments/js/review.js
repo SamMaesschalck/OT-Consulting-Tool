@@ -14,8 +14,9 @@
  *                     (js/review-core.js); the list is js/review-author.js.
  *   Accept            puts suggested wording where it can be changed in the
  *                     tool, rebuilds the Word document to check it took, and
- *                     undoes it if not.
- *   Issue check       warnings only (issueWarnings). Final is never stopped by
+ *                     undoes it if not. What it replaced is kept on the
+ *                     comment (thread.accepted.revert), for undoAccept.
+ *   Issue check      warnings only (issueWarnings). Final is never stopped by
  *                     a review, so a lone contractor is not stuck.
  *
  * The store lives on the assessment (Engine.getReview), not on the engagement
@@ -96,6 +97,11 @@ window.App.Review = (function () {
     if (entry.expected != null && entry.expected !== "") return String(entry.expected);
     if (entry.targetSL != null) return "SL " + entry.targetSL;
     if (entry.slTarget != null) return "SL " + entry.slTarget;
+    // The CAF family's expected state for the outcome under the chosen profile
+    // (none where the profile sets no expectation), and the ML family's level
+    // by its name rather than its id.
+    if (entry.expectedStateLabel) return String(entry.expectedStateLabel);
+    if (entry.targetLabel) return String(entry.targetLabel);
     if (entry.targetMl != null) return String(entry.targetMl);
     if (entry.target != null && typeof entry.target !== "object") return String(entry.target);
     return "";
@@ -149,7 +155,7 @@ window.App.Review = (function () {
         var entryR = road[c.id] || entry || {};
         var groupName = c.groupId ? (groups[c.groupId] || c.groupId) : "";
         items.push({
-          targetName: t.name, itemId: c.id, code: c.code || c.id, title: c.label || "", groupName: groupName,
+          targetName: t.name, targetId: t.id, itemId: c.id, code: c.code || c.id, title: c.label || "", groupName: groupName,
           answer: (entry && entry.profileApplicable === false) ? "Outside the chosen profile" : v.label,
           expected: expectedOf(entryR),
           evidence: (r && r.evidence) || "", notes: (r && r.notes) || "",
@@ -181,9 +187,12 @@ window.App.Review = (function () {
     };
   }
 
-  // The whole pack. Resolves to { pack, docs }.
-  function buildPack(progress) {
+  // The whole pack. Resolves to { pack, docs }. opts { note, neededBy }: what
+  // the author typed for the reviewers, carried as the pack's request only
+  // when something was (it never reaches Word or Excel).
+  function buildPack(progress, opts) {
     var s = ensureStore();
+    var note = String((opts && opts.note) || "").trim(), neededBy = norm(opts && opts.neededBy);
     return buildDocuments({ charts: true }, progress).then(function (docs) {
       if (progress) progress("Writing the review pack…");
       var nr = RC().nextRound(s, docs);
@@ -206,6 +215,11 @@ window.App.Review = (function () {
         facts: { perTarget: extract.perTarget },
         previousRound: RC().previousRound(s)
       };
+      if (note || neededBy) {
+        pack.request = {};
+        if (note) pack.request.note = note;
+        if (neededBy) pack.request.neededBy = neededBy;
+      }
       return { pack: pack, docs: docs, store: s };
     });
   }
@@ -217,9 +231,9 @@ window.App.Review = (function () {
 
   // Send for review: build, write, then record the round. Written first and
   // recorded after, so a cancelled save dialog moves nothing on.
-  function send(progress, done) {
+  function send(progress, done, opts) {
     if (!E().state.instrument) { done({ ok: false, message: "Choose an assessment first." }); return; }
-    buildPack(progress).then(function (r) {
+    buildPack(progress, opts).then(function (r) {
       var text = JSON.stringify(r.pack);
       RC().saveNewFile(text, packFileName(r.pack), "Review pack", function (res) {
         if (!res.ok) {
@@ -229,7 +243,7 @@ window.App.Review = (function () {
         RC().recordRound(r.store, r.pack);
         E().touchReview();
         rememberSnapshot(r.docs);
-        done({ ok: true, message: "Round " + r.pack.round + " pack saved as " + res.name + ". It holds client data: share it as you would the project file, then give it to each reviewer to open in the OT Cyber Report Review Tool.", pack: r.pack });
+        done({ ok: true, message: "Round " + r.pack.round + " pack saved as " + res.name + ". It holds client data: share it as you would the project file, then give it to each reviewer to open in the OT Cyber Report Review Tool.", pack: r.pack, name: res.name });
       });
     }).catch(function (e) {
       console.error(e);
@@ -246,8 +260,12 @@ window.App.Review = (function () {
   function signature() {
     var e = E();
     if (!e.state.engagement) return "";
+    // The baseline (with its target mapping) decides each document's progress
+    // section, so loading, clearing or remapping it is a change of content.
+    // The target selected on screen is not: the documents never depend on it.
     return JSON.stringify([e.state.activeAssessmentId, e.state.engagement.engagement, e.state.engagement.responses, e.state.engagement.targets,
-      e.state.engagement.targetProfile, e.state.engagement.reportNarrative, e.state.engagement.reportCustom, e.state.engagement.basisOfAssessment]);
+      e.state.engagement.targetProfile, e.state.engagement.reportNarrative, e.state.engagement.reportCustom, e.state.engagement.basisOfAssessment,
+      e.getBaseline ? e.getBaseline() : null]);
   }
   function rememberSnapshot(docs) { snap.signature = signature(); snap.docs = docs; }
 
@@ -297,7 +315,7 @@ window.App.Review = (function () {
     if (a.kind === "general") return false;
     var e = E();
     if (a.kind === "item") {
-      var target = targetByName(a.targetName);
+      var target = targetOf(a);
       var inst = e.state.instrument;
       if (!target) return true;
       if (!window.App.Compare.catalogFor(inst, e.state.scoringFamily).some(function (c) { return c.id === a.itemId; })) return true;
@@ -313,10 +331,15 @@ window.App.Review = (function () {
     return !docContains(docs, a.quote);
   }
 
-  function targetByName(name) {
+  // The target an item comment is on: by its id when the anchor carries one,
+  // so a site or zone renamed since the pack still holds its comments, else by
+  // name (an older file).
+  function targetOf(a) {
     var ts = (E().state.engagement && E().state.engagement.targets) || [];
-    return ts.filter(function (t) { return t.name === name; })[0] || null;
+    return (a.targetId && ts.filter(function (t) { return t.id === a.targetId; })[0]) ||
+      ts.filter(function (t) { return t.name === a.targetName; })[0] || null;
   }
+  function targetWord() { return String((E().state.instrument && E().state.instrument.targetDimensionLabel) || "target").toLowerCase(); }
 
   // ---- suggested wording: where it can go ------------------------------------
 
@@ -389,8 +412,9 @@ window.App.Review = (function () {
     var e = E(), R = window.App.Report, eng = e.state.engagement;
 
     if (a.kind === "item") {
-      var target = targetByName(a.targetName);
-      if (!target || !ITEM_FIELDS[a.field]) return { can: false, why: "This comment does not name one field of the item, so copy the wording and use Go to." };
+      var target = targetOf(a);
+      if (!target) return { can: false, why: "The " + targetWord() + " this comment is on can no longer be found, so copy the wording and compare." };
+      if (!ITEM_FIELDS[a.field]) return { can: false, why: "This comment does not name one field of the item, so copy the wording and use Go to." };
       var holder = holderOf(target.id, a.itemId, a.field);
       if (norm(holder.value) !== norm(a.quote)) return { can: false, why: "The " + ITEM_FIELDS[a.field] + " has changed since the review, so copy the wording and compare." };
       return itemPlan(holder.targetId, a.itemId, a.field, holder.value, String(sug).trim(), docs);
@@ -410,6 +434,7 @@ window.App.Review = (function () {
       return { can: true, kind: "section title", label: "Accept",
         apply: function () { e.setReportSection(a.sectionKey, { title: title }); },
         undo: function () { e.setReportSection(a.sectionKey, { title: prevTitle }); },
+        revert: { what: "section", key: a.sectionKey, field: "title", prev: prevTitle }, applied: title,
         expect: [title], mustPrint: true };
     }
 
@@ -475,6 +500,7 @@ window.App.Review = (function () {
         return { can: true, kind: "section opening", label: "Accept",
           apply: function () { e.setReportSection(a.sectionKey, { prose: prose }); },
           undo: function () { e.setReportSection(a.sectionKey, { prose: prev }); },
+          revert: { what: "section", key: a.sectionKey, field: "prose", prev: prev }, applied: prose,
           expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }).concat(keep), mustPrint: true };
       }
     }
@@ -487,6 +513,9 @@ window.App.Review = (function () {
     return { can: true, kind: "narrative", label: "Accept",
       apply: function () { var p = {}; p[field] = next; e.setReportNarrative(p); },
       undo: function () { var p = {}; p[field] = had; e.setReportNarrative(p); },
+      // null for next steps that were still scaffolded: putting null back
+      // scaffolds them again.
+      revert: { what: "narrative", field: field, prev: had == null ? null : had }, applied: next,
       expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }), mustPrint: true };
   }
 
@@ -496,6 +525,7 @@ window.App.Review = (function () {
     return { can: true, kind: ITEM_FIELDS[field], label: "Accept",
       apply: function () { var p = {}; p[field] = next; e.setResponse(targetId, itemId, p); },
       undo: function () { var p = {}; p[field] = prev; e.setResponse(targetId, itemId, p); },
+      revert: { what: "item", targetId: targetId, itemId: itemId, field: field, prev: prev == null ? "" : prev }, applied: next,
       expect: [next], mustPrint: printed, fragment: true };
   }
 
@@ -530,13 +560,56 @@ window.App.Review = (function () {
           });
           return;
         }
+        // What was replaced is kept with the comment, so the change can be
+        // put back from it (Undo the accepted wording) and is never lost in a
+        // section the report page has no card for.
         t.accepted = { at: new Date().toISOString(), kind: plan.kind };
+        if (plan.revert) { t.accepted.revert = plan.revert; t.accepted.applied = plan.applied; }
         t.status = "resolved"; t.statusAt = t.accepted.at;
         E().touchReview();
         done({ ok: true, message: "Accepted into the " + plan.kind + ", and checked in the rebuilt Word document." +
           (plan.mustPrint ? "" : " This field does not print in the Word report, so the change shows only in the assessment.") });
       });
     });
+  }
+
+  // What the accepted change touched holds now, or undefined if it is gone.
+  function revertTarget(rv) {
+    var e = E();
+    if (rv.what === "section") return e.getReportSection(rv.key)[rv.field];
+    if (rv.what === "narrative") return e.getReportNarrative()[rv.field];
+    if (rv.what === "item") {
+      if (!(e.state.engagement.targets || []).some(function (t) { return t.id === rv.targetId; }) && rv.targetId !== e.SHARED_TARGET_ID) return undefined;
+      var r = e.findResponse(rv.targetId, rv.itemId);
+      return r ? r[rv.field] : "";
+    }
+    return undefined;
+  }
+
+  // Puts back what Accept replaced, and opens the comment again. Refused when
+  // the text has been edited since, as putting the old wording back would
+  // throw that edit away.
+  function undoAccept(t, done) {
+    var acc = t && t.accepted, rv = acc && acc.revert;
+    if (!rv) { done({ ok: false, message: "There is no record of what this replaced, so change it where it is entered." }); return; }
+    var e = E(), cur = revertTarget(rv);
+    if (cur === undefined && rv.what === "item") { done({ ok: false, message: "That " + targetWord() + " is no longer in this assessment, so there is nothing to put back." }); return; }
+    if (norm(cur) !== norm(acc.applied)) {
+      done({ ok: false, message: "The wording has been edited since it was accepted, so the earlier wording was not put back. Use Edit where it is, or change it where it is entered." });
+      return;
+    }
+    var p = {};
+    try {
+      if (rv.what === "section") { p[rv.field] = rv.prev == null ? null : rv.prev; e.setReportSection(rv.key, p); }
+      else if (rv.what === "narrative") { p[rv.field] = rv.prev == null ? null : rv.prev; e.setReportNarrative(p); }
+      else { p[rv.field] = rv.prev == null ? "" : rv.prev; e.setResponse(rv.targetId, rv.itemId, p); }
+    } catch (x) { done({ ok: false, message: "The earlier wording could not be put back: " + (x.message || x) }); return; }
+    delete t.accepted;
+    delete failedPlans[t.comment.id];
+    t.status = "open"; t.reason = ""; t.statusAt = new Date().toISOString();
+    delete t.reopened;
+    e.touchReview();
+    done({ ok: true, message: "The earlier wording is back, and the comment is open again." });
   }
   // Remembered for this session, so the failed Accept is not offered again.
   var failedPlans = {};
@@ -548,21 +621,120 @@ window.App.Review = (function () {
     var a = t.comment.anchor || {};
     return a.kind !== "general" || /^Basis of assessment/.test(a.sectionTitle || "");
   }
+  // Many Word sections have no card on the report page under the same key, but
+  // most are edited somewhere: the document control page in the engagement
+  // details, the basis of assessment in its register, the executive summary in
+  // the consultant's input, a finding on its item. Tried in this order; the
+  // first that is on the page wins. cards are other report-page keys.
+  var PLACES = [
+    { re: /^terms-used-in-the-findings$|^other-terms-used-in-this-report$/, cards: [/^terms-used-in-this-report$/] },
+    { re: /^executive-summary$/, anchor: "consultant-input" },
+    { re: /^document-control/, engagement: true },
+    { re: /^(basis-of-assessment|people-interviewed|documents-reviewed|systems-observed)$/, basis: true },
+    { re: /^method-and-limitations$|^scope-and-method$/, anchor: "narrative-method", cards: [/^about-this-assessment$/, /^not-a-formal-assessment$/, /^about-the-/] },
+    { re: /^(progress-since-previous-assessment|change-since-the-previous-assessment)$/, anchor: "progress" },
+    { re: /^findings-by-|^results-by-|^results-across-|^closeness-to-target|-achieved$|^full-obligation-register$|^fr\d+-/,
+      cards: [/^results-by-/, /^fr-breakdown$/, /^domain-results$/, /^fr-achievement-vs-target$/, /^the-three-positions/] },
+    { re: /at-a-glance$|^(outcome|conformance)-profile-by-|^maturity-distribution-by-|^posture-by-|^achieved-security-level|^overall-posture/,
+      cards: [/headline/, /^posture-summary$/, /^the-three-positions/, /^achieved-security-level/, /^capability-security-level/, /^results-by-/] },
+    { re: /roadmap|recommendations|^where-to-focus-first$/, cards: [/^where-to-focus-first$/, /roadmap/, /^priority-order$/, /^results-by-/] }
+  ];
+
+  // The catalogue item a piece of report text is about, when it opens with the
+  // item's code ("SR 1.1 Human user ...", "A1.a Board direction").
+  function itemByCode(text, catalog) {
+    var s = norm(text), best = null;
+    if (!s) return null;
+    catalog.forEach(function (c) {
+      var code = norm(c.code || c.id);
+      if (code.length < 2 || !/[a-z.]/i.test(code)) return;
+      if (s.slice(0, code.length).toLowerCase() !== code.toLowerCase()) return;
+      var next = s.charAt(code.length);
+      if (next && /[a-z0-9]/i.test(next)) return;
+      if (!best || code.length > norm(best.code || best.id).length) best = c;
+    });
+    return best;
+  }
+
+  // Takes the author to a report section by its key: its card, else the place
+  // it is edited, else a card close to it. Returns where it went, or null.
+  function placeSection(key, have, U) {
+    if (!key) return null;
+    if (have[key] && U.goToSection(key, null, true)) return "card:" + key;
+    var keys = Object.keys(have);
+    for (var i = 0; i < PLACES.length; i++) {
+      var p = PLACES[i];
+      if (!p.re.test(key)) continue;
+      if (p.engagement) { U.openEngagement("documentRevision"); return "engagement"; }
+      if (p.basis) { U.goToBasis(); return "basis"; }
+      if (p.anchor && U.revealIfThere('[data-check-anchor="' + p.anchor + '"]')) return "anchor:" + p.anchor;
+      var cards = p.cards || [];
+      for (var j = 0; j < cards.length; j++) {
+        var k = keys.filter(function (x) { return cards[j].test(x); })[0];
+        if (k && U.goToSection(k, null, true)) return "card:" + k;
+      }
+    }
+    // A card under a near name: a domain's card carries its code in front
+    // ("gov-governance-and-risk"), and a few headings differ in the last word.
+    var words = key.split("-");
+    var near = keys.filter(function (x) { return x.slice(-(key.length + 1)) === "-" + key; })[0] ||
+      (words.length >= 3 ? keys.filter(function (x) { return x.split("-").slice(0, 3).join("-") === words.slice(0, 3).join("-"); })[0] : null);
+    if (near && U.goToSection(near, null, true)) return "card:" + near;
+    return null;
+  }
+
   function goTo(t) {
     var a = t.comment.anchor || {};
-    var U = UI();
-    if (a.kind === "general") { U.goToBasis(); return; }
+    var U = UI(), e = E();
+    if (a.kind === "general") { U.goToBasis(); return "basis"; }
     if (a.kind === "item") {
-      var target = targetByName(a.targetName);
-      if (!target) { U.toast("That " + (E().state.instrument.targetDimensionLabel || "target").toLowerCase() + " is no longer in this assessment.", "warn"); return; }
-      if (a.field === "action" || a.field === "impact" || a.field === "owner") { U.openPlanFor(a.itemId, holderOf(target.id, a.itemId, a.field).targetId === E().SHARED_TARGET_ID ? E().SHARED_TARGET_ID : target.id); return; }
+      var target = targetOf(a);
+      if (!target) { U.toast("That " + targetWord() + " is no longer in this assessment.", "warn"); return null; }
+      if (a.field === "action" || a.field === "impact" || a.field === "owner") { U.openPlanFor(a.itemId, holderOf(target.id, a.itemId, a.field).targetId === e.SHARED_TARGET_ID ? e.SHARED_TARGET_ID : target.id); return "plan:" + a.itemId; }
       U.jumpToItem(target.id, a.itemId);
-      return;
+      return "item:" + a.itemId;
     }
     var docs = cachedDocs();
     var d = docs && docs[a.documentIndex];
     if (d && d.targetId) U.setTargetThen(d.targetId, function () {});
-    U.goToSection(a.sectionKey, a);
+    var have = {};
+    U.sectionKeys().forEach(function (k) { have[k] = true; });
+    if (have[a.sectionKey] && U.goToSection(a.sectionKey, a, true)) return "card:" + a.sectionKey;
+
+    // A finding: the text, its table row, or the smaller heading above it
+    // opens with an item's code.
+    var blocks = (d && d.blocks) || [];
+    var at = -1;
+    blocks.forEach(function (b, i) { if (at === -1 && b.id === a.blockId) at = i; });
+    var catalog = window.App.Compare.catalogFor(e.state.instrument, e.state.scoringFamily);
+    var texts = [a.quote];
+    var b0 = at !== -1 ? blocks[at] : null;
+    if (b0 && b0.type === "table" && a.cell && b0.rows[a.cell.row]) texts = texts.concat(b0.rows[a.cell.row].cells.map(function (c) { return c.text; }));
+    for (var i = at - 1; i >= 0 && blocks[i].sectionKey === a.sectionKey; i--) {
+      if (blocks[i].type === "heading") { texts.push(blocks[i].text); if (!blocks[i].sub) break; }
+    }
+    for (var k = 0; k < texts.length; k++) {
+      var item = itemByCode(texts[k], catalog);
+      if (item) {
+        U.jumpToItem((d && d.targetId) || e.state.activeTargetId, item.id);
+        return "item:" + item.id;
+      }
+    }
+
+    var went = placeSection(a.sectionKey, have, U);
+    if (went) return went;
+    // Else the section this one sits in, by the headings above it.
+    var own = blocks.filter(function (b) { return b.type === "heading" && !b.sub && b.sectionKey === a.sectionKey; })[0];
+    var level = own ? own.level : 99;
+    for (var j = (at !== -1 ? at : blocks.indexOf(own)) - 1; j >= 0; j--) {
+      var hb = blocks[j];
+      if (hb.type !== "heading" || hb.sub || !(hb.level < level)) continue;
+      level = hb.level;
+      went = placeSection(hb.sectionKey, have, U);
+      if (went) return went;
+    }
+    U.toast((a.sectionTitle ? "\"" + a.sectionTitle + "\" is" : "That part is") + " only in the Word report, so the report page has no card for it.", "warn");
+    return null;
   }
 
   // ---- what the Issue check says ----------------------------------------------
@@ -571,8 +743,11 @@ window.App.Review = (function () {
     var docs = cachedDocs();
     return docs ? docs.map(function (d) { return d.contentHash; }) : null;
   }
+  // QA review by filled in, with nothing ever sent, is a review done outside
+  // the tools: no "not reviewed" line then.
   function warningList() {
-    return RC().warnings(store() || RC().emptyStore(), currentHashes());
+    var m = (E().state.engagement && E().state.engagement.engagement) || {};
+    return RC().warnings(store() || RC().emptyStore(), currentHashes(), { qaReviewBy: m.qaReviewBy || "" });
   }
   // For App.UI's issue check: the same shape as its own warning lines.
   function issueWarnings() {
@@ -589,6 +764,30 @@ window.App.Review = (function () {
     if (cachedDocs()) { if (cb) cb(); return false; }
     currentDocs(function () { if (cb) cb(); });
     return true;
+  }
+
+  // ---- a pack this copy of the project has no record of ---------------------------
+  //
+  // If the project was not saved after Send for review, or an older copy is
+  // open, the round is not in the store and every review file is refused. The
+  // pack itself can put the round back (review-author asks packMatches first);
+  // packHint names another assessment in this file that did send it.
+  function packMatches(pack) {
+    var inst = E().state.instrument, eng = (pack && pack.engagement) || {};
+    if (!inst || eng.instrumentId !== inst.id) return false;
+    var m = E().state.engagement.engagement || {};
+    return norm(eng.client).toLowerCase() === norm(m.clientName).toLowerCase();
+  }
+  function packHint(packId) {
+    var e = E(), all = e.state.assessments || {}, hit = null;
+    Object.keys(all).forEach(function (id) {
+      if (hit || id === e.state.activeAssessmentId) return;
+      var rv = all[id] && all[id].review;
+      if (rv && Array.isArray(rv.rounds) && rv.rounds.some(function (r) { return r.packId === packId; })) hit = id;
+    });
+    if (!hit) return null;
+    var row = (e.listAssessments ? e.listAssessments() : []).filter(function (x) { return x.id === hit; })[0];
+    return "This file is for the " + ((row && (row.label || row.instrumentTitle)) || "other") + " assessment in this project: switch to it, then import the file.";
   }
 
   // ---- QA review by ------------------------------------------------------------
@@ -635,17 +834,24 @@ window.App.Review = (function () {
     var U = UI();
     return {
       store: function () { return store() || RC().emptyStore(); },
+      // Starts the review on the assessment, for a pack imported before any.
+      ensureStore: ensureStore,
       touch: function () { E().touchReview(); },
-      send: function (progress, done) { send(progress, done); },
+      send: function (progress, done, opts) { send(progress, done, opts); },
       afterImport: afterImport,
       goTo: goTo,
       canGo: canGo,
+      // Back from a Go to that left the report page (an item, its plan, the basis).
+      showCard: function () { window.App.UI.go("report"); },
       live: function () { return liveHolder && liveHolder.isConnected ? liveHolder : null; },
       acceptPlan: function (t) {
         if (failedPlans[t.comment.id]) return { can: false, why: "That wording did not reach the Word document when it was rebuilt, so copy it and use Go to." };
         return acceptPlan(t);
       },
       accept: accept,
+      undoAccept: undoAccept,
+      packMatches: packMatches,
+      packHint: packHint,
       stale: isStale,
       authorName: function () { return norm((E().state.engagement.engagement || {}).consultant) || "Author"; },
       extras: function () { return qaPrompt(function () { paint(liveHolder && liveHolder.isConnected ? liveHolder : container); }); },
@@ -687,6 +893,9 @@ window.App.Review = (function () {
     importTexts: function (list) { var a = adapter(null); return window.App.ReviewAuthor.importTexts(a, list, null, null); },
     acceptPlan: acceptPlan,
     accept: accept,
+    undoAccept: undoAccept,
+    packMatches: packMatches,
+    packHint: packHint,
     isStale: isStale,
     goTo: goTo,
     canGo: canGo,

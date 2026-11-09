@@ -1,0 +1,229 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Suite shell: tours, recent files, hand-off and drops</title></head>
+<body>
+<pre id="out">running...</pre>
+<iframe id="f" style="width:1440px;height:900px;border:0"></iframe>
+<!--
+  The suite shell in its folder build (platform/index.html, each tool its own
+  page in a frame), with the real tools and the real host bridge:
+    - a tour's unsaved changes and saves do not count (no bar tag, no close
+      warning, nothing in Recent files);
+    - Recent files says which review-tool entry is the pack and which the
+      review file;
+    - a tool can hand a file it wrote to another tool (the author's pack to
+      the Report Review Tool, a review file back to the author's tool), and a
+      tour cannot;
+    - a file dropped on the suite, or on a tool that does not take it, opens
+      in the tool that reads it and never replaces the page;
+    - the wording covers all three tools.
+  Run with tools/run-tests.ps1 -Root platform -Tests test-shell.html (headless
+  runs need --allow-file-access-from-files, which run-tests.ps1 passes).
+-->
+<script src="../../modules/report-review/data/demo-pack.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function until(test, ms, what) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function poll() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out waiting for " + (what || "a condition")));
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+  var frame = document.getElementById("f");
+  var S = null, Sh = null;
+  function tool(key) {
+    return until(function () {
+      var f = Sh.frames[key];
+      return f && f.ready && f.el.contentWindow && f.el.contentWindow.App && f.el.contentWindow.App.HostBridge && f;
+    }, 60000, key + " to start").then(function (f) {
+      var w = f.el.contentWindow;
+      w.confirm = function () { return true; }; w.alert = function () {};
+      return { f: f, w: w, d: w.document };
+    });
+  }
+  // A message as the tool in that frame would send it (its window is the source).
+  function postFrom(w, type, data, frameKey, module) {
+    w.eval("parent.postMessage(" + JSON.stringify({ protocol: "spt-suite/1", from: "module", module: module, frame: frameKey, type: type, data: data }) + ", '*')");
+  }
+  function dropEvent(w, type, files, text) {
+    var dt = new w.DataTransfer();
+    (files || []).forEach(function (f) { dt.items.add(new w.File([f.text], f.name, { type: "application/json" })); });
+    if (text) dt.setData("text/plain", text);
+    return new w.DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
+  }
+  function toastText() { var t = S.document.getElementById("toast"); return t && !t.classList.contains("hidden") ? t.textContent : ""; }
+
+  var pack = window.SPT_REVIEW_DEMO_PACK;
+  var packText = JSON.stringify(pack);
+
+  new Promise(function (resolve) {
+    frame.onload = function () { resolve(); };
+    frame.src = "../index.html";
+  }).then(function () {
+    return until(function () { return frame.contentWindow.Suite && frame.contentWindow.Suite.Shell; }, 30000, "the suite");
+  }).then(function () {
+    S = frame.contentWindow; Sh = S.Suite.Shell;
+    S.confirm = function () { return true; };
+    Sh.clearRecent();
+
+    // ---- wording: three tools ----------------------------------------------
+    var d = S.document;
+    Sh.openLicence();
+    var lic = d.querySelector(".licence-version");
+    ok(lic && /every tool in the suite/.test(lic.textContent) && !/both tools/.test(lic.textContent), "the licence covers every tool, not both", lic && lic.textContent);
+    d.querySelector(".licence-modal .btn.primary").click();
+    ok(/review packs and review files/.test(d.querySelector(".recent-empty").textContent), "Recent files says it holds review packs and review files too");
+    var tips = d.querySelector(".help-tips").textContent;
+    ok(/review file in the Report Review Tool/.test(tips) && !/its own project file with Save and Load/.test(tips), "the help says what each tool saves", tips);
+    ok(/drop a project file, review pack or review file/.test(tips), "and that a file can be dropped on the suite");
+    var helps = d.querySelectorAll(".help-tool[data-module='assessments'] p, .help-tool[data-module='risk-assessment'] p");
+    ok(helps.length === 2 && /Send for review/.test(helps[0].textContent) && /Import review files/.test(helps[1].textContent),
+      "Getting started explains the author's half of a review in the assessment and risk tools");
+
+    // ---- what a file is ----------------------------------------------------
+    var K = Sh.fileKind;
+    ok(K(packText).module === "report-review" && K(packText).what === "review pack", "a review pack goes to the review tool");
+    ok(K(JSON.stringify({ schema: "spt-review/1.0", packId: "x", comments: [] })).what === "review file", "and so does a review file");
+    ok(K(JSON.stringify({ schema: "spt-risk-project/0.2" })).module === "risk-assessment", "a risk project goes to the risk tool");
+    ok(K(JSON.stringify({ schemaVersion: "2.0", assessments: {} })).module === "assessments", "an assessment project goes to the assessment tool");
+    ok(K(JSON.stringify({ schema: "spt-risk-context/1.4" })).module === null, "a risk context file is not opened on its own");
+    ok(K("PK\u0003\u0004 not json") === null && K("[1,2]") === null && K(JSON.stringify({ schema: "something/1" })) === null, "anything else is not guessed at");
+
+    // ---- a tour's changes and saves do not count -----------------------------
+    Sh.open("report-review/tour");
+    return tool("report-review/tour");
+  }).then(function (t) {
+    return until(function () { return t.w.ReviewTool && t.w.ReviewTool.state.pack; }, 20000, "the review tour's pack").then(function () {
+      postFrom(t.w, "dirty", { dirty: true }, "report-review/tour", "report-review");
+      postFrom(t.w, "recent", { action: "save", name: "demo-review.json", label: "Acme Petrochemicals", hasHandle: false }, "report-review/tour", "report-review");
+      return sleep(300);
+    }).then(function () {
+      var f = Sh.frames["report-review/tour"];
+      ok(f.dirty === false && f.el.getAttribute("data-dirty") === "false", "a tour saying it has unsaved changes is not marked unsaved");
+      ok(!/Unsaved changes/.test(S.document.getElementById("suite-bar").textContent), "the bar shows no Unsaved changes for a tour");
+      var ev = new S.Event("beforeunload", { cancelable: true });
+      S.dispatchEvent(ev);
+      ok(!ev.defaultPrevented, "closing the suite does not warn about a tour");
+      ok(Sh.readRecent().length === 0, "a save in the tour is not added to Recent files", JSON.stringify(Sh.readRecent()));
+      ok(t.w.App.HostBridge.canHandoff === false && t.w.App.HostBridge.handoff("assessments", "x.json", "{}") === false, "a tour cannot hand a file to another tool");
+      postFrom(t.w, "handoff", { to: "assessments", name: "x.json", text: "{}" }, "report-review/tour", "report-review");
+      return until(function () { return /tour/.test(toastText()); }, 5000, "the tour hand-off message").then(function () {
+        ok(Sh.current() === "report-review/tour" && !Sh.frames.assessments, "and the suite refuses one sent anyway, staying where it was");
+      });
+    }).then(function () {
+      // ---- the author's pack handed to the review tool, opened for the first time ----
+      Sh.open("risk-assessment");
+      return tool("risk-assessment");
+    });
+  }).then(function (rk) {
+    ok(rk.w.App.HostBridge.canHandoff === true, "a tool in the suite may hand files on");
+    ok(!Sh.frames["report-review"], "the review tool is not open yet");
+    rk.w.App.HostBridge.handoff("report-review", "acme-review-pack-round-2.json", packText);
+    return tool("report-review").then(function (rv) {
+      return until(function () { return rv.w.ReviewTool.state.pack && rv.w.ReviewTool.state.pack.packId === pack.packId; }, 20000, "the handed pack to open").then(function () {
+        ok(Sh.current() === "report-review", "the hand-off opens the review tool, held until it had started");
+        ok(!rv.w.ReviewTool.state.demo && rv.w.ReviewTool.state.pack.round === pack.round, "with the pack open in it, as a real pack");
+        ok(Sh.readRecent().some(function (e) { return e.module === "report-review" && e.name === "acme-review-pack-round-2.json"; }),
+          "the pack it opened is in Recent files under the review tool");
+
+        // ---- Recent files tells the pack from the review file -----------------
+        rv.w.App.HostBridge.recent({ action: "save", name: "acme-review-round-2-pat.json", label: "Acme" });
+        rv.w.App.HostBridge.recent({ action: "open", name: "renamed.json", label: "Acme", kind: "Review file" });
+        return until(function () { return Sh.readRecent().length >= 3; }, 5000, "the recent entries");
+      }).then(function () {
+        Sh.home();
+        var metas = Array.prototype.map.call(S.document.querySelectorAll(".recent-item"), function (li) { return li.querySelector(".recent-name").textContent + " = " + li.querySelector(".recent-meta").textContent; });
+        function meta(n) { return metas.filter(function (m) { return m.indexOf(n + " = ") === 0; })[0] || ""; }
+        ok(/Review pack/.test(meta("acme-review-pack-round-2.json")), "a pack is labelled Review pack in Recent files", meta("acme-review-pack-round-2.json"));
+        ok(/Review file/.test(meta("acme-review-round-2-pat.json")), "a review file is labelled Review file", meta("acme-review-round-2-pat.json"));
+        ok(/Review file/.test(meta("renamed.json")), "and a kind the tool gives is used as given", meta("renamed.json"));
+
+        // ---- a review file handed back to the author's tool ----------------------
+        var file = { schema: "spt-review/1.0", packId: pack.packId, reviewId: pack.reviewId, round: pack.round, fileId: "rf-x", reviewer: "Pat", savedAt: "2026-11-09T10:00:00.000Z", comments: [] };
+        rv.w.App.HostBridge.handoff("OT Cyber Risk Assessment Tool", "acme-review-round-2-pat.json", JSON.stringify(file));
+        return until(function () { return Sh.current() === "risk-assessment" && rk.d.querySelector(".spt-host-banner"); }, 10000, "the hand-back").then(function () {
+          ok(/Import review files/.test(rk.d.querySelector(".spt-host-banner").textContent),
+            "a review file handed back by product name reaches that tool's review card, which says where it goes when no report is open", rk.d.querySelector(".spt-host-banner").textContent);
+          rk.d.querySelector(".spt-host-banner .spt-host-x").click();
+        });
+      }).then(function () {
+        // ---- files dropped on the suite ----------------------------------------
+        Sh.home();
+        var over = dropEvent(S, "dragover", [{ name: "p.json", text: "{}" }]);
+        S.document.body.dispatchEvent(over);
+        ok(over.defaultPrevented, "a file dragged over the home page is accepted, so the browser does not open it in place of the suite");
+        var pack2 = JSON.parse(packText); pack2.packId = "rp-dropped-on-home";
+        var drop = dropEvent(S, "drop", [{ name: "dropped-pack.json", text: JSON.stringify(pack2) }]);
+        S.document.querySelector(".home-main").dispatchEvent(drop);
+        ok(drop.defaultPrevented, "dropping it does not navigate away");
+        return until(function () { return rv.w.ReviewTool.state.pack.packId === "rp-dropped-on-home"; }, 15000, "the dropped pack").then(function () {
+          ok(Sh.current() === "report-review", "a review pack dropped on the home page opens in the review tool");
+          Sh.home();
+          var junk = dropEvent(S, "drop", [{ name: "notes.json", text: "{\"hello\":1}" }]);
+          S.document.body.dispatchEvent(junk);
+          return until(function () { return /notes\.json is not a file the suite opens/.test(toastText()); }, 5000, "the message for an unknown file").then(function () {
+            ok(junk.defaultPrevented && Sh.current() === null, "an unknown file gets a message and nothing else");
+          });
+        }).then(function () {
+          // ---- dropped on a tool that does not take files itself ------------------
+          Sh.open("risk-assessment");
+          var tdrag = dropEvent(rk.w, "dragover", null, "some text");
+          rk.d.body.dispatchEvent(tdrag);
+          ok(!tdrag.defaultPrevented, "dragging text in a tool is left alone");
+          var proj = JSON.parse(JSON.stringify(rk.w.RiskTool.state.project));
+          proj.schema = proj.schema || "spt-risk-project/0.2";
+          proj.suc = proj.suc || {}; proj.suc.name = "Dropped on the risk tool";
+          var pack3 = JSON.parse(packText); pack3.packId = "rp-dropped-on-risk";
+          var fdrag = dropEvent(rk.w, "dragover", [{ name: "x.json", text: "{}" }]);
+          rk.d.body.dispatchEvent(fdrag);
+          ok(fdrag.defaultPrevented, "a file dragged over a tool that does not take files is accepted for the suite");
+          var fdrop = dropEvent(rk.w, "drop", [{ name: "risk.json", text: JSON.stringify(proj) }]);
+          rk.d.querySelector("main, #main, body").dispatchEvent(fdrop);
+          ok(fdrop.defaultPrevented, "and dropping it does not replace the tool's page");
+          return until(function () { return rk.w.RiskTool.state.project.suc.name === "Dropped on the risk tool"; }, 15000, "the dropped risk project").then(function () {
+            ok(Sh.current() === "risk-assessment", "a risk project dropped on the risk tool opens in it, through the suite");
+            var gdrop = dropEvent(rk.w, "drop", [{ name: "pack3.json", text: JSON.stringify(pack3) }]);
+            rk.d.body.dispatchEvent(gdrop);
+            return until(function () { return rv.w.ReviewTool.state.pack.packId === "rp-dropped-on-risk"; }, 15000, "the pack dropped on the risk tool");
+          }).then(function () {
+            ok(Sh.current() === "report-review", "a review pack dropped on the risk tool opens in the review tool");
+            var rdrop = dropEvent(rv.w, "drop", [{ name: "pack4.json", text: packText }]);
+            rv.d.body.dispatchEvent(rdrop);
+            ok(rdrop.defaultPrevented, "the review tool still takes a file dropped on it itself");
+            // A review file the author drops on their own tool is theirs to import.
+            Sh.open("risk-assessment");
+            var oldBanner = rk.d.querySelector(".spt-host-banner");
+            if (oldBanner && oldBanner.parentNode) oldBanner.parentNode.removeChild(oldBanner);
+            var rf = { schema: "spt-review/1.0", packId: "rp-for-the-author", reviewId: "rv-x", round: 1, fileId: "rf-drop", reviewer: "Pat", savedAt: "2026-11-09T11:00:00.000Z", comments: [] };
+            var adrop = dropEvent(rk.w, "drop", [{ name: "pat-review.json", text: JSON.stringify(rf) }]);
+            rk.d.body.dispatchEvent(adrop);
+            return until(function () { return rk.d.querySelector(".spt-host-banner") || rk.d.querySelector(".rv-notice"); }, 10000, "the author's tool to take the dropped review file").then(function (n) {
+              ok(Sh.current() === "risk-assessment" && !rv.w.ReviewTool.state.pendingReview, "a review file dropped on the author's own tool stays there, not sent to the review tool", Sh.current());
+              ok(/Import review files|review file/i.test(n.textContent), "and the tool says what it did with it", n.textContent);
+            });
+          });
+        });
+      });
+    });
+  }).catch(function (e) {
+    ok(false, "the page ran to the end", e && e.message || e);
+  }).then(function () {
+    try { if (S) S.Suite.__noOwnGuard = true; } catch (e) {}
+    finish();
+  });
+})();
+</script>
+</body>
+</html>

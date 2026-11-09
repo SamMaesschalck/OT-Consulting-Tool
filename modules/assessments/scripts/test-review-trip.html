@@ -212,8 +212,14 @@ H.test(function (ok, done) {
     ok(bad2.bad === 1 && /could not be read/.test(bad2.lines[0]), "a file that is not JSON is refused");
     var bad3 = RV.importTexts([{ name: "z.json", text: JSON.stringify(Object.assign({}, later, { packId: "rp-other" })) }]);
     ok(bad3.bad === 1 && /different pack/.test(bad3.lines[0]), "a review file for another pack is refused", bad3.lines[0]);
+    // A pack is not a review file: this assessment's own is already on its
+    // rounds (importing it re-registers a round sent from an unsaved copy),
+    // and another client's is refused.
     var bad4 = RV.importTexts([{ name: "p.json", text: savedPack.text }]);
-    ok(bad4.bad === 1 && /review pack/.test(bad4.lines[0]), "and a pack is not a review file");
+    ok(bad4.bad === 0 && /already registered/.test(bad4.lines[0]), "this assessment's own pack is already registered, and nothing changes", bad4.lines[0]);
+    var otherPack = JSON.parse(savedPack.text); otherPack.packId = "rp-other-client"; otherPack.engagement.client = "Someone Else Ltd";
+    var bad5 = RV.importTexts([{ name: "q.json", text: JSON.stringify(otherPack) }]);
+    ok(bad5.bad === 1 && /not this assessment/.test(bad5.lines[0]), "and another client's pack is refused", bad5.lines[0]);
     ok(RV.store().threads.length === 4, "none of which changed anything");
 
     // The list, on the card.

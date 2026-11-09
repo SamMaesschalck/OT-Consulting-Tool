@@ -146,7 +146,9 @@ module.exports = function selfTest(win) {
       const clean = await run("ReviewTool.isDirty()");
       ok(!clean, "saving clears the unsaved mark");
 
-      await run(`(function () { ReviewTool.addComment({ severity: "suggestion", anchor: ReviewTool.state.review.comments[0].anchor, text: "Unsaved." }); return 0; })()`);
+      // Demo work never warns on close, so the warning is checked on a real
+      // pack: a copy of the demo pack with its own id.
+      await run(`(function () { ReviewTool.loadTexts([{ name: "self-test-pack.json", text: JSON.stringify(Object.assign({}, window.SPT_REVIEW_DEMO_PACK, { packId: "rp-selftest-" + Date.now() })) }]); ReviewTool.addComment({ severity: "suggestion", anchor: { kind: "general", sectionTitle: "General", documentIndex: 0, quote: "" }, text: "Unsaved." }); return 0; })()`);
       let closed = false;
       win.once("closed", () => { closed = true; });
       win.close();

@@ -1,0 +1,140 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Risk tool: the automatic review checks on its packs</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The review tool's automatic checks (modules/report-review/js/checks.js, loaded
+  here from its own module) on real packs the risk tool builds from its tour
+  demo. The risk checks are read against the risk tool's own functions: what
+  they flag must be exactly the threats above tolerable with no disposition
+  (RiskTool.threatDisposition) and the zones and conduits with target levels and
+  no justification. The demo is the clean negative; each positive is made by
+  changing the project and building the pack again, not by editing a pack. What
+  is flagged is printed ("flagged ...") so a false alarm is read, not assumed
+  away. Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script src="../../report-review/js/checks.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f"), RK = window.App.ReviewChecks;
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 60000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+  function of(list, check) { return list.filter(function (r) { return r.check === check; }); }
+  function ids(list) { return list.map(function (r) { return r.itemId; }).sort().join(","); }
+  frame.onload = function () {
+    var w = frame.contentWindow;
+    w.confirm = function () { return true; }; w.alert = function () {};
+    poll(function () { return w.RiskTool && w.RiskReview && w.RiskTool.state.project.zones.length; }).then(function () {
+      var RT = w.RiskTool, RR = w.RiskReview, demo = JSON.stringify(RT.state.project);
+      function fresh() { RT.loadProjectText(demo); return RT.state.project; }
+      function pack() { return RR.buildPack().then(function (r) { return JSON.parse(JSON.stringify(r.pack)); }); }
+      function owners(p) { return p.zones.concat(p.conduits); }
+      function tol(p) { return p.srs.tolerableRisk || "medium"; }
+      // The risk tool's own reading, as its pack builds the threat's status.
+      function noDisposition(p) {
+        var out = [];
+        owners(p).forEach(function (o) {
+          o.threats.forEach(function (t) {
+            var band = RT.threatRisk(t), resid = RT.residualRisk(t);
+            if (band && RT.exceedsTolerable(resid || band, tol(p)) && !RT.threatDisposition(o, t, tol(p))) out.push(o.id + ":" + t.id);
+          });
+        });
+        return out.sort().join(",");
+      }
+      function unjustified(p) {
+        return owners(p).filter(function (o) {
+          var s = o.slTargetByFR || {};
+          return Object.keys(s).some(function (k) { return s[k] != null; }) && !(o.justification || "").trim();
+        }).map(function (o) { return o.id + ":slt"; }).sort().join(",");
+      }
+      var p0 = fresh();
+      return pack().then(function (P) {
+        var res = RK.run(P, {});
+        res.forEach(function (x) { lines.push("flagged demo " + x.check + ": " + x.message + " [" + String(x.quote).slice(0, 110) + "]"); });
+        ok(P.engagement.scoringFamily === "risk-assessment" && P.items.length > 9, "the demo's pack is a risk pack (" + P.items.length + " items)");
+        ok(noDisposition(p0) === "" && of(res, "risk-no-disposition").length === 0, "no disposition: the demo has none, and none is flagged", noDisposition(p0));
+        ok(unjustified(p0) === "" && of(res, "risk-slt-justification").length === 0, "target levels with no justification: the demo has none, and none is flagged", unjustified(p0));
+        ok(of(res, "no-evidence").length === 0 && of(res, "dashes").length === 0 && of(res, "numbering").length === 0 && of(res, "figures").length === 0,
+          "and no evidence, dash, numbering or figure alarm on the demo");
+        ok(res.every(function (x) { return x.check === "red-prompts"; }), "the demo's only flags are its red consultant notes", res.map(function (x) { return x.check; }).join(","));
+
+        // ---- a threat above tolerable with nothing done about it --------------------
+        var p = fresh(), hit = null;
+        owners(p).forEach(function (o) {
+          o.threats.forEach(function (t) {
+            var band = RT.threatRisk(t);
+            if (!hit && band && RT.exceedsTolerable(band, tol(p))) hit = { o: o, t: t };
+          });
+        });
+        ok(!!hit, "the demo has a threat above tolerable to strip (" + (hit && hit.o.id + ":" + hit.t.id) + ")");
+        hit.o.countermeasures = []; hit.t.acceptance = ""; hit.t.residualLikelihood = null; hit.t.residualImpact = null;
+        (hit.t.affectedFR.length ? hit.t.affectedFR : Object.keys(hit.o.slTargetByFR)).forEach(function (fr) { hit.o.slTargetByFR[fr] = null; });
+        hit.o.justification = hit.o.justification || "Kept so this case is only about the disposition.";
+        window.__truth = noDisposition(p);
+        return pack();
+      }).then(function (P) {
+        var res = RK.run(P, {}), nd = of(res, "risk-no-disposition");
+        nd.forEach(function (x) { lines.push("flagged stripped " + x.check + ": " + x.message); });
+        ok(window.__truth.length > 0 && ids(nd) === window.__truth, "flags exactly the threats the risk tool says have no disposition", ids(nd) + " vs " + window.__truth);
+        ok(nd.every(function (x) { return x.kind === "item" && x.severity === "must-fix" && /above the tolerable risk with no disposition/.test(x.message) && "targetId" in x; }),
+          "each anchored to its threat, as a must fix");
+        ok(of(res, "no-evidence").length === 0, "and no-evidence stays out of a risk pack");
+
+        // ---- target levels with no justification ---------------------------------------
+        var p = fresh(), o = owners(p).filter(function (x) { return Object.keys(x.slTargetByFR || {}).some(function (k) { return x.slTargetByFR[k] != null; }); })[0];
+        ok(!!o, "a zone or conduit with target levels set (" + (o && o.id) + ")");
+        o.justification = "  ";
+        window.__truth = unjustified(p);
+        return pack();
+      }).then(function (P) {
+        var sj = of(RK.run(P, {}), "risk-slt-justification");
+        sj.forEach(function (x) { lines.push("flagged blank " + x.check + ": " + x.message + " [" + x.quote + "]"); });
+        ok(window.__truth.length > 0 && ids(sj) === window.__truth, "flags exactly the target levels with no justification", ids(sj) + " vs " + window.__truth);
+
+        // ---- an unrated threat, and a blank threat source --------------------------------
+        var p = fresh();
+        function over(t) { var b = RT.threatRisk(t), r = RT.residualRisk(t); return !!b && RT.exceedsTolerable(r || b, tol(p)); }
+        var o = owners(p).filter(function (x) { return x.threats.length > 1 && x.threats.some(over); })[0];
+        var t2 = o.threats.filter(over)[0], t = o.threats.filter(function (x) { return x !== t2; })[0];
+        t.likelihood = ""; t2.source = "";
+        window.__case = { owner: o.id, t: t.id, t2: t2.id, impact: t.impact };
+        return pack();
+      }).then(function (P) {
+        var c = window.__case, res = RK.run(P, {});
+        res.forEach(function (x) { lines.push("flagged unrated " + x.check + ": " + x.message + " [" + String(x.quote).slice(0, 110) + "]"); });
+        var cellText = [];
+        P.documents.forEach(function (d) { d.blocks.forEach(function (b) { if (b.type === "table") b.rows.forEach(function (r) { r.cells.forEach(function (cl) { cl.blocks.forEach(function (x) { if (/×/.test(x.text || "") && /[–—]|not rated/i.test(x.text || "")) cellText.push(x.text); }); }); }); }); });
+        ok(cellText.length > 0, "the register prints the unrated side of likelihood by impact (" + cellText[0] + ")");
+        ok(of(res, "dashes").length === 0, "and the dash check does not call that a style problem", JSON.stringify(of(res, "dashes").map(function (x) { return x.quote; })));
+        var un = of(res, "unanswered").filter(function (x) { return x.itemId === c.owner + ":" + c.t; });
+        ok(un.length === 1 && /is not rated/.test(un[0].message), "the gap is reported as an unrated threat", un[0] && un[0].message);
+        var f2 = P.items.filter(function (i) { return i.itemId === c.owner + ":" + c.t2; })[0];
+        ok(f2 && (f2.status === "finding" || f2.status === "recorded") &&!String(f2.evidence || "").trim() && of(res, "no-evidence").length === 0,
+          "a finding with a blank threat source is not reported as missing evidence", f2 && f2.status);
+      });
+    }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+      try { w.onbeforeunload = null; } catch (e) {}
+      finish();
+    });
+  };
+  frame.src = "../index.html?tour=1";
+})();
+</script>
+</body></html>

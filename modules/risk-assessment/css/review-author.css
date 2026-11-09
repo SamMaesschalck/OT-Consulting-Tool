@@ -47,4 +47,47 @@
 .rv-inline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .rv-input { flex: 1 1 220px; min-width: 0; font: inherit; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
 .rv-c-actions .btn, .rv-inline .btn { padding: 3px 9px; font-size: 12px; }
+/* The note for the reviewers, sent with the pack. */
+.rv-request { margin: 0 0 10px; font-size: 13px; }
+.rv-request > summary { cursor: pointer; color: var(--text-muted); }
+.rv-req-label { display: flex; flex-direction: column; gap: 3px; margin: 8px 0 0; font-weight: 600; font-size: 12px; }
+.rv-req-label .rv-input { font-weight: normal; width: 100%; box-sizing: border-box; }
+.rv-req-label textarea.rv-input { resize: vertical; }
+.rv-req-hint { margin: 6px 0 0; font-size: 12px; }
+.rv-sent-note { font-size: 13px; margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A reviewer's checklist and dismissed checks. */
+.rv-checklist { margin-top: 3px; }
+.rv-checklist > summary { cursor: pointer; color: var(--text-muted); }
+.rv-cl-list { margin: 4px 0 0; padding-left: 18px; }
+.rv-cl-list li { margin: 2px 0; }
+.rv-cl-list li.rv-cl-no strong { color: var(--gap); }
+.rv-cl-short { color: var(--near); }
+/* Section groups that open and close. */
+.rv-groupbox { margin: 0; }
+.rv-groupbox > summary.rv-group { cursor: pointer; font-weight: 600; }
+.rv-groupbox > summary.rv-group::marker { color: var(--text-muted); }
+.rv-groupbox:not([open]) > summary.rv-group { margin-bottom: 4px; }
+.rv-group-must { margin-left: 8px; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--gap-bg); color: var(--gap); }
+/* A closed comment folds what it is on away. */
+.rv-more { margin: 4px 0 0; }
+.rv-more > summary { cursor: pointer; font-size: 12px; color: var(--text-muted); }
+/* Suggested wording against the text it replaces. */
+.rv-diff { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.rv-ins { text-decoration: none; background: var(--met-bg); color: var(--met); font-weight: 600; padding: 0 2px; border-radius: 2px; }
+.rv-del { background: var(--gap-bg); color: var(--gap); padding: 0 2px; border-radius: 2px; }
+.rv-gap { color: var(--text-muted); }
+.rv-full { margin-top: 6px; }
+.rv-full > summary { cursor: pointer; font-size: 12px; color: var(--text-muted); }
+.rv-full .rv-s-label { margin-top: 6px; }
+.rv-s-was { color: var(--text-muted); }
+/* A comment raised again, and the earlier one it continues. */
+.rv-raised { margin: 6px 0; padding: 4px 10px; border-left: 2px solid var(--brand-blue); background: var(--surface-2); border-radius: var(--radius); }
+.rv-raised-head { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.rv-raised-text { margin: 2px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rv-raised-quote { font-size: 12px; overflow-wrap: anywhere; }
+.rv-raised .btn { margin-top: 4px; padding: 3px 9px; font-size: 12px; }
+/* After Go to, the way back to the comment. */
+.rv-back { position: fixed; right: 20px; bottom: 20px; z-index: 40; display: flex; gap: 6px; padding: 6px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.rv-comment.rv-flash { outline: 2px solid var(--brand-blue); outline-offset: 2px; background: var(--brand-blue-tint); transition: background .6s ease; }
+@media (max-width: 600px) { .rv-back { left: 16px; right: 16px; bottom: 12px; justify-content: flex-end; } }
 .export-issue-note.warn { color: var(--near); margin: 6px 0 0; }

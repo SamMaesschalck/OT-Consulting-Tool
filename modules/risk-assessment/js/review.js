@@ -11,9 +11,14 @@
  * A suggestion on a section's heading or the wording that opens it can be
  * accepted into that report's section overrides (js/report-page.js): the Word
  * document is rebuilt to check the words are really there, and it is undone if
- * they are not. Anything else is Copy plus Go to. The store is project.review:
- * absent until a review starts, so older files still load, and neither export
- * reads it.
+ * they are not, and the comment can undo it later. Anything else is Copy plus
+ * Go to. The store is project.review: absent until a review starts, so older
+ * files still load, and neither export reads it.
+ *
+ * Once a review has started, its warnings (not reviewed, changes requested,
+ * must-fix open, changed since approval) show on the Peer review, Report and
+ * Review & export pages and in the question before each Word or Excel
+ * download. They only warn. An approval offers to fill in QA review by.
  */
 window.RiskReview = (function () {
   "use strict";
@@ -33,16 +38,58 @@ window.RiskReview = (function () {
   }
 
   // ---- the documents --------------------------------------------------------
+  // reportId is which report's overrides a comment's Accept writes to, and
+  // which tab Go to opens. With no zones or conduits there is nothing behind
+  // the detailed report, so only the high-level report (the zone-free §4.2
+  // deliverable) is packed: a document's place in the pack is therefore not
+  // which report it is, and docFor() finds it by title.
   var DOCS = [
-    { title: "Detailed report", opts: {} },
-    { title: "High-level report", opts: { highLevelOnly: true } }
+    { id: "detailed", title: "Detailed report", opts: {} },
+    { id: "highLevel", title: "High-level report", opts: { highLevelOnly: true } }
   ];
+  function docsToPack() {
+    var p = project();
+    return (p.zones.length || p.conduits.length) ? DOCS : DOCS.filter(function (d) { return d.id === "highLevel"; });
+  }
+  // The document a comment is on: by its title where the anchor has one (a
+  // round packed before zones existed had the high-level report first), else
+  // by its place.
+  function docFor(a, docs) {
+    if (!docs) return null;
+    var byTitle = a.documentTitle ? docs.filter(function (d) { return d.title === a.documentTitle; })[0] : null;
+    return byTitle || docs[Number(a.documentIndex) || 0] || null;
+  }
+  function reportIdFor(a, docs) {
+    var d = docFor(a, docs);
+    if (d && d.reportId) return d.reportId;
+    if (a.documentTitle) return a.documentTitle === "High-level report" ? "highLevel" : "detailed";
+    return a.documentIndex === 1 ? "highLevel" : "detailed";
+  }
+
+  // The content hash leaves out the asset owner's sign-off, as document control
+  // leaves out QA review by: signing off after the review approved it is the
+  // normal order, not a change to what was reviewed. Out: the Sign-off section,
+  // the document control row, and the sentence the executive summary prints.
+  function hashBlocks(blocks) {
+    var skip = {};
+    RX().signOffTexts(project()).forEach(function (s) { skip[norm(s)] = 1; });
+    function para(b) { return b.type !== "table" && b.type !== "image" && skip[norm(b.text)]; }
+    function clean(b) {
+      if (b.type !== "table") return b;
+      return Object.assign({}, b, { rows: b.rows.filter(function (r) {
+        return !(r.cells.length === 2 && norm(r.cells[0].text).toLowerCase() === "asset-owner sign-off");
+      }) });
+    }
+    return (blocks || []).filter(function (b) { return b.sectionKey !== "sign-off" && !para(b); }).map(clean);
+  }
+  function hashOf(blocks) { return DB().contentHash(hashBlocks(blocks)); }
+
   function buildDocuments(progress) {
-    var out = [], chain = Promise.resolve();
-    DOCS.forEach(function (d, i) {
+    var out = [], chain = Promise.resolve(), list = docsToPack();
+    list.forEach(function (d, i) {
       var probe = [];
       chain = chain.then(function () {
-        if (progress) progress("Building the Word report " + (i + 1) + " of " + DOCS.length + "…");
+        if (progress) progress("Building the Word report " + (i + 1) + " of " + list.length + "…");
         return window.docx.Packer.toBlob(RX().buildWordDoc(project(), Object.assign({}, d.opts, { sectionProbe: probe })));
       }).then(function (blob) {
         // A section's key slugs its GENERATED heading, and a Word file only has
@@ -50,7 +97,7 @@ window.RiskReview = (function () {
         // renamed or not, and which are only a zone's name.
         return DB().fromBlob(blob, { idPrefix: "d" + i + "-b", headings: probe });
       }).then(function (res) {
-        out.push({ title: d.title, targetName: "", blocks: res.blocks, media: res.media, contentHash: DB().contentHash(res.blocks), probe: probe });
+        out.push({ title: d.title, reportId: d.id, targetName: "", blocks: res.blocks, media: res.media, contentHash: hashOf(res.blocks), probe: probe });
       });
     });
     return chain.then(function () { return out; });
@@ -58,43 +105,79 @@ window.RiskReview = (function () {
 
   // ---- the engagement behind them ----------------------------------------------
   function ownerName(o) { return o.name || o.id; }
+  // What the review tool calls each item field in a risk pack (contract
+  // spt-review-pack, engagement.fieldLabels). null: a threat has no such field,
+  // so the row is not shown, nor offered for suggested wording. Likelihood,
+  // impact, affected FRs, the residual rating and an SL-T's justification and
+  // suggestion are read-only rows (items[].details).
+  var FIELD_LABELS = { answer: "Risk", expected: "Tolerable risk", evidence: "Threat source", notes: "Risk acceptance",
+    action: "Countermeasures addressing this threat", impact: null, priority: "Disposition", owner: null };
+  function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function bandName(id) { return id ? RX().bandName(id) : ""; }
+  function rating(l, i) { return (l ? cap(l) : "Not rated") + " × " + (i ? cap(i) : "Not rated"); }
+  function slVector(v) {
+    var ids = RT().FR_IDS.filter(function (fr) { return v && v[fr] != null; });
+    return ids.map(function (fr) { return fr + " SL" + v[fr]; }).join(", ");
+  }
   function packItems() {
     var p = project(), R = RT(), items = [], facts = [];
     var tolerable = p.srs.tolerableRisk || "medium";
-    function addOwner(o, groupName) {
-      var fact = { targetName: ownerName(o), roadmapEntries: 0, findings: 0, met: 0, recorded: 0, toAssess: 0, unanswered: 0, na: 0, groups: [] };
+    function addOwner(o, groupName, isZone) {
+      var fact = { targetName: ownerName(o), targetId: o.id, roadmapEntries: 0, findings: 0, met: 0, recorded: 0, toAssess: 0, unanswered: 0, na: 0, groups: [] };
       var field = { finding: "findings", met: "met", recorded: "recorded", "to-assess": "toAssess", unanswered: "unanswered", na: "na" };
       (o.threats || []).forEach(function (t) {
         var band = R.threatRisk(t), resid = R.residualRisk(t);
         var over = R.exceedsTolerable(resid || band, tolerable);
         var status = !band ? "unanswered" : (over ? "finding" : "met");
-        var linked = (o.countermeasures || []).filter(function (m) { return (m.description || "").trim(); });
+        // Only the countermeasures that address this threat, as its disposition
+        // counts them: untagged on either side, coverage cannot be ruled out.
+        var affected = t.affectedFR || [];
+        var linked = (o.countermeasures || []).filter(function (m) {
+          if (!(m.description || "").trim()) return false;
+          var fr = m.addressesFR || [];
+          return !fr.length || !affected.length || fr.some(function (x) { return affected.indexOf(x) >= 0; });
+        });
+        var disp = R.threatDisposition(o, t, tolerable);
+        var details = [["Likelihood × impact", rating(t.likelihood, t.impact)], ["Affected FRs", affected.length ? affected.join(", ") : "None marked"]];
+        if (t.residualLikelihood || t.residualImpact) details.push(["Residual likelihood × impact", rating(t.residualLikelihood || t.likelihood, t.residualImpact || t.impact)]);
         items.push({
-          targetName: ownerName(o), itemId: o.id + ":" + t.id, code: t.id, title: t.statement || "(no statement)", groupName: groupName,
-          answer: band ? "Risk " + band + (resid ? ", residual " + resid : "") : "Not assessed",
-          expected: "Tolerable: " + tolerable,
+          targetName: ownerName(o), targetId: o.id, itemId: o.id + ":" + t.id, code: t.id, title: t.statement || "(no statement)", groupName: groupName,
+          answer: band ? bandName(band) + (resid ? ", residual " + bandName(resid).toLowerCase() : "") : "Not rated",
+          expected: bandName(tolerable),
           evidence: t.source || "", notes: t.acceptance || "",
-          owner: "", action: linked.map(function (m) { return m.description; }).join("; "), impact: t.impact || "",
-          priority: R.threatDisposition(o, t, tolerable) || "", status: status, shared: false
+          owner: "", action: linked.map(function (m) { return m.id + " " + m.description + (m.existing ? " [existing]" : " [planned]"); }).join("; "), impact: "",
+          // Empty when there is none: the review tool's risk-no-disposition
+          // check reads it so, and says what is missing.
+          priority: disp ? RX().DISPOSITION_LABEL[disp] : "",
+          details: details, status: status, shared: false
         });
         fact[field[status]]++;
       });
-      var slt = o.slTargetByFR || {}, vals = Object.keys(slt).filter(function (k) { return slt[k] != null; });
+      var slt = o.slTargetByFR || {}, set = slVector(slt), sug = null;
+      try { sug = isZone ? R.suggestZone(o, p) : R.suggestConduit(o, p); } catch (e) { sug = null; }
+      var sugVec = {};
+      if (sug && sug.byFR) R.FR_IDS.forEach(function (fr) { sugVec[fr] = sug.byFR[fr] ? sug.byFR[fr].sl : null; });
       items.push({
-        targetName: ownerName(o), itemId: o.id + ":slt", code: "SL-T", title: "Target security levels", groupName: groupName,
-        answer: vals.length ? vals.map(function (k) { return k + " " + slt[k]; }).join(", ") : "Not set",
-        expected: "", evidence: o.justification || "", notes: "", owner: "", action: "", impact: "", priority: "",
-        status: vals.length ? "recorded" : "unanswered", shared: false
+        targetName: ownerName(o), targetId: o.id, itemId: o.id + ":slt", code: "SL-T", title: "Target security levels", groupName: groupName,
+        answer: set || "Not set",
+        expected: "", evidence: "", notes: "", owner: "", action: "", impact: "", priority: "",
+        // No Justification row when there is none: the review tool's
+        // risk-slt-justification check reads a filled one as written.
+        details: [["Suggested SL-T", slVector(sugVec) || "None"]].concat((o.justification || "").trim() ? [["Justification", o.justification.trim()]] : []),
+        status: set ? "recorded" : "unanswered", shared: false
       });
-      fact[vals.length ? "recorded" : "unanswered"]++;
+      fact[set ? "recorded" : "unanswered"]++;
       facts.push(fact);
     }
-    p.zones.forEach(function (z) { addOwner(z, "Zone"); });
-    p.conduits.forEach(function (c) { addOwner(c, "Conduit"); });
+    p.zones.forEach(function (z) { addOwner(z, "Zone", true); });
+    p.conduits.forEach(function (c) { addOwner(c, "Conduit", false); });
     return { items: items, perTarget: facts };
   }
 
-  function buildPack(progress) {
+  // opts (optional): { note, neededBy }, what the author typed for the
+  // reviewers on Send for review. In the pack only when filled in; the review
+  // tool shows it to the reviewers, and it never reaches Word or Excel.
+  function buildPack(progress, opts) {
     var s = ensureStore(), p = project(), V = window.App.Version || {};
     return buildDocuments(progress).then(function (docs) {
       if (progress) progress("Writing the review pack…");
@@ -105,7 +188,8 @@ window.RiskReview = (function () {
         engagement: {
           client: p.engagement.client || "", site: p.suc.name || "", consultant: p.engagement.consultant || "",
           instrumentId: "risk-assessment", instrumentTitle: "IEC 62443-3-2 risk assessment", scoringFamily: "risk-assessment", targetLabel: "Zone or conduit",
-          documentControl: { documentRevision: p.engagement.revision || "", confidentiality: p.engagement.confidentiality || "" }
+          fieldLabels: Object.assign({}, FIELD_LABELS),
+          documentControl: { documentRevision: p.engagement.revision || "", confidentiality: p.engagement.confidentiality || "", qaReviewBy: p.engagement.qaReviewBy || "" }
         },
         documents: docs.map(function (d) { return { title: d.title, targetName: d.targetName, contentHash: d.contentHash, media: d.media, blocks: d.blocks }; }),
         items: extract.items,
@@ -113,19 +197,25 @@ window.RiskReview = (function () {
         facts: { perTarget: extract.perTarget },
         previousRound: RC().previousRound(s)
       };
+      var note = String((opts && opts.note) || "").trim(), due = norm(opts && opts.neededBy);
+      if (note || due) {
+        pack.request = {};
+        if (note) pack.request.note = note;
+        if (due) pack.request.neededBy = due;
+      }
       return { pack: pack, docs: docs, store: s };
     });
   }
 
-  function send(progress, done) {
-    buildPack(progress).then(function (r) {
+  function send(progress, done, opts) {
+    buildPack(progress, opts).then(function (r) {
       var name = RC().fileSlug(project().engagement.client || project().suc.name || "risk-assessment") + "-review-pack-round-" + r.pack.round + ".json";
       RC().saveNewFile(JSON.stringify(r.pack), name, "Review pack", function (res) {
         if (!res.ok) { done({ ok: false, message: res.aborted ? null : "The pack was not saved" + (res.error ? ": " + res.error : ".") }); return; }
         RC().recordRound(r.store, r.pack);
         RT().touched();
         snap.signature = signature(); snap.docs = r.docs;
-        done({ ok: true, message: "Round " + r.pack.round + " pack saved as " + res.name + ". It holds client data: share it as you would the project file, then give it to each reviewer to open in the OT Cyber Report Review Tool.", pack: r.pack });
+        done({ ok: true, message: "Round " + r.pack.round + " pack saved as " + res.name + ". It holds client data: share it as you would the project file, then give it to each reviewer to open in the OT Cyber Report Review Tool.", pack: r.pack, name: res.name });
       });
     }).catch(function (e) {
       console.error(e);
@@ -160,7 +250,9 @@ window.RiskReview = (function () {
   function isStale(t) {
     var a = t.comment.anchor || {};
     if (a.kind === "general") return false;
-    if (a.kind === "item") return !packItems().items.some(function (i) { return i.itemId === a.itemId && i.targetName === a.targetName; });
+    // The item id holds the zone or conduit's own id, so renaming a zone (as a
+    // reviewer may well ask) does not orphan the comments on its threats.
+    if (a.kind === "item") return !packItems().items.some(function (i) { return i.itemId === a.itemId; });
     var docs = cachedDocs();
     if (!docs) return null;
     var q = norm(a.quote);
@@ -194,8 +286,8 @@ window.RiskReview = (function () {
     if (!sug) return { can: false };
     if (a.kind !== "block") return { can: false, why: "This comment is on the zones and threats behind the reports, not on their wording, so copy the wording and use Go to." };
     if (!docs) return { can: false, why: "Still checking this against the current report." };
-    var i = a.documentIndex === 1 ? 1 : 0, doc = docs[i];
-    var docId = i === 1 ? "highLevel" : "detailed";
+    var doc = docFor(a, docs), i = docs.indexOf(doc);
+    var docId = reportIdFor(a, docs);
     if (!docHas(doc, a.quote)) return { can: false, why: "The report has changed, so this wording no longer matches what is there. Copy it and compare." };
     var probe = doc.probe || [];
 
@@ -210,6 +302,7 @@ window.RiskReview = (function () {
       return { can: true, kind: "section title", label: "Accept", documentIndex: i,
         apply: function () { RP().setSection(docId, a.sectionKey, { title: title }); },
         undo: function () { RP().setSection(docId, a.sectionKey, { title: prevTitle }); },
+        revert: { report: docId, key: a.sectionKey, field: "title", prev: prevTitle }, applied: title,
         expect: [title] };
     }
 
@@ -226,6 +319,7 @@ window.RiskReview = (function () {
       return { can: true, kind: "section opening", label: "Accept", documentIndex: i,
         apply: function () { RP().setSection(docId, a.sectionKey, { prose: prose }); },
         undo: function () { RP().setSection(docId, a.sectionKey, { prose: prev }); },
+        revert: { report: docId, key: a.sectionKey, field: "prose", prev: prev }, applied: prose,
         expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }).concat(keep) };
     }
     return { can: false, why: NOT_EDITABLE };
@@ -257,55 +351,233 @@ window.RiskReview = (function () {
           });
           return;
         }
-        t.accepted = { at: new Date().toISOString(), kind: plan.kind };
+        // What it replaced, so the comment can undo it (Reopen only changes the status).
+        t.accepted = { at: new Date().toISOString(), kind: plan.kind, revert: plan.revert, applied: plan.applied };
         t.status = "resolved"; t.statusAt = t.accepted.at;
         RT().touched();
         done({ ok: true, message: "Accepted into the " + plan.kind + ", and checked in the rebuilt Word document." });
       });
     });
   }
+  // Puts back what Accept replaced, unless it has been edited since, which is
+  // then the consultant's to change on the Report page.
+  function undoAccept(t, done) {
+    var acc = t.accepted, r = acc && acc.revert;
+    if (!r || !r.report || !r.key || (r.field !== "title" && r.field !== "prose")) { done({ ok: false, message: "There is nothing recorded to undo for this comment." }); return; }
+    var now = RP().sectionOf(r.report, r.key)[r.field] || null;
+    if (norm(now) !== norm(acc.applied)) {
+      done({ ok: false, message: "That section has been edited since the wording was accepted, so it was left as it is. Use Edit on the Report page." });
+      return;
+    }
+    var patch = {}; patch[r.field] = r.prev || null;
+    RP().setSection(r.report, r.key, patch);
+    delete t.accepted;
+    if (!RC().setStatus(store() || RC().emptyStore(), t.comment.id, "open").ok) t.status = "open";
+    RT().touched();
+    currentDocs(function () {
+      done({ ok: true, message: "The earlier wording is back, and the comment is open again." });
+    });
+  }
 
+  // Go to: a report block opens that report at the section; a zone's threat or
+  // target levels open the page they are entered on, scrolled to them.
+  function flash(el) {
+    if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("check-flash");
+    void el.offsetWidth;
+    el.classList.add("check-flash");
+    window.setTimeout(function () { el.classList.remove("check-flash"); }, 2200);
+  }
+  function attrSel(name, v) { return "[" + name + '="' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"]'; }
   function goTo(t) {
     var a = t.comment.anchor || {}, s = RT().state;
-    if (a.kind === "item") { s.stage = /:slt$/.test(a.itemId || "") ? "slt" : "risk"; RT().render(); return; }
+    if (a.kind === "item") {
+      var id = String(a.itemId || ""), cut = id.lastIndexOf(":"), owner = cut > 0 ? id.slice(0, cut) : id, sub = cut > 0 ? id.slice(cut + 1) : "";
+      s.stage = sub === "slt" ? "slt" : "risk"; RT().render();
+      var main = document.getElementById("main"), el = main && main.querySelector(attrSel("data-owner-id", owner));
+      if (el && sub && sub !== "slt") el = el.querySelector(attrSel("data-threat-id", sub)) || el;
+      if (!el) { RT().toast("That zone or threat is no longer in the risk assessment.", "warn"); return; }
+      flash(el);
+      return;
+    }
     if (a.kind === "general") { s.stage = "basis"; RT().render(); return; }
-    RP().goTo(a.documentIndex, a.sectionKey, a.quote);
+    var d = docFor(a, cachedDocs());
+    var tab = d ? (d.reportId === "highLevel" ? 1 : 0) : (a.documentTitle ? (a.documentTitle === "High-level report" ? 1 : 0) : a.documentIndex);
+    RP().goTo(tab, a.sectionKey, a.quote);
+  }
+
+  // ---- QA review by -------------------------------------------------------------
+  //
+  // An approval can fill QA review by, and the consultant says so: offered once
+  // per reviewer, and a different name already there is never replaced without
+  // asking.
+  var qaOffers = [], qaFor = null;   // { reviewer }, for this project only
+  function offersNow() {
+    if (qaFor !== project()) { qaFor = project(); qaOffers = []; }
+    return qaOffers;
+  }
+  function afterImport(results) {
+    offersNow();
+    results.forEach(function (r) {
+      if (!RC().isApproval(r.verdict)) return;
+      if (norm(project().engagement.qaReviewBy).toLowerCase() === norm(r.reviewer).toLowerCase()) return;
+      if (!qaOffers.some(function (o) { return o.reviewer === r.reviewer; })) qaOffers.push({ reviewer: r.reviewer });
+    });
+  }
+  function qaPrompt(h, repaint) {
+    if (!offersNow().length) return null;
+    var o = qaOffers[0], cur = norm(project().engagement.qaReviewBy);
+    function finish(fill) {
+      qaOffers.shift();
+      if (fill) { project().engagement.qaReviewBy = o.reviewer; RT().touched(); RT().toast("QA review by now says " + o.reviewer + ".", ""); }
+      repaint();
+    }
+    return h("div", { class: "rv-qa" }, [
+      h("span", { class: "rv-qa-text", text: cur
+        ? o.reviewer + " approved the report, and QA review by already says " + cur + ". Replace it with " + o.reviewer + "?"
+        : o.reviewer + " approved the report. Fill in QA review by with this name?" }),
+      h("button", { type: "button", class: "btn primary rv-qa-yes", text: cur ? "Replace" : "Fill in", onClick: function () { finish(true); } }),
+      h("button", { type: "button", class: "btn rv-qa-no", text: cur ? "Keep " + cur : "Not now", onClick: function () { finish(false); } })
+    ]);
+  }
+
+  // ---- the warnings ---------------------------------------------------------------
+  //
+  // What the review says about the reports now: on the Peer review, Report and
+  // Review & export pages, and in the question before a Word or Excel download.
+  // Only once a review has started, so a lone consultant is never nagged, and
+  // only ever a warning. "Changed since approval" needs the current reports, so
+  // it waits for them; the pages that show the list build them.
+  function currentHashes() { var d = cachedDocs(); return d ? d.map(function (x) { return x.contentHash; }) : null; }
+  function exportWarnings() {
+    var s = store();
+    return s ? RC().warnings(s, currentHashes(), { qaReviewBy: project().engagement.qaReviewBy }) : [];
+  }
+  function fillWarnings(box) {
+    if (box.__fill) { box.__fill(); return; }
+    var ws = exportWarnings();
+    box.innerHTML = "";
+    // The box, or the card it is in on another page: nothing to say, nothing to see.
+    (box.__shows || box).style.display = ws.length ? "" : "none";
+    ws.forEach(function (w) {
+      var li = document.createElement("li");
+      li.setAttribute("data-review-warning", w.kind);
+      li.textContent = w.text;
+      box.appendChild(li);
+    });
+  }
+  var warnBoxes = [];
+  function repaintWarnings() {
+    warnBoxes = warnBoxes.filter(function (b) { return b.isConnected; });
+    warnBoxes.forEach(fillWarnings);
+  }
+  function watchWarnings(box) {
+    warnBoxes = warnBoxes.filter(function (b) { return b.isConnected; });
+    warnBoxes.push(box);
+    fillWarnings(box);
+    if (needsDocs()) refreshDocs(repaintWarnings);
+  }
+  // Only an approval needs the reports rebuilt, to see whether they changed since.
+  function needsDocs() {
+    var s = store();
+    return !!s && !cachedDocs() && s.files.some(function (f) { return f.verdict && RC().isApproval(f.verdict.value); });
+  }
+  // A card for another page: the warnings and a way to the Peer review page.
+  // Nothing at all until a review has started.
+  function warningsCard(h, card) {
+    if (!store()) return null;
+    var box = h("ul", { class: "rv-warnings" });
+    var kids = [
+      box,
+      h("p", { class: "rv-warn-foot" }, [h("button", { type: "button", class: "btn sm", text: "Open Peer review", onClick: function () { RT().state.stage = "peer"; RT().render(); } })])
+    ];
+    var node = card ? card("Peer review", null, kids) : h("div", { class: "card" }, [h("div", { class: "card-h" }, [h("h2", { text: "Peer review" })]), h("div", { class: "card-b" }, kids)]);
+    node.classList.add("rv-warn-card", "no-print");
+    box.__shows = node;
+    watchWarnings(box);
+    return node;
+  }
+  // The lines for the question before a download.
+  function exportWarningTexts() { return exportWarnings().map(function (w) { return w.text; }); }
+
+  // Is this pack one this project sent? A risk pack for the same client, and
+  // the same system under consideration when both name one.
+  function packMatches(pack) {
+    var e = (pack && pack.engagement) || {}, p = project();
+    if (e.instrumentId !== "risk-assessment" && e.scoringFamily !== "risk-assessment") return false;
+    function k(s) { return norm(s).toLowerCase(); }
+    if (k(e.client) !== k(p.engagement.client)) return false;
+    return !k(e.site) || !k(p.suc && p.suc.name) || k(e.site) === k(p.suc.name);
   }
 
   // ---- the page ---------------------------------------------------------------------
-  var ui = null;
+  var ui = null, liveHolder = null, pageH = null;
   function paint(holder) {
     ui = ui || window.App.ReviewAuthor.newUi();
+    liveHolder = holder;
     window.App.ReviewAuthor.mount(holder, adapter(), ui);
   }
+  function live() { return liveHolder && liveHolder.isConnected ? liveHolder : null; }
   function adapter() {
     return {
       store: function () { return store() || RC().emptyStore(); },
-      touch: function () { RT().touched(); },
+      // A pack sent from a copy of the project that was never saved puts its
+      // round back (review-author asks packMatches), on a review started for it.
+      ensureStore: ensureStore,
+      packMatches: packMatches,
+      // The store changed (an import, a status, an Accept): the warnings follow.
+      touch: function () { RT().touched(); repaintWarnings(); },
       send: send,
+      afterImport: afterImport,
       goTo: goTo,
+      // Back from a Go to, which always leaves the Peer review page.
+      showCard: function () { RT().state.stage = "peer"; RT().render(); },
       acceptPlan: acceptPlan,
-      accept: accept,
+      accept: function (t, done) { accept(t, function (res) { repaintWarnings(); done(res); }); },
+      undoAccept: function (t, done) { undoAccept(t, function (res) { repaintWarnings(); done(res); }); },
       stale: isStale,
+      fieldLabel: function (f) { return FIELD_LABELS[f] || null; },
       authorName: function () { return norm(project().engagement.consultant) || "Author"; },
+      extras: function () { return pageH ? qaPrompt(pageH, function () { var c = live(); if (c) paint(c); }) : null; },
+      live: live,
       toast: RT().toast
     };
   }
   function render(main, h, card) {
+    pageH = h;
     main.appendChild(h("h1", { class: "page-title", text: "Peer review" }));
     main.appendChild(h("p", { class: "page-sub", text: "Have the reports reviewed through the tools rather than by marking up Word files. Nothing on this page reaches the Word or Excel reports." }));
-    var warnings = RC().warnings(store() || RC().emptyStore(), cachedDocs() ? cachedDocs().map(function (d) { return d.contentHash; }) : null);
     var holder = h("div", { class: "rv-panel" });
+    var warnBox = h("ul", { class: "rv-warnings", style: "margin:0 0 10px;padding-left:18px;font-size:13px" });
+    var p = project(), lead = (p.zones.length || p.conduits.length)
+      ? "Send for review writes a pack holding both Word reports and the zones and threats behind them."
+      : "Send for review writes a pack holding the high-level report and its basis of assessment. The detailed report joins it once there are zones or conduits.";
     main.appendChild(card("Review", null, [
-      h("p", { class: "issue-lead", text: "Send for review writes a pack holding both Word reports and the zones and threats behind them. Each reviewer opens it in the OT Cyber Report Review Tool and sends back a small review file; import those here." }),
-      warnings.length ? h("ul", { class: "rv-warnings", style: "margin:0 0 10px;padding-left:18px;font-size:13px" }, warnings.map(function (w) { return h("li", { "data-review-warning": w.kind, text: w.text }); })) : null,
+      h("p", { class: "issue-lead", text: lead + " Each reviewer opens it in the OT Cyber Report Review Tool and sends back a small review file; import those here." }),
+      warnBox,
       holder
     ]));
+    // Not through watchWarnings: on this page the list shows even before a
+    // review starts ("Not reviewed yet"), as the assessment tool's Issue check does.
+    function fill() {
+      var ws = RC().warnings(store() || RC().emptyStore(), currentHashes(), { qaReviewBy: project().engagement.qaReviewBy });
+      warnBox.innerHTML = "";
+      warnBox.style.display = ws.length ? "" : "none";
+      ws.forEach(function (w) { warnBox.appendChild(h("li", { "data-review-warning": w.kind, text: w.text })); });
+    }
+    warnBox.__fill = fill;
+    warnBoxes = warnBoxes.filter(function (b) { return b.isConnected; });
+    warnBoxes.push(warnBox);
+    fill();
     paint(holder);
-    if (store() && !cachedDocs()) refreshDocs(function () { if (holder.isConnected) paint(holder); });
+    // The reports are rebuilt after an edit; the comments' "no longer matches"
+    // and the "changed since approval" warning wait for them.
+    if (store() && !cachedDocs()) refreshDocs(function () { if (holder.isConnected) { paint(holder); fill(); } });
   }
 
   return { render: render, buildPack: buildPack, packItems: packItems, buildDocuments: buildDocuments, store: store, ensureStore: ensureStore, send: send,
     importTexts: function (list) { return window.App.ReviewAuthor.importTexts(adapter(), list, null, null); },
-    isStale: isStale, acceptPlan: acceptPlan, accept: accept, goTo: goTo, refreshDocs: refreshDocs };
+    isStale: isStale, acceptPlan: acceptPlan, accept: accept, undoAccept: undoAccept, goTo: goTo, refreshDocs: refreshDocs,
+    exportWarnings: exportWarnings, exportWarningTexts: exportWarningTexts, warningsCard: warningsCard, currentHashes: currentHashes, needsDocs: needsDocs,
+    qaOffers: function () { return offersNow().slice(); }, FIELD_LABELS: FIELD_LABELS };
 })();

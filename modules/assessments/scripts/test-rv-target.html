@@ -1,0 +1,103 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: the documents do not depend on the selected target</title></head>
+<body>
+<!--
+  A review checks an approval against the documents' content hashes, so the same
+  content must build the same documents whichever site or zone is selected on
+  screen. The progress section used to follow the selection: switching zones
+  alone changed the hash and gave a false "changed since approval", and a cached
+  read hid a change of baseline. Here the documents are built with each target
+  active in turn (the 62443-3-3 demo, one document across its zones, and CAF
+  with a second site, one document per site) and must hash the same; a site the
+  baseline names carries its progress section whichever is active; and loading,
+  remapping or clearing the baseline invalidates the cached read.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+
+  function build() { return RV.buildDocuments({ charts: false }); }
+  function hashes(docs) { return docs.map(function (d) { return d.contentHash; }).join(","); }
+  function hasProgress(doc) { return doc.blocks.some(function (b) { return b.type === "heading" && b.sectionKey === "progress-since-previous-assessment"; }); }
+  function docsNow() { return new Promise(function (res, rej) { RV.currentDocs(function (e, d) { if (e) rej(e); else res(d); }); }); }
+  // Builds with each target active in turn; resolves to the list of hash strings.
+  function eachActive() {
+    var ts = E.state.engagement.targets.map(function (t) { return t.id; }), out = [], chain = Promise.resolve();
+    ts.forEach(function (id) {
+      chain = chain.then(function () { E.setActiveTarget(id); return build(); }).then(function (d) { out.push({ id: id, hashes: hashes(d), docs: d }); });
+    });
+    return chain.then(function () { E.setActiveTarget(ts[0]); return out; });
+  }
+  var chain = Promise.resolve();
+  function step(fn) { chain = chain.then(fn); }
+
+  // ---- 62443-3-3: one document across the zones ---------------------------------
+  step(function () {
+    E.activateInstrument("iec-62443-3-3");
+    ok(E.state.engagement.targets.length >= 2, "the 3-3 demo has several zones (" + E.state.engagement.targets.length + ")");
+    ok(!!E.getBaseline(), "and a previous assessment as its baseline");
+    return eachActive();
+  });
+  step(function (runs) {
+    ok(runs.every(function (r) { return r.hashes === runs[0].hashes; }), "the document hashes the same whichever zone is selected", runs.map(function (r) { return r.hashes; }).join(" | "));
+    ok(runs.every(function (r) { return hasProgress(r.docs[0]); }), "and carries its progress section each time");
+    return docsNow();
+  });
+  step(function () {
+    ok(!!RV.cachedDocs(), "a read of the current report is cached");
+    E.setActiveTarget(E.state.engagement.targets[1].id);
+    ok(!!RV.cachedDocs(), "switching zone does not invalidate it, as nothing printed has changed");
+    var b = E.getBaseline();
+    E.setBaseline(null);
+    ok(RV.cachedDocs() === null, "clearing the baseline does, as the progress section goes");
+    E.setBaseline(b);
+    E.setActiveTarget(E.state.engagement.targets[0].id);
+  });
+
+  // ---- CAF with a second site: one document per site -------------------------------
+  var siteIds;
+  step(function () {
+    E.activateInstrument("ncsc-caf");
+    if (!E.getBaseline()) {
+      var res = A.Compare.extractBaseline(JSON.parse(JSON.stringify(E.getProjectFile())), "ncsc-caf", "previous.json");
+      ok(res.ok, "a baseline can be made from the project itself", res.error);
+      E.setBaseline(res.baseline);
+    }
+    var first = E.state.engagement.targets[0];
+    E.addTarget("Second site");
+    siteIds = E.state.engagement.targets.map(function (t) { return t.id; });
+    ok(siteIds.length === 2 && E.state.engagement.targets[0].id === first.id, "CAF now has two sites");
+    ok((E.getBaseline().targets || []).some(function (t) { return t.name === first.name; }), "and the baseline names the first");
+    return eachActive();
+  });
+  step(function (runs) {
+    ok(runs.every(function (r) { return r.hashes === runs[0].hashes; }), "each site's document hashes the same whichever site is selected", runs.map(function (r) { return r.hashes; }).join(" | "));
+    ok(runs.every(function (r) { return r.docs.length === 2 && hasProgress(r.docs[0]) && !hasProgress(r.docs[1]); }), "the site the baseline names carries its progress section, the new site does not, whichever is selected");
+    return docsNow();
+  });
+  step(function () {
+    ok(!!RV.cachedDocs(), "the read is cached");
+    // Comparing the new site against the baseline's site gives it a progress
+    // section of its own, and is a change of content.
+    E.setBaselineTarget(siteIds[1], E.getBaseline().targets[0].id);
+    ok(RV.cachedDocs() === null, "remapping the baseline invalidates the cached read");
+    return eachActive();
+  });
+  step(function (runs) {
+    ok(runs.every(function (r) { return r.hashes === runs[0].hashes; }), "with both sites compared, the documents still do not depend on the selection");
+    ok(runs[0].docs.every(hasProgress), "and each site's document carries its own progress section");
+    var job = A.UI.__issue.jobs(siteIds, "per");
+    ok(job.length === 2 && job[0].opts.progress && job[1].opts.progress && job[1].opts.progress.targetName === "Second site", "each export job compares its own site", job.map(function (j) { return j.opts.progress && j.opts.progress.targetName; }).join(", "));
+  });
+  chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+</script>
+</body></html>
