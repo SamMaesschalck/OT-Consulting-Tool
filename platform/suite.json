@@ -1,5 +1,5 @@
 {
-  "_note": "The suite shell's manifest, read by packaging/module-info.ps1 (as module.json is for a module) and by platform/scripts/build-data.ps1, which turns it into data/suite-data.js for the home page. The version is not here: it is the suite's, in shared/version.js. 'product' must match js/product.js. 'modules' lists the tools on the home page, in display order; each tool's name comes from its own modules/<id>/module.json. 'tour' says how to open the tool's guided tour: 'entry' is a page of its own (built into the suite file separately), 'launch' opens the tool's own page with those launch options (see shared/host-bridge.js).",
+  "_note": "The suite shell's manifest, read by packaging/module-info.ps1 (as module.json is for a module) and by platform/scripts/build-data.ps1, which turns it into data/suite-data.js for the home page. The version is not here: it is the suite's, in shared/version.js. 'product' must match js/product.js. 'modules' lists the tools on the home page, in display order; 'navLabel' is the one-word label under the tool's icon in the suite's side rail; each tool's name comes from its own modules/<id>/module.json. 'tour' says how to open the tool's guided tour: 'entry' is a page of its own (built into the suite file separately), 'launch' opens the tool's own page with those launch options (see shared/host-bridge.js).",
   "id": "suite",
   "product": "SolutionsPT OT Cyber Suite",
   "shortName": "OT Cyber Suite",
@@ -8,6 +8,7 @@
     {
       "id": "assessments",
       "shortName": "Assessments",
+      "navLabel": "Assess",
       "summary": "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and more, with an on-screen report, a Word report and an Excel tracker.",
       "useWhen": "Use it when the question is how well a site, system, product or supplier meets a framework or standard. Choose the framework, record answers and evidence, then issue the Word report and Excel tracker. One project file can hold several assessments for the same customer, such as this year's review and a later re-assessment. Send for review on the report page writes a pack for the Report Review Tool, and Import review files brings the comments back.",
       "tour": { "entry": "tour.html", "label": "Take the tour", "note": "A completed demo of every assessment. Nothing you do in it touches your own work." }
@@ -15,6 +16,7 @@
     {
       "id": "risk-assessment",
       "shortName": "Risk assessment",
+      "navLabel": "Risk",
       "summary": "Run an IEC 62443-3-2 risk assessment of zones and conduits, set target security levels, and produce the Word and Excel reports and a risk context file for the assessment tool.",
       "useWhen": "Use it before a 62443-3-3 assessment, to work out what each zone and conduit needs: define the system under consideration, split it into zones and conduits, assess the threats and set target security levels. Export the risk context file and import it into the 62443-3-3 assessment in the assessment tool. Send for review on the Peer review page writes a pack for the Report Review Tool, and Import review files brings the comments back.",
       "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A completed demo risk assessment of a petrochemical unit. Its changes are never kept." }
@@ -22,8 +24,9 @@
     {
       "id": "report-review",
       "shortName": "Report review",
-      "summary": "Review a report and the engagement behind it from a pack the author sends: comment on any paragraph, table or item, suggest wording, work through a checklist and automatic checks, and give a verdict.",
-      "useWhen": "Use it when a colleague has sent you a review pack from the assessment or risk tool. Read the report as the client will, challenge the findings as well as the wording, and save your own small review file for the author to import. Comments merge, so reviewers never overwrite each other.",
+      "navLabel": "Review",
+      "summary": "Review a colleague's report and the engagement behind it, from the pack they send. Comment on any paragraph, table or item, suggest wording, go through the checklist and automatic checks, then give a verdict.",
+      "useWhen": "Use it when a colleague sends you a review pack from the assessment or risk tool. Read the report as the client will and question the findings as well as the wording. Your comments go into a small review file for the author to import, and files from several reviewers merge without overwriting each other.",
       "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A demo pack made from a demo assessment, at its second review round. Its changes are never kept." }
     }
   ],

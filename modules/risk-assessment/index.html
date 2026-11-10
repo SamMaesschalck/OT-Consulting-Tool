@@ -55,7 +55,7 @@
     }
 
     .flag-grid { display: flex; flex-wrap: wrap; gap: 6px 16px; }
-    .flag-grid label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none; }
+    .flag-grid label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; cursor: pointer; user-select: none; }
 
     .asset-row, .line-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
     .asset-row input[type=text], .line-row input[type=text] { flex: 1; }
@@ -1038,7 +1038,7 @@
       ]));
 
       var body = [
-        selectField("Tolerable risk (§4.3.6)", s.tolerableRisk, BANDS.map(function (b) { return { value: b.id, text: b.name }; }), function (v) { s.tolerableRisk = v || RULES.tolerableRisk.default; touched(); rerender(); }, { placeholder: false, hint: "The highest unmitigated risk band accepted WITHOUT additional countermeasures. Any threat above this must be treated (clause 4.6/4.7)." }),
+        selectField("Tolerable risk (§4.3.6)", s.tolerableRisk, BANDS.map(function (b) { return { value: b.id, text: b.name }; }), function (v) { s.tolerableRisk = v || RULES.tolerableRisk.default; touched(); rerender(); }, { placeholder: false, hint: "The highest unmitigated risk band accepted without additional countermeasures. Any threat above this must be treated (clause 4.6/4.7)." }),
         lineListField("Known or presumed threats (§4.3.4)", s.knownThreats, function (a) { s.knownThreats = a; touched(); }, "e.g. Capable criminal adversary; insider misuse of engineering access"),
         lineListField("Mandatory security functions (§4.3.5)", s.mandatorySecurityFunctions, function (a) { s.mandatorySecurityFunctions = a; touched(); }, "e.g. Hard-wired ESD independent of the BPCS"),
         lineListField("Regulatory requirements (§4.3.7)", s.regulatory, function (a) { s.regulatory = a; touched(); }, "e.g. UK NIS Regulations 2018"),
@@ -1084,7 +1084,7 @@
       if (guide) {
         function gcol(title, items, forgotten) {
           return h("div", null, [
-            h("h3", { style: "margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted)", text: title }),
+            h("h3", { style: "margin:0 0 6px;font-size:13px;font-weight:600;color:var(--text-muted)", text: title }),
             h("ul", { style: "margin:0;padding-left:18px;font-size:13px" }, (items || []).map(function (t) {
               return h("li", { style: "margin:3px 0;" + (forgotten ? "color:var(--near);" : "") }, [t]);
             }))

@@ -16,7 +16,7 @@ window.App.Data.checklists = {
   "families": {
     "capability-sl": [
       { "id": "sl-targets", "text": "The target security levels are justified for each zone, conduit or component assessed, and the source of each target is stated." },
-      { "id": "sl-shared", "text": "Answers shared across zones or components really do apply to each one that inherits them." }
+      { "id": "sl-shared", "text": "Answers shared across zones or components apply to each one that inherits them." }
     ],
     "caf-achieved": [
       { "id": "caf-profile", "text": "The profile chosen is the right one for this organisation, and the report says why." },

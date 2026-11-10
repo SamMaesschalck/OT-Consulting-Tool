@@ -85,12 +85,35 @@
     ok(lic && /every tool in the suite/.test(lic.textContent) && !/both tools/.test(lic.textContent), "the licence covers every tool, not both", lic && lic.textContent);
     d.querySelector(".licence-modal .btn.primary").click();
     ok(/review packs and review files/.test(d.querySelector(".recent-empty").textContent), "Recent files says it holds review packs and review files too");
+    ok(/Drop one anywhere in the suite/.test(d.querySelector(".recent-empty").textContent), "and, while it is empty, that a file can be dropped anywhere in the suite");
     var tips = d.querySelector(".help-tips").textContent;
-    ok(/review file in the Report Review Tool/.test(tips) && !/its own project file with Save and Load/.test(tips), "the help says what each tool saves", tips);
-    ok(/drop a project file, review pack or review file/.test(tips), "and that a file can be dropped on the suite");
-    var helps = d.querySelectorAll(".help-tool[data-module='assessments'] p, .help-tool[data-module='risk-assessment'] p");
+    ok(/ring on a tool means it is open/.test(tips) && /filled amber dot means it has unsaved changes/.test(tips), "the help says what the rail's markers mean", tips);
+    ok(!/drop a project file/i.test(tips), "and does not repeat the drop hint while the empty list already gives it");
+    Sh.home();
+    var send = d.querySelector(".help-card").textContent;
+    ok(/Send for review/.test(send) && /Import review files/.test(send) && /Import risk context/.test(send), "the flow names the buttons that pass each file on", send);
+    var helps = d.querySelectorAll(".tool-card[data-module='assessments'] .help-tool p, .tool-card[data-module='risk-assessment'] .help-tool p");
     ok(helps.length === 2 && /Send for review/.test(helps[0].textContent) && /Import review files/.test(helps[1].textContent),
-      "Getting started explains the author's half of a review in the assessment and risk tools");
+      "each author tool's When to use it explains the author's half of a review");
+    var flow = d.querySelector(".help-card .flow").textContent;
+    ok(/Risk context file/.test(flow) && /62443-3-3/.test(flow) && /Review pack/.test(flow) && /Review file/.test(flow),
+      "How the tools fit together names the files that pass between the tools", flow);
+
+    // ---- the rail ------------------------------------------------------------
+    var rail = d.getElementById("suite-bar");
+    var home = rail.querySelector(".bar-home");
+    ok(rail.tagName === "NAV" && home && home.getAttribute("aria-current") === "page" && rail.querySelectorAll(".bar-tab").length === 3,
+      "the rail shows Home, current on the home page, and a button for each tool");
+    ok(Array.prototype.every.call(rail.querySelectorAll("button"), function (b) {
+      var label = (b.querySelector(".rail-label") || {}).textContent || "";
+      return label && (b.getAttribute("aria-label") || "").toLowerCase().indexOf(label.toLowerCase()) !== -1;
+    }), "every rail button's spoken name contains its visible label");
+    ok(d.getElementById("btn-theme") && d.getElementById("btn-licence") && rail.contains(d.getElementById("btn-licence")), "the theme and licence buttons are in the rail");
+    ok(Sh.when(new Date(2026, 10, 9, 14, 2).toISOString(), new Date(2026, 10, 9, 18, 0)) === "today, 14:02" &&
+       Sh.when(new Date(2026, 10, 8, 9, 5).toISOString(), new Date(2026, 10, 9, 0, 30)) === "yesterday, 09:05" &&
+       Sh.when(new Date(2026, 1, 3, 16, 45).toISOString(), new Date(2026, 10, 9)) === "3 Feb, 16:45" &&
+       Sh.when(new Date(2025, 10, 3, 16, 45).toISOString(), new Date(2026, 10, 9)) === "3 Nov 2025" &&
+       Sh.when("not a date") === "", "Recent files says when in plain words (today, yesterday, a date)");
 
     // ---- what a file is ----------------------------------------------------
     var K = Sh.fileKind;
@@ -112,7 +135,9 @@
     }).then(function () {
       var f = Sh.frames["report-review/tour"];
       ok(f.dirty === false && f.el.getAttribute("data-dirty") === "false", "a tour saying it has unsaved changes is not marked unsaved");
-      ok(!/Unsaved changes/.test(S.document.getElementById("suite-bar").textContent), "the bar shows no Unsaved changes for a tour");
+      var tb = S.document.querySelector("#suite-bar .bar-tab[data-key='report-review/tour']");
+      ok(tb && tb.getAttribute("aria-current") === "page" && /tour/.test(tb.getAttribute("aria-label")) && !tb.querySelector(".dot.dirty") && !/unsaved/.test(tb.getAttribute("aria-label")),
+        "the rail shows the open tour, with no unsaved-changes marker", tb && tb.getAttribute("aria-label"));
       var ev = new S.Event("beforeunload", { cancelable: true });
       S.dispatchEvent(ev);
       ok(!ev.defaultPrevented, "closing the suite does not warn about a tour");

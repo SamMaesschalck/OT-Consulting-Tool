@@ -2925,7 +2925,7 @@ window.App.UI = (function () {
 
     function col(title, items, forgotten) {
       return h("div", null, [
-        h("h3", { style: "margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:0.4px; color:var(--text-muted);", text: title }),
+        h("h3", { style: "margin:0 0 6px; font-size:13px; font-weight:600; color:var(--text);", text: title }),
         h("ul", { style: "margin:0; padding-left:18px; font-size:13px;" },
           (items || []).map(function (t) {
             return h("li", { style: "margin:3px 0;" + (forgotten ? " color:var(--near);" : "") }, [t]);
@@ -3095,7 +3095,7 @@ window.App.UI = (function () {
 
   function buildMLNav(s) {
     var scored = E.scoreActiveTarget();
-    s.appendChild(h("div", { class: "nav-section-title", text: window.App.Report.mlNoun(E.state.instrument, "elementNounPlural") }));
+    s.appendChild(h("div", { class: "nav-section-title", text: cap(window.App.Report.mlNoun(E.state.instrument, "elementNounPlural")) }));
     s.appendChild(h("div", {
       class: "nav-item" + (view === "ml-wizard" ? " active" : ""),
       onClick: function () { enterMLWizard(view === "ml-wizard" ? mlWizardIdx : 0); }
@@ -5638,7 +5638,7 @@ window.App.UI = (function () {
     // answered once; by-product is walked per product (switch product below).
     var modeBar = h("div", { class: "card", style: "margin-bottom:14px;" }, [
       h("div", { class: "card-b", style: "padding:12px 14px;" }, [
-        h("div", { class: "muted", style: "font-size:12px; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px;", text: "What are you assessing?" }),
+        h("div", { class: "muted", style: "font-size:13px; font-weight:600; margin-bottom:8px;", text: "What are you assessing?" }),
         h("div", { class: "btn-row" }, [
           h("button", { class: "btn" + (craWizMode === "org" ? " primary" : ""), onClick: function () { enterCRAWizard("org", 0); }, text: "Organisation-wide" }),
           h("button", { class: "btn" + (craWizMode === "product" ? " primary" : ""), onClick: function () { enterCRAWizard("product", 0); }, text: "By " + d.noun })
@@ -5783,10 +5783,10 @@ window.App.UI = (function () {
       h("div", { class: "card-h" }, [h("h2", { text: DISP.gs.cardTitle })]),
       h("div", { class: "card-b" }, [
         h("p", { text: DISP.gs.intro }),
-        h("h3", { style: "margin:12px 0 6px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px;", text: DISP.gs.profileHeading }),
+        h("h3", { style: "margin:12px 0 6px; font-size:14px; font-weight:600; color:var(--text);", text: DISP.gs.profileHeading }),
         picker,
         h("ul", null, DISP.gs.bullets.map(function (b) { return h("li", null, [b]); })),
-        h("h3", { style: "margin:12px 0 6px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px;", text: DISP.gs.profilesHeading }),
+        h("h3", { style: "margin:12px 0 6px; font-size:14px; font-weight:600; color:var(--text);", text: DISP.gs.profilesHeading }),
         h("table", { class: "tbl" }, [h("tbody", null, rows)])
       ])
     ]);
@@ -5811,7 +5811,7 @@ window.App.UI = (function () {
 
   function metaPair(label, value) {
     return h("div", null, [
-      h("div", { class: "lbl muted", style: "font-size:11px; text-transform:uppercase; letter-spacing:0.4px; font-weight:600;", text: label }),
+      h("div", { class: "lbl muted", style: "font-size:12.5px; font-weight:600;", text: label }),
       h("div", { style: "padding:2px 0 0 0;", text: value || h("span", { class: "soft", text: "(not set)" }).textContent })
     ]);
   }

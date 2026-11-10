@@ -93,7 +93,8 @@
     return got;
   }
   function recent(S) { return S.Suite.Shell.readRecent(); }
-  function barText(S) { return (S.document.getElementById("suite-bar") || {}).textContent || ""; }
+  // The spoken name of the rail button for the tool on show: its name, and whether it has unsaved changes.
+  function railNow(S) { var b = S.document.querySelector("#suite-bar [aria-current='page']"); return b ? b.getAttribute("aria-label") || "" : ""; }
 
   var product, label, number, bundleName, S;
   var riskFile = "check-risk-project.json", assessFile = "check-assessment-project.json";
@@ -124,8 +125,9 @@
     ok(badge === label, "the header shows the suite version (" + badge + ")", badge);
     var cards = Array.prototype.map.call(d.querySelectorAll(".tool-card h2"), function (e) { return e.textContent; });
     ok(cards.length === 3 && cards[0] === "OT Cyber Assessment Tool" && cards[1] === "OT Cyber Risk Assessment Tool" && cards[2] === "OT Cyber Report Review Tool", "the home page has a card for each tool, in order (" + cards.join(", ") + ")", cards.join(" | "));
-    ok(d.querySelectorAll(".tool-card .tool-tour").length === 3 && d.querySelectorAll(".help-tool .help-tour").length === 3, "every tool's tour is offered, on the cards and in Getting started");
-    ok(d.querySelectorAll(".help-tool").length === 3 && /62443-3-3/.test(d.querySelector(".help-card").textContent) && /review pack/.test(d.querySelector(".help-card").textContent), "Getting started says what each tool is for");
+    ok(d.querySelectorAll(".tool-card .tool-tour").length === 3, "every tool's tour is offered on its card");
+    ok(d.querySelectorAll(".tool-card .help-tool").length === 3 && /62443-3-3/.test(d.querySelector(".help-card").textContent) && /review pack/i.test(d.querySelector(".help-card").textContent), "each card says when to use the tool, and How the tools fit together names the files between them");
+    ok(d.querySelector("#suite-bar .bar-home[aria-current='page']") && d.querySelectorAll("#suite-bar .bar-tab").length === 3, "the rail shows Home, current, and a button for each tool");
     ok(!/developer copy/.test(d.querySelector(".help-card").textContent), "and does not carry the folder build's note about downloads");
     ok(/appear here/.test(d.querySelector(".recent-card").textContent), "Recent files starts empty, saying what will appear");
     ok(/© 2026 SolutionsPT/.test(d.querySelector(".home-legal").textContent) && d.querySelector(".home-legal").textContent.indexOf(product + " " + label) !== -1, "the footer carries the version and the copyright notice");
@@ -135,8 +137,8 @@
     var notes = d.querySelector(".notes-card");
     var nt = notes ? notes.textContent : "";
     ok(notes && notes.querySelector("h2").textContent === "What's new in " + label, "What's new shows this version's release notes", notes && notes.querySelector("h2").textContent);
-    ok(notes && notes.querySelectorAll(".notes li").length >= 5 && notes.querySelector(".notes strong"),
-       "rendered from Markdown: bullets and bold", nt.slice(0, 200));
+    ok(notes && notes.querySelectorAll(".notes li").length >= 5 && notes.querySelectorAll(".notes h4").length >= 3,
+       "rendered from Markdown: subheadings and bullets", nt.slice(0, 200));
     // Only the "What's new" section: which file to download, checksums and
     // SmartScreen are for the GitHub release page, not someone in the suite.
     ok(notes && !notes.querySelector(".notes table") && !/Which file to use|SHA256SUMS|SmartScreen/.test(nt),
@@ -179,16 +181,18 @@
     ok(t.w.App.HostBridge.hosted && launch.module === "risk-assessment" && launch.tour === false, "it knows it is in the suite, not on its tour");
     ok(R.supportsFilePickers(), "the frame is the suite's own origin, so the file dialogs are available in it");
     ok(R.state.project.zones.length === 0 && !R.state.project.suc.name, "it starts on an empty project");
-    var bt = barText(S);
-    ok(S.document.getElementById("suite-bar").offsetHeight > 20 && /OT Cyber Suite/.test(bt) && /OT Cyber Risk Assessment Tool/.test(bt) && /Switch to/.test(bt) && /Assessments/.test(bt),
-       "the bar shows the suite, the tool's name and a switcher", bt);
+    var here = S.document.querySelector("#suite-bar [aria-current='page']");
+    ok(S.document.getElementById("suite-bar").offsetWidth > 40 && here && here.getAttribute("data-key") === "risk-assessment" && /OT Cyber Risk Assessment Tool/.test(here.getAttribute("aria-label")) &&
+       S.document.querySelector("#suite-bar .bar-tab[data-key='assessments']") && S.document.querySelector("#suite-bar .bar-home"),
+       "the rail marks the tool as the current one, with Home and the other tools beside it", here && here.getAttribute("aria-label"));
     ok(S.document.getElementById("home").classList.contains("hidden") && S.document.title === "OT Cyber Risk Assessment Tool - " + product, "the home page gives way to the tool", S.document.title);
 
     // Unsaved work shows in the bar
     R.state.project.suc.name = "Check Ltd unit 7";
     R.touched();
     return until(function () { return t.f.dirty; }, 10000, "the dirty signal").then(function () {
-      ok(/Unsaved changes/.test(barText(S)) && t.f.el.getAttribute("data-dirty") === "true", "an edit shows as unsaved changes in the bar");
+      var rb = S.document.querySelector("#suite-bar .bar-tab[data-key='risk-assessment']");
+      ok(rb.querySelector(".dot.dirty") && /unsaved changes/.test(rb.getAttribute("aria-label")) && t.f.el.getAttribute("data-dirty") === "true", "an edit shows as unsaved changes in the rail");
       var ev = new S.Event("beforeunload", { cancelable: true });
       S.dispatchEvent(ev);
       ok(ev.defaultPrevented, "closing the suite now would ask first");
@@ -208,7 +212,7 @@
       ok(/Start an assessment/.test(t.d.getElementById("main").textContent), "on its assessment picker");
       ok(risk.f.el.isConnected && !risk.f.el.classList.contains("active") && getComputedStyle(risk.f.el).visibility === "hidden", "the risk tool stays open, hidden");
       var dot = S.document.querySelector(".bar-tab[data-key='risk-assessment'] .dot");
-      ok(dot && dot.classList.contains("dirty") && /unsaved/.test(S.document.querySelector(".bar-tab[data-key='risk-assessment']").title), "and the switcher marks it as having unsaved changes");
+      ok(dot && dot.classList.contains("dirty") && /unsaved/.test(S.document.querySelector(".bar-tab[data-key='risk-assessment']").title), "and the rail marks it as having unsaved changes");
       S.document.querySelector(".bar-tab[data-key='risk-assessment']").click();
       ok(S.Suite.Shell.current() === "risk-assessment" && risk.f.el.contentWindow === risk.w && risk.w.RiskTool.state.project.suc.name === "Check Ltd unit 7",
          "switching back finds the risk tool exactly as it was left");
@@ -257,7 +261,7 @@
          e.label === R.state.project.engagement.client && /^Acme/.test(e.label) && !isNaN(Date.parse(e.when)),
          "Recent files records the save: tool, file name, customer and when", JSON.stringify(e));
       ok(Object.keys(e).sort().join(",") === "action,hasHandle,kind,label,module,name,when", "and nothing of the file's contents (kind is a label such as Review pack)");
-      ok(!/Unsaved changes/.test(barText(S)), "the bar no longer shows unsaved changes once saved");
+      ok(!/unsaved/.test(railNow(S)) && !S.document.querySelector("#suite-bar .bar-tab[data-key='risk-assessment'] .dot.dirty"), "the rail no longer shows unsaved changes once saved", railNow(S));
 
       // The save dialog refused (a frame the browser will not show it in):
       // the save becomes a download, never a failure.
@@ -328,7 +332,8 @@
   .then(function (o) {
     S.Suite.Shell.home();
     var rows = S.document.querySelectorAll(".recent-open");
-    ok(rows.length === 5 && /loaded-risk\.json/.test(rows[0].textContent) && /OT Cyber Risk Assessment Tool/.test(rows[0].textContent) && /Opened /.test(rows[0].textContent),
+    ok(rows.length === 5 && /loaded-risk\.json/.test(rows[0].textContent) && /Risk assessment/.test(rows[0].querySelector(".recent-meta").textContent) &&
+       /OT Cyber Risk Assessment Tool/.test(rows[0].title) && /Opened today, /.test(rows[0].textContent),
        "the home page lists the recent files with their tool and when");
     var rw = o.risk.w, rd = o.risk.d;
     var proj = JSON.parse(JSON.stringify(rw.RiskTool.state.project));
@@ -368,7 +373,7 @@
       ok(t.f.el.hasAttribute("srcdoc") && t.d.title === "OT Cyber Report Review Tool" && t.w.App.Version.label === label, "the report review tool opens in a frame of its own, with its title and version (" + t.d.title + " " + label + ")");
       ok(t.w.App.HostBridge.hosted && launch.module === "report-review" && launch.tour === false && !R.state.pack, "it knows it is in the suite, and starts with no pack");
       ok(R.supportsFilePickers(), "the frame is the suite's own origin, so the file dialogs are available in it");
-      ok(/OT Cyber Report Review Tool/.test(barText(S)), "the bar names it");
+      ok(/OT Cyber Report Review Tool/.test(railNow(S)), "the rail marks it as the tool on show", railNow(S));
       ok(S.document.title === "OT Cyber Report Review Tool - " + product, "and the suite's title follows", S.document.title);
       // Open a real pack and review it, through the tool's own load.
       var packText = JSON.stringify(t.w.SPT_REVIEW_DEMO_PACK);
@@ -386,7 +391,7 @@
         R.addComment({ severity: "must-fix", anchor: { documentIndex: 0, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text, cell: null }, text: "From the suite check." });
         return until(function () { return t.f.dirty; }, 10000, "the review dirty signal");
       }).then(function () {
-        ok(/Unsaved changes/.test(barText(S)), "a comment shows as unsaved changes in the bar");
+        ok(/unsaved changes/.test(railNow(S)) && S.document.querySelector("#suite-bar .bar-tab[data-key='report-review'] .dot.dirty"), "a comment shows as unsaved changes in the rail", railNow(S));
         var h = fakeHandle(t.w, "my-review.json");
         t.w.showSaveFilePicker = function () { return Promise.resolve(h); };
         return new Promise(function (res) { R.saveReview(null, res); }).then(function (r) {
@@ -438,7 +443,7 @@
         }).then(function () {
           ok(true, "the risk tool's tour opens in a frame of its own with the demo project (" + t.w.RiskTool.state.project.suc.name + ")");
           ok(o.risk.w.RiskTool.state.project.suc.name === "Reopened unit 3", "leaving the consultant's own risk project alone");
-          ok(/Tour/.test(barText(S)), "the bar marks it as the tour");
+          ok(S.document.querySelector("#suite-bar .bar-tab[data-key='risk-assessment/tour'][aria-current='page']"), "the rail marks it as the tour");
           S.Suite.Shell.open("assessments/tour");
           return tool(S, "assessments/tour");
         });
@@ -451,8 +456,9 @@
         });
       }).then(function () {
         S.Suite.Shell.home();
-        var chip = S.document.querySelector(".tool-card[data-module='assessments'] .chip");
-        ok(chip && /Unsaved changes/.test(chip.textContent), "the home page marks a tool with unsaved changes");
+        var chip = S.document.querySelector(".tool-card[data-module='assessments'] .tool-state");
+        ok(chip && /Unsaved changes/.test(chip.textContent) && /Go back to it/.test(S.document.querySelector(".tool-card[data-module='assessments'] .tool-open").textContent),
+           "the home page marks a tool with unsaved changes, and its button goes back to it");
         var ev = new S.Event("beforeunload", { cancelable: true });
         S.dispatchEvent(ev);
         ok(ev.defaultPrevented, "and the suite asks before closing while it has them");

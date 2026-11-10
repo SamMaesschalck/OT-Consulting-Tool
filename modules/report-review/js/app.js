@@ -600,9 +600,9 @@
       } else if (last === "opened") {
         msg = state.restore ? "Your review file is open. Unsaved work that is not in it was also found: Restore or Discard it at the top of the page."
           : state.carried ? "Your review file is open, with your unsaved work added to it. Save to keep it."
-          : "Your review is open (round " + (r.round || state.pack.round) + (r.reviewer ? ", as " + r.reviewer : "") + "), so you can carry on.";
+          : "Your review is open (round " + (r.round || state.pack.round) + (r.reviewer ? ", as " + r.reviewer : "") + ").";
       } else {
-        msg = "Review pack opened: round " + state.pack.round + "." + (realInTour ? " This is the tour's window: it works normally, but the Report Review Tool is the place for real work." : "");
+        msg = "Review pack opened: round " + state.pack.round + "." + (realInTour ? " This is the tour's window. Use the Report Review Tool itself for real work." : "");
       }
       toast(msg);
     }
@@ -1422,7 +1422,7 @@
     // on a narrow window); with two reports, which one this is.
     var who = [e.client, e.site].filter(Boolean).join(", "), me = state.review && state.review.reviewer;
     main.appendChild(h("p", { class: "page-sub", text: (who ? who + ". " : "") + "As the client will read it: " +
-      (multi ? "the " + (doc.title || "report") + ", round " + pack.round + "." : "this is the generated Word report, round " + pack.round + ".") +
+      (multi ? "the " + (doc.title || "report") + ", round " + pack.round + "." : "the generated Word report, round " + pack.round + ".") +
       (me ? " You are reviewing as " + me + "." : "") }));
     var rq = requestPanel();
     if (rq) main.appendChild(rq);
@@ -1721,7 +1721,7 @@
     var openBasis = state.composer && state.composer.anchor.kind === "general" && state.composer.anchor.sectionTitle === "Basis of assessment";
     var basisComments = comments().filter(function (c) { return c.anchor.kind === "general" && c.anchor.sectionTitle === "Basis of assessment"; });
     main.appendChild(h("div", { class: "spacer-12", style: "height:12px" }));
-    var basis = card("Basis of assessment", "who was spoken to, what was read, what was seen", [
+    var basis = card("Basis of assessment", null, [
       list("People interviewed", bs.interviews, function (r) { return [r.name, r.role, r.date].filter(Boolean).join(", "); }),
       list("Documents reviewed", bs.documents, function (r) { return [r.title, r.reference, r.date].filter(Boolean).join(", "); }),
       list("Systems observed", bs.observations, function (r) { return [r.name, r.method || r.description, r.location, r.date].filter(Boolean).join(", "); }),
@@ -1774,7 +1774,7 @@
               setAnswer(q, { answer: a.answer === o[0] ? "" : o[0] }); render(true);
             } });
           })),
-          h("div", { class: "rr-note" }, [h("input", { type: "text", placeholder: "A note, if there is anything to say", "aria-label": "Note", value: a.note || "", onChange: function (e) { setAnswer(q, { note: e.target.value }); } })])
+          h("div", { class: "rr-note" }, [h("input", { type: "text", placeholder: "Note (optional)", "aria-label": "Note", value: a.note || "", onChange: function (e) { setAnswer(q, { note: e.target.value }); } })])
         ]);
       })));
     });
@@ -1823,7 +1823,7 @@
   }
   function renderChecks(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Automatic checks" }));
-    main.appendChild(h("p", { class: "page-sub", text: "What a machine can find in this pack. None of it is a verdict: go and look, then make it a comment or dismiss it." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Possible problems found automatically in this pack. Look at each one in place, then make it a comment or dismiss it." }));
     var all = currentChecks(), active = all.filter(function (r) { return !isDismissed(r.id); }), gone = all.length - active.length;
     // What was found first, in the checks' own order; the clean checks folded
     // into one card, each opening to say what it looked for.
@@ -1882,7 +1882,7 @@
   }
   function namesEditor() {
     var ta = h("input", { type: "text", id: "rr-names", style: "width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text)",
-      placeholder: "Other clients' names to look for, separated by commas", "aria-label": "Other clients' names to look for", value: userNames().join(", ") });
+      placeholder: "Names, separated by commas", "aria-label": "Other clients' names to look for", value: userNames().join(", ") });
     ta.addEventListener("change", function () {
       var names = ta.value.split(",").map(RC.norm).filter(Boolean);
       lsSet(KEY_NAMES, JSON.stringify(names));
@@ -1896,7 +1896,7 @@
   function renderPrevious(main) {
     var list = prevComments();
     main.appendChild(h("h1", { class: "page-title", text: "Previous round" }));
-    main.appendChild(h("p", { class: "page-sub", text: "What was said last time, what the author did and why, and what the text reads now. Go to the place, then confirm a fix you have checked, accept a reason, or raise the point again." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Each earlier comment, with what the author did about it and how the text reads now. Look at each one in place, then confirm the fix, accept the author's reason, or raise it again." }));
     var verdicts = (state.pack.previousRound && state.pack.previousRound.verdicts) || [];
     if (verdicts.length) {
       main.appendChild(card("Verdicts so far", null, verdicts.map(function (v) {
@@ -1987,7 +1987,7 @@
   function renderSummary(main) {
     var r = state.review, list = comments();
     main.appendChild(h("h1", { class: "page-title rr-sum-title", text: "Summary and verdict" }));
-    main.appendChild(h("p", { class: "page-sub", text: "When you have finished, say where it stands and save. Send the file to the author by shared folder or email; it holds only your review, and the author's tool merges it with anyone else's." }));
+    main.appendChild(h("p", { class: "page-sub", text: "When you have finished, choose a verdict and save. Send the file to the author by shared folder or email. It holds only your review, and the author's tool merges it with other reviewers' files." }));
     main.appendChild(printHeader());
     var rq = requestPanel();
     if (rq) main.appendChild(rq);
@@ -2048,7 +2048,7 @@
         h("button", { type: "button", class: "btn primary", id: "rr-save-2", text: "Save my review file", onClick: function (e) { saveReview(e); } }),
         savedText ? h("span", { class: "small muted", id: "rr-saved-at", text: savedText }) : null
       ]),
-      (r.verdict.value || "none") === "none" ? h("div", { class: "small muted no-print", id: "rr-no-verdict", text: "No verdict yet. That is fine for a save to carry on later; choose one before you send the file to the author." }) : null
+      (r.verdict.value || "none") === "none" ? h("div", { class: "small muted no-print", id: "rr-no-verdict", text: "No verdict yet. You can save without one and carry on later, but choose one before you send the file to the author." }) : null
     ]);
     // In the suite, the file just saved can go straight to the tool the pack
     // came from, which imports it as Import review files would. Never on its
@@ -2150,7 +2150,7 @@
     main.appendChild(card("How a review works", null, [h("ol", { class: "rr-steps" }, [
       h("li", { text: "The author sends a review pack from the assessment or risk tool. It holds client data: handle it as you would the project file." }),
       h("li", { text: "Open it here. Read the report, look at the engagement, work through the checklist and the automatic checks, and comment as you go." }),
-      h("li", { text: "On Summary and verdict, say where it stands and save your review file. To carry on later, open the pack and your review file, in either order: unsaved work this browser kept is offered back." }),
+      h("li", { text: "On Summary and verdict, choose a verdict and save your review file. To carry on later, open the pack and your review file in either order. Any unsaved work this browser kept is offered back." }),
       h("li", { text: "Send the file to the author. Their tool merges it with other reviewers' files, so nobody overwrites anyone." })
     ])]));
   }
@@ -2368,7 +2368,7 @@
     renderNav(); renderHeader();
     main.innerHTML = "";
     if (state.demo) {
-      main.appendChild(h("div", { class: "rr-banner", id: "rr-demo-note" }, [h("span", { class: "t", text: "This is a demo pack, made from a demo assessment. Try anything; nothing here touches real work." })]));
+      main.appendChild(h("div", { class: "rr-banner", id: "rr-demo-note" }, [h("span", { class: "t", text: "This is a demo pack, made from a demo assessment. Nothing you do here affects real work." })]));
     }
     [restoreBar(), pendingBar(), savedHintBar(), colleagueBar()].forEach(function (bar) { if (bar) main.appendChild(bar); });
     var page = state.page;

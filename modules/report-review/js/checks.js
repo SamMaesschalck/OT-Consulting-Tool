@@ -24,12 +24,12 @@
   var CHECKS = {
     "red-prompts": { title: "Red prompts left in", severity: "must-fix", about: "Text the Word report prints in red for the author to complete." },
     "dashes": { title: "Em or en dashes", severity: "should-fix", about: "House style is a spaced hyphen. A cell holding a lone dash is the house mark for empty, so it is not counted." },
-    "internal-wording": { title: "Internal wording in client text", severity: "must-fix", about: "Words that describe the tool or its workings, not the client's position." },
+    "internal-wording": { title: "Internal wording in client text", severity: "must-fix", about: "Words about the tool or how it works, and notes to self, in text the client reads." },
     "other-names": { title: "A name from a demo or another client", severity: "must-fix", about: "The demo clients' names, and any you add below, found in this report." },
     "client-name": { title: "Client name missing or inconsistent", severity: "must-fix", about: "The client's name should be set, and printed the same way throughout." },
     "no-evidence": { title: "Findings with no evidence recorded", severity: "should-fix", about: "A finding with nothing behind it is hard to defend to the client." },
     "unanswered": { title: "Items not answered", severity: "should-fix", about: "Items in scope with no answer at all. Unknown and not applicable count as answers." },
-    "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Fields the document control table prints empty. They may be filled in at issue. QA review by is not counted: an approval is what fills it in." },
+    "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Fields the document control table prints empty. They may be filled in at issue. QA review by is not counted, as an approval fills it in." },
     "numbering": { title: "Section numbering gaps", severity: "should-fix", about: "Numbered sections that skip a number, which usually means a section was hidden." },
     "figures": { title: "Figures that disagree", severity: "must-fix", about: "Counts the report prints that do not match the assessment behind it." },
     "risk-no-disposition": { title: "Risks above tolerable with no disposition", severity: "must-fix", about: "A threat above the tolerable risk with no countermeasure, no target level on its affected requirements and no recorded acceptance. The report prints it as needing a decision." },
@@ -125,7 +125,7 @@
     eachText(pack, function (text, b, cell, p, d) {
       if (!p.red) return;
       var red = (p.runs || []).filter(function (r) { return r.red; }).map(function (r) { return r.t; }).join("");
-      out.push(result("red-prompts", keyFor(b, cell), "This prints in red for the author to complete, so the report is not finished here.", red || text, b, cell, d));
+      out.push(result("red-prompts", keyFor(b, cell), "Red text for the author to complete is still in the report here.", red || text, b, cell, d));
     });
   }
 
@@ -170,7 +170,7 @@
         if (!m) return;
         if (recorded.some(function (v) { return w.re.test(v) && nt.indexOf(v) !== -1; })) return;
         var from = Math.max(0, m.index - 50);
-        out.push(result("internal-wording", keyFor(b, cell, w.label), "“" + m[0] + "” describes the tool rather than the client's position.",
+        out.push(result("internal-wording", keyFor(b, cell, w.label), "“" + m[0] + "” is internal wording that the client should not see.",
           (from ? "…" : "") + t.slice(from, m.index + 60) + (m.index + 60 < t.length ? "…" : ""), b, cell, d, { fullText: text }));
       });
     });

@@ -1,8 +1,8 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
 /* suite.js - the SolutionsPT OT Cyber Suite shell.
  *
- * A home page with a card per tool, and, once a tool is opened, that tool in a
- * frame under a slim bar (Home, the tool's name, a switcher). Each tool runs
+ * A rail down the left (Home, each tool, any tour that is open, the theme and
+ * the licence) and beside it the home page or a tool in its frame. Each tool runs
  * exactly as it does on its own, in its own frame: the two tools define the
  * same global names, so they could not share one page, and the frame keeps
  * every tool's behaviour identical inside and outside the suite. A tool that
@@ -85,7 +85,8 @@
     t.textContent = msg;
     t.className = "toast" + (kind ? " " + kind : "");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.className = "toast hidden"; }, 6000);
+    // Long enough to read: a note about dropped files can run to a few lines.
+    toastTimer = setTimeout(function () { t.className = "toast hidden"; }, Math.max(6000, String(msg).length * 60));
   }
 
   // ---- what this copy carries ----------------------------------------------
@@ -162,7 +163,9 @@
     if (BUNDLE) {
       payloadHtml(src.payload, function (err, html) {
         if (err) {
-          if (f.loading) f.loading.textContent = "The " + displayName(f) + " could not be opened: " + (err.message || err) + ".";
+          var why = "The " + displayName(f) + " could not be opened: " + (err.message || err) + ".";
+          if (f.loading) f.loading.textContent = why;
+          toast(why, "err");
           return;
         }
         el.srcdoc = html;
@@ -177,8 +180,18 @@
     return null;
   }
 
+  // A file's handle (Open a file in the single-file build) is passed with it
+  // so the tool can save back to it; if the browser cannot pass the handle,
+  // the file still goes, without it.
   function send(f, type, data) {
-    try { f.el.contentWindow.postMessage({ protocol: PROTOCOL, from: "suite", type: type, data: data || {} }, "*"); } catch (e) {}
+    var msg = { protocol: PROTOCOL, from: "suite", type: type, data: data || {} };
+    try { f.el.contentWindow.postMessage(msg, "*"); }
+    catch (e) {
+      if (!data || !data.handle) return;
+      var plain = {};
+      Object.keys(data).forEach(function (k) { if (k !== "handle") plain[k] = data[k]; });
+      try { f.el.contentWindow.postMessage({ protocol: PROTOCOL, from: "suite", type: type, data: plain }, "*"); } catch (x) {}
+    }
   }
 
   // Opens a tool and sends it a message, held until the tool has started.
@@ -202,10 +215,11 @@
       if (f.loading) f.loading.classList.toggle("hidden", !on);
     });
     $("home").classList.toggle("hidden", key !== null);
-    renderBar();
+    renderRail();
     if (key === null) {
       document.title = D.product;
       renderHome();
+      markNotesSeen();
     } else {
       document.title = displayName(frames[key]) + " - " + D.product;
       try { frames[key].el.focus(); } catch (e) {}
@@ -236,7 +250,7 @@
     if (!f) return;
     var d = m.data || {};
     // A tour is a demo whose changes are never kept: its unsaved changes do
-    // not count (no bar tag, no close warning) and its saves are not recent files.
+    // not count (no amber dot, no close warning) and its saves are not recent files.
     if (m.type === "ready") {
       f.ready = true;
       f.product = String(d.product || "");
@@ -264,7 +278,7 @@
     // Readable from outside the frame too (the check page, the self-test).
     if (f.ready) f.el.setAttribute("data-ready", f.version || "");
     f.el.setAttribute("data-dirty", f.dirty ? "true" : "false");
-    renderBar();
+    renderRail();
     if (current === null) renderHome();
   });
 
@@ -313,10 +327,12 @@
     deliver(entry.module, "open-recent", { name: entry.name, label: entry.label || "" });
   }
 
-  // What sort of file a recent entry is, for the list: what the tool said,
+  // What sort of file a recent entry is, for the list: what the tool said; a
+  // project file for the assessment and risk tools, which write nothing else;
   // or, for the Report Review Tool, read from the names it gives its files.
   function recentKind(e) {
     if (e.kind) return e.kind;
+    if (e.module === "assessments" || e.module === "risk-assessment") return "Project file";
     if (e.module !== "report-review") return "";
     if (/-review-pack-round-\d+/i.test(e.name)) return "Review pack";
     if (/-review-round-\d+-/i.test(e.name)) return "Review file";
@@ -326,7 +342,9 @@
   // ---- files handed over, and files dropped on the suite ----------------------
   //
   // The contents go straight to the tool that opens them (open-text, see
-  // shared/host-bridge.js) and are never kept here. postMessage carries them
+  // shared/host-bridge.js) and are never kept here. A file chosen with Open a
+  // file in the single-file build also carries its handle, so the tool can
+  // save back to it. postMessage carries them
   // across origins, so this works in the folder build as well.
 
   var FILE_MAX = 100 * 1024 * 1024;   // well above the largest review pack
@@ -341,7 +359,7 @@
     if (/^spt-review\//.test(s)) return { module: "report-review", what: "review file" };
     if (/^spt-risk-project\//.test(s)) return { module: "risk-assessment", what: "project file" };
     if (/^spt-risk-context\//.test(s)) return { module: null, what: "risk context file",
-      hint: "Import it in the 62443-3-3 assessment in the OT Cyber Assessment Tool." };
+      hint: "Open or start an IEC 62443-3-3 assessment in the OT Cyber Assessment Tool and use Import risk context on the Target SL card of its Engagement details page." };
     if (!s && typeof d.schemaVersion === "string") return { module: "assessments", what: "project file" };
     return null;
   }
@@ -356,7 +374,7 @@
   // A tool hands over a file it has just written: the author's pack to the
   // Report Review Tool, or a reviewer's file back to the tool the pack came from.
   function handoff(from, d) {
-    if (from.tour) { toast("This is a tour, so its files stay in it.", "err"); return; }
+    if (from.tour) { toast("A tour's files can't be passed to another tool.", "err"); return; }
     var m = moduleFor(d.to);
     if (!m || m.id === from.module.id || !moduleAvailable(m) || typeof d.text !== "string" || d.text.length > FILE_MAX) {
       toast("That file could not be passed to the other tool. Open it there with Load.", "err");
@@ -380,7 +398,7 @@
     return Promise.all(files.map(function (file) {
       if (typeof file.size === "number" && file.size > FILE_MAX) return Promise.resolve({ name: file.name, text: null });
       return Promise.resolve().then(function () { return file.text(); })
-        .then(function (text) { return { name: file.name, text: text }; }, function () { return { name: file.name, text: null }; });
+        .then(function (text) { return { name: file.name, text: text, handle: file.__sptHandle || null }; }, function () { return { name: file.name, text: null }; });
     })).then(function (got) {
       var byTool = {}, order = [], notes = [], projects = {};
       got.forEach(function (g) {
@@ -395,7 +413,7 @@
         }
         if (!byTool[m.id]) { byTool[m.id] = []; order.push(m.id); }
         if (m.id !== "report-review" && !toAuthor) {
-          if (projects[m.id]) { notes.push(g.name + " was left out: drop one project file at a time."); return; }
+          if (projects[m.id]) { notes.push(g.name + " was left out: open one project file at a time."); return; }
           projects[m.id] = true;
         }
         byTool[m.id].push(g);
@@ -410,7 +428,7 @@
       });
       // The first tool is shown last, so it is the one in front.
       order.slice().reverse().forEach(function (id) {
-        byTool[id].forEach(function (g) { deliver(id, "open-text", { name: g.name, text: g.text }); });
+        byTool[id].forEach(function (g) { deliver(id, "open-text", g.handle ? { name: g.name, text: g.text, handle: g.handle } : { name: g.name, text: g.text }); });
       });
       if (notes.length) toast(notes.join(" "), "err");
       return order;
@@ -422,28 +440,47 @@
     return !!t && Array.prototype.indexOf.call(t, "Files") !== -1;
   }
   // Without these the browser opens a file dropped on the home page or the
-  // bar in place of the suite, and the exe silently does nothing.
+  // rail in place of the suite, and the exe silently does nothing. While a
+  // file is over the suite, an overlay says what dropping it will do.
+  // dragover repeats while a file is over this page, so the overlay goes
+  // when it stops: the file left the window, moved over a tool's frame (whose
+  // own page takes it) or the drag was cancelled. dragleave alone misses some.
+  var dragTimer = null;
+  function dragOver(on) {
+    clearTimeout(dragTimer);
+    document.body.classList.toggle("drop-over", on);
+    if (on) dragTimer = setTimeout(function () { dragOver(false); }, 250);
+  }
   document.addEventListener("dragover", function (e) {
     if (!isFileDrag(e)) return;
     e.preventDefault();
     try { e.dataTransfer.dropEffect = "copy"; } catch (x) {}
-    document.body.classList.add("drop-over");
+    dragOver(true);
   });
   document.addEventListener("dragleave", function (e) {
-    if (!e.relatedTarget) document.body.classList.remove("drop-over");
+    if (!e.relatedTarget || e.relatedTarget.tagName === "IFRAME") dragOver(false);
   });
   document.addEventListener("drop", function (e) {
-    document.body.classList.remove("drop-over");
+    dragOver(false);
     if (!isFileDrag(e)) return;
     e.preventDefault();
     openDropped(Array.prototype.slice.call(e.dataTransfer.files || []));
   });
 
-  function when(iso) {
+  // "today, 14:02", "yesterday, 09:10", "3 Nov, 16:45", or "3 Nov 2025"
+  // for an earlier year. now: for the tests.
+  function when(iso, now) {
     var d = new Date(iso);
     if (isNaN(d.getTime())) return "";
+    now = now || new Date();
+    function day(x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); }
     try {
-      return d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      var time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      var ago = Math.round((day(now) - day(d)) / 86400000);
+      if (ago === 0) return "today, " + time;
+      if (ago === 1) return "yesterday, " + time;
+      if (d.getFullYear() === now.getFullYear()) return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + ", " + time;
+      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     } catch (e) { return d.toISOString().slice(0, 16).replace("T", " "); }
   }
 
@@ -451,13 +488,16 @@
 
   function theme() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
 
+  // The rail's button names the mode it would switch to.
   function updateThemeButton() {
     var btn = $("btn-theme");
     if (!btn) return;
     var dark = theme() === "dark";
-    btn.textContent = dark ? "☀ Light" : "☾ Dark";   // the mode you would switch to
+    btn.innerHTML = "";
+    btn.appendChild(icon(dark ? "sun" : "moon"));
+    btn.appendChild(h("span", { class: "rail-label", text: dark ? "Light" : "Dark" }));
     btn.setAttribute("title", dark ? "Switch to light mode" : "Switch to dark mode");
-    btn.setAttribute("aria-pressed", dark ? "true" : "false");
+    btn.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
   }
 
   // The suite and every open tool share one theme: a change in any of them
@@ -479,15 +519,27 @@
 
   // ---- licence -------------------------------------------------------------
 
-  var modal = null;
-  function closeModal() { if (modal && modal.parentNode) modal.parentNode.removeChild(modal); modal = null; }
+  // The dialog keeps the keyboard inside it (the text and Close) and
+  // gives focus back to what opened it. The rail is redrawn whenever a tool
+  // says something, so the opener is remembered by what it is, not as a node.
+  var modal = null, modalOpener = null;
+  function closeModal() {
+    if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+    modal = null;
+    var back = modalOpener && (modalOpener.isConnected ? modalOpener
+      : modalOpener.getAttribute("data-rail") ? document.querySelector('#suite-bar [data-rail="' + modalOpener.getAttribute("data-rail") + '"]')
+      : document.querySelector(".home-legal .link-btn"));
+    modalOpener = null;
+    if (back && back.offsetParent !== null) back.focus();
+  }
   function openLicence() {
     closeModal();
+    modalOpener = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
     var close = h("button", { class: "btn primary", type: "button", onClick: closeModal, text: "Close" });
     modal = h("div", { class: "modal-backdrop licence-modal" }, [
       h("div", { class: "modal", role: "dialog", "aria-modal": "true", "aria-label": "Licence" }, [
         h("div", { class: "modal-h" }, [h("h2", { text: "Licence" })]),
-        h("div", { class: "modal-b" }, [
+        h("div", { class: "modal-b", tabindex: "0", "aria-label": "Licence text" }, [
           h("p", { class: "licence-version muted small",
             text: D.product + " " + V.label + " (version " + V.number + "). The licence covers every tool in the suite." }),
           D.licence ? h("pre", { class: "licence-text", text: D.licence })
@@ -497,7 +549,11 @@
       ])
     ]);
     modal.addEventListener("click", function (ev) { if (ev.target === modal) closeModal(); });
-    modal.addEventListener("keydown", function (ev) { if (ev.key === "Escape") { ev.preventDefault(); closeModal(); } });
+    modal.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") { ev.preventDefault(); closeModal(); }
+      // Tab goes between the text (which scrolls) and Close, and no further.
+      else if (ev.key === "Tab") { ev.preventDefault(); (document.activeElement === close ? modal.querySelector(".modal-b") : close).focus(); }
+    });
     document.body.appendChild(modal);
     close.focus();
   }
@@ -578,90 +634,189 @@
     return host;
   }
 
-  // ---- the bar --------------------------------------------------------------
+  // ---- icons ------------------------------------------------------------------
+  // Line icons on a 24-unit grid, drawn in the current text colour.
 
-  function houseIcon() {
+  var ICONS = {
+    home: ["M3.5 10.5 12 3.5l8.5 7", "M5.5 9v11h4.5v-6h4v6h4.5V9"],
+    assessments: ["M8.5 4.5H6.5a1.5 1.5 0 0 0-1.5 1.5v13.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5h-2",
+                  "M9 3h6v3H9z", "m8.5 13.5 2.5 2.5 4.5-5"],
+    "risk-assessment": ["M3 3.5h7v7H3z", "M14 3.5h7v7h-7z", "M8.5 15h7v6h-7z", "M10 7h4", "M6.5 10.5V13H12v2", "M17.5 10.5V13H12"],
+    "report-review": ["M4 4.5h16v11.5H10l-6 4.5z", "M8 8.5h8", "M8 12h5"],
+    moon: ["M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"],
+    sun: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M12 2.5V5", "M12 19v2.5", "M2.5 12H5", "M19 12h2.5",
+          "m5.3 5.3 1.8 1.8", "m16.9 16.9 1.8 1.8", "m5.3 18.7 1.8-1.8", "m16.9 7.1 1.8-1.8"],
+    licence: ["M6.5 3h7.5l4.5 4.5V21h-12z", "M14 3v4.5h4.5", "M9.5 12h6", "M9.5 15.5h6"],
+    folder: ["M3 7.5A2 2 0 0 1 5 5.5h4l2 2h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"],
+    drop: ["M12 3.5v11", "m7.5 10 4.5 4.5 4.5-4.5", "M4.5 20.5h15"],
+    chevron: ["m9 5.5 6.5 6.5L9 18.5"],
+    down: ["M12 4.5v14", "m6.5 13 5.5 5.5 5.5-5.5"],
+    back: ["M9 14 4.5 9.5 9 5", "M4.5 9.5H15a5 5 0 0 1 0 10h-3"]
+  };
+
+  function icon(name, cls) {
     var ns = "http://www.w3.org/2000/svg";
     var s = document.createElementNS(ns, "svg");
-    s.setAttribute("viewBox", "0 0 16 16");
+    s.setAttribute("viewBox", "0 0 24 24");
+    s.setAttribute("class", "ic" + (cls ? " " + cls : ""));
     s.setAttribute("aria-hidden", "true");
-    var p = document.createElementNS(ns, "path");
-    p.setAttribute("d", "M8 1.5 1 7.6l1 1.1.9-.8V14.5h4.2v-4h1.8v4h4.2V7.9l.9.8 1-1.1z");
-    p.setAttribute("fill", "currentColor");
-    s.appendChild(p);
+    s.setAttribute("focusable", "false");
+    s.setAttribute("fill", "none");
+    s.setAttribute("stroke", "currentColor");
+    s.setAttribute("stroke-width", "1.7");
+    s.setAttribute("stroke-linecap", "round");
+    s.setAttribute("stroke-linejoin", "round");
+    (ICONS[name] || []).forEach(function (d) {
+      var p = document.createElementNS(ns, "path");
+      p.setAttribute("d", d);
+      s.appendChild(p);
+    });
     return s;
   }
+
+  function toolIcon(m, small) {
+    return h("span", { class: "tool-ic" + (small ? " sm" : ""), "data-module": m.id, "aria-hidden": "true" }, [icon(m.id)]);
+  }
+
+  function srOnly(text) { return h("span", { class: "sr-only", text: text }); }
+
+  // ---- the rail -------------------------------------------------------------
 
   function stateWords(f) {
     if (!f) return "";
     return f.dirty ? "open, with unsaved changes" : "open";
   }
 
-  function renderBar() {
-    var bar = $("suite-bar");
-    if (current === null) { bar.classList.add("hidden"); bar.innerHTML = ""; return; }
-    bar.classList.remove("hidden");
-    bar.innerHTML = "";
-    var f = frames[current];
+  // The spoken name starts with the visible label whenever the label is not
+  // already a word of the full name ("Assess" is not a word of "OT Cyber
+  // Assessment Tool"), so a speech user can say what they see.
+  function railName(label, full) {
+    var words = full.toLowerCase().split(/[^a-z0-9]+/);
+    return words.indexOf(label.toLowerCase()) !== -1 ? full : label + ", " + full;
+  }
 
-    bar.appendChild(h("button", {
-      type: "button", class: "bar-btn bar-home", title: "Back to the " + D.product + " home page",
-      "aria-label": "Home: " + D.product, onClick: goHome
-    }, [houseIcon(), h("span", { class: "bar-suite-name", text: D.shortName || D.product })]));
-    bar.appendChild(h("span", { class: "bar-sep", "aria-hidden": "true", text: "›" }));
-    bar.appendChild(h("span", { class: "bar-current", "aria-current": "page" }, [
-      h("span", { class: "bar-name bar-name-full", text: f.module.name }),
-      h("span", { class: "bar-name bar-name-short", text: f.module.shortName || f.module.name }),
-      f.tour ? h("span", { class: "bar-tag", text: "Tour" }) : null,
-      f.dirty ? h("span", { class: "bar-tag dirty", title: "This tool has changes that are not saved to its file yet.", text: "Unsaved changes" }) : null
-    ]));
-    bar.appendChild(h("span", { class: "bar-spacer" }));
+  // A tool's marker: a ring when it is open, a larger filled amber dot when
+  // it has unsaved changes. Shape as well as colour, so it reads without colour.
+  function railButton(o) {
+    var words = stateWords(o.frame);
+    var full = o.full + (words ? " (" + words + ")" : "");
+    return h("button", {
+      type: "button", id: o.id || null, class: "rail-btn" + (o.cls ? " " + o.cls : ""),
+      "data-key": o.key || null, "data-rail": o.rail, title: full, "aria-label": railName(o.label, full),
+      "aria-current": o.current ? "page" : null, onClick: o.onClick
+    }, [
+      icon(o.icon),
+      h("span", { class: "rail-label", "aria-hidden": "true", text: o.label }),
+      o.key ? h("span", { class: "dot" + (o.frame ? (o.frame.dirty ? " dirty" : " open") : ""), "aria-hidden": "true" }) : null
+    ]);
+  }
 
-    // Every other tool, and any tour that is open.
-    var others = [];
+  // Redrawn whenever a tool opens, has or clears unsaved changes, or is shown.
+  // The button that had the keyboard focus keeps it.
+  function renderRail() {
+    var rail = $("suite-bar");
+    var had = document.activeElement && rail.contains(document.activeElement) ? document.activeElement.getAttribute("data-rail") : null;
+    rail.innerHTML = "";
+
+    rail.appendChild(railButton({ rail: "home", icon: "home", label: "Home", full: D.product + " home page",
+      current: current === null, onClick: goHome, cls: "bar-home" }));
+    // In line with the bottom edge of the header beside it.
+    rail.appendChild(h("div", { class: "rail-sep rail-sep-top", role: "presentation" }));
+
+    var tours = [];
     D.modules.forEach(function (m) {
       if (!moduleAvailable(m)) return;
-      if (m.id !== current) others.push({ key: m.id, label: m.shortName || m.name, full: m.name });
+      rail.appendChild(railButton({ rail: m.id, key: m.id, icon: m.id, label: m.navLabel || m.shortName || m.name, full: m.name,
+        frame: frames[m.id], current: current === m.id, cls: "bar-tab", onClick: function () { openTool(m.id); } }));
       var tk = m.id + "/tour";
-      if (frames[tk] && tk !== current) others.push({ key: tk, label: (m.shortName || m.name) + " tour", full: m.name + " tour" });
+      if (frames[tk]) tours.push({ m: m, key: tk });
     });
-    if (others.length) {
-      var nav = h("div", { class: "bar-switch", role: "group", "aria-label": "Switch to another tool" }, [
-        h("span", { class: "bar-switch-label", text: "Switch to" })
-      ]);
-      others.forEach(function (o) {
-        var of = frames[o.key];
-        var words = stateWords(of);
-        nav.appendChild(h("button", {
-          type: "button", class: "bar-btn bar-tab", "data-key": o.key,
-          title: o.full + (words ? " (" + words + ")" : ""), onClick: function () { openTool(o.key); }
-        }, [
-          h("span", { class: "dot" + (of ? (of.dirty ? " dirty" : " open") : ""), "aria-hidden": "true" }),
-          h("span", { text: o.label }),
-          words ? h("span", { class: "sr-only", text: ", " + words }) : null
-        ]));
+    // A tour that is open: its tool's icon, labelled Tour. A tour's changes
+    // are never kept, so it has no unsaved changes to mark.
+    if (tours.length) {
+      rail.appendChild(h("div", { class: "rail-sep", role: "presentation" }));
+      tours.forEach(function (t) {
+        rail.appendChild(railButton({ rail: t.key, key: t.key, icon: t.m.id, label: "Tour", full: t.m.name + " tour",
+          frame: frames[t.key], current: current === t.key, cls: "bar-tab is-tour", onClick: function () { openTool(t.key); } }));
       });
-      bar.appendChild(nav);
+    }
+
+    rail.appendChild(h("div", { class: "rail-spacer" }));
+    rail.appendChild(h("button", { type: "button", id: "btn-theme", class: "rail-btn", "data-rail": "theme",
+      onClick: function () { setTheme(theme() === "dark" ? "light" : "dark"); } }));
+    rail.appendChild(railButton({ rail: "licence", id: "btn-licence", icon: "licence", label: "Licence", full: "Read the licence", onClick: openLicence }));
+    updateThemeButton();
+
+    if (had) {
+      var back = rail.querySelector('[data-rail="' + had + '"]');
+      if (back) back.focus();
     }
   }
 
   // ---- the home page --------------------------------------------------------
+  //
+  // Redrawn whenever a tool says something while the home page is showing, so
+  // what is folded open is remembered here rather than in the page.
+
+  var unfolded = {};        // "when:<id>": the tool card's "When to use it"
+  var notesOpen = null;     // What's new; decided the first time it is drawn
+  var NOTES_SEEN_KEY = "spt-suite:notes-seen:v1";
+
+  function fold(key, summary, body, cls) {
+    var d = h("details", { class: cls || null, open: !!unfolded[key] }, [h("summary", null, summary)].concat(body));
+    d.addEventListener("toggle", function () { unfolded[key] = d.open; });
+    return d;
+  }
 
   function toolCard(m) {
     var f = frames[m.id];
-    return h("section", { class: "tool-card", "data-module": m.id }, [
+    var tourNote = tourAvailable(m) && m.tour.note ? h("span", { id: "tour-note-" + m.id, class: "sr-only", text: m.tour.note }) : null;
+    return h("section", { class: "tool-card", "data-module": m.id, "aria-labelledby": "tool-h-" + m.id }, [
       h("div", { class: "tool-card-top" }, [
-        h("h2", { text: m.name }),
-        f ? h("div", { class: "tool-chips" }, [
-          f.dirty ? h("span", { class: "chip dirty", text: "Unsaved changes" }) : h("span", { class: "chip open", text: "Open" })
-        ]) : null
+        toolIcon(m),
+        h("h2", { id: "tool-h-" + m.id, text: m.name })
       ]),
-      h("p", { text: m.summary }),
+      h("p", { class: "tool-summary", text: m.summary }),
       h("div", { class: "tool-actions" }, [
-        h("button", { type: "button", class: "btn primary tool-open", onClick: function () { openTool(m.id); }, text: f ? "Return to it" : "Open" }),
+        h("button", { type: "button", class: "btn primary tool-open", onClick: function () { openTool(m.id); } },
+          [f ? "Go back to it" : "Open", srOnly(" the " + m.name)]),
         tourAvailable(m) ? h("button", { type: "button", class: "link-btn tool-tour", title: m.tour.note || "",
-          onClick: function () { openTool(m.id + "/tour"); }, text: m.tour.label || "Take the tour" }) : null
-      ])
+          "aria-describedby": tourNote ? "tour-note-" + m.id : null,
+          onClick: function () { openTool(m.id + "/tour"); } }, [m.tour.label || "Take the tour", srOnly(" of the " + m.name)]) : null,
+        tourNote,
+        f && f.dirty ? h("span", { class: "tool-state", text: "Unsaved changes" }) : null
+      ]),
+      fold("when:" + m.id, [icon("chevron", "chev"), "When to use it", srOnly(" the " + m.name)], [h("p", { text: m.useWhen })], "tool-when help-tool")
+    ]);
+  }
+
+  // Opens files where a dropped one would go. In the single-file build and
+  // the exe the tools share this page's origin, so the file's handle goes with
+  // it and the tool can save back to the same file, as it does after its own
+  // Load. The folder build cannot pass a handle into a tool's frame, so it
+  // reads the file and hands over its contents, as a drop does.
+  function openFileButton() {
+    var input = h("input", { type: "file", accept: ".json,application/json", multiple: true, class: "sr-only", tabindex: "-1", "aria-hidden": "true" });
+    input.addEventListener("change", function () {
+      var files = Array.prototype.slice.call(input.files || []);
+      input.value = "";
+      openDropped(files);
+    });
+    function pick() {
+      if (!BUNDLE || typeof window.showOpenFilePicker !== "function") { input.click(); return; }
+      window.showOpenFilePicker({ multiple: true, types: [{ description: "Project file, review pack or review file", accept: { "application/json": [".json"] } }] })
+        .then(function (handles) {
+          return Promise.all(handles.map(function (hd) {
+            return hd.getFile().then(function (file) { file.__sptHandle = hd; return file; });
+          }));
+        })
+        .then(function (files) { openDropped(files); },
+              function (e) { if (!e || e.name !== "AbortError") toast("The file could not be opened: " + ((e && e.message) || e) + ".", "err"); });
+    }
+    return h("span", null, [
+      input,
+      h("button", { type: "button", class: "btn small recent-pick", title: "Open a project file, review pack or review file in the tool that reads it",
+        onClick: pick }, [icon("folder"), "Open a file"])
     ]);
   }
 
@@ -669,94 +824,160 @@
     var list = readRecent();
     var body;
     if (!list.length) {
-      body = h("p", { class: "recent-empty", text: "Project files, review packs and review files you open or save in a tool appear here, so you can go back to one in a click." });
+      body = h("div", { class: "recent-empty" }, [
+        icon("drop"),
+        h("p", { text: "Project files, review packs and review files you open or save in a tool appear here." }),
+        h("p", { text: "Drop one anywhere in the suite and it opens in the right tool." })
+      ]);
     } else {
       body = h("ul", { class: "recent-list" }, list.map(function (e) {
         var m = modulesById[e.module];
-        var meta = [m.name];
+        var meta = [];
         var kind = recentKind(e);
         if (kind) meta.push(kind);
         if (e.label) meta.push(e.label);
+        meta.push(m.shortName || m.name);
         var w = when(e.when);
-        if (w) meta.push((e.action === "save" ? "Saved " : "Opened ") + w);
         return h("li", { class: "recent-item" }, [
-          h("button", { type: "button", class: "recent-open", title: "Open " + e.name + " in the " + m.name,
-            onClick: function () { openRecent(e); } }, [
+          h("button", { type: "button", class: "recent-open", "data-recent": e.module + "|" + e.name,
+            title: "Open " + e.name + " in the " + m.name, onClick: function () { openRecent(e); } }, [
+            toolIcon(m, true),
             h("span", { class: "recent-text" }, [
               h("span", { class: "recent-name", text: e.name }),
-              h("span", { class: "recent-meta", text: meta.join("  ·  ") })
+              h("span", { class: "recent-meta", text: meta.join(" · ") })
             ]),
-            h("span", { class: "recent-go", "aria-hidden": "true", text: "Open" })
+            w ? h("span", { class: "recent-when", text: (e.action === "save" ? "Saved " : "Opened ") + w }) : null
           ])
         ]);
       }));
     }
-    return h("section", { class: "card recent-card" }, [
+    return h("section", { class: "card recent-card", "aria-labelledby": "recent-h" }, [
       h("div", { class: "card-h" }, [
-        h("h2", { text: "Recent files" }),
-        list.length ? h("button", { type: "button", class: "link-btn small recent-clear", onClick: clearRecent, text: "Clear the list" }) : null
+        h("h2", { id: "recent-h", text: "Recent files" }),
+        h("div", { class: "card-h-actions" }, [
+          list.length ? h("button", { type: "button", class: "link-btn small recent-clear", onClick: clearRecent, text: "Clear the list" }) : null,
+          openFileButton()
+        ])
       ]),
       body,
-      h("div", { class: "recent-foot" }, [
-        "Only the file name, the customer and the date are kept here, never what a file contains. Opening one switches to its tool, which offers to reopen the file where the browser still has access to it, or shows you where to load it from. A review file opened before its pack waits for the pack."
+      h("div", { class: "recent-foot", text: list.length
+        ? "The list holds each file's name, its customer or system and the time, not its contents. Picking one switches to its tool, which offers to reopen the file if the browser still has access to it, or shows where to load it from."
+        : "The list holds each file's name, its customer or system and the time, not its contents." })
+    ]);
+  }
+
+  // Each tool, and the file that passes from one to the next.
+  function helpCard() {
+    var by = function (id) { return modulesById[id] && moduleAvailable(modulesById[id]) ? modulesById[id] : null; };
+    var risk = by("risk-assessment"), assess = by("assessments"), review = by("report-review");
+    function step(m, what) {
+      return h("li", { class: "flow-step", "data-module": m.id }, [
+        toolIcon(m, true),
+        h("span", { class: "flow-text" }, [h("span", { class: "flow-name", text: m.name }), h("span", { class: "flow-what", text: what })])
+      ]);
+    }
+    function link(arrow, file, note) {
+      return h("li", { class: "flow-link" }, [
+        h("span", { class: "flow-arrow" }, [icon(arrow)]),
+        h("span", { class: "flow-file" }, [h("strong", { text: file }), h("span", { text: note })])
+      ]);
+    }
+    var flow = [];
+    if (risk) {
+      flow.push(step(risk, "Zones and conduits, and a target security level for each."));
+      if (assess) flow.push(link("down", "Risk context file", "Imported into an IEC 62443-3-3 assessment with Import risk context, on its Engagement details page."));
+    }
+    if (assess) flow.push(step(assess, "Answers and evidence against the framework, then the Word report and Excel tracker."));
+    if (review && (risk || assess)) {
+      flow.push(link("down", "Review pack", risk && assess ? "Sent from either tool with Send for review." : "Sent with Send for review."));
+      flow.push(step(review, "A colleague comments on the report and the engagement behind it, and gives a verdict."));
+      flow.push(link("back", "Review file", "Goes back to the author, who brings the comments in with Import review files."));
+    }
+    // Dropping files is said by the empty Recent files; once the list has
+    // entries, this is the only place that says it.
+    var tips = [];
+    if (readRecent().length) tips.push("Drop a project file, review pack or review file anywhere in the suite and it opens in the right tool.");
+    tips.push("A tool you leave keeps your work until you close the suite. In the rail, a ring on a tool means it is open and a filled amber dot means it has unsaved changes. The suite asks before closing while any tool has them.");
+    return h("section", { class: "card help-card", "aria-labelledby": "help-h" }, [
+      h("div", { class: "card-h" }, [h("h2", { id: "help-h", text: "How the tools fit together" })]),
+      h("div", { class: "card-b" }, [
+        h("ol", { class: "flow" }, flow),
+        h("ul", { class: "help-tips" }, tips.map(function (t) { return h("li", { text: t }); })),
+        BUNDLE ? null : h("p", { class: "help-dev muted small", text: "This is the developer copy of the suite, run from its folder. The browser does not let a tool save back into the same file here, so Save downloads a new copy each time." })
       ])
     ]);
   }
 
-  function helpCard() {
-    var tips = [
-      "Each tool saves and loads its own files with the buttons in its own header, just as it does on its own: a project file in the assessment and risk tools, a review pack and your review file in the Report Review Tool.",
-      "You can also drop a project file, review pack or review file anywhere on the suite: it opens in the tool that reads it.",
-      "Switching keeps your work: a tool you leave stays open in the background until you close the suite.",
-      "The bar at the top marks a tool with unsaved changes, and the suite asks before it closes while any tool has them."
-    ];
-    if (!BUNDLE) tips.push("This is the developer copy of the suite, run from its folder. The browser does not let a tool save back into the same file here, so Save downloads a new copy each time.");
-    return h("section", { class: "card help-card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Getting started" })]),
-      h("div", { class: "card-b" }, D.modules.filter(moduleAvailable).map(function (m) {
-        return h("div", { class: "help-tool", "data-module": m.id }, [
-          h("h3", { text: m.name }),
-          h("p", { text: m.useWhen }),
-          h("div", { class: "help-links" }, [
-            h("button", { type: "button", class: "link-btn", onClick: function () { openTool(m.id); }, text: "Open it" }),
-            tourAvailable(m) ? h("button", { type: "button", class: "link-btn help-tour", title: m.tour.note || "",
-              onClick: function () { openTool(m.id + "/tour"); }, text: m.tour.label || "Take the tour" }) : null
-          ])
-        ]);
-      }).concat([h("ul", { class: "help-tips" }, tips.map(function (t) { return h("li", { text: t }); }))]))
-    ]);
-  }
-
+  // What's new opens by itself the first time this version's notes are on
+  // show, and is folded away after that until someone opens it. They count as
+  // seen only once the home page has actually been shown (markNotesSeen).
   function notesCard() {
     var n = D.releaseNotes;
     if (!n || !n.markdown) return null;
-    return h("section", { class: "card notes-card" }, [
-      h("div", { class: "card-h" }, [
+    if (notesOpen === null) {
+      var seen = null;
+      try { seen = localStorage.getItem(NOTES_SEEN_KEY); } catch (e) {}
+      notesOpen = seen !== n.version;
+    }
+    var d = h("details", { open: notesOpen }, [
+      h("summary", null, [
+        icon("chevron", "chev"),
         h("h2", { text: "What's new in " + n.label }),
-        h("span", { class: "card-h-note", text: "Release notes" })
+        h("span", { class: "notes-hint", "aria-hidden": "true", text: notesOpen ? "Hide" : "Show" })
       ]),
       renderMarkdown(n.markdown, h("div", { class: "card-b notes" }))
     ]);
+    d.addEventListener("toggle", function () {
+      notesOpen = d.open;
+      d.querySelector(".notes-hint").textContent = d.open ? "Hide" : "Show";
+      markNotesSeen();
+    });
+    return h("section", { class: "card notes-card" }, [d]);
+  }
+
+  function markNotesSeen() {
+    var n = D.releaseNotes;
+    if (n && n.version) try { localStorage.setItem(NOTES_SEEN_KEY, n.version); } catch (e) {}
   }
 
   function renderHome() {
     var main = $("home-main");
     var scroll = $("home").scrollTop;
+    var had = document.activeElement && main.contains(document.activeElement) ? focusKey(document.activeElement) : null;
     main.innerHTML = "";
     main.appendChild(h("h1", { class: "page-title", text: "Choose a tool" }));
-    main.appendChild(h("p", { class: "page-sub", text:
-      "Open a tool to work in it here. The bar at the top of a tool takes you back to this page or straight to another tool, and a tool you leave stays open with your work in it." }));
     main.appendChild(h("div", { class: "tool-grid" }, D.modules.filter(moduleAvailable).map(toolCard)));
-    // Recent files and What's new on the left, the wider column (the notes
-    // carry a table); getting started on the right. One column when narrow,
-    // in reading order: recent files, getting started, then what's new
-    // (grid areas in suite.css).
-    main.appendChild(h("div", { class: "home-cols" }, [recentCard(), helpCard(), notesCard()]));
+    // Recent files on the left, the wider column; how the tools fit together
+    // on the right. One column when narrow, in that order. What's new below,
+    // across both.
+    main.appendChild(h("div", { class: "home-cols" }, [recentCard(), helpCard()]));
+    var notes = notesCard();
+    if (notes) main.appendChild(notes);
     main.appendChild(h("footer", { class: "home-legal" }, [
       h("p", { class: "home-version", text: D.product + " " + V.label }),
       h("p", null, [LEGAL_NOTICE + " ", h("button", { type: "button", class: "link-btn", onClick: openLicence, text: "Read the licence" })])
     ]));
     $("home").scrollTop = scroll;
+    if (had) {
+      // A control that is gone (Clear the list removes itself) hands focus to
+      // Open a file, next to where it was.
+      var back = main.querySelector(had) || main.querySelector(".recent-pick");
+      if (back) back.focus();
+    }
+  }
+
+  // Where the keyboard focus was on the home page, as a selector that finds
+  // the same control after a redraw.
+  function focusKey(el) {
+    function esc(v) { return window.CSS && CSS.escape ? CSS.escape(v) : String(v).replace(/["\\]/g, "\\$&"); }
+    if (el.hasAttribute("data-recent")) return '.recent-open[data-recent="' + esc(el.getAttribute("data-recent")) + '"]';
+    var card = el.closest(".tool-card");
+    var scope = card ? '.tool-card[data-module="' + card.getAttribute("data-module") + '"] ' : "";
+    var cls = ["tool-open", "tool-tour", "recent-pick", "recent-clear"].filter(function (c) { return el.classList.contains(c); })[0];
+    if (cls) return scope + "." + cls;
+    if (el.tagName === "SUMMARY") return card ? scope + "summary" : ".notes-card summary";
+    if (el.closest(".home-legal")) return ".home-legal .link-btn";
+    return null;
   }
 
   // ---- start -------------------------------------------------------------------
@@ -768,13 +989,16 @@
       if (V.label) name.appendChild(h("span", { class: "version-badge", title: D.product + " version " + V.number, text: V.label }));
     }
     document.title = D.product;
-    updateThemeButton();
-    $("btn-theme").addEventListener("click", function () { setTheme(theme() === "dark" ? "light" : "dark"); });
-    $("btn-licence").addEventListener("click", openLicence);
+    document.body.appendChild(h("div", { class: "drop-overlay", "aria-hidden": "true" }, [
+      h("div", { class: "drop-msg" }, [icon("drop"), h("strong", { text: "Drop to open" }),
+        h("span", { text: "Each file opens in the tool that reads it." })])
+    ]));
+    renderRail();
     renderHome();
     // #open=<id> or #open=<id>/tour opens a tool straight away.
     var m = /^#open=([\w\-\/]+)$/.exec(location.hash || "");
-    if (m) openTool(m[1]);
+    if (m && openTool(m[1])) return;
+    markNotesSeen();
   })();
 
   // For the suite's check page and the exe self-test.
@@ -792,6 +1016,7 @@
     setTheme: setTheme,
     openLicence: openLicence,
     renderMarkdown: renderMarkdown,
+    when: when,
     bundled: !!BUNDLE,
     RECENT_KEY: RECENT_KEY
   };

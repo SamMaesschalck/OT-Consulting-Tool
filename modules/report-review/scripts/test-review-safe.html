@@ -442,7 +442,7 @@
           ok(/demo review, so there is no author/.test(toastText()), "saving the demo says there is no author to send it to", toastText());
           R.loadTexts([{ name: "real.json", text: PACK }]);
           ok(!R.state.demo && !D.getElementById("rr-demo-note"), "a real pack opened there is not called a demo");
-          ok(/tour's window/.test(toastText()) && /the Report Review Tool is the place for real work/.test(toastText()), "and the message says where real work belongs, naming the tool as everywhere else", toastText());
+          ok(/tour's window/.test(toastText()) && /Use the Report Review Tool itself for real work/.test(toastText()), "and the message says where real work belongs, naming the tool as everywhere else", toastText());
           R.addComment({ severity: "suggestion", anchor: GEN, text: "Real in the tour." });
           R.writeAutosave();
           ok(storedTexts().indexOf("Real in the tour.") !== -1 && dirtySent[dirtySent.length - 1] === true, "it gets the crash net, and its unsaved work is reported");

@@ -76,7 +76,13 @@
 :root[data-theme="dark"] .header { background: #0A3D62; }
 /* Primary-button hover: --brand-blue-dark is light in dark mode, so use a
    deeper blue for the hover state instead. */
-:root[data-theme="dark"] .btn.primary:hover { background: #3B82C4; border-color: #3B82C4; }
+/* White on the dark theme's lighter blue is too faint (3.1:1), so a dark
+   theme's primary button is a deeper blue (5:1); links keep --brand-blue. */
+:root[data-theme="dark"] .btn.primary { background: #2F72B5; border-color: #2F72B5; }
+:root[data-theme="dark"] .btn.primary:hover { background: #2A66A3; border-color: #2A66A3; }
+/* In the suite (shared/host-bridge.js marks the page), the suite's rail has
+   the theme toggle and switches every tool at once, so this one is hidden. */
+:root[data-host="suite"] #btn-theme { display: none; }
 /* Hand-drawn SVG charts paint a white plate; on a dark card, frame it so it
    reads as an intentional chart panel rather than a raw white block. */
 :root[data-theme="dark"] .report-grid svg,
@@ -191,13 +197,12 @@ a:hover { text-decoration: underline; }
 
 .nav-section { padding: 10px 0; }
 /* Section headers get a tinted band with rules top and bottom so each capture
-   section reads as a distinct block in the sidebar. */
+   section reads as a distinct block in the sidebar. Sentence case: weight and
+   colour carry the hierarchy, not capitals and tracking. */
 .nav-section-title {
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.8px;
-  color: var(--brand-blue-dark);
-  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 600;
   padding: 7px 18px;
   margin-top: 10px;
   background: var(--surface-2);
@@ -345,12 +350,10 @@ a:hover { text-decoration: underline; }
 .field { margin-bottom: 12px; }
 .field label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  color: var(--text);
+  margin-bottom: 5px;
 }
 .field input[type=text],
 .field input[type=date],
@@ -697,9 +700,7 @@ a:hover { text-decoration: underline; }
 .priority-inline-label {
   color: var(--text-muted);
   font-weight: 600;
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.4px;
+  font-size: 12.5px;
   margin-right: 4px;
 }
 .priority-chip {
@@ -743,10 +744,8 @@ a:hover { text-decoration: underline; }
 .caf-picker-label {
   display: block;
   margin: 0 18px 2px;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   color: var(--text-muted);
 }
 .caf-picker-label + .caf-profile-select { margin-bottom: 8px; }
@@ -777,9 +776,8 @@ a:hover { text-decoration: underline; }
   color: var(--near);
 }
 .engagement-profile-chip .chip-tag {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 600;
   padding: 1px 5px;
   border-radius: 8px;
   background: var(--near);
@@ -842,10 +840,8 @@ a:hover { text-decoration: underline; }
 /* State summaries (paraphrased memory jogs) under the buttons. */
 .caf-summaries { margin-top: 12px; }
 .caf-summary-label {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
   font-weight: 600;
   margin-bottom: 6px;
 }
@@ -871,10 +867,8 @@ a:hover { text-decoration: underline; }
 .caf-summary-tag {
   display: inline-block;
   margin-right: 6px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
 }
 .caf-igp-list { margin: 4px 0 0 16px; padding: 0; }
@@ -890,10 +884,8 @@ a:hover { text-decoration: underline; }
   color: var(--brand-blue-dark);
 }
 .caf-supplementary-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-weight: 700;
+  font-size: 12.5px;
+  font-weight: 600;
   margin-bottom: 4px;
 }
 
@@ -935,10 +927,8 @@ a:hover { text-decoration: underline; }
 }
 .ml-req-verbatim-label,
 .ml-req-hint-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-soft);
+  font-size: 12.5px;
+  color: var(--text-muted);
   font-weight: 600;
   margin-bottom: 2px;
 }
@@ -1098,11 +1088,9 @@ a:hover { text-decoration: underline; }
 .wiz-ctx-block { margin-bottom: 18px; }
 .wiz-ctx-block:last-child { margin-bottom: 0; }
 .wiz-ctx-label {
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-soft);
-  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 600;
   margin: 0 0 6px;
 }
 .wiz-ctx-text {
@@ -1286,9 +1274,7 @@ a:hover { text-decoration: underline; }
   background: var(--surface-2);
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.4px;
+  font-size: 12.5px;
 }
 .tbl tbody tr:hover { background: var(--surface-2); }
 .tbl th.center, .tbl td.center  { text-align: center; }
@@ -1387,7 +1373,7 @@ a:hover { text-decoration: underline; }
   border-radius: var(--radius-lg);
   padding: 12px 14px;
 }
-.kpi .lbl { color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px; font-weight: 600; }
+.kpi .lbl { color: var(--text-muted); font-size: 12.5px; font-weight: 600; }
 .kpi .val {
   font-size: 22px;
   font-weight: 600;
@@ -1455,10 +1441,8 @@ a:hover { text-decoration: underline; }
   color: var(--brand-blue-dark);
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
   margin-bottom: 10px;
 }
 
@@ -1631,8 +1615,8 @@ a:hover { text-decoration: underline; }
 .q-capture .field.notes { flex: 1; min-width: 280px; }
 .q-capture .field > label {
   display: block;
-  font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--text-soft); font-weight: 700; margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text); font-weight: 600; margin-bottom: 8px;
 }
 .q-capture textarea { min-height: 42px; }
 

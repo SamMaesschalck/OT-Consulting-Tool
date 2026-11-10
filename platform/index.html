@@ -24,9 +24,10 @@
 </head>
 <body>
   <!--
-    The suite shell. The home page lists the tools; opening one shows it in a
-    frame under a slim bar (Home, the tool's name, and a switcher). A tool
-    stays open, hidden, when another is shown, so switching never loses work.
+    The suite shell. A rail down the left (Home, each tool, any open tour, the
+    theme and the licence) and the stage beside it: the home page, or a tool
+    in a frame. A tool stays open, hidden, when another is shown, so
+    switching never loses work.
 
     In the folder (developer) build each frame is the tool's own page,
     ../modules/<id>/index.html. In the single-file build and the exe each tool
@@ -35,18 +36,13 @@
     and docs/platform-architecture.md.
   -->
   <div class="suite" id="suite">
-    <div id="suite-bar" class="suite-bar hidden" role="navigation" aria-label="Suite"></div>
+    <nav id="suite-bar" class="rail" aria-label="OT Cyber Suite"></nav>
     <div id="stage" class="stage">
       <div id="home" class="home">
         <div class="header">
           <div class="brand">
             <span class="brand-logo"><img src="img/AVEVASelect-LogoLockup-Landscape-Positive.png" alt="SolutionsPT - AVEVA Select UK &amp; Ireland" /></span>
             <span class="sub" id="suite-name">OT Cyber Suite</span>
-          </div>
-          <div class="spacer"></div>
-          <div class="header-actions">
-            <button id="btn-theme" class="btn ghost" type="button" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
-            <button id="btn-licence" class="btn ghost" type="button" title="Read the licence">Licence</button>
           </div>
         </div>
         <main id="home-main" class="home-main"></main>

@@ -46,7 +46,7 @@ foreach ($m in $suite.modules) {
     $tour.note = [string]$m.tour.note
   }
   $modules += [ordered]@{
-    id = $m.id; name = [string]$info.product; shortName = [string]$m.shortName
+    id = $m.id; name = [string]$info.product; shortName = [string]$m.shortName; navLabel = [string]$m.navLabel
     summary = [string]$m.summary; useWhen = [string]$m.useWhen
     entry = $entry; payload = $m.id; tour = $tour
   }

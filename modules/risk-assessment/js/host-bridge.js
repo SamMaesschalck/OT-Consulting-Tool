@@ -37,8 +37,9 @@
  *   suite -> module (from: "suite")
  *     theme        { theme }                                     follow the suite's theme
  *     open-recent  { name, label }                               reopen a recent file (see openRecent)
- *     open-text    { name, text }                                open a file handed over by another tool or
- *                                                                dropped on the suite (see openText)
+ *     open-text    { name, text, handle? }                       open a file handed over by another tool,
+ *                                                                dropped on the suite or chosen with its
+ *                                                                Open a file (with its handle, see openText)
  *
  * Recent files never carry file contents: the suite keeps only the name, the
  * customer or project label and when. Where the browser gave the module a file
@@ -68,6 +69,9 @@
   } catch (e) { launch = null; }
   var hosted = !!launch;
   var host = hosted ? window.parent : null;
+  // For the module's styles: in the suite, its own theme toggle is hidden, as
+  // the suite's rail has one that switches every tool together.
+  if (hosted) document.documentElement.setAttribute("data-host", "suite");
 
   var hooks = {};
   var dirty = false, readySent = false, themeSeen = null;
@@ -241,6 +245,10 @@
   // (the author's review card takes a review file this way), the module's
   // openText hook, then its openFile hook given the text as a file, so a
   // module that can reopen a recent file can open one handed over as well.
+  // A file chosen with the suite's Open a file comes with its handle (the
+  // single-file build, where the tool shares the suite's origin): it goes to
+  // the openFile hook with the handle, as the tool's own Load would, so Save
+  // writes back to that file.
   var textListeners = [];
   function openText(d) {
     var name = d && d.name ? String(d.name) : "file.json";
@@ -248,6 +256,12 @@
     if (text === null) return;
     for (var i = 0; i < textListeners.length; i++) {
       try { if (textListeners[i](name, text) === true) return; } catch (e) {}
+    }
+    var handle = d && d.handle && typeof d.handle.getFile === "function" ? d.handle : null;
+    if (handle && typeof hooks.openFile === "function") {
+      var hf = null;
+      try { hf = new File([text], name, { type: "application/json" }); } catch (e) { hf = null; }
+      if (hf) { hooks.openFile(hf, handle); return; }
     }
     if (typeof hooks.openText === "function") { hooks.openText(name, text); return; }
     if (typeof hooks.openFile === "function") {

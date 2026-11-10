@@ -92,7 +92,7 @@ They run on the pack, in `modules/report-review/js/checks.js`. A false alarm cos
 | Client name missing or inconsistent | not set; not printed in a document; printed with different capitals (all capitals is styling, and not flagged) |
 | Findings with no evidence | items whose status is finding, with nothing in the pack's evidence field (named as the pack names it); not on a risk pack, where the field is the threat source |
 | Items not answered | one line per item, or one per target above five; in a risk pack, a threat not rated or a zone with no target levels |
-| Blank document control fields | named together in one line; QA review by is left out, as an approval is what fills it in |
+| Blank document control fields | named together in one line; QA review by is left out, as an approval fills it in |
 | Section numbering gaps | numbered level 1 headings (the number printed as its own run) whose number jumps forward |
 | Figures that disagree | sentences the exporter generates, for a document covering one target: "the N outcomes below their expected state", "open gaps moved from X to N", "there are N open gaps" against the roadmap, and "N of M outcomes were assessed as achieved" against the items met |
 | Risks above tolerable with no disposition | risk packs: a threat above the tolerable risk with no countermeasure, no target level on its affected requirements and no recorded acceptance |

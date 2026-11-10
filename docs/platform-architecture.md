@@ -52,7 +52,7 @@ From stage 2, the manifest also declares what the module **produces** and **cons
 
 Inside the suite, each module runs in its own frame. The two existing tools both define the same global object and load the same libraries, so they cannot share one page. The frame also guarantees a module behaves the same in both settings.
 
-**The suite shell (first version, built).** A home page with a card per tool, "Recent files", "Getting started" (what each tool is for, and its guided tour) and "What's new" (the newest `docs/releases/v*.md`), plus the version and the licence pop-up. Opening a tool shows it in a frame under a slim bar: home, the tool's name, and a switcher for the other tools. A tool's frame is created the first time it is opened and then stays alive, hidden, when another is shown, so switching never loses work. Each tool still saves and loads its own files from its own header (a project file, or in the Report Review Tool a review pack and review file); the shared customer workspace file is a later step.
+**The suite shell (first version, built).** A rail down the left (Home, a button per tool with an open or unsaved marker, any open tour, the theme and the licence) and beside it the home page or a tool in its frame. The home page has a card per tool (what it does, its guided tour, when to use it), "Recent files" with "Open a file", "How the tools fit together" (the files that pass between the tools) and "What's new" (the newest `docs/releases/v*.md`, folded away once read), plus the version and the licence pop-up. The rail takes the place of a bar above the tool, so a tool keeps its full height and its own header is the only one. A tool's frame is created the first time it is opened and then stays alive, hidden, when another is shown, so switching never loses work. Each tool still saves and loads its own files from its own header (a project file, or in the Report Review Tool a review pack and review file); the shared customer workspace file is a later step.
 
 **Where a tool's page comes from, and the origin rules that follow.** Chromium gives every `file://` page an origin of its own, so:
 
@@ -71,7 +71,7 @@ Inside the suite, each module runs in its own frame. The two existing tools both
 | From | Type | Data | When |
 |---|---|---|---|
 | tool | `ready` | product, version, number, title, dirty, reopen, theme | the tool has started |
-| tool | `dirty` | dirty | unsaved changes appear or are saved (drives the bar and the close warning) |
+| tool | `dirty` | dirty | unsaved changes appear or are saved (drives the rail's marker and the close warning) |
 | tool | `recent` | action (`save` or `open`), name, label, kind (optional, such as "Review pack"), hasHandle, when | a file was saved or opened |
 | tool | `theme` | theme | the tool's own theme toggle was used |
 | tool | `handoff` | to (a tool's id or product name), name, text | open a file this tool has just written in another tool |

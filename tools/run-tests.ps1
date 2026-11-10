@@ -22,6 +22,9 @@ param(
 )
 if (-not $Root) { $Root = Join-Path (Split-Path -Parent $PSScriptRoot) "modules\$Module" }
 if (-not (Test-Path $Root)) { throw "No such module folder: $Root" }
+# Absolute, so the file:/// URLs built from it point at the pages (a relative
+# -Root such as "platform" would otherwise give file:///platform/...).
+$Root = (Resolve-Path -LiteralPath $Root).Path
 $ErrorActionPreference = "Continue"
 $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 $out  = Join-Path (Split-Path -Parent $PSScriptRoot) ("test-results\" + (Split-Path $Root -Leaf).Replace(' ', '_'))

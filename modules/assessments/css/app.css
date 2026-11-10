@@ -91,7 +91,13 @@
 :root[data-theme="dark"] .header { background: #0A3D62; }
 /* Primary-button hover: --brand-blue-dark is light in dark mode, so use a
    deeper blue for the hover state instead. */
-:root[data-theme="dark"] .btn.primary:hover { background: #3B82C4; border-color: #3B82C4; }
+/* White on the dark theme's lighter blue is too faint (3.1:1), so a dark
+   theme's primary button is a deeper blue (5:1); links keep --brand-blue. */
+:root[data-theme="dark"] .btn.primary { background: #2F72B5; border-color: #2F72B5; }
+:root[data-theme="dark"] .btn.primary:hover { background: #2A66A3; border-color: #2A66A3; }
+/* In the suite (shared/host-bridge.js marks the page), the suite's rail has
+   the theme toggle and switches every tool at once, so this one is hidden. */
+:root[data-host="suite"] #btn-theme { display: none; }
 /* Hand-drawn SVG charts paint a white plate; on a dark card, frame it so it
    reads as an intentional chart panel rather than a raw white block. */
 :root[data-theme="dark"] .report-grid svg,
@@ -245,10 +251,8 @@ a:hover { text-decoration: underline; }
      the instrument picker is collapsed by default for the same reason. */
   padding: 4px 18px 5px;
   font: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
   color: var(--text-muted);
   cursor: pointer;
   text-align: left;
@@ -350,9 +354,7 @@ a:hover { text-decoration: underline; }
 /* Section headers get a tinted band with rules top and bottom so each capture
    section reads as a distinct block in the sidebar. */
 .nav-section-title {
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.8px;
+  font-size: 13px;
   color: var(--brand-blue-dark);
   font-weight: 700;
   padding: 7px 18px;
@@ -566,18 +568,14 @@ a:hover { text-decoration: underline; }
   padding: 12px 18px;
 }
 .home-strip-title {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  font-weight: 700;
-  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
   margin-bottom: 12px;
 }
 .home-strip-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-muted);
   margin-right: 10px;
 }
@@ -594,9 +592,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--brand-blue-dark);
   padding-bottom: 6px;
@@ -779,12 +775,10 @@ a:hover { text-decoration: underline; }
 .field { margin-bottom: 12px; }
 .field label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text);
   margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
 }
 /* Base theming for ALL text-like form controls, so they render correctly in
    dark mode even when they are not wrapped in a .field (e.g. the inline name
@@ -1109,10 +1103,8 @@ select:focus {
   margin: 10px 0 6px;
 }
 .sl-items-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-muted);
 }
 .sl-allmet {
@@ -1142,9 +1134,8 @@ select:focus {
 .sl-item-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .sl-item-code { font-weight: 700; font-size: 12px; color: var(--brand-blue-dark); }
 .sl-item-sl {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.4px;
   color: var(--text-muted);
   background: var(--surface-3);
   border-radius: 10px;
@@ -1221,8 +1212,7 @@ table.glossary td { vertical-align: top; }
 .sl-level-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .sl-level-n {
   font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.4px;
+  font-size: 12.5px;
   color: var(--brand-blue-dark);
   min-width: 34px;
 }
@@ -1295,11 +1285,9 @@ table.glossary td { vertical-align: top; }
    the same thing before anything is replaced. */
 .sl-link-choose { margin-top: 12px; }
 .sl-link-choose-h {
-  font-size: 11px;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
+  font-size: 13px;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 .sl-link-cards { display: flex; flex-direction: column; gap: 6px; }
@@ -1321,10 +1309,9 @@ table.glossary td { vertical-align: top; }
 .sl-link-field-l {
   display: inline-block;
   min-width: 62px;
-  font-size: 10.5px;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--text-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
   vertical-align: top;
 }
 .sl-link-actions { display: flex; gap: 8px; margin-top: 10px; }
@@ -1684,9 +1671,7 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 .priority-inline-label {
   color: var(--text-muted);
   font-weight: 600;
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.4px;
+  font-size: 13px;
   margin-right: 4px;
 }
 .priority-chip {
@@ -1730,10 +1715,8 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 .caf-picker-label {
   display: block;
   margin: 0 18px 2px;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   color: var(--text-muted);
 }
 .caf-picker-label + .caf-profile-select { margin-bottom: 8px; }
@@ -1764,9 +1747,8 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
   color: var(--near);
 }
 .engagement-profile-chip .chip-tag {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 11.5px;
+  font-weight: 600;
   padding: 1px 5px;
   border-radius: 8px;
   background: var(--near);
@@ -1845,10 +1827,8 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 /* State summaries (paraphrased memory jogs) under the buttons. */
 .caf-summaries { margin-top: 12px; }
 .caf-summary-label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
   font-weight: 600;
   margin-bottom: 6px;
 }
@@ -1884,11 +1864,9 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 .caf-summary-tag {
   display: inline-block;
   margin-right: 6px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--text);
 }
 .caf-igp-list { margin: 4px 0 0 16px; padding: 0; }
 
@@ -1903,9 +1881,7 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
   color: var(--brand-blue-dark);
 }
 .caf-supplementary-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-size: 12.5px;
   font-weight: 700;
   margin-bottom: 4px;
 }
@@ -1972,10 +1948,8 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 }
 .ml-req-verbatim-label,
 .ml-req-hint-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-soft);
+  font-size: 12.5px;
+  color: var(--text-muted);
   font-weight: 600;
   margin-bottom: 2px;
 }
@@ -2135,11 +2109,9 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 .wiz-ctx-block { margin-bottom: 18px; }
 .wiz-ctx-block:last-child { margin-bottom: 0; }
 .wiz-ctx-label {
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-soft);
-  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
   margin: 0 0 6px;
 }
 .wiz-ctx-text {
@@ -2323,9 +2295,7 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
   background: var(--surface-2);
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.4px;
+  font-size: 12.5px;
 }
 .tbl tbody tr:hover { background: var(--surface-2); }
 .tbl th.center, .tbl td.center  { text-align: center; }
@@ -2446,7 +2416,7 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
   border-radius: var(--radius-lg);
   padding: 12px 14px;
 }
-.kpi .lbl { color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px; font-weight: 600; }
+.kpi .lbl { color: var(--text-muted); font-size: 12.5px; font-weight: 600; }
 .kpi .val {
   font-size: 22px;
   font-weight: 600;
@@ -2514,10 +2484,8 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
   color: var(--brand-blue-dark);
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
   margin-bottom: 10px;
 }
 
@@ -2692,8 +2660,8 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 .q-capture .field.notes { flex: 1; min-width: 280px; }
 .q-capture .field > label {
   display: block;
-  font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--text-soft); font-weight: 700; margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text); font-weight: 600; margin-bottom: 6px;
 }
 .q-capture textarea { min-height: 42px; }
 
@@ -2802,8 +2770,8 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
   margin: 0 0 10px;
 }
 .ra-prompt-label {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
-  text-transform: uppercase; color: var(--brand-blue-dark); margin-bottom: 3px;
+  font-size: 13px; font-weight: 700;
+  color: var(--brand-blue-dark); margin-bottom: 3px;
 }
 .ra-prompt-text { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text); }
 
@@ -2872,7 +2840,7 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 .issue-check .issue-pill.blocked { background: var(--gap-bg); color: var(--gap); border-color: var(--gap); }
 .issue-check .issue-pill.ready   { background: var(--met-bg); color: var(--met); border-color: var(--met); }
 .issue-check .issue-lead { margin: 0 0 6px; font-size: 13px; }
-.issue-check h3 { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); }
+.issue-check h3 { margin: 10px 0 4px; font-size: 13px; font-weight: 600; color: var(--text); }
 .issue-list { list-style: none; margin: 0; padding: 0; }
 .issue-line {
   display: flex; align-items: baseline; gap: 10px; padding: 3px 0 3px 10px;

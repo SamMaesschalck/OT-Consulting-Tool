@@ -148,11 +148,11 @@ module.exports = function selfTest(win) {
           srcdoc: Suite.Shell.frames["risk-assessment"].el.hasAttribute("srcdoc"),
           pickers: w.RiskTool.supportsFilePickers(),
           storage: (function () { try { w.localStorage.setItem("otcat:selftest", "1"); var v = w.localStorage.getItem("otcat:selftest"); w.localStorage.removeItem("otcat:selftest"); return v === "1"; } catch (e) { return false; } })(),
-          bar: document.getElementById("suite-bar").textContent };`));
+          bar: (document.querySelector("#suite-bar [aria-current='page']") || { getAttribute: function () { return ""; } }).getAttribute("aria-label") || "", tabs: document.querySelectorAll("#suite-bar .bar-tab").length };`));
       ok(risk.title === "OT Cyber Risk Assessment Tool" && risk.version === app.getVersion() && risk.badge === risk.label + ", 62443-3-2-aligned",
          "with its own title and the exe's version (" + risk.title + " " + risk.label + ")", JSON.stringify(risk));
       ok(risk.srcdoc && risk.pickers && risk.storage, "the frame is the suite's own origin: the file dialogs and storage work in it", JSON.stringify(risk));
-      ok(/OT Cyber Risk Assessment Tool/.test(risk.bar) && /Switch to/.test(risk.bar), "the suite bar shows the tool and the switcher", risk.bar);
+      ok(/OT Cyber Risk Assessment Tool/.test(risk.bar) && risk.tabs === 3, "the rail marks the tool on show, with a button for every tool", risk.bar);
 
       await run(`Suite.Shell.open("assessments"); 0`);
       const asUp = await until(IN("assessments", "return !!(w.App && w.App.UI && w.App.Engine && w.App.Engine.state.instruments && Suite.Shell.frames['assessments'].ready);"), 60000);
@@ -200,8 +200,11 @@ module.exports = function selfTest(win) {
       ok(!!rf, "Electron sees the risk tool's frame");
       const dirty1 = rf ? await rf.executeJavaScript("RiskTool.state.project.suc.description += ' (self-test)'; RiskTool.touched(); RiskTool.isDirty()", true) : false;
       ok(dirty1, "editing in the risk tool marks it unsaved");
-      const shown = await until(`/Unsaved changes/.test(document.getElementById("suite-bar").textContent)`, 5000);
-      ok(shown, "and the suite bar says so");
+      const shown = await until(`(function () {
+        var b = document.querySelector('#suite-bar .bar-tab[data-key="risk-assessment"]');
+        return !!b && !!b.querySelector(".dot.dirty") && /unsaved changes/.test(b.getAttribute("aria-label"));
+      })()`, 5000);
+      ok(shown, "and the rail marks it, in its marker and its name");
       preventUnloadFired = 0;
       const reloaded = new Promise((r) => win.webContents.once("did-finish-load", r));
       win.webContents.reload();

@@ -4348,7 +4348,7 @@ window.App.Report = (function () {
       return h("div", { class: "card", style: "margin:0;" }, [
         h("div", { class: "card-h" }, [h("h2", { style: "font-size:15px;", text: layer.layerId + " - " + layer.name })]),
         h("div", { class: "card-b" }, [
-          layer.scope ? h("div", { class: "lbl muted", style: "text-transform:uppercase; font-size:11px; letter-spacing:0.4px; margin-bottom:6px;", text: layer.scope }) : null,
+          layer.scope ? h("div", { class: "lbl muted", style: "font-size:13px; font-weight:600; margin-bottom:6px;", text: layer.scope }) : null,
           craProfilePills(ov),
           h("div", { class: "kpi-row", style: "margin-top:10px;" }, [
             h("div", { class: "kpi" }, [ h("div", { class: "lbl", text: "Gaps" }), h("div", { class: "val " + (ov.gaps > 0 ? "gap" : "met"), text: String(ov.gaps) }) ]),
