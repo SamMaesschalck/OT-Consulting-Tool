@@ -1,0 +1,444 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: accepting wording on one paragraph of an opening</title></head>
+<body>
+<!--
+  Accept on a paragraph of a section's opening replaces that paragraph only
+  (reportCustom[key].paragraphs, shared/report-sections.js). On real Word builds:
+  - a generated paragraph of the executive summary is accepted with the exposure
+    and priorities written and the basis prompt present: only that paragraph
+    changes in the rebuilt document, the consultant's input still feeds the
+    summary (a later change to it prints), the prompt stays red and the Issue
+    check's count is the same, and the content hash moves;
+  - two replacements in one section, and Undo of each, restore exactly;
+  - a comment on a reworded paragraph changes that replacement, and its Undo
+    puts the earlier rewording back;
+  - when the assessment changes the generated text, the replacement stops
+    applying: the generated text prints, the report page and the comment say
+    so, the Issue check warns once (a warning, never a blocker), and taking the
+    replacement out clears it. Undo works whether or not it applies;
+  - a section the author rewrote as a whole (Edit) keeps the old behaviour: the
+    one line of the rewrite is changed;
+  - Edit on a section with a reworded paragraph starts from the text as printed,
+    and saving a rewrite leaves the replacement stored, listed as not applying;
+  - with several documents, a paragraph every document prints is reworded in
+    each, and one only a single document prints is reworded only there; in the
+    3-3 report, where a section repeats per zone in one document, the other
+    zones' openings are left alone;
+  - the report page shows the same paragraph as Word, and says so of a
+    paragraph only Word prints (test-review-accept.html has a section with no
+    card, listed under the changes to sections only in the Word report);
+  - a store without `paragraphs` behaves as before.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore, DB = A.DocxBlocks, RS = A.ReportSections, I;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  I = A.UI.__issue;
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  var main = document.getElementById("main");
+  function N(s) { return RC.norm(s); }
+  function ids() { return E.state.engagement.targets.map(function (t) { return t.id; }); }
+  function docs() { return new Promise(function (res, rej) { RV.currentDocs(function (e, d) { if (e) rej(e); else res(d); }); }); }
+  function issues() { return new Promise(function (res) { I.run(I.jobs(ids(), "per"), function (err, list) { res(list || []); }); }); }
+  // Every paragraph, bullet and cell paragraph a document prints, in order.
+  function texts(doc) { return DB.flatten(doc.blocks).map(function (b) { return N(b.text); }).filter(Boolean); }
+  function has(doc, t) { return texts(doc).indexOf(N(t)) !== -1; }
+  function diffCount(a, b) {
+    var n = Math.abs(a.length - b.length);
+    for (var i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) n++;
+    return n;
+  }
+  var seq = 0;
+  function thread(anchor, suggestion) {
+    var s = RV.ensureStore();
+    if (!s.rounds.length) s.rounds.push({ round: 1, packId: "rp-test", createdAt: new Date().toISOString(), documents: [] });
+    var t = { comment: { id: "c-para-" + (++seq), reviewer: "J. Marsh", createdAt: "2026-11-01T10:00:00Z", updatedAt: "2026-11-01T10:00:00Z", severity: "should-fix", anchor: anchor, text: "Reword.", suggestion: suggestion, relatesTo: null, check: null },
+      round: 1, savedAt: "2026-11-01T10:00:00Z", fileId: "f1", status: "open", reason: "", replies: [], confirmedBy: [] };
+    s.threads.push(t);
+    return t;
+  }
+  function anchorOf(b, d, doc) { return { documentIndex: d || 0, documentTitle: doc ? doc.title : undefined, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text, cell: null, targetName: "", itemId: "", field: "" }; }
+  function paraOf(doc, key, text) { return doc.blocks.filter(function (x) { return x.sectionKey === key && x.type === "paragraph" && N(x.text) === N(text); })[0]; }
+  function sec(doc, key) { return (doc.probe || []).filter(function (p) { return p.key === key; })[0]; }
+  function acceptIt(t) { return new Promise(function (res) { RV.accept(t, res); }); }
+  function undoIt(t) { return new Promise(function (res) { RV.undoAccept(t, res); }); }
+  function drop() { var gone = [].slice.call(arguments), s = RV.store(); s.threads = s.threads.filter(function (t) { return gone.indexOf(t) === -1; }); }
+  function paras(key) { return RS.paragraphsOf(E.getReportSection(key)); }
+  // The report page, drawn once the Word report has been read, so each line
+  // can say whether its replacement applies.
+  function page() { return docs().then(function (d) { A.UI.go("report"); return d; }); }
+  function rewordedRow(key) { return main.querySelector('[data-check-anchor="reworded"] [data-reworded-row="' + key + '"]'); }
+  function showAll() { var sel = main.querySelector(".review-card .rv-filters select"); if (sel) { sel.value = ""; sel.dispatchEvent(new Event("change", { bubbles: true })); } }
+  function lostWarnings() { return I.warnings().filter(function (w) { return w.kind === "reworded-not-applied"; }); }
+  var BASIS_PROMPT = /^Basis of assessment not yet recorded\./;
+  var ES = "executive-summary";
+
+  var chain = Promise.resolve();
+  function step(fn) { chain = chain.then(fn); }
+
+  // ---- a store without paragraphs: nothing new ------------------------------------
+  var x = {};
+  step(function () {
+    E.activateInstrument("ncsc-caf");
+    var b = E.getBasisOfAssessment();
+    b.interviews.length = 0; b.documents.length = 0; b.observations.length = 0; E.touchBasisOfAssessment();
+    E.setReportNarrative({ regulatoryExposure: "The site falls under the NIS regulations as an operator of an essential service.", topPriorities: "Close the remote access gap before the summer shutdown." });
+    E.setReportSection("how-to-read-this-report", { title: "Reading this report" });
+    return page();
+  });
+  step(function (d) {
+    ok(d[0].probe.every(function (p) { return Array.isArray(p.from) && p.from.length === p.texts.length && p.from.every(function (f) { return f === null; }); }), "with no paragraph replacements stored, the build marks every opening paragraph as generated");
+    ok(RV.paragraphChanges().length === 0 && !main.querySelector('[data-check-anchor="reworded"]') && lostWarnings().length === 0, "and the report page lists none, and the Issue check says nothing of them");
+    E.clearReportSection("how-to-read-this-report");
+    return issues();
+  });
+
+  // ---- one generated paragraph of the executive summary ---------------------------
+  step(function (list) {
+    x.blockers = list.length;
+    ok(list.some(function (p) { return p.where && p.where.kind === "basis"; }), "the basis prompt is one of the Issue check's blockers (" + list.length + ")");
+    return docs();
+  });
+  step(function (d) {
+    var es = sec(d[0], ES), rn = E.getReportNarrative();
+    x.before = texts(d[0]); x.hash = d[0].contentHash;
+    ok(es.texts.some(function (t) { return N(t) === N(rn.regulatoryExposure); }) && es.texts.some(function (t) { return N(t) === N(rn.topPriorities); }), "the executive summary's opening holds the consultant's exposure and priorities");
+    ok(DB.flatten(d[0].blocks).some(function (b) { return b.red && BASIS_PROMPT.test(N(b.text)); }), "and the basis prompt prints in red");
+    x.gen = es.texts.filter(function (t) { return N(t) !== N(rn.regulatoryExposure) && N(t) !== N(rn.topPriorities); })[0];
+    ok(!!x.gen, "its first paragraph is generated", x.gen);
+    x.t1 = thread(anchorOf(paraOf(d[0], ES, x.gen)), "The reviewer's opening sentence for the summary.");
+    var plan = RV.acceptPlan(x.t1);
+    ok(plan.can && plan.kind === "paragraph", "Accept is offered on that paragraph", JSON.stringify(plan));
+    return acceptIt(x.t1);
+  });
+  step(function (res) {
+    ok(res.ok && /Accepted into the paragraph/.test(res.message) && /Only that paragraph is changed/.test(res.message) && !/[–—]/.test(res.message), "accepted, and the message says only that paragraph changed", res.message);
+    var c = E.getReportSection(ES);
+    ok(!c.prose && c.paragraphs.length === 1 && c.paragraphs[0].from === N(x.gen) && c.paragraphs[0].to === "The reviewer's opening sentence for the summary." && !isNaN(Date.parse(c.paragraphs[0].at)),
+      "the store holds { from, to, at } for that paragraph, and no rewrite of the opening", JSON.stringify(c));
+    var rv = x.t1.accepted.revert;
+    ok(x.t1.status === "resolved" && rv.what === "paragraph" && rv.key === ES && rv.from === N(x.gen) && rv.prevTo === null && JSON.parse(JSON.stringify(x.t1.accepted)).revert.from === rv.from, "the comment records what is needed to undo it, in a form the project file keeps");
+    return docs();
+  });
+  step(function (d) {
+    var after = texts(d[0]);
+    ok(diffCount(x.before, after) === 1, "exactly one paragraph of the rebuilt document differs", String(diffCount(x.before, after)));
+    ok(has(d[0], "The reviewer's opening sentence for the summary.") && !has(d[0], x.gen), "the new wording in place of the generated paragraph");
+    ok(has(d[0], E.getReportNarrative().regulatoryExposure) && has(d[0], E.getReportNarrative().topPriorities), "the consultant's input still prints");
+    ok(DB.flatten(d[0].blocks).filter(function (b) { return b.red && BASIS_PROMPT.test(N(b.text)); }).length === 1, "the prompt still prints once, in red");
+    var es = sec(d[0], ES);
+    ok(es.from.filter(function (f) { return f !== null; }).length === 1 && N(es.from[0]) === N(x.gen), "and the build says which paragraph it replaced");
+    ok(d[0].contentHash !== x.hash, "the content hash has moved, as for any change of wording");
+    E.setReportNarrative({ regulatoryExposure: "The exposure note, changed after the wording was accepted." });
+    return docs();
+  });
+  step(function (d) {
+    ok(has(d[0], "The exposure note, changed after the wording was accepted.") && has(d[0], "The reviewer's opening sentence for the summary."), "a later change to the exposure note prints, beside the accepted wording");
+    return issues();
+  });
+  step(function (list) {
+    ok(list.length === x.blockers && list.some(function (p) { return p.where && p.where.kind === "basis"; }), "the Issue check's blockers are the same, the basis prompt among them (" + list.length + ")");
+    return page();
+  });
+  step(function () {
+    // The page's own executive summary card is written differently from Word's.
+    var row = rewordedRow(ES);
+    ok(!!row && row.getAttribute("data-reworded-state") === "applied" && /In the Word report\. This page does not show that paragraph\./.test(row.textContent), "the report page lists the reworded paragraph, saying it shows only in Word", row && row.textContent);
+    ok(!!row && /Executive summary/.test(row.textContent) && row.textContent.indexOf(N(x.gen).slice(0, 40)) !== -1 && /The reviewer's opening sentence/.test(row.textContent) && !!row.querySelector(".wo-back"), "with its section, the words before and after, and Back to the generated version");
+    ok(lostWarnings().length === 0, "the Issue check has nothing to say about a replacement that applies");
+    showAll();
+    var card = main.querySelector('[data-comment-id="' + x.t1.comment.id + '"]');
+    ok(!!card && !!card.querySelector(".rv-undo") && !card.querySelector(".rv-accept-note"), "the comment offers Undo the accepted wording, with no note");
+
+    // ---- the assessment changes the paragraph it replaced --------------------
+    x.client = E.state.engagement.engagement.clientName;
+    E.updateMetadata({ clientName: "Borealis Chemicals" });
+    return issues();
+  });
+  step(function (list) {
+    ok(list.length === x.blockers, "after the client's name changes, the blockers are still the same");
+    return page();
+  });
+  step(function (d) {
+    ok(!has(d[0], "The reviewer's opening sentence for the summary.") && texts(d[0]).some(function (t) { return /^This assessment finds that Borealis Chemicals/.test(t); }), "the paragraph it replaced has changed, so the generated text prints and the rewording does not");
+    ok(paras(ES).length === 1, "the replacement is still stored: it is not deleted");
+    var row = rewordedRow(ES);
+    ok(!!row && row.getAttribute("data-reworded-state") === "changed" && /No longer applies: the text it replaced has changed\./.test(row.textContent), "the report page says it no longer applies", row && row.textContent);
+    var w = lostWarnings();
+    ok(w.length === 1 && /^1 accepted rewording is not in the Word report: the text it replaced has changed\.$/.test(w[0].text) && /warn/.test(w[0].cls) && !/[–—]/.test(w[0].text), "the Issue check warns once", JSON.stringify(w));
+    ok(I.blockerLines(I.last() && I.last().list || []).every(function (l) { return !/reword/i.test(l.text); }), "as a warning, never among the blockers");
+    showAll();
+    var card = main.querySelector('[data-comment-id="' + x.t1.comment.id + '"]');
+    var note = card && card.querySelector(".rv-accept-note");
+    ok(!!note && note.textContent === "No longer applies: the text it replaced has changed." && !!card.querySelector(".rv-undo"), "the comment says the same, with Undo still offered", card && card.textContent);
+    w[0].go();
+    ok(main.querySelector('[data-check-anchor="reworded"]').classList.contains("check-flash"), "the warning's button shows the list");
+    // A second one in the same state, so the count is seen.
+    var gen2 = texts(d[0]).filter(function (t) { return /^This assessment finds that Borealis Chemicals/.test(t); })[0];
+    x.t2 = thread(anchorOf(paraOf(d[0], ES, gen2)), "A second opening sentence, for the renamed client.");
+    return acceptIt(x.t2);
+  });
+  step(function (res) {
+    ok(res.ok && paras(ES).length === 2, "a rewording accepted on the paragraph as it reads now is stored beside the first", res.message);
+    E.updateMetadata({ clientName: "Caledon Water" });
+    return page();
+  });
+  step(function () {
+    var w = lostWarnings();
+    ok(w.length === 1 && /^2 accepted rewordings are not in the Word report: the text they replaced has changed\.$/.test(w[0].text), "two that do not apply are still one line, with the count", JSON.stringify(w));
+    // Undo on one that does not apply just takes its replacement out.
+    return undoIt(x.t2);
+  });
+  step(function (res) {
+    ok(res.ok && paras(ES).length === 1 && paras(ES)[0].to === "The reviewer's opening sentence for the summary." && x.t2.status === "open" && !x.t2.accepted, "Undo on one that does not apply takes out that replacement alone, and opens the comment", res.message);
+    return page();
+  });
+  step(function () {
+    ok(/^1 accepted rewording is/.test((lostWarnings()[0] || {}).text || ""), "and the warning counts the one left");
+    rewordedRow(ES).querySelector(".wo-back").click();
+    ok(paras(ES).length === 0 && !Object.keys(E.getReportSection(ES)).length, "Back to the generated version on the list takes the other out, and nothing is left stored for the section");
+    return page();
+  });
+  step(function () {
+    ok(lostWarnings().length === 0 && !main.querySelector('[data-check-anchor="reworded"]'), "the warning and the list are gone");
+    showAll();
+    var card = main.querySelector('[data-comment-id="' + x.t1.comment.id + '"]');
+    var note = card && card.querySelector(".rv-accept-note");
+    ok(!!note && /has since been taken out on the report page/.test(note.textContent), "the comment whose wording it was says it has been taken out", card && card.textContent);
+    return undoIt(x.t1);
+  });
+  step(function (res) {
+    ok(res.ok && /already been taken out/.test(res.message) && x.t1.status === "open" && !x.t1.accepted, "and its Undo opens the comment again", res.message);
+    E.updateMetadata({ clientName: x.client });
+    drop(x.t1, x.t2);
+    return page();
+  });
+
+  // ---- two in one section, on the page as in Word, and Undo of each -----------------
+  var k = {};
+  step(function (d) {
+    // A section with a card on the report page, which shows one paragraph of
+    // the opening Word prints (p0) and not another (p1).
+    function shownIn(p) {
+      var card = main.querySelector('[data-section="' + p.key + '"]');
+      var lines = card ? String(card.getAttribute("data-generated-prose") || "").split("\n").map(N) : [];
+      return p.texts.filter(function (t) { return lines.indexOf(N(t)) !== -1; });
+    }
+    var s = d[0].probe.filter(function (p) { return p.key && p.key !== ES && p.texts.length >= 2 && !p.prompts && shownIn(p).length >= 1 && shownIn(p).length < p.texts.length; })[0];
+    ok(!!s, "a section with a card on the report page opens with one paragraph the page shows and one only Word prints (" + (s && s.key) + ")");
+    k.key = s.key; k.all = s.texts.slice(); k.p0 = shownIn(s)[0];
+    k.p1 = s.texts.filter(function (t) { return shownIn(s).indexOf(t) === -1; })[0];
+    k.rest = s.texts.filter(function (t) { return t !== k.p0 && t !== k.p1; });
+    k.t0 = thread(anchorOf(paraOf(d[0], k.key, k.p0)), "First paragraph, as the reviewer put it.");
+    return acceptIt(k.t0);
+  });
+  step(function (res) {
+    ok(res.ok, "the first paragraph is accepted", res.message);
+    return docs();
+  });
+  step(function (d) {
+    k.t1 = thread(anchorOf(paraOf(d[0], k.key, k.p1)), "Second paragraph, as the reviewer put it.\nWith a second line of its own.");
+    return acceptIt(k.t1);
+  });
+  step(function (res) {
+    ok(res.ok && paras(k.key).length === 2, "and the second, held beside it", res.message);
+    k.second = JSON.stringify(paras(k.key).filter(function (p) { return p.from === N(k.p1); })[0]);
+    return page();
+  });
+  step(function (d) {
+    var s = sec(d[0], k.key);
+    var want = RS.applyParagraphs(k.all, paras(k.key)).map(N);
+    ok(want.length === k.all.length + 1 && JSON.stringify(s.texts.map(N)) === JSON.stringify(want) && has(d[0], "First paragraph, as the reviewer put it.") && has(d[0], "With a second line of its own."), "Word prints both in their places, a wording of two lines as two paragraphs", JSON.stringify(s.texts));
+    ok(k.rest.every(function (t) { return has(d[0], t); }) && !has(d[0], k.p0) && !has(d[0], k.p1), "and the rest of the opening as generated");
+    var card = main.querySelector('[data-section="' + k.key + '"]');
+    var shown = [].slice.call(card.querySelectorAll("[data-reworded]")).map(function (p) { return N(p.textContent); });
+    ok(JSON.stringify(shown) === JSON.stringify(["First paragraph, as the reviewer put it."]), "the report page shows the reworded paragraph in that section's card, as Word prints it", JSON.stringify(shown));
+    ok(N(card.textContent).indexOf(N(k.p0)) === -1, "in place of the generated one");
+    var rows = [].slice.call(main.querySelectorAll('[data-check-anchor="reworded"] [data-reworded-row="' + k.key + '"]'));
+    ok(rows.length === 2 && rows.every(function (r) { return r.getAttribute("data-reworded-state") === "applied"; }), "and lists both as applying");
+    ok(rows.filter(function (r) { return /First paragraph, as the reviewer/.test(r.textContent) && /: In the report\./.test(r.textContent); }).length === 1, "the one the page shows as in the report");
+    ok(rows.filter(function (r) { return /Second paragraph, as the reviewer/.test(r.textContent) && /: In the Word report\. This page does not show that paragraph\./.test(r.textContent); }).length === 1, "and the one only Word prints as in the Word report, not shown on this page");
+    ok(!main.querySelector('[data-word-only="' + k.key + '"]'), "a section with a card is not under the Word-only changes");
+    return undoIt(k.t0);
+  });
+  step(function (res) {
+    ok(res.ok && paras(k.key).length === 1 && JSON.stringify(paras(k.key)[0]) === k.second, "Undo of the first leaves the second exactly as it was", JSON.stringify(paras(k.key)));
+    return docs();
+  });
+  step(function (d) {
+    ok(has(d[0], k.p0) && has(d[0], "Second paragraph, as the reviewer put it.") && !has(d[0], k.p1), "the first paragraph is generated again, the second still reworded");
+
+    // ---- a comment on the reworded paragraph -----------------------------------
+    k.t2 = thread(anchorOf(paraOf(d[0], k.key, "With a second line of its own.")), "With a better second line.");
+    var plan = RV.acceptPlan(k.t2);
+    ok(plan.can && plan.kind === "paragraph" && plan.revert.from === N(k.p1) && plan.revert.prevTo === JSON.parse(k.second).to, "a comment on a reworded paragraph changes that replacement", JSON.stringify(plan));
+    return acceptIt(k.t2);
+  });
+  step(function (res) {
+    ok(res.ok && paras(k.key).length === 1 && paras(k.key)[0].to === "Second paragraph, as the reviewer put it.\nWith a better second line.", "accepted: the one line of it", JSON.stringify(paras(k.key)));
+    return undoIt(k.t1);
+  });
+  step(function (res) {
+    ok(!res.ok && /changed since it was accepted/.test(res.message) && paras(k.key).length === 1, "the earlier comment's Undo is refused while the later wording stands on it", res.message);
+    return undoIt(k.t2);
+  });
+  step(function (res) {
+    ok(res.ok && JSON.stringify(paras(k.key)[0].to) === JSON.stringify(JSON.parse(k.second).to), "Undo of the later one puts the earlier rewording back", JSON.stringify(paras(k.key)));
+    return undoIt(k.t1);
+  });
+  step(function (res) {
+    ok(res.ok && !Object.keys(E.getReportSection(k.key)).length, "and Undo of that leaves nothing stored for the section", res.message);
+    drop(k.t0, k.t1, k.t2);
+    return docs();
+  });
+
+  // ---- Edit on a section with a reworded paragraph (a whole rewrite) ----------------
+  step(function (d) {
+    k.t3 = thread(anchorOf(paraOf(d[0], k.key, k.p0)), "First paragraph, reworded before the author's own edit.");
+    return acceptIt(k.t3);
+  });
+  step(function () { return page(); });
+  step(function () {
+    var card = main.querySelector('[data-section="' + k.key + '"]');
+    for (var p = card.parentNode; p; p = p.parentNode) { if (p.tagName === "DETAILS") p.open = true; }
+    card.querySelector(".sect-edit").click();
+    var box = main.querySelector('[data-section="' + k.key + '"] .sect-prose-input');
+    ok(!!box && N(box.value).indexOf("First paragraph, reworded before the author's own edit.") !== -1 && N(box.value).indexOf(N(k.p0)) === -1, "Edit starts from the text as printed, with the reworded paragraph in it", box && box.value.slice(0, 120));
+    box.value = box.value + "\nA closing line the author added by hand.";
+    box.dispatchEvent(new Event("change", { bubbles: true }));
+    var c = E.getReportSection(k.key);
+    ok(/A closing line the author added by hand\.$/.test(c.prose) && /First paragraph, reworded before/.test(c.prose) && c.paragraphs.length === 1, "saving makes it a rewrite of the whole opening, and leaves the paragraph's replacement stored", JSON.stringify(c));
+    return page();
+  });
+  step(function (d) {
+    ok(has(d[0], "A closing line the author added by hand.") && has(d[0], "First paragraph, reworded before the author's own edit."), "the rewrite prints");
+    var row = rewordedRow(k.key);
+    ok(!!row && row.getAttribute("data-reworded-state") === "rewritten" && /Does not apply: the opening of its section has since been rewritten as a whole\./.test(row.textContent), "the list says the replacement does not apply, as the opening was rewritten", row && row.textContent);
+    ok(lostWarnings().length === 0, "which was the author's own doing, so the Issue check does not warn");
+
+    // ---- a rewrite by the author: Accept changes its one line, as before ----------
+    k.t4 = thread(anchorOf(paraOf(d[0], k.key, "A closing line the author added by hand.")), "A closing line, tidied by the reviewer.");
+    var plan = RV.acceptPlan(k.t4);
+    ok(plan.can && plan.kind === "section opening" && plan.revert.field === "prose", "in a section with a whole rewrite, Accept edits the one line of the rewrite", JSON.stringify(plan));
+    k.prose = E.getReportSection(k.key).prose;
+    return acceptIt(k.t4);
+  });
+  step(function (res) {
+    var c = E.getReportSection(k.key);
+    ok(res.ok && c.prose === k.prose.replace("A closing line the author added by hand.", "A closing line, tidied by the reviewer.") && c.paragraphs.length === 1, "accepted into the rewrite, every other line as it was", res.message);
+    return undoIt(k.t4);
+  });
+  step(function (res) {
+    ok(res.ok && E.getReportSection(k.key).prose === k.prose, "and Undo puts the rewrite back as the author left it", res.message);
+    main.querySelector('[data-check-anchor="reworded"] [data-reworded-row="' + k.key + '"] .wo-back').click();
+    var c = E.getReportSection(k.key);
+    ok(c.prose === k.prose && !c.paragraphs, "Back to the generated version on the list takes out the replacement and leaves the rewrite");
+    E.clearReportSection(k.key);
+    drop(k.t3, k.t4);
+
+    // ---- a hidden section ---------------------------------------------------------
+    return docs();
+  });
+  step(function (d) {
+    k.t5 = thread(anchorOf(paraOf(d[0], k.key, k.p0)), "Reworded, then the section is hidden.");
+    return acceptIt(k.t5);
+  });
+  step(function () { E.setReportSection(k.key, { hidden: true }); return page(); });
+  step(function (d) {
+    var row = rewordedRow(k.key);
+    ok(!has(d[0], "Reworded, then the section is hidden.") && !!row && row.getAttribute("data-reworded-state") === "hidden" && /Not printed: its section is hidden\./.test(row.textContent) && lostWarnings().length === 0, "a reworded paragraph in a section since hidden is listed as not printed, without a warning", row && row.textContent);
+    E.clearReportSection(k.key);
+    drop(k.t5);
+
+    // ---- several documents ---------------------------------------------------------
+    E.addTarget("Second site");
+    return docs();
+  });
+  var m = {};
+  step(function (d) {
+    ok(d.length === 2, "with a second site there are two documents");
+    var s0 = sec(d[0], k.key), s1 = sec(d[1], k.key);
+    ok(!!s1 && N(s1.texts[0]) === N(s0.texts[0]), "both open that section with the same paragraph");
+    m.t0 = thread(anchorOf(paraOf(d[0], k.key, k.p0), 0, d[0]), "The same paragraph, reworded for every site.");
+    var plan = RV.acceptPlan(m.t0);
+    ok(plan.can && plan.kind === "paragraph" && plan.places === 2, "Accept is offered, and knows the paragraph prints twice", JSON.stringify(plan));
+    return acceptIt(m.t0);
+  });
+  step(function (res) {
+    ok(res.ok && /printed 2 times across the documents, and each now has the new wording/.test(res.message), "accepted, and the message says both now have it", res.message);
+    return docs();
+  });
+  step(function (d) {
+    ok(has(d[0], "The same paragraph, reworded for every site.") && has(d[1], "The same paragraph, reworded for every site.") && !has(d[0], k.p0) && !has(d[1], k.p0), "both documents print the new wording");
+    // A paragraph only one document prints.
+    var es0 = sec(d[0], ES), es1 = sec(d[1], ES) || { texts: [] };
+    m.own = es0.texts.filter(function (t) { return !es1.texts.some(function (u) { return N(u) === N(t); }) && N(t) !== N(E.getReportNarrative().regulatoryExposure) && N(t) !== N(E.getReportNarrative().topPriorities); })[0];
+    ok(!!m.own, "the first site's executive summary has a paragraph the second site's does not");
+    m.before1 = texts(d[1]); m.before0 = texts(d[0]);
+    m.t1 = thread(anchorOf(paraOf(d[0], ES, m.own), 0, d[0]), "Wording for the first site's summary only.");
+    var plan = RV.acceptPlan(m.t1);
+    ok(plan.can && plan.kind === "paragraph" && plan.places === 1, "Accept is offered on it, though the documents open that section differently", JSON.stringify(plan));
+    return acceptIt(m.t1);
+  });
+  step(function (res) {
+    ok(res.ok && !/printed \d+ times/.test(res.message), "accepted", res.message);
+    return docs();
+  });
+  step(function (d) {
+    ok(has(d[0], "Wording for the first site's summary only.") && diffCount(m.before0, texts(d[0])) === 1, "the first site's document has it, and nothing else there changed");
+    ok(diffCount(m.before1, texts(d[1])) === 0, "the second site's document is exactly as it was");
+    return undoIt(m.t1);
+  });
+  step(function (res) {
+    ok(res.ok, "undone", res.message);
+    return undoIt(m.t0);
+  });
+  step(function (res) {
+    ok(res.ok && !E.hasReportCustom(), "and the other, leaving no customisation at all", JSON.stringify(E.getReportCustom()));
+    drop(m.t0, m.t1);
+
+    // ---- one document, a section repeated per zone -------------------------------------
+    E.activateInstrument("iec-62443-3-3");
+    return docs();
+  });
+  var z = {};
+  step(function (d) {
+    var byKey = {};
+    d[0].probe.forEach(function (s) { if (s.key && s.texts.length) (byKey[s.key] = byKey[s.key] || []).push(s); });
+    // A key printed more than once, with a paragraph only one of them has.
+    var key = Object.keys(byKey).filter(function (kk) {
+      var list = byKey[kk];
+      return list.length > 1 && list[0].texts.some(function (t) { return !list.slice(1).some(function (s) { return s.texts.some(function (u) { return N(u) === N(t); }); }); });
+    })[0];
+    ok(!!key, "the 3-3 report prints a section once per zone, each opening with wording of its own (" + key + ")");
+    z.key = key;
+    z.own = byKey[key][0].texts.filter(function (t) { return !byKey[key].slice(1).some(function (s) { return s.texts.some(function (u) { return N(u) === N(t); }); }); })[0];
+    z.before = texts(d[0]);
+    z.t = thread(anchorOf(paraOf(d[0], key, z.own)), "Wording for the one zone this paragraph is about.");
+    var plan = RV.acceptPlan(z.t);
+    ok(plan.can && plan.kind === "paragraph" && plan.places === 1, "Accept is offered on one zone's paragraph", JSON.stringify(plan));
+    return acceptIt(z.t);
+  });
+  step(function (res) {
+    ok(res.ok, "accepted", res.message);
+    return docs();
+  });
+  step(function (d) {
+    var after = texts(d[0]);
+    ok(diffCount(z.before, after) === 1 && has(d[0], "Wording for the one zone this paragraph is about."), "one paragraph of the document changed: the other zones' openings are as they were", String(diffCount(z.before, after)));
+    return undoIt(z.t);
+  });
+  step(function (res) {
+    ok(res.ok && !Object.keys(E.getReportSection(z.key)).length, "and Undo puts it back", res.message);
+    drop(z.t);
+  });
+  chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+</script>
+</body></html>

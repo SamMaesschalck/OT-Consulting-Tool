@@ -11,7 +11,10 @@
   active in turn (the 62443-3-3 demo, one document across its zones, and CAF
   with a second site, one document per site) and must hash the same; a site the
   baseline names carries its progress section whichever is active; and loading,
-  remapping or clearing the baseline invalidates the cached read.
+  remapping or clearing the baseline invalidates the cached read. So does every
+  other input of the Word build: the chosen profile, the CRA and risk appetite
+  setup, which other instruments in the project have answers, and anything
+  added to the assessment later. The review itself is not one of them.
 -->
 <script src="harness.js"></script>
 <script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
@@ -96,6 +99,70 @@ H.test(function (ok, done) {
     ok(runs[0].docs.every(hasProgress), "and each site's document carries its own progress section");
     var job = A.UI.__issue.jobs(siteIds, "per");
     ok(job.length === 2 && job[0].opts.progress && job[1].opts.progress && job[1].opts.progress.targetName === "Second site", "each export job compares its own site", job.map(function (j) { return j.opts.progress && j.opts.progress.targetName; }).join(", "));
+  });
+
+  // ---- every input of the build is in the signature -------------------------------
+  // The chosen profile changes what each outcome is expected to be, so an
+  // approval of the report under one profile is not an approval under another.
+  var cafHash;
+  step(function () { return docsNow(); });
+  step(function (d) {
+    cafHash = hashes(d);
+    ok(!!RV.cachedDocs(), "CAF: the read is cached");
+    var reg = E.getCAFProfileRegistry(), cur = E.getActiveCAFProfileId();
+    var other = reg.profiles.filter(function (p) { return p.id !== cur; })[0];
+    E.setCAFProfile(other.id);
+    ok(RV.cachedDocs() === null, "choosing another profile invalidates the cached read", cur + " to " + other.id);
+    return docsNow().then(function (d2) {
+      ok(hashes(d2) !== cafHash, "and the documents it builds are different, so an approval would be seen as changed");
+      E.setCAFProfile(cur);
+      return docsNow();
+    });
+  });
+  step(function (d) {
+    ok(hashes(d) === cafHash && !!RV.cachedDocs(), "back on the first profile the documents hash as before");
+    // The review is not content: a comment, a status or a reply changes nothing printed.
+    var s = RV.ensureStore();
+    s.threads.push({ comment: { id: "c-sig", reviewer: "R", severity: "suggestion", anchor: { kind: "general" }, text: "x", suggestion: null }, round: 1, status: "open", replies: [] });
+    E.touchReview();
+    ok(!!RV.cachedDocs(), "a change to the review itself does not invalidate it");
+    // Which other instruments have answers is printed (the report names its
+    // companions), and lives outside this assessment.
+    var here = E.state.activeAssessmentId, before = E.answeredInstrumentIds().join(",");
+    var otherId = Object.keys(E.state.assessments).filter(function (id) { return id !== here; })[0];
+    if (!otherId) { E.activateInstrument("iec-62443-2-1-2024"); otherId = E.state.activeAssessmentId; E.activateAssessment(here); }
+    var kept = E.state.assessments[otherId].responses;
+    E.state.assessments[otherId].responses = [];
+    ok(E.answeredInstrumentIds().join(",") !== before, "another instrument in the project has answers, and can lose them", before);
+    ok(RV.cachedDocs() === null, "a change to which other instruments have answers invalidates the cached read");
+    E.state.assessments[otherId].responses = kept;
+    ok(!!RV.cachedDocs(), "and putting them back restores it");
+    // Anything the assessment holds that this file has never heard of.
+    E.state.assessments[here].somethingAddedLater = { a: 1 };
+    ok(RV.cachedDocs() === null, "a field added to the assessment later is covered without being named");
+    delete E.state.assessments[here].somethingAddedLater;
+    ok(!!RV.cachedDocs(), "(and its removal restores the read)");
+  });
+  // The CRA's setup (layers in scope, each product's class) and the risk
+  // appetite's (sector, technical layer) both change the report.
+  step(function () { E.activateInstrument("eu-cra"); return docsNow(); });
+  step(function () {
+    ok(!!RV.cachedDocs(), "CRA: the read is cached");
+    var raw = E.getCRASetupRaw(), was = raw.layers.slice();
+    raw.layers = was.slice(0, 1);
+    ok(RV.cachedDocs() === null, "taking a layer out of scope invalidates it", was.join(","));
+    raw.layers = was;
+    ok(!!RV.cachedDocs(), "and putting it back restores it");
+    E.activateInstrument("risk-appetite");
+    return docsNow();
+  });
+  step(function () {
+    ok(!!RV.cachedDocs(), "risk appetite: the read is cached");
+    var su = E.getRiskAppetiteSetup(), was = !!su.includeTech;
+    E.updateRiskAppetiteSetup({ includeTech: !was });
+    ok(RV.cachedDocs() === null, "switching the technical layer invalidates it");
+    E.updateRiskAppetiteSetup({ includeTech: was });
+    ok(!!RV.cachedDocs(), "and switching it back restores it");
   });
   chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
 });

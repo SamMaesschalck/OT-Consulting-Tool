@@ -14,10 +14,15 @@
  *     reviewId,
  *     rounds:  [{ round, packId, createdAt, documents: [{ title, targetName, contentHash }], request, fieldLabels }],
  *     files:   [{ fileId, packId, round, reviewer, savedAt, importedAt, verdict, checklist, checklistTotal,
- *                 dismissedChecks, dismissedCheckTitles, confirmations }],
+ *                 dismissedChecks, dismissedCheckTitles, confirmations, setAside }],
  *     threads: [{ comment, round, savedAt, fileId, status, reason, statusAt, replies, confirmedBy, withdrawn,
  *                 accepted, reopened }]
  *   }
+ *
+ * A reply is { id, author, at, text }; one the reviewer wrote (the review
+ * file's `replies`) also carries from: "reviewer" and the fileId it came in.
+ * `setAside` ({ at }) is the author's: that review no longer counts towards
+ * the warnings, and its comments stay.
  *
  * `comment` is the reviewer's, and an import may replace it (their later save
  * wins). Everything else on a thread is the author's, with one exception: when
@@ -176,7 +181,8 @@
   function substance(c) { return JSON.stringify([c.severity || "", norm(c.text), norm(c.suggestion || "")]); }
 
   // Merges one parsed review file. Never throws for a bad file: returns
-  //   { ok: false, error } or { ok: true, reviewer, round, added, updated, reopened, removed, duplicate, older }
+  //   { ok: false, error } or { ok: true, reviewer, round, added, updated, reopened, removed, withdrawn,
+  //     withdrawnAccepted, replies, repliesOnClosed, setAside, duplicate, older }
   function importFile(store, file) {
     var chk = checkFile(file);
     if (!chk.ok) return chk;
@@ -187,7 +193,8 @@
       return { ok: false, noPack: true, error: "This review file answers a different pack" + (file.reviewer ? " (from " + file.reviewer + ", round " + (file.round || "?") + ")" : "") + ", not one sent from here." + OLDER_COPY };
     }
     var fileId = file.fileId || (file.packId + "|" + norm(file.reviewer));
-    var res = { ok: true, reviewer: file.reviewer || "Reviewer", round: round.round, added: 0, updated: 0, reopened: 0, removed: 0, duplicate: false, older: false, verdict: (file.verdict && file.verdict.value) || "none" };
+    var res = { ok: true, reviewer: file.reviewer || "Reviewer", round: round.round, added: 0, updated: 0, reopened: 0, removed: 0, withdrawn: 0, withdrawnAccepted: 0,
+      replies: 0, repliesOnClosed: 0, duplicate: false, older: false, verdict: (file.verdict && file.verdict.value) || "none" };
     var rec = store.files.filter(function (f) { return f.fileId === fileId; })[0];
     // The same file saved under another name (a handover, or a reviewer who
     // corrected their name): said in the import line.
@@ -216,13 +223,20 @@
       }
     });
     // A comment this reviewer has since deleted from their own file goes,
-    // unless the author has already answered it, when it stays, marked.
+    // unless the author has already answered it (a reply of theirs, a status,
+    // an accepted change), when it stays, marked, and the import says so.
     store.threads = store.threads.filter(function (t) {
       if (t.fileId !== fileId || t.round !== round.round || seen[t.comment.id]) return true;
-      if ((t.replies && t.replies.length) || t.status !== "open") { t.withdrawn = true; return true; }
+      var answered = (t.replies || []).some(function (r) { return r && r.from !== "reviewer"; }) || t.status !== "open" || !!t.accepted;
+      if (answered) {
+        if (!t.withdrawn) { res.withdrawn++; if (t.accepted) res.withdrawnAccepted++; }
+        t.withdrawn = true;
+        return true;
+      }
       res.removed++;
       return false;
     });
+    mergeReplies(store, file, fileId, res);
     // A confirmation this same file made before and has now taken back goes,
     // unless another of the reviewer's files still makes it. A later round's
     // file does not repeat an earlier round's confirmations, so only this
@@ -257,8 +271,43 @@
       dismissedChecks: Array.isArray(file.dismissedChecks) ? file.dismissedChecks.slice() : [],
       dismissedCheckTitles: titles,
       confirmations: file.confirmations || [] };
+    // Setting a review aside is the author's decision: a later save of the
+    // same file does not undo it.
+    if (rec && rec.setAside) { entry.setAside = rec.setAside; res.setAside = true; }
     if (rec) store.files[store.files.indexOf(rec)] = entry; else store.files.push(entry);
     return res;
+  }
+
+  // The reviewer's replies on earlier comments (the file's optional `replies`,
+  // each { id, to, text, at }) go into those threads beside the author's own,
+  // under the reviewer's name and keyed by id: the same reply again changes
+  // nothing, an edited one is updated, and one no longer in this file is
+  // removed. A reply never changes a thread's status.
+  function mergeReplies(store, file, fileId, res) {
+    var now = {};
+    (Array.isArray(file.replies) ? file.replies : []).forEach(function (r) {
+      if (!r || typeof r !== "object" || !r.id || !r.to || !norm(r.text)) return;
+      var t = findThread(store, r.to);
+      if (!t) return;
+      now[r.id] = true;
+      t.replies = t.replies || [];
+      var text = String(r.text).trim();
+      var have = t.replies.filter(function (x) { return x && x.id === r.id; })[0];
+      if (have) {
+        // An id the author's own reply holds is never written over.
+        if (have.from !== "reviewer" || have.fileId !== fileId) return;
+        if (have.text === text && have.author === res.reviewer) return;
+        have.text = text; have.author = res.reviewer; have.at = r.at || have.at;
+      } else {
+        t.replies.push({ id: r.id, author: res.reviewer, at: r.at || file.savedAt || new Date().toISOString(), text: text, from: "reviewer", fileId: fileId });
+        if (t.status !== "open") res.repliesOnClosed++;
+      }
+      res.replies++;
+    });
+    store.threads.forEach(function (t) {
+      if (!t.replies || !t.replies.length) return;
+      t.replies = t.replies.filter(function (x) { return !(x && x.from === "reviewer" && x.fileId === fileId && !now[x.id]); });
+    });
   }
 
   // Registers a pack this assessment sent from an older copy of the project
@@ -309,15 +358,29 @@
     return { ok: true, reply: r };
   }
 
+  // Sets a review file aside, or counts it again: a reviewer who has left, or
+  // who answered a later round under another name, would otherwise leave a
+  // warning nothing could clear. Its comments stay as they are.
+  function setAside(store, fileId, on) {
+    var f = store.files.filter(function (x) { return x.fileId === fileId; })[0];
+    if (!f) return { ok: false, error: "That review file is not in this review." };
+    if (on) f.setAside = { at: new Date().toISOString() }; else delete f.setAside;
+    return { ok: true };
+  }
+
   // ---- where the review stands ------------------------------------------------
 
+  // The files that count: not those the author set aside.
+  function counted(store) { return store.files.filter(function (f) { return !f.setAside; }); }
+  function hasVerdict(f) { return !!(f.verdict && f.verdict.value && f.verdict.value !== "none"); }
   // The verdicts to act on: those of the latest round that has any files back.
   function latestVerdicts(store) {
+    var files = counted(store);
     var withFiles = store.rounds.slice().reverse().filter(function (r) {
-      return store.files.some(function (f) { return f.packId === r.packId; });
+      return files.some(function (f) { return f.packId === r.packId; });
     })[0];
     if (!withFiles) return { round: null, files: [] };
-    return { round: withFiles, files: store.files.filter(function (f) { return f.packId === withFiles.packId; }) };
+    return { round: withFiles, files: files.filter(function (f) { return f.packId === withFiles.packId; }) };
   }
   function isApproval(v) { return v === "approved" || v === "approved-with-comments"; }
   function openMustFix(store) {
@@ -334,45 +397,62 @@
   // are not yet known (the "changed since approval" line waits for them).
   // opts (optional): { qaReviewBy }. With nothing ever sent and QA review by
   // filled in, the report was reviewed outside the tools: no "not reviewed".
+  //
+  // A round is reviewed once a file with a verdict is back for it: a file
+  // saved with no verdict yet is work in progress, and is said to be. Each
+  // reviewer speaks through their latest file that has a verdict, and files
+  // the author set aside are left out throughout.
   function warnings(store, currentHashes, opts) {
     store = normaliseStore(store);
     var out = [];
-    var latest = latestVerdicts(store), last = lastRound(store);
-    if (!store.files.length) {
-      if (last || !(opts && norm(opts.qaReviewBy))) {
-        out.push({ kind: "not-reviewed", text: last
-          ? "Not reviewed yet: round " + last.round + " was sent, and no review has come back."
-          : "Not reviewed yet: no review has come back for this report." });
+    var files = counted(store), latest = latestVerdicts(store), last = lastRound(store);
+    if (!last) {
+      if (!files.length && !(opts && norm(opts.qaReviewBy))) out.push({ kind: "not-reviewed", text: "Not reviewed yet: no review has come back for this report." });
+    } else {
+      var back = files.filter(function (f) { return f.packId === last.packId; });
+      var aside = store.files.filter(function (f) { return f.setAside && f.packId === last.packId; }).length;
+      if (!back.some(hasVerdict)) {
+        out.push({ kind: "not-reviewed", text: back.length
+          ? plural(back.length, "review file") + (back.length === 1 ? " is" : " are") + " back for round " + last.round + " with no verdict yet."
+          : aside ? "Round " + last.round + " was sent, and the only " + (aside === 1 ? "review back has" : "reviews back have") + " been set aside."
+          : !files.length ? "Not reviewed yet: round " + last.round + " was sent, and no review has come back."
+          : "Round " + last.round + " was sent, and no review has come back for it yet." });
       }
-    } else if (last && !store.files.some(function (f) { return f.packId === last.packId; })) {
-      out.push({ kind: "not-reviewed", text: "Round " + last.round + " was sent, and no review has come back for it yet." });
     }
-    var requested = latest.files.filter(function (f) { return f.verdict && f.verdict.value === "changes-requested"; });
-    if (requested.length) {
-      out.push({ kind: "changes-requested", text: "Changes requested by " + names(requested.map(function (f) { return f.reviewer; })) + " (round " + latest.round.round + ")." });
-    }
-    // A reviewer who asked for changes in an earlier round and has not
+    // Each reviewer's standing verdict: the latest file of theirs that has
+    // one. A reviewer who asked for changes in an earlier round and has not
     // answered a later one still stands: one quicker reviewer's approval of
     // the next round does not speak for them.
     var byReviewer = {};
-    store.files.forEach(function (f) {
+    files.filter(hasVerdict).forEach(function (f) {
       var k = norm(f.reviewer).toLowerCase() || f.fileId;
       var cur = byReviewer[k];
       if (!cur || f.round > cur.round || (f.round === cur.round && stamp(f.savedAt) > stamp(cur.savedAt))) byReviewer[k] = f;
     });
-    var waiting = Object.keys(byReviewer).map(function (k) { return byReviewer[k]; }).filter(function (f) {
-      return latest.round && f.round < latest.round.round && f.verdict && f.verdict.value === "changes-requested";
-    });
+    var standing = Object.keys(byReviewer).map(function (k) { return byReviewer[k]; });
+    var asking = standing.filter(function (f) { return f.verdict.value === "changes-requested"; });
+    var requested = asking.filter(function (f) { return !latest.round || f.round >= latest.round.round; });
+    var waiting = asking.filter(function (f) { return latest.round && f.round < latest.round.round; });
+    if (requested.length) {
+      out.push({ kind: "changes-requested", text: "Changes requested by " + names(requested.map(function (f) { return f.reviewer; })) + " (round " + requested[0].round + ")." });
+    }
     waiting.forEach(function (f) {
       out.push({ kind: "changes-requested", text: "Changes requested by " + f.reviewer + " in round " + f.round + "; " + f.reviewer + " has not reviewed round " + latest.round.round + " yet." });
     });
     var must = openMustFix(store).length;
     if (must) out.push({ kind: "must-fix", count: must, text: plural(must, "must-fix review comment") + (must === 1 ? " is" : " are") + " still open." });
-    var approvers = latest.files.filter(function (f) { return f.verdict && isApproval(f.verdict.value); });
-    if (approvers.length && !requested.length && !waiting.length && currentHashes && latest.round) {
-      var was = latest.round.documents.map(function (d) { return d.contentHash; });
+    // Changed since approval: against the latest round anyone approved, which
+    // need not be the latest round with a file back.
+    var approvals = standing.filter(function (f) { return isApproval(f.verdict.value); });
+    var top = approvals.reduce(function (m, f) { return Math.max(m, f.round); }, 0);
+    var approvedRound = top ? store.rounds.filter(function (r) {
+      return r.round === top && approvals.some(function (f) { return f.packId === r.packId; });
+    })[0] : null;
+    if (approvedRound && !asking.length && currentHashes) {
+      var approvers = approvals.filter(function (f) { return f.packId === approvedRound.packId; });
+      var was = approvedRound.documents.map(function (d) { return d.contentHash; });
       var same = was.length === currentHashes.length && was.every(function (h, i) { return h === currentHashes[i]; });
-      if (!same) out.push({ kind: "changed-since-approval", text: "Approved by " + names(approvers.map(function (f) { return f.reviewer; })) + " in round " + latest.round.round + ", but the report has changed since." });
+      if (!same) out.push({ kind: "changed-since-approval", text: "Approved by " + names(approvers.map(function (f) { return f.reviewer; })) + " in round " + approvedRound.round + ", but the report has changed since." });
     }
     return out;
   }
@@ -430,7 +510,7 @@
     parseJson: parseJson, identify: identify, checkPack: checkPack, checkFile: checkFile,
     emptyStore: emptyStore, normaliseStore: normaliseStore, lastRound: lastRound, roundOfPack: roundOfPack, findThread: findThread,
     nextRound: nextRound, recordRound: recordRound, previousRound: previousRound,
-    importFile: importFile, adoptPack: adoptPack, setStatus: setStatus, addReply: addReply,
+    importFile: importFile, adoptPack: adoptPack, setStatus: setStatus, addReply: addReply, setAside: setAside,
     latestVerdicts: latestVerdicts, isApproval: isApproval, openMustFix: openMustFix, warnings: warnings,
     saveNewFile: saveNewFile, downloadText: downloadText, inForeignFrame: inForeignFrame, fileSlug: fileSlug, copyText: copyText
   };

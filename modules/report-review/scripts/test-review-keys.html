@@ -1,0 +1,458 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: the keyboard and assistive technology</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The tool from the keyboard. The report is one stop for Tab, with the arrow
+  keys moving between its blocks and, in a table, its cells; headings and
+  tables are there as headings and tables; a block says it has comments; the
+  keyboard is never left nowhere after an action (it stays on the control
+  used, or goes to the next sensible thing); dialogs take the keyboard, keep
+  it and give it back; Delete leads to Undo, and Ctrl+Z undoes it; the outline
+  and the items on Engagement are one stop each; and the Keyboard help says
+  all this.
+  Keys are dispatched as events, which run the page's own handlers; what the
+  browser itself does for a key (Tab moving on, an arrow moving a radio) is
+  stood in for by doing what the browser would do.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  var errors = [];
+  function load(q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () { res(w); });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+  function clean() { try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); } catch (e) {} }
+  clean();
+  try { localStorage.setItem("spt-review:reviewer:v1", "K. Board"); } catch (e) {}
+
+  var W, D, R;
+  function q(s) { return D.querySelector(s); }
+  function all(s) { return Array.prototype.slice.call(D.querySelectorAll(s)); }
+  function key(el, k, more) {
+    var init = { key: k, bubbles: true, cancelable: true };
+    Object.keys(more || {}).forEach(function (x) { init[x] = more[x]; });
+    var e = new W.KeyboardEvent("keydown", init); el.dispatchEvent(e); return e;
+  }
+  function type(el, v) { el.value = v; el.dispatchEvent(new W.Event("input", { bubbles: true })); }
+  function mouseClick(el) { el.dispatchEvent(new W.MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 })); }
+  function active() { return D.activeElement; }
+  function onBody() { return !active() || active() === D.body; }
+  function who() { var a = active(); return a ? a.nodeName + "." + a.className + "#" + a.id : "none"; }
+  // What Tab can stop at, inside a part of the page.
+  function stops(root) {
+    return Array.prototype.filter.call(root.querySelectorAll("[tabindex], button, input, select, textarea, a[href], summary"), function (el) { return el.tabIndex >= 0 && !el.disabled && el.offsetParent !== null; });
+  }
+  function block(id) { return q('#rr-paper [data-block-id="' + id + '"]'); }
+  // The report's stops for Tab are all one block's: the block, then the
+  // buttons of the comments beside it.
+  function oneBlockHasTab(el) {
+    var mine = [el], n = el.nextSibling;
+    while (n && n.classList && n.classList.contains("rr-side")) { mine.push(n); n = n.nextSibling; }
+    var st = stops(q("#rr-paper"));
+    return st[0] === el && st.every(function (s) { return mine.some(function (m) { return m.contains(s); }); }) && all('#rr-paper .rr-block[tabindex="0"]').length === 1;
+  }
+  function nav(page) { q('.nav-item[data-page="' + page + '"]').click(); }
+
+  load("?tour=1").then(function (w) {
+    W = w; D = w.document; R = w.ReviewTool;
+    return poll(function () { return R.state.pack; });
+  }).then(function () {
+    var doc = R.state.pack.documents[0], blocks = doc.blocks;
+    var els = all("#rr-paper .rr-block");
+
+    // ---- the report's structure, for assistive technology ----
+    ok(!q('#rr-paper [role="button"]') && els.every(function (e) { return e.getAttribute("role") !== "button"; }), "no block is a button: a button would hide what is inside it");
+    var heads = blocks.filter(function (b) { return b.type === "heading"; });
+    ok(heads.length > 5 && all("#rr-paper .rr-block > h1, #rr-paper .rr-block > h2, #rr-paper .rr-block > h3, #rr-paper .rr-block > h4").length === heads.length && !q("#rr-paper .rr-block:not([role]) [role]"),
+      "every heading is a heading (" + heads.length + "), in a block with no role of its own");
+    var tables = blocks.filter(function (b) { return b.type === "table"; });
+    var tEls = all('#rr-paper .rr-block[role="group"]');
+    ok(tables.length > 3 && tEls.length === tables.length && tEls.every(function (e) { return /^Table, \d+ rows?$/.test(e.getAttribute("aria-label")) && !!e.querySelector("table") && !e.querySelector("table").hasAttribute("role"); }),
+      "every table is a table, in a group named as one rather than by all its words", tEls[0] && tEls[0].getAttribute("aria-label"));
+    ok(all("#rr-paper .rr-block").every(function (e) { return (D.getElementById((e.getAttribute("aria-describedby") || "").split(" ").pop()) || {}).textContent; }) &&
+      /Enter/.test(q("#rr-block-hint").textContent) && /Heading/.test(q("#rr-head-hint").textContent) && /cells/.test(q("#rr-table-hint").textContent) && /Escape/.test(q("#rr-cell-hint").textContent),
+      "each block has a short description of what Enter does");
+    var pic = q("#rr-paper .rr-img");
+    ok(pic && !pic.hasAttribute("role") && pic.querySelector("img[alt]") && pic.querySelector("img").alt.length > 5, "a picture is read by its own description");
+
+    // ---- one stop for Tab, and the arrow keys ----
+    var zero = all('#rr-paper .rr-block[tabindex="0"]');
+    ok(zero.length === 1 && zero[0] === els[0] && stops(q("#rr-paper")).length === 1, "the report is one stop for Tab, at its first block", zero.length + " blocks, " + stops(q("#rr-paper")).length + " stops");
+    ok(all("#rr-paper td").every(function (td) { return td.tabIndex < 0; }) && all("#rr-paper td[data-cell]").length > 20, "no table cell is a stop for Tab, and every cell can still take the keyboard");
+    els[0].focus();
+    var e1 = key(els[0], "ArrowDown");
+    ok(active() === els[1] && e1.defaultPrevented && els[1].tabIndex === 0 && els[0].tabIndex === -1, "Down moves to the next block, and Tab's stop moves with it", who());
+    key(els[1], "ArrowDown"); key(els[2], "ArrowUp");
+    ok(active() === els[1], "Up moves back");
+    key(els[1], "End");
+    ok(active() === els[els.length - 1], "End goes to the last block");
+    key(active(), "Home");
+    ok(active() === els[0], "Home goes to the first");
+    var firstPlain = heads.filter(function (h) { return !h.sub; })[0], secondPlain = heads.filter(function (h) { return !h.sub; })[1];
+    key(els[0], "PageDown");
+    var atFirst = active();
+    key(active(), "PageDown");
+    ok(atFirst === block(firstPlain.id) && active() === block(secondPlain.id), "Page Down goes to the next section's heading, then the one after", who());
+    key(active(), "PageUp");
+    ok(active() === block(firstPlain.id), "Page Up goes back a section");
+    ok(oneBlockHasTab(block(firstPlain.id)), "and Tab still stops at one block of the report, the one the keyboard is on");
+    var mods = key(active(), "ArrowDown", { ctrlKey: true });
+    ok(!mods.defaultPrevented && active() === block(firstPlain.id), "a key held with Ctrl is left to the browser");
+
+    // ---- Enter, Space and Escape on a paragraph ----
+    var paras = blocks.filter(function (b) { return b.type === "paragraph" && !b.front && b.text.length > 60 && !b.red; });
+    var A = paras[0], B = paras[1], C = paras[2];
+    block(A.id).focus();
+    key(block(A.id), "Enter");
+    ok(R.state.composer && R.state.composer.anchor.blockId === A.id && active() === q(".rr-c-text"), "Enter on a paragraph opens the comment box, with the keyboard in it", who());
+    var esc = key(q(".rr-c-text"), "Escape");
+    ok(!R.state.composer && active() === block(A.id) && esc.defaultPrevented, "Escape closes an empty box and goes back to the paragraph", who());
+    key(block(A.id), " ");
+    ok(R.state.composer && active() === q(".rr-c-text"), "Space opens it too");
+    type(q(".rr-c-text"), "Written from the keyboard.");
+    key(q(".rr-c-text"), "Escape");
+    ok(R.state.composer && R.state.composer.text === "Written from the keyboard." && !!q(".rr-composer") && /Add or cancel the comment/.test(q("#toast").textContent), "Escape leaves a box with something written in it, and says why");
+    // the Suggest wording tick
+    var sug = q(".rr-c-suggest"); sug.focus(); sug.checked = true; sug.dispatchEvent(new W.Event("change", { bubbles: true }));
+    ok(active() === q(".rr-c-suggest") && active().checked && !!q(".rr-c-sug") && q(".rr-c-text").value === "Written from the keyboard.", "ticking Suggest wording keeps the keyboard on the tick", who());
+    sug = q(".rr-c-suggest"); sug.checked = false; sug.dispatchEvent(new W.Event("change", { bubbles: true }));
+    ok(active() === q(".rr-c-suggest") && !q(".rr-c-sug"), "and unticking it");
+    q('.rr-composer [data-severity="should-fix"]').focus();
+    key(active(), "ArrowRight");
+    ok(active() === q('.rr-composer [data-severity="suggestion"]'), "Right moves between the severities", who());
+    key(active(), "ArrowLeft"); key(active(), "ArrowLeft");
+    ok(active() === q('.rr-composer [data-severity="must-fix"]'), "and Left");
+    q(".rr-c-add").focus(); q(".rr-c-add").click();
+    var c1 = R.state.review.comments[0];
+    ok(c1 && c1.anchor.blockId === A.id && active() === block(A.id), "Add comment puts the keyboard back on the paragraph, to read on", who());
+    // a block with comments says so
+    var said = block(A.id).getAttribute("aria-describedby").split(" ").map(function (id) { return D.getElementById(id).textContent; }).join(" ");
+    ok(/^Has 1 comment[.,]/.test(said) && /Enter/.test(said), "a block with a comment says so to a screen reader", said);
+    // Tab from the block reaches its comment, and only its comment
+    var st = stops(q("#rr-paper"));
+    ok(oneBlockHasTab(block(A.id)) && st.indexOf(q('[data-comment-id="' + c1.id + '"] .rr-edit')) > 0 && st.indexOf(q('[data-comment-id="' + c1.id + '"] .rr-del')) > 0, "Tab from the paragraph goes to its comment's Edit and Delete, then out of the report", st.length + " stops");
+    block(B.id).focus(); key(block(B.id), "Enter"); type(q(".rr-c-text"), "Second."); q(".rr-c-add").click();
+    st = stops(q("#rr-paper"));
+    ok(oneBlockHasTab(block(B.id)) && st.length >= 3 && q('[data-comment-id="' + c1.id + '"] .rr-edit').tabIndex === -1, "another block's comment is then the one in the Tab order, and the first one's is out of it");
+    said = block(B.id).getAttribute("aria-describedby").split(" ").map(function (id) { return D.getElementById(id).textContent; }).join(" ");
+    ok(/^Has 1 comment[.,]/.test(said), "the second block says it has a comment too");
+
+    // ---- Edit, Cancel, Delete, Undo, Ctrl+Z ----
+    var c2 = R.state.review.comments[1];
+    function cEl(c, sel) { return q('#main [data-comment-id="' + c.id + '"] ' + sel); }
+    cEl(c2, ".rr-edit").focus(); cEl(c2, ".rr-edit").click();
+    ok(R.state.composer && R.state.composer.editing === c2.id && active() === q(".rr-c-text"), "Edit opens the comment with the keyboard in it");
+    key(q(".rr-c-text"), "Escape");
+    ok(!R.state.composer && active() === cEl(c2, ".rr-edit"), "Escape on an edit with no change goes back to Edit", who());
+    cEl(c2, ".rr-edit").click(); q(".rr-c-cancel").focus(); q(".rr-c-cancel").click();
+    ok(!R.state.composer && active() === cEl(c2, ".rr-edit"), "and so does Cancel");
+    cEl(c2, ".rr-edit").click(); type(q(".rr-c-text"), "Second, reworded."); q(".rr-c-add").click();
+    ok(c2.text === "Second, reworded." && active() === cEl(c2, ".rr-edit"), "Save comment puts the keyboard on the comment's Edit", who());
+    cEl(c2, ".rr-del").focus(); cEl(c2, ".rr-del").click();   // a click with no pointer: Enter or Space on the button
+    var undo = q("#toast .rr-toast-act");
+    ok(R.state.review.comments.length === 1 && undo && active() === undo && /Comment deleted/.test(q("#toast").textContent), "Delete from the keyboard takes the keyboard to Undo", who());
+    return wait(12000).then(function () {
+      ok(!q("#toast").classList.contains("hidden") && active() === q("#toast .rr-toast-act"), "and the message stays up while the keyboard is on Undo");
+      q("#toast .rr-toast-act").click();
+      ok(R.state.review.comments.length === 2 && active() === cEl(c2, ".rr-edit") && /Comment restored/.test(q("#toast").textContent), "Undo puts the comment back and the keyboard on its Edit", who());
+      // Escape on Undo
+      cEl(c2, ".rr-del").click();
+      key(q("#toast .rr-toast-act"), "Escape");
+      ok(q("#toast").classList.contains("hidden") && active() === block(B.id) && R.state.review.comments.length === 1, "Escape on Undo closes the message and goes back to the paragraph", who());
+      // it stays deleted: put a new one there for the Ctrl+Z case
+      key(block(B.id), "Enter"); type(q(".rr-c-text"), "Third."); q(".rr-c-add").click();
+      var c3 = R.state.review.comments[1];
+      cEl(c3, ".rr-del").click();
+      block(C.id).focus();
+      return wait(3000).then(function () {
+        ok(!q("#toast").classList.contains("hidden"), "with the keyboard elsewhere, the message is still up for a few seconds");
+        var z = key(block(C.id), "z", { ctrlKey: true });
+        ok(R.state.review.comments.length === 2 && R.state.review.comments[1] === c3 && z.defaultPrevented && !!cEl(c3, ".rr-edit"), "Ctrl+Z undoes the delete while Undo is on offer");
+        var z2 = key(D.body, "z", { ctrlKey: true });
+        ok(!z2.defaultPrevented && R.state.review.comments.length === 2, "and does nothing once it is not");
+        // in a box of text, Ctrl+Z is for the typing
+        cEl(c3, ".rr-del").click();
+        q("#rr-report-find").focus();
+        var z3 = key(q("#rr-report-find"), "z", { ctrlKey: true });
+        ok(!z3.defaultPrevented && R.state.review.comments.length === 1, "in a box of text, Ctrl+Z is left to undo typing");
+        q("#toast .rr-toast-act").click();
+        // with the mouse, Delete does not move the keyboard to the message
+        mouseClick(cEl(c3, ".rr-del"));
+        ok(R.state.review.comments.length === 1 && active() === block(B.id) && !!q("#toast .rr-toast-act"), "Delete with the mouse leaves the keyboard on the paragraph, not on the message", who());
+        ok(q("#toast").getAttribute("role") === "status" && q("#toast").getAttribute("aria-live") === "polite", "which is announced all the same");
+        q("#toast .rr-toast-act").click();
+        c3 = R.state.review.comments[1];
+      });
+    }).then(function () {
+      // ---- a table ----
+      var t = blocks.filter(function (b) { return b.type === "table" && b.rows.length > 2 && b.rows[0].cells.length > 1 && !b.front; })[0], tEl = block(t.id);
+      function cell(r, c) { return tEl.querySelector('td[data-cell="' + r + "." + c + '"]'); }
+      tEl.focus();
+      key(tEl, "Enter");
+      ok(active() === cell(0, 0) && !R.state.composer && active().getAttribute("aria-describedby") === "rr-cell-hint", "Enter on a table goes into its first cell", who());
+      key(active(), "ArrowRight");
+      ok(active() === cell(0, 1), "Right moves along the row");
+      key(active(), "ArrowDown"); key(active(), "ArrowDown");
+      ok(active() === cell(2, 1), "Down moves down the column");
+      key(active(), "ArrowLeft"); key(active(), "ArrowUp");
+      ok(active() === cell(1, 0), "Left and Up move back");
+      key(active(), "End");
+      ok(active() === cell(1, t.rows[1].cells.length - 1), "End goes to the last cell of the row");
+      key(active(), "Home");
+      ok(active() === cell(1, 0) && stops(q("#rr-paper")).filter(function (e) { return e.nodeName === "TD"; }).length === 0, "Home to the first, and no cell has become a stop for Tab");
+      key(active(), "Enter");
+      ok(R.state.composer && R.state.composer.anchor.cell && R.state.composer.anchor.cell.row === 1 && R.state.composer.anchor.cell.col === 0 && R.state.composer.label === "On this cell" && active() === q(".rr-c-text") && cell(1, 0).classList.contains("picked"),
+        "Enter on a cell comments on that cell", JSON.stringify(R.state.composer && R.state.composer.anchor.cell));
+      key(q(".rr-c-text"), "Escape");
+      ok(!R.state.composer && active() === cell(1, 0) && !cell(1, 0).classList.contains("picked"), "Escape goes back to the cell", who());
+      key(active(), "Escape");
+      ok(active() === tEl, "and Escape again goes back out to the table");
+      key(tEl, "Enter");
+      ok(active() === cell(1, 0), "Enter goes back in at the cell last used");
+      key(active(), "Escape");
+      key(tEl, " ");
+      ok(R.state.composer && !R.state.composer.anchor.cell && R.state.composer.label === "On the whole table" && R.state.composer.canSuggest === false, "Space on a table comments on the whole table");
+      key(q(".rr-c-text"), "Escape");
+      ok(active() === tEl, "and Escape goes back to it");
+      // the mouse is as it was
+      mouseClick(cell(0, 1));
+      ok(R.state.composer && R.state.composer.anchor.cell && R.state.composer.anchor.cell.col === 1, "a click on a cell still comments on the cell");
+      q(".rr-c-cancel").click();
+      mouseClick(block(C.id));
+      ok(R.state.composer && R.state.composer.anchor.blockId === C.id && block(C.id).tabIndex === 0 && all('#rr-paper .rr-block[tabindex="0"]').length === 1, "a click on a paragraph still comments on it, and Tab's stop follows the click");
+      q(".rr-c-cancel").click();
+      ok(active() === block(C.id), "Cancel goes back to the paragraph");
+
+      // ---- earlier comments: Confirm, Reply, Raise it again ----
+      var prevIds = all("#rr-paper [data-prev-id]").map(function (n) { return n.getAttribute("data-prev-id"); });
+      function pv(id, sel) { return q('#main [data-prev-id="' + id + '"] ' + sel); }
+      var canConfirm = prevIds.filter(function (id) { return pv(id, ".rr-confirm"); })[0], other = prevIds.filter(function (id) { return id !== canConfirm; })[0] || canConfirm;
+      ok(prevIds.length > 0 && !!canConfirm, "the demo has earlier comments beside the report (" + prevIds.length + ")");
+      pv(canConfirm, ".rr-confirm").focus(); pv(canConfirm, ".rr-confirm").click();
+      ok(R.state.review.confirmations.length === 1 && active() === pv(canConfirm, ".rr-confirm") && /Take back/.test(active().textContent), "Confirm keeps the keyboard on the button, now Take back", who());
+      active().click();
+      ok(R.state.review.confirmations.length === 0 && active() === pv(canConfirm, ".rr-confirm"), "and taking it back does too");
+      pv(other, ".rr-reply").click();
+      ok(active() === q(".rr-reply-box textarea"), "Reply opens with the keyboard in the box");
+      key(active(), "Escape");
+      ok(!R.state.replyBox && active() === pv(other, ".rr-reply"), "Escape closes an empty reply and goes back to Reply", who());
+      pv(other, ".rr-reply").click(); type(q(".rr-reply-box textarea"), "Seen, thanks.");
+      key(q(".rr-reply-box textarea"), "Escape");
+      ok(R.state.replyBox && /Add or cancel the reply/.test(q("#toast").textContent), "Escape leaves a reply with something written in it");
+      q(".rr-reply-add").click();
+      ok(R.state.review.replies.length === 1 && active() === pv(other, ".rr-reply"), "Add reply goes back to Reply");
+      q(".rr-reply-del").click();
+      ok(!R.state.review.replies.length && active() === q("#toast .rr-toast-act"), "deleting a reply from the keyboard goes to Undo");
+      q("#toast .rr-toast-act").click();
+      ok(R.state.review.replies.length === 1 && active() === q(".rr-reply-edit"), "and Undo to the reply's Edit", who());
+      pv(other, ".rr-raise").click();
+      ok(R.state.composer && R.state.composer.relatesTo === other && active() === q(".rr-c-text"), "Raise it again opens with the keyboard in the box");
+      key(active(), "Escape");
+      ok(!R.state.composer && active() === pv(other, ".rr-raise"), "and Escape goes back to Raise it again", who());
+
+      // ---- the outline ----
+      var rows = all(".rr-outline-row"), sb = q("#sidebar");
+      ok(rows.length > 5 && stops(q(".rr-outline")).length === 2 && all(".rr-outline-row.tab").length === 1, "the outline is one stop for Tab: one section's tick and link", String(stops(q(".rr-outline")).length));
+      var link0 = q(".rr-outline-row.tab .rr-outline-item"), at = rows.indexOf(link0.parentNode);
+      link0.focus();
+      key(link0, "ArrowDown");
+      ok(active() === rows[at + 1].querySelector(".rr-outline-item") && rows[at + 1].classList.contains("tab") && stops(q(".rr-outline")).length === 2, "Down moves to the next section's link", who());
+      key(active(), "End");
+      ok(active() === rows[rows.length - 1].querySelector(".rr-outline-item"), "End to the last");
+      key(active(), "Home");
+      ok(active() === rows[0].querySelector(".rr-outline-item"), "Home to the first");
+      var tick0 = rows[0].querySelector(".rr-read"); tick0.focus();
+      key(tick0, "ArrowDown");
+      ok(active() === rows[1].querySelector(".rr-read"), "on a tick, Down moves to the next tick");
+      var tick1 = active(); tick1.checked = true; tick1.dispatchEvent(new W.Event("change", { bubbles: true }));
+      ok(active() === tick1 && tick1.isConnected && rows[1].classList.contains("read") && /1 of \d+ read/.test(q(".rr-outline .nav-section-title").textContent), "ticking a section read keeps the keyboard on the tick: the outline is not drawn again", who());
+      var link1 = rows[1].querySelector(".rr-outline-item"); link1.focus(); link1.click();
+      var secBlock = block(link1.getAttribute("data-section-block"));
+      ok(active() === link1 && secBlock.tabIndex === 0 && all('#rr-paper .rr-block[tabindex="0"]').length === 1, "going to a section keeps the keyboard on its link, and Tab into the report then starts at that section");
+
+      // ---- the Keyboard help, and dialogs ----
+      var kb = q("#rr-keys"); kb.focus(); kb.click();
+      var dlg = q(".rr-modal");
+      ok(dlg && dlg.getAttribute("role") === "dialog" && dlg.getAttribute("aria-modal") === "true" && dlg.getAttribute("aria-label") === "Keyboard" && dlg.contains(active()) && active().id === "rr-keys-close",
+        "the Keyboard button opens the help as a dialog, with the keyboard on Close", who());
+      ok(/Up and Down/.test(dlg.textContent) && /Page Up/.test(dlg.textContent) && /Escape/.test(dlg.textContent) && /Ctrl\+F/.test(dlg.textContent) && /Ctrl\+Z/.test(dlg.textContent) && /In a table/.test(dlg.textContent), "which lists the keys");
+      ok(!/[–—]/.test(dlg.textContent), "in plain words, with no dashes");
+      var tab = key(active(), "Tab");
+      ok(tab.defaultPrevented && dlg.contains(active()), "Tab stays inside it");
+      key(D, "Escape");
+      ok(!q(".rr-modal") && active() === q("#rr-keys"), "Escape closes it and gives the keyboard back to the button", who());
+      nav("summary");
+      var rn = q("#rr-rename"); rn.focus(); rn.click();
+      dlg = q(".rr-modal");
+      ok(dlg && dlg.getAttribute("aria-label") === "Your name" && active() === q("#rr-name-input"), "the name question takes the keyboard into its field");
+      q("#rr-name-ok").focus();
+      var t1 = key(active(), "Tab");
+      ok(t1.defaultPrevented && active() === q("#rr-name-input"), "Tab from the last button goes round to the field", who());
+      var t2 = key(active(), "Tab", { shiftKey: true });
+      ok(t2.defaultPrevented && active() === q("#rr-name-ok"), "and Shift+Tab from the field goes round to the last button");
+      q("#rr-name-cancel").focus();
+      var t3 = key(active(), "Tab");
+      ok(!t3.defaultPrevented, "between them Tab is left to the browser");
+      rn.blur();
+      key(D, "Escape");
+      ok(!q(".rr-modal") && active() === q("#rr-rename"), "Escape cancels it and gives the keyboard back", who());
+      q("#rr-rename").click(); type(q("#rr-name-input"), "K. Board-Smith"); q("#rr-name-ok").click();
+      ok(!q(".rr-modal") && R.state.review.reviewer === "K. Board-Smith" && active() === q("#rr-rename"), "Carry on draws the page again and still gives the keyboard back", who());
+
+      // ---- the verdict ----
+      var order = ["approved", "approved-with-comments", "changes-requested", "none"];
+      function radio(v) { return q('input[name="rr-verdict"][value="' + v + '"]'); }
+      // An arrow key on a radio moves to the next one, checks it and fires change.
+      function arrowTo(v) { var r = radio(v); r.focus(); r.checked = true; r.dispatchEvent(new W.Event("change", { bubbles: true })); }
+      radio("none").focus();
+      var went = order.map(function (v) { arrowTo(v); return R.state.review.verdict.value === v && active() === radio(v) && active().checked; });
+      ok(went.every(Boolean), "the arrow keys go through all four verdicts: the keyboard stays on the one chosen each time", went.join());
+      arrowTo("changes-requested");
+      ok(active() === radio("changes-requested") && order.every(function (v) { return radio(v).name === "rr-verdict"; }), "and back again");
+      // a count that goes to another page
+      var go = q('.rr-stat-go[data-go="checklist"]'); go.focus(); go.click();
+      ok(R.state.page === "checklist" && !onBody() && active() === q("#main .page-title"), "a count that goes to another page puts the keyboard on that page's heading", who());
+
+      // ---- the checklist ----
+      var q1 = q(".rr-q"), qid = q1.getAttribute("data-q");
+      function ans(a) { return q('.rr-q[data-q="' + qid + '"] [data-answer="' + a + '"]'); }
+      ans("yes").focus(); ans("yes").click();
+      ok(active() === ans("yes") && active().getAttribute("aria-pressed") === "true", "an answer keeps the keyboard on its button", who());
+      key(active(), "ArrowRight");
+      ok(active() === ans("no"), "Right moves to the next answer");
+      active().click();
+      ok(active() === ans("no") && active().getAttribute("aria-pressed") === "true" && !!q('.rr-q[data-q="' + qid + '"] .rr-q-why-add'), "and pressing it keeps the keyboard there");
+      key(active(), "ArrowRight"); key(active(), "ArrowRight");
+      ok(active() === ans("na"), "Right stops at the last answer");
+      q('.rr-q[data-q="' + qid + '"] .rr-q-why-add').click();
+      ok(active() === q(".rr-c-text"), "Add a comment saying why opens with the keyboard in the box");
+      key(active(), "Escape");
+      ok(!R.state.composer && active() === q('.rr-q[data-q="' + qid + '"] .rr-q-why-add'), "and Escape goes back to the link", who());
+
+      // ---- automatic checks ----
+      nav("checks");
+      var dis = all(".rr-check-dismiss");
+      ok(dis.length > 0, "the demo has checks to dismiss (" + dis.length + ")");
+      var firstId = dis[0].closest(".rr-check").getAttribute("data-check-id");
+      dis[0].focus(); dis[0].click();
+      ok(R.state.review.dismissedChecks.length === 1 && !onBody() && (active().classList.contains("rr-check-dismiss") || active().id === "rr-checks-gone"), "Dismiss moves the keyboard to the next check, or to the link that shows the dismissed ones", who());
+      q("#rr-checks-gone").focus(); q("#rr-checks-gone").click();
+      ok(active() === q("#rr-checks-gone") && /^Hide/.test(active().textContent), "showing the dismissed ones keeps the keyboard on the link");
+      var res = q(".rr-check-restore"); res.focus(); res.click();
+      ok(!R.state.review.dismissedChecks.length && active() === q('[data-check-id="' + firstId + '"] .rr-check-dismiss'), "Restore puts the keyboard on the check's Dismiss", who());
+      var mk = q('[data-check-id="' + firstId + '"] .rr-check-comment'); mk.focus(); mk.click();
+      ok(R.state.review.comments.some(function (c) { return c.check === firstId; }) && active() === q('[data-check-id="' + firstId + '"] .rr-check-dismiss'), "Make it a comment puts the keyboard on the check's Dismiss", who());
+
+      // ---- engagement ----
+      nav("engagement");
+      var f = q('[data-filter="findings"]'); f.focus(); f.click();
+      ok(active() === q('[data-filter="findings"]') && active().classList.contains("on"), "a filter keeps the keyboard on its button", who());
+      key(active(), "ArrowLeft");
+      ok(active() === q('[data-filter="all"]'), "Left moves to the filter before");
+      active().click();
+      var cards = all(".rr-item"), btns = cards.map(function (c) { return c.querySelector(".rr-item-comment"); });
+      var cardStops = stops(q("#main")).filter(function (e) { return e.closest(".rr-item"); });
+      ok(cards.length > 20 && cardStops[0] === btns[0] && cardStops.every(function (e) { return cards[0].contains(e); }) && cardStops.length < 8, "the items are one stop for Tab: the first item's Comment button and its comments", cardStops.length + " stops in " + cards.length + " cards");
+      ok(/^Comment on \S+/.test(btns[3].getAttribute("aria-label")), "each Comment button says which item it is for", btns[3].getAttribute("aria-label"));
+      btns[0].focus();
+      key(btns[0], "ArrowDown"); key(active(), "ArrowDown");
+      ok(active() === btns[2] && btns[2].tabIndex === 0 && btns[0].tabIndex === -1, "Down moves from item to item, and Tab's stop moves with it", who());
+      key(active(), "ArrowUp");
+      ok(active() === btns[1], "Up moves back");
+      active().click();
+      ok(R.state.composer && R.state.composer.anchor.kind === "item" && active() === q(".rr-c-text"), "Comment opens with the keyboard in the box");
+      key(active(), "Escape");
+      ok(!R.state.composer && active() === all(".rr-item")[1].querySelector(".rr-item-comment"), "Escape goes back to the item's Comment button", who());
+      active().click(); type(q(".rr-c-text"), "On an item."); q(".rr-c-add").click();
+      var ic = R.state.review.comments[R.state.review.comments.length - 1];
+      ok(ic.anchor.kind === "item" && active() === cEl(ic, ".rr-edit"), "Add comment puts the keyboard on the new comment's Edit", who());
+      cardStops = stops(q("#main")).filter(function (e) { return e.closest(".rr-item"); });
+      ok(cardStops.indexOf(cEl(ic, ".rr-edit")) > 0 && cardStops.every(function (e) { return all(".rr-item")[1].contains(e); }), "and that item's comment is in the Tab order with it");
+      cEl(ic, ".rr-del").click();
+      ok(active() === q("#toast .rr-toast-act"), "Delete goes to Undo here too");
+      q("#toast .rr-toast-act").click();
+      ok(active() === cEl(ic, ".rr-edit"), "and Undo back to the comment");
+      q("#rr-basis-link").focus(); q("#rr-basis-link").click();
+      ok(active() === q(".rr-basis-comment"), "Go to the basis of assessment takes the keyboard there");
+
+      // ---- going to things ----
+      nav("summary");
+      var where = q("[data-sum-comment] .rr-sum-where button"); where.focus(); where.click();
+      ok(!onBody() && (active().classList.contains("rr-block") || active().classList.contains("rr-item-comment") || active().classList.contains("rr-edit")), "a comment's place on Summary takes the keyboard to it", who());
+      nav("about");
+      ok(/Keyboard/.test(q("#main").textContent) && !!q("#main .rr-keys") && all("#main .rr-keys dt").length >= 8, "About has the Keyboard help too");
+      ok(active() === q('.nav-item[data-page="about"]'), "and a page chosen in the sidebar keeps the keyboard on its entry");
+      R.state.dirty = false; R.state.composer = null; R.state.replyBox = null;
+    });
+  }).then(function () {
+    // ---- a large report: the number of stops for Tab ----
+    function cellOf(t) { return { blocks: [{ type: "paragraph", text: t, runs: [{ t: t }], red: false }], text: t, red: false, fill: "" }; }
+    var blocks = [], n = 0, sec = "s0", secN = 0;
+    while (blocks.length < 1500) {
+      n++;
+      var id = "d0-b" + n;
+      if (n % 25 === 1) { secN++; sec = "s" + secN; blocks.push({ id: id, type: "heading", level: 1, text: secN + " Section " + secN, runs: [{ t: secN + " Section " + secN }], red: false, front: false, sectionKey: sec, sectionTitle: "Section " + secN }); }
+      else if (n % 25 === 10) { var rows = []; for (var r = 0; r < 10; r++) rows.push({ cells: ["SR " + r, "Requirement text " + n, "Partially achieved", "High"].map(cellOf) }); blocks.push({ id: id, type: "table", text: "t" + n, red: false, front: false, sectionKey: sec, sectionTitle: sec, rows: rows }); }
+      else blocks.push({ id: id, type: "paragraph", text: "Paragraph " + n + " of a long report about a site.", runs: [{ t: "Paragraph " + n + " of a long report about a site." }], red: false, front: false, sectionKey: sec, sectionTitle: sec });
+    }
+    var items = [];
+    for (var i = 0; i < 300; i++) items.push({ targetName: "Works 1", itemId: "i" + i, code: "A" + i, title: "Item " + i, groupName: "Group " + (i % 10), answer: "Partially achieved", expected: "Achieved", evidence: "Seen.", notes: "", owner: "", action: "", impact: "", priority: "", status: "finding" });
+    var pack = { schema: "spt-review-pack/1.0", packId: "rp-keys", reviewId: "rv-keys", round: 1, createdAt: "2026-11-01T10:00:00Z", sourceTool: { product: "OT Cyber Assessment Tool", version: "0.6.0" },
+      engagement: { client: "Example Water Ltd", site: "Works 1", consultant: "A. Author", instrumentId: "ncsc-caf", instrumentTitle: "NCSC CAF", scoringFamily: "caf-achieved", targetLabel: "Site", documentControl: {} },
+      documents: [{ title: "Works 1", targetName: "Works 1", contentHash: "h", media: {}, blocks: blocks }], items: items, basisOfAssessment: { interviews: [], documents: [], observations: [] },
+      facts: { perTarget: [] }, previousRound: { comments: [], verdicts: [] } };
+    R.loadTexts([{ name: "keys.json", text: JSON.stringify(pack) }]);
+    for (var c = 0; c < 100; c++) {
+      var b = blocks[(c * 13 + 4) % blocks.length];
+      if (b.type !== "paragraph") continue;
+      R.addComment({ severity: "should-fix", anchor: { documentIndex: 0, documentTitle: "Works 1", kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionKey, blockId: b.id, blockType: b.type, quote: b.text, cell: null, targetName: "Works 1", targetId: "", itemId: "", field: "" }, text: "Comment " + c });
+    }
+    R.render(true);
+    var inMain = stops(q("#main")), inSide = stops(q("#sidebar")), made = all("#rr-paper [data-comment-id]").length;
+    ok(all("#rr-paper .rr-block").length === 1500 && made > 80, "a report of 1,500 blocks with " + made + " comments beside it");
+    ok(inMain.length <= 12 && stops(q("#rr-paper")).length === 1, "has " + inMain.length + " stops for Tab in the page (12 or fewer), one of them the report", inMain.map(function (e) { return e.nodeName + "." + e.className; }).join(" "));
+    ok(inSide.length <= 12 && all(".rr-outline-row").length === 60, "and " + inSide.length + " in the sidebar, for 60 sections (12 or fewer)");
+    nav("engagement");
+    var st = stops(q("#main"));
+    ok(all(".rr-item").length === 150 && st.length <= 12, "Engagement with 150 items shown has " + st.length + " stops for Tab (12 or fewer)");
+    q("#rr-items-all").focus(); q("#rr-items-all").click();
+    ok(all(".rr-item").length === 300 && active() === all(".rr-item")[150].querySelector(".rr-item-comment") && stops(q("#main")).length <= 12, "Show all puts the keyboard on the first of the items just shown", who());
+    R.state.dirty = false; R.state.composer = null;
+    ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+    clean();
+    finish();
+  });
+})();
+</script>
+</body></html>

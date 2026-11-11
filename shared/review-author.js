@@ -20,6 +20,8 @@
  *   acceptPlan(thread)      { can, why, label } for a comment with suggested wording
  *   accept(thread, done)    apply it; done({ ok, message }) after checking it took
  *   undoAccept(thread, done) optional, put back what Accept replaced (thread.accepted.revert);
+ *   acceptedNote(thread)    optional, a sentence for an accepted comment whose wording is
+ *                           not in the report now, or null
  *                           done({ ok, message }). Without it there is no Undo button
  *   fieldLabel(field)       optional, what the tool calls an item field, when the
  *                           round's pack named no fieldLabels
@@ -28,6 +30,12 @@
  *   extras()                optional, a node shown under the review summary (the QA prompt)
  *   live()                  optional, the panel's container now, when the tool may
  *                           have redrawn its page while something was running
+ *   beginPaint(), endPaint() optional, called around one drawing of the panel. Each
+ *                           card asks stale() and acceptPlan(), so a tool may keep what
+ *                           it works out about the report between the two calls
+ *   packMatches(pack), ensureStore(), packHint(packId, reviewId)
+ *                           optional, for a pack this copy of the project has no record
+ *                           of (see importTexts)
  *   toast(msg, kind)
  * Nothing here is part of a report, so nothing here can reach Word or Excel.
  */
@@ -72,7 +80,16 @@
   // card stays short enough not to push the report far down the page.
   var OPEN_GROUPS_UP_TO = 12;
 
+  // One drawing of the panel. Every card asks the tool whether its comment is
+  // stale and whether its wording can be accepted, so the tool is told when a
+  // drawing starts and ends and can work the report out once, not per card.
   function mount(container, adapter, ui) {
+    if (adapter.beginPaint) adapter.beginPaint();
+    try { draw(container, adapter, ui); }
+    finally { if (adapter.endPaint) adapter.endPaint(); }
+  }
+
+  function draw(container, adapter, ui) {
     ui = ui || newUi();
     listenForHandBack();
     lastMount = { container: container, adapter: adapter, ui: ui, repaint: function () { var c = (adapter.live && adapter.live()) || container; if (c.isConnected) mount(c, adapter, ui); } };
@@ -174,7 +191,14 @@
           h("strong", { text: f.reviewer }),
           " ",
           h("span", { class: "rv-verdict v-" + v, text: RC().VERDICTS[v] || v }),
-          h("span", { class: "muted", text: " round " + f.round + ", saved " + fmtDate(f.savedAt) })
+          h("span", { class: "muted", text: " round " + f.round + ", saved " + fmtDate(f.savedAt) }),
+          f.setAside ? h("span", { class: "rv-aside-tag", text: "Set aside" }) : null,
+          // For a reviewer who has left, or who answered a later round under
+          // another name: their verdict stops counting, their comments stay.
+          h("button", { type: "button", class: "btn sm rv-aside", text: f.setAside ? "Count this review again" : "Set aside this review",
+            title: f.setAside ? "This review counts towards the warnings again."
+              : "This review no longer counts towards the warnings. Its comments stay, and you can count it again at any time.",
+            onClick: function () { RC().setAside(store, f.fileId, !f.setAside); adapter.touch(); repaint(); } })
         ];
         if (f.verdict && f.verdict.note) kids.push(h("div", { class: "rv-note", text: f.verdict.note }));
         if (no.length) kids.push(h("div", { class: "rv-note", text: "Checklist, answered no: " + no.map(function (c) { return c.text + (c.note ? " (" + c.note + ")" : ""); }).join("; ") }));
@@ -188,14 +212,14 @@
             return titles[id] || String(id).split(":")[0].replace(/-/g, " ");
           }).join("; ") }));
         }
-        return h("li", null, kids);
+        return h("li", { class: f.setAside ? "rv-file-aside" : null, "data-file-id": f.fileId }, kids);
       })));
     }
     var extra = adapter.extras && adapter.extras();
     if (extra) container.appendChild(extra);
 
     // ---- the comments -------------------------------------------------------
-    var live = store.threads.filter(function (t) { return !t.withdrawn; });
+    var live = store.threads.filter(listed);
     if (!live.length) {
       container.appendChild(h("p", { class: "muted rv-empty", text: store.files.length ? "No comments in the review files imported so far." : "Comments appear here once review files are imported." }));
       return;
@@ -264,11 +288,16 @@
     }
   }
 
+  // A comment the reviewer has since deleted is not listed, unless wording
+  // accepted from it is still in the report: that one stays, marked, so the
+  // change and its Undo are not lost with it.
+  function listed(t) { return !t.withdrawn || !!t.accepted; }
+
   // Sets the card up to show one comment when it is next drawn: the filters
   // widened if they hide it, its group open, and it flashed.
   function readyReveal(store, ui, id) {
     var t = RC().findThread(store, id);
-    if (!t || t.withdrawn) return false;
+    if (!t || !listed(t)) return false;
     if (ui.status && t.status !== ui.status) ui.status = "";
     if (ui.severity && t.comment.severity !== ui.severity) ui.severity = "";
     if (ui.reviewer && t.comment.reviewer !== ui.reviewer) ui.reviewer = "";
@@ -442,7 +471,7 @@
     var kids = [h("div", { class: "rv-raised-head", text: "Raised again from round " + e.round + ". " + e.comment.reviewer + " said then:" }),
       h("div", { class: "rv-raised-text", text: e.comment.text })];
     if (ea.quote) kids.push(h("div", { class: "rv-raised-quote muted", text: "On the wording then: " + (ea.quote.length > 200 ? ea.quote.slice(0, 200) + "…" : ea.quote) }));
-    if (!e.withdrawn && reveal) {
+    if (listed(e) && reveal) {
       kids.push(h("button", { type: "button", class: "btn sm rv-raised-go", text: "Show the earlier comment", onClick: function () { reveal(relatesTo); } }));
     }
     return h("div", { class: "rv-raised" }, kids);
@@ -465,6 +494,7 @@
       stale === true ? h("span", { class: "rv-stale", text: "No longer matches the current report" }) : null,
       t.reopened && open ? h("span", { class: "rv-stale rv-reopened", text: "Changed by the reviewer after you marked it " + (t.reopened.from === "wontchange" ? "Won't change" : "Resolved") }) : null,
       t.accepted ? h("span", { class: "rv-accepted", text: "Wording accepted" }) : null,
+      t.withdrawn ? h("span", { class: "rv-stale rv-withdrawn", text: "Deleted by the reviewer" }) : null,
       t.confirmedBy && t.confirmedBy.length ? h("span", { class: "rv-accepted", text: "Fix confirmed by " + t.confirmedBy.join(", ") }) : null
     ]));
     // What is behind the comment's text. On a closed comment it folds away,
@@ -573,6 +603,10 @@
       more.addEventListener("toggle", function () { ui.expanded[id] = more.open; });
       card.appendChild(more);
     }
+    // Accepted wording that is not in the report now (the paragraph it replaced
+    // has changed, say): said beside Undo the accepted wording, which still works.
+    var lost = t.accepted && adapter.acceptedNote ? adapter.acceptedNote(t) : null;
+    if (lost) card.appendChild(h("p", { class: "rv-why rv-accept-note", text: lost }));
     card.appendChild(h("div", { class: "rv-c-actions" }, actions));
 
     if (ui.refusing[id] && t.status === "open") {
@@ -617,13 +651,24 @@
     // A pack this assessment sent goes on its rounds, so the review must
     // exist first: adapter.store() gives a stand-in when none has started,
     // which nothing would keep (adapter.ensureStore makes the real one).
-    var adopting = typeof adapter.packMatches === "function" && read.some(function (x) { return x.id.ok && x.id.kind === "pack" && adapter.packMatches(x.id.data); });
+    // A pack, or a review, that another assessment in the project already
+    // holds is never put on this one: two assessments of one instrument for
+    // one client both match, and the hint says which to switch to.
+    function heldElsewhere(pack) {
+      if (typeof adapter.packHint !== "function" || RC().roundOfPack(adapter.store(), pack.packId)) return "";
+      return adapter.packHint(pack.packId, pack.reviewId) || "";
+    }
+    var adopting = typeof adapter.packMatches === "function" && read.some(function (x) {
+      return x.id.ok && x.id.kind === "pack" && adapter.packMatches(x.id.data) && !heldElsewhere(x.id.data);
+    });
     var store = adopting && typeof adapter.ensureStore === "function" ? adapter.ensureStore() : adapter.store();
     read.forEach(function (x) {
       var f = x.f, id = x.id;
       if (!id.ok) { bad++; lines.push(f.name + ": " + id.error); return; }
       if (id.kind === "pack") {
         if (typeof adapter.packMatches !== "function") { bad++; lines.push(f.name + ": this is a review pack. Import the review files reviewers send back."); return; }
+        var other = heldElsewhere(id.data);
+        if (other) { bad++; lines.push(f.name + ": " + other); return; }
         var ad = RC().adoptPack(store, id.data, !!adapter.packMatches(id.data));
         if (!ad.ok) { bad++; lines.push(f.name + ": " + ad.error); return; }
         if (ad.already) lines.push(f.name + ": round " + ad.round.round + " pack already registered with this assessment. Import the reviewers' files.");
@@ -634,7 +679,7 @@
       if (!r.ok) {
         bad++;
         // The tool may know which of its assessments sent that pack.
-        var hint = r.noPack && typeof adapter.packHint === "function" ? adapter.packHint(id.data.packId) : "";
+        var hint = r.noPack && typeof adapter.packHint === "function" ? adapter.packHint(id.data.packId, id.data.reviewId) : "";
         lines.push(f.name + ": " + (hint || r.error));
         return;
       }
@@ -646,7 +691,15 @@
         changed = true;
         lines.push(r.reviewer + " (round " + r.round + "): " + RC().plural(r.added, "new comment") + (r.updated ? ", " + r.updated + " updated" : "") +
           (r.reopened ? ", " + r.reopened + " reopened because the reviewer changed " + (r.reopened === 1 ? "it" : "them") + " after you closed " + (r.reopened === 1 ? "it" : "them") : "") +
-          (r.removed ? ", " + r.removed + " withdrawn" : "") + "." +
+          (r.removed ? ", " + r.removed + " withdrawn" : "") +
+          (r.replies ? ", " + RC().plural(r.replies, "reply", "replies") : "") + "." +
+          // What the reviewer deleted after the author had answered it stays.
+          (r.withdrawn ? " " + r.reviewer + " also deleted " + RC().plural(r.withdrawn, "comment") + " you had already answered." : "") +
+          (r.withdrawnAccepted ? " Wording you accepted from " + (r.withdrawn === 1 ? "it" : r.withdrawnAccepted + " of them") + " is still in the report, so " +
+            (r.withdrawnAccepted === 1 ? "that comment stays" : "those comments stay") + " listed (show All), with Undo the accepted wording." : "") +
+          (r.repliesOnClosed === 1 ? " 1 reply is on a comment you had closed, which stays closed: show All to read it." : "") +
+          (r.repliesOnClosed > 1 ? " " + r.repliesOnClosed + " replies are on comments you had closed, which stay closed: show All to read them." : "") +
+          (r.setAside ? " This review is set aside, so it does not count towards the warnings." : "") +
           (r.renamedFrom ? " This file was " + r.renamedFrom + "'s and is now saved as " + r.reviewer + "." : ""));
       }
     });

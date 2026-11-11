@@ -5,11 +5,12 @@
 <pre id="out">running...</pre>
 <!--
   Accept in the risk tool, on real packs and real Word output: a suggestion on a
-  section's heading or opening wording goes into that report's overrides (a
-  comment's documentIndex says which), the Word document is rebuilt to confirm it,
-  and it is undone if the words are not there. Everything else is Copy and Go to
-  with the reason. Go to reaches the section on the Report page, and a pack reflects
-  renamed and hidden sections with their keys.
+  section's heading goes into that report's title override and one on a paragraph
+  of its opening replaces that paragraph only (a comment's documentIndex says which
+  report), the Word document is rebuilt to confirm it, and it is undone if the words
+  are not there. test-risk-para.html goes through the paragraph replacement. Everything else is Copy and Go to
+  with the reason. Go to reaches the section on the Report page.
+  test-risk-accept2.html has the pack, so each page fits the runner's time budget.
   Needs allow-file-access-from-files (tools/run-tests.ps1 passes it).
 -->
 <iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
@@ -70,7 +71,7 @@
         var lead = para(d0, "why-this-assessment");
         var t2 = thread(0, lead, lead.text + " Reviewed.");
         p = RR.acceptPlan(t2);
-        ok(p.can && p.kind === "section opening", "a paragraph of a section's opening can be accepted into its wording", p.why);
+        ok(p.can && p.kind === "paragraph", "a paragraph of a section's opening can be accepted, as that paragraph alone", p.why);
         var cell = d0.blocks.filter(function (b) { return b.type === "table" && b.sectionKey === "high-level-risk-ranking-4-2"; })[0];
         p = RR.acceptPlan(thread(0, cell, "Other words", cell.rows[1].cells[0].text));
         ok(!p.can && /written from the zones and threats/.test(p.why), "a table cell is Copy, with the reason", p.why);
@@ -86,7 +87,7 @@
         ok(!p.can && /built from a zone's name/.test(p.why), "a per-zone heading is refused for one zone", p.why);
         var jp = para(d0, "justification-for");
         p = RR.acceptPlan(thread(0, jp, jp.text + " Changed."));
-        ok(!p.can && /Each zone and conduit has its own wording in this section, and a rewrite here would replace all of them/.test(p.why), "and a per-zone opening, saying why", p.why);
+        ok(p.can && p.kind === "paragraph", "but that zone's own paragraph under it can be accepted: only it is replaced", p.why);
         var sg = d0.blocks.filter(function (b) { return b.sectionKey === "sign-off" && b.type !== "heading"; })[0];
         p = RR.acceptPlan(thread(0, sg, "Signed off by someone else"));
         ok(!p.can, "sign-off is not offered", p.why);
@@ -120,8 +121,8 @@
         ok(!!lead && lead.text !== para(again[0], "why-this-assessment").text, "the two reports' Why this assessment really differ");
         var t = thread(1, lead, lead.text + " Reviewed for the board.");
         return accept(t).then(function (res) {
-          ok(res.ok && /section opening/.test(res.message), "Accept on the high-level report's opening works", res.message);
-          ok(!!RP.sectionOf("highLevel", "why-this-assessment").prose && !RP.sectionOf("detailed", "why-this-assessment").prose, "into that report alone");
+          ok(res.ok && /Accepted into the paragraph/.test(res.message), "Accept on the high-level report's opening works", res.message);
+          ok(RS.paragraphsOf(RP.sectionOf("highLevel", "why-this-assessment")).length === 1 && !RP.sectionOf("highLevel", "why-this-assessment").prose && !Object.keys(RP.sectionOf("detailed", "why-this-assessment")).length, "into that report alone, as one paragraph and not a rewrite of the opening");
           return Promise.all([xml({}), xml({ highLevelOnly: true })]);
         });
       }).then(function (both) {
@@ -184,8 +185,8 @@
         btn.click();
         return poll(function () { return main.querySelector(".rv-notice.ok"); });
       }).then(function (note) {
-        ok(/Accepted into the section opening/.test(note.textContent), "Accept from the comments list works", note.textContent);
-        ok(RP.sectionOf("detailed", "why-this-assessment").prose.indexOf(" Through the list.") !== -1, "and the wording is stored");
+        ok(/Accepted into the paragraph/.test(note.textContent), "Accept from the comments list works", note.textContent);
+        ok(RS.paragraphsOf(RP.sectionOf("detailed", "why-this-assessment"))[0].to.indexOf(" Through the list.") !== -1, "and the wording is stored");
         var th = RR.store().threads.filter(function (t) { return t.comment.id === "list-a"; })[0];
         ok(th.status === "resolved" && th.accepted, "resolved, with the acceptance recorded");
         // ---- Go to ---------------------------------------------------------------------------------
@@ -210,24 +211,6 @@
       }).then(function () {
         var hit = main.querySelector(".card.check-flash");
         ok(!!hit && hit.getAttribute("data-section") === "where-to-look-first", "to its section");
-        // ---- a pack reflects the overrides -------------------------------------------------------------
-        reset();
-        RP.setSection("detailed", "method-and-limitations", { title: "How this was done" });
-        RP.setSection("detailed", "basis-of-assessment", { hidden: true });
-        RP.setSection("highLevel", "executive-summary", { title: "Board summary" });
-        return RR.buildPack();
-      }).then(function (r) {
-        var d0 = r.pack.documents[0], d1 = r.pack.documents[1];
-        var ren = d0.blocks.filter(function (b) { return b.type === "heading" && b.text === "How this was done"; })[0];
-        ok(!!ren && ren.sectionKey === "method-and-limitations" && ren.sectionTitle === "How this was done", "a pack prints the new title, under the section's own key", ren && ren.sectionKey);
-        ok(d0.blocks.filter(function (b) { return b.sectionKey === "method-and-limitations" && b.type === "paragraph"; }).length === 2, "with its body under it");
-        ok(!d0.blocks.some(function (b) { return b.sectionKey === "basis-of-assessment"; }), "a hidden section is not in the pack");
-        ok(d1.blocks.some(function (b) { return b.sectionKey === "basis-of-assessment"; }), "but is still in the other report's");
-        ok(d1.blocks.some(function (b) { return b.type === "heading" && b.text === "Board summary" && b.sectionKey === "executive-summary"; }), "and that report's own rename is in it");
-        ok(d0.blocks.some(function (b) { return b.type === "heading" && b.text === "Executive summary"; }), "not this one's");
-        var hs = d0.blocks.filter(function (b) { return b.type === "heading"; });
-        ok(hs.every(function (b) { return !b.sub; }), "every heading matched the build's list of sections");
-        ok(hs.filter(function (b) { return !b.sectionKey; }).every(function (b) { return /^[ZC]\d+: /.test(b.text); }) && hs.filter(function (b) { return !b.sectionKey; }).length === P().zones.length + P().conduits.length, "only a zone's or conduit's own heading has no key");
         reset();
       });
     }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {

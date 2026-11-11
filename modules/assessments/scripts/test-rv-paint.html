@@ -1,0 +1,108 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: drawing a long comments list</title></head>
+<body>
+<!--
+  The comments list is drawn again after every click on it. Each card asks
+  whether its comment still matches the report and whether its wording can be
+  accepted, and both answers used to be worked out from scratch per card: the
+  whole assessment turned to text for the signature, every piece of text in the
+  documents gathered again, every answer looped over. With 200 open comments on
+  the NIST SP 800-53 demo that was seconds per click.
+  One drawing now works each of those out once (js/review.js keeps them between
+  review-author's beginPaint and endPaint). This page draws 200 open comments
+  and counts how often each was really worked out, which is what would catch a
+  return to once per card; the time is noted, not asserted, as it depends on
+  the machine. It also checks that nothing is kept from one drawing to the
+  next, so an edit between two drawings is seen.
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, RV = A.Review, RC = A.ReviewCore, RA = A.ReviewAuthor;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var SEED = H.demoSeeds();
+  E.on("instrument-changed", function (inst) { var m = inst && SEED[inst.id]; if (m && m.apply && !m.__busy) { m.__busy = true; try { m.apply(E); } finally { m.__busy = false; } } });
+  function docs() { return new Promise(function (res, rej) { RV.currentDocs(function (e, d) { if (e) rej(e); else res(d); }); }); }
+  var N = 200, seq = 0;
+  function thread(anchor, suggestion) {
+    return { comment: { id: "c-paint-" + (++seq), reviewer: seq % 2 ? "J. Marsh" : "R. Okafor", createdAt: "2026-11-01T10:00:00Z", updatedAt: "2026-11-01T10:00:00Z", severity: ["must-fix", "should-fix", "suggestion"][seq % 3],
+        anchor: anchor, text: "Reword this.", suggestion: suggestion, relatesTo: null, check: null },
+      round: 1, savedAt: "2026-11-01T10:00:00Z", fileId: "f1", status: "open", reason: "", replies: [], confirmedBy: [] };
+  }
+  function zero() { Object.keys(RV.__counts).forEach(function (k) { RV.__counts[k] = 0; }); }
+
+  E.activateInstrument("nist-800-53");
+  docs().then(function (d) {
+    var s = RV.ensureStore();
+    s.rounds.push({ round: 1, packId: "rp-paint", createdAt: new Date().toISOString(), documents: d.map(function (x) { return { title: x.title, targetName: x.targetName, contentHash: x.contentHash }; }) });
+    // Comments as a thorough review leaves them: on paragraphs and table cells
+    // all through the report, each with suggested wording, and on items.
+    var spots = [];
+    d[0].blocks.forEach(function (b) {
+      if (b.front || !b.sectionKey) return;
+      if (b.type === "paragraph" && b.text && b.text.length > 30) spots.push({ b: b, quote: b.text, cell: null });
+      if (b.type === "table") b.rows.forEach(function (r, ri) { if (ri > 0 && ri % 7 === 0 && r.cells[1] && r.cells[1].text) spots.push({ b: b, quote: r.cells[1].text, cell: { row: ri, col: 1 } }); });
+    });
+    var step = Math.max(1, Math.floor(spots.length / 130));
+    for (var i = 0; i < spots.length && s.threads.length < 130; i += step) {
+      var sp = spots[i];
+      s.threads.push(thread({ documentIndex: 0, documentTitle: d[0].title, kind: "block", sectionKey: sp.b.sectionKey, sectionTitle: sp.b.sectionTitle, blockId: sp.b.id, blockType: sp.b.type,
+        quote: sp.quote, cell: sp.cell, targetName: "", itemId: "", field: "" }, sp.quote + " And a further clause."));
+    }
+    var items = RV.packItems().items.filter(function (it) { return it.evidence; });
+    for (var k = 0; k < items.length && s.threads.length < N; k++) {
+      var it = items[k];
+      s.threads.push(thread({ documentIndex: 0, kind: "item", targetName: it.targetName, targetId: it.targetId, itemId: it.itemId, field: "evidence", quote: it.evidence, code: it.code, itemTitle: it.title, groupName: it.groupName },
+        it.evidence + " Checked."));
+    }
+    ok(s.threads.length === N, "the review holds " + N + " open comments, on the report's text and on items (" + s.threads.filter(function (t) { return t.comment.anchor.kind === "block"; }).length + " on text)");
+    ok(!!RV.cachedDocs(), "and the current report has been read");
+
+    var holder = document.createElement("div"); document.body.appendChild(holder);
+    var ui = RA.newUi();
+    // A first drawing, so that what is kept with the documents (their texts)
+    // is there, as it is from the second click on.
+    RA.mount(holder, RV.__adapter(holder), ui);
+    ok(holder.querySelectorAll(".rv-comment").length === N, "the list draws a card for each");
+    ok(holder.querySelectorAll(".rv-accept").length + holder.querySelectorAll(".rv-copy").length === N, "each offering Accept or Copy for its wording (" + holder.querySelectorAll(".rv-accept").length + " Accept)");
+    ok(!holder.querySelector(".rv-stale"), "and none marked as no longer matching");
+
+    zero();
+    var t0 = performance.now();
+    RA.mount(holder, RV.__adapter(holder), ui);
+    var ms = Math.round(performance.now() - t0), c = JSON.parse(JSON.stringify(RV.__counts));
+    ok.note("A repaint with " + N + " open comments took " + ms + " ms (signature " + c.signature + ", document texts " + c.texts + ", item fields " + c.fields + ", resolved answers " + c.resolved + ").");
+    ok(c.signature === 1, "one drawing works the signature out once, not once or twice per card", JSON.stringify(c));
+    ok(c.texts === 0, "the documents' texts are kept with the documents, not gathered again", JSON.stringify(c));
+    ok(c.fields <= 1, "the filled item fields are gathered once", JSON.stringify(c));
+    ok(c.resolved <= E.state.engagement.targets.length, "and each target's answers are resolved once", JSON.stringify(c));
+
+    // The counters count: outside a drawing, every question is answered afresh.
+    zero();
+    s.threads.slice(0, 20).forEach(function (t) { RV.isStale(t); RV.acceptPlan(t); });
+    ok(RV.__counts.signature >= 20, "outside a drawing nothing is kept, so 20 comments asked one by one work the signature out at least 20 times", JSON.stringify(RV.__counts));
+
+    // Nothing is carried from one drawing to the next: an edit in between is seen.
+    var itemThread = s.threads.filter(function (t) { return t.comment.anchor.kind === "item"; })[0], a = itemThread.comment.anchor;
+    E.setResponse(a.targetId, a.itemId, { evidence: a.quote + " Edited since the review." });
+    zero();
+    RA.mount(holder, RV.__adapter(holder), ui);
+    var card = holder.querySelector('[data-comment-id="' + itemThread.comment.id + '"]');
+    ok(!!card && !!card.querySelector(".rv-stale") && !card.querySelector(".rv-accept"), "after an edit, the next drawing marks that comment as no longer matching and offers Copy");
+    ok(RV.__counts.signature === 1, "still working the signature out once", JSON.stringify(RV.__counts));
+    ok(RV.cachedDocs() === null, "and the cached read of the report is seen to be out of date");
+    // A drawing that throws must not leave the tool keeping stale answers.
+    var bad = RV.__adapter(holder); bad.store = function () { throw new Error("no store"); };
+    var threw = false;
+    try { RA.mount(holder, bad, ui); } catch (e) { threw = true; }
+    zero();
+    RV.isStale(itemThread); RV.isStale(itemThread);
+    ok(threw && RV.__counts.resolved === 2, "a drawing that fails still ends, so nothing is kept after it", JSON.stringify(RV.__counts));
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
+});
+</script>
+</body></html>

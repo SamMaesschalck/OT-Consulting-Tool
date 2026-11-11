@@ -12,6 +12,10 @@
   must land somewhere, and so must every paragraph or table row that opens with
   an item's code. Only text written from the framework may say it is only in
   the Word report, and then it names the section.
+  A comment's block id and document index are positions, which move as the
+  report is edited: Go to finds the document by its title and the block by its
+  wording within its section (a table cell by the row and column headings the
+  review tool notes), and uses the positions only when those find nothing.
 -->
 <script src="harness.js"></script>
 <script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
@@ -89,6 +93,85 @@ H.test(function (ok, done) {
       summary.push(id + " " + landed + "/" + tried + " (only in Word: " + nowhere.join(" | ") + ")");
     }).catch(function (e) { ok(false, id + ": threw " + (e && e.message) + " " + (e && e.stack)); });
   });
+  // ---- after the report has been edited: positions have moved ------------------------
+  var mv = {};
+  function docsNow() { return new Promise(function (res, rej) { RV.currentDocs(function (e, d) { if (e) rej(e); else res(d); }); }); }
+  chain = chain.then(function () {
+    E.activateInstrument("ncsc-caf");
+    A.UI.go("report");
+    return docsNow();
+  }).then(function (d) {
+    var catalog = A.Compare.catalogFor(E.state.instrument, E.state.scoringFamily);
+    var have = {}; A.UI.__review.sectionKeys().forEach(function (k) { have[k] = true; });
+    // A cell of a row that opens with an item's code, in a section with no
+    // card of its own, some way down the document.
+    // A cell that is an item's code, or opens with it.
+    function cellItem(text) {
+      var s = RC.norm(text);
+      return catalog.filter(function (c) { return RC.norm(c.code || c.id) === s; })[0] || opensWithCode(s, catalog);
+    }
+    function rowItem(r) {
+      var item = null;
+      r.cells.forEach(function (c) { item = item || cellItem(c.text); });
+      return item;
+    }
+    var pick = null;
+    d[0].blocks.forEach(function (b) {
+      if (pick || b.type !== "table" || have[b.sectionKey] || b.rows.length < 4) return;
+      b.rows.forEach(function (r, ri) {
+        if (pick || ri < 2) return;
+        var item = rowItem(r);
+        if (!item) return;
+        r.cells.forEach(function (c, ci) {
+          if (!pick && c.text && !cellItem(c.text) && b.rows.filter(function (x) { return x.cells[ci] && x.cells[ci].text === c.text; }).length > 1) pick = { b: b, row: ri, col: ci, item: item, text: c.text };
+        });
+      });
+    });
+    ok(!!pick, "there is a table whose rows name an item by its code and repeat a value down a column (" + (pick && pick.b.sectionKey) + ")");
+    mv.pick = pick;
+    mv.anchor = { documentIndex: 0, documentTitle: d[0].title, kind: "block", sectionKey: pick.b.sectionKey, sectionTitle: pick.b.sectionTitle, blockId: pick.b.id, blockType: "table",
+      quote: pick.text, cell: { row: pick.row, col: pick.col }, rowKey: pick.b.rows[pick.row].cells[0].text, colHead: pick.b.rows[0].cells[pick.col].text, targetName: "", itemId: "", field: "" };
+    ok(RV.goTo(thread(mv.anchor)) === "item:" + pick.item.id, "Go to on that cell reaches the row's item");
+    closeModals();
+    // The same value sits in other rows: the row heading the review tool noted
+    // says which, even when the row number it saved is another row's.
+    var otherRow = -1;
+    pick.b.rows.forEach(function (r, ri) {
+      if (otherRow === -1 && ri > 0 && ri !== pick.row && r.cells[pick.col] && r.cells[pick.col].text === pick.text && rowItem(r) && rowItem(r).id !== pick.item.id &&
+          r.cells[0].text !== pick.b.rows[pick.row].cells[0].text) otherRow = ri;
+    });
+    ok(otherRow !== -1, "another row of it holds the same value under another row heading");
+    if (otherRow !== -1) {
+      var moved = Object.assign({}, mv.anchor, { cell: { row: otherRow, col: pick.col } });
+      ok(RV.goTo(thread(moved)) === "item:" + pick.item.id, "with rows added above it, the cell is found by its row heading, not its row number");
+      closeModals();
+      var bare = Object.assign({}, moved); delete bare.rowKey; delete bare.colHead;
+      ok(RV.goTo(thread(bare)) === "item:" + rowItem(pick.b.rows[otherRow]).id, "a comment from before row headings were noted still goes by its row number");
+      closeModals();
+    }
+    // Edits above the table: more paragraphs in the summary, a basis register,
+    // a section hidden. Every block id after them moves.
+    E.setReportNarrative({ regulatoryExposure: "First line of the exposure note.\nSecond line of it.\nThird line of it.", topPriorities: "Priority one for the client.\nPriority two.\nPriority three.\nPriority four." });
+    var bb = E.getBasisOfAssessment();
+    bb.interviews.push({ name: "A. Person", role: "Engineer", date: "2026-10-01" }, { name: "C. Person", role: "Manager", date: "2026-10-02" });
+    bb.documents.push({ title: "Network drawing", reference: "ND-1", date: "" }); E.touchBasisOfAssessment();
+    var hide = d[0].probe.filter(function (p) { return p.key && p.level === 1 && p.key !== pick.b.sectionKey && !/executive|document-control/.test(p.key); })[0];
+    E.setReportSection(hide.key, { hidden: true });
+    mv.hidden = hide.key;
+    return docsNow();
+  }).then(function (d) {
+    var now = d[0].blocks.filter(function (b) { return b.id === mv.pick.b.id; })[0];
+    ok(!now || now.sectionKey !== mv.pick.b.sectionKey, "after edits above it, the comment's block id is another block (" + (now ? now.type + " in " + now.sectionKey : "gone") + ")");
+    ok(RV.isStale(thread(mv.anchor)) === false, "the comment still matches the report");
+    toasts = [];
+    ok(RV.goTo(thread(mv.anchor)) === "item:" + mv.pick.item.id, "and Go to still reaches the row's item", toasts.join(" "));
+    closeModals();
+    // A second site: the first site's document may no longer be first.
+    var wrongIndex = Object.assign({}, mv.anchor, { documentIndex: 5 });
+    ok(RV.goTo(thread(wrongIndex)) === "item:" + mv.pick.item.id, "a document is found by its title when its place among the documents has changed");
+    closeModals();
+    E.clearReportSection(mv.hidden);
+  }).catch(function (e) { ok(false, "positions: threw " + (e && e.message) + " " + (e && e.stack)); });
   chain.then(function () {
     ok(true, "sections that land, per demo: " + summary.join("; "));
   }).then(done);

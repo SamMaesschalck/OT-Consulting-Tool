@@ -1,0 +1,265 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: a large report is not drawn again for each click</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  A pack of 1,600 blocks (tables and pictures among them), 300 items, 150
+  comments and earlier comments. For each thing a reviewer does on the Report
+  and Engagement pages, the report's own elements must be the same objects
+  afterwards (a paragraph far from the action, a picture, the paper itself),
+  only a handful of elements may be made, and the scroll position and a
+  selection must stay where they were. A return to drawing the whole page for
+  a click fails every one of these.
+  No times are asserted: the runner's clock is virtual.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  var errors = [], downloads = [];
+  function load(q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.HTMLAnchorElement.prototype.click = function () { if (this.download) downloads.push(this.download); };
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () { res(w); });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+
+  // ---- the pack ----
+  var PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  var WORDS = "the site operates a segmented control network with a firewall between the business systems and the process control domain and remote access is brokered through a jump host that is patched monthly".split(" ");
+  function sentence(n, seed) { var o = []; for (var i = 0; i < n; i++) o.push(WORDS[(i * 7 + seed * 13) % WORDS.length]); return o.join(" "); }
+  function bigPack(nBlocks, nItems) {
+    function para(id, text, sec) { return { id: id, type: "paragraph", text: text, runs: [{ t: text }], red: false, front: false, sectionKey: sec, sectionTitle: sec }; }
+    function cellOf(t) { return { blocks: [{ type: "paragraph", text: t, runs: [{ t: t }], red: false }], text: t, red: false, fill: "" }; }
+    var blocks = [], n = 0, sec = "s0", secN = 0;
+    while (blocks.length < nBlocks) {
+      n++;
+      var id = "d0-b" + n;
+      if (n % 25 === 1) { secN++; sec = "s" + secN; blocks.push({ id: id, type: "heading", level: 1, text: secN + " Section " + secN, runs: [{ t: secN + " " }, { t: "Section " + secN }], red: false, front: false, sectionKey: sec, sectionTitle: "Section " + secN }); }
+      else if (n % 25 === 10) {
+        var rows = [];
+        for (var r = 0; r < 12; r++) rows.push({ cells: ["SR " + r + "." + n, sentence(6, r + n), "Partially achieved", sentence(8, r)].map(cellOf) });
+        blocks.push({ id: id, type: "table", text: rows.map(function (x) { return x.cells.map(function (c) { return c.text; }).join(" "); }).join(" "), red: false, front: false, sectionKey: sec, sectionTitle: sec, rows: rows });
+      } else if (n % 50 === 20) blocks.push({ id: id, type: "image", media: "m1", width: 300, height: 200, front: false, sectionKey: sec, sectionTitle: sec });
+      else blocks.push(para(id, "Example Water Ltd, paragraph " + n + ". " + sentence(40, n), sec));
+    }
+    var items = [];
+    for (var i = 0; i < nItems; i++) items.push({ targetName: "Works 1", itemId: "i" + i, code: "A" + i, title: sentence(6, i), groupName: "Group " + (i % 10), answer: "Partially achieved", expected: "Achieved", evidence: sentence(12, i), notes: "", owner: "", action: sentence(8, i), impact: "", priority: "High", status: "finding" });
+    var prev = [];
+    for (var k = 0; k < 20; k++) {
+      var pb = blocks[30 + k * 60]; if (pb.type !== "paragraph") pb = blocks[31 + k * 60];
+      prev.push({ comment: { id: "pc" + k, reviewer: "P. Earlier", severity: "should-fix", anchor: { documentIndex: 0, documentTitle: "Works 1", kind: "block", sectionKey: pb.sectionKey, sectionTitle: pb.sectionKey, blockId: pb.id, blockType: "paragraph", quote: pb.text }, text: "Earlier point " + k, suggestion: null }, status: k % 2 ? "resolved" : "wontchange", reason: "As agreed.", round: 1, replies: [], confirmedBy: [] });
+    }
+    return { schema: "spt-review-pack/1.0", packId: "rp-speed", reviewId: "rv-speed", round: 2, createdAt: "2026-11-01T10:00:00Z", sourceTool: { product: "OT Cyber Assessment Tool", version: "0.6.0" },
+      engagement: { client: "Example Water Ltd", site: "Works 1", consultant: "A. Author", instrumentId: "ncsc-caf", instrumentTitle: "NCSC CAF", scoringFamily: "caf-achieved", targetLabel: "Site", documentControl: {} },
+      documents: [{ title: "Works 1", targetName: "Works 1", contentHash: "h", media: { m1: PNG }, blocks: blocks }], items: items, basisOfAssessment: { interviews: [], documents: [], observations: [] },
+      facts: { perTarget: [] }, previousRound: { comments: prev, verdicts: [] } };
+  }
+
+  try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); localStorage.setItem("spt-review:reviewer:v1", "S. Peed"); } catch (e) {}
+
+  load("").then(function (w) {
+    var d = w.document, R = w.ReviewTool, main = d.getElementById("main");
+    var pack = bigPack(1600, 300), blocks = pack.documents[0].blocks;
+    R.loadTexts([{ name: "speed.json", text: JSON.stringify(pack) }]);
+    ok(R.state.pack && d.querySelectorAll("#rr-paper .rr-block").length === 1600, "a pack of 1,600 blocks opens, all of it drawn", String(d.querySelectorAll("#rr-paper .rr-block").length));
+    // 150 comments: on blocks all through the report, and on items.
+    for (var c = 0; c < 150; c++) {
+      if (c % 5 === 4) { var it = R.state.pack.items[(c * 7) % 300]; R.addComment({ severity: "should-fix", anchor: { documentIndex: 0, documentTitle: "Works 1", kind: "item", sectionKey: "", sectionTitle: "", blockId: "", quote: "", cell: null, targetName: it.targetName, targetId: "", itemId: it.itemId, field: "", code: it.code }, text: "Item comment " + c }); continue; }
+      var b = blocks[(c * 11 + 5) % blocks.length];
+      R.addComment({ severity: c % 4 ? "should-fix" : "must-fix", anchor: { documentIndex: 0, documentTitle: "Works 1", kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionKey, blockId: b.id, blockType: b.type, quote: b.type === "image" ? "" : b.text, cell: null, targetName: "Works 1", targetId: "", itemId: "", field: "" }, text: "Comment " + c });
+    }
+    R.render(true);
+    function q(s) { return d.querySelector(s); }
+    function block(id) { return q('#rr-paper [data-block-id="' + id + '"]'); }
+    function type(el, v) { el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    ok(d.querySelectorAll("#rr-paper [data-comment-id]").length === 120 && d.querySelectorAll("#rr-paper [data-prev-id]").length === 20, "with its 120 comments and 20 earlier comments beside their blocks", d.querySelectorAll("#rr-paper [data-comment-id]").length + " / " + d.querySelectorAll("#rr-paper [data-prev-id]").length);
+    ok(q(".rr-outline-item .n") && /\(\d+\)/.test(q("#rr-jump").textContent), "and the outline and the Go to section list count them");
+
+    // ---- the Report page: nothing far from the click is made again ----
+    var paper = q("#rr-paper"), far = block("d0-b40"), farTable = block("d0-b60"), img = q("#rr-paper img"), headEl = block("d0-b1").firstChild;
+    far.rrMark = img.rrMark = farTable.rrMark = paper.rrMark = headEl.rrMark = 1;
+    var HERE = "d0-b1203", THERE = "d0-b1204";   // two plain paragraphs deep in the report
+    block(HERE).scrollIntoView({ block: "center" });
+    // A selection in a paragraph in view, which a redraw would drop.
+    var selNode = block("d0-b1202").querySelector("p").firstChild, range = d.createRange();
+    range.setStart(selNode, 3); range.setEnd(selNode, 15);
+    var made = 0, realCreate = d.createElement;
+    d.createElement = function () { made++; return realCreate.apply(d, arguments); };
+    var CEILING = 150, worst = 0;
+    function act(name, fn, opts) {
+      opts = opts || {};
+      var top = main.scrollTop, before;
+      if (opts.selection) { w.getSelection().removeAllRanges(); w.getSelection().addRange(range); before = String(w.getSelection()); }
+      made = 0;
+      fn();
+      var n = made, why = [];
+      worst = Math.max(worst, n);
+      if (q("#rr-paper") !== paper || !paper.rrMark) why.push("the paper is a new element");
+      if (block("d0-b40") !== far || !far.isConnected) why.push("a far paragraph is a new element");
+      if (block("d0-b60") !== farTable || !farTable.isConnected) why.push("a far table is a new element");
+      if (q("#rr-paper img") !== img || !img.isConnected) why.push("a picture is a new element");
+      if (block("d0-b1").firstChild !== headEl) why.push("a heading is a new element");
+      if (n > CEILING) why.push(n + " elements made");
+      if (!opts.scrolls && Math.abs(main.scrollTop - top) > 1) why.push("the page scrolled from " + top + " to " + main.scrollTop);
+      if (opts.selection && String(w.getSelection()) !== before) why.push("the selection went");
+      ok(!why.length, name + " draws only what it changes (" + n + " elements made)", why.join("; "));
+    }
+    act("opening the comment box", function () { block(HERE).click(); });
+    ok(R.state.composer && R.state.composer.anchor.blockId === HERE && q(".rr-composer") && block(HERE).nextSibling === q(".rr-composer") && block(HERE).classList.contains("open"), "the box opens under its paragraph");
+    act("moving the box to another paragraph", function () { block(THERE).click(); });
+    ok(R.state.composer.anchor.blockId === THERE && !block(HERE).classList.contains("open") && d.querySelectorAll(".rr-composer").length === 1, "one box, under the new paragraph");
+    act("closing the box with a second click", function () { block(THERE).click(); });
+    ok(!R.state.composer && !q(".rr-composer"), "it closes");
+    act("opening it again", function () { block(HERE).click(); });
+    act("changing the severity", function () { q('.rr-composer [data-severity="must-fix"]').click(); });
+    act("ticking Suggest wording", function () { var s = q(".rr-c-suggest"); s.checked = true; s.dispatchEvent(new w.Event("change", { bubbles: true })); });
+    ok(q(".rr-c-sug") && q(".rr-c-sug").value === blocks[1202].text && R.state.composer.severity === "must-fix" && q('.rr-composer [data-severity="must-fix"]').classList.contains("on"), "the suggestion box appears, starting from the paragraph, and the severity is kept");
+    act("unticking it", function () { var s = q(".rr-c-suggest"); s.checked = false; s.dispatchEvent(new w.Event("change", { bubbles: true })); });
+    act("typing", function () { type(q(".rr-c-text"), "A point on a paragraph deep in the report."); });
+    act("a click elsewhere while writing (refused)", function () { block(THERE).click(); }, { scrolls: true });
+    ok(R.state.composer.anchor.blockId === HERE && /Add or cancel the comment/.test(q("#toast").textContent), "the draft guard still holds");
+    var badge = function () { return q('.nav-item[data-page="report"] .badge').textContent; };
+    act("Add comment", function () { q(".rr-c-add").click(); });
+    var mine = R.state.review.comments[R.state.review.comments.length - 1];
+    ok(mine.anchor.blockId === HERE && mine.severity === "must-fix" && block(HERE).classList.contains("has-must") && q('[data-comment-id="' + mine.id + '"]') && !q(".rr-composer"), "the comment is beside its paragraph, marked must fix");
+    ok(badge() === "121" && /\(\d+\)/.test(q('#rr-jump option[value="d0-b1201"]').textContent) && q('.rr-outline-item[data-section-block="d0-b1201"] .n'), "and the sidebar, the outline and the Go to section list count it", badge());
+    act("Edit", function () { q('[data-comment-id="' + mine.id + '"] .rr-edit').click(); });
+    ok(R.state.composer && R.state.composer.editing === mine.id && q(".rr-c-text").value === mine.text, "Edit opens the comment where it is");
+    type(q(".rr-c-text"), mine.text + " More.");
+    act("a click on another paragraph while editing (refused)", function () { block(THERE).click(); }, { scrolls: true });
+    ok(R.state.composer && R.state.composer.editing === mine.id && q(".rr-c-text").value === mine.text + " More.", "an edit with a change in it stays on its own block");
+    act("Cancel", function () { q(".rr-c-cancel").click(); });
+    act("Delete", function () { q('[data-comment-id="' + mine.id + '"] .rr-del').click(); }, { selection: true });
+    ok(R.state.review.comments.indexOf(mine) === -1 && !q('[data-comment-id="' + mine.id + '"]') && !block(HERE).classList.contains("has-comment") && badge() === "120", "Delete takes it off the page and the counts");
+    act("Undo", function () { q("#toast .rr-toast-act").click(); });
+    ok(R.state.review.comments.indexOf(mine) !== -1 && q('[data-comment-id="' + mine.id + '"]') && badge() === "121", "Undo puts it back");
+    // earlier comments beside the report
+    var p0 = "pc10", prevBlock = d.querySelector('#rr-paper [data-prev-id="' + p0 + '"]');
+    prevBlock.scrollIntoView({ block: "center" });
+    block(HERE).rrMark = 1;
+    function pv(sel) { return q('#rr-paper [data-prev-id="' + p0 + '"] ' + sel); }
+    act("Accept the reason", function () { pv(".rr-confirm").click(); }, { selection: true });
+    ok(R.state.review.confirmations.length === 1 && /Take back/.test(pv(".rr-confirm").textContent) && /You accepted the reason/.test(q('#rr-paper [data-prev-id="' + p0 + '"]').textContent) && !pv(".rr-raise") && q('.nav-item[data-page="previous"] .badge').textContent === "1/20", "the earlier comment says so, and the sidebar counts it", q('.nav-item[data-page="previous"] .badge').textContent);
+    act("Take back", function () { pv(".rr-confirm").click(); });
+    act("Reply", function () { pv(".rr-reply").click(); });
+    ok(q(".rr-reply-box textarea"), "the reply box opens in the thread");
+    type(q(".rr-reply-box textarea"), "Thanks, seen.");
+    act("Add reply", function () { q(".rr-reply-add").click(); });
+    ok(R.state.review.replies.length === 1 && /Thanks, seen\./.test(q('#rr-paper [data-prev-id="' + p0 + '"]').textContent) && /You replied/.test(q('#rr-paper [data-prev-id="' + p0 + '"]').textContent), "the reply shows under it");
+    act("deleting the reply", function () { q(".rr-reply-del").click(); });
+    act("Undo for the reply", function () { q("#toast .rr-toast-act").click(); });
+    ok(R.state.review.replies.length === 1 && q("[data-reply-id]"), "and comes back");
+    act("Raise it again", function () { pv(".rr-raise").click(); });
+    ok(R.state.composer && R.state.composer.relatesTo === p0 && q("#rr-paper .rr-composer") && /Raising again/.test(q(".rr-composer").textContent), "the point is raised on its paragraph");
+    type(q(".rr-c-text"), "Still not right.");
+    act("adding the point raised again", function () { q(".rr-c-add").click(); });
+    ok(/You raised this again/.test(q('#rr-paper [data-prev-id="' + p0 + '"]').textContent) && !pv(".rr-confirm") && d.querySelectorAll("#rr-paper .rr-chip").length > 0 && q('.nav-item[data-page="previous"] .badge').textContent === "1/20", "the earlier comment says it was raised again, and can no longer be confirmed");
+    // reading and finding
+    act("ticking a section read", function () { var t = q('.rr-read[data-read-block="d0-b26"]'); t.checked = true; t.dispatchEvent(new w.Event("change", { bubbles: true })); }, { selection: true });
+    ok(/1 of 64 read/.test(q(".rr-outline .nav-section-title").textContent) && q('.rr-read[data-read-block="d0-b26"]').parentNode.classList.contains("read") && / ✓$/.test(q('#rr-jump option[value="d0-b26"]').textContent), "the outline and the Go to section list show it", q(".rr-outline .nav-section-title").textContent);
+    var marksBefore = d.querySelectorAll("mark.rr-find").length;
+    q("#rr-report-find").value = "firewall";
+    q("#rr-report-find").dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    var found = d.querySelectorAll("mark.rr-find").length;
+    ok(marksBefore === 0 && found > 1000 && /^1 of \d+$/.test(q("#rr-find-count").textContent), "find marks every match in the report (" + found + ")", q("#rr-find-count").textContent);
+    act("find next", function () { q("#rr-find-next").click(); }, { scrolls: true });
+    act("find previous", function () { q("#rr-find-prev").click(); }, { scrolls: true });
+    ok(q("mark.rr-find.cur") === d.querySelectorAll("mark.rr-find")[0] && /^1 of/.test(q("#rr-find-count").textContent), "and Next and Previous move between them");
+    act("a comment while the find is on", function () { block(THERE).click(); type(q(".rr-c-text"), "With the find on."); q(".rr-c-add").click(); }, { scrolls: true });
+    ok(d.querySelectorAll("mark.rr-find").length === found, "the find marks are still there afterwards");
+    q("#rr-report-find").dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    ok(d.querySelectorAll("mark.rr-find").length === 0, "Escape clears them");
+    act("Go to a block in the report that is open", function () { R.jumpToBlock(0, "d0-b900"); }, { scrolls: true });
+    ok(block("d0-b900").classList.contains("flash") && d.activeElement === block("d0-b900"), "it is scrolled to, flashed and given the keyboard");
+    act("Go to section", function () { q('.rr-outline-item[data-section-block="d0-b1201"]').click(); }, { scrolls: true });
+    w.showSaveFilePicker = undefined;   // so the save is a download, made at once
+    act("saving the review file", function () { R.saveReview(); });
+    ok(downloads.length === 1 && !R.isDirty() && q("#btn-save").textContent === "Save", "the file is saved, and the Report page is left as it was", downloads.join());
+    d.createElement = realCreate;
+    ok(worst <= CEILING, "no action made more than " + CEILING + " elements (most: " + worst + ")");
+    // A whole-state change still draws the page: a new paper, by design.
+    R.render(true);
+    ok(q("#rr-paper") !== paper && d.querySelectorAll("#rr-paper .rr-block").length === 1600 && d.querySelectorAll("#rr-paper [data-comment-id]").length === 123, "a full draw (a file opened, a change of name) still makes the page afresh, with every comment", String(d.querySelectorAll("#rr-paper [data-comment-id]").length));
+
+    // ---- the Engagement page ----
+    q('.nav-item[data-page="engagement"]').click();
+    var cards = d.querySelectorAll(".rr-item");
+    ok(cards.length === 150 && /Showing 300 of 300/.test(q("#rr-item-count").textContent), "Engagement shows the first 150 of 300 items");
+    var farCard = cards[120], nearCard = cards[10], nearId = nearCard.getAttribute("data-item-id");
+    farCard.rrMark = 1;
+    nearCard.scrollIntoView({ block: "center" });
+    function card() { return Array.prototype.filter.call(d.querySelectorAll(".rr-item"), function (n) { return n.getAttribute("data-item-id") === nearId; })[0]; }
+    d.createElement = function () { made++; return realCreate.apply(d, arguments); };
+    worst = 0;
+    function actE(name, fn) {
+      var top = main.scrollTop;
+      made = 0; fn();
+      var n = made, why = [];
+      worst = Math.max(worst, n);
+      if (d.querySelectorAll(".rr-item")[120] !== farCard || !farCard.isConnected) why.push("a far card is a new element");
+      if (n > CEILING) why.push(n + " elements made");
+      if (Math.abs(main.scrollTop - top) > 1) why.push("the page scrolled from " + top + " to " + main.scrollTop);
+      ok(!why.length, "Engagement: " + name + " draws only its card (" + n + " elements made)", why.join("; "));
+    }
+    actE("Comment", function () { card().querySelector(".rr-item-comment").click(); });
+    ok(R.state.composer && R.state.composer.anchor.itemId === nearId && card().querySelector(".rr-composer"), "the box opens in the item's card");
+    actE("choosing a field to suggest wording for", function () { var s = q(".rr-c-field"); s.value = "evidence"; s.dispatchEvent(new w.Event("change", { bubbles: true })); });
+    ok(q(".rr-c-sug") && q(".rr-c-sug").value === R.state.pack.items[10].evidence, "the suggestion starts from the field");
+    type(q(".rr-c-text"), "On an item.");
+    var itemBadge = function () { return q('.nav-item[data-page="engagement"] .badge').textContent; };
+    actE("Add comment", function () { q(".rr-c-add").click(); });
+    var ic = R.state.review.comments[R.state.review.comments.length - 1];
+    ok(ic.anchor.kind === "item" && ic.anchor.field === "evidence" && card().querySelector('[data-comment-id="' + ic.id + '"]') && itemBadge() === "31", "the comment is in the card and the sidebar counts it", itemBadge());
+    actE("Edit", function () { card().querySelector(".rr-edit").click(); });
+    actE("Cancel", function () { q(".rr-c-cancel").click(); });
+    actE("Delete", function () { card().querySelector(".rr-del").click(); });
+    ok(!card().querySelector("[data-comment-id]") && itemBadge() === "30", "Delete takes it out of the card");
+    actE("Undo", function () { q("#toast .rr-toast-act").click(); });
+    ok(card().querySelector('[data-comment-id="' + ic.id + '"]') && itemBadge() === "31", "Undo puts it back");
+    actE("commenting on the basis of assessment", function () { q(".rr-basis-comment").click(); type(q(".rr-c-text"), "On the basis."); q(".rr-c-add").click(); });
+    ok(q("#rr-basis [data-comment-id]") && R.state.review.comments[R.state.review.comments.length - 1].anchor.sectionTitle === "Basis of assessment", "a comment on the basis shows in its card");
+    d.createElement = realCreate;
+    // the filter that depends on comments is still right after a delete
+    q('[data-filter="commented"]').click();
+    var withComments = d.querySelectorAll(".rr-item").length;
+    Array.prototype.filter.call(d.querySelectorAll(".rr-item"), function (n) { return n.getAttribute("data-item-id") === nearId; })[0].querySelector(".rr-del").click();
+    ok(d.querySelectorAll(".rr-item").length === withComments - 1 && new RegExp("Showing " + (withComments - 1) + " of 300").test(q("#rr-item-count").textContent), "With your comments drops an item when its last comment is deleted", d.querySelectorAll(".rr-item").length + " of " + withComments);
+    q('[data-filter="all"]').click();
+    R.jumpToItem("Works 1", "i280", "");
+    ok(d.querySelectorAll(".rr-item").length === 300 && Array.prototype.some.call(d.querySelectorAll(".rr-item.flash"), function (n) { return n.getAttribute("data-item-id") === "i280"; }), "Go to an item past the first 150 shows them all and flashes it");
+    R.state.dirty = false; R.state.composer = null;
+    ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+    try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); } catch (e) {}
+    finish();
+  });
+})();
+</script>
+</body></html>

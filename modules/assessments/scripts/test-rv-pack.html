@@ -11,7 +11,9 @@
   maturity item its target level by name. The comments list heads two groups of
   one site, and one group in two zones, differently. And a pack this copy of
   the project has no record of can be recognised as this engagement's, or found
-  on another assessment in the file.
+  on another assessment in the file. With two assessments of one instrument in
+  a project, a pack and its review files are never put on the one that did not
+  send them: the import says which assessment to switch to.
 -->
 <script src="harness.js"></script>
 <script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
@@ -147,6 +149,33 @@ H.test(function (ok, done) {
     ok(!!hint && /2028 re-assessment/.test(hint) && /switch to it/.test(hint) && !/[–—]/.test(hint), "a review file for another assessment in the file names it", hint);
     ok(RV.packHint("rp-nowhere") === null, "and says nothing when no assessment sent that pack");
     ok(twin && twin.id !== here, "the two assessments are separate");
+
+    // ---- never adopted onto the wrong assessment ------------------------------------
+    // A third assessment of the same instrument, with no review of its own: the
+    // pack is for this instrument and client, so it "matches" here too.
+    RC.recordRound(RV.ensureStore(), r.pack); E.touchReview();
+    var third = E.newAssessment("ncsc-caf", { label: "2030 re-assessment" });
+    ok(E.state.activeAssessmentId === third.id && E.getReview() === null && RV.packMatches(r.pack) === true, "a third assessment of the same instrument is open, and the first one's pack matches it by instrument and client");
+    function reviewFile(p, comments) {
+      return JSON.stringify({ schema: RC.fileSchema(), packId: p.packId, reviewId: p.reviewId, round: p.round, fileId: "rf-wrong-" + p.round, reviewer: "J. Marsh", savedAt: "2026-11-02T10:00:00Z",
+        verdict: { value: "changes-requested", date: "2026-11-02", note: "" }, checklist: [], dismissedChecks: [], confirmations: [], comments: comments });
+    }
+    var cm = { id: "c-wrong-1", reviewer: "J. Marsh", createdAt: "2026-11-02T10:00:00Z", updatedAt: "2026-11-02T10:00:00Z", severity: "must-fix",
+      anchor: { documentIndex: 0, kind: "general", sectionTitle: "General", quote: "" }, text: "Fix this.", suggestion: null, relatesTo: null, check: null };
+    var out = RV.importTexts([{ name: "review.json", text: reviewFile(r.pack, [cm]) }, { name: "pack.json", text: JSON.stringify(r.pack) }]);
+    ok(out.bad === 2 && out.lines.length === 2 && out.lines.every(function (l) { return /switch to it, then import the file/.test(l); }), "importing the pack and its review file together there is refused, saying which assessment to switch to", out.lines.join(" || "));
+    ok(E.getReview() === null, "and no review is started on the wrong assessment", JSON.stringify(E.getReview()));
+    // A later pack of the same review, which no assessment has a record of:
+    // known by its review id.
+    var later = JSON.parse(JSON.stringify(r.pack)); later.packId = "rp-later-round"; later.round = r.pack.round + 1;
+    var cm2 = JSON.parse(JSON.stringify(cm)); cm2.id = "c-wrong-2";
+    out = RV.importTexts([{ name: "pack2.json", text: JSON.stringify(later) }, { name: "review2.json", text: reviewFile(later, [cm2]) }]);
+    ok(out.bad === 2 && out.lines.every(function (l) { return /switch to it/.test(l); }) && E.getReview() === null, "a later round's pack of that review is refused there too, by the review it belongs to", out.lines.join(" || "));
+    ok(RV.packHint("rp-nowhere", "rv-nobody") === null, "a pack of a review no assessment holds gets no hint, and can still be put back");
+    E.activateAssessment(here);
+    out = RV.importTexts([{ name: "pack2.json", text: JSON.stringify(later) }, { name: "review2.json", text: reviewFile(later, [cm2]) }]);
+    var mine = RV.store();
+    ok(!out.bad && mine.rounds.some(function (x) { return x.packId === "rp-later-round"; }) && !!RC.findThread(mine, "c-wrong-2"), "on the assessment that holds the review, the same two files go in", out.lines.join(" || "));
   });
   chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
 });

@@ -8,9 +8,14 @@
  * docs/report-review.md lists what is deliberately not attempted.
  *
  *   App.ReviewChecks.run(pack, { names: [...] }) returns
- *     [{ id, check, title, severity, message, quote, kind, documentIndex, blockId,
- *        sectionKey, sectionTitle, targetName, targetId, itemId, cell }]
- *   id is stable for a given pack, so a dismissal keeps across saves.
+ *     [{ id, check, title, severity, message, quote, fullText, kind, documentIndex,
+ *        blockId, sectionKey, sectionTitle, targetName, targetId, itemId, cell, legacyIds }]
+ *   id is stable for a given pack, so a dismissal keeps across saves. quote is
+ *   for showing and may be clipped; fullText (block results only) is the whole
+ *   text of the block, or of the cell, which is what a comment made from the
+ *   result quotes, as the author's tool matches a comment by that. legacyIds
+ *   (optional) are ids the same result had in earlier versions: a dismissal
+ *   saved under one still counts.
  *
  * A pack may name its item fields its own way (engagement.fieldLabels, with
  * null for a field it does not have): the checks that talk about a field use
@@ -69,6 +74,12 @@
     return L && typeof L === "object" && f in L ? L[f] : dflt;
   }
   function isRisk(pack) { return (pack.engagement || {}).scoringFamily === "risk-assessment"; }
+  // An item result's key: the target by id where the pack carries one, so two
+  // targets with one name stay apart, else by name. Results were keyed by name
+  // alone before, so that key is kept as a legacy id (see legacy).
+  function targetKey(it) { return it.targetId || it.targetName || ""; }
+  function legacy(check, key, oldKey) { return key === oldKey ? {} : { legacyIds: [check + ":" + oldKey] }; }
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
   // An item's anchor: the target by id where the pack carries one, and by name.
   function itemAnchor(it, extra) {
     var a = { kind: "item", targetName: it.targetName || "", targetId: it.targetId || "", itemId: it.itemId, code: it.code, itemTitle: it.title };
@@ -106,14 +117,23 @@
   // The text of a paragraph that is not red: a red prompt is its own check, and
   // is meant to go, so what it says is not held against it twice.
   function plainOf(p) {
-    return (p.runs || []).filter(function (r) { return !r.red; }).map(function (r) { return r.t; }).join("");
+    // A paragraph with no runs is its text, unless it is red throughout.
+    if (!(p.runs && p.runs.length)) return p.red ? "" : String(p.text || "");
+    return p.runs.filter(function (r) { return !r.red; }).map(function (r) { return r.t; }).join("");
   }
 
+  // The words a comment on a block quotes: the whole cell when it is in one,
+  // else the whole block. A picture has none.
+  function anchorText(b, cell) {
+    if (cell && b.rows) { var row = b.rows[cell.row], c = row && row.cells && row.cells[cell.col]; return c ? String(c.text || "") : ""; }
+    return b.type === "image" ? "" : String(b.text || "");
+  }
   function result(check, id, message, quote, b, cell, d, extra) {
     var r = { id: check + ":" + id, check: check, title: CHECKS[check].title, severity: CHECKS[check].severity, message: message,
       quote: quote || "", kind: "block", documentIndex: d == null ? 0 : d, blockId: b ? b.id : "",
       sectionKey: b ? (b.sectionKey || "") : "", sectionTitle: b ? (b.sectionTitle || "") : "", cell: cell ? { row: cell.row, col: cell.col } : null,
       targetName: "", targetId: "", itemId: "" };
+    if (b) r.fullText = anchorText(b, cell);
     Object.keys(extra || {}).forEach(function (k) { r[k] = extra[k]; });
     return r;
   }
@@ -144,7 +164,7 @@
       var m = /[–—]/.exec(t);
       var from = Math.max(0, m.index - 50);
       out.push(result("dashes", keyFor(b, cell), "An " + (m[0] === "—" ? "em" : "en") + " dash in the client's text. House style is a spaced hyphen.",
-        (from ? "…" : "") + t.slice(from, m.index + 50) + (m.index + 50 < t.length ? "…" : ""), b, cell, d, { fullText: text }));
+        (from ? "…" : "") + t.slice(from, m.index + 50) + (m.index + 50 < t.length ? "…" : ""), b, cell, d));
     });
   }
 
@@ -171,7 +191,7 @@
         if (recorded.some(function (v) { return w.re.test(v) && nt.indexOf(v) !== -1; })) return;
         var from = Math.max(0, m.index - 50);
         out.push(result("internal-wording", keyFor(b, cell, w.label), "“" + m[0] + "” is internal wording that the client should not see.",
-          (from ? "…" : "") + t.slice(from, m.index + 60) + (m.index + 60 < t.length ? "…" : ""), b, cell, d, { fullText: text }));
+          (from ? "…" : "") + t.slice(from, m.index + 60) + (m.index + 60 < t.length ? "…" : ""), b, cell, d));
       });
     });
   }
@@ -203,8 +223,9 @@
         if (fieldLabel(pack, f, f) === null) return;
         names.forEach(function (n) {
           if (it[f] && hasWord(it[f], n)) {
-            out.push(result("other-names", "item:" + it.targetName + ":" + it.itemId + ":" + f + ":" + n, "“" + n + "” is in the " + String(fieldLabel(pack, f, f)).toLowerCase() + " recorded for " + it.code + ".",
-              clip(it[f]), null, null, 0, itemAnchor(it, { field: f })));
+            var tail = ":" + it.itemId + ":" + f + ":" + n;
+            out.push(result("other-names", "item:" + targetKey(it) + tail, "“" + n + "” is in the " + String(fieldLabel(pack, f, f)).toLowerCase() + " recorded for " + it.code + ".",
+              clip(it[f]), null, null, 0, itemAnchor(it, Object.assign({ field: f }, legacy("other-names", "item:" + targetKey(it) + tail, "item:" + it.targetName + tail)))));
           }
         });
       });
@@ -223,6 +244,9 @@
         var re = new RegExp("(^|[^A-Za-z0-9])(" + esc(client) + ")($|[^A-Za-z0-9])", "ig"), m;
         while ((m = re.exec(text))) {
           if (m[2] === client) found = true;
+          // A one-word name that is also an ordinary word (Shell, Total): in
+          // all lower case it is the word, not the client.
+          else if (!/\s/.test(client) && m[2] === m[2].toLowerCase() && m[2] !== m[2].toUpperCase()) continue;
           else if (!variants[m[2]]) variants[m[2]] = { text: text, b: b, cell: cell };
         }
       });
@@ -245,10 +269,28 @@
     var label = fieldLabel(pack, "evidence", "evidence");
     if (label === null || isRisk(pack)) return;
     var name = String(label || "evidence").toLowerCase(), extra = name === "evidence" ? {} : { title: "Findings with no " + name + " recorded" };
+    // A system-wide answer is one finding, however many zones inherit it: one
+    // result, on the first of them, which a dismissal of any of them (as
+    // earlier versions listed it) still dismisses.
+    var shared = Object.create(null);
     (pack.items || []).forEach(function (it) {
       if (it.status !== "finding" || norm(it.evidence)) return;
-      out.push(result("no-evidence", it.targetName + ":" + it.itemId, it.code + " is a finding" + (it.targetName ? " on " + it.targetName : "") + ", and no " + name + " is recorded.",
-        it.title, null, null, 0, itemAnchor(it, Object.assign({ field: "evidence" }, extra))));
+      var key = targetKey(it) + ":" + it.itemId, old = it.targetName + ":" + it.itemId;
+      if (it.shared) {
+        var sk = String(it.itemId);
+        if (own(shared, sk)) {
+          var first = shared[sk];
+          first.n++;
+          first.r.legacyIds.push("no-evidence:" + key);
+          if (key !== old) first.r.legacyIds.push("no-evidence:" + old);
+          first.r.message = it.code + " is a system-wide finding" + (first.name ? ", on " + first.name + " and " + (first.n === 2 ? "1 other" : (first.n - 1) + " others") : "") + ", and no " + name + " is recorded.";
+          return;
+        }
+      }
+      var r = result("no-evidence", key, it.code + " is a finding" + (it.targetName ? " on " + it.targetName : "") + ", and no " + name + " is recorded.",
+        it.title, null, null, 0, itemAnchor(it, Object.assign({ field: "evidence" }, extra, legacy("no-evidence", key, old))));
+      if (it.shared) { r.legacyIds = r.legacyIds || []; shared[String(it.itemId)] = { r: r, n: 1, name: it.targetName }; }
+      out.push(r);
     });
   }
 
@@ -260,7 +302,7 @@
   // 300 separate problems. In a risk pack, an unanswered threat is one not yet
   // rated, and an unanswered SL-T item a zone with no target levels.
   function unanswered(pack, out) {
-    var byTarget = {}, order = [], risk = isRisk(pack);
+    var byTarget = Object.create(null), order = [], risk = isRisk(pack);
     function says(it, t) {
       if (risk && isSlt(it)) return "No target security levels are set" + (t ? " for " + t : "") + ".";
       if (risk) return it.code + (t ? " on " + t : "") + " is not rated: its likelihood or impact is not set.";
@@ -268,19 +310,20 @@
     }
     (pack.items || []).forEach(function (it) {
       if (it.status !== "unanswered") return;
-      if (!byTarget[it.targetName]) { byTarget[it.targetName] = []; order.push(it.targetName); }
-      byTarget[it.targetName].push(it);
+      var k = targetKey(it);
+      if (!own(byTarget, k)) { byTarget[k] = []; order.push(k); }
+      byTarget[k].push(it);
     });
-    order.forEach(function (t) {
-      var list = byTarget[t];
+    order.forEach(function (k) {
+      var list = byTarget[k], t = list[0].targetName;
       if (list.length <= 5) {
         list.forEach(function (it) {
-          out.push(result("unanswered", t + ":" + it.itemId, says(it, t), it.title, null, null, 0, itemAnchor(it, { targetName: t })));
+          out.push(result("unanswered", k + ":" + it.itemId, says(it, t), it.title, null, null, 0, itemAnchor(it, Object.assign({ targetName: t }, legacy("unanswered", k + ":" + it.itemId, t + ":" + it.itemId)))));
         });
       } else {
         var it = list[0];
-        out.push(result("unanswered", t + ":many", list.length + " items" + (t ? " on " + t : "") + " have no answer, starting with " + it.code + ".", it.title, null, null, 0,
-          itemAnchor(it, { targetName: t })));
+        out.push(result("unanswered", k + ":many", list.length + " items" + (t ? " on " + t : "") + " have no answer, starting with " + it.code + ".", it.title, null, null, 0,
+          itemAnchor(it, Object.assign({ targetName: t }, legacy("unanswered", k + ":many", t + ":many")))));
       }
     });
   }
@@ -295,9 +338,9 @@
     if (!isRisk(pack) || fieldLabel(pack, "priority", "priority") === null) return;
     (pack.items || []).forEach(function (it) {
       if (isSlt(it) || it.status !== "finding" || norm(it.priority)) return;
-      var t = it.targetName;
-      out.push(result("risk-no-disposition", t + ":" + it.itemId, it.code + (t ? " on " + t : "") + " is above the tolerable risk with no disposition: no countermeasure, no target level on its affected requirements and no recorded acceptance.",
-        it.title, null, null, 0, itemAnchor(it)));
+      var t = it.targetName, key = targetKey(it) + ":" + it.itemId;
+      out.push(result("risk-no-disposition", key, it.code + (t ? " on " + t : "") + " is above the tolerable risk with no disposition: no countermeasure, no target level on its affected requirements and no recorded acceptance.",
+        it.title, null, null, 0, itemAnchor(it, legacy("risk-no-disposition", key, t + ":" + it.itemId))));
     });
   }
   // The justification is what the risk tool calls the deliverable, and the
@@ -307,13 +350,13 @@
     if (!isRisk(pack)) return;
     (pack.items || []).forEach(function (it) {
       if (!isSlt(it) || it.status === "unanswered" || it.status === "na") return;
-      var just = norm(it.evidence) || norm(it.notes) || (it.details || []).filter(function (row) {
+      var just = norm(it.evidence) || norm(it.notes) || (Array.isArray(it.details) ? it.details : []).filter(function (row) {
         return row && /justif/i.test(String(row[0] || "")) && norm(row[1]);
       }).length;
       if (just) return;
-      var t = it.targetName;
-      out.push(result("risk-slt-justification", t + ":" + it.itemId, "Target security levels are set" + (t ? " for " + t : "") + " with no justification recorded, so the report leaves the justification out.",
-        it.answer || it.title, null, null, 0, itemAnchor(it)));
+      var t = it.targetName, key = targetKey(it) + ":" + it.itemId;
+      out.push(result("risk-slt-justification", key, "Target security levels are set" + (t ? " for " + t : "") + " with no justification recorded, so the report leaves the justification out.",
+        it.answer || it.title, null, null, 0, itemAnchor(it, legacy("risk-slt-justification", key, t + ":" + it.itemId))));
     });
   }
 
@@ -346,7 +389,8 @@
     return m ? Number(m[1]) : null;
   }
   // Only a number that jumps forward is a gap. One that repeats or goes back is
-  // not, and is not given impossible arithmetic.
+  // not, and is not given impossible arithmetic. Numbering that starts above 1
+  // is a gap before the first section.
   function numbering(pack, out) {
     (pack.documents || []).forEach(function (doc, d) {
       var last = null;
@@ -354,7 +398,9 @@
         if (b.type !== "heading" || b.level !== 1) return;
         var n = sectionNumber(b);
         if (n === null) return;
-        if (last !== null && n > last + 1) {
+        if (last === null && n > 1) {
+          out.push(result("numbering", b.id, "The first numbered section is section " + n + ", so " + (n === 2 ? "section 1 is" : "sections 1 to " + (n - 1) + " are") + " missing.", b.text, b, null, d));
+        } else if (last !== null && n > last + 1) {
           out.push(result("numbering", b.id, "Section " + n + " follows section " + last + ", so " + (n - last === 2 ? "section " + (last + 1) + " is" : "sections " + (last + 1) + " to " + (n - 1) + " are") + " missing.", b.text, b, null, d));
         }
         last = n;
@@ -366,23 +412,37 @@
   // thing, read against the facts for the one target the document covers. A
   // document covering several targets has no single fact to compare with, so it
   // is left alone. docs/report-review.md lists what is not attempted.
+  // The unit is whatever the framework calls what it assesses (outcomes,
+  // controls, safeguards, expectations), so any noun of up to four words is
+  // read there, and a count of one is written in the singular.
+  var UNIT = "([a-z][a-z'’-]*(?: [a-z][a-z'’-]*){0,3})";
+  function gapWords(n) { return n === "1" ? "open gap" : "open gaps"; }
   var FIGURE_SENTENCES = [
-    { re: /\bthe (\d+) outcomes below their expected state\b/i, fact: "roadmapEntries", what: "outcomes below their expected state" },
-    { re: /\bopen gaps moved from \d+ to (\d+)\b/i, fact: "roadmapEntries", what: "open gaps" },
-    { re: /\bthere are (\d+) open gaps\b/i, fact: "roadmapEntries", what: "open gaps" },
-    { re: /\b(\d+) of \d+ outcomes were assessed as achieved\b/i, fact: "met", what: "outcomes achieved" }
+    { re: new RegExp("\\bthe (\\d+) " + UNIT + " below their expected state\\b", "i"), fact: "roadmapEntries", what: function (m) { return m[2].toLowerCase() + " below their expected state"; } },
+    { re: /\bopen gaps moved from \d+ to (\d+)\b/i, fact: "roadmapEntries", what: function (m) { return gapWords(m[1]); } },
+    { re: /\bthere (?:is|are) (\d+) open gaps?\b/i, fact: "roadmapEntries", what: function (m) { return gapWords(m[1]); } },
+    { re: new RegExp("\\b(\\d+) of \\d+ " + UNIT + " were assessed as achieved\\b", "i"), fact: "met", what: function (m) { return m[2].toLowerCase() + " achieved"; } }
   ];
   function figures(pack, out) {
     var facts = (pack.facts && pack.facts.perTarget) || [];
     (pack.documents || []).forEach(function (doc, d) {
       var fact = doc.targetName ? facts.filter(function (f) { return f.targetName === doc.targetName; })[0] : (facts.length === 1 ? facts[0] : null);
       if (!fact) return;
+      // The met fact counts what meets its expected state. Under a profile
+      // that expects less than achieved of some items, more can meet it than
+      // are achieved: then a printed count above it is wrong, and one below
+      // it may be right. It is exact when everything met has one answer.
+      var metAnswers = {};
+      (pack.items || []).forEach(function (it) { if (it.status === "met" && it.targetName === fact.targetName) metAnswers["=" + norm(it.answer)] = 1; });
+      var metExact = Object.keys(metAnswers).length <= 1;
       (doc.blocks || []).forEach(function (b) {
         if (b.type !== "paragraph" && b.type !== "bullet") return;
         FIGURE_SENTENCES.forEach(function (f, i) {
           var m = f.re.exec(b.text || "");
           if (!m || Number(m[1]) === fact[f.fact]) return;
-          out.push(result("figures", b.id + ":" + i, "This says " + m[1] + " " + f.what + ", and the assessment behind it has " + fact[f.fact] + ".", clip(b.text), b, null, d));
+          var atMost = f.fact === "met" && !metExact;
+          if (atMost && Number(m[1]) < fact.met) return;
+          out.push(result("figures", b.id + ":" + i, "This says " + m[1] + " " + f.what(m) + ", and the assessment behind it has " + (atMost ? "no more than " : "") + fact[f.fact] + ".", clip(b.text), b, null, d));
         });
       });
     });

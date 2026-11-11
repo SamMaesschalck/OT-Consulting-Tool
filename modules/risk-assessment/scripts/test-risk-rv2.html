@@ -20,7 +20,11 @@
   - Go to on a threat or a zone's SL-T lands on it and flashes it;
   - renaming a zone does not orphan its comments;
   - with no zones the pack holds the high-level report only, and Accept and its
-    undo write to that report's overrides.
+    undo write to that report's overrides; a second Accept is refused until the
+    first is undone;
+  - two approvals under one name in different capitals make one QA offer;
+  - one drawing of a long comments list works out the project's signature and
+    its items once, not once per comment.
   Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
 -->
 <iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
@@ -168,6 +172,45 @@
       ok(P().engagement.qaReviewBy === "A. Reviewer" && !main.querySelector(".rv-qa"), "Fill in sets it, and the question goes");
       RR.importTexts([reviewFile("A. Reviewer", "approved")]);
       ok(RR.qaOffers().length === 0, "importing the same file again does not ask again");
+      // The same name in other capitals is the same reviewer.
+      P().engagement.qaReviewBy = "a. reviewer";
+      RR.importTexts([reviewFile("A. Reviewer", "approved")]);
+      ok(RR.qaOffers().length === 0, "nor when QA review by names them in other capitals");
+      P().engagement.qaReviewBy = "A. Reviewer";
+      RR.importTexts([reviewFile("C. Other", "approved"), reviewFile("c. other", "approved")]);
+      ok(RR.qaOffers().length === 1, "two approvals under one name in different capitals make one offer", JSON.stringify(RR.qaOffers()));
+      RT.state.stage = "peer"; RT.render();
+      main.querySelector(".rv-qa .rv-qa-no").click();
+      ok(RR.qaOffers().length === 0 && P().engagement.qaReviewBy === "A. Reviewer", "and keeping the name already there settles it");
+
+      // ---- one drawing of a long list ---------------------------------------------------
+      // Each card asks whether its comment is stale and whether its wording can
+      // be accepted. The project's signature and its items are the same for
+      // every card, so a drawing works them out once.
+      return new Promise(function (res) { RR.refreshDocs(function () { RR.buildDocuments().then(res); }); });
+    }).then(function (d) {
+      var s = RR.store(), kept = s.threads.slice(), n = 0;
+      var paras = d[0].blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey && b.text && b.text.length > 30; });
+      var items = RR.packItems().items;
+      for (var i = 0; i < 60; i++) {
+        var b = paras[i % paras.length], it = items[i % items.length];
+        var anchor = i % 2 ? { documentIndex: 0, documentTitle: "Detailed report", kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: b.text, cell: null }
+          : { documentIndex: 0, kind: "item", targetName: it.targetName, targetId: it.targetId, itemId: it.itemId, code: it.code, itemTitle: it.title, groupName: it.groupName, quote: "" };
+        s.threads.push({ comment: { id: "c-many-" + (++n), reviewer: "J. Marsh", createdAt: "2026-11-09T10:00:00Z", updatedAt: "2026-11-09T10:00:00Z", severity: "suggestion", text: "Reword.", suggestion: i % 2 ? b.text + " More." : null, anchor: anchor },
+          round: 1, savedAt: "2026-11-09T10:00:00Z", fileId: "f-many", status: "open", reason: "", replies: [], confirmedBy: [] });
+      }
+      var holder = w.document.createElement("div"); w.document.body.appendChild(holder);
+      var ui = w.App.ReviewAuthor.newUi(), C = RR.__counts;
+      w.App.ReviewAuthor.mount(holder, RR.__adapter(), ui);
+      ok(holder.querySelectorAll('[data-comment-id^="c-many-"]').length === 60 && !holder.querySelector('[data-comment-id^="c-many-"] .rv-stale'), "sixty more comments are listed, none marked as no longer matching");
+      Object.keys(C).forEach(function (k) { C[k] = 0; });
+      w.App.ReviewAuthor.mount(holder, RR.__adapter(), ui);
+      ok(C.signature === 1 && C.items <= 1 && C.texts === 0, "one drawing works the signature and the items out once, and reads no document's text again", JSON.stringify(C));
+      Object.keys(C).forEach(function (k) { C[k] = 0; });
+      s.threads.slice(-10).forEach(function (t) { RR.isStale(t); });
+      ok(C.signature + C.items >= 10, "outside a drawing nothing is kept: ten comments asked one by one are each worked out afresh", JSON.stringify(C));
+      holder.parentNode.removeChild(holder);
+      s.threads = kept;
       return new Promise(function (res) { RR.refreshDocs(res); });
     }).then(function () {
       ok(RR.exportWarnings().length === 0, "approved and unchanged: no warnings", JSON.stringify(RR.exportWarnings()));
@@ -258,6 +301,17 @@
       var rc = P().reportCustom || {}, t = window.__t;
       ok(res.ok && rc.highLevel && rc.highLevel["executive-summary"] && rc.highLevel["executive-summary"].title === "Summary for the board" && !rc.detailed, "Accept writes to the high-level report's overrides, though it is the pack's first document", JSON.stringify(rc));
       ok(t.accepted && t.accepted.revert && t.accepted.revert.report === "highLevel" && t.accepted.revert.field === "title" && t.accepted.applied === "Summary for the board", "and records what it replaced", JSON.stringify(t.accepted));
+      // One accepted change per comment: the reviewer changes the suggestion,
+      // which opens the comment again with the first change still in the report.
+      t.status = "open"; t.comment.suggestion = "Summary for the directors";
+      window.__kept = JSON.stringify(t.accepted);
+      var plan = RR.acceptPlan(t);
+      ok(!plan.can && /Undo the accepted wording first/.test(plan.why), "a second Accept is refused while the first is in the report", JSON.stringify(plan));
+      return new Promise(function (res2) { RR.accept(t, res2); });
+    }).then(function (res) {
+      var t = window.__t;
+      ok(!res.ok && JSON.stringify(t.accepted) === window.__kept && P().reportCustom.highLevel["executive-summary"].title === "Summary for the board", "and the record of what the first replaced is not written over", res.message);
+      t.comment.suggestion = "Summary for the board";
       return new Promise(function (res2) { RR.undoAccept(t, res2); });
     }).then(function (res) {
       var t = window.__t;

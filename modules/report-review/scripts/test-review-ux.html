@@ -113,7 +113,7 @@
 
     // ---- #9: the keyboard ------------------------------------------------------------
     ok(d.getElementById("toast").getAttribute("role") === "status" && d.getElementById("toast").getAttribute("aria-live") === "polite", "messages are announced");
-    ok(!block(A.id).hasAttribute("aria-label") && block(A.id).getAttribute("aria-describedby") === "rr-block-hint" && !!d.getElementById("rr-block-hint"), "a paragraph is read by its own words, with a hint");
+    ok(!block(A.id).hasAttribute("aria-label") && /(^| )rr-block-hint$/.test(block(A.id).getAttribute("aria-describedby")) && !!d.getElementById("rr-block-hint"), "a paragraph is read by its own words, with a hint");
     var nav = d.querySelector('.nav-item[data-page="checks"]');
     key(w, nav, "Enter");
     ok(R.state.page === "checks", "Enter on a page in the sidebar opens it");
@@ -254,7 +254,7 @@
       j.value = target.id; j.dispatchEvent(new w.Event("change", { bubbles: true }));
       var el = d.querySelector('[data-block-id="' + target.id + '"]'), mainTop = d.getElementById("main").getBoundingClientRect().top;
       var tbr = d.querySelector(".rr-toolbar").getBoundingClientRect(), top = el.getBoundingClientRect().top;
-      ok(top >= tbr.bottom - 1 && top < tbr.bottom + 40 && j.value === "", "choosing a section puts its heading just below the toolbar, not under it", top + " vs toolbar bottom " + tbr.bottom);
+      ok(top >= tbr.bottom - 1 && top < tbr.bottom + 40 && j.value === target.id, "choosing a section puts its heading just below the toolbar, not under it, and the list stays on it", top + " vs toolbar bottom " + tbr.bottom);
       ok(Math.abs(tbr.top - mainTop) <= 1, "and the toolbar sits flush at the top, with nothing showing above it", tbr.top + " vs " + mainTop);
       // #25 at this width: the outline's ticks are hidden, so the toolbar has one.
       var tick = d.getElementById("rr-mark-read");

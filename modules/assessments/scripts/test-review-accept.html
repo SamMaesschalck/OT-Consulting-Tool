@@ -6,12 +6,22 @@
   Suggested wording is accepted in one click where the text can be changed in the
   tool, and only counts once it is in the Word document. Each editable kind is
   accepted through App.Review.accept, then the Word file is built separately and
-  opened: a section's opening prose (with the rest of the run kept), a renamed
+  opened: a paragraph of a section's opening (that paragraph alone, the rest of
+  the run still generated: test-review-para.html goes through it), a renamed
   section, a section title, each narrative field, the proposed next steps, and a
   plan and an evidence field. Then what must not be accepted: generated text
-  falls back to Copy, and so do a stale comment, wording shared by several items
-  and a section that opens differently per zone. A change that does not reach the
-  document is undone.
+  falls back to Copy, and so do a stale comment and wording shared by several
+  items. A change that does not reach the document is undone.
+  Then what Accept must never do. A red prompt is never taken into a rewrite of a
+  section's opening by the consultant's own Edit, nor reworded by Accept: it stays
+  red, the Issue check still counts it, and it goes when it is answered. A
+  generated paragraph beside a prompt or the consultant's input is accepted on its
+  own, and leaves both as they were. Wording is only written to an
+  item's field when the commented text is about that item (a role in the People
+  interviewed table is not an item's owner), and only counts when it is in the
+  section the comment is on. An answer a zone inherits is found by the scorer's
+  own rules, and a change to a system-wide answer says so. One accepted change
+  per comment, until it is undone.
 -->
 <script src="harness.js"></script>
 <script>H.app({ docx: true, tours: H.ALL_TOURS }); H.dom();</script>
@@ -71,21 +81,24 @@ H.test(function (ok, done) {
   });
   step(function (d0) {
     var probe = d0[0].probe;
-    var s = probe.filter(function (p) { return p.key && p.texts.length >= 2; })[0];
+    // Not the executive summary: its opening holds the consultant's input,
+    // which a rewrite must not fix in place (tested further down).
+    var s = probe.filter(function (p) { return p.key && p.key !== "executive-summary" && p.texts.length >= 2; })[0];
     ok(!!s, "there is a section opening with two paragraphs or more to try this on (" + (s && s.key) + ")");
     leadKey = s.key; leadRun = s.texts.slice(); lead0 = s.texts[0]; other = s.texts[1];
     var b = d0[0].blocks.filter(function (x) { return x.sectionKey === leadKey && x.type === "paragraph" && RC.norm(x.text) === RC.norm(lead0); })[0];
     var t = thread(blockAnchor(b), "A clearer opening sentence from the reviewer.");
     window.__t1 = t;
     var plan = RV.acceptPlan(t);
-    ok(plan.can && plan.kind === "section opening", "the opening prose of a section can be accepted", JSON.stringify(plan));
+    ok(plan.can && plan.kind === "paragraph", "a paragraph of a section's opening can be accepted", JSON.stringify(plan));
     return acceptIt(t);
   });
   step(function (res) {
     ok(res.ok, "accepted", res.message);
-    ok(window.__t1.status === "resolved" && window.__t1.accepted.kind === "section opening", "the comment is resolved and says how");
+    ok(window.__t1.status === "resolved" && window.__t1.accepted.kind === "paragraph", "the comment is resolved and says how");
     var c = E.getReportSection(leadKey);
-    ok(c.prose && c.prose.split("\n").length === leadRun.length && c.prose.indexOf("A clearer opening sentence") === 0 && c.prose.indexOf(RC.norm(other).slice(0, 30)) !== -1, "reportCustom prose holds the whole run with only the one paragraph changed");
+    ok(!c.prose && c.paragraphs && c.paragraphs.length === 1 && c.paragraphs[0].from === RC.norm(lead0) && c.paragraphs[0].to === "A clearer opening sentence from the reviewer." && !isNaN(Date.parse(c.paragraphs[0].at)),
+      "reportCustom holds that one paragraph's replacement, and no rewrite of the run", JSON.stringify(c));
     return wordParas();
   });
   step(function (ps) {
@@ -353,13 +366,17 @@ H.test(function (ok, done) {
     d[0].blocks.forEach(function (x) { if (!b && x.text && /The very same evidence wording on two items\./.test(x.text)) b = x; });
     if (!b) d[0].blocks.forEach(function (x) { if (!b && x.type === "table" && /The very same evidence wording/.test(x.text)) b = x; });
     ok(!!b, "the shared wording prints");
-    var quote = b.type === "table" ? "The very same evidence wording on two items." : b.text;
-    var t = thread({ documentIndex: 0, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: quote, cell: null }, quote.replace("very same", "one"));
+    var quote = b.type === "table" ? "The very same evidence wording on two items." : b.text, cell = null;
+    // In a table, the comment is on the cell, as the review tool anchors it.
+    if (b.type === "table") b.rows.forEach(function (r, ri) { r.cells.forEach(function (c, ci) { if (!cell && RC.norm(c.text) === quote) cell = { row: ri, col: ci }; }); });
+    var t = thread({ documentIndex: 0, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: quote, cell: cell }, quote.replace("very same", "one"));
     var plan = RV.acceptPlan(t);
     ok(!plan.can && /on 2 items/.test(plan.why), "wording recorded on two items falls back to Copy, as it could only change one", JSON.stringify(plan));
   });
 
   // ---- a section that opens differently per zone ----------------------------------
+  // Only the commented paragraph is replaced, so the other zones' openings
+  // are not at risk and Accept is offered (test-review-para.html accepts it).
   step(function () { E.activateInstrument("iec-62443-3-3"); return docs(); });
   step(function (d) {
     var byKey = {};
@@ -370,13 +387,14 @@ H.test(function (ok, done) {
     var b = doc.blocks.filter(function (x) { return x.sectionKey === key && RC.norm(x.text) === RC.norm(sec.texts[0]); })[0];
     var t = thread(blockAnchor(b), "Words for one zone only.");
     var plan = RV.acceptPlan(t);
-    ok(!plan.can && /opens differently/.test(plan.why), "accepting there would overwrite the other zones, so it falls back to Copy", JSON.stringify(plan));
+    ok(plan.can && plan.kind === "paragraph", "a paragraph there can be accepted: it replaces that paragraph, not every zone's opening", JSON.stringify(plan));
+    var s = RV.store(); s.threads = s.threads.filter(function (x) { return x !== t; });
   });
 
   // ---- a change that does not reach the document is undone -----------------------
   step(function () { E.activateInstrument("ncsc-caf"); return docs(); });
   step(function (d) {
-    var s = d[0].probe.filter(function (p) { return p.key && p.texts.length; })[0];
+    var s = d[0].probe.filter(function (p) { return p.key === leadKey; })[0];
     var b = d[0].blocks.filter(function (x) { return x.sectionKey === s.key && RC.norm(x.text) === RC.norm(s.texts[0]); })[0];
     var t = thread(blockAnchor(b), "Wording the exporter will not print.");
     window.__t9 = t; window.__k9 = s.key;
@@ -386,7 +404,7 @@ H.test(function (ok, done) {
     return acceptIt(t).then(function (res) {
       A.Report.reportCustom = real;
       ok(!res.ok && /did not reach the Word document/.test(res.message), "a change that does not print is refused, saying so", res.message);
-      ok(!E.getReportSection(s.key).prose, "and undone");
+      ok(!Object.keys(E.getReportSection(s.key)).length, "and undone", JSON.stringify(E.getReportSection(s.key)));
       ok(t.status === "open" && !t.accepted, "the comment stays open");
       return new Promise(function (r) { RV.currentDocs(function () { r(); }); });
     });
@@ -443,7 +461,7 @@ H.test(function (ok, done) {
   step(function (res) {
     ok(res.ok, "accepted into a section only the Word report has", res.message);
     var acc = wo.t1.accepted;
-    ok(acc && acc.revert && acc.revert.what === "section" && acc.revert.key === "where-to-focus-first" && acc.revert.field === "prose" && acc.revert.prev === null && /Start with the outcomes/.test(acc.applied), "the comment records what it replaced", JSON.stringify(acc));
+    ok(acc && acc.revert && acc.revert.what === "paragraph" && acc.revert.key === "where-to-focus-first" && acc.revert.from === RC.norm(wo.lead) && acc.revert.prevTo === null && /Start with the outcomes/.test(acc.applied), "the comment records what it replaced", JSON.stringify(acc));
     ok(JSON.parse(JSON.stringify(acc)).revert.key === "where-to-focus-first", "in a form that survives the project file");
     return docs();
   });
@@ -460,8 +478,9 @@ H.test(function (ok, done) {
     var card = main.querySelector('[data-check-anchor="word-only"]');
     ok(!!card && !card.hasAttribute("data-section"), "the report page lists changes to sections only in the Word report");
     ok(!!card && !!card.querySelector('[data-word-only="where-to-focus-first"]') && !!card.querySelector('[data-word-only="document-control-and-confidentiality"]'), "naming both", card && card.textContent);
-    ok(!!card && /Renamed by reviewer/.test(card.textContent) && /opening rewritten/.test(card.textContent) && /Where to focus first/.test(card.textContent), "with the Word heading and what changed", card && card.textContent);
-    ok(!!card && main.querySelector('[data-check-anchor="review"]').nextSibling === card, "under the Review card");
+    ok(!!card && /Renamed by reviewer/.test(card.textContent) && /1 paragraph reworded/.test(card.textContent) && /Where to focus first/.test(card.textContent), "with the Word heading and what changed", card && card.textContent);
+    var rw = main.querySelector('[data-check-anchor="reworded"]');
+    ok(!!card && !!rw && main.querySelector('[data-check-anchor="review"]').nextSibling === rw && rw.nextSibling === card, "under the Review card, after the list of reworded paragraphs");
     ok(!card || !/[–—]/.test(card.textContent), "with no em or en dashes");
     var sel = main.querySelector(".review-card .rv-filters select");
     sel.value = ""; sel.dispatchEvent(new Event("change", { bubbles: true }));
@@ -471,12 +490,14 @@ H.test(function (ok, done) {
   step(function (res) {
     ok(res.ok && !E.getReportSection("document-control-and-confidentiality").title, "Undo puts the generated heading back", res.message);
     ok(wo.t2.status === "open" && !wo.t2.accepted, "and opens the comment again");
-    // Edited since: Undo refuses, and keeps the edit.
+    // The opening rewritten as a whole since: Undo takes out the one
+    // paragraph's replacement, and keeps the rewrite.
     E.setReportSection("where-to-focus-first", { prose: "The consultant rewrote it again by hand." });
     return new Promise(function (r) { RV.undoAccept(wo.t1, r); });
   });
   step(function (res) {
-    ok(!res.ok && /edited since/.test(res.message) && E.getReportSection("where-to-focus-first").prose === "The consultant rewrote it again by hand.", "Undo refuses when the text was edited since, and keeps the edit", res.message);
+    var c = E.getReportSection("where-to-focus-first");
+    ok(res.ok && c.prose === "The consultant rewrote it again by hand." && !c.paragraphs && wo.t1.status === "open", "Undo after the opening was rewritten by hand takes out the paragraph's replacement and keeps the rewrite", res.message);
     A.UI.go("report");
     var main = document.getElementById("main");
     ok(!main.querySelector('[data-word-only="document-control-and-confidentiality"]'), "an undone change leaves the list");
@@ -487,6 +508,279 @@ H.test(function (ok, done) {
   });
   step(function (ps) {
     ok(ps.indexOf(RC.norm(wo.lead)) !== -1 && !ps.some(function (p) { return /rewrote it again by hand/.test(p); }), "the generated opening is back in the Word document");
+  });
+
+  // ---- a red prompt is never taken into a rewrite ------------------------------------
+  var BASIS_PROMPT = /^Basis of assessment not yet recorded\./;
+  function issues() { return new Promise(function (res) { I.run(I.jobs(ids(), "per"), function (err, list) { res(list || []); }); }); }
+  function basisIssues(list) { return list.filter(function (p) { return p.where && p.where.kind === "basis"; }).length; }
+  function promptParas(d, redOnly) {
+    return DB.flatten(d[0].blocks).filter(function (b) { return BASIS_PROMPT.test(RC.norm(b.text)) && (!redOnly || b.red); });
+  }
+  var bp = {};
+  step(function () {
+    E.activateInstrument("ncsc-caf");
+    E.clearReportSection("executive-summary");
+    var b = E.getBasisOfAssessment();
+    bp.basis = JSON.parse(JSON.stringify({ interviews: b.interviews, documents: b.documents, observations: b.observations }));
+    b.interviews.length = 0; b.documents.length = 0; b.observations.length = 0; E.touchBasisOfAssessment();
+    return docs();
+  });
+  step(function (d) {
+    var es = d[0].probe.filter(function (p) { return p.key === "executive-summary"; })[0];
+    ok(promptParas(d, true).length === 1, "with no basis recorded, the executive summary prints its prompt in red");
+    bp.promptText = promptParas(d, true)[0].text;
+    ok(!!es && es.texts.length >= 3 && !es.texts.some(function (x) { return BASIS_PROMPT.test(RC.norm(x)); }) && !es.prompts, "the prompt is not part of the wording a rewrite of that opening replaces", JSON.stringify(es && es.texts.slice(-2)));
+    // The demo's summary carries the consultant's exposure and priorities.
+    var b = d[0].blocks.filter(function (x) { return x.sectionKey === "executive-summary" && x.type === "paragraph" && RC.norm(x.text) === RC.norm(es.texts[0]); })[0];
+    bp.t = thread(blockAnchor(b), "A reviewer's reworded opening sentence.");
+    var plan = RV.acceptPlan(bp.t);
+    ok(plan.can && plan.kind === "paragraph", "a generated paragraph of an opening that also holds the consultant's input can be accepted on its own", JSON.stringify(plan));
+    // The prompt itself is answered where it is entered, never reworded.
+    var pb = d[0].blocks.filter(function (x) { return x.sectionKey === "executive-summary" && x.red && BASIS_PROMPT.test(RC.norm(x.text)); })[0];
+    var tp = thread(blockAnchor(pb), "The basis is recorded elsewhere.");
+    var pp = RV.acceptPlan(tp);
+    ok(!pp.can && /prompt to complete in the tool/.test(pp.why) && !/[\u2013\u2014]/.test(pp.why), "Accept on the red prompt itself is refused, saying it is a prompt to complete in the tool", JSON.stringify(pp));
+    var s = RV.store(); s.threads = s.threads.filter(function (x) { return x !== tp; });
+    return acceptIt(bp.t);
+  });
+  step(function (res) {
+    var c = E.getReportSection("executive-summary");
+    ok(res.ok && !c.prose && c.paragraphs.length === 1 && bp.t.status === "resolved", "and accepting it stores that paragraph only", res.message);
+    return issues();
+  });
+  step(function (list) {
+    ok(basisIssues(list) === 1, "the Issue check counts the prompt", JSON.stringify(list.map(function (p) { return p.where.kind; })));
+    // The consultant's own Edit of that opening on the report page writes the
+    // same override Accept would: it replaces the wording, never the prompt.
+    E.setReportSection("executive-summary", { prose: "The summary, rewritten by the consultant.\nA second paragraph of it." });
+    return docs();
+  });
+  step(function (d) {
+    ok(DB.flatten(d[0].blocks).some(function (b) { return RC.norm(b.text) === "The summary, rewritten by the consultant."; }), "a rewrite of the opening prints");
+    ok(promptParas(d, true).length === 1 && promptParas(d, false).length === 1, "and the prompt still prints with it, once, in red");
+    return issues();
+  });
+  step(function (list) {
+    ok(basisIssues(list) === 1, "it is still counted, so a Final is still refused");
+    // A rewrite saved while the prompt could be taken into it holds the prompt
+    // as a line of its own.
+    E.setReportSection("executive-summary", { prose: "The summary, rewritten by the consultant.\n" + bp.promptText });
+    return docs();
+  });
+  step(function (d) {
+    ok(promptParas(d, false).length === 1 && promptParas(d, true).length === 1, "a rewrite saved with the prompt in it prints the prompt once, in red, not in black as the consultant's words");
+    E.getBasisOfAssessment().interviews.push({ name: "A. Engineer", role: "Control systems lead", date: "2026-10-01" }); E.touchBasisOfAssessment();
+    return docs();
+  });
+  step(function (d) {
+    ok(promptParas(d, false).length === 0, "once a basis is recorded the prompt goes, even from that rewrite");
+    return issues();
+  });
+  step(function (list) {
+    ok(basisIssues(list) === 0, "and the Issue check no longer counts it");
+    E.clearReportSection("executive-summary");
+    var b = E.getBasisOfAssessment();
+    ["interviews", "documents", "observations"].forEach(function (k) { b[k].length = 0; bp.basis[k].forEach(function (x) { b[k].push(x); }); });
+    E.touchBasisOfAssessment();
+    var s = RV.store(); s.threads = s.threads.filter(function (t) { return t !== bp.t; });
+    // With the consultant's input not yet written, its own prompts end the
+    // run, so the generated paragraphs before them can be accepted and every
+    // prompt is left as it was.
+    bp.narrative = { regulatoryExposure: E.getReportNarrative().regulatoryExposure, topPriorities: E.getReportNarrative().topPriorities };
+    E.setReportNarrative({ regulatoryExposure: "", topPriorities: "" });
+    return issues();
+  });
+  step(function (list) {
+    bp.before = list.length;
+    ok(bp.before >= 1, "with the consultant's input blank, its prompts print (" + bp.before + ")");
+    return docs();
+  });
+  step(function (d) {
+    var es = d[0].probe.filter(function (p) { return p.key === "executive-summary"; })[0];
+    var b = d[0].blocks.filter(function (x) { return x.sectionKey === "executive-summary" && x.type === "paragraph" && RC.norm(x.text) === RC.norm(es.texts[0]); })[0];
+    bp.t2 = thread(blockAnchor(b), "A reviewer's reworded opening sentence.");
+    var plan = RV.acceptPlan(bp.t2);
+    ok(plan.can && plan.kind === "paragraph", "the generated opening before those prompts can be accepted", JSON.stringify(plan));
+    return acceptIt(bp.t2);
+  });
+  step(function (res) {
+    ok(res.ok, "accepted", res.message);
+    return issues();
+  });
+  step(function (list) {
+    ok(list.length === bp.before, "and every prompt is still printed and counted (" + list.length + " of " + bp.before + ")");
+    return new Promise(function (r) { RV.undoAccept(bp.t2, r); });
+  });
+  step(function (res) {
+    ok(res.ok && !Object.keys(E.getReportSection("executive-summary")).length, "Undo puts the generated opening back", res.message);
+    E.setReportNarrative(bp.narrative);
+    var s = RV.store(); s.threads = s.threads.filter(function (t) { return t !== bp.t2; });
+    // A prompt that is part of the run (the standing method, closing in a
+    // [prompt] to confirm it): rewording that paragraph would take the prompt
+    // out unanswered, so it is refused. The paragraphs beside it are not.
+    E.activateInstrument("supplier-screener");
+    bp.method = E.getReportNarrative().method;
+    E.setReportNarrative({ method: "" });
+    return docs();
+  });
+  step(function (d) {
+    var sec = d[0].probe.filter(function (p) { return p.key && p.prompts && p.texts.length; })[0];
+    ok(!!sec, "the standing method prints with a red prompt in its section's opening (" + (sec && sec.key) + ")");
+    if (!sec) return;
+    var b = d[0].blocks.filter(function (x) { return x.sectionKey === sec.key && x.type === "paragraph" && x.red; })[0];
+    ok(!!b, "one paragraph of that opening is the prompt");
+    var t = thread(blockAnchor(b), "A reviewer's wording for the method.");
+    var plan = RV.acceptPlan(t);
+    ok(!plan.can && /prompt to complete in the tool/.test(plan.why) && !/[\u2013\u2014]/.test(plan.why), "Accept on the prompt is refused: it is answered in the tool, not reworded", JSON.stringify(plan));
+    var plain = d[0].blocks.filter(function (x) { return x.sectionKey === sec.key && x.type === "paragraph" && !x.red && sec.texts.some(function (y) { return RC.norm(y) === RC.norm(x.text); }); })[0];
+    var t2 = plain ? thread(blockAnchor(plain), "A reviewer's wording for the paragraph beside it.") : null;
+    ok(!plain || RV.acceptPlan(t2).kind === "paragraph", "a paragraph beside it in the same opening can still be accepted");
+    var s = RV.store(); s.threads = s.threads.filter(function (x) { return x !== t && x !== t2; });
+  });
+  step(function () { E.setReportNarrative({ method: bp.method }); });
+
+  // ---- wording is written to an item only where the text is about that item -----------
+  var it3 = {};
+  step(function () {
+    E.activateInstrument("ncsc-caf");
+    var tid = E.state.engagement.targets[0].id;
+    var road = E.scoreAllTargets().perTarget[0].result.roadmap || [];
+    it3.tid = tid; it3.itemId = road[0].itemId || road[0].requirementId || road[0].outcomeId || road[0].id;
+    it3.owner = (E.findResponse(tid, it3.itemId) || {}).owner || "";
+    E.setResponse(tid, it3.itemId, { owner: "Site Engineering Manager" });
+    E.getBasisOfAssessment().interviews.push({ name: "P. Jones", role: "Site Engineering Manager", date: "2026-10-01" }); E.touchBasisOfAssessment();
+    return docs();
+  });
+  step(function (d) {
+    var found = null;
+    d[0].blocks.forEach(function (b) {
+      if (found || b.type !== "table" || b.sectionKey !== "people-interviewed") return;
+      b.rows.forEach(function (r, ri) { r.cells.forEach(function (c, ci) { if (!found && RC.norm(c.text) === "Site Engineering Manager") found = { b: b, cell: { row: ri, col: ci } }; }); });
+    });
+    ok(!!found, "a role in the People interviewed table reads the same as an item's owner");
+    var a = blockAnchor(found.b); a.quote = "Site Engineering Manager"; a.cell = found.cell;
+    it3.t = thread(a, "Site Engineering Lead");
+    var plan = RV.acceptPlan(it3.t);
+    ok(!plan.can && /cannot be changed here/.test(plan.why), "Accept on that cell is not offered: the table prints no item's field", JSON.stringify(plan));
+    return acceptIt(it3.t);
+  });
+  step(function (res) {
+    ok(!res.ok && E.findResponse(it3.tid, it3.itemId).owner === "Site Engineering Manager" && it3.t.status === "open", "and the item's owner is left alone", res.message);
+    // The same owner where it is the item's: its line in the roadmap.
+    var d = RV.cachedDocs(), hit = null;
+    d[0].blocks.forEach(function (b) { if (!hit && b.type !== "table" && /roadmap/.test(b.sectionKey || "") && /Site Engineering Manager/.test(b.text || "")) hit = b; });
+    ok(!!hit, "the owner prints on the item's own line in the roadmap", hit && hit.text);
+    it3.t2 = thread(blockAnchor(hit), hit.text.replace("Site Engineering Manager", "Site Engineering Lead"));
+    var plan = RV.acceptPlan(it3.t2);
+    ok(plan.can && plan.kind === "owner" && plan.revert.itemId === it3.itemId, "there it is accepted into that item's owner", JSON.stringify(plan));
+    return acceptIt(it3.t2);
+  });
+  step(function (res) {
+    ok(res.ok && E.findResponse(it3.tid, it3.itemId).owner === "Site Engineering Lead", "accepted", res.message);
+    ok(E.getBasisOfAssessment().interviews.slice(-1)[0].role === "Site Engineering Manager", "and the interview's role is not touched");
+    // One accepted change per comment. The reviewer changes the suggestion,
+    // which opens the comment again with the first change still in the report.
+    it3.t2.status = "open"; it3.t2.comment.suggestion = it3.t2.comment.suggestion.replace("Site Engineering Lead", "Engineering Director");
+    var keep = JSON.stringify(it3.t2.accepted);
+    var plan = RV.acceptPlan(it3.t2);
+    ok(!plan.can && /Undo the accepted wording first/.test(plan.why), "a second Accept is refused while the first is in the report", JSON.stringify(plan));
+    return acceptIt(it3.t2).then(function (res2) {
+      ok(!res2.ok && JSON.stringify(it3.t2.accepted) === keep && E.findResponse(it3.tid, it3.itemId).owner === "Site Engineering Lead", "and the record of what the first replaced is not written over", res2.message);
+      return new Promise(function (r) { RV.undoAccept(it3.t2, r); });
+    });
+  });
+  step(function (res) {
+    ok(res.ok && E.findResponse(it3.tid, it3.itemId).owner === "Site Engineering Manager" && !it3.t2.accepted, "Undo puts the first owner back", res.message);
+    return docs();
+  });
+  step(function () {
+    var plan = RV.acceptPlan(it3.t2);
+    ok(plan.can && plan.kind === "owner", "after which the new suggestion can be accepted", JSON.stringify(plan));
+    E.setResponse(it3.tid, it3.itemId, { owner: it3.owner });
+    var b = E.getBasisOfAssessment(); b.interviews.pop(); E.touchBasisOfAssessment();
+    var s = RV.store(); s.threads = s.threads.filter(function (t) { return t !== it3.t && t !== it3.t2; });
+    return docs();
+  });
+  // The new wording has to be in the section the comment is on, not just
+  // somewhere. Here the rebuilt document leaves the roadmap out and prints the
+  // new evidence in another section's opening, as a fault in the exporter might.
+  var sec4 = {};
+  step(function (d) {
+    var it = RV.packItems().items.filter(function (i) {
+      var n = RC.norm(i.evidence);
+      return i.status === "finding" && n.length > 20 &&
+        d[0].blocks.filter(function (b) { return b.type !== "table" && /roadmap/.test(b.sectionKey || "") && RC.norm(b.text || "").indexOf(n) !== -1; }).length === 1;
+    })[0];
+    ok(!!it, "a finding's evidence prints on its own line in the roadmap");
+    if (!it) return;
+    var hit = d[0].blocks.filter(function (b) { return b.type !== "table" && /roadmap/.test(b.sectionKey || "") && RC.norm(b.text || "").indexOf(RC.norm(it.evidence)) !== -1; })[0];
+    sec4.it = it; sec4.key = hit.sectionKey;
+    sec4.t = thread(blockAnchor(hit), hit.text.replace(it.evidence, it.evidence + " Seen on site."));
+    var plan = RV.acceptPlan(sec4.t);
+    ok(plan.can && plan.kind === "evidence", "a comment on it there can be accepted", JSON.stringify(plan));
+    var real = A.Report.reportCustom, tid = E.state.engagement.targets[0].id;
+    A.Report.reportCustom = function (o) {
+      var c = Object.assign({}, real(o));
+      // Only once the change is in: the first read must still find the comment.
+      var now = (E.findResponse(tid, it.itemId) || {}).evidence || "";
+      if (/Seen on site\./.test(now)) {
+        c[sec4.key] = Object.assign({}, c[sec4.key], { hidden: true });
+        c[leadKey] = Object.assign({}, c[leadKey], { prose: "Captured evidence: " + now });
+      }
+      return c;
+    };
+    return acceptIt(sec4.t).then(function (res) {
+      A.Report.reportCustom = real;
+      ok(DB.flatten(RV.cachedDocs()[0].blocks).every(function (b) { return !/Seen on site\./.test(b.text || ""); }), "(the documents are back as they were)");
+      ok(!res.ok && /did not reach the Word document/.test(res.message), "wording that prints only in another section does not count as accepted", res.message);
+      ok(E.findResponse(tid, it.itemId).evidence === it.evidence && sec4.t.status === "open", "and the change is undone");
+      var s = RV.store(); s.threads = s.threads.filter(function (t) { return t !== sec4.t; });
+      return docs();
+    });
+  });
+
+  // ---- an answer a zone inherits ----------------------------------------------------------
+  var sh = {};
+  step(function () { E.activateInstrument("iec-62443-3-3"); return docs(); });
+  step(function () {
+    var S = E.SHARED_TARGET_ID, eng = E.state.engagement, z = eng.targets[0];
+    // A system-wide answer every zone inherits.
+    var r = eng.responses.filter(function (x) {
+      return x.targetId === S && Object.keys(x.components || {}).some(function (k) { return x.components[k].state && !(x.components[k].appliesTo || []).length; });
+    })[0];
+    ok(!!r, "the 3-3 demo has a system-wide answer");
+    sh.S = S; sh.z = z; sh.id = r.requirementId;
+    sh.was = { action: r.action || "" };
+    E.setResponse(S, sh.id, { action: "Shared recommended action for every zone." });
+    // The zone has an owner of its own, so it takes none of the shared plan:
+    // its recommended action is blank, whatever the shared layer holds.
+    E.setResponse(z.id, sh.id, { owner: "Zone owner only", action: "", impact: "", priorityBand: "", priorityRank: null });
+    var it = RV.packItems().items.filter(function (i) { return i.targetId === z.id && i.itemId === sh.id; })[0];
+    ok(it.action === "" && it.owner === "Zone owner only", "a zone with its own owner shows no inherited action in the pack", JSON.stringify([it.action, it.owner]));
+    sh.t = thread({ documentIndex: 0, kind: "item", targetName: z.name, targetId: z.id, itemId: sh.id, field: "action", quote: it.action, code: it.code, itemTitle: it.title, groupName: it.groupName }, "Enforce it by March.");
+    ok(RV.isStale(sh.t) === false, "a comment on that blank action is not marked as no longer matching");
+    var plan = RV.acceptPlan(sh.t);
+    ok(plan.can && plan.kind === "recommended action" && plan.revert.targetId === z.id, "and its wording goes to the zone's own answer, not the system-wide one", JSON.stringify(plan));
+    // With no plan of its own, the zone inherits the shared one.
+    E.setResponse(z.id, sh.id, { owner: "" });
+    it = RV.packItems().items.filter(function (i) { return i.targetId === z.id && i.itemId === sh.id; })[0];
+    ok(it.action === "Shared recommended action for every zone.", "with no plan of its own the zone shows the system-wide action", it.action);
+    sh.t2 = thread({ documentIndex: 0, kind: "item", targetName: z.name, targetId: z.id, itemId: sh.id, field: "action", quote: it.action, code: it.code, itemTitle: it.title, groupName: it.groupName }, "Shared recommended action, agreed with the site.");
+    ok(RV.isStale(sh.t2) === false, "a comment on it matches");
+    plan = RV.acceptPlan(sh.t2);
+    ok(plan.can && plan.revert.targetId === S, "and its wording goes to the system-wide answer", JSON.stringify(plan));
+    return acceptIt(sh.t2);
+  });
+  step(function (res) {
+    ok(res.ok && E.findResponse(sh.S, sh.id).action === "Shared recommended action, agreed with the site.", "accepted into the system-wide answer", res.message);
+    ok(/This is a system-wide answer, so the change applies to every .+ that inherits it\./.test(res.message) && !/[\u2013\u2014]/.test(res.message), "and the message says it applies to every zone that inherits it", res.message);
+    return new Promise(function (r) { RV.undoAccept(sh.t2, r); });
+  });
+  step(function (res) {
+    ok(res.ok && E.findResponse(sh.S, sh.id).action === "Shared recommended action for every zone.", "Undo puts the system-wide wording back", res.message);
+    E.setResponse(sh.S, sh.id, { action: sh.was.action });
+    var s = RV.store(); s.threads = s.threads.filter(function (t) { return t !== sh.t && t !== sh.t2; });
   });
   chain.catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(done);
 });

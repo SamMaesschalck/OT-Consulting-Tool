@@ -6,7 +6,7 @@ window.App.Data.contracts = window.App.Data.contracts || {};
 window.App.Data.contracts.reviewPack = {
   "schema": "spt-review-pack/1.0",
   "_note": "What an author sends for review. The assessment tool and the risk tool WRITE it (Send for review); the report review tool READS it. It holds the text the client will receive, read back from the generated Word file, and the engagement behind it, so a reviewer can challenge a finding as well as its wording. A pack contains client data: handle it like the project file. Each tool carries its own copy of this contract; bump the schema string here when the shape changes, so that a mismatch fails loudly. Importers ACCEPT the listed schemas and reject unknown ones with a clear message.",
-  "_optional": "Within spt-review-pack/1.0 these fields are OPTIONAL and additive, so a pack without them loads and shows exactly as before, and a reader that does not know them ignores them: engagement.fieldLabels, items[].targetId, items[].details, request and documents[].blocks[].runs[].c. Nothing in request ever reaches Word or Excel.",
+  "_optional": "Within spt-review-pack/1.0 these fields are OPTIONAL and additive, so a pack without them loads and shows exactly as before, and a reader that does not know them ignores them: engagement.fieldLabels, items[].targetId, items[].details, request, documents[].blocks[].runs[].c, and from and fileId on a reply in previousRound.comments[].replies. Nothing in request ever reaches Word or Excel.",
   "acceptedSchemas": ["spt-review-pack/1.0"],
   "shape": {
     "schema": "spt-review-pack/1.0",
@@ -64,7 +64,7 @@ window.App.Data.contracts.reviewPack = {
       "perTarget": [{ "targetName": "", "roadmapEntries": 0, "findings": 0, "met": 0, "recorded": 0, "toAssess": 0, "unanswered": 0, "na": 0, "groups": [{ "groupName": "", "findings": 0, "met": 0, "recorded": 0, "toAssess": 0, "unanswered": 0, "na": 0 }] }]
     },
     "previousRound": {
-      "comments": [{ "comment": "a comment as in spt-review/1.0", "status": "open | resolved | wontchange", "reason": "why it will not change", "replies": [{ "id": "", "author": "", "at": "", "text": "" }], "round": 1, "confirmedBy": ["names of reviewers who confirmed the fix"] }],
+      "comments": [{ "comment": "a comment as in spt-review/1.0", "status": "open | resolved | wontchange", "reason": "why it will not change", "replies": [{ "id": "", "author": "", "at": "", "text": "", "from": "OPTIONAL. \"reviewer\" on a reply a reviewer wrote (the replies of a review file); absent on the author's own", "fileId": "OPTIONAL. On a reviewer's reply, the review file it came in" }], "round": 1, "confirmedBy": ["names of reviewers who confirmed the fix"] }],
       "verdicts": [{ "reviewer": "", "round": 1, "value": "approved", "date": "", "note": "" }]
     }
   },

@@ -1,0 +1,227 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review: when a round counts as reviewed, and what an import keeps</title></head>
+<body>
+<!--
+  The rules of a review that an author relies on without seeing them, on the
+  shared core (js/review-core.js) and the comments list (js/review-author.js),
+  with a stand-in adapter and no Word build.
+  - A round is reviewed only when a file with a verdict is back. A file saved
+    with no verdict yet says so, and silences nothing: not "not reviewed", and
+    not "changed since approval" of an earlier round, which is checked against
+    the latest round anyone approved.
+  - Each reviewer speaks through their latest file with a verdict. A request for
+    changes that can never be answered (a reviewer who left, or approved later
+    under another name) goes when the author sets that review aside, which keeps
+    its comments and can be reversed.
+  - A comment the reviewer deletes after the author accepted its wording stays
+    listed, with its Undo, and the import says so.
+  - A reviewer's replies on earlier comments (the review file's optional replies)
+    merge by id, are updated and removed with the reviewer's later saves, never
+    reopen a closed comment, show in the list and travel in the next pack.
+  - A second Accept is not offered while the first is still in the report.
+-->
+<script src="harness.js"></script>
+<script>H.app({}); H.dom();</script>
+<script>
+H.test(function (ok) {
+  var A = window.App, RC = A.ReviewCore, RA = A.ReviewAuthor;
+  function pack(store, hash) {
+    var nr = RC.nextRound(store, [{ contentHash: hash }]);
+    var p = { schema: RC.packSchema(), packId: nr.packId, reviewId: store.reviewId, round: nr.round, createdAt: new Date().toISOString(), engagement: {},
+      documents: [{ title: "D", targetName: "", contentHash: hash, blocks: [] }] };
+    RC.recordRound(store, p);
+    return p;
+  }
+  function comment(id, who, sev, text, sug) {
+    return { id: id, reviewer: who, createdAt: "2026-11-01T10:00:00Z", updatedAt: "2026-11-01T10:00:00Z", severity: sev || "should-fix",
+      anchor: { kind: "general", documentIndex: 0, sectionTitle: "General", quote: "" }, text: text || "A point.", suggestion: sug || null, relatesTo: null, check: null };
+  }
+  function file(p, who, verdict, comments, savedAt, extra) {
+    return Object.assign({ schema: RC.fileSchema(), packId: p.packId, reviewId: p.reviewId, round: p.round, fileId: "rf-" + who + "-" + p.round, reviewer: who, savedAt: savedAt,
+      verdict: { value: verdict, date: "", note: "" }, checklist: [], dismissedChecks: [], confirmations: [], comments: comments || [] }, extra || {});
+  }
+  function texts(s, hashes) { return RC.warnings(s, hashes).map(function (w) { return w.text; }); }
+  function kinds(s, hashes) { return RC.warnings(s, hashes).map(function (w) { return w.kind; }).join(","); }
+
+  // ---- a file with no verdict is not a review ----------------------------------
+  var s = RC.emptyStore(), p1 = pack(s, "a");
+  RC.importFile(s, file(p1, "Ruth", "none", [comment("c1", "Ruth")], "2026-11-01T10:00:00Z"));
+  var w = texts(s, ["a"]);
+  ok(w.length === 1 && w[0] === "1 review file is back for round 1 with no verdict yet.", "one file back with no verdict: said plainly, and still not reviewed", JSON.stringify(w));
+  ok(kinds(s, ["a"]) === "not-reviewed", "under the same kind as not reviewed, so the Issue check still warns");
+  RC.importFile(s, file(p1, "Omar", "none", [], "2026-11-01T11:00:00Z"));
+  ok(texts(s, ["a"])[0] === "2 review files are back for round 1 with no verdict yet.", "two files: plural", texts(s, ["a"])[0]);
+  ok(!/[–—]/.test(texts(s, ["a"]).join(" ")), "no em or en dashes");
+  RC.importFile(s, file(p1, "Omar", "approved", [], "2026-11-01T12:00:00Z"));
+  ok(kinds(s, ["a"]) === "", "once one of them has a verdict the round is reviewed", JSON.stringify(texts(s, ["a"])));
+
+  // An approved round 1, a changed report sent as round 2, and a round-2 file
+  // with no verdict: both lines stand.
+  s = RC.emptyStore(); p1 = pack(s, "a");
+  RC.importFile(s, file(p1, "Ann", "approved", [], "2026-11-01T10:00:00Z"));
+  var p2 = pack(s, "b");
+  ok(kinds(s, ["b"]) === "not-reviewed,changed-since-approval", "approved in round 1, round 2 sent with changes: waiting, and changed since approval", JSON.stringify(texts(s, ["b"])));
+  RC.importFile(s, file(p2, "Ben", "none", [], "2026-11-03T10:00:00Z"));
+  w = texts(s, ["b"]);
+  ok(w.indexOf("1 review file is back for round 2 with no verdict yet.") !== -1, "a round-2 file with no verdict does not make round 2 reviewed", JSON.stringify(w));
+  ok(w.indexOf("Approved by Ann in round 1, but the report has changed since.") !== -1, "nor hide that the report changed since Ann approved round 1", JSON.stringify(w));
+  RC.importFile(s, file(p2, "Ben", "approved", [], "2026-11-04T10:00:00Z"));
+  ok(kinds(s, ["b"]) === "", "Ben's approval of round 2 is the latest approval, and the report matches it", JSON.stringify(texts(s, ["b"])));
+  ok(/Approved by Ben in round 2, but the report has changed since\./.test(texts(s, ["c"]).join(" ")), "a later change is checked against round 2, naming who approved that round", JSON.stringify(texts(s, ["c"])));
+
+  // ---- each reviewer's latest verdict; setting a review aside ---------------------
+  s = RC.emptyStore(); p1 = pack(s, "a");
+  RC.importFile(s, file(p1, "Sam M", "changes-requested", [comment("m1", "Sam M", "must-fix")], "2026-11-01T10:00:00Z"));
+  // The same reviewer starts again on another machine: a second file, same pack.
+  RC.importFile(s, file(p1, "Sam M", "approved", [], "2026-11-02T10:00:00Z", { fileId: "rf-second" }));
+  ok(!/Changes requested/.test(texts(s, ["a"]).join(" ")), "a reviewer's later file for the same round speaks for them", JSON.stringify(texts(s, ["a"])));
+  ok(/1 must-fix review comment is still open/.test(texts(s, ["a"]).join(" ")), "their open must fix still counts");
+
+  s = RC.emptyStore(); p1 = pack(s, "a");
+  RC.importFile(s, file(p1, "Sam M", "changes-requested", [comment("m2", "Sam M", "should-fix")], "2026-11-01T10:00:00Z"));
+  p2 = pack(s, "b");
+  RC.importFile(s, file(p2, "Sam Morris", "approved", [], "2026-11-03T10:00:00Z"));
+  ok(/Changes requested by Sam M in round 1; Sam M has not reviewed round 2 yet\./.test(texts(s, ["b"]).join(" ")), "approving under a slightly different name leaves the earlier request standing");
+  var first = s.files.filter(function (f) { return f.reviewer === "Sam M"; })[0];
+  ok(RC.setAside(s, first.fileId, true).ok && !!first.setAside, "the author can set that review aside");
+  ok(kinds(s, ["b"]) === "", "which clears the warning", JSON.stringify(texts(s, ["b"])));
+  ok(kinds(s, ["c"]) === "changed-since-approval", "and lets the approval be checked against the report", kinds(s, ["c"]));
+  ok(!!RC.findThread(s, "m2") && RC.findThread(s, "m2").status === "open", "its comments stay");
+  var again = RC.importFile(s, file(p1, "Sam M", "changes-requested", [comment("m2", "Sam M", "should-fix")], "2026-11-05T10:00:00Z"));
+  ok(again.ok && again.setAside === true && kinds(s, ["b"]) === "", "a later save of the file set aside stays set aside, and the import says so", JSON.stringify(again));
+  RC.setAside(s, first.fileId, false);
+  ok(/Changes requested by Sam M in round 1/.test(texts(s, ["b"]).join(" ")), "counting it again brings the warning back");
+  ok(!RC.setAside(s, "nope", true).ok, "an unknown file is refused");
+  // The only review back for the latest round, set aside.
+  s = RC.emptyStore(); p1 = pack(s, "a");
+  RC.importFile(s, file(p1, "Gone", "changes-requested", [], "2026-11-01T10:00:00Z"));
+  RC.setAside(s, s.files[0].fileId, true);
+  ok(texts(s, ["a"]).join("|") === "Round 1 was sent, and the only review back has been set aside.", "with the only review set aside, the round is not reviewed and says why", JSON.stringify(texts(s, ["a"])));
+
+  // ---- a comment deleted after its wording was accepted ---------------------------
+  s = RC.emptyStore(); p1 = pack(s, "a");
+  RC.importFile(s, file(p1, "Ruth", "none", [comment("d1", "Ruth", "should-fix", "Reword.", "New words."), comment("d2", "Ruth"), comment("d3", "Ruth")], "2026-11-01T10:00:00Z"));
+  var t = RC.findThread(s, "d1");
+  t.accepted = { at: "2026-11-01T11:00:00Z", kind: "section opening", revert: { what: "section", key: "k", field: "prose", prev: null }, applied: "New words." };
+  t.status = "resolved";
+  RC.setStatus(s, "d2", "wontchange", "Client's wording.");
+  var r = RC.importFile(s, file(p1, "Ruth", "none", [], "2026-11-02T10:00:00Z"));
+  ok(r.removed === 1 && r.withdrawn === 2 && r.withdrawnAccepted === 1, "the import counts what was deleted unanswered, answered, and accepted", JSON.stringify(r));
+  ok(RC.findThread(s, "d1").withdrawn && !!RC.findThread(s, "d1").accepted.revert && !RC.findThread(s, "d3"), "the accepted one is kept with what it replaced; the unanswered one goes");
+  r = RC.importFile(s, file(p1, "Ruth", "none", [], "2026-11-03T10:00:00Z"));
+  ok(r.withdrawn === 0, "a later save does not report the same deletion twice", JSON.stringify(r));
+
+  // ---- the reviewer's replies on earlier comments -----------------------------------
+  s = RC.emptyStore(); p1 = pack(s, "a");
+  RC.importFile(s, file(p1, "Ruth", "changes-requested", [comment("e1", "Ruth"), comment("e2", "Ruth")], "2026-11-01T10:00:00Z"));
+  RC.addReply(s, "e1", "Author", "Done in section 4.");
+  RC.setStatus(s, "e2", "wontchange", "Agreed with the client.");
+  p2 = pack(s, "b");
+  var rep = [{ id: "rr-1", to: "e1", text: "  Thanks, that reads better. ", at: "2026-11-04T09:00:00Z" }, { id: "rr-2", to: "e2", text: "I still think this matters.", at: "2026-11-04T09:05:00Z" },
+    { id: "rr-3", to: "no-such-comment", text: "Lost.", at: "2026-11-04T09:06:00Z" }, { id: "", to: "e1", text: "No id." }, { id: "rr-5", to: "e1", text: "   " }];
+  r = RC.importFile(s, file(p2, "Ruth", "none", [], "2026-11-04T10:00:00Z", { replies: rep }));
+  var e1 = RC.findThread(s, "e1"), e2 = RC.findThread(s, "e2");
+  ok(r.ok && r.replies === 2 && r.repliesOnClosed === 1, "two replies come in, one of them on a closed comment", JSON.stringify(r));
+  ok(e1.replies.length === 2 && e1.replies[1].id === "rr-1" && e1.replies[1].author === "Ruth" && e1.replies[1].text === "Thanks, that reads better." && e1.replies[1].at === "2026-11-04T09:00:00Z",
+    "a reply joins the thread after the author's, under the reviewer's name, trimmed", JSON.stringify(e1.replies));
+  ok(e2.status === "wontchange" && e2.reason === "Agreed with the client." && e2.replies.length === 1 && !e2.reopened, "a reply on a won't-change comment does not reopen it", JSON.stringify(e2));
+  var before = JSON.stringify(s.threads);
+  r = RC.importFile(s, file(p2, "Ruth", "none", [], "2026-11-04T10:00:00Z", { replies: rep }));
+  ok(r.duplicate && JSON.stringify(s.threads) === before, "importing the same file again changes nothing");
+  rep[0].text = "Thanks, much better."; rep.splice(1, 1);
+  r = RC.importFile(s, file(p2, "Ruth", "none", [], "2026-11-05T10:00:00Z", { replies: rep }));
+  ok(r.replies === 1 && e1.replies.length === 2 && e1.replies[1].text === "Thanks, much better.", "a later save with other text updates the reply, without adding one", JSON.stringify(e1.replies));
+  ok(RC.findThread(s, "e2").replies.length === 0, "and a reply no longer in the reviewer's file is removed");
+  ok(e1.replies[0].author === "Author" && e1.replies[0].text === "Done in section 4.", "the author's own reply is untouched");
+  // Another reviewer's file never removes Ruth's reply.
+  RC.importFile(s, file(p2, "Omar", "approved", [], "2026-11-05T11:00:00Z", { replies: [{ id: "ro-1", to: "e1", text: "Agreed.", at: "2026-11-05T10:30:00Z" }] }));
+  ok(e1.replies.length === 3 && e1.replies[2].author === "Omar", "a second reviewer's reply is added beside the first's", JSON.stringify(e1.replies));
+  var pr = RC.previousRound(s).comments.filter(function (c) { return c.comment.id === "e1"; })[0];
+  ok(pr.replies.length === 3 && pr.replies[1].from === "reviewer" && pr.replies[1].author === "Ruth" && !pr.replies[0].from, "the next pack carries the thread's replies, the reviewer's marked as theirs", JSON.stringify(pr.replies));
+  // A file from before replies existed, and one with a malformed list.
+  r = RC.importFile(s, file(p2, "Old", "none", [], "2026-11-05T12:00:00Z"));
+  ok(r.ok && r.replies === 0, "a file with no replies imports as before");
+  r = RC.importFile(s, file(p2, "Odd", "none", [], "2026-11-05T12:00:00Z", { replies: "nonsense" }));
+  ok(r.ok && r.replies === 0 && e1.replies.length === 3, "and a replies field that is not a list is ignored");
+  ok(RC.identify(JSON.stringify(window.App.Data.contracts.reviewFile.example)).ok, "the contract's example still reads");
+  ok(/replies/.test(window.App.Data.contracts.reviewFile._optional) && /rowKey/.test(window.App.Data.contracts.reviewFile._optional) && /colHead/.test(window.App.Data.contracts.reviewFile._optional),
+    "the contract lists replies, rowKey and colHead as optional");
+
+  // ---- the author's list --------------------------------------------------------------
+  var touched = 0, paints = { begin: 0, end: 0 }, planFor = {};
+  var holder = document.createElement("div"); document.body.appendChild(holder);
+  var ui = RA.newUi(); ui.status = "";
+  function adapter(store) {
+    return { store: function () { return store; }, touch: function () { touched++; }, send: function () {}, goTo: function () {}, canGo: function () { return false; },
+      acceptPlan: function (th) { return planFor[th.comment.id] || { can: true, label: "Accept" }; }, accept: function () {}, undoAccept: function (th, done) { done({ ok: true, message: "Back." }); },
+      stale: function () { return false; }, authorName: function () { return "Author"; }, toast: function () {},
+      beginPaint: function () { paints.begin++; }, endPaint: function () { paints.end++; } };
+  }
+  RA.mount(holder, adapter(s), ui);
+  ok(paints.begin === 1 && paints.end === 1, "one drawing of the list tells the tool when it starts and ends");
+  var card = holder.querySelector('[data-comment-id="e1"]');
+  var lines = card ? Array.prototype.map.call(card.querySelectorAll(".rv-replyline"), function (x) { return x.textContent; }) : [];
+  ok(lines.length === 3 && /^Author/.test(lines[0]) && /^Ruth/.test(lines[1]) && /Thanks, much better\./.test(lines[1]) && /^Omar/.test(lines[2]), "the reviewer's replies show in the thread like the author's", lines.join(" | "));
+
+  // Import through the list, as Import review files does: the message.
+  var s2 = RC.emptyStore(), q1 = pack(s2, "a");
+  RC.importFile(s2, file(q1, "Ruth", "none", [comment("g1", "Ruth", "should-fix", "Reword.", "New words."), comment("g2", "Ruth")], "2026-11-01T10:00:00Z"));
+  var g1 = RC.findThread(s2, "g1");
+  g1.accepted = { at: "2026-11-01T11:00:00Z", kind: "section opening", revert: { what: "section", key: "k", field: "prose", prev: null }, applied: "New words." };
+  g1.status = "resolved";
+  RC.setStatus(s2, "g2", "resolved");
+  var q2 = pack(s2, "b");
+  var ui2 = RA.newUi(), holder2 = document.createElement("div"); document.body.appendChild(holder2);
+  var ad2 = adapter(s2);
+  var out = RA.importTexts(ad2, [
+    { name: "round1.json", text: JSON.stringify(file(q1, "Ruth", "none", [comment("g2", "Ruth")], "2026-11-02T10:00:00Z")) },
+    { name: "round2.json", text: JSON.stringify(file(q2, "Ruth", "none", [], "2026-11-03T10:00:00Z", { fileId: "rf-Ruth-2", replies: [{ id: "rg-1", to: "g2", text: "Checked, thank you.", at: "2026-11-03T09:00:00Z" }] })) }
+  ], ui2, function () { RA.mount(holder2, ad2, ui2); });
+  var said = out.lines.join("\n");
+  ok(/Ruth also deleted 1 comment you had already answered\./.test(said) && /Wording you accepted from it is still in the report, so that comment stays listed \(show All\), with Undo the accepted wording\./.test(said),
+    "the import says a comment with accepted wording was deleted, and where to find it", said);
+  ok(/1 reply\b/.test(said) && /1 reply is on a comment you had closed, which stays closed: show All to read it\./.test(said), "and that a reply came in on a closed comment", said);
+  ok(!/[–—]/.test(said), "with no em or en dashes");
+  ok(RC.findThread(s2, "g2").status === "resolved", "the closed comment stays closed");
+  ui2.status = ""; RA.mount(holder2, ad2, ui2);
+  var gone = holder2.querySelector('[data-comment-id="g1"]');
+  ok(!!gone && !!gone.querySelector(".rv-withdrawn") && /Deleted by the reviewer/.test(gone.querySelector(".rv-withdrawn").textContent), "a deleted comment whose wording was accepted is still listed, marked");
+  ok(!!gone && !!gone.querySelector(".rv-undo") && /Undo the accepted wording/.test(gone.querySelector(".rv-undo").textContent), "with its Undo");
+  ok(!RC.previousRound(s2).comments.some(function (c) { return c.comment.id === "g1"; }), "it is not sent to the reviewers again");
+  var s3 = RC.emptyStore(), z1 = pack(s3, "a");
+  RC.importFile(s3, file(z1, "Ruth", "none", [comment("h1", "Ruth")], "2026-11-01T10:00:00Z"));
+  RC.setStatus(s3, "h1", "resolved");
+  RC.importFile(s3, file(z1, "Ruth", "none", [comment("h2", "Ruth")], "2026-11-02T10:00:00Z"));
+  var holder3 = document.createElement("div"); document.body.appendChild(holder3);
+  var ui3 = RA.newUi(); ui3.status = "";
+  RA.mount(holder3, adapter(s3), ui3);
+  ok(!holder3.querySelector('[data-comment-id="h1"]') && !!holder3.querySelector('[data-comment-id="h2"]'), "a deleted comment with no accepted wording is not listed, as before");
+
+  // Set aside, from the list.
+  var s4 = RC.emptyStore(), y1 = pack(s4, "a");
+  RC.importFile(s4, file(y1, "Sam M", "changes-requested", [comment("k1", "Sam M")], "2026-11-01T10:00:00Z"));
+  var holder4 = document.createElement("div"); document.body.appendChild(holder4);
+  var ui4 = RA.newUi(), ad4 = adapter(s4);
+  RA.mount(holder4, ad4, ui4);
+  var btn = holder4.querySelector(".rv-files .rv-aside");
+  ok(!!btn && btn.textContent === "Set aside this review", "each review in the list can be set aside", btn && btn.textContent);
+  touched = 0; btn.click();
+  ok(!!s4.files[0].setAside && touched === 1 && RC.warnings(s4, ["a"]).every(function (x) { return x.kind !== "changes-requested"; }), "which stops it counting, and marks the project changed");
+  var row = holder4.querySelector(".rv-files li");
+  ok(/Set aside/.test(row.querySelector(".rv-aside-tag").textContent) && row.querySelector(".rv-aside").textContent === "Count this review again", "the row says so and offers to count it again", row.textContent);
+  ok(!!holder4.querySelector('[data-comment-id="k1"]'), "its comments are still listed");
+  row.querySelector(".rv-aside").click();
+  ok(!s4.files[0].setAside && /Changes requested by Sam M/.test(texts(s4, ["a"]).join(" ")), "counting it again is one click");
+
+  // One accepted change per comment: the tool's plan says no, the list offers Copy.
+  var s5 = RC.emptyStore(), x1 = pack(s5, "a");
+  RC.importFile(s5, file(x1, "Ruth", "none", [comment("n1", "Ruth", "should-fix", "Reword.", "Newer words.")], "2026-11-01T10:00:00Z"));
+  planFor.n1 = { can: false, why: "Wording from this comment is already in the report. Undo the accepted wording first, then accept the new suggestion." };
+  var holder5 = document.createElement("div"); document.body.appendChild(holder5);
+  RA.mount(holder5, adapter(s5), RA.newUi());
+  var n1 = holder5.querySelector('[data-comment-id="n1"]');
+  ok(!n1.querySelector(".rv-accept") && !!n1.querySelector(".rv-copy") && /Undo the accepted wording first/.test(n1.querySelector(".rv-why").textContent), "a comment the tool will not accept twice offers Copy and says why");
+});
+</script>
+</body></html>

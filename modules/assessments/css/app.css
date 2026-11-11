@@ -1568,6 +1568,8 @@ select.slt-cell:focus { outline: none; border-color: var(--brand-blue); }
 .wo-row { padding: 8px 0; border-top: 1px solid var(--border); }
 .wo-row:first-child { border-top: 0; }
 .wo-prose { margin: 4px 0 6px; font-size: 12.5px; white-space: pre-line; overflow-wrap: anywhere; }
+/* A paragraph reworded from a review comment that is not in the report now. */
+.rw-lost { color: var(--gap); }
 
 .terms-editor h3 { margin: 18px 0 0; font-size: 14px; }
 .term-row {

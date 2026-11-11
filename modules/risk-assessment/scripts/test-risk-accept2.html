@@ -1,0 +1,84 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Risk tool: a pack reflects the section overrides</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Second page of test-risk-accept.html, on a real pack: a pack reflects renamed and
+  hidden sections, per report, with their keys.
+  Needs allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 120000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, RT, RR, RP, RX, RC, DB, RS, main, n = 0;
+    w.confirm = function () { return true; }; w.alert = function () {};
+    function P() { return RT.state.project; }
+    function norm(s) { return RC.norm(s); }
+    function thread(docIndex, b, suggestion, cell) {
+      n++;
+      return { comment: { id: "c" + n, reviewer: "J. Marsh", severity: "should-fix", text: "Reword.", suggestion: suggestion,
+        anchor: { documentIndex: docIndex, kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, quote: cell || b.text, cell: cell ? { row: 0, col: 0 } : null } },
+        status: "open", round: 1, replies: [] };
+    }
+    function docs() { return new Promise(function (res) { RR.refreshDocs(function () { RR.buildDocuments().then(res); }); }); }
+    function current() { return new Promise(function (res) { RR.refreshDocs(res); }); }
+    function accept(t) { return new Promise(function (res) { RR.accept(t, res); }); }
+    function xml(opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(P(), opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
+      });
+    }
+    function reset() { delete P().reportCustom; RT.touched(); }
+
+    poll(function () { return w.RiskTool && w.RiskReview && w.RiskReportPage && w.RiskExports && w.docx && w.RiskTool.state.project.zones.length; }).then(function () {
+      RT = w.RiskTool; RR = w.RiskReview; RP = w.RiskReportPage; RX = w.RiskExports; RC = w.App.ReviewCore; DB = w.App.DocxBlocks; RS = w.App.ReportSections; main = w.document.getElementById("main");
+      return Promise.resolve().then(function () {
+        // ---- a pack reflects the overrides -------------------------------------------------------------
+        reset();
+        RP.setSection("detailed", "method-and-limitations", { title: "How this was done" });
+        RP.setSection("detailed", "basis-of-assessment", { hidden: true });
+        RP.setSection("highLevel", "executive-summary", { title: "Board summary" });
+        return RR.buildPack();
+      }).then(function (r) {
+        var d0 = r.pack.documents[0], d1 = r.pack.documents[1];
+        var ren = d0.blocks.filter(function (b) { return b.type === "heading" && b.text === "How this was done"; })[0];
+        ok(!!ren && ren.sectionKey === "method-and-limitations" && ren.sectionTitle === "How this was done", "a pack prints the new title, under the section's own key", ren && ren.sectionKey);
+        ok(d0.blocks.filter(function (b) { return b.sectionKey === "method-and-limitations" && b.type === "paragraph"; }).length === 2, "with its body under it");
+        ok(!d0.blocks.some(function (b) { return b.sectionKey === "basis-of-assessment"; }), "a hidden section is not in the pack");
+        ok(d1.blocks.some(function (b) { return b.sectionKey === "basis-of-assessment"; }), "but is still in the other report's");
+        ok(d1.blocks.some(function (b) { return b.type === "heading" && b.text === "Board summary" && b.sectionKey === "executive-summary"; }), "and that report's own rename is in it");
+        ok(d0.blocks.some(function (b) { return b.type === "heading" && b.text === "Executive summary"; }), "not this one's");
+        var hs = d0.blocks.filter(function (b) { return b.type === "heading"; });
+        ok(hs.every(function (b) { return !b.sub; }), "every heading matched the build's list of sections");
+        ok(hs.filter(function (b) { return !b.sectionKey; }).every(function (b) { return /^[ZC]\d+: /.test(b.text); }) && hs.filter(function (b) { return !b.sectionKey; }).length === P().zones.length + P().conduits.length, "only a zone's or conduit's own heading has no key");
+        reset();
+      });
+    }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+      try { w.onbeforeunload = null; } catch (e) {}
+      finish();
+    });
+  };
+  frame.src = "../index.html?tour=1";
+})();
+</script>
+</body></html>

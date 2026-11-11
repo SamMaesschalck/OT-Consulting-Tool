@@ -8945,6 +8945,9 @@ window.App.UI = (function () {
       var after = refs.main.querySelector('[data-check-anchor="review"]') || refs.main.querySelector(".issue-check");
       if (after) after.parentNode.insertBefore(wordOnly, after.nextSibling); else refs.main.insertBefore(wordOnly, container);
     }
+    // After the word-only list is placed, so it sits between the Review card
+    // and that list.
+    placeRewordedCard();
 
     // Re-assessment comparison. With a baseline loaded this is a real finding
     // and shows what has moved; with none it is a prompt to load a file, which
@@ -9168,8 +9171,9 @@ window.App.UI = (function () {
     [].slice.call(refs.main.querySelectorAll("[data-section]")).forEach(function (c) { onPage[c.getAttribute("data-section")] = true; });
     var keys = Object.keys(custom).filter(function (k) {
       var c = custom[k];
-      return !onPage[k] && c && typeof c === "object" && (c.title || c.prose || c.hidden || (c.order && c.order.length));
+      return !onPage[k] && c && typeof c === "object" && (c.title || c.prose || c.hidden || (c.order && c.order.length) || paraCount(c));
     });
+    function paraCount(c) { return window.App.ReportSections.paragraphsOf(c).length; }
     if (!keys.length) return null;
     // The Word heading, from the last read of the documents when there is one.
     var docs = window.App.Review && window.App.Review.cachedDocs ? window.App.Review.cachedDocs() : null;
@@ -9186,6 +9190,9 @@ window.App.UI = (function () {
       if (c.prose) what.push("opening rewritten");
       if (c.hidden) what.push("hidden");
       if (c.order && c.order.length) what.push("reordered");
+      // Each is set out, with whether it applies, in the list of reworded
+      // paragraphs above this one.
+      if (paraCount(c)) what.push(paraCount(c) === 1 ? "1 paragraph reworded" : paraCount(c) + " paragraphs reworded");
       var kids = [
         h("div", { class: "wo-head" }, [
           h("strong", { text: titleOf(k) }),
@@ -9204,6 +9211,71 @@ window.App.UI = (function () {
         h("ul", { class: "wo-list" }, rows)
       ])
     ]);
+  }
+
+  // Paragraphs reworded by an accepted review suggestion (a section's
+  // `paragraphs`, see js/review.js). Each replaces one generated paragraph,
+  // found by its text, so when the assessment changes that text the
+  // replacement stops applying and the generated paragraph prints. Nothing
+  // is lost, but the author has to be told, or a report goes out without a
+  // rewording they believe is in it. So every one is listed: its section,
+  // the words before and after, whether it is in the report now, and the way
+  // back. Null when there are none.
+  function buildRewordedCard() {
+    var RV = window.App.Review;
+    var rows = RV && RV.paragraphChanges ? RV.paragraphChanges() : [];
+    if (!rows.length) return null;
+    var RS = window.App.ReportSections;
+    function clip(s) { s = String(s).replace(/\s+/g, " ").trim(); return s.length > 180 ? s.slice(0, 180) + "…" : s; }
+    function titleOf(r) {
+      if (r.title) return r.title;
+      var card = refs.main.querySelector('[data-section="' + String(r.key).replace(/"/g, '\\"') + '"]');
+      if (card) return card.getAttribute("data-section-title") || r.key;
+      var s = r.key.replace(/-/g, " ");
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    // Does this page show the reworded paragraph, or only Word?
+    function onScreen(r) {
+      return [].slice.call(refs.main.querySelectorAll("[data-reworded]")).some(function (p) {
+        return p.getAttribute("data-reworded") === r.from;
+      });
+    }
+    var items = rows.map(function (r) {
+      var note = RS.paragraphNote(r.state);
+      var status = r.state === "checking" ? "Checking the Word report…"
+        : note || (onScreen(r) ? "In the report." : "In the Word report. This page does not show that paragraph.");
+      return h("li", { class: "wo-row", "data-reworded-row": r.key, "data-reworded-state": r.state }, [
+        h("div", { class: "wo-head" }, [
+          h("strong", { text: titleOf(r) }),
+          h("span", { class: note ? "rw-lost" : "muted", text: ": " + status })
+        ]),
+        h("p", { class: "wo-prose muted", text: "Generated: " + clip(r.from) }),
+        h("p", { class: "wo-prose", text: "Reworded: " + clip(r.to) }),
+        h("button", { type: "button", class: "inherited-edit wo-back", text: "Back to the generated version",
+          title: "Takes out this rewording. The paragraph is written from the assessment again",
+          onClick: function () { RV.removeParagraph(r.key, r.from); renderReportPage(); } })
+      ]);
+    });
+    return h("div", { class: "card reworded-changes", "data-check-anchor": "reworded" }, [
+      h("div", { class: "card-h" }, [h("h2", { text: "Paragraphs reworded from review comments" })]),
+      h("div", { class: "card-b" }, [
+        h("p", { class: "issue-lead", text: "Accepting a reviewer's wording on a paragraph that opens a section replaces that paragraph only. The rest of the section is still written from the assessment. If the assessment changes the paragraph it replaced, the rewording stops applying and the generated text prints." }),
+        h("ul", { class: "wo-list" }, items)
+      ])
+    ]);
+  }
+  // Puts the list on the page, or redraws it where it is (the Word report
+  // has been read since, so each line can say whether it applies).
+  function placeRewordedCard() {
+    var old = refs.main.querySelector('[data-check-anchor="reworded"]');
+    var card = view === "report" ? buildRewordedCard() : null;
+    if (old) {
+      if (card) old.parentNode.replaceChild(card, old); else old.parentNode.removeChild(old);
+      return;
+    }
+    if (!card) return;
+    var after = refs.main.querySelector('[data-check-anchor="review"]') || refs.main.querySelector(".issue-check");
+    if (after) after.parentNode.insertBefore(card, after.nextSibling); else refs.main.appendChild(card);
   }
 
   // Editing happens IN the report, not beside it: the heading becomes a field
@@ -9245,11 +9317,17 @@ window.App.UI = (function () {
         title: isNextSteps
           ? "One step per line, in the order you would do them."
           : "One paragraph per line. The tables and charts below are not affected." });
-      proseTa.value = isNextSteps ? generatedProse : (cur.prose || generatedProse);
+      // The box starts from the text as printed. With paragraphs reworded
+      // from review comments, that is the generated wording with those put
+      // in; saving a rewrite then makes it the whole opening, and the
+      // paragraph replacements stay stored, listed as not applying.
+      var printedProse = isNextSteps ? generatedProse
+        : window.App.ReportSections.applyParagraphs(generatedProse.split("\n"), cur.paragraphs).join("\n");
+      proseTa.value = isNextSteps ? generatedProse : (cur.prose || printedProse);
       proseTa.addEventListener("change", function () {
         var v = proseTa.value.trim();
         if (isNextSteps) { E.setReportNarrative({ nextSteps: proseTa.value }); renderReportPage(); return; }
-        save({ prose: (v === generatedProse.trim() || v === "") ? null : v });
+        save({ prose: (v === printedProse.trim() || v === "") ? null : v });
       });
       proseTa.addEventListener("input", function () { autoGrow(proseTa); });
       cardBody.insertBefore(proseTa, lead[0] || cardBody.firstChild);
@@ -10114,6 +10192,7 @@ window.App.UI = (function () {
         var card = refs.main.querySelector(".issue-check");
         if (card) paintIssueCheck(card, lastIssueCheck());
       },
+      repaintReworded: function () { if (view === "report") placeRewordedCard(); },
       toast: toast,
       h: h
     },

@@ -61,7 +61,8 @@
     openedFrom: null,    // { reviewer, ids }: whose the opened file was, and the comments it held
     undoOpen: null,      // the review as it was before a file was opened, until it is drawn
     lastSave: null,      // { name, at, method } of the last save this session
-    focusSearch: false   // put the caret back in the item search after a redraw
+    focusSearch: false,  // put the caret back in the item search after a redraw
+    replyBox: null       // the reply being written to an earlier comment: { to, editing, text }
   };
 
   // ---------- DOM helpers ----------
@@ -76,6 +77,7 @@
       else if (k === "onClick") el.addEventListener("click", v);
       else if (k === "onInput") el.addEventListener("input", v);
       else if (k === "onChange") el.addEventListener("change", v);
+      else if (k === "onKeydown") el.addEventListener("keydown", v);
       else if (k === "value") el.value = v;
       else el.setAttribute(k, v === true ? "" : v);
     });
@@ -91,19 +93,43 @@
       h("div", { class: "card-b" }, kids)
     ]);
   }
-  // action (optional): { label, run } adds one button, such as Undo, and keeps
-  // the message up longer so there is time to press it.
-  var toastTimer = null;
+  function focusOn(el) {
+    if (!el) return false;
+    try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+    return document.activeElement === el;
+  }
+  // action (optional): { label, run, focus, back } adds one button, such as
+  // Undo, and keeps the message up longer so there is time to press it. With
+  // focus (a delete made from the keyboard) the keyboard goes to the button,
+  // and the message stays up while it is there; Escape on it closes the
+  // message and back() says where the keyboard goes then. An Undo on offer is
+  // on Ctrl+Z too (see the wiring).
+  var toastTimer = null, toastUndo = null;
+  function hideToast() { clearTimeout(toastTimer); toastUndo = null; $("toast").className = "toast hidden"; }
   function toast(msg, kind, action) {
-    var t = $("toast");
+    var t = $("toast"), btn = null;
     t.textContent = msg;
-    if (action) t.appendChild(h("button", { type: "button", class: "rr-toast-act", text: action.label, onClick: function () {
-      clearTimeout(toastTimer); t.className = "toast hidden"; action.run();
-    } }));
+    toastUndo = null;
+    if (action) {
+      var press = function () { hideToast(); action.run(); };
+      btn = h("button", { type: "button", class: "rr-toast-act", text: action.label, onClick: press });
+      btn.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape") return;
+        e.preventDefault(); hideToast();
+        if (action.back) action.back();
+      });
+      t.appendChild(btn);
+      if (action.label === "Undo") toastUndo = press;
+    }
     t.className = "toast" + (kind ? " " + kind : "");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.className = "toast hidden"; }, action ? 8000 : 4200);
+    (function wait(ms) {
+      toastTimer = setTimeout(function () { if (t.contains(document.activeElement)) wait(1500); else hideToast(); }, ms);
+    })(action ? 8000 : 4200);
+    if (btn && action.focus) focusOn(btn);
   }
+  // Was this click made from the keyboard (Enter or Space on the button)?
+  function byKeyboard(ev) { return !!ev && ev.detail === 0; }
   function fmtDate(iso) {
     var d = new Date(iso);
     if (isNaN(d.getTime())) return String(iso || "");
@@ -120,6 +146,12 @@
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  // A value inside a quoted attribute selector. A pack's ids are its own, and
+  // one with a quote or a backslash in it must not break the selector.
+  function cssEsc(v) { v = String(v == null ? "" : v); return window.CSS && window.CSS.escape ? window.CSS.escape(v) : v.replace(/["\\]/g, "\\$&"); }
+  // A map keyed by ids from a pack or a file: no inherited names, so an id
+  // such as __proto__ is a key like any other.
+  function mapOf() { return Object.create(null); }
 
   // ---------- theme ----------
   function currentTheme() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
@@ -147,9 +179,10 @@
     b.title = "Save your review file (Shift+click: Save as)" + (state.lastSave ? ". Last saved to " + state.lastSave.name + " at " + fmtTime(state.lastSave.at) + "." : "");
     if (state.review) b.removeAttribute("disabled"); else b.setAttribute("disabled", "");
   }
-  function markClean() { state.dirty = false; updateSaveButton(); }
+  function markClean() { state.dirty = false; cix = null; updateSaveButton(); }
   function touched() {
     state.dirty = true;
+    cix = null;
     updateSaveButton();
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(writeAutosave, 800);
@@ -173,9 +206,12 @@
     normaliseReview(snap.review);
     return { savedOn: snap.savedOn || "", review: snap.review };
   }
+  // Anything the reviewer would mind losing: a dismissed check and a note for
+  // the author count as much as a comment does.
   function hasWork(r) {
-    return !!(r && ((r.comments && r.comments.length) || (r.verdict && r.verdict.value !== "none") ||
-      (r.checklist && r.checklist.some(function (c) { return c.answer || c.note; })) || (r.confirmations && r.confirmations.length)));
+    return !!(r && ((r.comments && r.comments.length) || (r.verdict && ((r.verdict.value && r.verdict.value !== "none") || RC.norm(r.verdict.note))) ||
+      (r.checklist && r.checklist.some(function (c) { return c.answer || c.note; })) || (r.confirmations && r.confirmations.length) ||
+      (r.dismissedChecks && r.dismissedChecks.length) || (r.replies && r.replies.length)));
   }
   function normaliseReview(r) {
     ["checklist", "dismissedChecks", "confirmations", "comments"].forEach(function (k) { if (!Array.isArray(r[k])) r[k] = []; });
@@ -183,6 +219,10 @@
     ["checklist", "confirmations"].forEach(function (k) { r[k] = r[k].filter(function (x) { return x && typeof x === "object"; }); });
     if (!r.verdict || typeof r.verdict !== "object") r.verdict = { value: "none", date: "", note: "" };
     if (!r.verdict.value) r.verdict.value = "none";
+    // Replies to earlier comments are optional: a file without them has no
+    // such key, and one that is not whole says nothing.
+    if (Array.isArray(r.replies)) r.replies = r.replies.filter(function (x) { return x && typeof x === "object" && x.id && x.to && typeof x.text === "string"; });
+    else delete r.replies;
     return r;
   }
   function stamp(x) { var t = Date.parse(x || ""); return isNaN(t) ? 0 : t; }
@@ -206,6 +246,13 @@
     });
     o.confirmations.forEach(function (c) { if (indexBy(m.confirmations, "commentId", c.commentId) < 0) m.confirmations.push(c); });
     o.dismissedChecks.forEach(function (id) { if (m.dismissedChecks.indexOf(id) < 0) m.dismissedChecks.push(id); });
+    // Replies are a union by id too, and one in both keeps its later edit.
+    (o.replies || []).forEach(function (x) {
+      if (!m.replies) m.replies = [];
+      var i = indexBy(m.replies, "id", x.id);
+      if (i < 0) m.replies.push(x);
+      else if (stamp(x.at) > stamp(m.replies[i].at)) m.replies[i] = x;
+    });
     if (o.dismissedCheckTitles && typeof o.dismissedCheckTitles === "object") {
       m.dismissedCheckTitles = m.dismissedCheckTitles || {};
       Object.keys(o.dismissedCheckTitles).forEach(function (k) { if (!(k in m.dismissedCheckTitles)) m.dismissedCheckTitles[k] = o.dismissedCheckTitles[k]; });
@@ -221,7 +268,7 @@
     return m;
   }
   function reviewContent(r) {
-    return JSON.stringify([r.comments, r.checklist.filter(function (c) { return c.answer || c.note; }), r.verdict, r.confirmations, r.dismissedChecks]);
+    return JSON.stringify([r.comments, r.checklist.filter(function (c) { return c.answer || c.note; }), r.verdict, r.confirmations, r.dismissedChecks, r.replies || []]);
   }
   // Would adding `other` change anything in `r`?
   function addsTo(r, other, otherWins) { return reviewContent(mergeReviews(r, other, otherWins)) !== reviewContent(normaliseReview(r)); }
@@ -239,17 +286,41 @@
   // In the page, never confirm(): that blocks a headless run and looks foreign
   // in the exe. build(m) returns the dialog's children; m.close() shuts it and
   // m.cancel() shuts it and calls onCancel. Escape and a click outside cancel.
-  function modal(label, build, onCancel) {
-    var back = null;
-    function onKey(e) { if (e.key === "Escape") { e.preventDefault(); m.cancel(); } }
+  // The keyboard goes into it when it opens (its first field, else the main
+  // button, which in every dialog here is the one that loses nothing), Tab
+  // stays inside it, and closing it puts the keyboard back where it was.
+  function modal(label, build, onCancel, cls) {
+    var back = null, box = null, opener = document.activeElement, openerKey = focusKey(opener), shut = false;
+    function stops() {
+      return Array.prototype.filter.call(box.querySelectorAll("button, input, select, textarea, a[href]"), function (el) { return !el.disabled; });
+    }
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); m.cancel(); return; }
+      if (e.key !== "Tab") return;
+      var list = stops(), at = list.indexOf(document.activeElement);
+      if (!list.length) { e.preventDefault(); return; }
+      if (at === -1 || (e.shiftKey && at === 0) || (!e.shiftKey && at === list.length - 1)) {
+        e.preventDefault();
+        focusOn(list[e.shiftKey ? list.length - 1 : 0]);
+      }
+    }
     var m = {
-      close: function () { if (back && back.parentNode) back.parentNode.removeChild(back); document.removeEventListener("keydown", onKey, true); },
-      cancel: function () { m.close(); if (onCancel) onCancel(); }
+      close: function () {
+        if (shut) return;
+        shut = true;
+        if (back && back.parentNode) back.parentNode.removeChild(back);
+        document.removeEventListener("keydown", onKey, true);
+        // The page may have been drawn again while it was up.
+        if (!focusOn(opener && opener !== document.body && opener.isConnected ? opener : null)) focusBack(openerKey);
+      },
+      cancel: function () { if (shut) return; m.close(); if (onCancel) onCancel(); }
     };
-    back = h("div", { class: "rr-modal-back" }, [h("div", { class: "rr-modal", role: "dialog", "aria-modal": "true", "aria-label": label }, build(m))]);
+    box = h("div", { class: "rr-modal" + (cls ? " " + cls : ""), role: "dialog", "aria-modal": "true", "aria-label": label }, build(m));
+    back = h("div", { class: "rr-modal-back" }, [box]);
     back.addEventListener("click", function (e) { if (e.target === back) m.cancel(); });
     document.addEventListener("keydown", onKey, true);
     document.body.appendChild(back);
+    focusOn(box.querySelector("input, textarea, select") || box.querySelector(".btn.primary") || box.querySelector("button"));
     return m;
   }
 
@@ -356,6 +427,9 @@
   }
   function openPack(pack, isDemo, name) {
     closeFileQuestion();
+    // Unsaved work on the pack being left is stored first: a write still
+    // waiting would be lost, and it is offered back when that pack is opened.
+    if (state.dirty) writeAutosave();
     state.openedFrom = null;
     state.undoOpen = null;
     state.demo = !!isDemo;
@@ -364,6 +438,7 @@
     state.page = "report";
     state.docIndex = 0;
     state.composer = null;
+    state.replyBox = null;
     state.checks = null;
     state.itemTarget = "";
     state.handle = null;
@@ -454,6 +529,7 @@
       state.openedFrom = { reviewer: RC.norm(file.reviewer), ids: file.comments.map(function (c) { return c.id; }) };
       state.handle = handle || null;
       state.composer = null;
+      state.replyBox = null;
       state.pendingReview = null;
       state.savedHint = null;
       state.colleague = null;
@@ -507,27 +583,42 @@
   }
   // Asked in the page, like every other question here: never confirm().
   function askMerge(name, cb) {
-    fileQuestion = modal("Unsaved comments", function (m) {
+    fileQuestion = modal("Unsaved work", function (m) {
       function pick(v) { return function () { fileQuestion = null; m.close(); cb(v); }; }
       return [
-        h("h2", { text: "You have unsaved comments on this pack" }),
-        h("p", { text: "They can be added to the review file you are opening" + (name ? " (" + name + ")" : "") + ", so nothing is lost." }),
+        h("h2", { text: "You have unsaved work on this pack" }),
+        h("p", { text: "It can be added to the review file you are opening" + (name ? " (" + name + ")" : "") + ", so nothing is lost." }),
         h("div", { class: "rr-modal-choices" }, [
-          h("button", { type: "button", class: "btn primary", id: "rr-merge-yes", text: "Add them to the review file", onClick: pick(true) }),
+          h("button", { type: "button", class: "btn primary", id: "rr-merge-yes", text: "Add it to the review file", onClick: pick(true) }),
           h("button", { type: "button", class: "btn", id: "rr-merge-no", text: "Leave everything as it is", onClick: m.cancel })
+        ])
+      ];
+    }, function () { fileQuestion = null; cb(false); });
+  }
+  // Opening another pack over unsaved work. cb(true) to open it.
+  function askLeave(cb) {
+    closeFileQuestion();   // one question at a time
+    fileQuestion = modal("Unsaved review", function (m) {
+      function pick(v) { return function () { fileQuestion = null; m.close(); cb(v); }; }
+      return [
+        h("h2", { text: "Your review of the open pack is not saved" }),
+        h("p", { text: "Opening this pack leaves it behind. Save it first if you want to keep it in your review file." }),
+        h("div", { class: "rr-modal-choices" }, [
+          h("button", { type: "button", class: "btn primary", id: "rr-leave-no", text: "Stay on the open pack", onClick: m.cancel }),
+          h("button", { type: "button", class: "btn", id: "rr-leave-yes", text: "Open the pack without saving", onClick: pick(true) })
         ])
       ];
     }, function () { fileQuestion = null; cb(false); });
   }
   function showColleague(file, name) {
     state.colleague = { reviewer: RC.norm(file.reviewer), round: file.round, name: name || "", fileId: file.fileId,
-      comments: file.comments.filter(function (c) { return c && c.anchor; }), verdict: file.verdict };
+      comments: file.comments.filter(function (c) { return c && c.anchor; }), replies: file.replies || [], verdict: file.verdict };
   }
   function colleagueOnBlock(id, d) {
-    return state.colleague ? state.colleague.comments.filter(function (c) { return c.anchor.kind === "block" && c.anchor.documentIndex === d && c.anchor.blockId === id; }) : [];
+    return state.colleague ? (placeIndex().theirBlock[d + "|" + id] || []).filter(function (c) { return c.anchor.documentIndex === d && c.anchor.blockId === id; }) : [];
   }
   function colleagueOnItem(i) {
-    return state.colleague ? state.colleague.comments.filter(function (c) { return c.anchor.kind === "item" && onItem(c.anchor, i); }) : [];
+    return state.colleague ? (placeIndex().theirItem[String(i.itemId)] || []).filter(function (c) { return onItem(c.anchor, i); }) : [];
   }
 
   // What a file is, with messages for the mistakes people make: the Word
@@ -566,8 +657,7 @@
     var packs = parsed.filter(function (p) { return p.id.kind === "pack"; });
     var files = parsed.filter(function (p) { return p.id.kind !== "pack"; });
     var realInTour = false, failed = false;
-    packs.forEach(function (p) {
-      if (state.dirty && hasWork(state.review) && !confirm("Open this pack? Your unsaved review of the open pack will be left behind. Save it first if you want to keep it.")) return;
+    function openOne(p) {
       var pending = state.pendingReview;
       openPack(p.id.data, false, p.name);
       noteRecent("open", p.name, p.handle, "Review pack");
@@ -578,8 +668,15 @@
       if (pending && pending.file.packId === p.id.data.packId && !files.length) {
         files.push({ name: pending.name, id: { kind: "review", data: pending.file }, handle: pending.handle, held: true });
       }
-    });
-    (function next(i) {
+    }
+    // A pack over unsaved work asks first, in the page; the review files
+    // wait for the answer.
+    (function nextPack(k) {
+      if (k >= packs.length) { next(0); return; }
+      if (!(state.dirty && hasWork(state.review))) { openOne(packs[k]); nextPack(k + 1); return; }
+      askLeave(function (yes) { if (yes) openOne(packs[k]); nextPack(k + 1); });
+    })(0);
+    function next(i) {
       if (i >= files.length) { if (opened) finish(); return; }
       var p = files[i];
       openReviewFile(p.id.data, p.handle, p.name, function (res) {
@@ -587,7 +684,7 @@
         if (res) { opened++; outcomes.push(res); } else failed = true;
         next(i + 1);
       });
-    })(0);
+    }
     function finish() {
       if (!show()) return;
       var last = outcomes[outcomes.length - 1], r = state.review, msg;
@@ -698,7 +795,9 @@
         markClean();
         noteRecent("save", shown, handle, "Review file");
         noteSeen(state.pack.packId, { reviewName: shown, savedAt: state.review.savedAt, reviewer: RC.norm(state.review.reviewer) });
-        render();
+        // Only Summary says where the save went; elsewhere nothing in the
+        // page changes, so nothing is drawn again under the reviewer.
+        if (state.page === "summary") render(true); else renderHeader();
         onDone({ ok: true, method: method, name: shown, text: text });
       }
       function download(blocked) {
@@ -754,16 +853,139 @@
     touched();
     return c;
   }
+  // Which comments (your own, and a colleague's shown read only) are on which
+  // block and which item: worked out once, then looked up, rather than every
+  // comment being checked for every block drawn. Any change to the review
+  // drops it (touched, markClean), and so does the start of every draw.
+  var cix = null;
+  function placeIndex() {
+    if (cix) return cix;
+    var ix = { block: mapOf(), item: mapOf(), theirBlock: mapOf(), theirItem: mapOf() };
+    function put(map, k, c) { (map[k] = map[k] || []).push(c); }
+    function add(list, blocks, items) {
+      list.forEach(function (c) {
+        var a = c && c.anchor;
+        if (!a) return;
+        if (a.kind === "block") put(blocks, a.documentIndex + "|" + a.blockId, c);
+        else if (a.kind === "item") put(items, String(a.itemId), c);
+      });
+    }
+    add(comments(), ix.block, ix.item);
+    if (state.colleague) add(state.colleague.comments, ix.theirBlock, ix.theirItem);
+    return (cix = ix);
+  }
   function commentsOnBlock(id, doc) {
-    return comments().filter(function (c) { return c.anchor.kind === "block" && c.anchor.documentIndex === doc && c.anchor.blockId === id; });
+    return (placeIndex().block[doc + "|" + id] || []).filter(function (c) { return c.anchor.documentIndex === doc && c.anchor.blockId === id; });
   }
   function commentsOnItem(i) {
-    return comments().filter(function (c) { return c.anchor.kind === "item" && onItem(c.anchor, i); });
+    return (placeIndex().item[String(i.itemId)] || []).filter(function (c) { return onItem(c.anchor, i); });
   }
   function severityLabel(id) { return (RC.SEVERITIES.filter(function (s) { return s.id === id; })[0] || { label: id }).label; }
   function prevComments() { return (state.pack.previousRound && state.pack.previousRound.comments) || []; }
 
   function isConfirmed(id) { return state.review.confirmations.some(function (c) { return c.commentId === id; }); }
+
+  // ---------- replies to earlier comments ----------
+  // From round 2 the reviewer can answer an earlier comment's thread without
+  // raising the point again. They are kept in the review file as
+  // replies: [{ id, to, text, at }], where "to" is the earlier comment's id.
+  // A review with none has no such key, so older files are as they were.
+  function replies() { return (state.review && state.review.replies) || []; }
+  function repliesTo(id) { return replies().filter(function (r) { return r.to === id; }); }
+  function replyHasDraft() {
+    var b = state.replyBox;
+    if (!b) return false;
+    var ex = b.editing ? replies().filter(function (r) { return r.id === b.editing; })[0] : null;
+    return ex ? RC.norm(b.text) !== RC.norm(ex.text) : !!RC.norm(b.text);
+  }
+  function focusReply() { focusOn(document.querySelector(".rr-reply-box textarea")); }
+  function prevEl(id, sel) { return document.querySelector('#main [data-prev-id="' + cssEsc(id) + '"]' + (sel ? " " + sel : "")); }
+  // One reply box at a time; a reply half written is not thrown away by
+  // starting another.
+  function openReply(to, editing) {
+    var b = state.replyBox;
+    if (b && b.to === to && (b.editing || "") === (editing || "")) { focusReply(); return; }
+    if (replyHasDraft()) { toast("Add or cancel the reply you are writing first.", "warn"); focusReply(); return; }
+    withReviewerName(function () {
+      var ex = editing ? replies().filter(function (r) { return r.id === editing; })[0] : null;
+      var was = state.replyBox && state.replyBox.to;
+      state.replyBox = { to: to, editing: ex ? ex.id : null, text: ex ? ex.text : "" };
+      redraw([], [was, to]);
+      focusReply();
+    });
+  }
+  function closeReply() {
+    var to = state.replyBox && state.replyBox.to;
+    state.replyBox = null;
+    redraw([], [to]);
+    if (to) focusOn(prevEl(to, ".rr-reply"));
+  }
+  function replyBoxNode() {
+    var b = state.replyBox;
+    // Escape closes an empty box; a reply half written stays.
+    function onKey(e) {
+      if (e.key !== "Escape") return;
+      e.preventDefault(); e.stopPropagation();
+      if (replyHasDraft()) toast("Add or cancel the reply you are writing first.", "warn"); else closeReply();
+    }
+    return h("div", { class: "rr-reply-box", onKeydown: onKey }, [
+      h("textarea", { "aria-label": "Your reply", placeholder: "Your reply to the author", value: b.text || "", onInput: function (e) { b.text = e.target.value; } }),
+      h("div", { class: "rr-actions" }, [
+        h("button", { type: "button", class: "btn sm primary rr-reply-add", text: b.editing ? "Save reply" : "Add reply", onClick: function () {
+          var text = String(b.text || "").trim(), now = new Date().toISOString();
+          if (!text) { toast("Write the reply first.", "warn"); return; }
+          var ex = b.editing ? replies().filter(function (r) { return r.id === b.editing; })[0] : null;
+          if (ex) { ex.text = text; ex.at = now; }
+          else {
+            if (!Array.isArray(state.review.replies)) state.review.replies = [];
+            state.review.replies.push({ id: RC.newId("r"), to: b.to, text: text, at: now });
+          }
+          touched(); closeReply();
+        } }),
+        h("button", { type: "button", class: "btn sm rr-reply-cancel", text: "Cancel", onClick: closeReply })
+      ])
+    ]);
+  }
+  // Delete at once, with Undo, as a comment is: the same reply goes back.
+  function deleteReply(r, ev) {
+    var review = state.review, idx = review.replies.indexOf(r), keys = byKeyboard(ev);
+    review.replies = review.replies.filter(function (x) { return x !== r; });
+    if (state.replyBox && state.replyBox.editing === r.id) state.replyBox = null;
+    touched(); redraw([], [r.to]);
+    function back() { focusOn(prevEl(r.to, ".rr-reply")); }
+    if (!keys) back();
+    toast("Reply deleted.", null, { label: "Undo", focus: keys, back: back, run: function () {
+      if (state.review !== review || replies().indexOf(r) !== -1) return;
+      if (!Array.isArray(review.replies)) review.replies = [];
+      review.replies.splice(Math.min(idx, review.replies.length), 0, r);
+      touched(); redraw([], [r.to]); toast("Reply restored.");
+      if (!focusOn(document.querySelector('#main [data-reply-id="' + cssEsc(r.id) + '"] .rr-reply-edit'))) back();
+    } });
+  }
+  // The thread under an earlier comment: the author's replies, a colleague's
+  // (read only, when their file is open beside yours), then your own.
+  function threadNode(p) {
+    var id = p.comment.id, box = state.replyBox && state.replyBox.to === id ? state.replyBox : null, col = state.colleague;
+    var rows = (p.replies || []).map(function (r) {
+      return h("div", { class: "small" }, [h("strong", { text: r.author }), " " + r.text]);
+    });
+    (col ? col.replies || [] : []).forEach(function (r) {
+      if (r.to !== id) return;
+      rows.push(h("div", { class: "small rr-reply-theirs", "data-colleague-reply": r.id }, [h("strong", { text: col.reviewer }), " ", h("span", { class: "rr-chip", text: "Read only" }), " " + r.text]));
+    });
+    repliesTo(id).forEach(function (r) {
+      if (box && box.editing === r.id) return;   // it is in the box below
+      rows.push(h("div", { class: "small rr-reply-mine", "data-reply-id": r.id }, [
+        h("strong", { text: state.review.reviewer || reviewerName() || "You" }), " ", h("span", { class: "rr-chip mine", text: "Your reply" }), " " + r.text + " ",
+        h("span", { class: "rr-reply-acts" }, [
+          h("button", { type: "button", class: "rr-linkbtn rr-reply-edit", text: "Edit", onClick: function () { openReply(id, r.id); } }), " ",
+          h("button", { type: "button", class: "rr-linkbtn rr-reply-del", text: "Delete", onClick: function (ev) { deleteReply(r, ev); } })
+        ])
+      ]));
+    });
+    if (box) rows.push(replyBoxNode());
+    return rows.length ? h("div", { class: "rr-replies" }, rows) : null;
+  }
 
   // ---------- the composer ----------
   // { kind, anchor, severity, text, suggest, suggestion, editing, relatesTo, label }
@@ -789,7 +1011,10 @@
   function sameAnchor(a, b) {
     if (!a || !b) return false;
     return a.kind === b.kind && (a.documentIndex || 0) === (b.documentIndex || 0) && (a.blockId || "") === (b.blockId || "") &&
-      (a.targetName || "") === (b.targetName || "") && (a.itemId || "") === (b.itemId || "") && (a.sectionTitle || "") === (b.sectionTitle || "");
+      (a.targetName || "") === (b.targetName || "") && (a.itemId || "") === (b.itemId || "") && (a.sectionTitle || "") === (b.sectionTitle || "") &&
+      // General comments under one title are told apart by what they quote
+      // (a checklist question each).
+      (a.kind !== "general" || RC.norm(a.quote) === RC.norm(b.quote));
   }
   // Where the draft is, in words, for the bar on other pages.
   function draftWhere() {
@@ -804,6 +1029,7 @@
     if (c.relatesTo && !c.editing && (state.page === "previous" || a.kind === "general")) return "previous";
     if (c.editing && state.page === "summary") return "summary";
     if (a.kind === "item" || (a.kind === "general" && a.sectionTitle === "Basis of assessment")) return "engagement";
+    if (isChecklistAnchor(a)) return "checklist";
     if (a.kind === "general") return "summary";
     return "report";
   }
@@ -820,8 +1046,7 @@
     var el = document.querySelector(".rr-composer");
     if (!el) return;
     if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
-    var t = el.querySelector("textarea");
-    if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
+    focusOn(el.querySelector("textarea"));
     el.classList.add("flash");
     setTimeout(function () { el.classList.remove("flash"); }, 1500);
   }
@@ -837,27 +1062,46 @@
     var cur = state.composer;
     if (cur && composerHasDraft() && !(sameAnchor(cur.anchor, c.anchor) && (cur.editing || "") === (c.editing || "") && (cur.relatesTo || "") === (c.relatesTo || ""))) { holdDraft(); return; }
     withReviewerName(function () {
+      var was = state.composer;
       state.composer = c;
-      render();
-      setTimeout(function () {
-        var t = document.querySelector(".rr-composer textarea");
-        if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
-      }, 0);
+      redraw([was && was.anchor, c.anchor], [was && was.relatesTo, c.relatesTo]);
+      focusOn(document.querySelector(".rr-composer textarea"));
     });
   }
-  // Closing the composer puts the keyboard back where it was opened from.
-  function closeComposer() {
-    var a = state.composer && state.composer.anchor;
-    state.composer = null;
-    render();
-    if (!a) return;
+  // The place a comment is on, for the keyboard: its block or its cell, its
+  // item's Comment button, the button that comments on the basis, or the
+  // checklist question's link.
+  function placeEl(a) {
+    if (!a) return null;
     var el = null;
-    if (a.kind === "block" && state.page === "report") el = document.querySelector('[data-block-id="' + a.blockId + '"]');
-    else if (a.kind === "item" && state.page === "engagement") {
+    if (a.kind === "block" && state.page === "report") {
+      el = document.querySelector('#rr-paper [data-block-id="' + cssEsc(a.blockId) + '"]');
+      var td = el && a.cell ? el.querySelector('td[data-cell="' + a.cell.row + "." + a.cell.col + '"]') : null;
+      if (td) el = td;
+    } else if (a.kind === "item" && state.page === "engagement") {
       el = Array.prototype.filter.call(document.querySelectorAll(".rr-item"), function (n) { return n.getAttribute("data-item-id") === a.itemId && n.getAttribute("data-target") === a.targetName; })[0];
       el = el && el.querySelector(".rr-item-comment");
     } else if (a.kind === "general" && state.page === "engagement") el = document.querySelector(".rr-basis-comment");
-    if (el) { try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } }
+    else if (isChecklistAnchor(a) && state.page === "checklist") {
+      el = Array.prototype.filter.call(document.querySelectorAll(".rr-q"), function (n) { return RC.norm((n.firstChild || {}).textContent) === RC.norm(a.quote); })[0];
+      el = el && (el.querySelector(".rr-q-why-add") || el.querySelector("[data-answer]"));
+    }
+    return el;
+  }
+  function commentEl(id, sel) { return document.querySelector('#main [data-comment-id="' + cssEsc(id) + '"]' + (sel ? " " + sel : "")); }
+  // Closing the composer puts the keyboard back where it was opened from: the
+  // comment's Edit, the earlier comment's Raise it again, or the place the
+  // comment is on. A comment just added (`added`) takes it to its Edit, except
+  // on the Report page, where it goes back to the paragraph to read on.
+  function closeComposer(added) {
+    var c = state.composer, a = c && c.anchor;
+    state.composer = null;
+    redraw([a], [c && c.relatesTo]);
+    if (!a) return;
+    if (c.editing && focusOn(commentEl(c.editing, ".rr-edit"))) return;
+    if (added && state.page !== "report" && focusOn(commentEl(added.id, ".rr-edit"))) return;
+    if (c.relatesTo && !added && focusOn(prevEl(c.relatesTo, ".rr-raise"))) return;
+    focusOn(placeEl(a));
   }
   // What each severity means, beside the buttons. review-core may carry the
   // wording (SEVERITIES[].help); this is the same wording, for an older copy.
@@ -887,7 +1131,7 @@
         c.field = e.target.value;
         c.suggestion = c.fieldValue(c.field);
         c.suggest = !!c.field;
-        render();
+        redrawComposer();
       } }, [h("option", { value: "", text: "No suggested wording" })].concat(c.fields.map(function (f) {
         var o = h("option", { value: f[0], text: "Suggest wording for: " + f[1] });
         if (f[0] === c.field) o.selected = true;
@@ -897,11 +1141,39 @@
     } else if (c.canSuggest !== false) {
       var box = h("input", { type: "checkbox", class: "rr-c-suggest" });
       box.checked = !!c.suggest;
-      box.addEventListener("change", function () { c.suggest = box.checked; render(); });
+      box.addEventListener("change", function () { c.suggest = box.checked; redrawComposer(); });
       kids.push(h("label", { class: "small" }, [box, " Suggest wording"]));
     }
     if (c.suggest) {
-      kids.push(h("textarea", { class: "rr-c-sug", "aria-label": "Suggested wording", value: c.suggestion || "", onInput: function (e) { c.suggestion = e.target.value; } }));
+      // The wording it started from: the field's, or the text the comment is
+      // on. Under the box, what the suggestion changes in it, as it is typed.
+      var orig = String((c.field && c.fieldValue ? c.fieldValue(c.field) : c.anchor && c.anchor.quote) || "");
+      var sug = h("textarea", { class: "rr-c-sug", "aria-label": "Suggested wording", value: c.suggestion || "" });
+      var diff = h("div", { class: "rr-now small rr-sug-diff" }), diffTimer = null;
+      // As tall as its wording, up to a limit (review.css), then it scrolls.
+      var grow = function () { sug.style.height = "auto"; sug.style.height = (sug.scrollHeight + 2) + "px"; };
+      var showDiff = function () {
+        var now = c.suggestion || "", kids2 = [];
+        if (RC.norm(now) === RC.norm(orig)) kids2.push(h("span", { class: "muted", text: orig ? "No change yet. Edit the wording above." : "Write the wording above." }));
+        else {
+          if (!RC.norm(orig)) kids2.push(h("span", { class: "muted", text: "There is no wording here now, so all of this is new." }));
+          else if (!RC.norm(now)) kids2.push(h("span", { class: "muted", text: "The box is empty, so no wording is suggested." }));
+          else kids2 = [h("span", { class: "rr-lbl", text: "What changes: " })].concat(wordDiff(orig, now));
+          if (RC.norm(orig)) kids2.push(" ", h("button", { type: "button", class: "rr-linkbtn rr-sug-reset", text: "Start again from the original", onClick: function () {
+            c.suggestion = orig; sug.value = orig; grow(); showDiff();
+            focusOn(sug);
+          } }));
+        }
+        diff.textContent = "";
+        kids2.forEach(function (k) { diff.appendChild(typeof k === "string" ? document.createTextNode(k) : k); });
+      };
+      sug.addEventListener("input", function () {
+        c.suggestion = sug.value; grow();
+        clearTimeout(diffTimer); diffTimer = setTimeout(showDiff, 150);
+      });
+      showDiff();
+      setTimeout(grow, 0);   // once it is in the page and has a size
+      kids.push(sug, diff);
     }
     kids.push(h("div", { class: "rr-actions" }, [
       h("button", { type: "button", class: "btn sm primary rr-c-add", text: c.editing ? "Save comment" : "Add comment", onClick: function () {
@@ -909,17 +1181,36 @@
         var sug = c.suggest && RC.norm(c.suggestion) ? c.suggestion : null;
         if (c.field) c.anchor.field = c.field;
         if (c.field && c.fieldValue) c.anchor.quote = c.fieldValue(c.field);
+        var added = null;
         if (c.editing) {
           var ex = comments().filter(function (x) { return x.id === c.editing; })[0];
           if (ex) { ex.severity = c.severity; ex.text = c.text; ex.suggestion = sug; ex.anchor = c.anchor; ex.updatedAt = new Date().toISOString(); touched(); }
         } else {
-          addComment({ severity: c.severity, anchor: c.anchor, text: c.text, suggestion: sug, relatesTo: c.relatesTo, check: c.check });
+          added = addComment({ severity: c.severity, anchor: c.anchor, text: c.text, suggestion: sug, relatesTo: c.relatesTo, check: c.check });
         }
-        closeComposer();
+        closeComposer(added);
       } }),
-      h("button", { type: "button", class: "btn sm rr-c-cancel", text: "Cancel", onClick: closeComposer })
+      h("button", { type: "button", class: "btn sm rr-c-cancel", text: "Cancel", onClick: function () { closeComposer(); } })
     ]));
-    return h("div", { class: "rr-side rr-composer", onClick: function (e) { e.stopPropagation(); } }, kids);
+    // Escape cancels an empty box; one with something written stays, as it
+    // does for a click elsewhere.
+    function onKey(e) {
+      if (e.key !== "Escape") return;
+      e.preventDefault(); e.stopPropagation();
+      if (composerHasDraft()) holdDraft(); else closeComposer();
+    }
+    return h("div", { class: "rr-side rr-composer", onClick: function (e) { e.stopPropagation(); }, onKeydown: onKey }, kids);
+  }
+  // The composer drawn again in place, for a change to what it holds (Suggest
+  // wording, the field a suggestion is for). The keyboard stays on the control.
+  function redrawComposer() {
+    var old = document.querySelector("#main .rr-composer");
+    if (!old || !state.composer) { render(true); return; }
+    var act = document.activeElement, sel = old.contains(act) ? ["rr-c-suggest", "rr-c-field", "rr-c-text", "rr-c-sug"].filter(function (k) { return act.classList.contains(k); })[0] : null;
+    var nu = composerNode();
+    rovingFor(old, nu);
+    old.parentNode.replaceChild(nu, old);
+    if (sel) focusOn(nu.querySelector("." + sel));
   }
 
   function commentNode(c) {
@@ -936,15 +1227,20 @@
     }
     // Delete at once, with Undo for a few seconds: the same comment object
     // goes back where it was, so its id (which the author merges on) is kept.
-    function del() {
-      var list = comments(), idx = list.indexOf(c), review = state.review;
+    // From the keyboard, Delete takes the keyboard to Undo; with the mouse it
+    // goes to the place the comment was on, never nowhere.
+    function del(ev) {
+      var list = comments(), idx = list.indexOf(c), review = state.review, keys = byKeyboard(ev);
       review.comments = list.filter(function (x) { return x !== c; });
       if (state.composer && state.composer.editing === c.id) state.composer = null;
-      touched(); render();
-      toast("Comment deleted.", null, { label: "Undo", run: function () {
+      touched(); redraw([c.anchor], [c.relatesTo]);
+      function back() { if (!focusOn(placeEl(c.anchor))) focusOn(pageTitle()); }
+      if (!keys) back();
+      toast("Comment deleted.", null, { label: "Undo", focus: keys, back: back, run: function () {
         if (state.review !== review || comments().indexOf(c) !== -1) return;
         review.comments.splice(Math.min(idx, review.comments.length), 0, c);
-        touched(); render(); toast("Comment restored.");
+        touched(); redraw([c.anchor], [c.relatesTo]); toast("Comment restored.");
+        if (!focusOn(commentEl(c.id, ".rr-edit"))) back();
       } });
     }
     return h("div", { class: "rr-comment sev-" + c.severity, "data-comment-id": c.id, onClick: function (e) { e.stopPropagation(); } }, [
@@ -975,10 +1271,17 @@
   //            was on the section itself (no quote), so nothing has changed
   // null when the section has gone as well. Worked out once per pack.
   var NEAR = 0.5, NEAR_IN_PLACE = 0.3;
-  var prevCache = { pack: null, at: {}, byDoc: {} };
+  var prevCache = { pack: null, at: mapOf(), byDoc: {}, norm: new WeakMap() };
   function prevMemo() {
-    if (prevCache.pack !== state.pack) prevCache = { pack: state.pack, at: {}, byDoc: {} };
+    if (prevCache.pack !== state.pack) prevCache = { pack: state.pack, at: mapOf(), byDoc: {}, norm: new WeakMap() };
     return prevCache;
+  }
+  // A block's or a cell's text with its spacing evened out, worked out once:
+  // every earlier comment is compared with every block.
+  function normText(x) {
+    var m = prevMemo().norm, v = m.get(x);
+    if (v === undefined || v.of !== x.text) { v = { of: x.text, is: RC.norm(x.text) }; m.set(x, v); }
+    return v.is;
   }
   function wordsOf(s) { return RC.norm(s).toLowerCase().split(/[^a-z0-9'’]+/).filter(Boolean); }
   // Word overlap of two texts: shared words over all words (Jaccard).
@@ -991,6 +1294,9 @@
     return all ? both / all : 0;
   }
   function cellText(t, cell) { var r = t.rows && t.rows[cell.row], c = r && r.cells[cell.col]; return c ? c.text || "" : ""; }
+  // What a cell comment keeps of its row and its column, to find the cell
+  // again by: the first cell of the row, the header cell of the column.
+  function anchorKey(s) { return RC.norm(s).slice(0, 200); }
   function sectionHead(blocks, key) {
     return key ? blocks.filter(function (x) { return x.type === "heading" && !x.sub && x.sectionKey === key; })[0] || null : null;
   }
@@ -1012,11 +1318,45 @@
     var doc = state.pack.documents[docOf(a)];
     if (!doc) return null;
     var blocks = doc.blocks || [], q = RC.norm(a.quote), found = [], best = null;
-    // Several blocks with the same words: the one with the old id, then one in
-    // the same section, then the first.
+    // Several pictures with the same key: the one with the old id, then one
+    // in the same section, then the first.
     function pick() {
       return found.filter(function (x) { return x.block.id === a.blockId; })[0] ||
         found.filter(function (x) { return x.block.sectionKey === a.sectionKey; })[0] || found[0] || null;
+    }
+    // Narrows the matches to those passing a test, when any do. Returns how many did.
+    function keep(test) { var some = found.filter(test); if (some.length) found = some; return some.length; }
+    // Several cells with the same words, as a status column has. The row and
+    // column the comment kept (rowKey, colHead) say which; then the table in
+    // the same section. One left, in the row it was in, is the cell. Otherwise
+    // it is a guess, the one nearest the old place, and it is marked as a tie
+    // ("near", with no change of wording) so the reviewer is told to check: a
+    // cell whose row cannot be found, or a repeated one from an older file
+    // that kept no row.
+    function pickCell() {
+      var rk = anchorKey(a.rowKey), ch = anchorKey(a.colHead);
+      var rowFound = rk ? keep(function (x) { return anchorKey(cellText(x.block, { row: x.cell.row, col: 0 })) === rk; }) : 0;
+      if (ch) keep(function (x) { return anchorKey(cellText(x.block, { row: 0, col: x.cell.col })) === ch; });
+      keep(function (x) { return x.block.sectionKey === a.sectionKey; });
+      if (found.length === 1 && (!rk || rowFound)) return found[0];
+      keep(function (x) { return x.block.id === a.blockId; });
+      var g = found.slice().sort(function (x, y) {
+        return (Math.abs(x.cell.row - a.cell.row) + Math.abs(x.cell.col - a.cell.col)) - (Math.abs(y.cell.row - a.cell.row) + Math.abs(y.cell.col - a.cell.col));
+      })[0];
+      return { block: g.block, cell: g.cell, how: "near", now: cellText(g.block, g.cell), tie: true };
+    }
+    // Several blocks with the same words, as a sentence each zone's section
+    // repeats. One of the same kind in the same section is the one. Several
+    // there are a guess: the block at the old id, else the nearest to where
+    // it was (ids count the blocks), marked as a tie.
+    function pickBlock() {
+      if (a.blockType) keep(function (x) { return x.block.type === a.blockType; });
+      keep(function (x) { return x.block.sectionKey === a.sectionKey; });
+      if (found.length === 1) return found[0];
+      var was = /(\d+)$/.exec(a.blockId || ""), at = was ? Number(was[1]) : 0;
+      var g = found.filter(function (x) { return x.block.id === a.blockId; })[0] ||
+        found.slice().sort(function (x, y) { return Math.abs(x.at - at) - Math.abs(y.at - at); })[0];
+      return { block: g.block, how: "near", now: g.block.text || "", tie: true };
     }
     // Generated paragraphs share a lot of words (a demo's summary has
     // neighbours at 0.33 and 0.49 of a deleted paragraph), so half the words
@@ -1035,14 +1375,14 @@
       }
       if (found.length) return pick();
     } else if (a.cell) {
-      blocks.forEach(function (x) {
-        if (x.type !== "table" || !q) return;
-        if (RC.norm(cellText(x, a.cell)) === q) { found.push({ block: x, cell: { row: a.cell.row, col: a.cell.col }, how: "same" }); return; }
-        for (var r = 0; r < x.rows.length; r++) for (var c = 0; c < x.rows[r].cells.length; c++) {
-          if (RC.norm(x.rows[r].cells[c].text) === q) { found.push({ block: x, cell: { row: r, col: c }, how: "same" }); return; }
-        }
+      // Every cell that holds the words, in any table.
+      if (q) blocks.forEach(function (x) {
+        if (x.type !== "table") return;
+        (x.rows || []).forEach(function (row, r) {
+          (row.cells || []).forEach(function (cell, c) { if (normText(cell) === q) found.push({ block: x, cell: { row: r, col: c }, how: "same" }); });
+        });
       });
-      if (found.length) return pick();
+      if (found.length) return pickCell();
       // A cell of a word or two is too short to match by overlap.
       if (wordsOf(q).length >= 3) blocks.forEach(function (x) {
         if (x.type !== "table" || x.sectionKey !== a.sectionKey) return;
@@ -1050,8 +1390,8 @@
       });
       if (best) return best;
     } else if (q) {
-      blocks.forEach(function (x) { if (x.type !== "image" && RC.norm(x.text) === q) found.push({ block: x, how: "same" }); });
-      if (found.length) return pick();
+      blocks.forEach(function (x, k) { if (x.type !== "image" && normText(x) === q) found.push({ block: x, how: "same", at: k }); });
+      if (found.length) return pickBlock();
       // An anchor with no block type (older files) takes any block with words.
       blocks.forEach(function (x) { if (x.sectionKey === a.sectionKey && (a.blockType ? x.type === a.blockType : x.type !== "image")) nearer(x, null, x.text || ""); });
       if (best) return best;
@@ -1069,7 +1409,7 @@
   function prevAt(d) {
     var m = prevMemo();
     if (!m.byDoc[d]) {
-      var map = {};
+      var map = mapOf();
       prevComments().forEach(function (p) {
         var a = p.comment.anchor;
         if (a.kind !== "block" || docOf(a) !== d) return;
@@ -1084,7 +1424,7 @@
   function prevChanged(p, loc) {
     var a = p.comment.anchor;
     if (a.kind === "item") { var it = findItemFor(a); return !!(it && a.field && RC.norm(it[a.field]) !== RC.norm(a.quote)); }
-    return !!loc && loc.how !== "same" && !loc.placeOnly;
+    return !!loc && loc.how !== "same" && !loc.placeOnly && !loc.tie;
   }
   // A plain word diff: words taken out struck through, words put in marked.
   function wordDiff(before, after) {
@@ -1128,13 +1468,14 @@
     var b = loc.block;
     if (loc.how === "section") return { anchor: blockAnchor(doc, di, b, null, ""), moved: loc.placeOnly ? false : "section" };
     var quote = loc.cell ? cellText(b, loc.cell) : b.type === "image" ? "" : b.text;
-    return { anchor: blockAnchor(doc, di, b, loc.cell || null, quote), moved: loc.how === "near" ? "near" : false,
+    return { anchor: blockAnchor(doc, di, b, loc.cell || null, quote), moved: loc.tie ? "tie" : loc.how === "near" ? "near" : false,
       canSuggest: b.type !== "image" && (b.type !== "table" || !!loc.cell) };
   }
   function raiseAgain(p) {
     var c = p.comment, r = raiseAnchor(c.anchor);
     var why = { near: "The text has changed since round " + p.round + ", so this goes on it as it reads now.",
       section: "The text has changed since round " + p.round + ", so this goes on its section heading.",
+      tie: "This could not be matched to one place for certain, so check it is on the right one.",
       gone: "That text is no longer in the report, so this keeps only the section it was in." }[r.moved] || "";
     var comp = { anchor: r.anchor, severity: c.severity, text: "", relatesTo: c.id, suggest: false, suggestion: "",
       label: "Raising again: " + cut(c.text, 120) + (why ? " " + why : "") };
@@ -1183,29 +1524,33 @@
         h("span", { class: "small muted", text: "round " + p.round }),
         h("span", { class: "rr-chip " + st, text: RC.STATUSES[st] || st }),
         changed ? h("span", { class: "rr-chip changed", text: "Text changed since round " + p.round }) : null,
+        loc && loc.tie ? h("span", { class: "rr-chip changed", text: "Check the place" }) : null,
         p.confirmedBy && p.confirmedBy.length ? h("span", { class: "rr-chip met", text: "Confirmed by " + p.confirmedBy.join(", ") }) : null,
         confirmed ? h("span", { class: "rr-chip met", text: wont ? "You accepted the reason" : "You confirmed this fix" }) : null,
-        raised ? h("span", { class: "rr-chip", text: "You raised this again" }) : null
+        raised ? h("span", { class: "rr-chip", text: "You raised this again" }) : null,
+        repliesTo(c.id).length ? h("span", { class: "rr-chip", text: "You replied" }) : null
       ]),
       where ? h("div", { class: "small muted rr-prev-where", text: where }) : null,
       a.quote ? h("div", { class: "quote small" }, [changed ? h("span", { class: "rr-lbl", text: "Was: " }) : a.cell ? h("span", { class: "rr-lbl", text: "On a cell: " }) : null, cut(a.quote, 240)]) : null,
       now != null ? h("div", { class: "rr-now small" }, [h("span", { class: "rr-lbl", text: "Now reads: " })].concat(wordDiff(a.quote, now))) : null,
       changed && loc && loc.how === "section" ? h("div", { class: "small muted", text: inline ? "No close match for it now, so it is shown on its section heading." : "No close match for it now. Go to takes you to its section." }) : null,
+      loc && loc.tie ? h("div", { class: "small muted rr-tie", text: (a.cell ? "These words could not be matched to one cell for certain." : "The same words are in the report more than once.") + " Check this is the right place." }) : null,
       gone && !inline ? h("div", { class: "small rr-gone", text: a.kind === "item" ? "This item is no longer in the engagement." : "This is no longer in the report." }) : null,
       h("div", { class: "text", text: c.text }),
       c.suggestion ? h("div", { class: "sug" }, [h("div", { class: "small muted", text: "Suggested wording" }), c.suggestion]) : null,
       wont && p.reason ? h("div", { class: "small", text: "Won't change: " + p.reason }) : null,
-      (p.replies || []).length ? h("div", { class: "rr-replies" }, p.replies.map(function (r) {
-        return h("div", { class: "small" }, [h("strong", { text: r.author }), " " + r.text]);
-      })) : null,
+      threadNode(p),
       h("div", { class: "rr-actions" }, [
         !inline && !gone && a.kind !== "general" ? h("button", { type: "button", class: "rr-linkbtn rr-prev-go", text: "Go to", onClick: function () { goToPrev(p); } }) : null,
         canConfirm ? h("button", { type: "button", class: "rr-linkbtn rr-confirm", text: confirmed ? (wont ? "Take back" : "Take back the confirmation") : (wont ? "Accept the reason" : "Confirm it is fixed"), onClick: function () {
           if (confirmed) state.review.confirmations = state.review.confirmations.filter(function (x) { return x.commentId !== c.id; });
           else state.review.confirmations.push({ commentId: c.id, at: new Date().toISOString() });
-          touched(); render();
+          touched(); redraw([], [c.id]);
+          focusOn(prevEl(c.id, ".rr-confirm"));
         } }) : null,
-        confirmed ? null : h("button", { type: "button", class: "rr-linkbtn rr-raise", text: "Raise it again", onClick: function () { raiseAgain(p); } })
+        confirmed ? null : h("button", { type: "button", class: "rr-linkbtn rr-raise", text: "Raise it again", onClick: function () { raiseAgain(p); } }),
+        // An answer in the thread, which changes nothing else about the point.
+        h("button", { type: "button", class: "rr-linkbtn rr-reply", text: "Reply", onClick: function () { openReply(c.id); } })
       ])
     ]);
   }
@@ -1246,38 +1591,39 @@
     var n = parseInt(fill, 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
     return (r * 299 + g * 587 + b * 114) / 1000 < 120;
   }
+  // A picture is shown only from the pack's own data: an embedded PNG, JPEG,
+  // GIF or BMP. Anything else there (a web or file address) is never loaded.
+  var IMAGE_SRC = /^data:image\/(png|jpeg|gif|bmp);base64,/;
   function imageNode(b, media) {
-    var src = media && media[b.media];
-    if (!src) return h("p", { class: "muted small", text: "[image: " + b.media + "]" });
-    return h("img", { src: src, alt: "Chart or picture from the report", style: b.width ? "width:" + Math.min(b.width, 800) + "px" : null });
+    var src = media && Object.prototype.hasOwnProperty.call(media, b.media) ? media[b.media] : null;
+    if (typeof src !== "string" || !IMAGE_SRC.test(src)) return h("p", { class: "muted small", text: "[image: " + b.media + "]" });
+    var w = Number(b.width);
+    return h("img", { src: src, alt: "Chart or picture from the report", style: w > 0 ? "width:" + Math.min(w, 800) + "px" : null });
   }
-  function tableNode(t, media, onCell, pickedCell, prevCells) {
+  // top: the block's own table, whose cells can be commented on (a table
+  // inside a cell cannot). Those cells carry data-cell and can take the
+  // keyboard; the paper's own listeners do the rest (see paperClick, paperKey).
+  function tableNode(t, media, top, prevCells) {
     var tbl = h("table", { class: "rr-table" });
     var tb = h("tbody");
     t.rows.forEach(function (row, r) {
       var tr = h("tr");
       row.cells.forEach(function (cell, c) {
-        var td = h("td", { "data-cell": r + "." + c });
-        if (cell.fill && cell.fill !== "FFFFFF" && cell.fill !== "AUTO") {
+        var td = document.createElement("td");
+        if (top) { td.setAttribute("data-cell", r + "." + c); td.setAttribute("tabindex", "-1"); }
+        // Only a plain six-figure colour is put in a style ("AUTO" is none).
+        if (typeof cell.fill === "string" && /^[0-9A-Fa-f]{6}$/.test(cell.fill) && cell.fill.toUpperCase() !== "FFFFFF") {
           td.style.background = "#" + cell.fill;
           if (lightText(cell.fill)) td.style.color = "#FFF";
         }
         if (cell.span) td.setAttribute("colspan", cell.span);
-        if (pickedCell && pickedCell.row === r && pickedCell.col === c) td.classList.add("picked");
-        if ((prevCells || []).some(function (x) { return x.row === r && x.col === c; })) td.classList.add("prev");
+        if (prevCells && prevCells.length && prevCells.some(function (x) { return x.row === r && x.col === c; })) td.classList.add("prev");
         cell.blocks.forEach(function (p) {
-          if (p.type === "table") td.appendChild(tableNode(p, media, null, null));
+          if (p.type === "table") td.appendChild(tableNode(p, media, false, null));
           else if (p.type === "image") td.appendChild(imageNode(p, media));
           else if (p.type === "bullet") td.appendChild(runsNode({ runs: [{ t: "• " }].concat(p.runs || []) }));
           else td.appendChild(runsNode(p));
         });
-        if (onCell) {
-          td.setAttribute("tabindex", "0");
-          td.addEventListener("click", function (e) { e.stopPropagation(); onCell(r, c, cell); });
-          td.addEventListener("keydown", function (e) {
-            if ((e.key === "Enter" || e.key === " ") && e.target === td) { e.preventDefault(); e.stopPropagation(); onCell(r, c, cell); }
-          });
-        }
         tr.appendChild(td);
       });
       tb.appendChild(tr);
@@ -1291,75 +1637,255 @@
       blockId: b.id, blockType: b.type, quote: quote != null ? quote : (b.text || ""), cell: cell || null, targetName: doc.targetName || "", targetId: "", itemId: "", field: "" };
     // A picture has no words to find it by next round: its media key does.
     if (b.type === "image" && b.media) a.media = b.media;
+    // A cell's words are often in the table many times: its row and column
+    // say which cell it is next round (both optional in the review file).
+    if (cell && b.rows) { a.rowKey = anchorKey(cellText(b, { row: cell.row, col: 0 })); a.colHead = anchorKey(cellText(b, { row: 0, col: cell.col })); }
     return a;
   }
 
-  function blockNode(doc, d, b) {
-    var mine = commentsOnBlock(b.id, d);
-    var open = state.composer && state.composer.anchor.kind === "block" && state.composer.anchor.documentIndex === d && state.composer.anchor.blockId === b.id;
-    var cls = "rr-block" + (mine.length ? " has-comment" : "") + (mine.some(function (c) { return c.severity === "must-fix"; }) ? " has-must" : "") + (open ? " open" : "");
-    // The block's own words name it for a screen reader; the hint says what a
-    // press does.
-    var wrap = h("div", { class: cls, "data-block-id": b.id, "data-section-key": b.sectionKey || "", tabindex: "0", role: "button", "aria-describedby": "rr-block-hint",
-      "aria-label": b.type === "image" ? "Chart or picture" : null });
-    function startOnBlock(quote, cell, canSuggest) {
-      var cur = state.composer;
-      // An edit, or a point raised again, stays on its own block; elsewhere a
-      // click is refused only while there is something in it to lose.
-      if (cur && (cur.editing || cur.relatesTo)) { if (open || holdDraft()) return; cur = null; }
-      else if (cur && !open && holdDraft()) return;
-      // Text selected with the mouse says which words the comment is about. The
-      // quote stays the whole block, which is what a later round matches on.
-      var picked = "";
-      try { picked = RC.norm(String(window.getSelection && window.getSelection())); } catch (e) {}
-      var mine = open && cur;
-      if (mine && !cell && !cur.anchor.cell && !picked) {
-        // A second click on the block closes an empty box, and leaves a draft.
-        if (composerHasDraft()) flashComposer(); else closeComposer();
-        return;
-      }
-      // Moving within the block (a cell, some words) keeps what is written,
-      // but not a suggestion reworded from text the comment would leave.
-      if (mine && cur.suggest && RC.norm(cur.suggestion) !== RC.norm(cur.anchor.quote) && RC.norm(quote) !== RC.norm(cur.anchor.quote)) { holdDraft(); return; }
-      var anchor = blockAnchor(doc, d, b, cell, quote);
-      if (picked && picked !== RC.norm(quote)) anchor.selection = picked;
-      var keepSug = !!(mine && cur.suggest && canSuggest && RC.norm(quote) === RC.norm(cur.anchor.quote));
-      openComposer({ anchor: anchor, severity: (mine && cur.severity) || "should-fix", text: (mine && cur.text) || "",
-        suggest: keepSug, suggestion: keepSug ? cur.suggestion : canSuggest ? (quote || "") : "", canSuggest: canSuggest,
-        label: anchor.selection ? "On: " + anchor.selection : (b.type === "table" && !cell ? "On the whole table" : (cell ? "On this cell" : "")) });
-    }
+  // ---------- the Report page as drawn ----------
+  // rep holds what the page shows: the paper, and for each block of the
+  // document an entry { b, el, n } (the block, its element, its place). The
+  // report's own text, tables and pictures are made once, when the page is
+  // opened. A change to a comment then draws again only the comments beside
+  // the blocks it touches (refreshBlock), so nothing the reviewer is reading
+  // moves, and a picture is never made twice.
+  var rep = null;
+  function curDoc() { return Math.min(state.docIndex, state.pack.documents.length - 1); }
+  function repLive() { return !!rep && !!state.pack && rep.pack === state.pack && state.page === "report" && rep.d === curDoc() && rep.paper.isConnected; }
+  function entryOf(node) {
+    var w = node && node.closest ? node.closest(".rr-block") : null;
+    return (w && w.rrEntry) || null;
+  }
+  // The block a comment panel (or anything in one) sits under.
+  function entryOfSide(node) {
+    var s = node && node.closest ? node.closest(".rr-side") : null;
+    while (s && !(s.classList && s.classList.contains("rr-block"))) s = s.previousSibling;
+    return (s && s.rrEntry) || null;
+  }
+  function sidesOf(en) {
+    var out = [], n = en.el.nextSibling;
+    while (n && n.classList && n.classList.contains("rr-side")) { out.push(n); n = n.nextSibling; }
+    return out;
+  }
+  // Takes the controls in a panel or a card out of the Tab order, or puts
+  // them back (they can still be clicked, and focused by the page).
+  function setTabbable(root, on) {
+    Array.prototype.forEach.call(root.querySelectorAll("button, input, select, textarea"), function (c) {
+      if (on) c.removeAttribute("tabindex"); else c.setAttribute("tabindex", "-1");
+    });
+  }
+  function rovingFor(old, nu) { if (old.querySelector('[tabindex="-1"]')) setTabbable(nu, false); }
+  // A height to lay an unseen block out at until it is first shown (see
+  // .rr-block in review.css), so the scroll bar is about right from the start.
+  function roughHeight(b) {
+    if (b.type === "table") return (b.rows || []).length * 26 + 10;
+    if (b.type === "image") { var w = Number(b.width), ht = Number(b.height); return (ht > 0 ? (w > 800 ? ht * 800 / w : ht) : 240) + 10; }
+    if (b.type === "heading") return 44;
+    return Math.ceil(String(b.text || "").length / 110) * 20 + 8;
+  }
+  // A block's element. It has no role of its own, so the heading, paragraph
+  // or picture inside is what a screen reader meets; a table is named as one
+  // rather than by all its words. Blocks take the keyboard one at a time
+  // (setCurrent): the report is a single stop for Tab.
+  function blockEl(doc, b, prevOn) {
+    var wrap = h("div", { class: "rr-block", "data-block-id": b.id, "data-section-key": b.sectionKey || "", tabindex: "-1" });
     if (b.type === "heading") {
-      var lv = Math.min(4, Math.max(1, b.level || 1));
-      wrap.appendChild(runsNode(b, "h" + lv));
-      wrap.addEventListener("click", function () { startOnBlock(b.text, null, true); });
+      wrap.appendChild(runsNode(b, "h" + Math.min(4, Math.max(1, b.level || 1))));
     } else if (b.type === "table") {
-      var picked = open ? state.composer.anchor.cell : null;
+      wrap.setAttribute("role", "group");
+      wrap.setAttribute("aria-label", "Table, " + RC.plural(b.rows.length, "row"));
       // Cells an earlier round commented on, where their text is now.
-      var prevCells = (prevAt(d)[b.id] || []).map(function (p) { var l = placeOf(p); return l && l.cell; }).filter(Boolean);
-      wrap.appendChild(tableNode(b, doc.media, function (r, c, cell) {
-        startOnBlock(cell.text, { row: r, col: c }, true);
-      }, picked, prevCells));
-      wrap.addEventListener("click", function () { startOnBlock(b.text, null, false); });
+      var prevCells = (prevOn || []).map(function (p) { var l = placeOf(p); return l && l.cell; }).filter(Boolean);
+      wrap.appendChild(tableNode(b, doc.media, true, prevCells));
     } else if (b.type === "image") {
       wrap.classList.add("rr-img");
       wrap.appendChild(imageNode(b, doc.media));
-      wrap.addEventListener("click", function () { startOnBlock("", null, false); });
     } else if (b.type === "bullet") {
       wrap.appendChild(h("div", { class: "rr-bullet" }, [h("span", { class: "m", text: b.marker || "•" }), runsNode(b)]));
-      wrap.addEventListener("click", function () { startOnBlock(b.text, null, true); });
     } else {
       wrap.appendChild(runsNode(b));
-      wrap.addEventListener("click", function () { startOnBlock(b.text, null, true); });
     }
-    wrap.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && e.target === wrap) { e.preventDefault(); wrap.click(); } });
-    var frag = [wrap];
-    var prevOn = prevAt(d)[b.id] || [];
-    if (prevOn.length) frag.push(h("div", { class: "rr-side" }, prevOn.map(function (p) { return prevNode(p, true); })));
-    var theirs = colleagueOnBlock(b.id, d);
-    if (theirs.length) frag.push(h("div", { class: "rr-side" }, theirs.map(colleagueNode)));
-    if (mine.length) frag.push(h("div", { class: "rr-side" }, mine.map(commentNode)));
-    if (open) frag.push(composerNode());
-    return frag;
+    wrap.style.setProperty("contain-intrinsic-block-size", "auto " + Math.round(roughHeight(b)) + "px");
+    return wrap;
+  }
+  function composerOnBlock(id, d) {
+    var c = state.composer;
+    return !!c && c.anchor.kind === "block" && c.anchor.documentIndex === d && c.anchor.blockId === id;
+  }
+  // The comments beside a block: earlier rounds', a colleague's, your own,
+  // then the comment being written.
+  function sideNodes(en) {
+    var d = rep.d, b = en.b, out = [];
+    var prevOn = prevAt(d)[b.id] || [], theirs = colleagueOnBlock(b.id, d), mine = commentsOnBlock(b.id, d);
+    if (prevOn.length) out.push(h("div", { class: "rr-side" }, prevOn.map(function (p) { return prevNode(p, true); })));
+    if (theirs.length) out.push(h("div", { class: "rr-side" }, theirs.map(colleagueNode)));
+    if (mine.length) out.push(h("div", { class: "rr-side" }, mine.map(commentNode)));
+    if (composerOnBlock(b.id, d)) out.push(composerNode());
+    return out;
+  }
+  // Words for a screen reader, kept once each and pointed at by the blocks
+  // they describe: what Enter does, and that a block has comments (colour and
+  // a border are all that show it otherwise).
+  function hintId(text) {
+    var id = rep.hints[text];
+    if (!id) { id = rep.hints[text] = "rr-hint-" + (++rep.hintN); rep.hintBox.appendChild(h("span", { id: id, text: text })); }
+    return id;
+  }
+  // What a block shows of its comments: the bar at its edge, the open box's
+  // tint, the cell being commented on, and the words for a screen reader.
+  function dressBlock(en) {
+    var d = rep.d, b = en.b, el = en.el, mine = commentsOnBlock(b.id, d), open = composerOnBlock(b.id, d);
+    el.classList.toggle("has-comment", mine.length > 0);
+    el.classList.toggle("has-must", mine.some(function (c) { return c.severity === "must-fix"; }));
+    el.classList.toggle("open", open);
+    if (b.type === "table") {
+      var cell = open ? state.composer.anchor.cell : null, was = el.querySelector("td.picked");
+      var now = cell ? el.querySelector('td[data-cell="' + cell.row + "." + cell.col + '"]') : null;
+      if (was && was !== now) was.classList.remove("picked");
+      if (now) now.classList.add("picked");
+    }
+    var said = [], earlier = (prevAt(d)[b.id] || []).length, theirs = colleagueOnBlock(b.id, d).length;
+    if (mine.length) said.push(RC.plural(mine.length, "comment"));
+    if (earlier) said.push(RC.plural(earlier, "earlier comment"));
+    if (theirs) said.push(RC.plural(theirs, "comment") + " from " + state.colleague.reviewer);
+    el.setAttribute("aria-describedby", (said.length ? hintId("Has " + said.join(", ") + ".") + " " : "") +
+      (b.type === "table" ? "rr-table-hint" : b.type === "heading" ? "rr-head-hint" : "rr-block-hint"));
+  }
+  // The comments beside one block, drawn again; the block itself is not touched.
+  function refreshBlock(en) {
+    var el = en.el, par = el.parentNode, next;
+    while ((next = el.nextSibling) && next.classList && next.classList.contains("rr-side")) par.removeChild(next);
+    sideNodes(en).forEach(function (n) {
+      if (rep.cur !== en) setTabbable(n, false);
+      par.insertBefore(n, next);
+    });
+    dressBlock(en);
+  }
+  // The block that holds the report's place in the Tab order. Its comments'
+  // buttons come with it; every other block's are skipped by Tab.
+  function setCurrent(en) {
+    if (!rep || !en || rep.cur === en) return;
+    var old = rep.cur;
+    rep.cur = en;
+    if (old) { old.el.setAttribute("tabindex", "-1"); sidesOf(old).forEach(function (s) { setTabbable(s, false); }); }
+    en.el.setAttribute("tabindex", "0");
+    sidesOf(en).forEach(function (s) { setTabbable(s, true); });
+  }
+  function focusBlock(en) {
+    if (!en) return;
+    setCurrent(en);
+    en.el.focus();
+  }
+
+  function startOnBlock(en, quote, cell, canSuggest) {
+    var doc = rep.doc, d = rep.d, b = en.b, wrap = en.el, open = composerOnBlock(b.id, d);
+    var cur = state.composer;
+    // An edit, or a point raised again, stays on its own block; elsewhere a
+    // click is refused only while there is something in it to lose.
+    if (cur && (cur.editing || cur.relatesTo)) { if (open || holdDraft()) return; cur = null; }
+    else if (cur && !open && holdDraft()) return;
+    // Text selected with the mouse says which words the comment is about. The
+    // quote stays the whole block, which is what a later round matches on.
+    // Only words selected in this block count: a selection left in another
+    // one (the block was opened from the keyboard) is not about this one.
+    var picked = "";
+    try {
+      var sel = window.getSelection && window.getSelection();
+      if (sel && sel.rangeCount && !sel.isCollapsed && wrap.contains(sel.anchorNode) && wrap.contains(sel.focusNode)) picked = RC.norm(String(sel));
+    } catch (e) {}
+    var mine = open && cur;
+    if (mine && !cell && !cur.anchor.cell && !picked) {
+      // A second click on the block closes an empty box, and leaves a draft.
+      if (composerHasDraft()) flashComposer(); else closeComposer();
+      return;
+    }
+    // Moving within the block (a cell, some words) keeps what is written,
+    // but not a suggestion reworded from text the comment would leave.
+    if (mine && cur.suggest && RC.norm(cur.suggestion) !== RC.norm(cur.anchor.quote) && RC.norm(quote) !== RC.norm(cur.anchor.quote)) { holdDraft(); return; }
+    var anchor = blockAnchor(doc, d, b, cell, quote);
+    if (picked && picked !== RC.norm(quote)) anchor.selection = picked;
+    var keepSug = !!(mine && cur.suggest && canSuggest && RC.norm(quote) === RC.norm(cur.anchor.quote));
+    openComposer({ anchor: anchor, severity: (mine && cur.severity) || "should-fix", text: (mine && cur.text) || "",
+      suggest: keepSug, suggestion: keepSug ? cur.suggestion : canSuggest ? (quote || "") : "", canSuggest: canSuggest,
+      label: anchor.selection ? "On: " + anchor.selection : (b.type === "table" && !cell ? "On the whole table" : (cell ? "On this cell" : "")) });
+  }
+  // A comment on a block, or on one cell of its table (td).
+  function commentOn(en, td) {
+    var b = en.b;
+    if (td) {
+      var at = td.getAttribute("data-cell").split("."), r = Number(at[0]), c = Number(at[1]);
+      startOnBlock(en, b.rows[r].cells[c].text, { row: r, col: c }, true);
+    } else if (b.type === "table") startOnBlock(en, b.text, null, false);
+    else if (b.type === "image") startOnBlock(en, "", null, false);
+    else startOnBlock(en, b.text, null, true);
+  }
+  // One click listener and one key listener for the whole paper, in place of
+  // several on every block and every cell.
+  function paperClick(e) {
+    var en = entryOf(e.target);
+    if (!en) return;   // the comments beside a block are not in it
+    commentOn(en, en.b.type === "table" && e.target.closest ? e.target.closest("td[data-cell]") : null);
+  }
+  // The keyboard in the report. On a block: Up and Down move to the next,
+  // Page Up and Page Down to the next section, Home and End to the ends;
+  // Enter or Space comments on it. A table takes Enter into its cells (Space
+  // comments on the whole table), where the arrow keys move between cells,
+  // Enter comments on the cell and Escape goes back out to the table.
+  function paperKey(e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    var t = e.target, en = entryOf(t), k = e.key;
+    if (!en) return;
+    function done() { e.preventDefault(); e.stopPropagation(); }
+    if (t === en.el) {
+      var list = rep.list, to = null;
+      if (k === "ArrowDown") to = list[en.n + 1];
+      else if (k === "ArrowUp") to = list[en.n - 1];
+      else if (k === "Home") to = list[0];
+      else if (k === "End") to = list[list.length - 1];
+      else if (k === "PageDown" || k === "PageUp") {
+        var step = k === "PageDown" ? 1 : -1;
+        for (var i = en.n + step; i >= 0 && i < list.length && !to; i += step) if (list[i].b.type === "heading" && !list[i].b.sub) to = list[i];
+        if (!to) to = list[step > 0 ? list.length - 1 : 0];
+      } else if (k === "Enter" && en.b.type === "table") {
+        var first = (en.cell && en.cell.isConnected ? en.cell : null) || en.el.querySelector("td[data-cell]");
+        if (first) { done(); focusCell(en, first); return; }
+      }
+      if (to) { done(); focusBlock(to); return; }
+      if (k === "Enter" || k === " ") { done(); commentOn(en, null); }
+      return;
+    }
+    var td = t.nodeName === "TD" && t.hasAttribute("data-cell") ? t : null;
+    if (!td) return;
+    var at = td.getAttribute("data-cell").split("."), r = Number(at[0]), c = Number(at[1]), rows = en.b.rows, next = null;
+    function cellAt(rr, cc) {
+      if (rr < 0 || rr >= rows.length) return null;
+      cc = Math.max(0, Math.min(cc, rows[rr].cells.length - 1));
+      return en.el.querySelector('td[data-cell="' + rr + "." + cc + '"]');
+    }
+    if (k === "ArrowRight") next = c + 1 < rows[r].cells.length ? cellAt(r, c + 1) : null;
+    else if (k === "ArrowLeft") next = c > 0 ? cellAt(r, c - 1) : null;
+    else if (k === "ArrowDown") next = cellAt(r + 1, c);
+    else if (k === "ArrowUp") next = cellAt(r - 1, c);
+    else if (k === "Home") next = cellAt(r, 0);
+    else if (k === "End") next = cellAt(r, rows[r].cells.length - 1);
+    else if (k === "Escape") { done(); focusBlock(en); return; }
+    else if (k === "Enter" || k === " ") { done(); commentOn(en, td); return; }
+    else return;
+    done();
+    if (next) focusCell(en, next);
+  }
+  function focusCell(en, td) {
+    setCurrent(en);
+    en.cell = td;
+    td.setAttribute("aria-describedby", "rr-cell-hint");
+    td.focus();
+  }
+  // Wherever the keyboard or the mouse lands in the report, that block is the
+  // one Tab comes back to.
+  function paperFocus(e) {
+    var en = entryOf(e.target) || entryOfSide(e.target);
+    if (en) setCurrent(en);
   }
 
   function sectionsOf(doc) {
@@ -1372,7 +1898,7 @@
   // Comments per section of one document: a heading's own comments and those on
   // the blocks under it, up to the next section heading.
   function countsBySection(doc, d) {
-    var counts = {}, cur = "";
+    var counts = mapOf(), cur = "";
     (doc.blocks || []).forEach(function (b) {
       if (b.type === "heading" && !b.sub) cur = b.id;
       var n = commentsOnBlock(b.id, d).length;
@@ -1381,15 +1907,23 @@
     return counts;
   }
 
+  // What the Document list and the Go to section list say for one entry.
+  function docOptionText(x, i) {
+    var n = comments().filter(function (c) { return c.anchor.kind === "block" && (c.anchor.documentIndex || 0) === i; }).length;
+    return x.title + (x.targetName && x.title !== x.targetName ? " (" + x.targetName + ")" : "") + (n ? " (" + RC.plural(n, "comment") + ")" : "");
+  }
+  function jumpOptionText(s, counts, d) {
+    return (s.level > 1 ? "  " : "") + s.title + (counts[s.id] ? " (" + counts[s.id] + ")" : "") + (isRead(d, s.id) ? " ✓" : "");
+  }
+
   function renderReport(main) {
-    var pack = state.pack, d = Math.min(state.docIndex, pack.documents.length - 1), doc = pack.documents[d];
+    var pack = state.pack, d = curDoc(), doc = pack.documents[d];
     var tb = [], e = pack.engagement || {}, multi = pack.documents.length > 1;
     if (multi) {
       // A draft stays put when the document changes: it shows again on its own.
       tb.push(h("label", null, ["Document ", h("select", { id: "rr-doc", onChange: function (ev) { state.docIndex = Number(ev.target.value); if (!composerHasDraft()) state.composer = null; render(false); } },
         pack.documents.map(function (x, i) {
-          var n = comments().filter(function (c) { return c.anchor.kind === "block" && (c.anchor.documentIndex || 0) === i; }).length;
-          var o = h("option", { value: String(i), text: x.title + (x.targetName && x.title !== x.targetName ? " (" + x.targetName + ")" : "") + (n ? " (" + RC.plural(n, "comment") + ")" : "") });
+          var o = h("option", { value: String(i), text: docOptionText(x, i) });
           if (i === d) o.selected = true; return o;
         }))]));
     }
@@ -1397,11 +1931,11 @@
     var secs = sectionsOf(doc), counts = countsBySection(doc, d);
     if (secs.length) {
       tb.push(h("select", { class: "rr-jump", id: "rr-jump", "aria-label": "Go to section", onChange: function (ev) {
+        // It stays on the section chosen, and then follows the one in view.
         var id = ev.target.value;
-        ev.target.value = "";
         if (id) scrollToSection(id);
       } }, [h("option", { value: "", text: "Go to section" })].concat(secs.map(function (s) {
-        return h("option", { value: s.id, text: (s.level > 1 ? "  " : "") + s.title + (counts[s.id] ? " (" + counts[s.id] + ")" : "") + (isRead(d, s.id) ? " ✓" : "") });
+        return h("option", { value: s.id, text: jumpOptionText(s, counts, d) });
       }))));
       // Nor are the outline's ticks: this one marks the section at the top of
       // the report read (syncReadTick keeps it in step as you scroll).
@@ -1410,13 +1944,13 @@
         var s = sectionInView();
         if (!s) return;
         setRead(d, s.id, tick.checked);
-        var opt = $("rr-jump") && $("rr-jump").querySelector('option[value="' + s.id + '"]');
-        if (opt) opt.textContent = opt.textContent.replace(/ ✓$/, "") + (tick.checked ? " ✓" : "");
+        syncCounts();
       });
       tb.push(h("label", { class: "rr-markread", id: "rr-markread" }, [tick, "Read"]));
     }
     tb.push(findBox());
-    tb.push(h("span", { class: "muted", text: "Click any paragraph, heading or table to comment. Click a table cell to comment on that cell." }));
+    tb.push(h("button", { type: "button", class: "btn sm", id: "rr-keys", text: "Keyboard", title: "The keys that work on this page", onClick: showKeys }));
+    tb.push(h("span", { class: "muted", text: "Click any paragraph, heading or table to comment. Click a table cell to comment on that cell. Select some words first and the comment is about those words." }));
     main.appendChild(h("h1", { class: "page-title", text: (e.instrumentTitle || "Report") }));
     // Who and which round stay in view at any width (the header hides them
     // on a narrow window); with two reports, which one this is.
@@ -1428,15 +1962,36 @@
     if (rq) main.appendChild(rq);
     main.appendChild(h("div", { class: "rr-toolbar" }, tb));
     main.appendChild(h("span", { class: "rr-sr", id: "rr-block-hint", text: "Press Enter to comment on it." }));
+    var hintBox = h("div", { class: "rr-sr", id: "rr-hints" }, [
+      h("span", { id: "rr-head-hint", text: "Heading. Press Enter to comment on it." }),
+      h("span", { id: "rr-table-hint", text: "Press Enter to go into its cells, or Space to comment on the whole table." }),
+      h("span", { id: "rr-cell-hint", text: "Press Enter to comment on this cell. Escape goes back to the table." })
+    ]);
+    main.appendChild(hintBox);
     var paper = h("div", { class: "rr-paper", id: "rr-paper" });
-    var cover = null;
-    (doc.blocks || []).forEach(function (b) {
-      var nodes = blockNode(doc, d, b);
+    // Drawn again for the same document (a change of name, a file opened), the
+    // report keeps its place in the Tab order.
+    var keep = rep && rep.pack === pack && rep.d === d && rep.cur ? rep.cur.n : 0;
+    rep = { pack: pack, d: d, doc: doc, paper: paper, at: mapOf(), list: [], cur: null, secs: secs, hints: mapOf(), hintN: 0, hintBox: hintBox };
+    var cover = null, prevMap = prevAt(d);
+    (doc.blocks || []).forEach(function (b, n) {
+      var en = { b: b, el: blockEl(doc, b, prevMap[b.id]), n: n, cell: null };
+      en.el.rrEntry = en;
+      rep.list.push(en);
+      if (!rep.at[b.id]) rep.at[b.id] = en;
+      var into = paper;
       if (b.front) {
         if (!cover) { cover = h("div", { class: "rr-cover" }); paper.appendChild(cover); }
-        nodes.forEach(function (n) { cover.appendChild(n); });
-      } else nodes.forEach(function (n) { paper.appendChild(n); });
+        into = cover;
+      }
+      into.appendChild(en.el);
+      sideNodes(en).forEach(function (s) { setTabbable(s, false); into.appendChild(s); });
+      dressBlock(en);
     });
+    setCurrent(rep.list[keep] || rep.list[0]);
+    paper.addEventListener("click", paperClick);
+    paper.addEventListener("keydown", paperKey);
+    paper.addEventListener("focusin", paperFocus);
     main.appendChild(paper);
     applyFind(paper, false);
   }
@@ -1447,29 +2002,88 @@
     var tb = document.querySelector("#main .rr-toolbar"), main = $("main");
     return tb ? tb.getBoundingClientRect().bottom : main.getBoundingClientRect().top;
   }
+  // A block's element on the Report page, by its id.
+  function blockElById(id) {
+    if (repLive()) return rep.at[id] ? rep.at[id].el : null;
+    return document.querySelector('#rr-paper [data-block-id="' + cssEsc(id) + '"]');
+  }
+  // Blocks not yet scrolled to are laid out at a rough height (.rr-block in
+  // review.css), so the first scroll to a far one can land a little off: go
+  // again once the ones around it have their real heights. still() says
+  // whether it is still wanted.
+  function bringIntoView(el, where, still) {
+    var main = $("main");
+    function go() {
+      if (!el.isConnected || !el.scrollIntoView || (still && !still())) return false;
+      // Something taller than the window (a long table) is shown from its top.
+      var tall = where === "center" && el.offsetHeight > main.clientHeight - 140;
+      el.scrollIntoView({ block: tall ? "start" : where });
+      var gap = tall ? el.getBoundingClientRect().top - toolbarBottom() - 8 : 0;
+      if (gap < 0) main.scrollTop += gap;
+      return true;
+    }
+    if (go()) setTimeout(go, 80);
+  }
   function scrollToSection(id) {
-    var el = document.querySelector('#rr-paper [data-block-id="' + id + '"]'), main = $("main");
+    var el = blockElById(id), main = $("main");
     if (!el || !el.scrollIntoView) return;
-    el.scrollIntoView({ block: "start" });
-    var gap = el.getBoundingClientRect().top - toolbarBottom() - 8;
-    if (gap < 0) main.scrollTop += gap;
-    syncReadTick();
+    function place() {
+      if (!el.isConnected) return;
+      el.scrollIntoView({ block: "start" });
+      var gap = el.getBoundingClientRect().top - toolbarBottom() - 8;
+      if (gap < 0) main.scrollTop += gap;
+      syncSection();
+    }
+    place();
+    setTimeout(place, 80);
+    // Tab into the report now starts at this section.
+    if (repLive() && rep.at[id]) setCurrent(rep.at[id]);
   }
   // The section whose heading was passed last, reading down: the one in view.
   function sectionInView() {
     if (!state.pack || state.page !== "report") return null;
-    var d = Math.min(state.docIndex, state.pack.documents.length - 1), secs = sectionsOf(state.pack.documents[d]);
+    var secs = repLive() ? rep.secs : sectionsOf(state.pack.documents[curDoc()]);
     var line = toolbarBottom() + 40, cur = null;
-    secs.forEach(function (s) {
-      var el = document.querySelector('#rr-paper [data-block-id="' + s.id + '"]');
-      if (el && (!cur || el.getBoundingClientRect().top <= line)) cur = s;
-    });
+    // In reading order, so the first heading below the line ends the search.
+    for (var i = 0; i < secs.length; i++) {
+      var el = blockElById(secs[i].id);
+      if (!el) continue;
+      if (cur && el.getBoundingClientRect().top > line) break;
+      cur = secs[i];
+    }
     return cur;
   }
-  function syncReadTick() {
+  // The section in view, wherever the page names one: the outline's row
+  // (aria-current and a bar, and kept in view within the outline), the narrow
+  // window's Go to section list, and its Read tick. It runs as the report
+  // scrolls, so it draws nothing again: it touches those three, and the
+  // outline only when the section changes.
+  function syncSection() {
+    if (!state.pack || state.page !== "report") return;
+    var s = sectionInView(), id = s ? s.id : "";
+    var cur = document.querySelector(".rr-outline-item[aria-current]");
+    if ((cur ? cur.getAttribute("data-section-block") : "") !== id) {
+      if (cur) { cur.removeAttribute("aria-current"); cur.parentNode.classList.remove("cur"); }
+      var next = id ? document.querySelector('.rr-outline-item[data-section-block="' + cssEsc(id) + '"]') : null;
+      if (next) {
+        next.setAttribute("aria-current", "location");
+        next.parentNode.classList.add("cur");
+        if (next.offsetParent && next.scrollIntoView) next.scrollIntoView({ block: "nearest" });
+      }
+      // Tab into the outline starts at the section in view, unless the
+      // keyboard is already in it.
+      var sb = $("sidebar");
+      if (!sb.contains(document.activeElement)) outlineRow(next ? next.parentNode : sb.querySelector(".rr-outline-row"));
+    }
+    // Not while the list is in use: it would change under the reviewer.
+    var jump = $("rr-jump");
+    if (jump && jump.value !== id && document.activeElement !== jump) jump.value = id;
+    syncReadTick(s);
+  }
+  function syncReadTick(s) {
     var tick = $("rr-mark-read");
     if (!tick || !tick.offsetParent) return;
-    var s = sectionInView(), d = Math.min(state.docIndex, state.pack.documents.length - 1);
+    var d = curDoc();
     tick.checked = !!(s && isRead(d, s.id));
     var label = s ? "Mark " + s.title + " as read" : "Mark this section as read";
     tick.setAttribute("aria-label", label);
@@ -1497,10 +2111,20 @@
       h("button", { type: "button", class: "btn sm", id: "rr-find-next", text: "Next", title: "Next match (Enter)", onClick: function () { stepFind(1); } }),
       h("span", { class: "small muted", id: "rr-find-count", "aria-live": "polite" })]);
   }
-  function findMarks() { var p = $("rr-paper"); return p ? Array.prototype.slice.call(p.querySelectorAll("mark.rr-find")) : []; }
+  // The marks in the report, in order. Kept from the last search (the report's
+  // own text is not drawn again between searches), so Next and Previous do
+  // not look for them each time.
+  var findCache = { paper: null, marks: [] };
+  function findMarks() {
+    var p = $("rr-paper");
+    if (!p) return [];
+    if (findCache.paper !== p) findCache = { paper: p, marks: Array.prototype.slice.call(p.querySelectorAll("mark.rr-find")) };
+    return findCache.marks;
+  }
   function applyFind(paper, scroll) {
     if (!paper) return;
-    findMarks().forEach(function (m) { var par = m.parentNode; par.replaceChild(document.createTextNode(m.textContent), m); par.normalize(); });
+    findMarks().forEach(function (m) { var par = m.parentNode; if (!par) return; par.replaceChild(document.createTextNode(m.textContent), m); par.normalize(); });
+    findCache = { paper: paper, marks: [] };
     var f = state.reportFind || { q: "", i: 0 }, q = RC.norm(f.q).toLowerCase(), count = $("rr-find-count");
     if (q.length < 2) { if (count) count.textContent = ""; return; }
     var walker = document.createTreeWalker(paper, NodeFilter.SHOW_TEXT, null), nodes = [], n;
@@ -1519,13 +2143,15 @@
       if (at < s.length) frag.appendChild(document.createTextNode(s.slice(at)));
       t.parentNode.replaceChild(frag, t);
     });
-    var marks = findMarks();
+    var marks = Array.prototype.slice.call(paper.querySelectorAll("mark.rr-find"));
+    findCache = { paper: paper, marks: marks };
     if (!marks.length) { if (count) count.textContent = "Not found"; return; }
     f.i = ((f.i % marks.length) + marks.length) % marks.length;
     marks[f.i].classList.add("cur");
     if (count) count.textContent = (f.i + 1) + " of " + marks.length;
-    if (scroll && marks[f.i].scrollIntoView) marks[f.i].scrollIntoView({ block: "center" });
+    if (scroll) showMark(marks[f.i]);
   }
+  function showMark(m) { bringIntoView(m, "center", function () { return m.classList.contains("cur"); }); }
   function stepFind(by) {
     var f = state.reportFind, marks = findMarks();
     if (!f || !marks.length) return;
@@ -1534,7 +2160,7 @@
     marks[f.i].classList.add("cur");
     var count = $("rr-find-count");
     if (count) count.textContent = (f.i + 1) + " of " + marks.length;
-    if (marks[f.i].scrollIntoView) marks[f.i].scrollIntoView({ block: "center" });
+    showMark(marks[f.i]);
   }
 
   // The author's note sent with the pack (pack.request): a quiet panel on
@@ -1586,7 +2212,25 @@
   // and keeps two targets of the same name apart.
   function onTarget(a, i) { return a.targetId && i.targetId ? a.targetId === i.targetId : a.targetName === i.targetName; }
   function onItem(a, i) { return !!a && a.itemId === i.itemId && onTarget(a, i); }
-  function findItemFor(a) { return (state.pack.items || []).filter(function (i) { return onItem(a, i); })[0] || null; }
+  // The pack's items by id, and the earlier comments on each: looked up, not
+  // searched for, as a pack can hold hundreds of both. Made once per pack.
+  var itemCache = { pack: null, n: -1, byId: mapOf(), prev: mapOf() };
+  function itemMemo() {
+    var items = (state.pack && state.pack.items) || [], np = state.pack ? prevComments().length : 0;
+    if (itemCache.pack !== state.pack || itemCache.n !== items.length || itemCache.np !== np) {
+      var m = { pack: state.pack, n: items.length, np: np, byId: mapOf(), prev: mapOf() };
+      items.forEach(function (i) { var k = String(i.itemId); (m.byId[k] = m.byId[k] || []).push(i); });
+      if (state.pack) prevComments().forEach(function (p) {
+        var a = p.comment.anchor;
+        if (a.kind === "item") { var k = String(a.itemId); (m.prev[k] = m.prev[k] || []).push(p); }
+      });
+      itemCache = m;
+    }
+    return itemCache;
+  }
+  function findItemFor(a) { return (itemMemo().byId[String(a.itemId)] || []).filter(function (i) { return onItem(a, i); })[0] || null; }
+  // An item's extra rows, [[label, value]]. Anything else there is no rows.
+  function detailsOf(i) { return Array.isArray(i.details) ? i.details : []; }
   var searchTimer = null;
   var STATUS_LABELS = { finding: "Finding", met: "Met", recorded: "Recorded", "to-assess": "To assess", unanswered: "Not answered", na: "N/A" };
 
@@ -1605,7 +2249,7 @@
     if (state.itemSearch) {
       var q = RC.norm(state.itemSearch).toLowerCase();
       var words = [i.code, i.title, i.answer, i.evidence, i.notes, i.action, i.impact, i.owner, i.priority, i.targetName];
-      (i.details || []).forEach(function (row) { if (Array.isArray(row)) words.push(row[1]); });
+      detailsOf(i).forEach(function (row) { if (Array.isArray(row)) words.push(row[1]); });
       if (q && words.join(" ").toLowerCase().indexOf(q) === -1) return false;
     }
     return true;
@@ -1631,20 +2275,20 @@
     // A blank evidence row is worth showing on a finding, or on an item with
     // nothing else to go on; a risk pack's SL-T item keeps its justification
     // in its detail rows, and "Threat source: Not recorded" would mislead.
-    field("evidence", i.status === "finding" || !(i.details && i.details.length));
+    field("evidence", i.status === "finding" || !detailsOf(i).length);
     field("notes");
     if (i.status === "finding" || i.action || i.owner || i.impact) { field("action", true); field("owner", true); field("impact", true); }
     field("priority");
-    (i.details || []).forEach(function (d) {
+    detailsOf(i).forEach(function (d) {
       if (Array.isArray(d) && d[0]) kv = kv.concat(row(String(d[0]), d[1] == null ? "" : String(d[1])));
     });
-    return h("div", { class: "rr-item", "data-item-id": i.itemId, "data-target": i.targetName, "data-target-id": i.targetId || null }, [
+    var card = h("div", { class: "rr-item", "data-item-id": i.itemId, "data-target": i.targetName, "data-target-id": i.targetId || null }, [
       h("div", { class: "rr-item-h" }, [
         h("span", { class: "code", text: i.code }),
         h("span", { class: "ttl", text: i.title }),
         i.shared ? h("span", { class: "rr-chip", text: "Shared answer" }) : null,
         h("span", { class: "rr-chip " + i.status, text: STATUS_LABELS[i.status] || i.status }),
-        h("button", { type: "button", class: "btn sm rr-item-comment", text: "Comment", onClick: function () {
+        h("button", { type: "button", class: "btn sm rr-item-comment", text: "Comment", "aria-label": "Comment on " + [i.code, i.title].filter(Boolean).join(" "), onClick: function () {
           if (open && !state.composer.editing && !state.composer.relatesTo) { flashComposer(); return; }
           openComposer({ anchor: itemCommentAnchor(i), severity: "should-fix", text: "", fields: itemFields(), field: "", fieldValue: function (f) { return i[f] || ""; }, suggestion: "" });
         } })
@@ -1655,9 +2299,61 @@
       colleagueOnItem(i).length ? h("div", { class: "rr-side" }, colleagueOnItem(i).map(colleagueNode)) : null,
       open ? composerNode() : null
     ]);
+    card.rrItem = i;
+    return card;
+  }
+  // ---------- the Engagement page as drawn ----------
+  // eng holds the item cards on the page, by item. A change to a comment
+  // draws again only the card it is on (refreshItem), or the basis card. The
+  // cards take the keyboard one at a time, as the report's blocks do: Tab
+  // stops at one card's buttons, and Up and Down on a Comment button move to
+  // the next card's.
+  var eng = null;
+  function engLive() { return !!eng && eng.pack === state.pack && state.page === "engagement" && eng.host.isConnected; }
+  function refreshItem(i) {
+    var old = eng.els.get(i);
+    if (!old) return;
+    var nu = itemNode(i);
+    if (eng.cur !== i) setTabbable(nu, false);
+    old.parentNode.replaceChild(nu, old);
+    eng.els.set(i, nu);
+  }
+  function setCurrentItem(i) {
+    if (!eng || eng.cur === i || !eng.els.get(i)) return;
+    var old = eng.cur && eng.els.get(eng.cur);
+    eng.cur = i;
+    if (old) setTabbable(old, false);
+    setTabbable(eng.els.get(i), true);
+  }
+  function refreshBasis() {
+    var old = $("rr-basis");
+    if (old) old.parentNode.replaceChild(basisCard(), old);
+  }
+  function basisCard() {
+    var bs = state.pack.basisOfAssessment || {};
+    function list(title, rows, fmt) {
+      rows = Array.isArray(rows) ? rows.filter(function (r) { return r && typeof r === "object"; }) : [];
+      if (!rows.length) return h("p", { class: "muted", text: title + ": none recorded." });
+      return h("div", null, [h("strong", { text: title }), h("ul", { style: "margin:4px 0 10px; padding-left:20px" }, rows.map(function (r) { return h("li", { text: fmt(r) }); }))]);
+    }
+    var openBasis = state.composer && state.composer.anchor.kind === "general" && state.composer.anchor.sectionTitle === "Basis of assessment";
+    var basisComments = comments().filter(function (c) { return c.anchor.kind === "general" && c.anchor.sectionTitle === "Basis of assessment"; });
+    var basis = card("Basis of assessment", null, [
+      list("People interviewed", bs.interviews, function (r) { return [r.name, r.role, r.date].filter(Boolean).join(", "); }),
+      list("Documents reviewed", bs.documents, function (r) { return [r.title, r.reference, r.date].filter(Boolean).join(", "); }),
+      list("Systems observed", bs.observations, function (r) { return [r.name, r.method || r.description, r.location, r.date].filter(Boolean).join(", "); }),
+      h("button", { type: "button", class: "btn sm rr-basis-comment", text: "Comment on the basis of assessment", onClick: function () {
+        if (openBasis && !state.composer.editing) { flashComposer(); return; }
+        openComposer({ anchor: { documentIndex: 0, documentTitle: "", kind: "general", sectionKey: "", sectionTitle: "Basis of assessment", blockId: "", quote: "", cell: null, targetName: "", itemId: "", field: "" }, severity: "should-fix", text: "", canSuggest: false });
+      } }),
+      basisComments.length ? h("div", { class: "rr-side" }, basisComments.map(commentNode)) : null,
+      openBasis ? composerNode() : null
+    ]);
+    basis.id = "rr-basis";
+    return basis;
   }
   function prevOnItem(i) {
-    var list = prevComments().filter(function (p) { return p.comment.anchor.kind === "item" && onItem(p.comment.anchor, i); });
+    var list = (itemMemo().prev[String(i.itemId)] || []).filter(function (p) { return onItem(p.comment.anchor, i); });
     return list.length ? h("div", { class: "rr-side" }, list.map(function (p) { return prevNode(p, true); })) : null;
   }
 
@@ -1697,43 +2393,56 @@
       try { var n = search.value.length; search.setSelectionRange(n, n); } catch (e) {}
     }
     var shown = all.filter(itemVisible);
-    main.appendChild(h("p", { class: "small muted", id: "rr-item-count" }, ["Showing " + shown.length + " of " + all.length + " items. ",
+    var countLine = h("p", { class: "small muted", id: "rr-item-count" }, ["Showing " + shown.length + " of " + all.length + " items. ",
       h("button", { type: "button", class: "rr-linkbtn", id: "rr-basis-link", text: "Go to the basis of assessment", onClick: function () {
         var el = $("rr-basis");
         if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" });
-      } })]));
+        focusOn(el && el.querySelector(".rr-basis-comment"));
+      } })]);
+    main.appendChild(countLine);
     var lastT = null, lastG = null;
     var LIMIT = 150, cut = shown.length > LIMIT && !state.itemsAll ? LIMIT : shown.length;
+    var keep = eng && eng.pack === pack ? eng.cur : null;
+    eng = { pack: pack, els: new Map(), list: [], cur: null, host: countLine };
     shown.slice(0, cut).forEach(function (i) {
       if (targets.length > 1 && i.targetName !== lastT) { main.appendChild(h("h2", { class: "rr-target-h", text: i.targetName })); lastG = null; }
       lastT = i.targetName;
       if (i.groupName !== lastG) { main.appendChild(h("div", { class: "rr-group-h", text: i.groupName })); lastG = i.groupName; }
-      main.appendChild(itemNode(i));
+      var el = itemNode(i);
+      eng.els.set(i, el);
+      eng.list.push(i);
+      main.appendChild(el);
     });
-    if (cut < shown.length) main.appendChild(h("button", { type: "button", class: "btn", text: "Show all " + shown.length, onClick: function () { state.itemsAll = true; render(true); } }));
+    // One card's buttons are in the Tab order: the one last used, if it is
+    // still shown, else the first.
+    eng.cur = keep && eng.els.get(keep) ? keep : eng.list[0] || null;
+    eng.list.forEach(function (i) { if (i !== eng.cur) setTabbable(eng.els.get(i), false); });
+    if (cut < shown.length) main.appendChild(h("button", { type: "button", class: "btn", id: "rr-items-all", text: "Show all " + shown.length, onClick: function () {
+      var from = eng.list.length;
+      state.itemsAll = true; render(true);
+      // On to the first of the items just shown.
+      var first = eng.list[from], el = first && eng.els.get(first);
+      if (el) { setCurrentItem(first); focusOn(el.querySelector(".rr-item-comment")); }
+    } }));
 
     // The basis of assessment
-    var bs = pack.basisOfAssessment || {};
-    function list(title, rows, fmt) {
-      if (!rows || !rows.length) return h("p", { class: "muted", text: title + ": none recorded." });
-      return h("div", null, [h("strong", { text: title }), h("ul", { style: "margin:4px 0 10px; padding-left:20px" }, rows.map(function (r) { return h("li", { text: fmt(r) }); }))]);
-    }
-    var openBasis = state.composer && state.composer.anchor.kind === "general" && state.composer.anchor.sectionTitle === "Basis of assessment";
-    var basisComments = comments().filter(function (c) { return c.anchor.kind === "general" && c.anchor.sectionTitle === "Basis of assessment"; });
     main.appendChild(h("div", { class: "spacer-12", style: "height:12px" }));
-    var basis = card("Basis of assessment", null, [
-      list("People interviewed", bs.interviews, function (r) { return [r.name, r.role, r.date].filter(Boolean).join(", "); }),
-      list("Documents reviewed", bs.documents, function (r) { return [r.title, r.reference, r.date].filter(Boolean).join(", "); }),
-      list("Systems observed", bs.observations, function (r) { return [r.name, r.method || r.description, r.location, r.date].filter(Boolean).join(", "); }),
-      h("button", { type: "button", class: "btn sm rr-basis-comment", text: "Comment on the basis of assessment", onClick: function () {
-        if (openBasis && !state.composer.editing) { flashComposer(); return; }
-        openComposer({ anchor: { documentIndex: 0, documentTitle: "", kind: "general", sectionKey: "", sectionTitle: "Basis of assessment", blockId: "", quote: "", cell: null, targetName: "", itemId: "", field: "" }, severity: "should-fix", text: "", canSuggest: false });
-      } }),
-      basisComments.length ? h("div", { class: "rr-side" }, basisComments.map(commentNode)) : null,
-      openBasis ? composerNode() : null
-    ]);
-    basis.id = "rr-basis";
-    main.appendChild(basis);
+    main.appendChild(basisCard());
+  }
+  // Up and Down on an item's Comment button: the next item's, or the one
+  // before. Home and End: the first and the last.
+  function itemKey(e) {
+    var t = e.target, k = e.key;
+    if (e.altKey || e.ctrlKey || e.metaKey || !engLive() || !t.classList || !t.classList.contains("rr-item-comment")) return;
+    var cardEl = t.closest(".rr-item"), at = cardEl && cardEl.rrItem ? eng.list.indexOf(cardEl.rrItem) : -1;
+    if (at === -1) return;
+    var to = k === "ArrowDown" ? at + 1 : k === "ArrowUp" ? at - 1 : k === "Home" ? 0 : k === "End" ? eng.list.length - 1 : null;
+    if (to === null) return;
+    e.preventDefault();
+    var next = eng.list[to];
+    if (!next) return;
+    setCurrentItem(next);
+    eng.els.get(next).querySelector(".rr-item-comment").focus();
   }
 
   // ---------- the checklist ----------
@@ -1761,20 +2470,46 @@
     Object.keys(patch).forEach(function (k) { a[k] = patch[k]; });
     touched();
   }
+  // A comment saying why an answer is No: a general comment like any other,
+  // with the question as the text it is on, so the author sees which one.
+  function checklistAnchor(q) {
+    return { documentIndex: 0, documentTitle: "", kind: "general", sectionKey: "", sectionTitle: "Checklist", blockId: "", quote: q.text, cell: null, targetName: "", itemId: "", field: "" };
+  }
+  // Is this anchor on the checklist (and, given a question, on that one)?
+  function isChecklistAnchor(a, q) {
+    return !!a && a.kind === "general" && a.sectionTitle === "Checklist" && (!q || RC.norm(a.quote) === RC.norm(q.text));
+  }
   function renderChecklist(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Checklist" }));
     main.appendChild(h("p", { class: "page-sub", text: "Your answers go in your review file. A no is worth a comment saying why." }));
     checklistItems().forEach(function (g) {
       main.appendChild(card(g.title, null, g.items.map(function (q) {
         var a = answerOf(q.id) || {};
-        return h("div", { class: "rr-q", "data-q": q.id }, [
+        // Saved as it is typed: closing the window straight after must not
+        // lose it. Nothing is drawn again for a key.
+        function noteChanged(e) {
+          var cur = answerOf(q.id);
+          if ((cur ? cur.note || "" : "") !== e.target.value) setAnswer(q, { note: e.target.value });
+        }
+        // A No can say why, as a comment the author gets. Offered, never
+        // required; the comment then shows here, under its question.
+        var why = comments().filter(function (c) { return isChecklistAnchor(c.anchor, q); });
+        var open = !!state.composer && isChecklistAnchor(state.composer.anchor, q);
+        var whyKids = [];
+        if (a.answer === "no" && !why.length && !open) whyKids.push(h("button", { type: "button", class: "rr-linkbtn rr-q-why-add", text: "Add a comment saying why", onClick: function () {
+          openComposer({ anchor: checklistAnchor(q), severity: "should-fix", text: "", canSuggest: false, label: "Why the answer is no to: " + q.text });
+        } }));
+        if (why.length) whyKids.push(h("div", { class: "rr-side" }, why.map(commentNode)));
+        if (open) whyKids.push(composerNode());
+        return h("div", { class: "rr-q" + (why.length ? " has-why" : ""), "data-q": q.id }, [
           h("div", { text: q.text }),
           h("div", { class: "rr-seg", role: "group", "aria-label": "Answer" }, [["yes", "Yes"], ["no", "No"], ["na", "N/A"]].map(function (o) {
             return h("button", { type: "button", class: o[0] + (a.answer === o[0] ? " on" : ""), "data-answer": o[0], "aria-pressed": a.answer === o[0] ? "true" : "false", text: o[1], onClick: function () {
               setAnswer(q, { answer: a.answer === o[0] ? "" : o[0] }); render(true);
             } });
           })),
-          h("div", { class: "rr-note" }, [h("input", { type: "text", placeholder: "Note (optional)", "aria-label": "Note", value: a.note || "", onChange: function (e) { setAnswer(q, { note: e.target.value }); } })])
+          h("div", { class: "rr-note" }, [h("input", { type: "text", placeholder: "Note (optional)", "aria-label": "Note", value: a.note || "", onInput: noteChanged, onChange: noteChanged })]),
+          whyKids.length ? h("div", { class: "rr-note rr-q-why" }, whyKids) : null
         ]);
       })));
     });
@@ -1786,15 +2521,18 @@
     if (!state.checks) state.checks = RK.run(state.pack, { names: userNames() });
     return state.checks;
   }
-  function isDismissed(id) { return state.review.dismissedChecks.indexOf(id) !== -1; }
-  function hasCheckComment(r) { return comments().some(function (c) { return c.check === r.id; }); }
-  function activeChecks() { return currentChecks().filter(function (r) { return !isDismissed(r.id); }); }
+  // A result's ids: its own, and any it had in an earlier version of the
+  // checks. A dismissal or a comment saved under any of them still counts.
+  function checkIds(r) { return [r.id].concat(Array.isArray(r.legacyIds) ? r.legacyIds : []); }
+  function isDismissed(r) { return checkIds(r).some(function (id) { return state.review.dismissedChecks.indexOf(id) !== -1; }); }
+  function hasCheckComment(r) { var ids = checkIds(r); return comments().some(function (c) { return ids.indexOf(c.check) !== -1; }); }
+  function activeChecks() { return currentChecks().filter(function (r) { return !isDismissed(r); }); }
   // { check result id: what it said }, for each dismissed check, so the
   // author can read them with no check engine. One no longer found keeps the
   // words it was saved with.
   function dismissedTitles() {
-    var r = state.review, had = r.dismissedCheckTitles || {}, out = {}, byId = {};
-    currentChecks().forEach(function (x) { byId[x.id] = x; });
+    var r = state.review, had = r.dismissedCheckTitles || {}, out = {}, byId = mapOf();
+    currentChecks().forEach(function (x) { checkIds(x).forEach(function (id) { if (!byId[id]) byId[id] = x; }); });
     r.dismissedChecks.forEach(function (id) {
       var x = byId[id];
       if (x) out[id] = x.title + (x.kind === "block" && x.sectionTitle ? " (in " + x.sectionTitle + docSuffix(x.documentIndex || 0) + ")" : "") + ": " + x.message;
@@ -1813,6 +2551,14 @@
     if (r.kind === "general") {
       return { documentIndex: 0, documentTitle: "", kind: "general", sectionKey: "", sectionTitle: r.sectionTitle || "General", blockId: "", quote: r.quote || "", cell: null, targetName: "", itemId: "", field: "" };
     }
+    // On the block as a click on it would be: the quote is the whole block,
+    // or the whole cell, never the clipped words the check shows. That is
+    // what the author's tool and the next round match the comment by.
+    var b = (doc.blocks || []).filter(function (x) { return x.id === r.blockId; })[0];
+    if (b) {
+      var cell = r.cell && b.type === "table" ? { row: r.cell.row, col: r.cell.col } : null;
+      return blockAnchor(doc, r.documentIndex || 0, b, cell, typeof r.fullText === "string" ? r.fullText : cell ? cellText(b, cell) : b.type === "image" ? "" : b.text || "");
+    }
     return { documentIndex: r.documentIndex, documentTitle: doc.title || "", kind: "block", sectionKey: r.sectionKey, sectionTitle: r.sectionTitle, blockId: r.blockId,
       quote: r.fullText || r.quote, cell: r.cell, targetName: doc.targetName || "", itemId: "", field: "" };
   }
@@ -1824,7 +2570,7 @@
   function renderChecks(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Automatic checks" }));
     main.appendChild(h("p", { class: "page-sub", text: "Possible problems found automatically in this pack. Look at each one in place, then make it a comment or dismiss it." }));
-    var all = currentChecks(), active = all.filter(function (r) { return !isDismissed(r.id); }), gone = all.length - active.length;
+    var all = currentChecks(), active = all.filter(function (r) { return !isDismissed(r); }), gone = all.length - active.length;
     // What was found first, in the checks' own order; the clean checks folded
     // into one card, each opening to say what it looked for.
     var risk = (state.pack.engagement || {}).scoringFamily === "risk-assessment";
@@ -1853,15 +2599,26 @@
     main.appendChild(card("Other clients' names to look for", null, [namesEditor()]));
     if (gone) {
       main.appendChild(h("div", null, [
-        h("button", { type: "button", class: "rr-linkbtn", text: (state.showDismissed ? "Hide" : "Show") + " " + gone + " dismissed", onClick: function () { state.showDismissed = !state.showDismissed; render(true); } })
+        h("button", { type: "button", class: "rr-linkbtn", id: "rr-checks-gone", text: (state.showDismissed ? "Hide" : "Show") + " " + gone + " dismissed", onClick: function () { state.showDismissed = !state.showDismissed; render(true); } })
       ]));
       if (state.showDismissed) {
-        main.appendChild(card("Dismissed", null, all.filter(function (r) { return isDismissed(r.id); }).map(checkRow)));
+        main.appendChild(card("Dismissed", null, all.filter(isDismissed).map(checkRow)));
       }
     }
   }
+  // After a check's button has gone (the row dismissed, restored or made a
+  // comment), the keyboard goes to the row's Dismiss, else to the row that
+  // took its place, else to the link that shows the dismissed ones.
+  function checkFocus(id, nextId) {
+    function btn(x) { return x ? document.querySelector('#main [data-check-id="' + cssEsc(x) + '"]:not(.dismissed) .rr-check-dismiss') : null; }
+    if (!focusOn(btn(id)) && !focusOn(btn(nextId)) && !focusOn($("rr-checks-gone"))) focusOn(pageTitle());
+  }
   function checkRow(r) {
-    var dismissed = isDismissed(r.id), made = hasCheckComment(r);
+    var dismissed = isDismissed(r), made = hasCheckComment(r);
+    function neighbour(ev) {
+      var row = ev.currentTarget.closest(".rr-check"), n = row && (row.nextElementSibling || row.previousElementSibling);
+      return n && n.getAttribute ? n.getAttribute("data-check-id") : null;
+    }
     return h("div", { class: "rr-check" + (dismissed ? " dismissed" : ""), "data-check-id": r.id }, [
       h("div", { text: r.message }),
       r.quote ? h("div", { class: "quote small", text: r.quote }) : null,
@@ -1872,11 +2629,12 @@
           withReviewerName(function () {
             addComment({ severity: r.severity, anchor: checkAnchor(r), text: r.message, check: r.id });
             render(true);
+            checkFocus(r.id);
           });
         } }),
         dismissed
-          ? h("button", { type: "button", class: "btn sm rr-check-restore", text: "Restore", onClick: function () { state.review.dismissedChecks = state.review.dismissedChecks.filter(function (x) { return x !== r.id; }); touched(); render(true); } })
-          : h("button", { type: "button", class: "btn sm rr-check-dismiss", text: "Dismiss", onClick: function () { state.review.dismissedChecks.push(r.id); touched(); render(true); } })
+          ? h("button", { type: "button", class: "btn sm rr-check-restore", text: "Restore", onClick: function () { var ids = checkIds(r); state.review.dismissedChecks = state.review.dismissedChecks.filter(function (x) { return ids.indexOf(x) === -1; }); touched(); render(true); checkFocus(r.id); } })
+          : h("button", { type: "button", class: "btn sm rr-check-dismiss", text: "Dismiss", onClick: function (ev) { var next = neighbour(ev); state.review.dismissedChecks.push(r.id); touched(); render(true); checkFocus(null, next); } })
       ])
     ]);
   }
@@ -1966,7 +2724,7 @@
     if (c.anchor.kind === "general") {
       // The basis of assessment has its card on Engagement; any other general
       // comment (one made from a check) lives on Summary.
-      state.page = c.anchor.sectionTitle === "Basis of assessment" ? "engagement" : "summary";
+      state.page = c.anchor.sectionTitle === "Basis of assessment" ? "engagement" : isChecklistAnchor(c.anchor) ? "checklist" : "summary";
       state.jump = { el: state.page === "engagement" ? "rr-basis" : null, comment: c.id };
       render();
       return;
@@ -1974,10 +2732,12 @@
     jumpToBlock(c.anchor.documentIndex, c.anchor.blockId);
   }
   // How far through the previous round's comments the reviewer is: confirmed,
-  // or raised again.
+  // raised again, or replied to. Each is something done about the comment.
   function prevLookedAt() {
     var prev = prevComments();
-    return prev.filter(function (p) { return isConfirmed(p.comment.id) || comments().some(function (c) { return c.relatesTo === p.comment.id; }); }).length;
+    return prev.filter(function (p) {
+      return isConfirmed(p.comment.id) || comments().some(function (c) { return c.relatesTo === p.comment.id; }) || repliesTo(p.comment.id).length > 0;
+    }).length;
   }
   function sectionsRead() {
     var n = 0, all = 0;
@@ -2012,6 +2772,7 @@
         stat(answered + "/" + totalQ, "Checklist", "checklist", "rr-sum-checklist"),
         stat(String(activeChecks().length), "Checks not dismissed", "checks", "rr-sum-checks"),
         prevN ? stat(prevLookedAt() + "/" + prevN, "Earlier comments looked at", "previous", "rr-sum-prev") : null,
+        prevN ? stat(String(replies().length), "Replies to earlier comments", "previous", "rr-sum-replies") : null,
         reads.all ? stat(reads.read + "/" + reads.all, "Sections marked read", "report", "rr-sum-read") : null
       ]),
       h("div", { class: "rr-actions no-print" }, [
@@ -2040,10 +2801,19 @@
     var ls = state.lastSave, savedText = null;
     if (!state.dirty && ls) savedText = "Saved to " + ls.name + " at " + fmtTime(ls.at) + "." + (ls.method === "download" ? " Each save downloads a new copy; send the newest." : "");
     else if (!state.dirty && r.savedAt) savedText = "Saved " + fmtDate(r.savedAt) + ".";
+    // The note is saved as it is typed: closing the window straight after
+    // must not lose it. Nothing is drawn again for a key; only the line that
+    // says where the last save went, no longer true, is taken off.
+    function noteChanged(e) {
+      if ((r.verdict.note || "") === e.target.value) return;
+      r.verdict.note = e.target.value;
+      touched();
+      ["rr-saved-at", "rr-handback"].forEach(function (id) { var el = $(id); if (el && el.parentNode) el.parentNode.removeChild(el); });
+    }
     // Not printed: the printout's header carries the verdict and the note.
     var vCard = card("Verdict", null, [
       vWrap, warn,
-      h("div", { class: "field" }, [h("label", { text: "A note for the author" }), h("textarea", { id: "rr-verdict-note", "aria-label": "A note for the author", value: r.verdict.note || "", onChange: function (e) { r.verdict.note = e.target.value; touched(); } })]),
+      h("div", { class: "field" }, [h("label", { text: "A note for the author" }), h("textarea", { id: "rr-verdict-note", "aria-label": "A note for the author", value: r.verdict.note || "", onInput: noteChanged, onChange: noteChanged })]),
       h("div", { class: "rr-save-row no-print" }, [
         h("button", { type: "button", class: "btn primary", id: "rr-save-2", text: "Save my review file", onClick: function (e) { saveReview(e); } }),
         savedText ? h("span", { class: "small muted", id: "rr-saved-at", text: savedText }) : null
@@ -2127,9 +2897,12 @@
     var list = prevComments();
     if (!list.length) return null;
     var rows = list.map(function (p) {
-      var c = p.comment, raised = comments().some(function (x) { return x.relatesTo === c.id; });
-      var what = isConfirmed(c.id) ? (p.status === "wontchange" ? "Reason accepted" : "Confirmed fixed") : raised ? "Raised again" : "Not looked at";
-      return h("tr", { "data-prev-row": c.id }, [h("td", { text: commentWhere(c) }), h("td", { text: cut(c.text, 160) + " (" + c.reviewer + ", round " + p.round + ")" }), h("td", { class: "rr-ans", text: what })]);
+      var c = p.comment, raised = comments().some(function (x) { return x.relatesTo === c.id; }), mine = repliesTo(c.id);
+      var what = isConfirmed(c.id) ? (p.status === "wontchange" ? "Reason accepted" : "Confirmed fixed") : raised ? "Raised again" : mine.length ? "Replied" : "Not looked at";
+      var said = [h("div", { text: cut(c.text, 160) + " (" + c.reviewer + ", round " + p.round + ")" })].concat(mine.map(function (r) {
+        return h("div", { class: "rr-print-reply", text: "Your reply: " + cut(r.text, 300) });
+      }));
+      return h("tr", { "data-prev-row": c.id }, [h("td", { text: commentWhere(c) }), h("td", null, said), h("td", { class: "rr-ans", text: what })]);
     });
     return h("div", { class: "rr-print-only", id: "rr-print-prev" }, [
       h("h2", { text: "Earlier comments" }),
@@ -2160,7 +2933,34 @@
       h("p", { text: "Works offline, with no server. A review pack holds client data, so handle it as you would the project file. Your review file holds your comments, your checklist answers and your verdict, with the short quotes they are about." }),
       h("p", { text: "It reads " + RC.packSchema() + " and writes " + RC.fileSchema() + "." })
     ]));
+    main.appendChild(card("Keyboard", null, [keysList()]));
     main.appendChild(card("Copyright and licence", null, [h("p", { text: LEGAL_NOTICE }), h("div", { class: "rr-licence", text: (A.Data && A.Data.licence) || "" })]));
+  }
+  // The keys, in one place: on About, and from the Keyboard button above the
+  // report. Keep it in step with paperKey, itemKey and the wiring.
+  var KEYS = [
+    ["Tab", "Moves between the parts of the page. The report is one stop, and so are the list of sections and the items on Engagement: the keys below move inside them."],
+    ["Up and Down", "In the report, the paragraph, heading, table or picture before or after. In the list of sections and between items on Engagement, the one before or after."],
+    ["Page Up and Page Down", "In the report, the section before or after."],
+    ["Home and End", "The start or the end of the report, the list of sections or the items. In a table, the first or last cell of the row."],
+    ["Enter or Space", "Comment on the paragraph, heading or picture. On a table, Enter goes into its cells and Space comments on the whole table."],
+    ["In a table", "The arrow keys move between cells, Enter comments on the cell, and Escape goes back out to the table."],
+    ["Tab from a paragraph", "Goes to the comments beside it, then on out of the report."],
+    ["Escape", "Closes an empty comment or reply box and goes back to where it was opened from. A box with something written in it stays until you add or cancel it. Escape also closes a question, and clears the find box."],
+    ["Left and Right", "Move between the buttons of a group: the severities, Yes, No and N/A, and the filters."],
+    ["Ctrl+F", "On the Report page, find in the report. Enter and Shift+Enter go to the next and the previous match."],
+    ["Ctrl+Z", "Undoes a delete while Undo is on offer. After a delete made from the keyboard, the keyboard is on Undo."]
+  ];
+  function keysList() {
+    var kids = [];
+    KEYS.forEach(function (k) { kids.push(h("dt", { text: k[0] }), h("dd", { text: k[1] })); });
+    return h("dl", { class: "rr-keys" }, kids);
+  }
+  function showKeys() {
+    modal("Keyboard", function (m) {
+      return [h("h2", { text: "Keyboard" }), keysList(),
+        h("div", { class: "btn-row" }, [h("button", { type: "button", class: "btn primary", id: "rr-keys-close", text: "Close", onClick: m.close })])];
+    }, null, "wide");
   }
 
   function openDemo() {
@@ -2179,11 +2979,13 @@
   }
 
   // ---------- going to things ----------
+  // Already on the report, in that document: it is scrolled to, not drawn again.
   function jumpToBlock(d, id) {
+    var here = repLive() && rep.d === (d || 0);
     state.page = "report";
     state.docIndex = d || 0;
     state.jump = { block: id };
-    render();
+    if (here) flushJump(); else render();
   }
   function jumpToItem(target, id, targetId) {
     state.page = "engagement";
@@ -2198,16 +3000,21 @@
     state.jump = null;
     var el = null;
     if (j.el) el = $(j.el);
-    if (j.comment && !el) el = document.querySelector('[data-sum-comment="' + j.comment + '"]');
-    if (j.block) el = document.querySelector('[data-block-id="' + j.block + '"]');
+    if (j.comment && !el) el = document.querySelector('[data-sum-comment="' + cssEsc(j.comment) + '"]') || document.querySelector('[data-comment-id="' + cssEsc(j.comment) + '"]');
+    if (j.block) el = blockElById(j.block);
     if (j.item) el = Array.prototype.filter.call(document.querySelectorAll(".rr-item"), function (n) {
       if (n.getAttribute("data-item-id") !== j.item) return false;
       return j.targetId && n.getAttribute("data-target-id") ? n.getAttribute("data-target-id") === j.targetId : n.getAttribute("data-target") === j.target;
     })[0];
     if (!el) return;
-    if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
+    bringIntoView(el, "center");
     el.classList.add("flash");
     setTimeout(function () { el.classList.remove("flash"); }, 2000);
+    // The keyboard goes with it: to the block, the item's Comment button, or
+    // the comment's Edit.
+    if (j.block) { setCurrent(el.rrEntry); focusOn(el); }
+    else if (j.item) { setCurrentItem(el.rrItem); focusOn(el.querySelector(".rr-item-comment")); }
+    else focusOn(el.querySelector(".rr-edit, .rr-basis-comment, button"));
   }
 
   // ---------- the frame of the page ----------
@@ -2221,44 +3028,97 @@
         state.page = id; if (!composerHasDraft()) state.composer = null; render(false);
         // The sidebar was drawn again: keep the keyboard on this page's entry,
         // so the next Tab carries on from here rather than the top.
-        var again = document.querySelector('.nav-item[data-page="' + id + '"]');
-        if (again) { try { again.focus({ preventScroll: true }); } catch (e) { again.focus(); } }
+        focusOn(document.querySelector('.nav-item[data-page="' + id + '"]'));
       } }, [h("span", { text: label }), badge ? h("span", { class: "badge", text: String(badge) }) : null]);
+  }
+  // The count beside each page in the sidebar; null for none.
+  function navBadges() {
+    var block = 0, item = 0;
+    comments().forEach(function (c) { if (c.anchor.kind === "block") block++; else if (c.anchor.kind === "item") item++; });
+    return { report: block || null, engagement: item || null, checklist: checklistAnswered() + "/" + checklistTotal(), checks: activeChecks().length || null,
+      // Earlier comments confirmed or raised again, of all of them.
+      previous: prevComments().length ? prevLookedAt() + "/" + prevComments().length : null };
+  }
+  function outlineTitle(secs, d) {
+    return "Sections, " + secs.filter(function (s) { return isRead(d, s.id); }).length + " of " + secs.length + " read";
+  }
+  // The counts the page shows, brought up to date where they are: the
+  // sidebar's badges, the outline's comment counts and its count of sections
+  // read, and the Go to section and Document lists. Nothing is drawn again.
+  function syncCounts() {
+    if (!state.pack) return;
+    var badges = navBadges();
+    function count(host, cls, v) {
+      var el = host.querySelector("." + cls);
+      if (v == null || v === "" || v === 0) { if (el) host.removeChild(el); }
+      else if (!el) host.appendChild(h("span", { class: cls, text: String(v) }));
+      else if (el.textContent !== String(v)) el.textContent = String(v);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("#sidebar .nav-item"), function (n) {
+      var page = n.getAttribute("data-page");
+      if (page in badges) count(n, "badge", badges[page]);
+    });
+    if (!repLive()) return;
+    var d = rep.d, counts = countsBySection(rep.doc, d), byId = mapOf();
+    rep.secs.forEach(function (s) { byId[s.id] = s; });
+    Array.prototype.forEach.call(document.querySelectorAll("#sidebar .rr-outline-item"), function (n) {
+      count(n, "n", counts[n.getAttribute("data-section-block")]);
+    });
+    var title = document.querySelector("#sidebar .rr-outline .nav-section-title");
+    if (title) title.textContent = outlineTitle(rep.secs, d);
+    var jump = $("rr-jump"), docs = $("rr-doc");
+    if (jump) Array.prototype.forEach.call(jump.options, function (o) {
+      var s = byId[o.value], t = s ? jumpOptionText(s, counts, d) : null;
+      if (t != null && o.textContent !== t) o.textContent = t;
+    });
+    if (docs) Array.prototype.forEach.call(docs.options, function (o, i) {
+      var t = state.pack.documents[i] ? docOptionText(state.pack.documents[i], i) : null;
+      if (t != null && o.textContent !== t) o.textContent = t;
+    });
+  }
+  // The outline's row that Tab stops at: one row's tick and link at a time,
+  // with Up and Down to move between rows (see the sidebar's key listener).
+  function outlineRow(row) {
+    var sb = $("sidebar"), was = sb.querySelector(".rr-outline-row.tab");
+    if (!row || was === row) return;
+    if (was) { was.classList.remove("tab"); setTabbable(was, false); }
+    row.classList.add("tab");
+    setTabbable(row, true);
   }
   function renderNav() {
     var sb = $("sidebar"); sb.innerHTML = "";
     var sec = h("div", { class: "nav-section" });
     if (state.pack) {
-      var d = Math.min(state.docIndex, state.pack.documents.length - 1), doc = state.pack.documents[d];
+      var d = curDoc(), doc = state.pack.documents[d], badges = navBadges();
       sec.appendChild(h("div", { class: "nav-section-title", text: "This review" }));
-      var blockCount = comments().filter(function (c) { return c.anchor.kind === "block"; }).length;
-      var itemCount = comments().filter(function (c) { return c.anchor.kind === "item"; }).length;
-      sec.appendChild(navItem("report", "Report", blockCount || null));
-      sec.appendChild(navItem("engagement", "Engagement", itemCount || null));
-      sec.appendChild(navItem("checklist", "Checklist", checklistAnswered() + "/" + checklistTotal()));
-      sec.appendChild(navItem("checks", "Automatic checks", activeChecks().length || null));
-      // Earlier comments confirmed or raised again, of all of them.
-      if (prevComments().length) sec.appendChild(navItem("previous", "Previous round", prevLookedAt() + "/" + prevComments().length));
+      sec.appendChild(navItem("report", "Report", badges.report));
+      sec.appendChild(navItem("engagement", "Engagement", badges.engagement));
+      sec.appendChild(navItem("checklist", "Checklist", badges.checklist));
+      sec.appendChild(navItem("checks", "Automatic checks", badges.checks));
+      if (badges.previous) sec.appendChild(navItem("previous", "Previous round", badges.previous));
       sec.appendChild(navItem("summary", "Summary and verdict", null));
       sb.appendChild(sec);
       if (state.page === "report") {
         // Each section: go to it, its comment count, and a tick to mark it
         // read, which only tells you (on Summary) how far you have got.
         var counts = countsBySection(doc, d), secs = sectionsOf(doc);
-        var nRead = secs.filter(function (s) { return isRead(d, s.id); }).length;
-        var outline = h("div", { class: "rr-outline" }, [h("div", { class: "nav-section-title", text: "Sections, " + nRead + " of " + secs.length + " read" })]);
-        secs.forEach(function (s) {
+        var outline = h("div", { class: "rr-outline" }, [h("div", { class: "nav-section-title", text: outlineTitle(secs, d) })]);
+        secs.forEach(function (s, n) {
           var tick = h("input", { type: "checkbox", class: "rr-read", "data-read-block": s.id, title: "Mark as read", "aria-label": "Mark " + s.title + " as read" });
           tick.checked = isRead(d, s.id);
-          tick.addEventListener("change", function () {
-            setRead(d, s.id, tick.checked); renderNav();
-            var again = document.querySelector('.rr-read[data-read-block="' + s.id + '"]');
-            if (again) { try { again.focus({ preventScroll: true }); } catch (e) { again.focus(); } }
-          });
-          outline.appendChild(h("div", { class: "rr-outline-row" + (tick.checked ? " read" : "") }, [tick,
+          var row = h("div", { class: "rr-outline-row" + (tick.checked ? " read" : "") }, [tick,
             h("button", { type: "button", class: "rr-outline-item" + (s.level > 1 ? " lvl2" : ""), "data-section-block": s.id, onClick: function () {
               scrollToSection(s.id);
-            } },[h("span", { class: "t", text: s.title }), counts[s.id] ? h("span", { class: "n", text: String(counts[s.id]) }) : null])]));
+            } }, [h("span", { class: "t", text: s.title }), counts[s.id] ? h("span", { class: "n", text: String(counts[s.id]) }) : null])]);
+          // Ticked where it is: the outline is not drawn again, so the
+          // keyboard stays on the tick.
+          tick.addEventListener("change", function () {
+            setRead(d, s.id, tick.checked);
+            row.classList.toggle("read", tick.checked);
+            syncCounts(); syncSection();
+          });
+          if (n) setTabbable(row, false); else row.classList.add("tab");
+          outline.appendChild(row);
         });
         sb.appendChild(outline);
       }
@@ -2362,9 +3222,110 @@
       h("button", { type: "button", class: "btn sm", id: "rr-colleague-hide", text: "Hide them", onClick: function () { state.colleague = null; render(true); } })
     ]);
   }
+  // ---------- keeping the keyboard's place ----------
+  // A draw replaces the elements it draws, and the one with the keyboard
+  // may be among them. focusKey says where an element is in words that
+  // outlast it (the comment, question, item or block it belongs to, and
+  // which control of it); focusBack finds the element now in that place.
+  var FOCUS_SCOPES = ["data-reply-id", "data-comment-id", "data-prev-id", "data-check-id", "data-sum-comment", "data-q", "data-verdict", "data-item-id", "data-block-id"];
+  var FOCUS_SAYS = ["data-answer", "data-severity", "data-filter", "data-go", "data-page", "data-read-block", "data-section-block", "data-cell", "name", "type"];
+  var FOCUS_NOT = { on: 1, active: 1, cur: 1, flash: 1, open: 1, picked: 1, read: 1, tab: 1, prev: 1, "has-comment": 1, "has-must": 1, primary: 1 };
+  function attrSel(el, name) { return "[" + name + '="' + cssEsc(el.getAttribute(name)) + '"]'; }
+  function focusKey(el) {
+    el = el || document.activeElement;
+    if (!el || el === document.body || !el.closest || !el.getAttribute) return null;
+    var root = el.closest("#main") ? "#main" : el.closest("#sidebar") ? "#sidebar" : null;
+    if (!root) return null;
+    if (el.id) return { sel: "#" + cssEsc(el.id), n: 0 };
+    var scope = null, scopeSel = "";
+    for (var n = el; n && n.getAttribute && !scope; n = n.parentNode) {
+      if (n.id === "main" || n.id === "sidebar") break;
+      for (var k = 0; k < FOCUS_SCOPES.length; k++) if (n.hasAttribute(FOCUS_SCOPES[k])) {
+        scope = n;
+        scopeSel = attrSel(n, FOCUS_SCOPES[k]) + (FOCUS_SCOPES[k] === "data-item-id" && n.hasAttribute("data-target") ? attrSel(n, "data-target") : "");
+        break;
+      }
+    }
+    if (scope === el) return { sel: root + " " + scopeSel, n: 0 };
+    var says = el.nodeName.toLowerCase();
+    Array.prototype.forEach.call(el.classList || [], function (c) { if (!FOCUS_NOT[c]) says += "." + cssEsc(c); });
+    FOCUS_SAYS.forEach(function (a) { if (el.hasAttribute(a)) says += attrSel(el, a); });
+    var sel = root + " " + (scopeSel ? scopeSel + " " : "") + says, at = 0;
+    try { at = Math.max(0, Array.prototype.indexOf.call(document.querySelectorAll(sel), el)); } catch (e) { return null; }
+    return { sel: sel, n: at };
+  }
+  function focusBack(key) {
+    if (!key) return false;
+    var list;
+    try { list = document.querySelectorAll(key.sel); } catch (e) { return false; }
+    return focusOn(list[key.n] || list[0]);
+  }
+  function focusLost() { var a = document.activeElement; return !a || a === document.body || !a.isConnected; }
+  // The page's heading, which takes the keyboard when the control that had it
+  // has gone and nothing else is the obvious next place.
+  function pageTitle() {
+    var t = document.querySelector("#main .page-title");
+    if (t) t.setAttribute("tabindex", "-1");
+    return t;
+  }
+
+  // A comment still being written that this page does not show: say where.
+  function syncDraftBar() {
+    var main = $("main"), old = $("rr-draft");
+    var need = !!state.pack && composerHasDraft() && !main.querySelector(".rr-composer");
+    if (!need) { if (old) old.parentNode.removeChild(old); return; }
+    var bar = h("div", { class: "rr-banner", id: "rr-draft" }, [
+      h("span", { class: "t", text: "You have an unfinished comment on " + draftWhere() + ". It is not in your review until you add it." }),
+      h("button", { type: "button", class: "btn sm primary", id: "rr-draft-go", text: "Go to it", onClick: goToDraft }),
+      h("button", { type: "button", class: "btn sm", id: "rr-draft-drop", text: "Discard it", onClick: function () { state.composer = null; render(true); } })
+    ]);
+    if (old) { old.parentNode.replaceChild(bar, old); return; }
+    var first = main.querySelector(".page-title");
+    main.insertBefore(bar, first || main.firstChild);
+  }
+
+  // Draws again only what a change to a comment touched. On the Report page
+  // that is the comments beside the blocks named; on Engagement the item
+  // cards named, or the basis card. The report's own text, the other cards,
+  // the scroll position and any selection are left as they are. anchors: the
+  // places of the comments (or the composer) that changed; prevIds: earlier
+  // rounds' comments whose own node changed (confirmed, replied to, raised
+  // again). The counts around the page are brought up to date too. On any
+  // other page, or if the page is not as it was drawn, the page is drawn.
+  function redraw(anchors, prevIds) {
+    var key = focusKey(), todo = [], i;
+    cix = null;
+    anchors = (anchors || []).filter(Boolean);
+    var prevs = (prevIds || []).filter(Boolean).map(function (id) { return prevComments().filter(function (p) { return p.comment.id === id; })[0]; }).filter(Boolean);
+    if (repLive()) {
+      var seen = mapOf();
+      var add = function (id) { var en = rep.at[id]; if (en && !seen[id]) { seen[id] = true; todo.push(en); } };
+      anchors.forEach(function (a) { if (a.kind === "block" && (a.documentIndex || 0) === rep.d && a.blockId) add(a.blockId); });
+      prevs.forEach(function (p) {
+        var a = p.comment.anchor, loc = a.kind === "block" && docOf(a) === rep.d ? placeOf(p) : null;
+        if (loc) add(loc.block.id);
+      });
+      todo.forEach(refreshBlock);
+    } else if (engLive() && state.itemFilter !== "commented") {
+      var basis = false;
+      anchors.concat(prevs.map(function (p) { return p.comment.anchor; })).forEach(function (a) {
+        if (a.kind === "item") { var it = findItemFor(a); if (it && todo.indexOf(it) === -1) todo.push(it); }
+        else if (a.kind === "general" && a.sectionTitle === "Basis of assessment") basis = true;
+      });
+      for (i = 0; i < todo.length; i++) refreshItem(todo[i]);
+      if (basis) refreshBasis();
+    } else { render(true); return; }
+    syncCounts();
+    syncDraftBar();
+    if (focusLost()) focusBack(key);
+  }
+
   function render(keepScroll) {
     var main = $("main");
     var top = main.scrollTop;
+    // Where the keyboard is, to put it back once the page is drawn.
+    var key = focusKey(), inMain = main.contains(document.activeElement);
+    cix = null;
     renderNav(); renderHeader();
     main.innerHTML = "";
     if (state.demo) {
@@ -2375,19 +3336,13 @@
     if (!state.pack && page !== "about") page = "welcome";
     var fn = { welcome: renderWelcome, report: renderReport, engagement: renderEngagement, checklist: renderChecklist, checks: renderChecks, previous: renderPrevious, summary: renderSummary, about: renderAbout }[page] || renderWelcome;
     fn(main);
-    // A comment still being written that this page does not show: say where.
-    if (state.pack && composerHasDraft() && !main.querySelector(".rr-composer")) {
-      var bar = h("div", { class: "rr-banner", id: "rr-draft" }, [
-        h("span", { class: "t", text: "You have an unfinished comment on " + draftWhere() + ". It is not in your review until you add it." }),
-        h("button", { type: "button", class: "btn sm primary", id: "rr-draft-go", text: "Go to it", onClick: goToDraft }),
-        h("button", { type: "button", class: "btn sm", id: "rr-draft-drop", text: "Discard it", onClick: function () { state.composer = null; render(true); } })
-      ]);
-      var first = main.querySelector(".page-title");
-      main.insertBefore(bar, first || main.firstChild);
-    }
+    syncDraftBar();
     if (state.jump) flushJump();
     else main.scrollTop = keepScroll === false ? 0 : top;
-    syncReadTick();
+    syncSection();
+    // The control that was in use, as it is now; if it has gone, the page's
+    // heading, so the keyboard is never left nowhere.
+    if (focusLost() && !focusBack(key) && inMain) focusOn(pageTitle());
   }
 
   // ---------- wiring ----------
@@ -2417,15 +3372,57 @@
     var files = Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.files) || []);
     if (files.length) loadFiles(files);
   });
-  // The narrow window's Read tick follows the section in view.
+  // The outline, and the narrow window's Go to section list and Read tick,
+  // follow the section in view.
   var tickTimer = null;
-  $("main").addEventListener("scroll", function () { clearTimeout(tickTimer); tickTimer = setTimeout(syncReadTick, 80); });
+  $("main").addEventListener("scroll", function () { clearTimeout(tickTimer); tickTimer = setTimeout(syncSection, 80); });
   // The sidebar's pages are role=button: Enter and Space press them. One
-  // listener on the sidebar, which keeps it through every redraw.
+  // listener on the sidebar, which keeps it through every redraw. In the
+  // outline, Up and Down (and Home and End) move between sections, staying on
+  // the tick or on the link.
   $("sidebar").addEventListener("keydown", function (e) {
-    if (e.key !== "Enter" && e.key !== " ") return;
+    var row = e.target && e.target.closest && e.target.closest(".rr-outline-row"), k = e.key;
+    if (row && !e.altKey && !e.ctrlKey && !e.metaKey && (k === "ArrowDown" || k === "ArrowUp" || k === "Home" || k === "End")) {
+      var rows = row.parentNode.querySelectorAll(".rr-outline-row"), at = Array.prototype.indexOf.call(rows, row);
+      var to = rows[k === "ArrowDown" ? at + 1 : k === "ArrowUp" ? at - 1 : k === "Home" ? 0 : rows.length - 1];
+      e.preventDefault();
+      if (to) { outlineRow(to); to.querySelector(e.target.classList.contains("rr-read") ? ".rr-read" : ".rr-outline-item").focus(); }
+      return;
+    }
+    if (k !== "Enter" && k !== " ") return;
     var t = e.target && e.target.closest && e.target.closest(".nav-item");
     if (t && e.target === t) { e.preventDefault(); t.click(); }
+  });
+  $("sidebar").addEventListener("focusin", function (e) {
+    var row = e.target && e.target.closest && e.target.closest(".rr-outline-row");
+    if (row) outlineRow(row);
+  });
+  // In the page: an item's card takes the Tab order when the keyboard or the
+  // mouse lands in it; Up and Down move between items; Left and Right move
+  // between the buttons of a group (severities, answers, filters).
+  $("main").addEventListener("focusin", function (e) {
+    var c = engLive() && e.target && e.target.closest && e.target.closest(".rr-item");
+    if (c && c.rrItem) setCurrentItem(c.rrItem);
+  });
+  $("main").addEventListener("keydown", function (e) {
+    var t = e.target, k = e.key;
+    if (!t || !t.closest || e.altKey || e.ctrlKey || e.metaKey) return;
+    if ((k === "ArrowLeft" || k === "ArrowRight") && t.nodeName === "BUTTON" && t.parentNode.classList.contains("rr-seg")) {
+      var to = k === "ArrowLeft" ? t.previousElementSibling : t.nextElementSibling;
+      e.preventDefault();
+      if (to) to.focus();
+      return;
+    }
+    itemKey(e);
+  });
+  // Ctrl+Z takes back the last delete while its Undo is on offer, unless the
+  // keyboard is in a box of text, where it undoes typing as usual.
+  document.addEventListener("keydown", function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || String(e.key).toLowerCase() !== "z" || !toastUndo) return;
+    var t = e.target, tag = t && t.nodeName;
+    if (tag === "TEXTAREA" || tag === "SELECT" || (tag === "INPUT" && !/^(checkbox|radio|button)$/.test(t.type)) || (t && t.isContentEditable)) return;
+    e.preventDefault();
+    toastUndo();
   });
   // Ctrl+F on the Report page goes to the page's own find, which the exe
   // (with no find bar) relies on. Elsewhere the browser's own find is left.
@@ -2438,8 +3435,8 @@
   });
   window.addEventListener("beforeunload", function (e) {
     clearTimeout(autosaveTimer);
-    // A comment still being written is in no file and no autosave.
-    if ((state.dirty || composerHasDraft()) && !state.demo) { writeAutosave(); e.preventDefault(); e.returnValue = ""; return ""; }
+    // A comment or a reply still being written is in no file and no autosave.
+    if ((state.dirty || composerHasDraft() || replyHasDraft()) && !state.demo) { writeAutosave(); e.preventDefault(); e.returnValue = ""; return ""; }
   });
   if (A.HostBridge && A.HostBridge.hosted) {
     A.HostBridge.register({
@@ -2472,6 +3469,8 @@
     mergeReviews: mergeReviews,
     writeAutosave: writeAutosave,
     composerHasDraft: composerHasDraft,
-    KEY_READ: KEY_READ
+    KEY_READ: KEY_READ,
+    hasWork: hasWork,
+    syncSection: syncSection
   };
 })();

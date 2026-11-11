@@ -19,7 +19,9 @@
 /* the toast's one action, such as Undo */
 .rr-toast-act { margin-left: 10px; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
 /* keyboard focus, wherever a click works */
-.nav-item:focus-visible, .rr-outline-item:focus-visible, .rr-linkbtn:focus-visible, .rr-stat-go:focus-visible, .rr-table td[tabindex]:focus-visible, .rr-toast-act:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+.nav-item:focus-visible, .rr-outline-item:focus-visible, .rr-linkbtn:focus-visible, .rr-stat-go:focus-visible, .rr-toast-act:focus-visible, .rr-read:focus-visible, .rr-seg button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+/* the page's heading takes the keyboard when the control in use has gone: no ring on a heading */
+.page-title:focus { outline: none; }
 
 /* ---- sidebar ---- */
 .rr-outline { padding: 0 0 8px; }
@@ -34,6 +36,9 @@
 .rr-outline-row .rr-outline-item { padding-left: 6px; }
 .rr-outline-row .rr-outline-item.lvl2 { padding-left: 18px; }
 .rr-outline-row.read .rr-outline-item .t { color: var(--text-muted); }
+/* the section at the top of the reading area: a bar and bold, not colour alone */
+.rr-outline-row.cur { box-shadow: inset 3px 0 0 var(--brand-blue); background: var(--surface-2); }
+.rr-outline-row.cur .rr-outline-item .t { font-weight: 700; color: var(--text); }
 .sidebar-legal { font-size: 11px; color: var(--text-soft); padding: 12px 16px; line-height: 1.4; }
 
 /* ---- welcome ---- */
@@ -57,9 +62,18 @@
 .rr-toolbar select, .rr-toolbar input[type=search] { font: inherit; padding: 4px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); min-width: 0; max-width: 100%; }
 .rr-paper { background: #FFF; color: #1A2533; border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 36px 44px; box-shadow: 0 1px 3px rgba(10,30,50,.08); max-width: 920px; margin-left: auto; margin-right: auto; font-size: 13.5px; line-height: 1.5; }
 .rr-cover { border-bottom: 1px solid #C8D2DD; padding-bottom: 18px; margin-bottom: 18px; }
-.rr-block { position: relative; border-radius: 3px; padding: 2px 6px; margin: 0 -6px 6px; cursor: pointer; border-left: 3px solid transparent; }
+/* A block out of view is not laid out or painted until it is scrolled to
+   (content-visibility), which is what keeps a report of thousands of blocks
+   quick to open and to scroll. Until then it stands at a rough height, set
+   on each block by app.js (contain-intrinsic-block-size), and afterwards at
+   the height it was last shown at. Find, Go to and the keyboard still reach
+   it: the browser lays a block out when it is scrolled to or focused. */
+.rr-block { position: relative; border-radius: 3px; padding: 2px 6px; margin: 0 -6px 6px; cursor: pointer; border-left: 3px solid transparent; content-visibility: auto; }
 .rr-block:hover { background: #F0F5FA; }
-.rr-block:focus-visible { outline: 2px solid #0F5FA6; outline-offset: 1px; }
+/* the keyboard's place in the report: the paper is white in both themes, so
+   the ring is a fixed blue, with the block tinted so it is not colour alone */
+.rr-block:focus { outline: none; }
+.rr-block:focus-visible { outline: 3px solid #0F5FA6; outline-offset: 1px; background: #F0F5FA; }
 .rr-block.has-comment { border-left-color: #0F5FA6; }
 .rr-block.has-must { border-left-color: #B23A33; }
 .rr-block.open { background: #E6EEF6; }
@@ -98,6 +112,10 @@ mark.rr-find.cur { background: #F2B035; outline: 1px solid #B07A10; }
 .rr-table td.picked { outline: 2px solid #0F5FA6; outline-offset: -2px; }
 .rr-table td.prev { outline: 2px dashed #B7791F; outline-offset: -2px; }
 .rr-table td.prev.picked { outline: 2px solid #0F5FA6; }
+/* the keyboard on a cell: a blue ring with a white one inside it, so it shows
+   on a shaded header cell as well as on a white one */
+.rr-table td:focus { outline: none; }
+.rr-table td[data-cell]:focus-visible { outline: 3px solid #0F5FA6; outline-offset: -3px; box-shadow: inset 0 0 0 5px #FFF; }
 .rr-table td p { margin: 0 0 3px; white-space: pre-wrap; }
 .rr-table td p:last-child { margin-bottom: 0; }
 
@@ -124,6 +142,13 @@ mark.rr-find.cur { background: #F2B035; outline: 1px solid #B07A10; }
 .rr-prev { background: var(--surface-2); }
 .rr-colleague { border-left-style: dashed; }
 .rr-replies { margin: 3px 0 0 8px; padding-left: 8px; border-left: 2px solid var(--border); }
+/* your own replies in an earlier comment's thread, and the box to write one */
+.rr-replies > div { margin: 2px 0; overflow-wrap: anywhere; }
+.rr-chip.mine { background: var(--brand-blue-tint); color: var(--brand-blue); }
+.rr-reply-acts { white-space: nowrap; }
+.rr-reply-box { display: grid; gap: 6px; margin-top: 4px; }
+.rr-reply-box textarea { font: inherit; width: 100%; box-sizing: border-box; min-height: 54px; resize: vertical; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
+.rr-print-reply { font-style: italic; }
 /* an earlier round's comment whose text has changed: what it was, what it reads now */
 .rr-chip.changed { background: var(--near-bg); color: var(--near); }
 .rr-lbl { font-style: normal; font-weight: 600; color: var(--text-muted); }
@@ -137,6 +162,10 @@ mark.rr-find.cur { background: #F2B035; outline: 1px solid #B07A10; }
 .rr-composer textarea, .rr-note input, .rr-composer select { font: inherit; width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
 .rr-composer textarea { min-height: 62px; resize: vertical; }
 .rr-composer.flash { animation: rr-flash 1.4s ease-out; }
+/* suggested wording: room to edit a paragraph; it grows with its wording up
+   to this limit, then scrolls. Under it, what the suggestion changes. */
+.rr-composer textarea.rr-c-sug { min-height: 96px; max-height: 320px; }
+.rr-sug-diff { margin-top: -4px; }
 .rr-sev-help { margin-top: -4px; }
 .rr-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .rr-seg button { font: inherit; font-size: 12px; font-weight: 600; padding: 3px 10px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); border-radius: 999px; cursor: pointer; }
@@ -148,7 +177,8 @@ mark.rr-find.cur { background: #F2B035; outline: 1px solid #B07A10; }
 /* ---- engagement ---- */
 .rr-group-h { font-size: 13px; color: var(--brand-blue-dark); margin: 16px 0 6px; font-weight: 700; }
 .rr-target-h { font-size: 15px; margin: 18px 0 4px; }
-.rr-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+/* as the report's blocks: a card out of view costs nothing until it is scrolled to */
+.rr-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; font-size: 13px; content-visibility: auto; contain-intrinsic-block-size: auto 150px; }
 .rr-item.flash { animation: rr-flash 1.8s ease-out; }
 .rr-item-h { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .rr-item-h .code { font-weight: 700; }
@@ -162,6 +192,8 @@ mark.rr-find.cur { background: #F2B035; outline: 1px solid #B07A10; }
 .rr-q { padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
 .rr-q:first-child { border-top: 0; }
 .rr-note { grid-column: 1 / -1; }
+/* a comment saying why an answer is No, under its question */
+.rr-q-why .rr-side { margin: 4px 0 0; }
 .rr-check { padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
 .rr-check:first-child { border-top: 0; }
 .rr-check .quote { color: var(--text-muted); margin-top: 2px; overflow-wrap: anywhere; }
@@ -195,6 +227,11 @@ button.rr-stat-go:hover { border-color: var(--brand-blue); }
 .rr-modal-choices { display: grid; gap: 8px; }
 .rr-modal-choices .btn { width: 100%; text-align: left; white-space: normal; }
 .rr-modal input { font: inherit; width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); margin: 8px 0 12px; }
+/* the keyboard help, on About and from the Keyboard button above the report */
+.rr-modal.wide { max-width: 640px; max-height: calc(100vh - 32px); overflow: auto; }
+.rr-keys { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 6px 14px; margin: 0 0 12px; font-size: 13px; }
+.rr-keys dt { font-weight: 700; }
+.rr-keys dd { margin: 0; }
 .rr-licence { white-space: pre-wrap; font-size: 12px; max-height: 320px; overflow: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
 
 /* ---- narrow screens ---- */
@@ -213,6 +250,8 @@ button.rr-stat-go:hover { border-color: var(--brand-blue); }
   .rr-paper { padding: 16px 14px; }
   .rr-kv { grid-template-columns: 1fr; }
   .rr-q { grid-template-columns: 1fr; }
+  .rr-keys { grid-template-columns: 1fr; gap: 0 0; }
+  .rr-keys dd { margin-bottom: 8px; }
   /* the active tab's count would otherwise touch its label */
   .sidebar .nav-item .badge { margin-left: 6px; }
   /* no outline in the sidebar here: a Go to section list and a tick to mark
@@ -222,9 +261,21 @@ button.rr-stat-go:hover { border-color: var(--brand-blue); }
   .rr-toolbar { top: -12px; }
 }
 
+/* ---- high contrast (forced colours): the rings and the comment bar keep
+   a meaning there, where a transparent border would show as a line ---- */
+@media (forced-colors: active) {
+  .rr-block { border-left-color: Canvas; }
+  .rr-block.has-comment, .rr-block.has-must { border-left-color: Highlight; }
+  .rr-block.has-must { border-left-style: double; border-left-width: 5px; }
+  .rr-block:focus-visible, .rr-table td[data-cell]:focus-visible { outline-color: Highlight; box-shadow: none; }
+  .rr-block.open { outline: 1px dashed CanvasText; }
+}
+
 /* ---- printing Summary and verdict: the review as a working note ---- */
 @media print {
   .rr-print-only { display: block; }
+  /* everything is laid out for paper */
+  .rr-block, .rr-item { content-visibility: visible; }
   /* the verdict and its note print in the header block instead */
   .rr-banner, .rr-composer, .rr-actions, .btn, .no-print, .toast, .rr-verdicts, #main .field, .rr-warn, .page-sub, .rr-sum-title { display: none !important; }
   /* the toolbar is in view on screen only */

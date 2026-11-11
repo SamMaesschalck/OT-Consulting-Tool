@@ -55,7 +55,11 @@
   }
   // A message as the tool in that frame would send it (its window is the source).
   function postFrom(w, type, data, frameKey, module) {
-    w.eval("parent.postMessage(" + JSON.stringify({ protocol: "spt-suite/1", from: "module", module: module, frame: frameKey, type: type, data: data }) + ", '*')");
+    // An inline script in the frame, not eval: a tool's page may forbid eval.
+    var s = w.document.createElement("script");
+    s.textContent = "parent.postMessage(" + JSON.stringify({ protocol: "spt-suite/1", from: "module", module: module, frame: frameKey, type: type, data: data }).replace(/</g, "\\u003c") + ", '*')";
+    w.document.documentElement.appendChild(s);
+    s.parentNode.removeChild(s);
   }
   function dropEvent(w, type, files, text) {
     var dt = new w.DataTransfer();

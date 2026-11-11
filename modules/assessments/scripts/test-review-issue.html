@@ -214,6 +214,11 @@ H.test(function (ok, done) {
     E.updateMetadata({ qaReviewBy: "U. Fourth" });
     RV.importTexts([{ name: "e.json", text: fileFrom(pack, "U. Fourth", "approved") }]);
     ok(!RV.qaOffers().length, "nor an approval from whoever it already names");
+    // The same name in other capitals is the same reviewer.
+    E.updateMetadata({ qaReviewBy: "u. fourth" });
+    RV.importTexts([{ name: "e2.json", text: fileFrom(pack, "U. Fourth", "approved", [], new Date(Date.now() + 3000).toISOString()) }]);
+    ok(!RV.qaOffers().length, "nor when QA review by names them in other capitals", JSON.stringify(RV.qaOffers()));
+    E.updateMetadata({ qaReviewBy: "U. Fourth" });
     // Back to an approved-only position for the next test.
     var s = RV.store();
     s.files = s.files.filter(function (f) { return f.reviewer !== "T. Third"; });

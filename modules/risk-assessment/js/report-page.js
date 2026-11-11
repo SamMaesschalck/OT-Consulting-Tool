@@ -9,7 +9,10 @@
  * be dimmed here and put back; every real export leaves it out.
  *
  * The store is project.reportCustom = { detailed: {...}, highLevel: {...} }, each
- * in the assessment tool's shape: { <sectionKey>: { title, hidden, prose, order } }.
+ * in the assessment tool's shape: { <sectionKey>: { title, hidden, prose, order,
+ * paragraphs } }. paragraphs holds single paragraphs reworded by an accepted review
+ * suggestion (js/review.js); this page lists them above the report, each with
+ * whether it still applies and the way back.
  * Two sets, because same-named sections say different things in the two reports.
  * It is absent until something is changed, and empties are removed again, so a
  * project with no overrides saves as it always did. See shared/report-sections.js
@@ -90,6 +93,7 @@ window.RiskReportPage = (function () {
     }).then(function (res) {
       var m = modelFrom(res.blocks, printed, generated, lists);
       m.media = res.media;
+      m.probe = printed;   // which reworded paragraphs applied (rewordedCard)
       return m;
     });
   }
@@ -121,7 +125,7 @@ window.RiskReportPage = (function () {
   }
   function showBusy(on) {
     if (ui.status) ui.status.textContent = on ? "Refreshing the preview…" : "";
-    var doc = ui.holder && ui.holder.firstChild;
+    var doc = ui.holder && (ui.holder.querySelector(".rp-doc") || ui.holder.firstChild);
     if (doc && doc.classList) doc.classList.toggle("rp-busy", !!on);
   }
 
@@ -344,6 +348,11 @@ window.RiskReportPage = (function () {
     var genTitle = s.repeat ? withoutTarget(s.genTitle, s.targetName) : s.genTitle;
     var shownTitle = s.repeat ? withoutTarget(s.title, s.targetName) : s.title;
     var genProse = s.repeat ? "" : s.genTexts.join("\n");
+    // What prints with no whole rewrite: the generated wording, with any
+    // paragraphs reworded from review comments put in. Edit starts from it, and
+    // saving a rewrite then makes it the whole opening: the paragraph
+    // replacements stay stored, listed as not applying.
+    var printedProse = s.repeat ? "" : RS().applyParagraphs(s.genTexts, cur.paragraphs).join("\n");
     var changed = Object.keys(cur).length > 0;
 
     var head = h("div", { class: "card-h" }, [h("h2", { text: shownTitle })]);
@@ -387,9 +396,9 @@ window.RiskReportPage = (function () {
           if (!box) {
             box = h("textarea", { class: "sect-prose-input", "aria-label": "Section wording",
               title: "One paragraph per line. The tables and charts below are not affected." });
-            box.value = cur.prose || genProse;
+            box.value = cur.prose || printedProse;
             commitOn(box, function (v) {
-              saveText({ prose: (sameProse(v, genProse) || norm(v) === "") ? null : v.trim() });
+              saveText({ prose: (sameProse(v, printedProse) || norm(v) === "") ? null : v.trim() });
             });
             box.addEventListener("input", function () { autoGrow(box); });
             bodyEl.appendChild(box);
@@ -467,6 +476,44 @@ window.RiskReportPage = (function () {
     return root;
   }
 
+  // Paragraphs reworded by an accepted review suggestion, in this report. Each
+  // replaces one generated paragraph, found by its text, so when the assessment
+  // changes that text it stops applying and the generated paragraph prints.
+  // Nothing is lost, but the author has to be told. Null when there are none.
+  function rewordedCard(m, docId) {
+    var h = ui.h, known = !!m && fresh();
+    var rows = RS().paragraphStatus(customOf(docId), m && m.probe ? [m.probe] : []);
+    if (!rows.length) return null;
+    function clip(t) { t = norm(t); return t.length > 180 ? t.slice(0, 180) + "…" : t; }
+    function titleOf(r) {
+      var t = r.title || r.key.replace(/-/g, " ");
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    }
+    var items = rows.map(function (r) {
+      var state = known ? r.state : "checking", note = RS().paragraphNote(state);
+      return h("li", { class: "wo-row", "data-reworded-row": r.key, "data-reworded-state": state }, [
+        h("div", { class: "wo-head" }, [
+          h("strong", { text: titleOf(r) }),
+          h("span", { class: note ? "rw-lost" : "muted", text: ": " + (state === "checking" ? "Checking the Word report…" : note || "In the report.") })
+        ]),
+        h("p", { class: "wo-prose muted", text: "Generated: " + clip(r.from) }),
+        h("p", { class: "wo-prose", text: "Reworded: " + clip(r.to) }),
+        h("button", { type: "button", class: "inherited-edit wo-back", text: "Back to the generated version",
+          title: "Takes out this rewording. The paragraph is written from the assessment again",
+          onClick: function () {
+            if (setSection(docId, r.key, { paragraphs: RS().setParagraph(sectionOf(docId, r.key).paragraphs, r.from, null) })) { paint(); pump(); }
+          } })
+      ]);
+    });
+    return h("div", { class: "card reworded-changes no-print", "data-check-anchor": "reworded" }, [
+      h("div", { class: "card-h" }, [h("h2", { text: "Paragraphs reworded from review comments" })]),
+      h("div", { class: "card-b" }, [
+        h("p", { class: "muted sect-note", text: "Accepting a reviewer's wording on a paragraph that opens a section replaces that paragraph only. The rest of the section is still written from the assessment. If the assessment changes the paragraph it replaced, the rewording stops applying and the generated text prints." }),
+        h("ul", { class: "wo-list" }, items)
+      ])
+    ]);
+  }
+
   // ---- the page ------------------------------------------------------------------
   function typingNow() {
     var a = document.activeElement;
@@ -499,6 +546,8 @@ window.RiskReportPage = (function () {
     if (fresh()) { ui.error = null; ui.errorSig = null; }   // the report is good again, whatever failed before
     var m = ui.models[ui.doc], h = ui.h;
     holder.innerHTML = "";
+    var reworded = rewordedCard(m, DOCS[ui.doc].id);
+    if (reworded) holder.appendChild(reworded);
     if (m) holder.appendChild(drawDoc(m, DOCS[ui.doc].id));
     else if (ui.error) holder.appendChild(h("p", { class: "rp-error", text: "The report could not be built: " + ui.error }));
     else holder.appendChild(h("div", { class: "rp-doc rp-busy" }, [h("p", { class: "muted", text: "Reading the Word report…" })]));

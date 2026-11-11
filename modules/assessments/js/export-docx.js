@@ -283,7 +283,13 @@ window.App.ExportDOCX = (function () {
       heading: function (n, title) {
         return n.__headingNum ? h1n(n.__headingNum, title) : (n.__headingLevel === 1 ? h1(title) : h2(title));
       },
-      body: function (line) { return body(line); },
+      // A rewrite saved before the basis prompt was kept out of the run may
+      // hold the prompt as a line of its own. That line is dropped: the
+      // prompt itself still prints, in red, for as long as it is due.
+      // Also what one reworded paragraph is printed with (a section's
+      // `paragraphs`, from an accepted review suggestion): the style of any
+      // generated body paragraph.
+      body: function (line) { return line === BASIS_NOT_RECORDED ? null : body(line); },
       rescued: rescued
     });
   }
@@ -941,15 +947,24 @@ window.App.ExportDOCX = (function () {
       if (c.observations) parts.push(c.observations + " system" + (c.observations === 1 ? "" : "s") + " observed");
       out.push({ text: "This assessment is based on " + joinList(parts) + ", set out in the “Basis of assessment” section.", note: false });
     } else {
-      out.push({ text: "Basis of assessment not yet recorded. Capture the interviews, documents reviewed and systems observed on the engagement page so this report shows what each verdict rests on.", note: true });
+      out.push({ text: BASIS_NOT_RECORDED, note: true });
     }
     return out;
   }
+  var BASIS_NOT_RECORDED = "Basis of assessment not yet recorded. Capture the interviews, documents reviewed and systems observed on the engagement page so this report shows what each verdict rests on.";
+  // The red prompt sits in the run of paragraphs that opens the executive
+  // summary, but it is not that run's wording: it is written from the basis
+  // register on every build. So it is kept (__keepInRun) when the run is
+  // rewritten, by the consultant or by an accepted review suggestion, rather
+  // than taken into the rewrite. Left as plain body it was: the prompt then
+  // printed in black as if the consultant had written it, the Issue check
+  // stopped counting it, and it stayed after the basis was recorded.
   function execSummaryAddenda(engagement, progress) {
     return execSummaryAddendaText(engagement, progress).map(function (row) {
-      return row.note
-        ? body([noteRun(row.text, { kind: "basis" }, { italics: true })])
-        : body(row.text);
+      if (!row.note) return body(row.text);
+      var p = body([noteRun(row.text, { kind: "basis" }, { italics: true })]);
+      p.__isBody = false; p.__keepInRun = true;
+      return p;
     });
   }
 

@@ -5,7 +5,7 @@ window.App.Data = window.App.Data || {};
 (window.App.Data.contracts = window.App.Data.contracts || {}).reviewFile = {
   "schema": "spt-review/1.0",
   "_note": "What a reviewer sends back. The report review tool WRITES it, one small file per reviewer; the assessment tool and the risk tool READ it. Files are merged by comment id, so reviewers can never overwrite each other, and importing a file twice changes nothing. Where the same comment arrives again, the reviewer's later save wins. The author's status, reason and replies are kept on the author's side and are never overwritten by an import. Each tool carries its own copy of this contract; bump the schema string here when the shape changes, so that a mismatch fails loudly. Importers ACCEPT the listed schemas and reject unknown ones with a clear message.",
-  "_optional": "Within spt-review/1.0 these fields are OPTIONAL and additive, so a file without them imports exactly as before: checklistTotal, dismissedCheckTitles, anchor.targetId (on item comments, and on comments made from an automatic check on an item) and anchor.media. A raised-again comment (relatesTo set) is anchored to where the text is now, not where it was, and may carry suggested wording.",
+  "_optional": "Within spt-review/1.0 these fields are OPTIONAL and additive, so a file without them imports exactly as before: checklistTotal, dismissedCheckTitles, anchor.targetId (on item comments, and on comments made from an automatic check on an item), anchor.media, anchor.rowKey and anchor.colHead (on a comment on a table cell), and replies (the reviewer's replies on earlier comments). A raised-again comment (relatesTo set) is anchored to where the text is now, not where it was, and may carry suggested wording.",
   "acceptedSchemas": ["spt-review/1.0"],
   "shape": {
     "schema": "spt-review/1.0",
@@ -22,6 +22,12 @@ window.App.Data = window.App.Data || {};
     "dismissedChecks": ["ids of automatic check results the reviewer dismissed"],
     "dismissedCheckTitles": "OPTIONAL. { check result id: what the check said, as the reviewer saw it }, for each dismissed check, so the author can read what was dismissed without the check engine. The review tool writes \"<check title> (in <section>[ - <report>]): <what it said>\"",
     "confirmations": [{ "commentId": "a previous round comment the reviewer confirmed as fixed", "at": "ISO date and time" }],
+    "replies": [{
+      "id": "OPTIONAL list. Globally unique, generated, and the same on each save, so importing the file again changes nothing",
+      "to": "the id of the earlier-round comment (in the pack's previousRound.comments) this reply is on",
+      "text": "the reply. Its author is this file's reviewer. A later save with other text updates it; a reply no longer in the reviewer's latest file is removed on import",
+      "at": "ISO date and time"
+    }],
     "comments": [{
       "id": "globally unique, generated",
       "reviewer": "reviewer's name",
@@ -39,6 +45,8 @@ window.App.Data = window.App.Data || {};
         "quote": "the text the comment is on: the whole block or cell, which is what a later round matches on; empty for an image",
         "selection": "the words selected, when the reviewer selected some, or absent",
         "cell": "{ row, col } when the comment is on one cell of a table, otherwise null",
+        "rowKey": "OPTIONAL. For a comment on a table cell, the text of the first cell in its row, so the cell can be found again when rows are added or removed above it",
+        "colHead": "OPTIONAL. For a comment on a table cell, the text of the header cell of its column",
         "targetName": "for an item comment, the target; for a block comment, the document's target",
         "targetId": "OPTIONAL. The pack item's targetId, when the pack gave one. Matched by targetId when both sides have it, otherwise by targetName",
         "media": "OPTIONAL. For a comment on an image, the image's media key in the pack (documents[].media), so it can be found again in a later round",

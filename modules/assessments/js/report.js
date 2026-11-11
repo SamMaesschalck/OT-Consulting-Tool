@@ -1021,6 +1021,11 @@ window.App.Report = (function () {
         });
         bodyEl.insertBefore(frag, anchor);
         lead.forEach(function (el) { bodyEl.removeChild(el); });
+      } else if (bodyEl && !isNextSteps && window.App.ReportSections.paragraphsOf(c).length) {
+        // No whole rewrite: a paragraph reworded from a review suggestion is
+        // shown in place of the generated one it replaces, as Word prints it,
+        // and every other paragraph stays as generated.
+        rewordParagraphs(lead, c.paragraphs);
       }
 
       if (c.hidden) {
@@ -1042,6 +1047,31 @@ window.App.Report = (function () {
         h("div", { class: "card-b" }, rescuedNotes)
       ]));
     }
+  }
+
+  // The screen's half of a section's `paragraphs` (shared/report-sections.js):
+  // a paragraph of the opening that reads a replacement's `from` shows its
+  // `to`, one paragraph per line, in the same style. Each is marked with what
+  // it replaced (data-reworded), which is how the report page knows a
+  // replacement shows here and not only in Word. A prompt is never replaced.
+  function rewordParagraphs(lead, list) {
+    var RS = window.App.ReportSections;
+    lead.forEach(function (el) {
+      var ps = el.tagName === "DIV" ? [].slice.call(el.children) : [el];
+      ps.forEach(function (p) {
+        if (p.tagName !== "P" || p.classList.contains("placeholder-note")) return;
+        var rep = RS.paragraphFor(list, p.textContent);
+        if (!rep) return;
+        String(rep.to).split(/\n/).forEach(function (line) {
+          if (line.trim() === "") return;
+          var made = p.cloneNode(false);
+          made.textContent = line.trim();
+          made.setAttribute("data-reworded", rep.from);
+          p.parentNode.insertBefore(made, p);
+        });
+        p.parentNode.removeChild(p);
+      });
+    });
   }
 
   // The opening prose of a card: leading paragraphs, plus a leading wrapper div

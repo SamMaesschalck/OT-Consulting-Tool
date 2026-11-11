@@ -11,6 +11,10 @@
 .rv-files { list-style: none; margin: 6px 0 10px; padding: 0; font-size: 13px; }
 .rv-files li { padding: 5px 0; border-top: 1px solid var(--border); }
 .rv-note { color: var(--text-muted); margin-top: 2px; }
+/* A review the author set aside: it no longer counts, and reads so. */
+.rv-files .rv-aside { margin-left: 8px; padding: 1px 8px; font-size: 12px; }
+.rv-aside-tag { margin-left: 8px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--na-bg); color: var(--text-muted); }
+.rv-file-aside > strong, .rv-file-aside > .rv-verdict { opacity: .6; }
 .rv-verdict { font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--na-bg); color: var(--text); }
 .rv-verdict.v-approved, .rv-verdict.v-approved-with-comments { background: var(--met-bg); color: var(--met); }
 .rv-verdict.v-changes-requested { background: var(--gap-bg); color: var(--gap); }
@@ -41,6 +45,7 @@
 .rv-s-label { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 2px; }
 .rv-s-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .rv-why { margin: 4px 0; font-size: 12px; }
+.rv-accept-note { color: var(--gap); }
 .rv-reason { margin: 4px 0; font-size: 12px; font-style: italic; }
 .rv-replyline { margin: 4px 0 4px 10px; padding-left: 8px; border-left: 2px solid var(--border); overflow-wrap: anywhere; }
 .rv-c-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

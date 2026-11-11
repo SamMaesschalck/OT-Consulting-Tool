@@ -257,17 +257,45 @@ window.App.Review = (function () {
   // never with charts: its text is all that is read.
   var snap = { signature: null, docs: null, building: null, waiting: [] };
 
-  function signature() {
-    var e = E();
-    if (!e.state.engagement) return "";
-    // The baseline (with its target mapping) decides each document's progress
-    // section, so loading, clearing or remapping it is a change of content.
-    // The target selected on screen is not: the documents never depend on it.
-    return JSON.stringify([e.state.activeAssessmentId, e.state.engagement.engagement, e.state.engagement.responses, e.state.engagement.targets,
-      e.state.engagement.targetProfile, e.state.engagement.reportNarrative, e.state.engagement.reportCustom, e.state.engagement.basisOfAssessment,
-      e.getBaseline ? e.getBaseline() : null]);
+  // One drawing of the comments list asks, for every card, whether the
+  // comment is stale and whether its wording can be accepted. What those
+  // answers are worked out from (the signature, the resolved answers, the
+  // filled item fields) is the same for every card, so it is kept between
+  // review-author's beginPaint and endPaint and worked out once. Outside a
+  // drawing nothing is kept: the assessment may change between any two calls.
+  var paintMemo = null, paintDepth = 0;
+  // How often each was really worked out, for the test that a drawing does
+  // not go back to once per card.
+  var counts = { signature: 0, texts: 0, fields: 0, resolved: 0 };
+  function beginPaint() { if (!paintDepth++) paintMemo = {}; }
+  function endPaint() { if (paintDepth && !--paintDepth) paintMemo = null; }
+  function once(key, make) {
+    if (!paintMemo) return make();
+    if (!(key in paintMemo)) paintMemo[key] = make();
+    return paintMemo[key];
   }
-  function rememberSnapshot(docs) { snap.signature = signature(); snap.docs = docs; }
+
+  // Everything the Word build reads, so a change to any of it is seen as a
+  // change of content: the whole assessment (answers, targets, profile and
+  // setup choices, narrative, section overrides, basis, baseline with its
+  // target mapping, and whatever is added to it later) without the review
+  // itself, the engagement details it shares with the project, and which
+  // other instruments in the project have answers (the report names its
+  // companions). The target selected on screen is not in it: the documents
+  // never depend on it.
+  function signature() {
+    return once("signature", function () {
+      var e = E();
+      if (!e.state.engagement) return "";
+      counts.signature++;
+      var ass = (e.state.assessments || {})[e.state.activeAssessmentId] || {};
+      var own = Object.assign({}, ass);
+      delete own.review;
+      return JSON.stringify([e.state.activeAssessmentId, e.state.engagement.engagement, own,
+        e.answeredInstrumentIds ? e.answeredInstrumentIds() : null]);
+    });
+  }
+  function rememberSnapshot(docs) { snap.signature = signature(); snap.docs = docs; snap.texts = null; snap.red = null; }
 
   // cb(err, docs) with the documents as they stand now.
   function currentDocs(cb) {
@@ -279,7 +307,7 @@ window.App.Review = (function () {
     buildDocuments({ charts: false }).then(function (docs) {
       if (snap.building !== sig) return;     // something newer has started
       snap.building = null;
-      snap.signature = sig; snap.docs = docs;
+      snap.signature = sig; snap.docs = docs; snap.texts = null; snap.red = null;
       var w = snap.waiting; snap.waiting = [];
       w.forEach(function (f) { f(null, docs); });
     }, function (e) {
@@ -292,7 +320,11 @@ window.App.Review = (function () {
   function cachedDocs() { return snap.docs && snap.signature === signature() ? snap.docs : null; }
   function resetSnapshot() { snap = { signature: null, docs: null, building: null, waiting: [] }; }
 
+  // Every piece of text in the documents, normalised. The snapshot's own set
+  // is kept with it: the documents do not change once read.
   function allTexts(docs) {
+    if (docs === snap.docs && snap.texts) return snap.texts;
+    counts.texts++;
     var set = {};
     function add(t) { var n = norm(t); if (n) set[n] = true; }
     docs.forEach(function (d) {
@@ -305,9 +337,93 @@ window.App.Review = (function () {
       });
       DB().flatten(d.blocks).forEach(function (b) { add(b.text); });
     });
+    if (docs === snap.docs) snap.texts = set;
     return set;
   }
   function docContains(docs, text) { return !!allTexts(docs)[norm(text)]; }
+  // What the documents print in red: the prompts the Issue check counts.
+  function redTexts(docs) {
+    if (docs === snap.docs && snap.red) return snap.red;
+    var set = {};
+    docs.forEach(function (d) {
+      DB().flatten(d.blocks).forEach(function (b) { if (b.red && norm(b.text)) set[norm(b.text)] = true; });
+    });
+    if (docs === snap.docs) snap.red = set;
+    return set;
+  }
+
+  // The document a comment is on. A document's place among those built can
+  // change (a site added or removed), so it is found by its title, then by
+  // its target, and by its place only when neither settles it.
+  function docFor(a, docs) {
+    if (!docs) return null;
+    var named = a.documentTitle ? docs.filter(function (d) { return d.title === a.documentTitle; }) : [];
+    if (named.length === 1) return named[0];
+    var forTarget = a.kind === "block" && (a.targetId || a.targetName) ? docs.filter(function (d) {
+      return a.targetId ? d.targetId === a.targetId : d.targetName === a.targetName;
+    }) : [];
+    if (forTarget.length === 1) return forTarget[0];
+    return docs[Number(a.documentIndex) || 0] || null;
+  }
+
+  // The cell of a table that holds the quoted text. Where several do, the
+  // one in the row and under the column heading the reviewer's tool noted
+  // (anchor.rowKey, anchor.colHead), then the one at the same place.
+  function cellFor(a, table, q) {
+    var rows = table.rows || [], found = [];
+    rows.forEach(function (r, ri) {
+      (r.cells || []).forEach(function (c, ci) { if (norm(c.text) === q) found.push({ row: ri, col: ci }); });
+    });
+    if (found.length < 2) return found[0] || null;
+    var rk = norm(a.rowKey), ch = norm(a.colHead), was = a.cell || {};
+    function score(f) {
+      var head = rows[0] && rows[0].cells[f.col];
+      return (rk && norm(rows[f.row].cells[0].text) === rk ? 4 : 0) + (ch && head && norm(head.text) === ch ? 2 : 0) +
+        (f.row === was.row && f.col === was.col ? 1 : 0);
+    }
+    return found.slice().sort(function (x, y) { return score(y) - score(x); })[0];
+  }
+
+  // The block a comment is on, in the document as it is now:
+  // { block, index, cell }, or null. A block's id is its position, which
+  // moves when anything above it is added, hidden or rewritten, so the block
+  // is found by its wording within its section first, and by its id only
+  // when the wording finds nothing (an image, or text changed since).
+  function blockFor(a, doc) {
+    var blocks = (doc && doc.blocks) || [], q = norm(a.quote), key = a.sectionKey || "", hits = [];
+    if (q) blocks.forEach(function (b, i) {
+      if ((b.sectionKey || "") !== key) return;
+      if (a.cell) {
+        var cell = b.type === "table" ? cellFor(a, b, q) : null;
+        if (cell) hits.push({ block: b, index: i, cell: cell });
+      } else if (norm(DB().blockText(b)) === q || (b.type === "heading" && norm(DB().stripNumber(b.text)) === q)) {
+        hits.push({ block: b, index: i, cell: null });
+      }
+    });
+    if (hits.length) return hits.filter(function (x) { return x.block.id === a.blockId; })[0] || hits[0];
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i].id !== a.blockId) continue;
+      var rows = blocks[i].rows || [];
+      return { block: blocks[i], index: i, cell: a.cell && rows[a.cell.row] ? a.cell : null, byId: true };
+    }
+    return null;
+  }
+
+  // What says which item a block is about: its table row, then the headings
+  // over it in its section, nearest first.
+  function contextTexts(a, doc, loc) {
+    var blocks = (doc && doc.blocks) || [], texts = [];
+    if (!loc) return texts;
+    var b = loc.block;
+    if (b.type === "table" && loc.cell && b.rows[loc.cell.row]) texts = texts.concat(b.rows[loc.cell.row].cells.map(function (c) { return c.text; }));
+    for (var i = loc.index - 1; i >= 0 && blocks[i].sectionKey === b.sectionKey; i--) {
+      if (blocks[i].type === "heading") { texts.push(blocks[i].text); if (!blocks[i].sub) break; }
+    }
+    return texts;
+  }
+  function catalog() {
+    return once("catalog", function () { return window.App.Compare.catalogFor(E().state.instrument, E().state.scoringFamily); });
+  }
 
   // true when the comment no longer matches the report, null while unknown.
   function isStale(t) {
@@ -316,9 +432,9 @@ window.App.Review = (function () {
     var e = E();
     if (a.kind === "item") {
       var target = targetOf(a);
-      var inst = e.state.instrument;
       if (!target) return true;
-      if (!window.App.Compare.catalogFor(inst, e.state.scoringFamily).some(function (c) { return c.id === a.itemId; })) return true;
+      var ids = once("catalogIds", function () { var m = {}; catalog().forEach(function (c) { m[c.id] = true; }); return m; });
+      if (!ids[a.itemId]) return true;
       if (a.field && a.quote != null) {
         var h = holderOf(target.id, a.itemId, a.field);
         return norm(h.value) !== norm(a.quote);
@@ -346,14 +462,48 @@ window.App.Review = (function () {
   var ITEM_FIELDS = { evidence: "evidence", notes: "notes", owner: "owner", action: "recommended action", impact: "business impact" };
   var MIN_FIELD_MATCH = 12;   // shorter than this, "the same text" is a coincidence
 
-  // Which response holds a field for this target: its own, else the shared layer.
+  // A target's answers as it reads them, by item: the system-wide layer
+  // resolved by the scorer's own rules (Compare.scopeResponses), which is
+  // what the pack showed the reviewer.
+  function resolvedFor(targetId) {
+    var all = once("resolved", function () { return {}; });
+    if (!all[targetId]) {
+      counts.resolved++;
+      var map = all[targetId] = {};
+      window.App.Compare.scopeResponses(E().state.engagement.responses, targetId).forEach(function (r) { map[r.requirementId] = r; });
+    }
+    return all[targetId];
+  }
+
+  // What a field reads for this target, and which response holds it: the
+  // target's own, or the system-wide one it inherits from. Inheritance is
+  // not field by field: evidence and notes come down only where the target
+  // inherits one of the shared items, and the plan (owner, action, impact)
+  // only as a whole, when the target has none of its own. So a blank field
+  // beside the target's own owner is blank, whatever the shared layer says.
   function holderOf(targetId, itemId, field) {
     var e = E();
+    var r = resolvedFor(targetId)[itemId];
+    var value = r && r[field] != null ? r[field] : "";
+    if (value === "") return { targetId: targetId, value: "" };
     var own = e.findResponse(targetId, itemId);
-    var shared = e.SHARED_TARGET_ID ? e.findResponse(e.SHARED_TARGET_ID, itemId) : null;
-    if (own && own[field] != null && own[field] !== "") return { targetId: targetId, value: own[field] };
-    if (shared && shared[field] != null && shared[field] !== "") return { targetId: e.SHARED_TARGET_ID, value: shared[field] };
-    return { targetId: targetId, value: "" };
+    var mine = !e.SHARED_TARGET_ID || !!(own && own[field] != null && own[field] !== "");
+    return { targetId: mine ? targetId : e.SHARED_TARGET_ID, value: value };
+  }
+  // Every filled item field, normalised, for finding the one a paragraph or
+  // cell of the report prints.
+  function fieldIndex() {
+    return once("fields", function () {
+      counts.fields++;
+      var out = [];
+      (E().state.engagement.responses || []).forEach(function (r) {
+        Object.keys(ITEM_FIELDS).forEach(function (fld) {
+          var v = r[fld], n = v == null ? "" : norm(v);
+          if (n.length >= MIN_FIELD_MATCH) out.push({ targetId: r.targetId, itemId: r.requirementId, field: fld, value: v, n: n });
+        });
+      });
+      return out;
+    });
   }
 
   // The new value of a field whose text sits inside the quoted paragraph
@@ -390,26 +540,15 @@ window.App.Review = (function () {
     return R.sectionKey(plain, { engagement: eng }) !== DB().slugTitle(plain);
   }
 
-  // The leading run of a section across every document it prints in. Null when
-  // the documents differ: a prose override replaces the run in all of them, so
-  // one zone's wording would overwrite another's.
-  function sharedLeads(docs, key) {
-    var runs = [];
-    docs.forEach(function (d) {
-      (d.probe || []).forEach(function (s) { if (s.key === key) runs.push(s.texts); });
-    });
-    if (!runs.length) return null;
-    var first = JSON.stringify(runs[0].map(norm));
-    if (runs.some(function (r) { return JSON.stringify(r.map(norm)) !== first; })) return null;
-    return runs[0];
-  }
-
   // How a comment's suggestion would be applied, given the current documents.
   // { can, why, label, kind, apply(), undo(), expect: [texts], mustPrint }
   function planAccept(t, docs) {
     var c = t.comment, a = c.anchor || {}, sug = c.suggestion;
     if (!sug) return { can: false };
     var e = E(), R = window.App.Report, eng = e.state.engagement;
+    // One accepted change per comment: a second would write over the record
+    // of what the first replaced, and its Undo with it.
+    if (t.accepted && t.accepted.revert) return { can: false, why: "Wording from this comment is already in the report. Undo the accepted wording first, then accept the new suggestion." };
 
     if (a.kind === "item") {
       var target = targetOf(a);
@@ -422,6 +561,10 @@ window.App.Review = (function () {
     if (a.kind !== "block") return { can: false, why: "This comment is not on a piece of the report's text." };
     if (!docs) return { can: false, why: "Still checking this against the current report." };
     if (!docContains(docs, a.quote)) return { can: false, why: "The report has changed, so this wording no longer matches what is there. Copy it and compare." };
+    // Where the new wording has to be once the document is rebuilt: in the
+    // section the comment is on, in its document, not just somewhere.
+    var doc = docFor(a, docs) || {};
+    var where = { title: doc.title, index: docs.indexOf(doc), sectionKey: a.sectionKey || "" };
 
     // A heading: the section's own title.
     var isHeading = !a.cell && docs.some(function (dd) {
@@ -431,7 +574,7 @@ window.App.Review = (function () {
       if (!a.sectionKey) return { can: false, why: "This heading is a name from the assessment, not a section title. Rename it where it is entered." };
       if (headingHasTarget(a.quote)) return { can: false, why: "This heading is built from a target's name, so it cannot be renamed for one document." };
       var title = DB().stripNumber(sug), prevTitle = e.getReportSection(a.sectionKey).title || null;
-      return { can: true, kind: "section title", label: "Accept",
+      return { can: true, kind: "section title", label: "Accept", where: where,
         apply: function () { e.setReportSection(a.sectionKey, { title: title }); },
         undo: function () { e.setReportSection(a.sectionKey, { title: prevTitle }); },
         revert: { what: "section", key: a.sectionKey, field: "title", prev: prevTitle }, applied: title,
@@ -445,7 +588,7 @@ window.App.Review = (function () {
       var f = fields[i], val = rn[f];
       if (val == null || !norm(val)) continue;
       var next = replaceLine(val, a.quote, sug);
-      if (next != null) return narrativePlan(f, val, next, sug);
+      if (next != null) return narrativePlan(f, val, next, sug, where);
     }
 
     // The proposed next steps: their own store, and until someone edits them
@@ -462,55 +605,187 @@ window.App.Review = (function () {
       lines.forEach(function (l, k) { if (idx === -1 && norm(l) === norm(a.quote)) idx = k; });
       if (idx !== -1) {
         var repl = lines.slice(); repl[idx] = String(sug).trim();
-        return narrativePlan("nextSteps", rn.nextSteps, repl.join("\n"), sug);
+        return narrativePlan("nextSteps", rn.nextSteps, repl.join("\n"), sug, where);
       }
     }
 
-    // A plan or evidence field that prints in this paragraph or cell.
-    var doc = docs[a.documentIndex] || {};
-    var tid = doc.targetId || null;
+    // A plan or evidence field that prints in this paragraph or cell. The
+    // same words are not enough to say so: a role in the People interviewed
+    // table can be an item's owner, word for word. The block has to be about
+    // that item (itemAt), which rules out every part of the report that
+    // prints no item's fields.
+    var tid = doc.targetId || null, nq = norm(a.quote);
     var matches = [];
-    (eng.responses || []).forEach(function (r) {
-      if (tid && r.targetId !== tid && r.targetId !== e.SHARED_TARGET_ID) return;
-      Object.keys(ITEM_FIELDS).forEach(function (fld) {
-        var v = r[fld];
-        if (v == null || norm(v).length < MIN_FIELD_MATCH) return;
-        var fitted = fitToField(v, a.quote, sug);
-        if (fitted != null) matches.push({ targetId: r.targetId, itemId: r.requirementId, field: fld, value: v, next: fitted });
-      });
+    fieldIndex().forEach(function (x) {
+      if (tid && x.targetId !== tid && x.targetId !== e.SHARED_TARGET_ID) return;
+      if (nq.indexOf(x.n) === -1) return;
+      var fitted = fitToField(x.value, a.quote, sug);
+      if (fitted != null) matches.push({ targetId: x.targetId, itemId: x.itemId, field: x.field, value: x.value, next: fitted });
     });
-    if (matches.length === 1) {
+    var about = matches.length ? itemAt(a, doc) : null;
+    if (about && matches.length === 1 && matches[0].itemId === about.id) {
       var m = matches[0];
       var ip = itemPlan(m.targetId, m.itemId, m.field, m.value, m.next, docs);
-      ip.mustPrint = true;
+      ip.mustPrint = true; ip.where = where;
       return ip;
     }
-    if (matches.length > 1) return { can: false, why: "The same wording is recorded on " + matches.length + " items, so copy the wording and change the ones it should apply to." };
+    if (about && matches.length > 1) return { can: false, why: "The same wording is recorded on " + matches.length + " items, so copy the wording and change the ones it should apply to." };
 
-    // A section's opening prose: a rewrite replaces the whole run, so the run
-    // is rebuilt with the one paragraph changed.
-    if (a.sectionKey) {
-      var occurs = docs.some(function (d) { return (d.probe || []).some(function (s) { return s.key === a.sectionKey && s.texts.some(function (x) { return norm(x) === norm(a.quote); }); }); });
-      if (occurs) {
-        var leads = sharedLeads(docs, a.sectionKey);
-        if (!leads) return { can: false, why: "This section opens differently in each document, and a rewrite here would replace all of them. Copy the wording and use Go to." };
-        var prev = e.getReportSection(a.sectionKey).prose || null;
-        var keep = leads.filter(function (x) { return norm(x) !== norm(a.quote); });
-        var prose = leads.map(function (x) { return norm(x) === norm(a.quote) ? String(sug).trim() : x; }).join("\n");
-        return { can: true, kind: "section opening", label: "Accept",
-          apply: function () { e.setReportSection(a.sectionKey, { prose: prose }); },
-          undo: function () { e.setReportSection(a.sectionKey, { prose: prev }); },
-          revert: { what: "section", key: a.sectionKey, field: "prose", prev: prev }, applied: prose,
-          expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }).concat(keep), mustPrint: true };
+    // A red prompt is answered where it is entered, never reworded: as plain
+    // words it would print in black, unanswered, and the Issue check would
+    // stop counting it. That is the whole of a prompt paragraph, and a
+    // paragraph that closes in one.
+    if (!a.cell && redTexts(docs)[nq]) {
+      return { can: false, why: "This is a prompt to complete in the tool, printed in red until it is answered, so it cannot be reworded here. Use Go to and answer it where it is entered." };
+    }
+
+    // A paragraph of a section's opening.
+    if (a.sectionKey && !a.cell) {
+      var runs = [];
+      docs.forEach(function (d) { (d.probe || []).forEach(function (s) { if (s.key === a.sectionKey) runs.push(s); }); });
+      var holding = runs.filter(function (s) { return s.texts.some(function (x) { return norm(x) === nq; }); });
+      if (holding.length) {
+        var cur = e.getReportSection(a.sectionKey);
+        // The author rewrote the whole opening on the report page (Edit):
+        // the one line of that rewrite is changed, and it stays a rewrite.
+        if (cur.prose) return prosePlan(a.sectionKey, cur.prose, nq, sug, where);
+        return paragraphPlan(a.sectionKey, cur, holding, nq, sug, where);
       }
     }
     return { can: false, why: NOT_EDITABLE };
   }
 
-  function narrativePlan(field, prev, next, sug) {
+  // One line of a whole-opening rewrite the author made.
+  function prosePlan(key, prev, nq, sug, where) {
+    var e = E(), hit = false;
+    var lines = String(prev).split(/\n/).map(function (l) {
+      if (norm(l) !== nq) return l;
+      hit = true;
+      return String(sug).trim();
+    });
+    if (!hit) return { can: false, why: NOT_EDITABLE };
+    var prose = lines.join("\n");
+    return { can: true, kind: "section opening", label: "Accept", where: where,
+      apply: function () { e.setReportSection(key, { prose: prose }); },
+      undo: function () { e.setReportSection(key, { prose: prev }); },
+      revert: { what: "section", key: key, field: "prose", prev: prev }, applied: prose,
+      expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }), mustPrint: true };
+  }
+
+  // One generated paragraph of a section's opening: only it is replaced
+  // (reportCustom[key].paragraphs, shared/report-sections.js), so the rest of
+  // the opening stays generated and the consultant's input still prints. The
+  // replacement is keyed by the paragraph's generated text and applies
+  // wherever a paragraph of that section's opening reads the same, in any
+  // document: the same words get the same rewording, and a paragraph only
+  // one zone or document prints is changed only there. holding is the
+  // openings that print the commented paragraph.
+  function paragraphPlan(key, cur, holding, nq, sug, where) {
+    var e = E(), RS = window.App.ReportSections;
+    // The commented paragraph may itself be an earlier accepted rewording:
+    // the generated text it stands for is then what the replacement is on.
+    var gen = nq, was = null;
+    holding.forEach(function (s) {
+      s.texts.forEach(function (x, i) { if (was == null && norm(x) === nq && s.from && s.from[i] != null) was = s.from[i]; });
+    });
+    var entry = RS.paragraphFor(cur.paragraphs, was != null ? was : nq);
+    var to = String(sug).trim();
+    if (was != null && entry) {
+      gen = norm(was);
+      to = String(entry.to).split(/\n/).map(function (l) { return norm(l) === nq ? String(sug).trim() : l; }).join("\n");
+    }
+    if (norm(to) === norm(entry ? entry.to : gen)) return { can: false, why: "The suggested wording is what the report already says." };
+    var before = RS.paragraphsOf(cur), at = new Date().toISOString();
+    var places = 0;
+    holding.forEach(function (s) { s.texts.forEach(function (x) { if (norm(x) === nq) places++; }); });
+    return { can: true, kind: "paragraph", label: "Accept", where: where, places: places,
+      apply: function () { e.setReportSection(key, { paragraphs: RS.setParagraph(before, gen, to, at) }); },
+      undo: function () { e.setReportSection(key, { paragraphs: before }); },
+      revert: { what: "paragraph", key: key, from: gen, prevTo: entry ? entry.to : null }, applied: to,
+      expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }), mustPrint: true };
+  }
+
+  // ---- paragraphs reworded by an accepted suggestion --------------------------
+  //
+  // Each stored replacement and whether it is in the report now, from the
+  // last read of the documents: [{ key, title, from, to, at, state }], state
+  // as ReportSections.paragraphStatus gives it, or "checking" until the
+  // documents have been read. A replacement whose paragraph has changed does
+  // not apply and the generated text prints, so the author is told: on the
+  // report page, on the comment, and once in the Issue check.
+  function hasParagraphs() {
+    var RS = window.App.ReportSections, custom = E().getReportCustom();
+    return Object.keys(custom).some(function (k) { return RS.paragraphsOf(custom[k]).length > 0; });
+  }
+  function paragraphChanges() {
+    if (!E().state.instrument || !hasParagraphs()) return [];
+    var RS = window.App.ReportSections, docs = cachedDocs();
+    var rows = RS.paragraphStatus(E().getReportCustom(), docs ? docs.map(function (d) { return d.probe || []; }) : []);
+    if (!docs) rows.forEach(function (r) { r.state = "checking"; });
+    return rows;
+  }
+  function removeParagraph(key, from) {
+    var RS = window.App.ReportSections, e = E();
+    e.setReportSection(key, { paragraphs: RS.setParagraph(e.getReportSection(key).paragraphs, from, null) });
+  }
+  // What a comment says about the paragraph its Accept reworded, when that
+  // wording is not in the report. Null when it is, or is not known yet.
+  function acceptedNote(t) {
+    var rv = t && t.accepted && t.accepted.revert;
+    if (!rv || rv.what !== "paragraph") return null;
+    var RS = window.App.ReportSections;
+    if (!RS.paragraphFor(E().getReportSection(rv.key).paragraphs, rv.from)) return "The accepted wording has since been taken out on the report page.";
+    var row = once("paragraphs", paragraphChanges).filter(function (r) { return r.key === rv.key && norm(r.from) === norm(rv.from); })[0];
+    return row ? RS.paragraphNote(row.state) : null;
+  }
+
+  // The catalogue item the commented block is about, or null: named by code
+  // in its table row or in the headings over it. Front matter, document
+  // control and the basis of assessment registers print no item's fields.
+  var NO_ITEM_FIELDS = /^document-control|^(basis-of-assessment|people-interviewed|documents-reviewed|systems-observed)$/;
+  function itemAt(a, doc) {
+    if (NO_ITEM_FIELDS.test(a.sectionKey || "")) return null;
+    var loc = blockFor(a, doc);
+    if (!loc || loc.block.front) return null;
+    var blocks = doc.blocks, b = loc.block, list = catalog(), item = null, i;
+    // A table row names its item in one of its cells.
+    if (b.type === "table" && loc.cell && b.rows[loc.cell.row]) {
+      var cells = b.rows[loc.cell.row].cells;
+      for (i = 0; i < cells.length && !item; i++) item = itemNamed(cells[i].text, list);
+      return item;
+    }
+    // Otherwise the block itself, or the nearest line or heading over it in
+    // its section: "SR 1.1 Human user identification ..." then "Evidence: ...".
+    item = itemNamed(DB().blockText(b), list);
+    for (i = loc.index - 1; !item && i >= 0 && i > loc.index - ITEM_LOOK_BACK && blocks[i].sectionKey === b.sectionKey; i--) {
+      if (blocks[i].type === "table" || blocks[i].type === "image") break;
+      item = itemNamed(blocks[i].text, list);
+      if (blocks[i].type === "heading" && !blocks[i].sub) break;
+    }
+    return item;
+  }
+  var ITEM_LOOK_BACK = 12;   // an item's own lines are few: further up is another item's
+  // The item a line of the report names: it opens with the item's code (after
+  // the priority a roadmap entry is headed with, "P3   SR 1.1 ..."), or with
+  // its title, which is how a question with no printed code is named.
+  function itemNamed(text, list) {
+    var s = norm(text).replace(/^P\d+\s+/, "");
+    if (!s) return null;
+    var byCode = itemByCode(s, list);
+    if (byCode) return byCode;
+    var low = s.toLowerCase(), best = null, bestLen = 0;
+    list.forEach(function (c) {
+      var label = norm(c.label).toLowerCase(), code = norm(c.code || c.id).toLowerCase();
+      if (label.length < MIN_FIELD_MATCH || label.length <= bestLen) return;
+      if (low.indexOf(label) === 0 || low.indexOf(code + " " + label) === 0) { best = c; bestLen = label.length; }
+    });
+    return best;
+  }
+
+  function narrativePlan(field, prev, next, sug, where) {
     var e = E();
     var had = prev;
-    return { can: true, kind: "narrative", label: "Accept",
+    return { can: true, kind: "narrative", label: "Accept", where: where,
       apply: function () { var p = {}; p[field] = next; e.setReportNarrative(p); },
       undo: function () { var p = {}; p[field] = had; e.setReportNarrative(p); },
       // null for next steps that were still scaffolded: putting null back
@@ -523,6 +798,8 @@ window.App.Review = (function () {
     var e = E();
     var printed = !!(docs && norm(prev) && docContainsFragment(docs, prev));
     return { can: true, kind: ITEM_FIELDS[field], label: "Accept",
+      // A system-wide answer: the change is every inheriting target's.
+      shared: !!e.SHARED_TARGET_ID && targetId === e.SHARED_TARGET_ID,
       apply: function () { var p = {}; p[field] = next; e.setResponse(targetId, itemId, p); },
       undo: function () { var p = {}; p[field] = prev; e.setResponse(targetId, itemId, p); },
       revert: { what: "item", targetId: targetId, itemId: itemId, field: field, prev: prev == null ? "" : prev }, applied: next,
@@ -532,6 +809,22 @@ window.App.Review = (function () {
   function docContainsFragment(docs, text) {
     var n = norm(text);
     return docs.some(function (d) { return DB().flatten(d.blocks).some(function (b) { return norm(b.text).indexOf(n) !== -1; }); });
+  }
+  // Is the text in the section a plan names (plan.where), in its document:
+  // as a whole paragraph, heading or cell, or (fragment) inside one. The
+  // document is found by its title, as its place can change.
+  function sectionContains(docs, where, text, fragment) {
+    var named = where.title ? docs.filter(function (d) { return d.title === where.title; }) : [];
+    var doc = named.length === 1 ? named[0] : docs[where.index];
+    if (!doc) return false;
+    var n = norm(text);
+    function hit(t) { var x = norm(t); return fragment ? x.indexOf(n) !== -1 : x === n; }
+    var blocks = doc.blocks.filter(function (b) { return (b.sectionKey || "") === where.sectionKey; });
+    return blocks.some(function (b) {
+      if (b.type === "heading" && hit(DB().stripNumber(b.text))) return true;
+      if (b.type === "table") return b.rows.some(function (r) { return r.cells.some(function (c) { return hit(c.text); }); });
+      return hit(DB().blockText(b));
+    }) || DB().flatten(blocks).some(function (b) { return hit(b.text); });
   }
 
   function acceptPlan(t) {
@@ -549,7 +842,10 @@ window.App.Review = (function () {
       try { plan.apply(); }
       catch (e) { done({ ok: false, message: "This could not be applied: " + (e.message || e) }); return; }
       currentDocs(function (err2, after) {
+        // A comment on the report's text must find its new wording in the
+        // section it is on, not just somewhere in the documents.
         var missing = err2 ? plan.expect : plan.expect.filter(function (x) {
+          if (plan.where) return !sectionContains(after, plan.where, x, !!plan.fragment);
           return plan.fragment ? !docContainsFragment(after, x) : !docContains(after, x);
         });
         if (plan.mustPrint && missing.length) {
@@ -568,7 +864,10 @@ window.App.Review = (function () {
         t.status = "resolved"; t.statusAt = t.accepted.at;
         E().touchReview();
         done({ ok: true, message: "Accepted into the " + plan.kind + ", and checked in the rebuilt Word document." +
-          (plan.mustPrint ? "" : " This field does not print in the Word report, so the change shows only in the assessment.") });
+          (plan.mustPrint ? "" : " This field does not print in the Word report, so the change shows only in the assessment.") +
+          (plan.kind === "paragraph" ? " Only that paragraph is changed: the rest of the section's opening is still written from the assessment." : "") +
+          (plan.places > 1 ? " The same paragraph is printed " + plan.places + " times across the documents, and each now has the new wording." : "") +
+          (plan.shared ? " This is a system-wide answer, so the change applies to every " + targetWord() + " that inherits it." : "") });
       });
     });
   }
@@ -592,6 +891,7 @@ window.App.Review = (function () {
   function undoAccept(t, done) {
     var acc = t && t.accepted, rv = acc && acc.revert;
     if (!rv) { done({ ok: false, message: "There is no record of what this replaced, so change it where it is entered." }); return; }
+    if (rv.what === "paragraph") { undoParagraph(t, done); return; }
     var e = E(), cur = revertTarget(rv);
     if (cur === undefined && rv.what === "item") { done({ ok: false, message: "That " + targetWord() + " is no longer in this assessment, so there is nothing to put back." }); return; }
     if (norm(cur) !== norm(acc.applied)) {
@@ -604,12 +904,35 @@ window.App.Review = (function () {
       else if (rv.what === "narrative") { p[rv.field] = rv.prev == null ? null : rv.prev; e.setReportNarrative(p); }
       else { p[rv.field] = rv.prev == null ? "" : rv.prev; e.setResponse(rv.targetId, rv.itemId, p); }
     } catch (x) { done({ ok: false, message: "The earlier wording could not be put back: " + (x.message || x) }); return; }
+    reopenAfterUndo(t);
+    done({ ok: true, message: "The earlier wording is back, and the comment is open again." });
+  }
+  function reopenAfterUndo(t) {
     delete t.accepted;
     delete failedPlans[t.comment.id];
     t.status = "open"; t.reason = ""; t.statusAt = new Date().toISOString();
     delete t.reopened;
-    e.touchReview();
-    done({ ok: true, message: "The earlier wording is back, and the comment is open again." });
+    E().touchReview();
+  }
+  // Takes out the one paragraph replacement this comment's Accept made (or
+  // puts back the wording it took over from an earlier one), whether or not
+  // it applies at the moment. Any other replacement in the section is left
+  // exactly as it is.
+  function undoParagraph(t, done) {
+    var acc = t.accepted, rv = acc.revert, e = E(), RS = window.App.ReportSections;
+    var list = e.getReportSection(rv.key).paragraphs, entry = RS.paragraphFor(list, rv.from);
+    var gone = !entry && !(rv.prevTo != null && norm(acc.applied) === norm(rv.from));
+    if (entry && norm(entry.to) !== norm(acc.applied)) {
+      done({ ok: false, message: "The wording has been changed since it was accepted, so the earlier wording was not put back. Use Back to the generated version on the report page." });
+      return;
+    }
+    if (!gone) {
+      try { e.setReportSection(rv.key, { paragraphs: RS.setParagraph(list, rv.from, rv.prevTo) }); }
+      catch (x) { done({ ok: false, message: "The earlier wording could not be put back: " + (x.message || x) }); return; }
+    }
+    reopenAfterUndo(t);
+    done({ ok: true, message: gone ? "The accepted wording had already been taken out, so the comment is open again."
+      : "The earlier wording is back, and the comment is open again." });
   }
   // Remembered for this session, so the failed Accept is not offered again.
   var failedPlans = {};
@@ -695,26 +1018,21 @@ window.App.Review = (function () {
       return "item:" + a.itemId;
     }
     var docs = cachedDocs();
-    var d = docs && docs[a.documentIndex];
+    var d = docFor(a, docs);
     if (d && d.targetId) U.setTargetThen(d.targetId, function () {});
     var have = {};
     U.sectionKeys().forEach(function (k) { have[k] = true; });
     if (have[a.sectionKey] && U.goToSection(a.sectionKey, a, true)) return "card:" + a.sectionKey;
 
     // A finding: the text, its table row, or the smaller heading above it
-    // opens with an item's code.
+    // opens with an item's code. The block is found by its wording in its
+    // section (blockFor), as its id moves with every edit above it.
     var blocks = (d && d.blocks) || [];
-    var at = -1;
-    blocks.forEach(function (b, i) { if (at === -1 && b.id === a.blockId) at = i; });
-    var catalog = window.App.Compare.catalogFor(e.state.instrument, e.state.scoringFamily);
-    var texts = [a.quote];
-    var b0 = at !== -1 ? blocks[at] : null;
-    if (b0 && b0.type === "table" && a.cell && b0.rows[a.cell.row]) texts = texts.concat(b0.rows[a.cell.row].cells.map(function (c) { return c.text; }));
-    for (var i = at - 1; i >= 0 && blocks[i].sectionKey === a.sectionKey; i--) {
-      if (blocks[i].type === "heading") { texts.push(blocks[i].text); if (!blocks[i].sub) break; }
-    }
+    var loc = blockFor(a, d), at = loc ? loc.index : -1;
+    var list = catalog();
+    var texts = [a.quote].concat(contextTexts(a, d, loc));
     for (var k = 0; k < texts.length; k++) {
-      var item = itemByCode(texts[k], catalog);
+      var item = itemByCode(texts[k], list);
       if (item) {
         U.jumpToItem((d && d.targetId) || e.state.activeTargetId, item.id);
         return "item:" + item.id;
@@ -747,14 +1065,27 @@ window.App.Review = (function () {
   // the tools: no "not reviewed" line then.
   function warningList() {
     var m = (E().state.engagement && E().state.engagement.engagement) || {};
-    return RC().warnings(store() || RC().emptyStore(), currentHashes(), { qaReviewBy: m.qaReviewBy || "" });
+    var out = RC().warnings(store() || RC().emptyStore(), currentHashes(), { qaReviewBy: m.qaReviewBy || "" });
+    // An accepted rewording whose paragraph has changed since: the generated
+    // text prints, and the author may believe the reviewer's wording is in.
+    // One line, however many. Not for a section the author has since hidden
+    // or rewritten as a whole: that was their own choice.
+    var lost = paragraphChanges().filter(function (r) { return r.state === "changed"; }).length;
+    if (lost) {
+      out.push({ kind: "reworded-not-applied", text: (lost === 1 ? "1 accepted rewording is" : lost + " accepted rewordings are") +
+        " not in the Word report: the text " + (lost === 1 ? "it" : "they") + " replaced has changed." });
+    }
+    return out;
   }
   // For App.UI's issue check: the same shape as its own warning lines.
   function issueWarnings() {
     if (!E().state.instrument) return [];
     var goCard = function () { UI().revealOnReport('[data-check-anchor="review"]'); };
+    // The line on reworded paragraphs goes to their list, not the Review card.
+    var goList = function () { UI().revealOnReport('[data-check-anchor="reworded"]'); };
     return warningList().map(function (w) {
-      return { cls: "warn review-warn", kind: w.kind, text: w.text, label: "Review", go: goCard };
+      var lost = w.kind === "reworded-not-applied";
+      return { cls: "warn review-warn", kind: w.kind, text: w.text, label: lost ? "Show" : "Review", go: lost ? goList : goCard };
     });
   }
   // Something needs the current text (a review exists): make sure it gets read,
@@ -778,12 +1109,17 @@ window.App.Review = (function () {
     var m = E().state.engagement.engagement || {};
     return norm(eng.client).toLowerCase() === norm(m.clientName).toLowerCase();
   }
-  function packHint(packId) {
+  // Another assessment in this project that holds the pack, or (reviewId
+  // given) the review it belongs to: the one to switch to. Two assessments of
+  // one instrument for one client both pass packMatches, so this is what
+  // keeps a pack and its review files off the wrong one.
+  function packHint(packId, reviewId) {
     var e = E(), all = e.state.assessments || {}, hit = null;
     Object.keys(all).forEach(function (id) {
       if (hit || id === e.state.activeAssessmentId) return;
       var rv = all[id] && all[id].review;
-      if (rv && Array.isArray(rv.rounds) && rv.rounds.some(function (r) { return r.packId === packId; })) hit = id;
+      if (!rv || !Array.isArray(rv.rounds) || !rv.rounds.length) return;
+      if (rv.rounds.some(function (r) { return r.packId === packId; }) || (reviewId && rv.reviewId === reviewId)) hit = id;
     });
     if (!hit) return null;
     var row = (e.listAssessments ? e.listAssessments() : []).filter(function (x) { return x.id === hit; })[0];
@@ -799,8 +1135,10 @@ window.App.Review = (function () {
   function afterImport(results) {
     results.forEach(function (r) {
       if (!RC().isApproval(r.verdict)) return;
-      if (norm((E().state.engagement.engagement || {}).qaReviewBy) === norm(r.reviewer)) return;
-      if (!qaOffers.some(function (o) { return o.reviewer === r.reviewer; })) qaOffers.push({ reviewer: r.reviewer });
+      // The same name in other capitals is the same reviewer.
+      var who = norm(r.reviewer).toLowerCase();
+      if (norm((E().state.engagement.engagement || {}).qaReviewBy).toLowerCase() === who) return;
+      if (!qaOffers.some(function (o) { return norm(o.reviewer).toLowerCase() === who; })) qaOffers.push({ reviewer: r.reviewer });
     });
   }
   function qaPrompt(repaint) {
@@ -844,12 +1182,15 @@ window.App.Review = (function () {
       // Back from a Go to that left the report page (an item, its plan, the basis).
       showCard: function () { window.App.UI.go("report"); },
       live: function () { return liveHolder && liveHolder.isConnected ? liveHolder : null; },
+      beginPaint: beginPaint,
+      endPaint: endPaint,
       acceptPlan: function (t) {
         if (failedPlans[t.comment.id]) return { can: false, why: "That wording did not reach the Word document when it was rebuilt, so copy it and use Go to." };
         return acceptPlan(t);
       },
       accept: accept,
       undoAccept: undoAccept,
+      acceptedNote: acceptedNote,
       packMatches: packMatches,
       packHint: packHint,
       stale: isStale,
@@ -875,8 +1216,8 @@ window.App.Review = (function () {
     body.appendChild(holder);
     paint(holder);
     // Comments are checked against the current report once it has been read.
-    if (store() && !cachedDocs()) {
-      currentDocs(function () { if (holder.isConnected) paint(holder); U.repaintIssueCheck(); });
+    if ((store() || hasParagraphs()) && !cachedDocs()) {
+      currentDocs(function () { if (holder.isConnected) paint(holder); U.repaintIssueCheck(); U.repaintReworded(); });
     }
     return card;
   }
@@ -905,6 +1246,13 @@ window.App.Review = (function () {
     refresh: refresh,
     issueWarnings: issueWarnings,
     warningList: warningList,
-    qaOffers: function () { return qaOffers.slice(); }
+    paragraphChanges: paragraphChanges,
+    removeParagraph: removeParagraph,
+    acceptedNote: acceptedNote,
+    qaOffers: function () { return qaOffers.slice(); },
+    // For the tests: the card's adapter, and how often a drawing really
+    // worked out the signature, the document texts and the answers.
+    __adapter: adapter,
+    __counts: counts
   };
 })();

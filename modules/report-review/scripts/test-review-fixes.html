@@ -1,0 +1,740 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: defects fixed, and four small features</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  One section per defect or feature, each from a fresh page, on small packs
+  built here so every case is under the test's control:
+    a comment made from a check quotes the whole block or cell; a cell comment
+    is found again by its row and column, and a tie is never called the same;
+    dismissed checks and a note alone are work to protect; notes are saved as
+    they are typed; pack values are checked before they reach a style or a
+    src, and the page carries a Content-Security-Policy; the checks' smaller
+    faults; replies to earlier comments; the outline follows the section in
+    view; the suggested wording box; a checklist No that offers a comment.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script src="../data/demo-pack.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  var errors = [], confirms = 0, downloads = [];
+  var W, R, D, RK;
+  function load(q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        confirms = 0; downloads = [];
+        w.confirm = function () { confirms++; return true; }; w.alert = function () {};
+        w.HTMLAnchorElement.prototype.click = function () { if (this.download) downloads.push(this.download); };
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () { W = w; R = w.ReviewTool; D = w.document; RK = w.App.ReviewChecks; res(w); });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+  function clean() { try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); } catch (e) {} }
+  function settle() { if (R) { R.state.dirty = false; R.state.composer = null; R.state.replyBox = null; } }
+  function fresh(q) {
+    settle(); clean();
+    localStorage.setItem("spt-review:reviewer:v1", "Me Myself");
+    frame.style.width = "1280px";
+    return load(q);
+  }
+  function nav(id) { D.querySelector('.nav-item[data-page="' + id + '"]').click(); }
+  function type(el, v, evt) { el.value = v; el.dispatchEvent(new W.Event(evt || "input", { bubbles: true })); }
+  function toastText() { return D.getElementById("toast").textContent; }
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+  function stored(pid) { var v = localStorage.getItem("spt-review:autosave:v1:" + pid); return v ? JSON.parse(v) : null; }
+  function open(pack, name) { settle(); return R.loadTexts([{ name: name || "pack.json", text: JSON.stringify(pack) }]); }
+  function texts(sel) { return Array.prototype.map.call(D.querySelectorAll(sel), function (n) { return n.textContent; }); }
+
+  // ---- small packs ----------------------------------------------------------
+  var seq = 0;
+  function para(id, text, key, title, extra) {
+    var b = { id: id, type: "paragraph", text: text, runs: [{ t: text, b: false, i: false, red: false }], red: false, sectionKey: key || "", sectionTitle: title || "" };
+    Object.keys(extra || {}).forEach(function (k) { b[k] = extra[k]; });
+    return b;
+  }
+  function head(id, n, title, key) {
+    var runs = n == null ? [{ t: title }] : [{ t: n + " " }, { t: title }];
+    return { id: id, type: "heading", level: 1, text: runs.map(function (r) { return r.t; }).join(""), runs: runs, sectionKey: key, sectionTitle: title };
+  }
+  function cell(text, paras) {
+    return { blocks: (paras || [text]).map(function (t) { return { type: "paragraph", text: t, runs: [{ t: t }], red: false }; }), text: text, red: false };
+  }
+  function table(id, rows, key, title) {
+    return { id: id, type: "table", sectionKey: key, sectionTitle: title, text: rows.map(function (r) { return r.join(" "); }).join(" "),
+      rows: rows.map(function (r) { return { cells: r.map(function (t) { return typeof t === "string" ? cell(t) : t; }) }; }) };
+  }
+  function mkPack(blocks, o) {
+    var p = clone(window.SPT_REVIEW_DEMO_PACK);
+    p.packId = "rp-fix-" + Date.now().toString(36) + "-" + (++seq);
+    p.round = 1;
+    p.engagement.client = "Example Water"; p.engagement.site = "Works";
+    p.documents = [{ title: "Works report", targetName: "Works", contentHash: "h" + seq, blocks: blocks, media: {} }];
+    p.items = []; p.facts = { perTarget: [] };
+    p.previousRound = { comments: [], verdicts: [] };
+    Object.keys(o || {}).forEach(function (k) { p[k] = o[k]; });
+    return p;
+  }
+  // The next round's pack: the same report unless changed, carrying comments.
+  function round2(pack, cs, change) {
+    var p = clone(pack);
+    p.packId = pack.packId + "-r2"; p.round = 2;
+    p.previousRound = { comments: cs.map(function (c) { return c.comment ? c : { comment: c, status: "open", reason: "", replies: [], round: 1, confirmedBy: [] }; }), verdicts: [] };
+    if (change) change(p);
+    return p;
+  }
+  function prevOf(c, o) {
+    var p = { comment: c, status: "open", reason: "", replies: [], round: 1, confirmedBy: [] };
+    Object.keys(o || {}).forEach(function (k) { p[k] = o[k]; });
+    return p;
+  }
+  function cmt(id, anchor, text) {
+    return { id: id, reviewer: "Me Myself", createdAt: "2026-11-01T09:00:00.000Z", updatedAt: "2026-11-01T09:00:00.000Z", severity: "should-fix", anchor: anchor, text: text || "Look at this.", suggestion: null, relatesTo: null, check: null };
+  }
+  function blockAnchorOf(b, key, o) {
+    var a = { documentIndex: 0, documentTitle: "Works report", kind: "block", sectionKey: b.sectionKey, sectionTitle: b.sectionTitle, blockId: b.id, blockType: b.type, quote: b.text, cell: null, targetName: "Works", itemId: "", field: "" };
+    Object.keys(o || {}).forEach(function (k) { a[k] = o[k]; });
+    return a;
+  }
+  var LONG = "The historian is shared with Northbridge Manufacturing under an old support contract, and the remote access path that was set up for it is still open: the vendor account has no expiry, the jump host is not patched, and nobody on site could say who approves its use or reviews what it is used for from one quarter to the next.";
+  var STATES = [["Ref", "Outcome", "State"], ["A1.a", "Governance", "Achieved"], ["A1.b", "Risk management", "Partially achieved"], ["A2.a", "Asset management", "Partially achieved"],
+    ["A2.b", "Assurance", "Partially achieved"], ["B1.a", "Policy", "Not achieved"]];
+
+  var sections = [
+    // ---- 1 -------------------------------------------------------------------
+    ["1: a comment made from a check quotes the whole block or cell", function () {
+      var red = para("d0-b2", "The scope is set out below. [Consultant to describe the scope here]", "scope", "Scope", { red: true });
+      red.runs = [{ t: "The scope is set out below. ", red: false }, { t: "[Consultant to describe the scope here]", red: true }];
+      var two = cell("Reviewed on site Remote access — not reviewed", ["Reviewed on site", "Remote access — not reviewed"]);
+      var blocks = [para("d0-b0", "Example Water runs the Works.", "", ""), head("d0-b1", 1, "Scope", "scope"), red, para("d0-b3", LONG, "scope", "Scope"),
+        para("d0-b4", "The example water team asked for this review of the control room, the two pumping stations and the telemetry that links them to the Works.", "scope", "Scope"),
+        table("d0-b5", [["Area", "What was done"], ["Network", two]], "scope", "Scope"),
+        para("d0-b6", "12 of 300 controls were assessed as achieved. Each is listed with the evidence recorded against it.", "scope", "Scope")];
+      var pack = mkPack(blocks, { facts: { perTarget: [{ targetName: "Works", roadmapEntries: 9, met: 30 }] } });
+      return fresh().then(function () {
+        var res = RK.run(pack, {}).filter(function (r) { return r.kind === "block"; });
+        var byId = {}; blocks.forEach(function (b) { byId[b.id] = b; });
+        function whole(r) { var b = byId[r.blockId]; return r.cell ? b.rows[r.cell.row].cells[r.cell.col].text : b.text; }
+        var want = ["red-prompts:d0-b2", "other-names:d0-b3:Northbridge Manufacturing", "client-name:variant:0:example water", "dashes:d0-b5:1.1.1", "figures:d0-b6:3"];
+        var ids = res.map(function (r) { return r.id; });
+        ok(want.every(function (id) { return ids.indexOf(id) !== -1; }), "the red prompt, other name, name variant, cell dash and figure are found, under the ids they always had", ids.join(" | "));
+        ok(res.length > 0 && res.every(function (r) { return r.fullText === whole(r); }), "every block result carries the whole block text, or the whole cell text, for the anchor",
+          res.filter(function (r) { return r.fullText !== whole(r); }).map(function (r) { return r.id; }).join(" | "));
+        var other = res.filter(function (r) { return r.id === want[1]; })[0], redR = res.filter(function (r) { return r.id === want[0]; })[0];
+        ok(other.quote.length < LONG.length && /…$/.test(other.quote) && redR.quote === "[Consultant to describe the scope here]", "and keeps the clipped or partial words for showing", other.quote.length + " / " + redR.quote);
+        open(pack);
+        nav("checks");
+        want.forEach(function (id) {
+          var row = Array.prototype.filter.call(D.querySelectorAll(".rr-check"), function (n) { return n.getAttribute("data-check-id") === id; })[0];
+          row.querySelector(".rr-check-comment").click();
+        });
+        var made = R.state.review.comments;
+        ok(made.length === want.length && made.every(function (c) {
+          var b = byId[c.anchor.blockId];
+          return c.anchor.quote === (c.anchor.cell ? b.rows[c.anchor.cell.row].cells[c.anchor.cell.col].text : b.text) && c.anchor.blockType === b.type && c.anchor.kind === "block";
+        }), "Make it a comment anchors each to the whole text of its block or cell, as a click on it would",
+          made.map(function (c) { return c.check + "=" + c.anchor.quote.length; }).join(" | "));
+        var onCell = made.filter(function (c) { return c.check === want[3]; })[0];
+        ok(onCell.anchor.cell.row === 1 && onCell.anchor.cell.col === 1 && onCell.anchor.quote === two.text && onCell.anchor.rowKey === "Network" && onCell.anchor.colHead === "What was done",
+          "a cell result quotes the whole cell, both paragraphs, and keeps its row and column", JSON.stringify(onCell.anchor));
+        ok(texts(".rr-chip.met").filter(function (t) { return t === "Comment added"; }).length === want.length, "and each check line says a comment was added");
+        // Round 2, report unchanged: each is found where it was, with nothing marked as changed.
+        var p2 = round2(pack, clone(made));
+        open(p2);
+        ok(made.every(function (c) { var l = R.locatePrev(c.anchor); return l && l.how === "same" && l.block.id === c.anchor.blockId && !l.tie; }), "next round, with the report unchanged, each is found as the same text",
+          made.map(function (c) { var l = R.locatePrev(c.anchor); return c.check + ":" + (l && l.how); }).join(" | "));
+        nav("previous");
+        ok(D.querySelectorAll("[data-prev-id]").length === want.length && D.querySelectorAll(".rr-chip.changed").length === 0, "and none is marked Text changed", texts(".rr-chip.changed").join(" | "));
+      });
+    }],
+    // ---- 2 -------------------------------------------------------------------
+    ["2: a cell comment is found by its row and column, and a tie is not called the same", function () {
+      var t = table("d0-b2", STATES, "results", "Results");
+      var blocks = [para("d0-b0", "Example Water", "", ""), head("d0-b1", 1, "Results", "results"), t,
+        head("d0-b3", 2, "Evidence", "evidence"), para("d0-b4", "Evidence was not provided.", "evidence", "Evidence"), para("d0-b5", "Evidence was not provided.", "evidence", "Evidence"),
+        head("d0-b6", 3, "Plans", "plans"), para("d0-b7", "Evidence was not provided.", "plans", "Plans"), para("d0-b8", "A plan is in place for the telemetry.", "plans", "Plans")];
+      var pack = mkPack(blocks);
+      var mine, old;
+      return fresh().then(function () {
+        open(pack);
+        D.querySelector('[data-block-id="d0-b2"] td[data-cell="4.2"]').click();
+        return poll(function () { return D.querySelector(".rr-composer textarea"); });
+      }).then(function (ta) {
+        type(ta, "A2.b looks achieved to me.");
+        D.querySelector(".rr-c-add").click();
+        mine = clone(R.state.review.comments[0]);
+        ok(mine.anchor.cell.row === 4 && mine.anchor.rowKey === "A2.b" && mine.anchor.colHead === "State" && mine.anchor.quote === "Partially achieved",
+          "a comment on a cell keeps the first cell of its row and the header of its column", JSON.stringify(mine.anchor));
+        old = clone(mine); old.id = "c-old"; delete old.anchor.rowKey; delete old.anchor.colHead;
+        var unique = cmt("c-unique", blockAnchorOf(t, null, { quote: "Not achieved", cell: { row: 5, col: 2 } }));
+        var p1 = cmt("c-p-ev", blockAnchorOf(blocks[5])), p2 = cmt("c-p-plan", blockAnchorOf(blocks[7]));
+        // Round 2: a row added above, so A2.b is one lower and every later block id has moved on by one.
+        var r2 = round2(pack, [mine, old, unique, p1, p2], function (p) {
+          var bs = p.documents[0].blocks;
+          bs[2].rows.splice(1, 0, { cells: [cell("A0.z"), cell("New outcome"), cell("Partially achieved")] });
+          bs.splice(1, 0, para("d0-bX", "A paragraph added before the results.", "", ""));
+          bs.forEach(function (b, i) { b.id = "d0-b" + i; });
+        });
+        open(r2);
+        var l = R.locatePrev(mine.anchor);
+        ok(l && l.how === "same" && l.cell.row === 5 && l.cell.col === 2 && !l.tie, "next round it is found in its own row, which has moved down one", JSON.stringify(l && { how: l.how, cell: l.cell, tie: l.tie }));
+        var lo = R.locatePrev(old.anchor);
+        ok(lo && lo.how === "near" && lo.tie === true, "the same comment from an older file, with no row kept, is a tie among the cells that say it: not called the same", JSON.stringify(lo && { how: lo.how, cell: lo.cell, tie: lo.tie }));
+        var lu = R.locatePrev(unique.anchor);
+        ok(lu && lu.how === "same" && lu.cell.row === 6, "a cell whose words are in the table once is still simply found, row kept or not", JSON.stringify(lu && { how: lu.how, cell: lu.cell }));
+        var lp = R.locatePrev(p1.anchor), lq = R.locatePrev(p2.anchor);
+        ok(lp && lp.how === "near" && lp.tie === true && lp.block.sectionKey === "evidence" && lp.block.text === "Evidence was not provided.", "a paragraph repeated in its section is a tie, kept to that section", JSON.stringify(lp && { how: lp.how, id: lp.block.id, tie: lp.tie }));
+        ok(lp.block.id === "d0-b5", "and the guess is the block now at the old id", lp.block.id);
+        var moved = clone(p1.anchor); moved.blockId = "d0-b9";
+        var lm = R.locatePrev(moved);
+        ok(lm && lm.tie === true && lm.block.id === "d0-b6", "or, with no twin at the old id, the one nearest to where it was", lm && lm.block.id);
+        ok(lq && lq.how === "same" && lq.block.sectionKey === "plans", "the same words once in another section are found there, as the same", JSON.stringify(lq && { how: lq.how, id: lq.block.id }));
+        nav("previous");
+        function card(id) { return D.querySelector('[data-prev-id="' + id + '"]'); }
+        ok(/Check the place/.test(card("c-old").textContent) && /could not be matched to one cell/.test(card("c-old").textContent) && !/Text changed/.test(card("c-old").textContent),
+          "a tie tells the reviewer to check the place, and does not claim the text changed", card("c-old").textContent);
+        ok(!/Check the place/.test(card(mine.id).textContent) && !/Text changed/.test(card(mine.id).textContent), "the comment found by its row says neither");
+        ok(/Check the place/.test(card("c-p-ev").textContent) && /more than once/.test(card("c-p-ev").textContent), "the repeated paragraph says the words are there more than once");
+        // The row itself gone: the words elsewhere are not its cell.
+        var r3 = round2(pack, [mine], function (p) { p.packId += "b"; p.documents[0].blocks[2].rows.splice(4, 1); });
+        open(r3);
+        var lg = R.locatePrev(mine.anchor);
+        ok(lg && lg.how === "near" && lg.tie === true, "with its row removed, the same words in other rows are only a guess", JSON.stringify(lg && { how: lg.how, cell: lg.cell, tie: lg.tie }));
+      });
+    }],
+    // ---- 3 -------------------------------------------------------------------
+    ["3: dismissed checks, or a note alone, are work to protect", function () {
+      var blocks = [para("d0-b0", "Example Water — the Works.", "", ""), head("d0-b1", 1, "Scope", "scope"), para("d0-b2", "TBC by the site.", "scope", "Scope")];
+      var pack = mkPack(blocks), other = mkPack(blocks);
+      return fresh().then(function () {
+        ok(R.hasWork({ dismissedChecks: ["x"] }) && R.hasWork({ verdict: { value: "none", note: "A note." } }) && R.hasWork({ replies: [{ id: "r", to: "c", text: "t" }] }) &&
+          !R.hasWork({ verdict: { value: "none", note: " " }, dismissedChecks: [], comments: [], checklist: [], confirmations: [] }),
+          "dismissed checks, a note with no verdict and a reply each count as work; an empty review does not");
+        open(pack);
+        nav("checks");
+        var n = D.querySelectorAll(".rr-check-dismiss").length;
+        D.querySelector(".rr-check-dismiss").click();
+        D.querySelector(".rr-check-dismiss").click();
+        ok(n >= 2 && R.state.review.dismissedChecks.length === 2 && R.isDirty(), "two checks dismissed, nothing else done");
+        // Another pack over it: asked in the page, and not by confirm().
+        R.loadTexts([{ name: "other.json", text: JSON.stringify(other) }]);
+        ok(!!D.getElementById("rr-leave-no") && confirms === 0 && R.state.pack.packId === pack.packId, "opening another pack over it asks first, in the tool's own dialog", "confirm() calls " + confirms);
+        D.getElementById("rr-leave-no").click();
+        ok(R.state.pack.packId === pack.packId && R.state.review.dismissedChecks.length === 2 && !D.querySelector(".rr-modal"), "Stay keeps the pack and the work as they were");
+        R.loadTexts([{ name: "other.json", text: JSON.stringify(other) }]);
+        D.getElementById("rr-leave-yes").click();
+        var snap = stored(pack.packId);
+        ok(R.state.pack.packId === other.packId, "Open the pack without saving opens it");
+        ok(!!snap && snap.review.dismissedChecks.length === 2, "and the work left behind is stored at once, not lost with a write still waiting", JSON.stringify(snap && snap.review.dismissedChecks));
+        open(pack);
+        ok(!!D.getElementById("rr-restore") && R.state.restore && R.state.restore.review.dismissedChecks.length === 2, "opening the first pack again offers the dismissed checks back");
+        D.getElementById("rr-restore-yes").click();
+        ok(R.state.review.dismissedChecks.length === 2, "and Restore puts them back");
+        // A note for the author alone.
+        settle(); clean(); localStorage.setItem("spt-review:reviewer:v1", "Me Myself");
+        open(pack);
+        nav("summary");
+        type(D.getElementById("rr-verdict-note"), "Only a note so far.");
+        R.writeAutosave();
+        open(other); open(pack);
+        ok(!!D.getElementById("rr-restore") && R.state.restore.review.verdict.note === "Only a note so far.", "a note for the author with no verdict is offered back too");
+      });
+    }],
+    // ---- 4 -------------------------------------------------------------------
+    ["4: notes are saved as they are typed", function () {
+      var pack = mkPack([para("d0-b0", "Example Water", "", ""), head("d0-b1", 1, "Scope", "scope"), para("d0-b2", "The scope is the Works.", "scope", "Scope")]);
+      return fresh().then(function () {
+        open(pack);
+        nav("summary");
+        var ta = D.getElementById("rr-verdict-note");
+        ta.focus();
+        type(ta, "Typed and not left.");   // input only: no change, no blur
+        ok(R.state.review.verdict.note === "Typed and not left." && R.isDirty(), "the note for the author is in the review as it is typed, and the review is unsaved");
+        ok(D.getElementById("rr-verdict-note") === ta && D.activeElement === ta, "without the page being drawn again under the caret");
+        var ev = new W.Event("beforeunload", { cancelable: true });
+        W.dispatchEvent(ev);
+        var snap = stored(pack.packId);
+        ok(ev.defaultPrevented && snap && snap.review.verdict.note === "Typed and not left.", "closing the window then warns, and the crash copy holds the note", JSON.stringify(snap && snap.review.verdict));
+        settle();
+        nav("checklist");
+        var q = D.querySelector(".rr-q"), input = q.querySelector(".rr-note input");
+        input.focus();
+        type(input, "See the scope.");
+        var a = R.state.review.checklist.filter(function (x) { return x.id === q.getAttribute("data-q"); })[0];
+        ok(a && a.note === "See the scope." && R.isDirty() && q.querySelector(".rr-note input") === input && D.activeElement === input, "a checklist note is saved as it is typed too, with no redraw", JSON.stringify(a));
+      });
+    }],
+    // ---- 5 -------------------------------------------------------------------
+    ["5: pack values are checked before they reach a style or a src", function () {
+      var PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+      var t = table("d0-b2", [["Good", "Bad", "Plain"]], "scope", "Scope");
+      t.rows[0].cells[0].fill = "1F4E79";
+      t.rows[0].cells[1].fill = "FFF;background:url(https://tracker.invalid/beacon.png)";
+      t.rows[0].cells[2].fill = "AUTO";
+      function img(id, m, w) { return { id: id, type: "image", media: m, width: w, sectionKey: "scope", sectionTitle: "Scope" }; }
+      var pack = mkPack([para("d0-b0", "Example Water", "", ""), head("d0-b1", 1, "Scope", "scope"), t, img("d0-b3", "ok", 300), img("d0-b4", "unc", 300), img("d0-b5", "web", 300), img("d0-b6", "html", 300),
+        img("d0-b7", "ok", "1px;background:url(https://tracker.invalid/w.png)")]);
+      pack.documents[0].media = { ok: PNG, unc: "file://attacker.invalid/share/x.png", web: "https://tracker.invalid/x.png", html: "data:text/html;base64,PGI+eDwvYj4=" };
+      return fresh().then(function () {
+        open(pack);
+        var tds = D.querySelectorAll('[data-block-id="d0-b2"] td');
+        ok(/rgb\(31, 78, 121\)/.test(tds[0].style.backgroundColor) && tds[0].style.color !== "", "a six-figure fill still shades its cell", tds[0].getAttribute("style"));
+        ok(!tds[1].getAttribute("style") && !tds[2].getAttribute("style"), "a fill that is anything else is not put in a style", tds[1].getAttribute("style"));
+        function pic(id) { return D.querySelector('[data-block-id="' + id + '"] img'); }
+        ok(!!pic("d0-b3") && pic("d0-b3").getAttribute("src") === PNG, "an embedded PNG is shown");
+        ok(!pic("d0-b4") && !pic("d0-b5") && !pic("d0-b6"), "a file address, a web address and data that is not a picture are never given to an img");
+        ok(!!pic("d0-b7") && !pic("d0-b7").getAttribute("style"), "and a width that is not a number is left out", pic("d0-b7") && pic("d0-b7").getAttribute("style"));
+        ok(!D.querySelector("#main img[src^='file:'], #main img[src^='http']"), "no picture in the report points outside the pack");
+        // The page's own policy.
+        var meta = D.querySelector('meta[http-equiv="Content-Security-Policy"]');
+        ok(!!meta && /default-src 'none'/.test(meta.getAttribute("content")) && /img-src 'self' data:/.test(meta.getAttribute("content")), "the page carries a Content-Security-Policy", meta && meta.getAttribute("content"));
+        var logo = D.querySelector(".brand-logo img");
+        ok(!!logo && logo.complete && logo.naturalWidth > 0, "which still lets the logo load", logo && logo.naturalWidth);
+        ok(pic("d0-b3").naturalWidth === 1 || !pic("d0-b3").complete, "and the pack's own pictures");
+        var blocked = [];
+        D.addEventListener("securitypolicyviolation", function (e) { blocked.push(e.violatedDirective + " " + e.blockedURI); });
+        var probe = D.createElement("img");
+        probe.src = "https://tracker.invalid/probe.png";
+        D.body.appendChild(probe);
+        return poll(function () { return blocked.length; }, 4000).then(function () {
+          ok(/img-src/.test(blocked[0]) && /tracker\.invalid/.test(blocked[0]), "and stops a picture from anywhere else being fetched", blocked.join(" | "));
+        }, function () { ok(false, "and stops a picture from anywhere else being fetched", "no policy violation was reported"); }).then(function () { D.body.removeChild(probe); });
+      });
+    }],
+    // ---- 6, 7, 8: the checks ---------------------------------------------------
+    ["6 to 8: the checks' own faults", function () {
+      function run(blocks, o) { return RK.run(mkPack(blocks, o), {}); }
+      function of(res, c) { return res.filter(function (r) { return r.check === c; }); }
+      var facts = { perTarget: [{ targetName: "Works", roadmapEntries: 9, met: 30 }] };
+      return fresh().then(function () {
+        // 6: any unit, and the singular.
+        ["controls", "safeguards", "expectations", "outcomes", "contributing outcomes"].forEach(function (u) {
+          var bad = of(run([para("d0-b0", "Example Water. 12 of 300 " + u + " were assessed as achieved. Each is listed.", "", "")], { facts: facts }), "figures");
+          var good = of(run([para("d0-b0", "Example Water. 30 of 300 " + u + " were assessed as achieved. Each is listed.", "", "")], { facts: facts }), "figures");
+          ok(bad.length === 1 && bad[0].id === "figures:d0-b0:3" && new RegExp("says 12 " + u + " achieved").test(bad[0].message) && good.length === 0, "figures: \"N of M " + u + " were assessed as achieved\" is read", JSON.stringify(bad.map(function (r) { return r.message; })));
+        });
+        var one = of(run([para("d0-b0", "Example Water. Across the layers in scope there is 1 open gap. The immediate priority is patching.", "", "")], { facts: facts }), "figures");
+        ok(one.length === 1 && /says 1 open gap, and the assessment behind it has 9/.test(one[0].message) && one[0].id === "figures:d0-b0:2", "figures: \"there is 1 open gap\" is read, and said in the singular", JSON.stringify(one.map(function (r) { return r.message; })));
+        var oneOk = of(run([para("d0-b0", "Example Water. Across the layers in scope there is 1 open gap.", "", "")], { facts: { perTarget: [{ targetName: "Works", roadmapEntries: 1, met: 3 }] } }), "figures");
+        var many = of(run([para("d0-b0", "Example Water. Across the layers in scope there are 4 open gaps.", "", "")], { facts: facts }), "figures");
+        ok(oneOk.length === 0 && many.length === 1 && /says 4 open gaps/.test(many[0].message), "a single gap that agrees is left alone, and the plural still works");
+        // Under a profile that expects less than achieved, more items meet it than are achieved.
+        var mixed = [{ targetName: "Works", itemId: "a", code: "A", title: "a", status: "met", answer: "Achieved", evidence: "x" }, { targetName: "Works", itemId: "b", code: "B", title: "b", status: "met", answer: "Partially achieved", evidence: "x" }];
+        var under = of(run([para("d0-b0", "Example Water. 12 of 300 outcomes were assessed as achieved. Each is listed.", "", "")], { facts: facts, items: mixed }), "figures");
+        var over = of(run([para("d0-b0", "Example Water. 31 of 300 outcomes were assessed as achieved. Each is listed.", "", "")], { facts: facts, items: mixed }), "figures");
+        ok(under.length === 0 && over.length === 1 && /no more than 30/.test(over[0].message), "where the items that meet their expected state are not all achieved, only a count above them is flagged", JSON.stringify(under.concat(over).map(function (r) { return r.message; })));
+        // 7: a client whose name is an ordinary word.
+        function clientRun(client, blocks) { var p = mkPack(blocks); p.engagement.client = client; return of(RK.run(p, {}), "client-name"); }
+        var sh = clientRun("Shell", [para("d0-b0", "Shell operates the Works site.", "", ""), para("d0-b1", "Engineers reach the PLCs over a secure shell session from the jump host.", "", "")]);
+        ok(sh.length === 0, "client name: \"a secure shell session\" is not the client Shell printed wrongly", JSON.stringify(sh.map(function (r) { return r.message; })));
+        var sh2 = clientRun("Shell", [para("d0-b0", "Shell operates the Works site.", "", ""), para("d0-b1", "The sHell team agreed the scope.", "", "")]);
+        ok(sh2.length === 1 && sh2[0].id === "client-name:variant:0:sHell", "mixed capitals on a one-word name are still flagged", JSON.stringify(sh2.map(function (r) { return r.id; })));
+        var sh3 = clientRun("Shell", [para("d0-b0", "Access is over a secure shell session.", "", "")]);
+        ok(sh3.length === 1 && sh3[0].id === "client-name:missing:0", "and the ordinary word alone does not count as the name being printed", JSON.stringify(sh3.map(function (r) { return r.id; })));
+        var two = clientRun("Example Water", [para("d0-b0", "Example Water runs it.", "", ""), para("d0-b1", "The example water team agreed.", "", "")]);
+        ok(two.length === 1 && /example water/.test(two[0].message), "a name of several words in lower case is still flagged");
+        // 8: numbering that starts above 1.
+        var n2 = of(run([para("d0-b0", "Example Water", "", ""), head("d0-b1", 2, "Scope", "scope"), head("d0-b2", 3, "Findings", "findings")]), "numbering");
+        ok(n2.length === 1 && n2[0].blockId === "d0-b1" && /first numbered section is section 2, so section 1 is missing/.test(n2[0].message), "numbering: a first numbered section of 2 is a gap", JSON.stringify(n2.map(function (r) { return r.message; })));
+        var n4 = of(run([para("d0-b0", "Example Water", "", ""), head("d0-b1", 4, "Scope", "scope")]), "numbering");
+        var n1 = of(run([para("d0-b0", "Example Water", "", ""), head("d0-b0a", null, "Document control", "dc"), head("d0-b1", 1, "Scope", "scope"), head("d0-b2", 2, "Findings", "findings")]), "numbering");
+        ok(n4.length === 1 && /sections 1 to 3 are missing/.test(n4[0].message) && n1.length === 0, "one of 4 names all three, and numbering from 1 after an unnumbered heading is fine");
+        // 8: a system-wide finding is one result.
+        var items = [];
+        ["Zone A", "Zone B", "Zone C", "Zone D"].forEach(function (z, k) {
+          ["SR 1.1", "SR 1.2"].forEach(function (c) { items.push({ targetName: z, targetId: "t" + k, itemId: c, code: c, title: c, status: "finding", evidence: "", shared: true }); });
+        });
+        items.push({ targetName: "Zone B", targetId: "t1", itemId: "SR 2.1", code: "SR 2.1", title: "Own", status: "finding", evidence: "", shared: false });
+        var ne = of(run([para("d0-b0", "Example Water", "", "")], { items: items }), "no-evidence");
+        ok(ne.length === 3 && /SR 1\.1 is a system-wide finding, on Zone A and 3 others/.test(ne[0].message) && /SR 2\.1 is a finding on Zone B/.test(ne[2].message),
+          "no evidence: a finding four zones share is one result, and a zone's own finding is its own", JSON.stringify(ne.map(function (r) { return r.message; })));
+        ok(ne[0].id === "no-evidence:t0:SR 1.1" && ne[0].legacyIds.indexOf("no-evidence:Zone A:SR 1.1") !== -1 && ne[0].legacyIds.indexOf("no-evidence:Zone C:SR 1.1") !== -1,
+          "it answers to each zone's old id, so an earlier dismissal of any of them still holds", JSON.stringify(ne[0].legacyIds));
+        // 8: two targets with one name.
+        var same = [{ targetName: "Plant", targetId: "t1", itemId: "x", code: "X", title: "t", status: "finding", evidence: "" }, { targetName: "Plant", targetId: "t2", itemId: "x", code: "X", title: "t", status: "finding", evidence: "" },
+          { targetName: "Plant", targetId: "t1", itemId: "y", code: "Y", title: "t", status: "unanswered" }, { targetName: "Plant", targetId: "t2", itemId: "y", code: "Y", title: "t", status: "unanswered" }];
+        var sr = run([para("d0-b0", "Example Water", "", "")], { items: same });
+        var sids = sr.filter(function (r) { return r.kind === "item"; }).map(function (r) { return r.id; });
+        ok(sids.join() === "no-evidence:t1:x,no-evidence:t2:x,unanswered:t1:y,unanswered:t2:y", "item results are keyed by the target's id, so two targets with one name do not collide", sids.join());
+        ok(sr.filter(function (r) { return r.kind === "item"; }).every(function (r) { return r.legacyIds && r.legacyIds.length === 1 && /:Plant:/.test(r.legacyIds[0]); }), "each keeps the id by name it had before");
+        var noId = of(run([para("d0-b0", "Example Water", "", "")], { items: [{ targetName: "Plant", itemId: "x", code: "X", title: "t", status: "finding", evidence: "" }] }), "no-evidence");
+        ok(noId.length === 1 && noId[0].id === "no-evidence:Plant:x" && !noId[0].legacyIds, "a pack with no target ids keeps the ids it always had");
+        // In the tool: a dismissal saved under the old id still counts.
+        var pk = mkPack([para("d0-b0", "Example Water", "", "")], { items: same });
+        open(pk);
+        var before = R.activeChecks().filter(function (r) { return r.check === "no-evidence"; }).length;
+        R.state.review.dismissedChecks.push("no-evidence:Plant:x");
+        var after = R.activeChecks().filter(function (r) { return r.check === "no-evidence"; }).length;
+        ok(before === 2 && after === 0, "a dismissal saved under the old id still hides the result", before + " then " + after);
+        nav("checks");
+        ok(!D.querySelector('[data-check-card="no-evidence"]') && /2 dismissed|3 dismissed|dismissed/.test(D.getElementById("main").textContent), "and the page shows it as dismissed");
+        // 8: a paragraph with no runs is read from its text.
+        var nr = run([{ id: "d0-b0", type: "paragraph", text: "Example Water — the tool says TBC", runs: [], red: false, sectionKey: "", sectionTitle: "" }]);
+        ok(of(nr, "dashes").length === 1 && of(nr, "internal-wording").length === 2, "a paragraph with no runs is checked by its text", nr.map(function (r) { return r.id; }).join(" | "));
+        // 8: details that are not a list.
+        var bad = mkPack([para("d0-b0", "Example Water", "", "")], { items: [{ targetName: "Works", itemId: "a", code: "A", title: "First", groupName: "G", status: "met", answer: "Yes", evidence: "Seen.", details: "not a list" },
+          { targetName: "Works", itemId: "Works:slt", code: "SL-T", title: "Targets", groupName: "G", status: "recorded", answer: "SL 2", details: { a: 1 } }] });
+        bad.engagement.scoringFamily = "risk-assessment";
+        var threw = null;
+        try { RK.run(bad, {}); } catch (e) { threw = e.message; }
+        ok(threw === null, "items[].details that is not a list does not stop the checks", threw);
+        open(bad);
+        nav("engagement");
+        ok(D.querySelectorAll(".rr-item").length === 2 && /First/.test(D.getElementById("main").textContent), "nor blank the Engagement page");
+        var s = D.getElementById("rr-item-search");
+        type(s, "First");
+        return wait(400).then(function () {
+          ok(D.querySelectorAll(".rr-item").length === 1, "and the search still works on it");
+        });
+      });
+    }],
+    ["8: ids a selector or a map could trip on, and a selection in another block", function () {
+      var QUOTE = 'd0-"b\'x\\', blocks = [para("d0-b0", "Example Water", "", ""), head(QUOTE, 1, "Scope", "scope"), para("__proto__", "The scope is the Works and its two pumping stations.", "scope", "Scope"),
+        head("constructor", 2, "Findings", "findings"), para("d0-b4", "The findings are listed below in the order of their priority.", "findings", "Findings")];
+      var pack = mkPack(blocks);
+      var c1 = cmt("__proto__", blockAnchorOf(blocks[2])), c2 = cmt("c-q", blockAnchorOf(blocks[1]));
+      var p2 = round2(pack, [c1, c2]);
+      return fresh().then(function () {
+        var before = errors.length, threw = null;
+        try {
+          open(p2);
+          ok(R.state.pack && R.state.page === "report" && D.querySelectorAll("#rr-paper .rr-block").length === blocks.length, "a pack whose block ids hold quotes, or are __proto__ and constructor, is shown");
+          ok(D.querySelectorAll("#rr-paper [data-prev-id]").length === 2, "with the earlier comments beside those blocks", String(D.querySelectorAll("#rr-paper [data-prev-id]").length));
+          Array.prototype.forEach.call(D.querySelectorAll(".rr-outline-item"), function (b) { b.click(); });
+          Array.prototype.forEach.call(D.querySelectorAll(".rr-read"), function (t) { t.checked = true; t.dispatchEvent(new W.Event("change", { bubbles: true })); });
+          R.jumpToBlock(0, QUOTE); R.jumpToBlock(0, "__proto__");
+          R.syncSection();
+          Array.prototype.filter.call(D.querySelectorAll(".rr-block"), function (n) { return n.getAttribute("data-block-id") === "__proto__"; })[0].click();
+        } catch (e) { threw = e.message; }
+        ok(threw === null && errors.length === before, "going to them, ticking them read and commenting on them throws nothing", threw || errors.slice(before).join(" | "));
+        return poll(function () { return D.querySelector(".rr-composer textarea"); }).then(function (ta) {
+          type(ta, "On the odd one.");
+          D.querySelector(".rr-c-add").click();
+          ok(R.state.review.comments.length === 1 && R.state.review.comments[0].anchor.blockId === "__proto__" && D.querySelector(".rr-outline-item .n"), "the comment is made and counted in the outline");
+          nav("previous"); nav("summary");
+          ok(/Summary and verdict/.test(D.getElementById("main").textContent), "and the other pages draw");
+          // A selection left in another block, then a comment opened from the keyboard.
+          nav("report");
+          var els = D.querySelectorAll("#rr-paper .rr-block"), a = els[4], b = els[0];
+          W.getSelection().selectAllChildren(a.querySelector("p"));
+          b.focus();
+          b.dispatchEvent(new W.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+          return poll(function () { return R.state.composer && R.state.composer.anchor.blockId === "d0-b0"; });
+        }).then(function () {
+          ok(!R.state.composer.anchor.selection && !/^On:/.test(R.state.composer.label || ""), "words selected in another block are not attached to a comment opened from the keyboard", JSON.stringify(R.state.composer.anchor.selection));
+          R.state.composer = null; R.render();
+          var p = D.querySelectorAll("#rr-paper .rr-block")[4], node = p.querySelector("p").firstChild, range = D.createRange();
+          range.setStart(node, 4); range.setEnd(node, 12);
+          W.getSelection().removeAllRanges(); W.getSelection().addRange(range);
+          p.click();
+          return poll(function () { return R.state.composer && R.state.composer.anchor.blockId === "d0-b4"; });
+        }).then(function () {
+          ok(R.state.composer.anchor.selection === "findings" && R.state.composer.anchor.quote === blocks[4].text, "words selected in the block itself still say what the comment is about, and the quote stays the whole block", JSON.stringify(R.state.composer.anchor.selection));
+          ok(/Select some words first/.test(D.querySelector(".rr-toolbar").textContent), "and the hint line on the Report page says so");
+          W.getSelection().removeAllRanges();
+        });
+      });
+    }],
+    // ---- A -------------------------------------------------------------------
+    ["A: a reply on an earlier comment's thread", function () {
+      var blocks = [para("d0-b0", "Example Water", "", ""), head("d0-b1", 1, "Scope", "scope"), para("d0-b2", "The scope is the Works and its two pumping stations.", "scope", "Scope"),
+        para("d0-b3", "The telemetry that links them is in scope as well.", "scope", "Scope")];
+      var pack = mkPack(blocks, { items: [{ targetName: "Works", targetId: "t1", itemId: "i1", code: "I 1", title: "An item", groupName: "G", status: "finding", answer: "No", evidence: "Seen on site." }] });
+      var c1 = cmt("c-one", blockAnchorOf(blocks[2]), "Which stations?"), c2 = cmt("c-two", blockAnchorOf(blocks[3]), "Say which links."),
+        c3 = cmt("c-item", { documentIndex: 0, documentTitle: "Works report", kind: "item", sectionKey: "", sectionTitle: "", blockId: "", quote: "", cell: null, targetName: "Works", targetId: "t1", itemId: "i1", field: "", code: "I 1", itemTitle: "An item" }, "Is this evidence enough?");
+      var p2 = round2(pack, [prevOf(c1, { replies: [{ id: "r-a", author: "A. Author", at: "2026-11-02T10:00:00.000Z", text: "Both of them. Do you want them named?" }] }), prevOf(c2, { status: "resolved" }), prevOf(c3)]);
+      var first, saved;
+      return fresh().then(function () {
+        open(p2);
+        nav("previous");
+        var card = D.querySelector('[data-prev-id="c-one"]');
+        ok(D.querySelectorAll("[data-prev-id] .rr-reply").length === 3 && !!card.querySelector(".rr-raise"), "each earlier comment has Reply, next to its other actions");
+        ok(!("replies" in R.state.review) && !R.hasWork(R.state.review), "a review with no replies has no replies key");
+        card.querySelector(".rr-reply").click();
+        return poll(function () { return D.querySelector('[data-prev-id="c-one"] .rr-reply-box textarea'); });
+      }).then(function (ta) {
+        ok(D.activeElement === ta, "Reply opens a box under the thread, with the caret in it");
+        D.querySelector(".rr-reply-add").click();
+        ok(/Write the reply first/.test(toastText()) && !R.state.review.replies, "an empty reply is not added");
+        type(ta, "Yes please, name both.");
+        D.querySelector('[data-prev-id="c-two"] .rr-reply').click();
+        ok(/Add or cancel the reply/.test(toastText()) && R.state.replyBox.to === "c-one", "a reply half written is not thrown away by starting another");
+        D.querySelector(".rr-reply-add").click();
+        var rs = R.state.review.replies;
+        first = rs && rs[0];
+        ok(rs && rs.length === 1 && first.to === "c-one" && first.text === "Yes please, name both." && /^r-/.test(first.id) && !isNaN(Date.parse(first.at)) && Object.keys(first).sort().join() === "at,id,text,to",
+          "it is saved as { id, to, text, at }", JSON.stringify(rs));
+        ok(R.isDirty() && R.hasWork(R.state.review), "and counts as unsaved work");
+        var rows = D.querySelectorAll('[data-prev-id="c-one"] .rr-replies > div');
+        ok(rows.length === 2 && /A\. Author/.test(rows[0].textContent) && rows[1].classList.contains("rr-reply-mine") && /Me Myself/.test(rows[1].textContent) && /Your reply/.test(rows[1].textContent) && /name both/.test(rows[1].textContent),
+          "it shows in the thread under the author's reply, marked as yours", texts('[data-prev-id="c-one"] .rr-replies > div').join(" | "));
+        ok(/You replied/.test(D.querySelector('[data-prev-id="c-one"] .rr-head').textContent) && !D.querySelector(".rr-reply-box"), "the comment says you replied, and the box has gone");
+        ok(D.querySelector('.nav-item[data-page="previous"] .badge').textContent === "1/3", "a reply counts as having looked at the comment", D.querySelector('.nav-item[data-page="previous"] .badge').textContent);
+        // Edit.
+        D.querySelector(".rr-reply-edit").click();
+        return poll(function () { return D.querySelector(".rr-reply-box textarea"); });
+      }).then(function (ta) {
+        ok(ta.value === "Yes please, name both." && D.querySelector(".rr-reply-add").textContent === "Save reply", "Edit opens it in the box");
+        var was = first.at;
+        type(ta, "Yes please: name both stations.");
+        return wait(20).then(function () {
+          D.querySelector(".rr-reply-add").click();
+          var r = R.state.review.replies[0];
+          ok(R.state.review.replies.length === 1 && r.id === first.id && r.text === "Yes please: name both stations." && Date.parse(r.at) >= Date.parse(was), "and saves it under the same id, with a later time");
+          // Delete, and Undo.
+          D.querySelector(".rr-reply-del").click();
+          ok(R.state.review.replies.length === 0 && !D.querySelector(".rr-reply-mine") && /Reply deleted/.test(toastText()), "Delete removes it at once");
+          D.querySelector(".rr-toast-act").click();
+          ok(R.state.review.replies.length === 1 && R.state.review.replies[0].id === first.id && !!D.querySelector(".rr-reply-mine"), "and Undo puts the same reply back");
+          // Beside the text on Report and Engagement.
+          nav("report");
+          var inline = D.querySelector('#rr-paper [data-prev-id="c-one"]');
+          ok(!!inline && !!inline.querySelector(".rr-reply") && !!inline.querySelector(".rr-reply-mine"), "the earlier comment beside its text on Report has Reply and shows yours");
+          nav("engagement");
+          var onItem = D.querySelector('.rr-item [data-prev-id="c-item"]');
+          ok(!!onItem && !!onItem.querySelector(".rr-reply"), "and so does one on an item, on Engagement");
+          onItem.querySelector(".rr-reply").click();
+          return poll(function () { return D.querySelector('.rr-item .rr-reply-box textarea'); });
+        });
+      }).then(function (ta) {
+        type(ta, "It is, with the photo added.");
+        D.querySelector(".rr-reply-add").click();
+        ok(R.state.review.replies.length === 2 && R.state.review.replies[1].to === "c-item", "a reply can be added from there");
+        // Summary and the printout.
+        nav("summary");
+        ok(D.getElementById("rr-sum-replies").textContent === "2" && D.getElementById("rr-sum-prev").textContent === "2/3", "Summary counts the replies, and the earlier comments looked at",
+          D.getElementById("rr-sum-replies").textContent + " / " + D.getElementById("rr-sum-prev").textContent);
+        var row = D.querySelector('[data-prev-row="c-one"]'), row2 = D.querySelector('[data-prev-row="c-two"]');
+        ok(/Replied/.test(row.lastChild.textContent) && /Your reply: Yes please: name both stations\./.test(row.textContent) && /Not looked at/.test(row2.lastChild.textContent), "the printout lists each reply, and says Replied",
+          row.textContent + " || " + row2.textContent);
+        // Autosave, and the saved file.
+        R.writeAutosave();
+        var snap = stored(p2.packId);
+        ok(snap && snap.review.replies.length === 2, "the crash copy holds the replies");
+        return new Promise(function (res) { R.saveReview(null, res); });
+      }).then(function (res) {
+        saved = JSON.parse(res.text);
+        ok(res.ok && Array.isArray(saved.replies) && saved.replies.length === 2 && saved.replies[0].to === "c-one" && saved.schema === "spt-review/1.0", "the review file holds them in a top-level replies array", JSON.stringify(saved.replies));
+        // Merging: keyed by id, the later edit wins, nothing dropped.
+        var a = clone(saved), b = clone(saved);
+        b.replies[0] = { id: saved.replies[0].id, to: "c-one", text: "Edited later.", at: "2099-01-01T00:00:00.000Z" };
+        b.replies.push({ id: "r-new", to: "c-two", text: "Another.", at: "2026-11-03T00:00:00.000Z" });
+        a.replies[1] = { id: saved.replies[1].id, to: "c-item", text: "Edited earlier.", at: "2000-01-01T00:00:00.000Z" };
+        var m = R.mergeReviews(a, b, false);
+        ok(m.replies.length === 3 && m.replies[0].text === "Edited later." && m.replies[1].text === "It is, with the photo added." && m.replies[2].id === "r-new", "two copies merge by id: the later edit wins, and a reply only one has is kept",
+          JSON.stringify(m.replies.map(function (r) { return r.text; })));
+        var none = clone(saved); delete none.replies;
+        ok(R.mergeReviews(none, none, false).replies === undefined && R.mergeReviews(none, saved, false).replies.length === 2, "and a copy with no replies merges as before");
+        // Restore after a crash brings them back.
+        settle();
+        localStorage.setItem("spt-review:autosave:v1:" + p2.packId, JSON.stringify({ savedOn: new Date().toISOString(), review: saved }));
+        open(p2);
+        ok(!!D.getElementById("rr-restore"), "unsaved replies are offered back");
+        D.getElementById("rr-restore-yes").click();
+        ok(R.state.review.replies.length === 2, "and restored");
+        // An older review file, with no replies, opens as before.
+        settle(); clean(); localStorage.setItem("spt-review:reviewer:v1", "Me Myself");
+        var oldFile = clone(saved); delete oldFile.replies; oldFile.comments = [cmt("c-mine", blockAnchorOf(blocks[2]), "Mine.")];
+        open(p2);
+        R.loadTexts([{ name: "old.json", text: JSON.stringify(oldFile) }]);
+        ok(R.state.review.comments.length === 1 && !("replies" in R.state.review) && !R.isDirty(), "an older review file with no replies opens as it always did");
+        // A colleague's file: theirs, read only.
+        var theirs = clone(saved); theirs.reviewer = "C. Colleague"; theirs.fileId = "rf-theirs"; theirs.comments = [];
+        R.loadTexts([{ name: "theirs.json", text: JSON.stringify(theirs) }]);
+        D.getElementById("rr-whose-mine").click();
+        nav("previous");
+        var their = D.querySelector('[data-prev-id="c-one"] .rr-reply-theirs');
+        ok(!!their && /C\. Colleague/.test(their.textContent) && /Read only/.test(their.textContent) && !their.querySelector("button") && !("replies" in R.state.review),
+          "a colleague's replies show in the thread read only, and are not taken into your review", their && their.textContent);
+      });
+    }],
+    // ---- B -------------------------------------------------------------------
+    ["B: the outline follows the section in view", function () {
+      var blocks = [para("d0-b0", "Example Water", "", "")];
+      for (var s = 1; s <= 8; s++) {
+        blocks.push(head("d0-h" + s, s, "Section " + s, "s" + s));
+        for (var k = 0; k < 12; k++) blocks.push(para("d0-s" + s + "p" + k, "Paragraph " + k + " of section " + s + ". " + LONG, "s" + s, "Section " + s));
+      }
+      var pack = mkPack(blocks);
+      var main, paper;
+      function scrollTo(id) {
+        var el = D.querySelector('#rr-paper [data-block-id="' + id + '"]');
+        // Twice: the toolbar only takes its place at the top once the page has scrolled.
+        for (var n = 0; n < 2; n++) main.scrollTop += el.getBoundingClientRect().top - D.querySelector(".rr-toolbar").getBoundingClientRect().bottom - 8;
+        main.dispatchEvent(new W.Event("scroll"));
+        return wait(200);
+      }
+      function current() { return Array.prototype.map.call(D.querySelectorAll(".rr-outline-item[aria-current]"), function (n) { return n.getAttribute("data-section-block"); }).join(); }
+      return fresh().then(function () {
+        open(pack);
+        main = D.getElementById("main"); paper = D.getElementById("rr-paper");
+        ok(current() === "d0-h1", "on opening, the first section is the current one in the outline", current());
+        return scrollTo("d0-h5");
+      }).then(function () {
+        var cur = D.querySelector(".rr-outline-item[aria-current]");
+        ok(current() === "d0-h5" && cur.getAttribute("aria-current") === "location", "scrolling the report to section 5 moves aria-current to its row, and only its row", current());
+        var row = cur.parentNode, cs = W.getComputedStyle(row), ts = W.getComputedStyle(cur.querySelector(".t"));
+        ok(row.classList.contains("cur") && cs.boxShadow !== "none" && Number(ts.fontWeight) >= 700, "shown by a bar and bold, not by colour alone", cs.boxShadow + " / " + ts.fontWeight);
+        ok(D.getElementById("rr-paper") === paper, "and nothing is drawn again for it");
+        var sb = D.getElementById("sidebar").getBoundingClientRect(), rr = row.getBoundingClientRect();
+        ok(rr.top >= sb.top - 1 && rr.bottom <= sb.bottom + 1, "the row is in view within the sidebar", rr.top + ".." + rr.bottom + " in " + sb.top + ".." + sb.bottom);
+        return scrollTo("d0-s7p6");
+      }).then(function () {
+        ok(current() === "d0-h7", "part way down section 7, it is section 7", current());
+        // The read ticks redraw the outline: it keeps its place.
+        var tick = D.querySelector('.rr-read[data-read-block="d0-h2"]');
+        tick.checked = true; tick.dispatchEvent(new W.Event("change", { bubbles: true }));
+        ok(current() === "d0-h7", "ticking a section read keeps the current row marked", current());
+        // The narrow window: the Go to section list follows too.
+        frame.style.width = "768px";
+        return wait(100);
+      }).then(function () { return scrollTo("d0-h3"); }).then(function () {
+        var j = D.getElementById("rr-jump");
+        ok(W.getComputedStyle(j).display !== "none" && j.value === "d0-h3", "in a narrow window the Go to section list shows the section in view", j.value);
+        j.value = "d0-h6"; j.dispatchEvent(new W.Event("change", { bubbles: true }));
+        return wait(200);
+      }).then(function () {
+        var j = D.getElementById("rr-jump"), top = D.querySelector('[data-block-id="d0-h6"]').getBoundingClientRect().top, tb = D.querySelector(".rr-toolbar").getBoundingClientRect().bottom;
+        ok(j.value === "d0-h6" && top >= tb - 1 && top < tb + 40, "choosing a section there still goes to it, and the list stays on it", j.value + " " + top + " vs " + tb);
+        frame.style.width = "1280px";
+      });
+    }],
+    // ---- C -------------------------------------------------------------------
+    ["C: the suggested wording box", function () {
+      var TEXT = "The site meets its target on five of seven requirements.";
+      var pack = mkPack([para("d0-b0", "Example Water", "", ""), head("d0-b1", 1, "Scope", "scope"), para("d0-b2", TEXT, "scope", "Scope"), para("d0-b3", LONG + " " + LONG + " " + LONG + " " + LONG + " " + LONG + " " + LONG, "scope", "Scope")]);
+      var sug, h0;
+      return fresh().then(function () {
+        open(pack);
+        D.querySelector('[data-block-id="d0-b2"]').click();
+        return poll(function () { return D.querySelector(".rr-c-suggest"); });
+      }).then(function (box) {
+        box.checked = true; box.dispatchEvent(new W.Event("change", { bubbles: true }));
+        return wait(50);
+      }).then(function () {
+        sug = D.querySelector(".rr-c-sug");
+        var diff = D.querySelector(".rr-sug-diff");
+        h0 = sug.getBoundingClientRect().height;
+        ok(sug.value === TEXT && h0 >= 90, "the box starts from the text and is tall enough to edit in", String(h0));
+        ok(/No change yet/.test(diff.textContent) && !D.querySelector(".rr-sug-reset"), "under it, a line says nothing has changed yet, with no link to start again", diff.textContent);
+        type(sug, "The site meets its target on six of seven requirements, which is good.");
+        return wait(300);
+      }).then(function () {
+        var diff = D.querySelector(".rr-sug-diff");
+        var dels = Array.prototype.map.call(diff.querySelectorAll("del"), function (n) { return n.textContent; }), ins = Array.prototype.map.call(diff.querySelectorAll("ins"), function (n) { return n.textContent; });
+        ok(/^What changes:/.test(diff.textContent) && dels.join("|") === "five|requirements." && ins.join("|") === "six|requirements, which is good.", "as it is typed, the line shows the words taken out and put in", dels.join("|") + " / " + ins.join("|"));
+        ok(D.querySelector(".rr-c-sug") === sug && R.state.composer.suggestion === sug.value, "without drawing the box again");
+        var long = []; for (var i = 0; i < 60; i++) long.push("Line " + i + " of a much longer suggestion.");
+        type(sug, long.join("\n"));
+        return wait(300);
+      }).then(function () {
+        var h1 = sug.getBoundingClientRect().height;
+        ok(h1 > h0 + 100 && h1 <= 322, "the box grows with its wording, up to a limit", h0 + " to " + h1);
+        var reset = D.querySelector(".rr-sug-reset");
+        ok(!!reset && reset.textContent === "Start again from the original", "once changed, a link offers to start again from the original");
+        reset.click();
+        ok(sug.value === TEXT && R.state.composer.suggestion === TEXT && /No change yet/.test(D.querySelector(".rr-sug-diff").textContent) && !D.querySelector(".rr-sug-reset") && sug.getBoundingClientRect().height < 200,
+          "which puts the original back, and the box and the line with it", sug.value.slice(0, 40) + " / " + sug.getBoundingClientRect().height);
+        type(sug, "");
+        return wait(300);
+      }).then(function () {
+        ok(/box is empty/.test(D.querySelector(".rr-sug-diff").textContent) && !!D.querySelector(".rr-sug-reset") && !D.querySelector(".rr-sug-diff ins"), "an emptied box says so rather than showing a change");
+        type(sug, "The site meets its target on six of seven requirements.");
+        type(D.querySelector(".rr-c-text"), "Six, not five.");
+        D.querySelector(".rr-c-add").click();
+        var c = R.state.review.comments[0];
+        ok(c && c.suggestion === "The site meets its target on six of seven requirements." && c.anchor.quote === TEXT, "and the suggestion is saved as before");
+      });
+    }],
+    // ---- D -------------------------------------------------------------------
+    ["D: a checklist No offers a comment saying why", function () {
+      var pack = mkPack([para("d0-b0", "Example Water", "", ""), head("d0-b1", 1, "Scope", "scope"), para("d0-b2", "The scope is the Works.", "scope", "Scope")]);
+      var q, qText, qId;
+      function row() { return D.querySelector('.rr-q[data-q="' + qId + '"]'); }
+      return fresh().then(function () {
+        open(pack);
+        nav("checklist");
+        q = D.querySelector(".rr-q"); qId = q.getAttribute("data-q"); qText = q.firstChild.textContent;
+        ok(!D.querySelector(".rr-q-why-add"), "with nothing answered, no question offers a comment");
+        row().querySelector('[data-answer="yes"]').click();
+        ok(!row().querySelector(".rr-q-why-add"), "nor does a Yes");
+        row().querySelector('[data-answer="no"]').click();
+        var add = row().querySelector(".rr-q-why-add");
+        ok(!!add && add.textContent === "Add a comment saying why" && D.querySelectorAll(".rr-q-why-add").length === 1, "a No offers Add a comment saying why, on that question");
+        ok(!R.state.composer && R.state.review.comments.length === 0 && R.state.review.checklist[0].answer === "no", "it does not force one: the No is saved as it is");
+        add.click();
+        return poll(function () { return row().querySelector(".rr-composer textarea"); });
+      }).then(function (ta) {
+        var a = R.state.composer.anchor;
+        ok(a.kind === "general" && a.sectionTitle === "Checklist" && a.quote === qText && new RegExp("Why the answer is no to: ").test(R.state.composer.label) && R.state.composer.label.indexOf(qText) !== -1,
+          "it opens a general comment with the question as its subject", JSON.stringify(a));
+        ok(!row().querySelector(".rr-c-suggest"), "with no suggested wording, as there is no text to reword");
+        type(ta, "The roadmap leaves out two findings.");
+        nav("report");
+        ok(!!D.getElementById("rr-draft") && /Checklist/.test(D.getElementById("rr-draft").textContent), "left half written, a bar on other pages leads back to it");
+        D.getElementById("rr-draft-go").click();
+        ok(R.state.page === "checklist" && !!row().querySelector(".rr-composer"), "and goes back to the question");
+        row().querySelector(".rr-c-add").click();
+        var c = R.state.review.comments[0];
+        ok(c && c.anchor.kind === "general" && c.anchor.sectionTitle === "Checklist" && c.anchor.quote === qText && c.text === "The roadmap leaves out two findings.", "the comment is anchored like other general comments, quoting the question", JSON.stringify(c && c.anchor));
+        ok(!!row().querySelector('.rr-comment[data-comment-id="' + c.id + '"]') && row().classList.contains("has-why") && !row().querySelector(".rr-q-why-add"), "and the question then shows it");
+        ok(D.querySelectorAll(".rr-q .rr-comment").length === 1, "on that question only");
+        // A second question keeps its own.
+        var q2 = D.querySelectorAll(".rr-q")[1];
+        q2.querySelector('[data-answer="no"]').click();
+        q2 = D.querySelectorAll(".rr-q")[1];
+        ok(!!q2.querySelector(".rr-q-why-add") && !q2.querySelector(".rr-comment"), "another No has its own offer, and none of the first one's comment");
+        nav("summary");
+        var sum = D.querySelector("[data-sum-comment]");
+        ok(/Checklist/.test(sum.querySelector(".rr-sum-where").textContent) && sum.querySelector(".rr-sum-quote").textContent === qText, "Summary lists it under Checklist, with the question");
+        sum.querySelector(".rr-sum-where button").click();
+        ok(R.state.page === "checklist", "and its link goes back to the checklist");
+        // Changing the answer keeps the comment; deleting it brings the offer back.
+        row().querySelector('[data-answer="yes"]').click();
+        ok(!!row().querySelector(".rr-comment"), "changing the answer does not drop the comment");
+        row().querySelector('[data-answer="no"]').click();
+        row().querySelector(".rr-del").click();
+        ok(R.state.review.comments.length === 0 && !!row().querySelector(".rr-q-why-add"), "and deleting the comment brings the offer back");
+      });
+    }]
+  ];
+
+  var chain = Promise.resolve();
+  sections.forEach(function (s) {
+    chain = chain.then(function () {
+      lines.push("-- " + s[0]);
+      return s[1]();
+    }).catch(function (e) { ok(false, s[0] + " threw: " + (e && e.message)); });
+  });
+  chain.then(function () {
+    ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+    settle();
+    clean();
+    finish();
+  });
+})();
+</script>
+</body></html>

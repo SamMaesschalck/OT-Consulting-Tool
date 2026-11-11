@@ -225,7 +225,54 @@ window.RiskReview = (function () {
 
   // ---- comments against the current reports --------------------------------------
   var snap = { signature: null, docs: null, building: null, waiting: [] };
-  function signature() { var c = Object.assign({}, project()); delete c.review; delete c.savedOn; return JSON.stringify(c); }
+  // One drawing of the comments list asks, for every card, whether the comment
+  // is stale and whether its wording can be accepted. The signature and the
+  // list of items are the same for every card, so between review-author's
+  // beginPaint and endPaint they are worked out once. Outside a drawing
+  // nothing is kept: the project may change between any two calls.
+  var paintMemo = null, paintDepth = 0;
+  // How often each was really worked out, for the test that a drawing does
+  // not go back to once per card.
+  var counts = { signature: 0, items: 0, texts: 0 };
+  function beginPaint() { if (!paintDepth++) paintMemo = {}; }
+  function endPaint() { if (paintDepth && !--paintDepth) paintMemo = null; }
+  function once(key, make) {
+    if (!paintMemo) return make();
+    if (!(key in paintMemo)) paintMemo[key] = make();
+    return paintMemo[key];
+  }
+  function signature() {
+    return once("signature", function () {
+      counts.signature++;
+      var c = Object.assign({}, project()); delete c.review; delete c.savedOn; return JSON.stringify(c);
+    });
+  }
+  // The ids of the items a pack would hold now.
+  function itemIds() {
+    return once("itemIds", function () {
+      counts.items++;
+      var ids = {};
+      packItems().items.forEach(function (i) { ids[i.itemId] = true; });
+      return ids;
+    });
+  }
+  // Every piece of text in one document, normalised. Kept with the document:
+  // it does not change once read.
+  var textsOf = typeof WeakMap === "function" ? new WeakMap() : null;
+  function docTexts(doc) {
+    var set = textsOf && textsOf.get(doc);
+    if (set) return set;
+    counts.texts++;
+    set = {};
+    function add(t) { var n = norm(t); if (n) set[n] = true; }
+    doc.blocks.forEach(function (b) {
+      add(DB().blockText(b));
+      if (b.type === "table") b.rows.forEach(function (r) { r.cells.forEach(function (c) { add(c.text); }); });
+    });
+    DB().flatten(doc.blocks).forEach(function (b) { add(b.text); });
+    if (textsOf) textsOf.set(doc, set);
+    return set;
+  }
   function cachedDocs() { return snap.docs && snap.signature === signature() ? snap.docs : null; }
   // The reports as they are now, built if they have changed.
   function currentDocs(cb) {
@@ -252,38 +299,31 @@ window.RiskReview = (function () {
     if (a.kind === "general") return false;
     // The item id holds the zone or conduit's own id, so renaming a zone (as a
     // reviewer may well ask) does not orphan the comments on its threats.
-    if (a.kind === "item") return !packItems().items.some(function (i) { return i.itemId === a.itemId; });
+    if (a.kind === "item") return !itemIds()[a.itemId];
     var docs = cachedDocs();
     if (!docs) return null;
     var q = norm(a.quote);
-    return !docs.some(function (d) {
-      return d.blocks.some(function (b) {
-        if (norm(DB().blockText(b)) === q) return true;
-        if (b.type === "table" && b.rows.some(function (r) { return r.cells.some(function (c) { return norm(c.text) === q; }); })) return true;
-        return false;
-      }) || DB().flatten(d.blocks).some(function (b) { return norm(b.text) === q; });
-    });
+    if (!q) return false;     // a chart or picture: nothing to compare
+    return !docs.some(function (d) { return !!docTexts(d)[q]; });
   }
 
   // ---- accepting a suggestion -------------------------------------------------------
   //
   // Which text accepts what: a section's heading goes into its title, and a
-  // paragraph of the wording that opens a section into its prose, in the report
-  // the comment is on (its documentIndex). Everything else is written from the
-  // zones and threats, or is the numbers.
+  // paragraph of the wording that opens a section is replaced on its own (the
+  // section's `paragraphs`), in the report the comment is on (its
+  // documentIndex). Everything else is written from the zones and threats, or
+  // is the numbers.
   var NOT_EDITABLE = "This text is written from the zones and threats, so it cannot be changed here. Copy the wording, then use Go to.";
-  function docHas(doc, text) {
-    var q = norm(text);
-    return !!doc && doc.blocks.some(function (b) {
-      if (norm(DB().blockText(b)) === q) return true;
-      return b.type === "table" && b.rows.some(function (r) { return r.cells.some(function (c) { return norm(c.text) === q; }); });
-    }) || (!!doc && DB().flatten(doc.blocks).some(function (b) { return norm(b.text) === q; }));
-  }
+  function docHas(doc, text) { var q = norm(text); return !!doc && (!q || !!docTexts(doc)[q]); }
   // How a comment's suggestion would be applied, given the current documents.
   // { can, why, label, kind, apply(), undo(), expect: [texts], documentIndex }
   function planAccept(t, docs) {
     var c = t.comment, a = c.anchor || {}, sug = c.suggestion;
     if (!sug) return { can: false };
+    // One accepted change per comment: a second would write over the record
+    // of what the first replaced, and its Undo with it.
+    if (t.accepted && t.accepted.revert) return { can: false, why: "Wording from this comment is already in the report. Undo the accepted wording first, then accept the new suggestion." };
     if (a.kind !== "block") return { can: false, why: "This comment is on the zones and threats behind the reports, not on their wording, so copy the wording and use Go to." };
     if (!docs) return { can: false, why: "Still checking this against the current report." };
     var doc = docFor(a, docs), i = docs.indexOf(doc);
@@ -306,23 +346,116 @@ window.RiskReview = (function () {
         expect: [title] };
     }
 
-    // A section's opening wording: a rewrite replaces the whole run, so the run
-    // is rebuilt with the one paragraph changed.
-    var runs = probe.filter(function (s) { return s.key && s.key === a.sectionKey && s.texts.some(function (x) { return norm(x) === norm(a.quote); }); });
+    // A paragraph of the wording that opens a section.
+    var nq = norm(a.quote);
+    var runs = probe.filter(function (s) { return s.key && s.key === a.sectionKey && s.texts.some(function (x) { return norm(x) === nq; }); });
     if (!a.cell && runs.length) {
-      if (runs[0].repeat || runs.length > 1) {
-        return { can: false, why: "Each zone and conduit has its own wording in this section, and a rewrite here would replace all of them. Copy the wording and use Go to." };
+      // The red note to the consultant is taken out, not reworded: as plain
+      // words it would print in black as if it were the report's own.
+      if (doc.blocks.some(function (b) { return b.red && b.type === "paragraph" && b.sectionKey === a.sectionKey && norm(b.text) === nq; })) {
+        return { can: false, why: "This is a note to complete in the tool, printed in red until it is dealt with, so it cannot be reworded here. Use Edit on the Report page." };
       }
-      var leads = runs[0].texts, prev = RP().sectionOf(docId, a.sectionKey).prose || null;
-      var keep = leads.filter(function (x) { return norm(x) !== norm(a.quote); });
-      var prose = leads.map(function (x) { return norm(x) === norm(a.quote) ? String(sug).trim() : x; }).join("\n");
-      return { can: true, kind: "section opening", label: "Accept", documentIndex: i,
-        apply: function () { RP().setSection(docId, a.sectionKey, { prose: prose }); },
-        undo: function () { RP().setSection(docId, a.sectionKey, { prose: prev }); },
-        revert: { report: docId, key: a.sectionKey, field: "prose", prev: prev }, applied: prose,
-        expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }).concat(keep) };
+      var cur = RP().sectionOf(docId, a.sectionKey);
+      // The author rewrote the whole opening on the Report page (Edit): the
+      // one line of that rewrite is changed, and it stays a rewrite. Not a
+      // section repeated per zone, where a rewrite never applies.
+      if (cur.prose && !runs[0].repeat) return prosePlan(docId, a.sectionKey, cur.prose, nq, sug, i);
+      return paragraphPlan(docId, a.sectionKey, cur, runs, nq, sug, i);
     }
     return { can: false, why: NOT_EDITABLE };
+  }
+
+  // One line of a whole-opening rewrite the author made.
+  function prosePlan(docId, key, prev, nq, sug, i) {
+    var hit = false;
+    var lines = String(prev).split(/\n/).map(function (l) {
+      if (norm(l) !== nq) return l;
+      hit = true;
+      return String(sug).trim();
+    });
+    if (!hit) return { can: false, why: NOT_EDITABLE };
+    var prose = lines.join("\n");
+    return { can: true, kind: "section opening", label: "Accept", documentIndex: i,
+      apply: function () { RP().setSection(docId, key, { prose: prose }); },
+      undo: function () { RP().setSection(docId, key, { prose: prev }); },
+      revert: { report: docId, key: key, field: "prose", prev: prev }, applied: prose,
+      expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }) };
+  }
+
+  // One generated paragraph of a section's opening: only it is replaced (the
+  // section's `paragraphs`, shared/report-sections.js), so the rest of the
+  // opening is still written from the assessment. The replacement is keyed by
+  // the paragraph's generated text and applies wherever a paragraph of that
+  // section's opening reads the same. In a section repeated per zone
+  // ("Justification for ...") that is the one zone whose wording it is, or
+  // every zone that says exactly the same. runs is the openings that print it.
+  function paragraphPlan(docId, key, cur, runs, nq, sug, i) {
+    var RS = window.App.ReportSections;
+    // The commented paragraph may itself be an earlier accepted rewording:
+    // the generated text it stands for is then what the replacement is on.
+    var gen = nq, was = null;
+    runs.forEach(function (s) {
+      s.texts.forEach(function (x, k) { if (was == null && norm(x) === nq && s.from && s.from[k] != null) was = s.from[k]; });
+    });
+    var entry = RS.paragraphFor(cur.paragraphs, was != null ? was : nq);
+    var to = String(sug).trim();
+    if (was != null && entry) {
+      gen = norm(was);
+      to = String(entry.to).split(/\n/).map(function (l) { return norm(l) === nq ? String(sug).trim() : l; }).join("\n");
+    }
+    if (norm(to) === norm(entry ? entry.to : gen)) return { can: false, why: "The suggested wording is what the report already says." };
+    var before = RS.paragraphsOf(cur), at = new Date().toISOString(), places = 0;
+    runs.forEach(function (s) { s.texts.forEach(function (x) { if (norm(x) === nq) places++; }); });
+    return { can: true, kind: "paragraph", label: "Accept", documentIndex: i, sectionKey: key, places: places,
+      apply: function () { RP().setSection(docId, key, { paragraphs: RS.setParagraph(before, gen, to, at) }); },
+      undo: function () { RP().setSection(docId, key, { paragraphs: before }); },
+      revert: { report: docId, key: key, field: "paragraph", from: gen, prevTo: entry ? entry.to : null }, applied: to,
+      expect: String(sug).split(/\n/).filter(function (l) { return norm(l); }) };
+  }
+  // Is the text a paragraph of that section's opening, in this document.
+  function openingHas(doc, key, text) {
+    var q = norm(text);
+    return !!doc && (doc.probe || []).some(function (s) { return s.key === key && s.texts.some(function (x) { return norm(x) === q; }); });
+  }
+
+  // ---- paragraphs reworded by an accepted suggestion --------------------------
+  //
+  // Each stored replacement, in either report, and whether it is in that
+  // report now: [{ report, key, title, from, to, at, state }], state as
+  // ReportSections.paragraphStatus gives it, or "checking" until the reports
+  // have been read. One whose paragraph has changed does not apply and the
+  // generated text prints, so the author is told: on the Report page, on the
+  // comment, and in the review's warnings.
+  function customOf(reportId) { var all = project().reportCustom; return (all && all[reportId]) || {}; }
+  function hasParagraphs() {
+    var RS = window.App.ReportSections;
+    return DOCS.some(function (d) {
+      var c = customOf(d.id);
+      return Object.keys(c).some(function (k) { return RS.paragraphsOf(c[k]).length > 0; });
+    });
+  }
+  function paragraphChanges() {
+    if (!hasParagraphs()) return [];
+    var RS = window.App.ReportSections, docs = cachedDocs(), out = [];
+    DOCS.forEach(function (d) {
+      var doc = docs ? docs.filter(function (x) { return x.reportId === d.id; })[0] : null;
+      RS.paragraphStatus(customOf(d.id), doc ? [doc.probe || []] : []).forEach(function (r) {
+        r.report = d.id; r.reportTitle = d.title;
+        if (!docs) r.state = "checking";
+        out.push(r);
+      });
+    });
+    return out;
+  }
+  // What a comment says about the paragraph its Accept reworded, when that
+  // wording is not in the report. Null when it is, or is not known yet.
+  function acceptedNote(t) {
+    var rv = t && t.accepted && t.accepted.revert;
+    if (!rv || rv.field !== "paragraph") return null;
+    var RS = window.App.ReportSections;
+    if (!RS.paragraphFor(RP().sectionOf(rv.report, rv.key).paragraphs, rv.from)) return "The accepted wording has since been taken out on the Report page.";
+    var row = once("paragraphs", paragraphChanges).filter(function (r) { return r.report === rv.report && r.key === rv.key && norm(r.from) === norm(rv.from); })[0];
+    return row ? RS.paragraphNote(row.state) : null;
   }
   // Remembered for this session, so the failed Accept is not offered again.
   var failedPlans = {};
@@ -342,7 +475,11 @@ window.RiskReview = (function () {
       try { plan.apply(); }
       catch (e) { done({ ok: false, message: "This could not be applied: " + (e.message || e) }); return; }
       currentDocs(function (err2, after) {
-        var missing = err2 ? plan.expect : plan.expect.filter(function (x) { return !docHas(after[plan.documentIndex], x); });
+        // A reworded paragraph has to be in the opening of its own section,
+        // not just somewhere in the report.
+        var missing = err2 ? plan.expect : plan.expect.filter(function (x) {
+          return plan.kind === "paragraph" ? !openingHas(after[plan.documentIndex], plan.sectionKey, x) : !docHas(after[plan.documentIndex], x);
+        });
         if (missing.length) {
           plan.undo();
           currentDocs(function () {
@@ -355,7 +492,9 @@ window.RiskReview = (function () {
         t.accepted = { at: new Date().toISOString(), kind: plan.kind, revert: plan.revert, applied: plan.applied };
         t.status = "resolved"; t.statusAt = t.accepted.at;
         RT().touched();
-        done({ ok: true, message: "Accepted into the " + plan.kind + ", and checked in the rebuilt Word document." });
+        done({ ok: true, message: "Accepted into the " + plan.kind + ", and checked in the rebuilt Word document." +
+          (plan.kind === "paragraph" ? " Only that paragraph is changed: the rest of the section's opening is still written from the assessment." : "") +
+          (plan.places > 1 ? " The same paragraph is printed " + plan.places + " times in this report, and each now has the new wording." : "") });
       });
     });
   }
@@ -363,19 +502,33 @@ window.RiskReview = (function () {
   // then the consultant's to change on the Report page.
   function undoAccept(t, done) {
     var acc = t.accepted, r = acc && acc.revert;
-    if (!r || !r.report || !r.key || (r.field !== "title" && r.field !== "prose")) { done({ ok: false, message: "There is nothing recorded to undo for this comment." }); return; }
-    var now = RP().sectionOf(r.report, r.key)[r.field] || null;
-    if (norm(now) !== norm(acc.applied)) {
-      done({ ok: false, message: "That section has been edited since the wording was accepted, so it was left as it is. Use Edit on the Report page." });
-      return;
+    if (!r || !r.report || !r.key || (r.field !== "title" && r.field !== "prose" && r.field !== "paragraph")) { done({ ok: false, message: "There is nothing recorded to undo for this comment." }); return; }
+    var gone = false;
+    if (r.field === "paragraph") {
+      // Only the one replacement this comment's Accept made, whether or not
+      // it applies now: any other in the section is left exactly as it is.
+      var RS = window.App.ReportSections, list = RP().sectionOf(r.report, r.key).paragraphs, entry = RS.paragraphFor(list, r.from);
+      gone = !entry && !(r.prevTo != null && norm(acc.applied) === norm(r.from));
+      if (entry && norm(entry.to) !== norm(acc.applied)) {
+        done({ ok: false, message: "The wording has been changed since it was accepted, so the earlier wording was not put back. Use Back to the generated version on the Report page." });
+        return;
+      }
+      if (!gone) RP().setSection(r.report, r.key, { paragraphs: RS.setParagraph(list, r.from, r.prevTo) });
+    } else {
+      var now = RP().sectionOf(r.report, r.key)[r.field] || null;
+      if (norm(now) !== norm(acc.applied)) {
+        done({ ok: false, message: "That section has been edited since the wording was accepted, so it was left as it is. Use Edit on the Report page." });
+        return;
+      }
+      var patch = {}; patch[r.field] = r.prev || null;
+      RP().setSection(r.report, r.key, patch);
     }
-    var patch = {}; patch[r.field] = r.prev || null;
-    RP().setSection(r.report, r.key, patch);
     delete t.accepted;
     if (!RC().setStatus(store() || RC().emptyStore(), t.comment.id, "open").ok) t.status = "open";
     RT().touched();
     currentDocs(function () {
-      done({ ok: true, message: "The earlier wording is back, and the comment is open again." });
+      done({ ok: true, message: gone ? "The accepted wording had already been taken out, so the comment is open again."
+        : "The earlier wording is back, and the comment is open again." });
     });
   }
 
@@ -420,8 +573,10 @@ window.RiskReview = (function () {
     offersNow();
     results.forEach(function (r) {
       if (!RC().isApproval(r.verdict)) return;
-      if (norm(project().engagement.qaReviewBy).toLowerCase() === norm(r.reviewer).toLowerCase()) return;
-      if (!qaOffers.some(function (o) { return o.reviewer === r.reviewer; })) qaOffers.push({ reviewer: r.reviewer });
+      // The same name in other capitals is the same reviewer.
+      var who = norm(r.reviewer).toLowerCase();
+      if (norm(project().engagement.qaReviewBy).toLowerCase() === who) return;
+      if (!qaOffers.some(function (o) { return norm(o.reviewer).toLowerCase() === who; })) qaOffers.push({ reviewer: r.reviewer });
     });
   }
   function qaPrompt(h, repaint) {
@@ -451,7 +606,20 @@ window.RiskReview = (function () {
   function currentHashes() { var d = cachedDocs(); return d ? d.map(function (x) { return x.contentHash; }) : null; }
   function exportWarnings() {
     var s = store();
-    return s ? RC().warnings(s, currentHashes(), { qaReviewBy: project().engagement.qaReviewBy }) : [];
+    return (s ? RC().warnings(s, currentHashes(), { qaReviewBy: project().engagement.qaReviewBy }) : []).concat(rewordedWarnings());
+  }
+  // An accepted rewording whose paragraph has changed since: the generated
+  // text prints, and the author may believe the reviewer's wording is in. One
+  // line per report. Not for a section the author has since hidden or
+  // rewritten as a whole: that was their own choice.
+  function rewordedWarnings() {
+    var out = [];
+    DOCS.forEach(function (d) {
+      var lost = paragraphChanges().filter(function (r) { return r.report === d.id && r.state === "changed"; }).length;
+      if (lost) out.push({ kind: "reworded-not-applied", text: d.title + ": " + (lost === 1 ? "1 accepted rewording is" : lost + " accepted rewordings are") +
+        " not in the Word report, as the text " + (lost === 1 ? "it" : "they") + " replaced has changed. The Report page lists " + (lost === 1 ? "it" : "them") + "." });
+    });
+    return out;
   }
   function fillWarnings(box) {
     if (box.__fill) { box.__fill(); return; }
@@ -477,10 +645,12 @@ window.RiskReview = (function () {
     fillWarnings(box);
     if (needsDocs()) refreshDocs(repaintWarnings);
   }
-  // Only an approval needs the reports rebuilt, to see whether they changed since.
+  // Only an approval needs the reports rebuilt, to see whether they changed
+  // since, or a reworded paragraph, to see whether it still applies.
   function needsDocs() {
     var s = store();
-    return !!s && !cachedDocs() && s.files.some(function (f) { return f.verdict && RC().isApproval(f.verdict.value); });
+    if (cachedDocs()) return false;
+    return hasParagraphs() || (!!s && s.files.some(function (f) { return f.verdict && RC().isApproval(f.verdict.value); }));
   }
   // A card for another page: the warnings and a way to the Peer review page.
   // Nothing at all until a review has started.
@@ -535,11 +705,14 @@ window.RiskReview = (function () {
       acceptPlan: acceptPlan,
       accept: function (t, done) { accept(t, function (res) { repaintWarnings(); done(res); }); },
       undoAccept: function (t, done) { undoAccept(t, function (res) { repaintWarnings(); done(res); }); },
+      acceptedNote: acceptedNote,
       stale: isStale,
       fieldLabel: function (f) { return FIELD_LABELS[f] || null; },
       authorName: function () { return norm(project().engagement.consultant) || "Author"; },
       extras: function () { return pageH ? qaPrompt(pageH, function () { var c = live(); if (c) paint(c); }) : null; },
       live: live,
+      beginPaint: beginPaint,
+      endPaint: endPaint,
       toast: RT().toast
     };
   }
@@ -560,7 +733,7 @@ window.RiskReview = (function () {
     // Not through watchWarnings: on this page the list shows even before a
     // review starts ("Not reviewed yet"), as the assessment tool's Issue check does.
     function fill() {
-      var ws = RC().warnings(store() || RC().emptyStore(), currentHashes(), { qaReviewBy: project().engagement.qaReviewBy });
+      var ws = RC().warnings(store() || RC().emptyStore(), currentHashes(), { qaReviewBy: project().engagement.qaReviewBy }).concat(rewordedWarnings());
       warnBox.innerHTML = "";
       warnBox.style.display = ws.length ? "" : "none";
       ws.forEach(function (w) { warnBox.appendChild(h("li", { "data-review-warning": w.kind, text: w.text })); });
@@ -578,6 +751,9 @@ window.RiskReview = (function () {
   return { render: render, buildPack: buildPack, packItems: packItems, buildDocuments: buildDocuments, store: store, ensureStore: ensureStore, send: send,
     importTexts: function (list) { return window.App.ReviewAuthor.importTexts(adapter(), list, null, null); },
     isStale: isStale, acceptPlan: acceptPlan, accept: accept, undoAccept: undoAccept, goTo: goTo, refreshDocs: refreshDocs,
-    exportWarnings: exportWarnings, exportWarningTexts: exportWarningTexts, warningsCard: warningsCard, currentHashes: currentHashes, needsDocs: needsDocs,
-    qaOffers: function () { return offersNow().slice(); }, FIELD_LABELS: FIELD_LABELS };
+    exportWarnings: exportWarnings, exportWarningTexts: exportWarningTexts, paragraphChanges: paragraphChanges, acceptedNote: acceptedNote, cachedDocs: cachedDocs, warningsCard: warningsCard, currentHashes: currentHashes, needsDocs: needsDocs,
+    qaOffers: function () { return offersNow().slice(); }, FIELD_LABELS: FIELD_LABELS,
+    // For the tests: the page's adapter, and how often a drawing really worked
+    // out the signature, the items and a document's texts.
+    __adapter: adapter, __counts: counts };
 })();
