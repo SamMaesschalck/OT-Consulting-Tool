@@ -119,15 +119,12 @@
         var sv = recents.filter(function (x) { return x.action === "save"; })[0];
         ok(sv && sv.kind === "Review file", "Recent files is told a saved review is a review file", JSON.stringify(sv));
         d.querySelector('.nav-item[data-page="summary"]').click();
-        var hb = d.getElementById("rr-handback");
-        ok(hb && /Give it to the OT Cyber Assessment Tool/.test(hb.textContent), "in the suite, a saved review can be given to the author's tool", hb && hb.textContent);
-        hb.click();
-        ok(handed && handed.to === "OT Cyber Assessment Tool" && handed.name === dl[0].name && JSON.parse(handed.text).comments.length === 1, "which hands over the file just saved", JSON.stringify(handed && { to: handed.to, name: handed.name }));
-        R.addComment({ severity: "suggestion", anchor: { kind: "general", documentIndex: 0, documentTitle: "", sectionTitle: "General", quote: "" }, text: "Another." });
-        R.render(true);
-        ok(!d.getElementById("rr-handback"), "not while there is unsaved work the file does not hold");
-        w.App.HostBridge.canHandoff = false; R.state.dirty = false; R.render(true);
-        ok(!d.getElementById("rr-handback"), "and never where the suite says no (a tour)");
+        // Someone else does the review (user, 12 Nov 2026): even in the suite,
+        // where the bridge would allow it, nothing gives the file to the
+        // author's tool. The reviewer sends it.
+        ok(/Saved to /.test(txt(w, "#rr-saved-at")), "in the suite, Summary says where the review was saved", txt(w, "#rr-saved-at"));
+        ok(!d.getElementById("rr-handback") && !/Give it to the/.test(d.body.textContent), "and offers no button to give it to the author's tool");
+        ok(handed === null, "nothing is handed to another tool");
         delete w.App.HostBridge;
         R.render(true);
         ok(!d.getElementById("rr-handback"), "nor in the tool on its own");

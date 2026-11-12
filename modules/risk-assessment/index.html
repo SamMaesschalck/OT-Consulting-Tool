@@ -2035,6 +2035,15 @@
           };
           reader.onerror = function () { toast("Could not read the file.", "err"); };
           reader.readAsText(file);
+        },
+        // The suite is closing this tool and the consultant chose to lose the
+        // unsaved work: the crash-net copy goes too, so the tool does not
+        // offer it when it is opened again. Only called with unsaved work,
+        // and the copy is then this session's (each edit rewrites it).
+        discardUnsaved: function () {
+          clearTimeout(autosaveTimer);
+          if (!TOUR_MODE) { try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {} }
+          markClean();
         }
       });
     }

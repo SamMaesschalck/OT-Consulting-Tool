@@ -6,7 +6,9 @@
  * exactly as it does on its own, in its own frame: the tools define the
  * same global names, so they could not share one page, and the frame keeps
  * every tool's behaviour identical inside and outside the suite. A tool that
- * is left stays open and hidden, so switching never loses work. Each tool
+ * is left stays open and hidden, so switching never loses work, until it is
+ * closed (the cross beside it in the rail, or Close on its card): its frame
+ * goes, and it opens fresh the next time. Each tool
  * still saves and loads its own files: a project file in the assessment and
  * risk tools, a review pack and review file in the Report Review Tool, a
  * document file (and Word files) in the Document Tool.
@@ -27,9 +29,10 @@
  * The shell and the tools talk only through postMessage (protocol
  * "spt-suite/1", see shared/host-bridge.js): a tool says when it has started,
  * when it has unsaved changes and when it saved or opened a file; the shell
- * passes on theme changes and asks a tool to reopen a recent file. A tool can
- * also hand a file it has just written to another tool (the author's review
- * pack to the Report Review Tool), and a file dropped anywhere in the suite is
+ * passes on theme changes, asks a tool to reopen a recent file and tells it
+ * when it is being closed. The bridge can also hand a file from one tool to
+ * another (handoff), though no tool offers that now: the review pack and the
+ * review file go between people, as files. A file dropped anywhere in the suite is
  * opened in the tool that reads it, never in place of the suite. Nothing in a
  * tool requires the shell. A tour's frame is a demo: its unsaved changes and
  * its saves are not counted, and it hands nothing on.
@@ -238,6 +241,76 @@
 
   function goHome() { show(null); }
 
+  // ---- closing a tool ---------------------------------------------------------
+  //
+  // The frame goes, and with it everything the tool held in memory, so the
+  // tool opened again starts as it did the first time. With unsaved changes
+  // the suite asks first; if the user closes anyway the tool is told to throw
+  // its autosave copy away (close { discard }, see shared/host-bridge.js), or
+  // it would offer that work back when it is opened again. The suite waits for
+  // the tool's answer, and not for ever.
+  var CLOSE_WAIT = 2500;
+
+  function closeTool(key) {
+    var f = frames[key];
+    if (!f || f.closing) return;
+    if (f.dirty) { confirmClose(f); return; }
+    finishClose(f, false);
+  }
+
+  function finishClose(f, discard) {
+    if (f.closing) return;
+    f.closing = true;
+    if (!f.ready) { removeFrame(f); return; }
+    f.closeTimer = setTimeout(function () { removeFrame(f); }, CLOSE_WAIT);
+    send(f, "close", { discard: !!discard });
+  }
+
+  function removeFrame(f) {
+    clearTimeout(f.closeTimer);
+    if (frames[f.key] !== f) return;
+    delete frames[f.key];
+    if (f.el.parentNode) f.el.parentNode.removeChild(f.el);
+    if (f.loading && f.loading.parentNode) f.loading.parentNode.removeChild(f.loading);
+    // Back to the home page if it was the tool on show; otherwise where you were.
+    if (current === f.key) show(null);
+    else { renderRail(); if (current === null) renderHome(); }
+    // The close button that had the keyboard is gone: the tool's own button
+    // (a tour's is gone too, so Home) takes it.
+    var a = document.activeElement;
+    if (!a || a === document.body || !a.isConnected) {
+      var back = document.querySelector('#suite-bar [data-rail="' + (f.tour ? "home" : f.module.id) + '"]');
+      if (back) back.focus();
+    }
+    toast("The " + displayName(f) + " is closed.");
+  }
+
+  function confirmClose(f) {
+    closeModal();
+    modalOpener = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+    var name = displayName(f);
+    var cancel = h("button", { class: "btn primary", type: "button", onClick: closeModal, text: "Cancel" });
+    var close = h("button", { class: "btn danger close-anyway", type: "button", text: "Close without saving",
+      onClick: function () { closeModal(); finishClose(f, true); } });
+    modal = h("div", { class: "modal-backdrop close-modal" }, [
+      h("div", { class: "modal", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "close-h", "aria-describedby": "close-b" }, [
+        h("div", { class: "modal-h" }, [h("h2", { id: "close-h", text: "Close the " + name + "?" })]),
+        h("div", { class: "modal-b", id: "close-b" }, [
+          h("p", { text: "It has unsaved changes. If you close it, they are lost." }),
+          h("p", { class: "muted", text: "To keep them, choose Cancel and save in the tool first." })
+        ]),
+        h("div", { class: "modal-f" }, [close, cancel])
+      ])
+    ]);
+    modal.addEventListener("click", function (ev) { if (ev.target === modal) closeModal(); });
+    modal.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") { ev.preventDefault(); closeModal(); }
+      else if (ev.key === "Tab") { ev.preventDefault(); (document.activeElement === cancel ? close : cancel).focus(); }
+    });
+    document.body.appendChild(modal);
+    cancel.focus();
+  }
+
   function dirtyFrames() {
     return Object.keys(frames).map(function (k) { return frames[k]; }).filter(function (f) { return f.dirty; });
   }
@@ -250,6 +323,8 @@
     var f = frameFor(ev.source);
     if (!f) return;
     var d = m.data || {};
+    // A tool being closed only has its answer left to give.
+    if (f.closing) { if (m.type === "closed") removeFrame(f); return; }
     // A tour is a demo whose changes are never kept: its unsaved changes do
     // not count (no amber dot, no close warning) and its saves are not recent files.
     if (m.type === "ready") {
@@ -379,8 +454,9 @@
     return null;
   }
 
-  // A tool hands over a file it has just written: the author's pack to the
-  // Report Review Tool, or a reviewer's file back to the tool the pack came from.
+  // A tool hands over a file it has just written to another tool. No tool
+  // does this now (the review buttons that did were taken out in v0.7, since
+  // someone else does the review); it stays as part of the bridge.
   function handoff(from, d) {
     if (from.tour) { toast("A tour's files can't be passed to another tool.", "err"); return; }
     var m = moduleFor(d.to);
@@ -677,7 +753,8 @@
     drop: ["M12 3.5v11", "m7.5 10 4.5 4.5 4.5-4.5", "M4.5 20.5h15"],
     chevron: ["m9 5.5 6.5 6.5L9 18.5"],
     down: ["M12 4.5v14", "m6.5 13 5.5 5.5 5.5-5.5"],
-    back: ["M9 14 4.5 9.5 9 5", "M4.5 9.5H15a5 5 0 0 1 0 10h-3"]
+    back: ["M9 14 4.5 9.5 9 5", "M4.5 9.5H15a5 5 0 0 1 0 10h-3"],
+    close: ["M6.5 6.5l11 11", "M17.5 6.5l-11 11"]
   };
 
   function icon(name, cls) {
@@ -737,6 +814,18 @@
     ]);
   }
 
+  // A tool's rail button, with a close button beside it while it is open.
+  function railTool(o) {
+    var btn = railButton(o);
+    if (!o.frame) return btn;
+    var name = o.full;
+    return h("div", { class: "rail-item" + (o.current ? " is-current" : "") }, [
+      btn,
+      h("button", { type: "button", class: "rail-close", "data-rail": "close:" + o.key, title: "Close the " + name,
+        "aria-label": "Close the " + name, onClick: function () { closeTool(o.key); } }, [icon("close")])
+    ]);
+  }
+
   // Redrawn whenever a tool opens, has or clears unsaved changes, or is shown.
   // The button that had the keyboard focus keeps it.
   function renderRail() {
@@ -752,7 +841,7 @@
     var tours = [];
     D.modules.forEach(function (m) {
       if (!moduleAvailable(m)) return;
-      rail.appendChild(railButton({ rail: m.id, key: m.id, icon: m.id, label: m.navLabel || m.shortName || m.name, full: m.name,
+      rail.appendChild(railTool({ rail: m.id, key: m.id, icon: m.id, label: m.navLabel || m.shortName || m.name, full: m.name,
         frame: frames[m.id], current: current === m.id, cls: "bar-tab", onClick: function () { openTool(m.id); } }));
       var tk = m.id + "/tour";
       if (frames[tk]) tours.push({ m: m, key: tk });
@@ -762,7 +851,7 @@
     if (tours.length) {
       rail.appendChild(h("div", { class: "rail-sep", role: "presentation" }));
       tours.forEach(function (t) {
-        rail.appendChild(railButton({ rail: t.key, key: t.key, icon: t.m.id, label: "Tour", full: t.m.name + " tour",
+        rail.appendChild(railTool({ rail: t.key, key: t.key, icon: t.m.id, label: "Tour", full: t.m.name + " tour",
           frame: frames[t.key], current: current === t.key, cls: "bar-tab is-tour", onClick: function () { openTool(t.key); } }));
       });
     }
@@ -810,6 +899,8 @@
           "aria-describedby": tourNote ? "tour-note-" + m.id : null,
           onClick: function () { openTool(m.id + "/tour"); } }, [m.tour.label || "Take the tour", srOnly(" of the " + m.name)]) : null,
         tourNote,
+        f ? h("button", { type: "button", class: "link-btn tool-close", onClick: function () { closeTool(m.id); } },
+          ["Close", srOnly(" the " + m.name)]) : null,
         f && f.dirty ? h("span", { class: "tool-state", text: "Unsaved changes" }) : null
       ]),
       fold("when:" + m.id, [icon("chevron", "chev"), "When to use it", srOnly(" the " + m.name)], [h("p", { text: m.useWhen })], "tool-when help-tool")
@@ -925,7 +1016,8 @@
     // entries, this is the only place that says it.
     var tips = [];
     if (readRecent().length) tips.push("Drop a project file, document file, review pack or review file anywhere in the suite and it opens in the right tool.");
-    tips.push("A tool you leave keeps your work until you close the suite. In the rail, a ring on a tool means it is open and a filled amber dot means it has unsaved changes. The suite asks before closing while any tool has them.");
+    tips.push("A tool you leave keeps your work until you close it or the suite. In the rail, a ring on a tool means it is open and a filled amber dot means it has unsaved changes. The suite asks before closing while any tool has them.");
+    tips.push("To close a tool, use the cross beside it in the rail or Close on its card. It opens fresh the next time, as if it had never been opened.");
     return h("section", { class: "card help-card", "aria-labelledby": "help-h" }, [
       h("div", { class: "card-h" }, [h("h2", { id: "help-h", text: "How the tools fit together" })]),
       h("div", { class: "card-b" }, [
@@ -989,7 +1081,10 @@
     if (had) {
       // A control that is gone (Clear the list removes itself) hands focus to
       // Open a file, next to where it was.
-      var back = main.querySelector(had) || main.querySelector(".recent-pick");
+      // A card's Close goes with the tool: its Open takes the focus.
+      var back = main.querySelector(had) ||
+        (/\.tool-close$/.test(had) ? main.querySelector(had.replace(/\.tool-close$/, ".tool-open")) : null) ||
+        main.querySelector(".recent-pick");
       if (back) back.focus();
     }
   }
@@ -1001,7 +1096,7 @@
     if (el.hasAttribute("data-recent")) return '.recent-open[data-recent="' + esc(el.getAttribute("data-recent")) + '"]';
     var card = el.closest(".tool-card");
     var scope = card ? '.tool-card[data-module="' + card.getAttribute("data-module") + '"] ' : "";
-    var cls = ["tool-open", "tool-tour", "recent-pick", "recent-clear"].filter(function (c) { return el.classList.contains(c); })[0];
+    var cls = ["tool-open", "tool-tour", "tool-close", "recent-pick", "recent-clear"].filter(function (c) { return el.classList.contains(c); })[0];
     if (cls) return scope + "." + cls;
     if (el.tagName === "SUMMARY") return card ? scope + "summary" : ".notes-card summary";
     if (el.closest(".home-legal")) return ".home-legal .link-btn";
@@ -1032,6 +1127,7 @@
   // For the suite's check page and the exe self-test.
   window.Suite.Shell = {
     open: openTool,
+    close: closeTool,
     home: goHome,
     current: function () { return current; },
     frames: frames,

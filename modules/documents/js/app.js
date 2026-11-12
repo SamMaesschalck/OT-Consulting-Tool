@@ -980,7 +980,15 @@
       // A file the user chose to reopen comes with its handle where the
       // browser kept one; a file handed over or dropped on the suite does not.
       openFile: function (file, handle) { loadFile(file, handle || null); },
-      openText: function (name, text) { loadText(name, text, null); }
+      openText: function (name, text) { loadText(name, text, null); },
+      // The suite is closing this tool and the user chose to lose the unsaved
+      // work: the document's autosave copy goes, so the tool does not offer
+      // it when it is opened again. The suite waits for this to finish.
+      discardUnsaved: function () {
+        var id = state.doc && !state.tour ? state.doc.id : null;
+        markClean();
+        return id ? S.autosave.drop(id) : null;
+      }
     });
   }
 

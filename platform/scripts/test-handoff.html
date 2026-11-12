@@ -6,9 +6,9 @@
 <div id="card"></div>
 <!--
   The suite half of shared/review-author.js, with a stand-in host bridge:
-  after Send for review the card offers "Open it in the Report Review Tool"
-  only inside the suite (not standalone, not on a tour), and a review file the
-  Report Review Tool hands back is imported as Import review files would.
+  after Send for review the card never offers to open the pack in the Report
+  Review Tool (someone else does the review), and a review file dropped on the
+  author's tool is imported as Import review files would.
   Run with tools/run-tests.ps1 -Root platform -Tests test-handoff.html.
 -->
 <script>
@@ -67,35 +67,22 @@
     var ui = RA.newUi();
     RA.mount(host, adapter, ui);
 
-    // ---- Send for review, then open the pack in the review tool ----------------
+    // ---- Send for review: nothing opens the pack in the review tool -----------
+    // Someone else does the review (user, 12 Nov 2026), so even in the suite,
+    // where the bridge would allow it, the card offers no way to open the pack
+    // in the Report Review Tool.
     sendResult = { ok: true, message: "Round 2 pack saved as acme-review-pack-round-2.json.", pack: pack, name: "acme-review-pack-round-2.json" };
     host.querySelector(".rv-send").click();
-    var btn = host.querySelector(".rv-handoff");
-    ok(!!btn && /Report Review Tool/.test(btn.textContent), "in the suite, a sent pack can be opened in the Report Review Tool");
-    if (btn) btn.click();
-    var hd = STUB.handed[0];
-    ok(hd && hd.to === "report-review" && hd.name === "acme-review-pack-round-2.json" && JSON.parse(hd.text).packId === pack.packId,
-      "the button hands that pack, under its file name, to the review tool", hd && hd.to + " " + hd.name);
-
-    sendResult = { ok: true, message: "Round 2 pack saved as x.json.", pack: pack };
-    host.querySelector(".rv-send").click();
-    host.querySelector(".rv-handoff").click();
-    ok(STUB.handed[1] && /-review-pack-round-2\.json$/.test(STUB.handed[1].name), "a tool that does not say the file name gets the name the tools give a pack", STUB.handed[1] && STUB.handed[1].name);
-
-    sendResult = { ok: false, message: "The pack was not saved." };
-    host.querySelector(".rv-send").click();
-    ok(!host.querySelector(".rv-handoff"), "a pack that was not saved offers nothing");
-
-    B.canHandoff = false;
-    sendResult = { ok: true, message: "Saved.", pack: pack };
-    host.querySelector(".rv-send").click();
-    ok(!host.querySelector(".rv-handoff"), "on a tour (no hand-off), the button is not shown");
-    B.canHandoff = true;
+    ok(/Round 2 pack saved/.test(host.querySelector(".rv-notice").textContent), "in the suite, a sent pack says where it was saved");
+    ok(!host.querySelector(".rv-handoff") && !/Open it in the Report Review Tool/.test(host.textContent) && host.querySelectorAll(".rv-notice button").length === 0,
+      "and offers no button to open it in the Report Review Tool");
+    ok(STUB.handed.length === 0, "nothing is handed to another tool");
 
     var saved = window.App.HostBridge;
     window.App.HostBridge = undefined;
+    sendResult = { ok: true, message: "Saved.", pack: pack };
     host.querySelector(".rv-send").click();
-    ok(!host.querySelector(".rv-handoff") && /Saved\./.test(host.textContent), "standalone, the card is as it was: the message, and no button");
+    ok(!host.querySelector(".rv-handoff") && /Saved\./.test(host.textContent), "standalone, the card is the same: the message, and no button");
     window.App.HostBridge = saved;
     ok(STUB.listeners.length === 1, "drawing the card again does not listen twice");
 

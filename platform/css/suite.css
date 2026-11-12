@@ -188,6 +188,21 @@ svg.ic { width: 20px; height: 20px; flex: 0 0 auto; display: block; }
 }
 .rail-btn .dot.open { display: block; background: var(--rail-bg); box-shadow: inset 0 0 0 2px #7FD0A4, 0 0 0 2px var(--rail-bg); }
 .rail-btn .dot.dirty { display: block; width: 11px; height: 11px; top: 5px; background: #F5B841; box-shadow: 0 0 0 2px var(--rail-bg); }
+/* An open tool's close button sits on the other top corner of its rail
+   button, as a button of its own (one button cannot hold another). Faint
+   until the tool's button is pointed at or has the keyboard, or is the tool
+   on show. */
+.rail-item { position: relative; display: flex; flex-direction: column; }
+.rail-close {
+  position: absolute; top: 2px; left: 10px; z-index: 1;
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; color: #B7C9DA; cursor: pointer; opacity: 0.55;
+}
+.rail-close svg.ic { width: 14px; height: 14px; stroke-width: 2; }
+.rail-item:hover .rail-close, .rail-item:focus-within .rail-close, .rail-item.is-current .rail-close { opacity: 1; }
+.rail-close:hover { background: rgba(255,255,255,0.18); color: #FFF; }
+.rail-close:focus-visible { outline: 2px solid #9CC6EE; outline-offset: 0; opacity: 1; }
 .rail-sep { height: 1px; margin: 6px 16px; background: rgba(255,255,255,0.12); flex: 0 0 auto; }
 .rail-sep-top { margin: 2px 0 8px; }
 .rail-spacer { flex: 1 1 auto; min-height: 12px; }
@@ -229,6 +244,8 @@ svg.ic { width: 20px; height: 20px; flex: 0 0 auto; display: block; }
 .btn.primary { background: var(--brand-blue); color: #FFF; border-color: var(--brand-blue); }
 .btn.primary:hover { background: var(--brand-blue-dark); border-color: var(--brand-blue-dark); }
 .btn.small { padding: 4px 10px; font-size: 13px; }
+.btn.danger { color: var(--gap); border-color: var(--gap); }
+.btn.danger:hover { background: var(--gap); color: #FFF; }
 .btn:focus-visible, .link-btn:focus-visible, .recent-open:focus-visible, summary:focus-visible {
   outline: 2px solid var(--brand-blue); outline-offset: 2px;
 }
@@ -425,6 +442,9 @@ body.drop-over .drop-overlay { display: flex; }
 .modal-b { padding: 18px; overflow: auto; }
 .modal-b:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
 .modal-f { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+.close-modal .modal { width: min(480px, 100%); }
+.close-modal .modal-b p { margin: 0 0 8px; }
+.close-modal .modal-b p:last-child { margin: 0; }
 .licence-version { margin: 0 0 12px; }
 .licence-text { margin: 0; white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.5; color: var(--text); }
 
@@ -447,6 +467,7 @@ body.drop-over .drop-overlay { display: flex; }
   .rail-btn .dot.open { background: Canvas; box-shadow: inset 0 0 0 2px CanvasText; }
   .rail-btn .dot.dirty { background: Highlight; box-shadow: none; }
   .rail-btn[aria-current="page"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .rail-close { opacity: 1; }
 }
 /* A short window, or the page zoomed: the rail still fits. */
 @media (max-height: 520px) {
@@ -479,6 +500,7 @@ body.drop-over .drop-overlay { display: flex; }
   :root { --rail-w: 64px; }
   .rail-btn { margin: 0 6px; font-size: 10.5px; }
   .rail-btn[aria-current="page"]::before { left: -6px; }
+  .rail-close { left: 8px; }
   .home-main { padding: 20px 16px 32px; }
   .header { padding: 0 12px; gap: 10px; }
   .header .brand { gap: 8px; }
@@ -490,6 +512,7 @@ body.drop-over .drop-overlay { display: flex; }
 @media (max-width: 520px) {
   :root { --rail-w: 52px; }
   .rail-btn { margin: 0 5px; padding: 10px 2px; }
+  .rail-close { left: 6px; top: 2px; }
   .rail-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   .rail-btn[aria-current="page"]::before { left: -5px; }
   .header { flex-wrap: wrap; padding: 8px 12px; row-gap: 6px; }

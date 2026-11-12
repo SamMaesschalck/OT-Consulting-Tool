@@ -55,5 +55,5 @@ All under its own keys, so it cannot touch another module's data: the reviewer's
 ## In the suite
 
 - Recent files is told whether a file is a review pack or a review file, so a renamed file is still labelled right.
-- After a save, Summary offers "Give it to the <author's tool>", which hands the file just saved to the tool the pack came from; it imports it as Import review files would. Never on its own, on a tour, for the demo, or while there is work the file does not hold.
+- Nothing hands the saved review file to the author's tool, even in the suite: someone other than the author does the review, so the reviewer sends the file. (Up to v0.6, Summary had a "Give it to the <author's tool>" button.)
 - A review file opened before its pack waits for it, and Open the pack reopens the pack from Recent files where it can.

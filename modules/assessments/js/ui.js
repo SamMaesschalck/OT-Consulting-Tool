@@ -990,6 +990,16 @@ window.App.UI = (function () {
           }
           if (dirtySinceSave && projectHasContent(E.getProjectFile())) askBeforeLoad(go, "Open " + file.name);
           else go();
+        },
+        // The suite is closing this tool and the consultant chose to lose the
+        // unsaved work: this session's backstop goes, and any copy of it
+        // already set aside, so the tool does not offer it when it is opened
+        // again. Work from earlier sessions still on offer is left alone.
+        discardUnsaved: function () {
+          if (autosaveTimer) { clearTimeout(autosaveTimer); autosaveTimer = null; }
+          clearAutosave();
+          dropOfferedFrom(sessionId);
+          markClean();
         }
       });
     }

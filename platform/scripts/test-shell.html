@@ -11,14 +11,15 @@
       warning, nothing in Recent files);
     - Recent files says which review-tool entry is the pack and which the
       review file;
-    - a tool can hand a file it wrote to another tool (the author's pack to
-      the Report Review Tool, a review file back to the author's tool), and a
-      tour cannot;
+    - the bridge can hand a file from one tool to another (no tool offers it
+      any more, but the plumbing still works), and a tour cannot;
     - a file dropped on the suite, or on a tool that does not take it, opens
       in the tool that reads it and never replaces the page;
     - the wording covers all four tools, and the Document Tool has its card,
       rail button, place beside the flow and file routing: its document file
-      opens in it, and a Word file is refused with where to open it.
+      opens in it, and a Word file is refused with where to open it;
+    - a tool can be closed from the rail or its card: with unsaved changes the
+      suite asks first, and a closed tool opens fresh, offering nothing back.
   Run with tools/run-tests.ps1 -Root platform -Tests test-shell.html (headless
   runs need --allow-file-access-from-files, which run-tests.ps1 passes).
 -->
@@ -140,7 +141,7 @@
     var wb = rail.querySelector(".bar-tab[data-key='documents']");
     ok(wb && wb.querySelector(".rail-label").textContent === "Write" && wb.getAttribute("aria-label") === "Write, OT Cyber Document Tool" && wb.querySelectorAll("svg path").length === 6,
       "the Document Tool's rail button is labelled Write, with its icon", wb && wb.getAttribute("aria-label"));
-    ok(Array.prototype.every.call(rail.querySelectorAll("button"), function (b) {
+    ok(Array.prototype.every.call(rail.querySelectorAll("button.rail-btn"), function (b) {
       var label = (b.querySelector(".rail-label") || {}).textContent || "";
       return label && (b.getAttribute("aria-label") || "").toLowerCase().indexOf(label.toLowerCase()) !== -1;
     }), "every rail button's spoken name contains its visible label");
@@ -320,6 +321,71 @@
             });
           });
         });
+      });
+    });
+  }).then(function () {
+    // ---- closing a tool ------------------------------------------------------
+    // A closed tool opens fresh the next time, as if it had never been opened:
+    // with unsaved changes the suite asks first, and closing anyway also
+    // throws away the tool's autosave copy, which it would otherwise offer back.
+    var d = S.document;
+    var rkf = Sh.frames["risk-assessment"], rw = rkf.el.contentWindow, RT = rw.RiskTool;
+    var fresh = RT.state.project.suc.name;
+    ok(fresh === "Dropped on the risk tool", "the risk tool holds the dropped project", fresh);
+    RT.touched(); RT.flushAutosave();
+    return until(function () { return rkf.dirty; }, 5000, "the risk tool's unsaved changes").then(function () {
+      ok(!!rw.localStorage.getItem(RT.AUTOSAVE_KEY), "with an autosave copy of them");
+      Sh.open("risk-assessment");
+      var x = d.querySelector('#suite-bar .rail-item.is-current [data-rail="close:risk-assessment"]');
+      ok(x && x.classList.contains("rail-close") && x.getAttribute("aria-label") === "Close the OT Cyber Risk Assessment Tool",
+        "an open tool has a close button beside it in the rail, saying which tool it closes", x && x.getAttribute("aria-label"));
+      ok(!d.querySelector('[data-rail="close:assessments"]'), "a tool that is not open has none");
+      x.click();
+      var dlg = d.querySelector(".close-modal");
+      ok(dlg && /Close the OT Cyber Risk Assessment Tool\?/.test(dlg.textContent) && /unsaved changes/.test(dlg.textContent) && d.activeElement && d.activeElement.textContent === "Cancel",
+        "with unsaved changes it asks first, with Cancel ready", dlg && dlg.textContent);
+      ok(!/[–—]/.test(dlg.textContent), "the question has no en or em dashes");
+      dlg.querySelector(".btn.primary").click();
+      ok(!d.querySelector(".close-modal") && Sh.frames["risk-assessment"] === rkf && rkf.el.isConnected && rkf.dirty, "Cancel leaves the tool open with its work");
+      d.querySelector('[data-rail="close:risk-assessment"]').click();
+      d.querySelector(".close-modal .close-anyway").click();
+      return until(function () { return !Sh.frames["risk-assessment"]; }, 6000, "the risk tool to close").then(function () {
+        ok(!rkf.el.isConnected && Sh.current() === null && !d.querySelector('[data-rail="close:risk-assessment"]'),
+          "Close without saving takes the tool's frame away and shows the home page");
+        var rb = d.querySelector("#suite-bar .bar-tab[data-key='risk-assessment']");
+        ok(rb && !rb.querySelector(".dot.open, .dot.dirty") && !/\(open/.test(rb.getAttribute("aria-label")), "the rail no longer marks it open", rb && rb.getAttribute("aria-label"));
+        ok(/is closed/.test(toastText()), "and says it is closed", toastText());
+        Sh.open("risk-assessment");
+        return tool("risk-assessment");
+      }).then(function (again) {
+        return sleep(600).then(function () {
+          ok(again.w !== rw && again.w.RiskTool.state.project.suc.name !== "Dropped on the risk tool" && !again.w.RiskTool.isDirty(),
+            "opened again, it starts fresh", again.w.RiskTool.state.project.suc.name);
+          ok(!again.d.querySelector(".autosave-bar") && !again.w.localStorage.getItem(again.w.RiskTool.AUTOSAVE_KEY),
+            "and offers nothing back: the work thrown away is not found as unsaved work");
+        });
+      });
+    }).then(function () {
+      // A tool with nothing unsaved closes at once, from its card on the home page.
+      var df = Sh.frames.documents;
+      ok(df && !df.dirty, "the Document Tool is open with nothing unsaved");
+      Sh.home();
+      var card = d.querySelector(".tool-card[data-module='documents']");
+      var c = card.querySelector(".tool-close");
+      ok(c && /^Close/.test(c.textContent) && /Go back to it/.test(card.querySelector(".tool-open").textContent), "an open tool's card has Close beside Go back to it");
+      ok(!d.querySelector(".tool-card[data-module='assessments'] .tool-close"), "a closed tool's card does not");
+      c.focus(); c.click();
+      ok(!d.querySelector(".close-modal"), "with nothing unsaved it does not ask");
+      return until(function () { return !Sh.frames.documents; }, 6000, "the Document Tool to close").then(function () {
+        var card2 = d.querySelector(".tool-card[data-module='documents']");
+        ok(!df.el.isConnected && !card2.querySelector(".tool-close") && /^Open/.test(card2.querySelector(".tool-open").textContent), "it closes, and its card offers Open again");
+        ok(d.activeElement === card2.querySelector(".tool-open"), "the keyboard moves to the card's Open", d.activeElement && d.activeElement.className);
+        // A tour closes from the rail too, and its button goes with it.
+        ok(!!Sh.frames["report-review/tour"] && d.querySelector('[data-rail="close:report-review/tour"]'), "an open tour has a close button too");
+        d.querySelector('[data-rail="close:report-review/tour"]').click();
+        return until(function () { return !Sh.frames["report-review/tour"]; }, 6000, "the tour to close");
+      }).then(function () {
+        ok(!d.querySelector("#suite-bar .bar-tab[data-key='report-review/tour']") && !d.querySelector("#suite-bar .is-tour"), "a closed tour leaves the rail");
       });
     });
   }).catch(function (e) {

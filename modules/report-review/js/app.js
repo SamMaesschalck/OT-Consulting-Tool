@@ -2957,7 +2957,8 @@
       if ((r.verdict.note || "") === e.target.value) return;
       r.verdict.note = e.target.value;
       touched();
-      ["rr-saved-at", "rr-handback"].forEach(function (id) { var el = $(id); if (el && el.parentNode) el.parentNode.removeChild(el); });
+      var at = $("rr-saved-at");
+      if (at && at.parentNode) at.parentNode.removeChild(at);
     }
     // Not printed: the printout's header carries the verdict and the note.
     var vCard = card("Verdict", null, [
@@ -2969,15 +2970,8 @@
       ]),
       (r.verdict.value || "none") === "none" ? h("div", { class: "small muted no-print", id: "rr-no-verdict", text: "No verdict yet. You can save without one and carry on later, but choose one before you send the file to the author." }) : null
     ]);
-    // In the suite, the file just saved can go straight to the tool the pack
-    // came from, which imports it as Import review files would. Never on its
-    // own, on a tour or for the demo (the bridge says no to the first two).
-    var B = HB(), src = state.pack.sourceTool && state.pack.sourceTool.product;
-    if (B && B.canHandoff && typeof B.handoff === "function" && !state.demo && ls && ls.text && !state.dirty && src) {
-      vCard.querySelector(".rr-save-row").appendChild(h("button", { type: "button", class: "btn", id: "rr-handback", text: "Give it to the " + src,
-        title: "Imports this review file into the author's tool here in the suite, as Import review files would.",
-        onClick: function () { if (B.handoff(src, ls.name, ls.text)) toast("Review file handed to the " + src + "."); } }));
-    }
+    // No button sends the saved file to the author's tool, even in the suite:
+    // the reviewer is someone else, who sends the file to the author.
     vCard.classList.add("no-print");
     main.appendChild(vCard);
     // In the order the document prints them, each with what it is on. Edit
@@ -3591,7 +3585,19 @@
     A.HostBridge.register({
       loadButton: "btn-load",
       applyTheme: applyTheme,
-      openFile: function (file, handle) { loadFiles([file], handle ? [handle] : null); }
+      openFile: function (file, handle) { loadFiles([file], handle ? [handle] : null); },
+      // The suite is closing this tool and the reviewer chose to lose the
+      // unsaved work: its autosave copy goes, so the tool does not offer it
+      // when it is opened again. Earlier work still on offer was never
+      // answered, so it stays offered, as it was before this session.
+      discardUnsaved: function () {
+        clearTimeout(autosaveTimer);
+        if (!state.demo && state.pack) {
+          if (state.restore) lsSet(KEY_AUTOSAVE + state.pack.packId, JSON.stringify({ savedOn: state.restore.savedOn, review: state.restore.review }));
+          else clearAutosave();
+        }
+        markClean();
+      }
     });
   }
 

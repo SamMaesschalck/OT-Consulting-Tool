@@ -127,8 +127,6 @@
       }, function (res) {
         ui.busy = null;
         ui.notice = res && res.message ? { kind: res.ok ? "ok" : "err", text: res.message } : null;
-        // In the suite: the pack can also be opened in the review tool there.
-        if (ui.notice && res.ok && res.pack && canHandoff()) ui.notice.handoff = { name: res.name || packName(res.pack), pack: res.pack };
         // The note went with that pack; the next one starts empty.
         if (res && res.ok) ui.request = { note: "", neededBy: "", open: false };
         repaint();
@@ -161,14 +159,6 @@
     if (ui.notice) {
       var lines = String(ui.notice.text).split("\n");
       var noticeBox = h("div", { class: "rv-notice " + ui.notice.kind }, lines.map(function (l) { return h("div", { text: l }); }));
-      var ho = ui.notice.handoff;
-      if (ho && canHandoff()) {
-        noticeBox.appendChild(h("div", { class: "rv-handoff-row", style: "margin-top:6px" }, [
-          h("button", { type: "button", class: "btn sm rv-handoff", text: "Open it in the Report Review Tool",
-            title: "See the pack as a reviewer will, here in the suite. The pack file you saved is not changed.",
-            onClick: function () { window.App.HostBridge.handoff("report-review", ho.name, JSON.stringify(ho.pack)); } })
-        ]));
-      }
       container.appendChild(noticeBox);
     }
 
@@ -710,22 +700,14 @@
     return { results: results, lines: lines, bad: bad };
   }
 
-  // ---- in the suite: handing files between tools ------------------------------
+  // ---- in the suite: a review file dropped on this tool -------------------------
   // Only inside the SolutionsPT OT Cyber Suite (App.HostBridge, which a tool
-  // never requires). Standalone, none of this shows or does anything.
-  //   - after Send for review, "Open it in the Report Review Tool" opens the
-  //     pack there, so the author can see it as a reviewer will;
-  //   - a review file the Report Review Tool hands back is imported here, as
-  //     Import review files would, into the card last drawn.
-  function canHandoff() {
-    var B = window.App.HostBridge;
-    return !!(B && B.hosted && B.canHandoff && typeof B.handoff === "function");
-  }
-  // The name the tools give a pack file, for a tool that did not say.
-  function packName(pack) {
-    var e = (pack && pack.engagement) || {};
-    return RC().fileSlug(e.client || e.instrumentTitle) + "-review-pack-round-" + ((pack && pack.round) || 1) + ".json";
-  }
+  // never requires). Standalone, none of this shows or does anything. A review
+  // file dropped on this tool's page is imported here, as Import review files
+  // would, into the card last drawn. Nothing here opens the pack in the review
+  // tool, and the review tool has no button that sends a review file back:
+  // someone else does the review, so the pack and the review file travel
+  // between people as files.
   var lastMount = null, listening = false;
   function takeHandedFile(name, text) {
     var id = RC() ? RC().identify(text) : null;

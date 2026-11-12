@@ -502,6 +502,17 @@
       call("remove", [docId]);
       return true;
     },
+    // The open document's unsaved work is thrown away on purpose (the suite
+    // closes the tool): its copy goes, unless it is the copy on offer, which
+    // nobody has answered and which stays offered. Resolves once the store
+    // has removed it.
+    drop: function (docId) {
+      if (!docId || docId === held) return Promise.resolve();
+      if (waiting && waiting.id === docId) { clearTimeout(timer); timer = null; waiting = null; }
+      var map = pointers();
+      if (map[docId]) { delete map[docId]; setPointers(map); }
+      return call("remove", [docId]);
+    },
     // "on", "off" or "unknown" (the store has not answered yet).
     status: function () { return status; },
     onStatus: function (fn) { if (typeof fn === "function") { listeners.push(fn); fn(status); } }

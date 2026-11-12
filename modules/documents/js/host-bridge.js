@@ -34,12 +34,20 @@
  *                                                                tool of the suite (to: its id or product name)
  *     drop    { files: [File] }                                  files dropped on the module's page that the
  *                                                                module did not take itself
+ *     closed  {}                                                 the answer to close: the module is done and
+ *                                                                its frame can go
  *   suite -> module (from: "suite")
  *     theme        { theme }                                     follow the suite's theme
  *     open-recent  { name, label }                               reopen a recent file (see openRecent)
  *     open-text    { name, text, handle? }                       open a file handed over by another tool,
  *                                                                dropped on the suite or chosen with its
  *                                                                Open a file (with its handle, see openText)
+ *     close        { discard }                                   the suite is closing this tool's frame. With
+ *                                                                discard (the tool has unsaved changes and the
+ *                                                                user chose to lose them), the module's
+ *                                                                discardUnsaved hook throws its autosave copy
+ *                                                                away, so a tool opened again starts as if it
+ *                                                                had never been opened. Answered with closed.
  *
  * Recent files never carry file contents: the suite keeps only the name, the
  * customer or project label and when. Where the browser gave the module a file
@@ -282,6 +290,26 @@
     return !!t && Array.prototype.indexOf.call(t, "Files") !== -1;
   }
 
+  // ---- closing --------------------------------------------------------------
+  // The suite removes this frame once it has the answer, or after its own
+  // wait if none comes. The hook may return a promise (the document tool's
+  // store answers later); a hook that fails or never finishes still lets the
+  // tool close, as unsaved work the user chose to lose is no reason to keep it.
+  var closing = false;
+  function close(d) {
+    if (closing) return;
+    closing = true;
+    closeBanner();
+    var work = null;
+    if (d && d.discard && typeof hooks.discardUnsaved === "function") {
+      try { work = hooks.discardUnsaved(); } catch (e) { work = null; }
+    }
+    var answered = false;
+    function done() { if (answered) return; answered = true; post("closed", {}); }
+    setTimeout(done, 1500);
+    Promise.resolve(work).then(done, done);
+  }
+
   // ---- messages from the suite ----------------------------------------------
   if (hosted) {
     window.addEventListener("message", function (ev) {
@@ -298,6 +326,8 @@
         openRecent(d);
       } else if (m.type === "open-text") {
         openText(d);
+      } else if (m.type === "close") {
+        close(d);
       }
     });
     // Listened for on the window, so the module's own handlers (on the
@@ -334,6 +364,8 @@
     //                           (handle is null for a file handed over or dropped)
     //   openText(name, text)    open a file handed over or dropped, in place of openFile
     //   applyTheme(theme)       switch theme the module's own way (button label too)
+    //   discardUnsaved()        throw away the autosave copy of the unsaved work,
+    //                           as the suite closes the tool (may return a promise)
     //   loadButton              the id of the module's Load button ("btn-load")
     register: function (h) {
       if (!hosted) return;
