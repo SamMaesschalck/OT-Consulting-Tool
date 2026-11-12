@@ -45,6 +45,6 @@ Read `README.md` for the layout and commands, and `docs/platform-architecture.md
 ## Releases and safety
 
 - Do not rebuild or publish releases unless asked. `tools/release.ps1` builds, checks and tags; publishing is `git push origin main <tag>` plus `gh release create`.
-- Every version needs `docs/releases/v<x.y.z>.md` before release (`release.ps1` refuses without it); it is the GitHub release notes and the suite's What's new. After editing it, run `platform/scripts/build-data.ps1` and commit `platform/data/suite-data.js`. The suite shows the newest `v<x.y.z>.md` whatever the version in `shared/version.js`, so notes for a version not yet bumped are drafted under another name (`docs/releases/v0.7.0-draft.md`) and renamed in the commit that bumps the version.
+- Every version needs `docs/releases/v<x.y.z>.md` before release (`release.ps1` refuses without it); it is the GitHub release notes and the suite's What's new. After editing it, run `platform/scripts/build-data.ps1` and commit `platform/data/suite-data.js`. The suite shows the newest `v<x.y.z>.md` whatever the version in `shared/version.js`, so notes for a version not yet bumped are drafted under another name (for example `docs/releases/v0.8.0-draft.md`) and renamed in the commit that bumps the version.
 - Built files, `dist/`, `test-results/` and the licensed reference documents are never committed.
 - Never take screenshots of the desktop to check the UI; use headless rendering or the exe self-tests.

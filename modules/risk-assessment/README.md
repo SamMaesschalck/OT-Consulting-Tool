@@ -241,7 +241,7 @@ to change it (then run `tools/sync-shared.ps1`). `js/product.js` gives this
 module its own name, so `App.Version.product` is "OT Cyber Risk Assessment
 Tool".
 
-- **In the tool:** the header badge (for example "v0.6, 62443-3-2-aligned",
+- **In the tool:** the header badge (for example "v0.7, 62443-3-2-aligned",
   with the full number on hover) and the About page.
 - **In the risk-context file:** `generatedBy` is `spt-risk-tool/<version>`.
   The project file's `schema` (`spt-risk-project/0.2`) is the file format's
@@ -260,12 +260,12 @@ be given just the risk tool. From the repository root:
 .\tools\build.ps1 -Module risk-assessment -As exe -SelfTest   # portable exe + its self-test
 ```
 
-- **Single HTML:** `packaging/single-html/OT Cyber Risk Assessment Tool v0.6.html`.
+- **Single HTML:** `packaging/single-html/OT Cyber Risk Assessment Tool v0.7.html`.
   Everything is inlined (stylesheet, logo, scripts, data and the demo project),
   so it opens from anywhere with no files beside it; add `?tour=1` to the
   address to open the demo. `packaging/single-html/check-single-html-risk.html`
   proves it is the same app as this folder.
-- **Portable exe:** `%LOCALAPPDATA%\OTCAT-electron\risk-assessment\dist\OT Cyber Risk Assessment Tool v0.6.exe`,
+- **Portable exe:** `%LOCALAPPDATA%\OTCAT-electron\risk-assessment\dist\OT Cyber Risk Assessment Tool v0.7.exe`,
   with its own app id, so its autosave is separate from the assessment tool's.
   See `packaging/electron/README.md`.
 

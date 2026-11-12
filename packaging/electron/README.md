@@ -23,8 +23,8 @@ powershell -ExecutionPolicy Bypass -File build-portable-exe.ps1 [-Module risk-as
 
 The module defaults to `assessments`. This produces a single file named for the product and the suite version, for example:
 
-- `%LOCALAPPDATA%\OTCAT-electron\assessments\dist\OT Cyber Assessment Tool v0.6.exe` (about 89 MB)
-- `%LOCALAPPDATA%\OTCAT-electron\risk-assessment\dist\OT Cyber Risk Assessment Tool v0.6.exe`
+- `%LOCALAPPDATA%\OTCAT-electron\assessments\dist\OT Cyber Assessment Tool v0.7.exe` (about 89 MB)
+- `%LOCALAPPDATA%\OTCAT-electron\risk-assessment\dist\OT Cyber Risk Assessment Tool v0.7.exe`
 
 Nothing is installed: the exe unpacks itself to a temp folder each time it starts, so it takes a few seconds longer to open than the folder build. Its file properties name the product and SolutionsPT and carry the copyright, and its file version is the suite version.
 

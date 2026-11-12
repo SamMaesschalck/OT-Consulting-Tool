@@ -161,4 +161,4 @@ Checks that nothing automatic can do, to be made before a release:
 - Autosave and restore in the suite's exe and in the single-file build, which use the browser's real store.
 - The tool's colour beside the red "gap" status colour in the suite.
 
-The notes for the release that first carries this tool are drafted in [releases/v0.7.0-draft.md](releases/v0.7.0-draft.md). They become `v0.7.0.md` when the version number changes, not before, because the suite shows the newest file in that folder as "What's new".
+The notes for the release that first carries this tool are [releases/v0.7.0.md](releases/v0.7.0.md).

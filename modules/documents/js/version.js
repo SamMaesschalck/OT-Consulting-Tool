@@ -29,7 +29,7 @@
  */
 (function () {
   window.App = window.App || {};
-  var VERSION = "0.6.0";
+  var VERSION = "0.7.0";
   function label(v) {
     var p = String(v || "").split(".");
     return "v" + (p.length === 3 && p[2] === "0" ? p[0] + "." + p[1] : String(v));
