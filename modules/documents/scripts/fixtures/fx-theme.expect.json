@@ -1,0 +1,13 @@
+{
+  "inlineShapes": 0,
+  "shapes": 2,
+  "shapeTypes": {
+    "autoShape": 1,
+    "textBox": 1
+  },
+  "accent1": "C00000",
+  "minorFont": "Georgia",
+  "textBoxFont": "Georgia",
+  "textBoxSize": 12,
+  "protection": "none"
+}

@@ -1,0 +1,169 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: how large a document file can be</title>
+<style>
+  body { font: 14px/1.45 "Segoe UI", sans-serif; margin: 24px; max-width: 980px; color: #1A2533; }
+  table { border-collapse: collapse; margin: 12px 0; }
+  th, td { border: 1px solid #C8D2DD; padding: 4px 10px; text-align: right; }
+  th:first-child, td:first-child, td.l { text-align: left; }
+  button { font: inherit; padding: 5px 12px; margin-right: 6px; }
+  .bad { color: #B23A33; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>How large a document file can be</h1>
+<!--
+  Not a test page (its name does not match the test glob): it measures, and a
+  person reads the result. It is how App.DocModel.LIMITS was set, and it is one
+  of the manual checks before a release (docs/document-tool-design.md 7 and 9),
+  to be run in Edge and in the exe.
+
+  For each size it makes a document holding that many megabytes of pictures
+  (2 MB each, random bytes, so they are as incompressible as real JPEGs), then
+  does what Save and Load do: App.DocModel.toFile to a Blob, the Blob read as
+  text, App.DocModel.fromText. It reports whether the document came back whole,
+  how long each step took and how large the script heap was at its largest
+  (where the browser says: Edge and the exe do). The pictures themselves are
+  Blobs, which the browser keeps outside the script heap, so the process uses
+  more than the heap figure: watch it in the Task Manager for the whole truth.
+
+  By hand: open the page and press a button. From a script:
+    measure-size.html?mb=100        runs one size and writes the row
+    measure-size.html?mb=50,100,150 runs several, one after another
+
+  Run headless with a virtual clock, the step times it prints are the virtual
+  clock's and mean nothing: time the run from outside, as the figures below
+  were. Opened by hand they are real.
+
+  WHAT WAS MEASURED (11 November 2026, Microsoft Edge headless on the build
+  laptop, one size per run in a new browser with its own profile; "peak" is the
+  most memory all of that browser's processes held at once, read from outside
+  while it ran, and includes roughly 0.7 GB the browser uses before it does
+  anything):
+
+    Pictures   File      Whole run   Peak memory   Largest heap   Came back whole
+      25 MB     35 MB       3 s        0.8 GB         122 MB          yes
+      50 MB     67 MB       4 s        0.9 GB         234 MB          yes
+     100 MB    133 MB       4 s        1.2 GB         468 MB          yes
+     150 MB    200 MB       5 s        1.3 GB         666 MB          yes
+     200 MB    267 MB       7 s        2.1 GB         934 MB          yes
+     300 MB    400 MB       9 s        2.6 GB        1401 MB          yes
+     400 MB    533 MB        -            -              -            NO
+
+  At 400 MB the file is longer than the longest string the browser can hold
+  (about 512 million characters), so it cannot be read back at all: the hard
+  ceiling for this file format is a little under 380 MB of pictures.
+
+  WHAT WAS DECIDED: LIMITS stays at a warning from 100 MB and no new bytes past
+  150 MB. Both open and save in a few seconds in about 1.3 GB, which a laptop
+  running Word and Teams beside the tool can spare; 200 MB and more need over
+  2 GB, and the ceiling is then less than twice away. 100 MB is also the most
+  the suite will pass to a tool (FILE_MAX in platform/js/suite.js).
+
+  NOT MEASURED HERE: the exe (it was not built when this was written), and Edge
+  with a window. Both are on the list of manual checks before a release. If the
+  exe disagrees, change LIMITS in js/model.js and these lines together.
+-->
+<p>Each run builds a document with that many megabytes of pictures, saves it to a file in memory, reads the file back and checks that every byte returned. Nothing is written to disk.</p>
+<p>
+  <button data-mb="25">25 MB</button><button data-mb="50">50 MB</button><button data-mb="100">100 MB</button>
+  <button data-mb="150">150 MB</button><button data-mb="200">200 MB</button><button data-mb="300">300 MB</button>
+</p>
+<table id="results">
+  <thead><tr><th>Pictures</th><th>File</th><th>Build</th><th>toFile</th><th>Read as text</th><th>fromText</th><th>Largest heap</th><th>Came back whole</th></tr></thead>
+  <tbody></tbody>
+</table>
+<pre id="out"></pre>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script>
+(function () {
+  var M = window.App.DocModel, MB = 1048576, EACH = 2 * MB;
+  var body = document.querySelector("#results tbody"), out = document.getElementById("out");
+  function cell(text, cls) { var td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; return td; }
+  function secs(ms) { return (ms / 1000).toFixed(1) + " s"; }
+  function heap() { return window.performance && performance.memory ? performance.memory.usedJSHeapSize : 0; }
+  // Run under a virtual clock (headless), the page would be closed the moment
+  // no timer was waiting: reading a Blob is work no timer stands for.
+  var beat = null;
+  function randomBlob(bytes) {
+    var parts = [], chunk = 65536;
+    for (var at = 0; at < bytes; at += chunk) {
+      var b = new Uint8Array(Math.min(chunk, bytes - at));
+      crypto.getRandomValues(b);
+      parts.push(b);
+    }
+    return new Blob(parts, { type: "image/jpeg" });
+  }
+  function sameBytes(a, b) {
+    return Promise.all([a.arrayBuffer(), b.arrayBuffer()]).then(function (r) {
+      var x = new Uint8Array(r[0]), y = new Uint8Array(r[1]);
+      if (x.length !== y.length) return false;
+      for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+      return true;
+    });
+  }
+  function measure(mb) {
+    var row = document.createElement("tr"), top = heap(), t = performance.now(), times = {};
+    function mark(name) { var now = performance.now(); times[name] = now - t; t = now; top = Math.max(top, heap()); }
+    row.appendChild(cell(mb + " MB"));
+    body.appendChild(row);
+    var doc = M.create(), keys = [];
+    doc.info.title = "Size test " + mb + " MB";
+    for (var i = 0; i < Math.round(mb * MB / EACH); i++) {
+      var k = M.addMedia(doc, randomBlob(EACH), { name: "picture " + i + ".jpg", width: 1600, height: 1200 });
+      keys.push(k);
+      doc.blocks.push(M.make.paragraph(doc, "Paragraph before picture " + i + "."), M.make.picture(doc, k, 600, 450));
+    }
+    mark("build");
+    var size = 0, back = null;
+    return M.toFile(doc).then(function (file) {
+      size = file.size; mark("toFile");
+      return file.text();
+    }).then(function (text) {
+      mark("text");
+      back = M.fromText(text);
+      text = null;
+      mark("fromText");
+      var whole = M.sizeOf(back) === M.sizeOf(doc) && M.missing(back).length === 0 && back.blocks.length === doc.blocks.length;
+      // The first and the last picture, byte for byte: the slices line up from end to end.
+      return Promise.all([sameBytes(doc.media[keys[0]].blob, back.media[keys[0]].blob),
+        sameBytes(doc.media[keys[keys.length - 1]].blob, back.media[keys[keys.length - 1]].blob)]).then(function (eq) {
+        return whole && eq[0] && eq[1];
+      });
+    }).then(function (whole) {
+      [(size / MB).toFixed(0) + " MB", secs(times.build), secs(times.toFile), secs(times.text), secs(times.fromText),
+        top ? (top / MB).toFixed(0) + " MB" : "not given"].forEach(function (v) { row.appendChild(cell(v)); });
+      row.appendChild(cell(whole ? "yes" : "NO", whole ? "" : "bad"));
+      return whole;
+    }, function (e) {
+      var td = cell("failed: " + ((e && e.message) || e), "bad l");
+      td.colSpan = 7;
+      row.appendChild(td);
+      return false;
+    });
+  }
+  var busy = false;
+  function run(list) {
+    if (busy) return;
+    busy = true;
+    beat = setInterval(function () {}, 20);
+    out.textContent = "running...";
+    var chain = Promise.resolve();
+    list.forEach(function (mb) { chain = chain.then(function () { return measure(mb); }); });
+    chain.then(function () {
+      clearInterval(beat);
+      busy = false;
+      out.textContent = "done. " + navigator.userAgent;
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("button[data-mb]"), function (b) {
+    b.addEventListener("click", function () { run([+b.getAttribute("data-mb")]); });
+  });
+  var asked = /[?&]mb=([\d,.]+)/.exec(location.search);
+  if (asked) run(asked[1].split(",").map(Number).filter(function (n) { return n > 0; }));
+})();
+</script>
+</body></html>

@@ -1,0 +1,397 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: tables</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/tables.css" />
+</head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.DocTables on its own (docs/document-tool-design.md 5.2, 5.3): a table is
+  drawn with its spans, header row, widths and caption; every table control
+  changes the model, is one history entry, redraws that one table and can be
+  undone; Tab and the arrow keys move between cells. The model, the renderer and
+  the history are the real ones. The editor and the shell are stood in for here
+  (the two functions of each that tables.js calls), so the page tests the table
+  code and not the editor: redraw() redraws a block as the editor would, and
+  focusBlock() puts a real caret in a block, which is what the arrow keys read.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<div id="bar"></div>
+<div id="paper" style="width:601px;font:14px 'Segoe UI',sans-serif;line-height:20px"></div>
+<script src="../js/house-docx.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  window.addEventListener("error", function (e) { ok(false, "no script error", e.message); finish(); });
+
+  var App = window.App, M = App.DocModel, R = App.DocRender, H = App.DocHistory, T = App.DocTables;
+  var paper = document.getElementById("paper"), bar = document.getElementById("bar");
+  var doc, calls;
+
+  // ---- the stand-ins ----------------------------------------------------
+  function el(id) { return document.getElementById("blk-" + id); }
+  App.DocApp = {
+    state: { doc: null },
+    touched: function (what) { calls.touched.push(what); },
+    say: function (text) { calls.said.push(text); }
+  };
+  App.DocEditor = {
+    redraw: function (ids) {
+      calls.redraw.push(ids.slice());
+      ids.forEach(function (id) {
+        var old = el(id), f = M.find(doc, id);
+        if (!f) { if (old) old.remove(); return; }
+        var nu = R.blockEl(doc, f.block, { editable: true });
+        if (old) old.replaceWith(nu);
+        else { var next = f.list[f.index + 1]; paper.insertBefore(nu, next ? el(next.id) : null); }
+      });
+    },
+    focusBlock: function (id, o) {
+      calls.focus.push({ id: id, at: o && o.at });
+      caret(id, o && o.at === "end" ? "end" : "start");
+    },
+    selection: function () { return { fake: true }; },
+    restore: function () {}
+  };
+  // A real caret in a block's text, as the editor leaves one.
+  function caret(id, at) {
+    var t = el(id) && el(id).querySelector("[data-edit]");
+    if (!t) { window.getSelection().removeAllRanges(); return null; }
+    t.setAttribute("contenteditable", "true");
+    t.focus();
+    var r = document.createRange();
+    if (typeof at === "number") { r.setStart(t.firstChild, at); r.collapse(true); }
+    else { r.selectNodeContents(t); r.collapse(at !== "end"); }
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    return t;
+  }
+  function fresh(blocks) {
+    doc = M.create("report");
+    doc.blocks = blocks(doc);
+    App.DocApp.state.doc = doc;
+    H.clear();
+    calls = { redraw: [], focus: [], touched: [], said: [] };
+    paper.textContent = "";
+    doc.blocks.forEach(function (b) { paper.appendChild(R.blockEl(doc, b, { editable: true })); });
+    return doc;
+  }
+  function para(d, text) { return M.make.paragraph(d, text); }
+  // rows x cols, each cell saying where it is ("r1c2").
+  function simple(d, rows, cols) {
+    var t = M.make.table(d, rows, cols);
+    t.rows.forEach(function (row, r) { row.cells.forEach(function (cell, c) { cell.blocks[0].runs = [{ t: "r" + r + "c" + c }]; }); });
+    return t;
+  }
+  function cellOf(d, text) { return { blocks: [para(d, text)] }; }
+  // A header row, a cell two columns wide and a cell two rows deep:
+  //   A | B | C
+  //   D . D | E
+  //   F | G | E
+  function merged(d) {
+    var D = cellOf(d, "D"), E = cellOf(d, "E");
+    D.span = 2; E.rowSpan = 2;
+    return { id: M.newId(d, "b"), type: "table", header: 1, cols: [2, 3, 1], caption: "Zones and their assets",
+      rows: [{ cells: [cellOf(d, "A"), cellOf(d, "B"), cellOf(d, "C")] }, { cells: [D, E] }, { cells: [cellOf(d, "F"), cellOf(d, "G")] }] };
+  }
+  function table() { return doc.blocks.filter(function (b) { return b.type === "table"; })[0]; }
+  function tEl() { return paper.querySelector("table.doc-table"); }
+  function td(r, c) { return tEl().querySelector('[data-r="' + r + '"][data-c="' + c + '"]'); }
+  function text(r, c) { var x = td(r, c); return x ? x.textContent : null; }
+  function first(r, c) { var g = M.table.grid(table()); return g[r][c].cell.blocks[0].id; }
+  function whole(t) { return M.table.grid(t).every(function (row) { return row.length === t.cols.length && row.every(function (g) { return !!g; }); }); }
+  function press(target, key, mods) {
+    var took = null, o = { key: key, bubbles: true, cancelable: true };
+    Object.keys(mods || {}).forEach(function (k) { o[k] = mods[k]; });
+    var ev = new KeyboardEvent("keydown", o);
+    function on(e) { took = T.keydown(e, { doc: doc }); }
+    paper.addEventListener("keydown", on);
+    target.dispatchEvent(ev);
+    paper.removeEventListener("keydown", on);
+    return { took: took, prevented: ev.defaultPrevented };
+  }
+  function lastFocus() { return calls.focus[calls.focus.length - 1] || {}; }
+  function point(r, c) { td(r, c).dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })); }
+  function click(name) {
+    bar.textContent = "";
+    var box = T.controls(doc, table());
+    bar.appendChild(box);
+    box.querySelector('[data-act="' + name + '"]').click();
+  }
+
+  try {
+    // ---- drawing ---------------------------------------------------------
+    fresh(function (d) { return [para(d, "Before"), merged(d), para(d, "After")]; });
+    var t = tEl(), b = table();
+    ok(!!t && t.getAttribute("data-table-id") === b.id && t.parentNode === el(b.id), "a table block is drawn as one table inside its block");
+    var widths = Array.prototype.map.call(t.querySelectorAll("colgroup > col"), function (c) { return c.style.width; });
+    ok(widths.map(function (w) { return Math.round(parseFloat(w) * 10) / 10; }).join(" ") === "33.3 50 16.7" && widths.every(function (w) { return /%$/.test(w); }), "column widths are the model's shares of the table", widths.join(" "));
+    ok(t.querySelectorAll("tr").length === 3 && t.querySelectorAll("th").length === 3 && t.querySelectorAll("td").length === 4, "three rows: three header cells, four body cells");
+    ok(Array.prototype.every.call(t.querySelectorAll("th"), function (x) { return x.getAttribute("scope") === "col" && x.parentNode === t.querySelector("tr"); }), "the header row's cells are column headers");
+    ok(td(1, 0).colSpan === 2 && td(1, 0).textContent === "D", "a cell two columns wide is drawn with its span");
+    ok(td(1, 2).rowSpan === 2 && td(1, 2).textContent === "E", "a cell two rows deep is drawn with its span");
+    ok(text(2, 0) === "F" && text(2, 1) === "G" && !td(2, 2) && !td(1, 1), "covered positions have no cell of their own, and the rest sit in the right columns");
+    var inner = td(0, 1).querySelector(".blk");
+    ok(inner && inner.id === "blk-" + first(0, 1) && inner.getAttribute("data-type") === "paragraph" && !!inner.querySelector('[data-edit="runs"]'), "a cell's paragraph is drawn as any block is, so the editor can edit it");
+    var cap = t.querySelector("caption");
+    ok(cap && cap.textContent === "Zones and their assets" && cap.querySelector('[data-edit="plain"][data-cap="' + b.id + '"]'), "the caption is under the table, marked as a picture's caption is");
+    ok(!t.querySelector('[tabindex]:not([tabindex="-1"])') && !t.querySelector("[contenteditable='true']"), "nothing in a table is a Tab stop or editable until it is used");
+    var still = T.tableEl(doc, b, { editable: false });
+    ok(still.querySelectorAll("th,td").length === 7 && still.querySelector("caption").textContent === "Zones and their assets", "the preview draws the same table");
+
+    fresh(function (d) {
+      var tb = simple(d, 2, 2);
+      tb.rows[1].cells[0].blocks = [M.make.list(d, "number", 0, "one"), M.make.list(d, "number", 0, "two"), M.make.list(d, "bullet", 1, "deeper")];
+      tb.rows[1].cells[1].blocks[0].runs = [{ t: "<img src=x onerror=\"window.__pwned=1\"><b>not bold</b>" }, { t: " bold", b: true }];
+      delete tb.caption;
+      return [tb];
+    });
+    var marks = Array.prototype.map.call(td(1, 0).querySelectorAll(".marker"), function (m) { return m.textContent; });
+    ok(marks.join(" ") === "1. 2. ◦" || marks.join(" ") === "1. 2. •", "a list in a cell shows the house markers, counted within the cell", marks.join(" "));
+    ok(!td(1, 1).querySelector("img") && td(1, 1).textContent.indexOf("<img src=x") === 0 && td(1, 1).querySelector("b").textContent === " bold" && !window.__pwned, "text that looks like markup is drawn as text");
+    ok(!tEl().querySelector("caption"), "no caption element without a caption");
+    table().caption = "";
+    ok(!!T.tableEl(doc, table(), { editable: true }).querySelector('caption [data-cap]') && !T.tableEl(doc, table(), { editable: false }).querySelector("caption"), "an empty caption is there to type in on the paper, and not in the preview");
+
+    // ---- the controls ----------------------------------------------------
+    fresh(function (d) { return [simple(d, 3, 3)]; });
+    var box = T.controls(doc, table());
+    bar.appendChild(box);
+    var btns = box.querySelectorAll("button");
+    ok(box.getAttribute("role") === "group" && box.getAttribute("aria-label") === "Table" && btns.length === 12, "the controls are one named group of twelve buttons");
+    ok(Array.prototype.every.call(btns, function (x) { return x.textContent.trim() && x.title && x.getAttribute("tabindex") === "-1" && x.type === "button"; }), "every button has a name and a hint, and none is a Tab stop of its own");
+    var names = Array.prototype.map.call(btns, function (x) { return x.textContent; });
+    ok(names.every(function (n) { return /^[A-Z][a-z ]+$/.test(n); }), "button names are plain sentence case", names.join(", "));
+    var field = box.querySelector("label input[type=text]");
+    ok(!!field && field.labels[0].textContent.indexOf("Caption") === 0, "the caption field has a label");
+    ok(box.querySelector('[data-act="header"]').getAttribute("aria-pressed") === "true" && box.querySelector('[data-act="land"]').getAttribute("aria-pressed") === "false", "Header row and Landscape page show their state");
+
+    // One control: what it must do to the table, and that it is one history
+    // entry, one redraw, and undone and redone exactly.
+    function control(name, at, label, check) {
+      fresh(function (d) { return [para(d, "Before"), simple(d, 3, 3), para(d, "After")]; });
+      if (at) point(at[0], at[1]);
+      var id = table().id, before = JSON.stringify(table());
+      click(name);
+      var now = table(), after = now ? JSON.stringify(now) : "";
+      var problem = check(now, JSON.parse(before));
+      ok(!problem, label, problem);
+      var one = H.canUndo() && calls.redraw.length === 1 && calls.redraw[0].join() === id && calls.touched.length === 1 && calls.said.length === 1;
+      ok(one, "  it is one history entry, one redraw of that table, one change noted and one line said", JSON.stringify(calls.redraw) + " " + calls.touched.length + " " + calls.said.length);
+      ok(!now || (whole(now) && !!tEl() && tEl().querySelectorAll("tr").length === now.rows.length), "  the table on the paper is the table in the model");
+      H.undo();
+      ok(table() && JSON.stringify(table()) === before && doc.blocks[1].id === id && el(id).parentNode === paper, "  undo puts the table back exactly as it was");
+      H.redo();
+      ok((table() ? JSON.stringify(table()) : "") === after, "  redo makes the change again");
+    }
+    function rowTexts(tb, r) { return tb.rows[r].cells.map(function (c) { return M.text(c.blocks[0]); }).join(","); }
+    control("rowAbove", [1, 1], "Row above adds an empty row above the caret's row", function (n) {
+      return n.rows.length === 4 && rowTexts(n, 1) === ",," && rowTexts(n, 2) === "r1c0,r1c1,r1c2" && lastFocus().id === n.rows[1].cells[1].blocks[0].id ? "" : rowTexts(n, 1) + " / " + JSON.stringify(lastFocus());
+    });
+    control("rowBelow", [1, 1], "Row below adds an empty row below it, and the caret goes there", function (n) {
+      return n.rows.length === 4 && rowTexts(n, 2) === ",," && rowTexts(n, 1) === "r1c0,r1c1,r1c2" && lastFocus().id === n.rows[2].cells[1].blocks[0].id ? "" : rowTexts(n, 2);
+    });
+    control("delRow", [1, 1], "Delete row removes the caret's row", function (n) {
+      return n.rows.length === 2 && rowTexts(n, 1) === "r2c0,r2c1,r2c2" ? "" : rowTexts(n, 1);
+    });
+    control("colLeft", [1, 1], "Column left adds an empty column to the left", function (n) {
+      return n.cols.length === 4 && rowTexts(n, 1) === "r1c0,,r1c1,r1c2" ? "" : rowTexts(n, 1);
+    });
+    control("colRight", [1, 1], "Column right adds an empty column to the right", function (n) {
+      return n.cols.length === 4 && rowTexts(n, 1) === "r1c0,r1c1,,r1c2" && lastFocus().id === n.rows[1].cells[2].blocks[0].id ? "" : rowTexts(n, 1);
+    });
+    control("delCol", [1, 1], "Delete column removes the caret's column", function (n) {
+      return n.cols.length === 2 && rowTexts(n, 1) === "r1c0,r1c2" ? "" : rowTexts(n, 1);
+    });
+    control("header", null, "Header row turns the header row off", function (n) {
+      return n.header === 0 && tEl().querySelectorAll("th").length === 0 && T.controls(doc, n).querySelector('[data-act="header"]').getAttribute("aria-pressed") === "false" ? "" : String(n.header);
+    });
+    control("wider", [1, 0], "Wider takes 5 percent of the table's width from the next column", function (n) {
+      var s = n.cols.reduce(function (a, x) { return a + x; }, 0);
+      var d0 = n.cols[0] / s - 1 / 3, d1 = n.cols[1] / s - 1 / 3;
+      return Math.abs(d0 - 0.05) < 0.001 && Math.abs(d1 + 0.05) < 0.001 && Math.abs(n.cols[2] / s - 1 / 3) < 0.001 ? "" : n.cols.join(",");
+    });
+    control("narrower", [1, 0], "Narrower gives 5 percent to the next column", function (n) {
+      var s = n.cols.reduce(function (a, x) { return a + x; }, 0);
+      return Math.abs(n.cols[0] / s - (1 / 3 - 0.05)) < 0.001 && Math.abs(n.cols[1] / s - (1 / 3 + 0.05)) < 0.001 ? "" : n.cols.join(",");
+    });
+    control("wider", [1, 2], "Wider on the last column takes from the column before it", function (n) {
+      var s = n.cols.reduce(function (a, x) { return a + x; }, 0);
+      return Math.abs(n.cols[2] / s - (1 / 3 + 0.05)) < 0.001 && Math.abs(n.cols[1] / s - (1 / 3 - 0.05)) < 0.001 ? "" : n.cols.join(",");
+    });
+    control("land", null, "Landscape page flags the table for a landscape page", function (n) {
+      return n.land === true && T.controls(doc, n).querySelector('[data-act="land"]').getAttribute("aria-pressed") === "true" ? "" : String(n.land);
+    });
+    control("remove", null, "Delete table removes the whole table and moves on to the next block", function (n) {
+      return !n && doc.blocks.length === 2 && !tEl() && lastFocus().id === doc.blocks[1].id ? "" : String(doc.blocks.length);
+    });
+
+    fresh(function (d) { var tb = simple(d, 2, 3); tb.cols = [2, 3, 1]; return [tb]; });
+    click("equal");
+    ok(table().cols.join() === "1,1,1" && H.canUndo(), "Equal widths makes every column the same");
+    H.undo();
+    ok(table().cols.join() === "2,3,1", "  and undo brings the widths back");
+    var n0 = calls.redraw.length;
+    click("equal"); click("equal");
+    ok(calls.redraw.length === n0 + 1, "a control that changes nothing records nothing and redraws nothing");
+
+    click("land"); click("land");
+    ok(!("land" in table()), "Landscape page again takes the flag off, leaving no field behind");
+
+    bar.textContent = "";
+    bar.appendChild(T.controls(doc, table()));
+    var input = bar.querySelector("input");
+    input.value = "  Zones   and assets "; input.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(table().caption === "Zones and assets" && tEl().querySelector("caption").textContent === "Zones and assets", "the caption field sets the caption, tidied", table().caption);
+    H.undo();
+    ok(!("caption" in table()) && !tEl().querySelector("caption"), "  undo takes the caption off again");
+    H.redo();
+    bar.textContent = ""; bar.appendChild(T.controls(doc, table()));
+    ok(bar.querySelector("input").value === "Zones and assets", "  the field shows the table's caption");
+    bar.querySelector("input").value = ""; bar.querySelector("input").dispatchEvent(new Event("change", { bubbles: true }));
+    ok(!("caption" in table()), "an emptied caption field removes the caption");
+
+    fresh(function (d) { return [simple(d, 1, 1)]; });
+    box = T.controls(doc, table());
+    var off = ["delRow", "delCol", "narrower", "wider"].filter(function (n) { return !box.querySelector('[data-act="' + n + '"]').disabled; });
+    ok(off.length === 0 && !box.querySelector('[data-act="rowBelow"]').disabled, "a table of one cell cannot lose its row or column, or trade widths", off.join(","));
+
+    fresh(function (d) { return [simple(d, 2, 2)]; });
+    click("rowBelow");
+    ok(table().rows.length === 3 && rowTexts(table(), 2) === ",", "with no caret in the table, Row below adds at the bottom");
+    click("colRight");
+    ok(table().cols.length === 3 && rowTexts(table(), 0) === "r0c0,r0c1,", "and Column right adds at the right");
+
+    // Controls on merged cells: the new row or column goes outside the span.
+    fresh(function (d) { return [merged(d)]; });
+    point(1, 2); click("rowBelow");
+    ok(table().rows.length === 4 && whole(table()) && rowTexts(table(), 3) === ",,", "Row below a cell two rows deep adds the row under the whole cell", JSON.stringify(table().rows.map(function (r) { return r.cells.length; })));
+    H.undo();
+    point(1, 0); click("colRight");
+    ok(table().cols.length === 4 && whole(table()) && td(1, 0).colSpan === 2 && text(1, 2) === "", "Column right of a cell two columns wide adds the column after the whole cell");
+    H.undo();
+    point(2, 1); click("rowAbove");
+    ok(table().rows.length === 4 && whole(table()) && td(1, 2).rowSpan === 3, "a row added inside a tall cell makes the cell taller");
+    H.undo();
+    point(1, 2); click("delRow");
+    ok(table().rows.length === 2 && whole(table()) && text(1, 2) === "E", "deleting the row a tall cell starts in keeps the cell's content");
+    H.undo();
+    ok(td(1, 2).rowSpan === 2 && td(1, 0).colSpan === 2 && text(2, 1) === "G", "and undo restores the merged table");
+
+    // ---- keys --------------------------------------------------------------
+    fresh(function (d) { return [para(d, "Before"), simple(d, 3, 3), para(d, "After")]; });
+    var k = press(caret(first(0, 0), "start"), "Tab");
+    ok(k.took === true && k.prevented && lastFocus().id === first(0, 1) && lastFocus().at === "start", "Tab moves to the next cell");
+    k = press(caret(first(0, 2), "start"), "Tab");
+    ok(k.took && lastFocus().id === first(1, 0), "Tab at the end of a row moves to the first cell of the next");
+    k = press(caret(first(1, 0), "start"), "Tab", { shiftKey: true });
+    ok(k.took && k.prevented && lastFocus().id === first(0, 2) && lastFocus().at === "end", "Shift+Tab moves to the cell before, caret at its end");
+    var f0 = calls.focus.length;
+    k = press(caret(first(0, 0), "start"), "Tab", { shiftKey: true });
+    ok(k.took && k.prevented && calls.focus.length === f0 && table().rows.length === 3, "Shift+Tab in the first cell does nothing, and does not leave the paper");
+    k = press(caret(first(2, 2), "end"), "Tab");
+    ok(k.took && table().rows.length === 4 && lastFocus().id === first(3, 0) && calls.said.length === 1, "Tab in the last cell adds a row and moves into it");
+    H.undo();
+    ok(table().rows.length === 3 && !H.canUndo(), "  and that row is one undo");
+    k = press(caret(first(0, 0), "start"), "Tab", { ctrlKey: true });
+    ok(k.took === false && !k.prevented, "Ctrl+Tab is left alone");
+    k = press(caret(doc.blocks[0].id, "start"), "Tab");
+    ok(k.took === false && !k.prevented, "a key outside a table is not the table's");
+
+    k = press(caret(first(1, 1), "end"), "ArrowRight");
+    ok(k.took && k.prevented && lastFocus().id === first(1, 2) && lastFocus().at === "start", "Right at the end of a cell moves to the next cell");
+    k = press(caret(first(1, 1), 2), "ArrowRight");
+    ok(k.took === false && !k.prevented, "Right inside the text is the browser's");
+    k = press(caret(first(1, 1), "start"), "ArrowLeft");
+    ok(k.took && lastFocus().id === first(1, 0) && lastFocus().at === "end", "Left at the start of a cell moves to the cell before");
+    k = press(caret(first(1, 1), 2), "ArrowLeft");
+    ok(k.took === false, "Left inside the text is the browser's");
+    k = press(caret(first(0, 0), "start"), "ArrowLeft");
+    ok(k.took === false, "Left in the first cell is left to the editor");
+    k = press(caret(first(2, 2), "end"), "ArrowRight");
+    ok(k.took === false, "Right in the last cell is left to the editor");
+    k = press(caret(first(1, 1), 2), "ArrowDown");
+    ok(k.took && lastFocus().id === first(2, 1) && lastFocus().at === "start", "Down moves to the cell below in the same column");
+    k = press(caret(first(1, 1), 2), "ArrowUp");
+    ok(k.took && lastFocus().id === first(0, 1) && lastFocus().at === "end", "Up moves to the cell above");
+    k = press(caret(first(0, 1), 2), "ArrowUp");
+    ok(k.took && lastFocus().id === doc.blocks[0].id && lastFocus().at === "end", "Up from the first row leaves the table for the block before it");
+    k = press(caret(first(2, 1), 2), "ArrowDown");
+    ok(k.took && lastFocus().id === doc.blocks[2].id && lastFocus().at === "start", "Down from the last row leaves the table for the block after it");
+    k = press(caret(first(1, 1), 2), "ArrowDown", { shiftKey: true });
+    ok(k.took === false, "Shift with an arrow extends the selection and is not taken");
+    var composing = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true, isComposing: true });
+    ok(T.keydown(composing, { doc: doc, blockId: first(1, 1) }) === false, "a key during a composition is ignored");
+    f0 = calls.focus.length;
+    var bare = { key: "Tab", preventDefault: function () { this.stopped = true; } };
+    ok(T.keydown(bare, { doc: doc, blockId: first(0, 0) }) === true && bare.stopped && lastFocus().id === first(0, 1), "the block can be named instead of read from the event");
+    window.getSelection().selectAllChildren(caret(first(1, 1), "start"));
+    k = press(el(first(1, 1)).querySelector("[data-edit]"), "ArrowRight");
+    ok(k.took === false, "an arrow with text selected collapses the selection first, as anywhere");
+
+    fresh(function (d) { return [simple(d, 2, 2)]; });
+    k = press(caret(first(0, 0), "start"), "ArrowUp");
+    ok(k.took === false && !k.prevented, "Up from the first row with nothing above the table is left alone");
+    k = press(caret(first(1, 0), "start"), "ArrowDown");
+    ok(k.took === false, "Down from the last row with nothing below is left alone");
+
+    // Two paragraphs in a cell, and a paragraph long enough to wrap.
+    fresh(function (d) {
+      var tb = simple(d, 2, 2);
+      tb.rows[0].cells[0].blocks = [para(d, "first"), para(d, "second")];
+      tb.rows[0].cells[1].blocks = [para(d, "A paragraph long enough to wrap over several lines in a cell that is half the width of the page, so that the caret can be on its first line or on its last line.")];
+      return [tb];
+    });
+    var two = table().rows[0].cells[0].blocks, long = table().rows[0].cells[1].blocks[0];
+    k = press(caret(two[0].id, "end"), "ArrowDown");
+    ok(k.took === false, "Down from the first of two paragraphs in a cell stays in the cell, for the editor");
+    k = press(caret(two[1].id, "end"), "ArrowDown");
+    ok(k.took && lastFocus().id === first(1, 0), "Down from the last paragraph of the cell moves to the cell below");
+    k = press(caret(two[1].id, "start"), "ArrowLeft");
+    ok(k.took === false, "Left at the start of the second paragraph is the editor's (it joins or moves within the cell)");
+    k = press(caret(two[0].id, "end"), "ArrowRight");
+    ok(k.took === false, "Right at the end of the first paragraph is the editor's too");
+    k = press(caret(first(1, 0), "start"), "ArrowUp");
+    ok(k.took && lastFocus().id === two[1].id && lastFocus().at === "end", "Up into a cell of two paragraphs lands in its last one");
+    k = press(caret(first(0, 0), "start"), "Tab", { shiftKey: false });
+    var wraps = el(long.id).querySelector("[data-edit]").getBoundingClientRect().height > 50;
+    ok(wraps, "(the long paragraph wraps in its cell)");
+    k = press(caret(long.id, "start"), "ArrowDown");
+    ok(k.took === false, "Down on the first line of a wrapped paragraph moves within it");
+    k = press(caret(long.id, "end"), "ArrowDown");
+    ok(k.took && lastFocus().id === first(1, 1), "Down on its last line moves to the cell below");
+    k = press(caret(long.id, "end"), "ArrowUp");
+    ok(k.took === false, "Up on its last line moves within it");
+
+    // Merged cells: Tab visits each cell once, and Down from a tall cell
+    // leaves from its bottom.
+    fresh(function (d) { return [merged(d), para(d, "After")]; });
+    var seen = [], at = first(0, 0);
+    for (var i = 0; i < 6; i++) { press(caret(at, "start"), "Tab"); at = lastFocus().id; seen.push(M.text(M.find(doc, at).block)); }
+    ok(seen.join("") === "BCDEFG" && table().rows.length === 3, "Tab walks a merged table cell by cell, skipping covered positions", seen.join(""));
+    k = press(caret(first(1, 2), "end"), "ArrowDown");
+    ok(k.took && lastFocus().id === doc.blocks[1].id, "Down from a cell two rows deep leaves from its bottom row");
+    k = press(caret(first(2, 1), "end"), "ArrowUp");
+    ok(k.took && M.text(M.find(doc, lastFocus().id).block) === "D", "Up into a wide cell lands in the cell that covers the column");
+    point(1, 2);
+    k = press(caret(first(2, 1), "end"), "Tab");
+    ok(k.took && table().rows.length === 4 && whole(table()), "Tab in the last cell of a merged table still adds a whole row");
+
+    ok(!window.__pwned, "nothing ran that should not have");
+  } catch (e) {
+    ok(false, "the page ran to the end", (e && e.stack) || String(e));
+  }
+  finish();
+})();
+</script>
+</body></html>

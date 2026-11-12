@@ -1,0 +1,280 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the Word fixtures</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The Word fixtures the import tests read (scripts/fixtures) were made by real
+  Word, and Word writes the name of whoever is logged in into more places than
+  the document properties. This page is the proof that what is committed names
+  nobody: every fixture is there, its wrapper matches its .docx, it is small,
+  it holds what it is said to hold, and no part of it, or of a workbook
+  embedded in it, carries an author other than the stand-in, a directory id, a
+  sensitivity label, a path on someone's disk, or the tool's name or version.
+  The tour's document is checked the same way, because it is made from one of
+  them. Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+
+  It unzips with its own few lines, not App.ZipIO, so that it says the same
+  thing whatever state the tool's own zip reader is in.
+-->
+<script src="../js/product.js"></script>
+<script src="../js/version.js"></script>
+<script src="fixtures/index.js"></script>
+<script src="../data/demo-document.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+
+  var STAND_IN = "Fixture Author";
+  var MAX_ONE = 120 * 1024, MAX_ALL = 400 * 1024;
+  // What each fixture is for. A fixture that lost one of these when it was
+  // remade would leave an import test passing on nothing.
+  var HOLDS = {
+    "fx-text": {
+      doc: [/w:pStyle w:val="Title"/, /w:pStyle w:val="Heading1"/, /w:pStyle w:val="Heading4"/, /w:pStyle w:val="Sectionheading"/,
+        /<w:b\/>/, /<w:i\/>/, /<w:u w:val="single"\/>/, /<w:strike\/>/, /w:vertAlign w:val="superscript"/, /w:vertAlign w:val="subscript"/, /Consolas/,
+        /<w:hyperlink r:id=/, /<w:hyperlink w:anchor="scope"/, /<w:bookmarkStart[^>]*w:name="scope"/, /<w:footnoteReference /, /<w:endnoteReference /,
+        /<w:ilvl w:val="2"\/>/, /<w:numPr><w:ilvl w:val="0"\/><w:numId w:val="\d+"\/><\/w:numPr><w:ind w:left="1080"\/>/,
+        /w:pStyle w:val="Caption"/, /SEQ Table/, /<w:tblHeader\/>/, /<w:vMerge w:val="restart"\/>/, /<w:gridSpan w:val="2"\/>/,
+        /<w:jc w:val="center"\/>/, /<w:jc w:val="right"\/>/, /<w:jc w:val="both"\/>/, /<w:br w:type="page"\/>/, /<pic:pic/],
+      parts: [/^word\/footnotes\.xml$/, /^word\/endnotes\.xml$/, /^word\/numbering\.xml$/, /^word\/media\/image\d+\.png$/],
+      other: { "word/numbering.xml": [/<w:start w:val="5"\/><w:numFmt w:val="lowerLetter"\/>/, /<w:numFmt w:val="bullet"\/>/] }
+    },
+    "fx-art": {
+      doc: [/<wp:anchor [^>]*>(?:(?!<\/wp:anchor>).)*<pic:pic/, /<a:srcRect /, /<wps:txbx>/, /<w:txbxContent>/, /<dgm:relIds /, /<c:chart /, /<o:OLEObject [^>]*ProgID="Excel\.Sheet\.12"/, /<wp:extent cx="6858000"/],
+      parts: [/^word\/media\/image\d+\.png$/, /^word\/media\/image\d+\.jpe?g$/, /^word\/media\/image\d+\.emf$/, /^word\/diagrams\/data\d+\.xml$/, /^word\/diagrams\/drawing\d+\.xml$/,
+        /^word\/charts\/chart2\.xml$/, /^word\/embeddings\/.*\.xlsx$/]
+    },
+    "fx-vector": {
+      doc: [/<asvg:svgBlip /, /<m:oMath>/, /<wpc:wpc>/, /<wpg:wgp>/],
+      parts: [/^word\/media\/image\d+\.svg$/, /^word\/media\/image\d+\.tiff?$/]
+    },
+    "fx-theme": {
+      doc: [/<wps:txbx>/, /<a:schemeClr val="accent1"/],
+      parts: [/^word\/theme\/theme1\.xml$/],
+      other: { "word/theme/theme1.xml": [/<a:accent1><a:srgbClr val="C00000"\/>/, /<a:minorFont><a:latin typeface="Georgia"/] }
+    },
+    "fx-review": {
+      doc: [/<w:ins /, /<w:del /, /<w:delText/, /<w:commentRangeStart /, /TOC \\o/, /w:orient="landscape"/, /<w:cols w:num="2"/, /<w:type w:val="continuous"\/>/, /w:pStyle w:val="Heading1"/],
+      parts: [/^word\/comments\.xml$/, /^word\/header\d\.xml$/, /^word\/footer\d\.xml$/],
+      // A cover and a control table made by hand, before the first heading.
+      order: [/Remote access review/, /<w:tbl>/, /w:pStyle w:val="Heading1"/]
+    },
+    "fx-styles": {
+      doc: [/w:pStyle w:val="Sectiontitle"/, /w:pStyle w:val="Clause"/, /w:pStyle w:val="berschrift2"/, /w:pStyle w:val="Titre3"/, /w:pStyle w:val="Chapter"/, /<w:outlineLvl w:val="1"\/>/],
+      parts: [],
+      other: { "word/styles.xml": [/<w:name w:val="\u00DCberschrift 2"\/>/, /<w:name w:val="Titre 3"\/>/, /<w:name w:val="Section title"\/><w:basedOn w:val="Heading1"\/>/, /<w:name w:val="Clause"\/><w:basedOn w:val="Sectiontitle"\/>/] }
+    },
+    "fx-all": {
+      doc: [/w:pStyle w:val="Title"/, /<w:hyperlink r:id=/, /<w:footnoteReference /, /<w:endnoteReference /, /<w:numPr>/, /<w:vMerge w:val="restart"\/>/, /<w:tblHeader\/>/,
+        /<pic:pic/, /<wp:anchor /, /<asvg:svgBlip /, /<wps:txbx>/, /<wpc:wpc>/, /<wpg:wgp>/, /<dgm:relIds /, /<c:chart /, /<o:OLEObject /, /<m:oMath>/,
+        /w:orient="landscape"/, /<w:cols w:num="2"/, /<w:ins /, /<w:del /, /<w:commentRangeStart /, /TOC \\o/, /w:pStyle w:val="Sectionheading"/, /w:pStyle w:val="berschrift2"/],
+      parts: [/^word\/media\/image\d+\.emf$/, /^word\/media\/image\d+\.svg$/, /^word\/comments\.xml$/, /^word\/header\d\.xml$/, /^word\/footer\d\.xml$/, /^word\/embeddings\/.*\.xlsx$/],
+      other: { "word/theme/theme1.xml": [/<a:accent1><a:srgbClr val="C00000"\/>/] }
+    },
+    "demo-source": {
+      doc: [/w:pStyle w:val="Title"/, /w:pStyle w:val="Heading1"/, /w:pStyle w:val="Heading2"/, /<w:numPr>/, /<w:tbl>/, /<w:tblHeader\/>/, /<pic:pic/, /<dgm:relIds /,
+        /w:pStyle w:val="Caption"/, /<w:color w:val="E00000"\/>/, /<w:br w:type="page"\/>/, /<w:footnoteReference /, /<w:hyperlink r:id=/],
+      parts: [/^word\/diagrams\/data\d+\.xml$/]
+    }
+  };
+
+  // ---- a zip reader of this page's own ----
+  function bytesOf(b64) {
+    var s = atob(b64), u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u;
+  }
+  function inflate(u) {
+    var ds = new DecompressionStream("deflate-raw");
+    var w = ds.writable.getWriter(); w.write(u); w.close();
+    return new Response(ds.readable).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+  }
+  function unzip(u) {
+    var v = new DataView(u.buffer, u.byteOffset, u.byteLength), end = -1;
+    for (var i = u.length - 22; i >= 0 && i >= u.length - 66000; i--) { if (v.getUint32(i, true) === 0x06054b50) { end = i; break; } }
+    if (end < 0) return Promise.reject(new Error("not a zip"));
+    var n = v.getUint16(end + 10, true), p = v.getUint32(end + 16, true), jobs = [];
+    var dec = new TextDecoder("utf-8");
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nl = v.getUint16(p + 28, true), xl = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), local = v.getUint32(p + 42, true);
+      var name = dec.decode(u.subarray(p + 46, p + 46 + nl));
+      var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+      var raw = u.subarray(start, start + csize);
+      (function (name, method, raw) {
+        if (name.slice(-1) !== "/") jobs.push((method === 0 ? Promise.resolve(raw) : inflate(raw)).then(function (b) { return { name: name, bytes: b }; }));
+      })(name, method, raw);
+      p += 46 + nl + xl + cl;
+    }
+    return Promise.all(jobs);
+  }
+  function textOf(b) { return new TextDecoder("utf-8").decode(b); }
+  function isText(name) { return /\.(xml|rels|vml)$/.test(name); }
+  function looksZipped(b) { return b.length > 4 && b[0] === 0x50 && b[1] === 0x4B; }
+
+  // ---- what must not be in a committed file ----
+  // Returns sentences; none means the package names nobody. Run again on each
+  // workbook inside it, because a chart's data sheet and an embedded sheet are
+  // Excel files with properties of their own.
+  function personal(parts, where) {
+    var bad = [], nested = [];
+    var names = parts.map(function (p) { return p.name; });
+    names.forEach(function (n) {
+      if (/^(word\/people\.xml|docProps\/custom\.xml|docMetadata\/.*|xl\/persons\/.*)$/.test(n)) bad.push(where + n + " is present");
+    });
+    parts.forEach(function (p) {
+      if (/\.(xlsx|xlsm|docx|pptx)$/.test(p.name)) { nested.push(unzip(p.bytes).then(function (inner) { return personal(inner, where + p.name + " > "); })); return; }
+      if (!isText(p.name)) return;
+      var t = textOf(p.bytes), m;
+      if (p.name === "docProps/core.xml") {
+        m = /<dc:creator>([^<]*)<\/dc:creator>/.exec(t);
+        if (!m || m[1] !== STAND_IN) bad.push(where + "creator is not the stand-in");
+        m = /<cp:lastModifiedBy>([^<]*)<\/cp:lastModifiedBy>/.exec(t);
+        if (!m || m[1] !== STAND_IN) bad.push(where + "last modified by is not the stand-in");
+      }
+      if (p.name === "docProps/app.xml") {
+        if (/<Company>[^<]+<\/Company>/.test(t)) bad.push(where + "app.xml names a company");
+        if (/<Manager>[^<]+<\/Manager>/.test(t)) bad.push(where + "app.xml names a manager");
+      }
+      if (/userId/.test(t)) bad.push(where + p.name + " holds a userId");
+      var re = /\bw:author="([^"]*)"/g;
+      while ((m = re.exec(t))) { if (m[1] !== STAND_IN) { bad.push(where + p.name + " has a change or comment by someone"); break; } }
+      if (/[a-z]:\\(Users|Documents and Settings)\\|file:\/\/\//i.test(t)) bad.push(where + p.name + " holds a path on a disk");
+    });
+    return Promise.all(nested).then(function (lists) { lists.forEach(function (l) { bad = bad.concat(l); }); return bad; });
+  }
+
+  // The tool's own name and version. A fixture is a customer's document as far
+  // as the tool is concerned, so neither belongs in one; and a version number
+  // in a fixture would defeat the test that proves exports carry none.
+  function toolMarks(parts) {
+    var V = window.App.Version, hits = [];
+    var num = new RegExp("(^|[^0-9.])" + V.number.replace(/\./g, "\\.") + "([^0-9]|$)");
+    var label = new RegExp("(^|[^A-Za-z0-9])" + V.label.replace(/\./g, "\\.") + "([^0-9]|$)");
+    parts.forEach(function (p) {
+      if (!isText(p.name)) return;
+      var t = textOf(p.bytes);
+      if (num.test(t)) hits.push(p.name + " holds " + V.number);
+      if (label.test(t)) hits.push(p.name + " holds " + V.label);
+      if (t.indexOf(window.App.Product.name) >= 0 || /OT Cyber|SolutionsPT/.test(t)) hits.push(p.name + " names the tool or its maker");
+    });
+    return hits;
+  }
+
+  function loadScript(src) {
+    return new Promise(function (res) {
+      var s = document.createElement("script");
+      s.onload = function () { res(true); }; s.onerror = function () { res(false); };
+      s.src = src; document.head.appendChild(s);
+    });
+  }
+  function readFile(url) {
+    return new Promise(function (res) {
+      var x = new XMLHttpRequest();
+      x.responseType = "arraybuffer";
+      x.onload = function () { res(x.response ? new Uint8Array(x.response) : null); };
+      x.onerror = function () { res(null); };
+      try { x.open("GET", url); x.send(); } catch (e) { res(null); }
+    });
+  }
+  function sameBytes(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  function checkFixture(entry) {
+    var name = entry.name, b64 = (window.Fixtures || {})[name];
+    ok(typeof b64 === "string" && b64.length > 0, name + ": the wrapper is loaded");
+    if (!b64) return Promise.resolve(0);
+    var u = bytesOf(b64);
+    ok(u.length === entry.bytes, name + ": the wrapper is the size the index says", u.length + " against " + entry.bytes);
+    ok(u.length <= MAX_ONE, name + ": it is small", Math.round(u.length / 1024) + " KB, limit " + (MAX_ONE / 1024) + " KB");
+    return readFile("fixtures/" + entry.file).then(function (disk) {
+      ok(!!disk, name + ": the .docx is beside its wrapper");
+      ok(sameBytes(disk, u), name + ": the wrapper is the .docx, byte for byte", "run scripts/build-fixtures.ps1");
+      return unzip(u);
+    }).then(function (parts) {
+      var byName = {};
+      parts.forEach(function (p) { byName[p.name] = p; });
+      ok(parts[0].name === "[Content_Types].xml" && !!byName["word/document.xml"], name + ": it is a Word package");
+      ok(!!byName["docProps/core.xml"], name + ": it has document properties to check");
+      var marks = toolMarks(parts);
+      ok(marks.length === 0, name + ": no tool name and no version number", marks.join("; "));
+      var holds = HOLDS[name];
+      if (holds && byName["word/document.xml"]) {
+        var doc = textOf(byName["word/document.xml"].bytes);
+        var missing = holds.doc.filter(function (re) { return !re.test(doc); }).map(String);
+        holds.parts.forEach(function (re) { if (!parts.some(function (p) { return re.test(p.name); })) missing.push("part " + re); });
+        Object.keys(holds.other || {}).forEach(function (pn) {
+          var t = byName[pn] ? textOf(byName[pn].bytes) : "";
+          holds.other[pn].forEach(function (re) { if (!re.test(t)) missing.push(pn + " " + re); });
+        });
+        ok(missing.length === 0, name + ": it holds what it is for", "missing " + missing.join(" , "));
+        if (holds.order) {
+          var at = holds.order.map(function (re) { var m = re.exec(doc); return m ? m.index : -1; });
+          ok(at.every(function (x, i) { return x >= 0 && (i === 0 || x > at[i - 1]); }), name + ": its hand-made front matter comes before the first heading", at.join(","));
+        }
+      }
+      return personal(parts, "").then(function (bad) {
+        ok(bad.length === 0, name + ": it names nobody (properties, authors, directory ids, labels, paths, embedded workbooks)", bad.join("; "));
+        return u.length;
+      });
+    }).catch(function (e) { ok(false, name + ": it could be read", String(e && e.message || e)); return u.length; });
+  }
+
+  // The tour's document is a project file, so its Word parts sit inside it as
+  // base64. The same rules apply to each.
+  function checkDemo() {
+    var demo = window.SPT_DOCUMENT_DEMO;
+    ok(!!demo && demo.schema === "spt-document/1.0", "demo: data/demo-document.js holds a document");
+    if (!demo) return Promise.resolve();
+    var author = (demo.info || {}).author || "";
+    ok(author === "" || author === "A. Consultant", "demo: its author is the stand-in consultant", author);
+    var skeleton = JSON.stringify(demo, function (k, v) { return k === "data" ? undefined : v; });
+    ok(!/userId|people\.xml|docMetadata|MSIP_Label/.test(skeleton), "demo: no directory id or label in the document itself");
+    ok(!/[a-z]:\\\\(Users|Documents and Settings)\\\\|file:\/\/\//i.test(skeleton), "demo: no path on a disk");
+    var parts = [], inner = [];
+    Object.keys(demo.parts || {}).forEach(function (k) {
+      var p = demo.parts[k];
+      if (!p || typeof p.data !== "string") return;
+      var b = bytesOf(p.data), nm = String(p.name || k);
+      // A carried workbook is checked as a package; anything else as one part.
+      if (looksZipped(b)) inner.push(unzip(b).then(function (ps) { return personal(ps, nm + " > "); }));
+      else parts.push({ name: /\.(xml|rels|vml)$/.test(nm) ? nm : nm + ".xml", bytes: b });
+    });
+    return personal(parts, "").then(function (bad) {
+      return Promise.all(inner).then(function (lists) {
+        lists.forEach(function (l) { bad = bad.concat(l); });
+        ok(bad.length === 0, "demo: its carried parts name nobody (" + (parts.length + inner.length) + " parts)", bad.join("; "));
+      });
+    });
+  }
+
+  var index = window.FixtureIndex || [];
+  ok(index.length > 0, "the fixture index is loaded (scripts/fixtures/index.js)");
+  var listed = index.map(function (e) { return e.name; });
+  Object.keys(HOLDS).forEach(function (n) { ok(listed.indexOf(n) >= 0, n + " is in the index"); });
+  ok(!!(window.App.Version && window.App.Version.number && window.App.Product && window.App.Product.name), "the version and product name to look for are known");
+
+  // Every fixture the index lists is checked, not only the ones named above,
+  // so a fixture added later is covered without touching this page.
+  Promise.all(index.map(function (e) { return loadScript("fixtures/" + e.name + ".js"); })).then(function (loaded) {
+    ok(loaded.every(Boolean), "every wrapper in the index loads", index.filter(function (e, i) { return !loaded[i]; }).map(function (e) { return e.name; }).join(", "));
+    return index.reduce(function (chain, e) {
+      return chain.then(function (total) { return checkFixture(e).then(function (n) { return total + n; }); });
+    }, Promise.resolve(0));
+  }).then(function (total) {
+    ok(total <= MAX_ALL, "the fixtures are small together", Math.round(total / 1024) + " KB, limit " + (MAX_ALL / 1024) + " KB");
+    ok(Object.keys(window.Fixtures || {}).length === index.length, "no wrapper is loaded that the index does not list");
+    return checkDemo();
+  }).catch(function (e) { ok(false, "the page ran to the end", String(e && e.stack || e)); }).then(finish);
+})();
+</script>
+</body></html>

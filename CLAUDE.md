@@ -8,9 +8,9 @@ Read `README.md` for the layout and commands, and `docs/platform-architecture.md
 - The suite shell is `platform/` (SolutionsPT OT Cyber Suite). It talks to a tool only through `js/host-bridge.js` (canonical copy `shared/host-bridge.js`) and postMessage, never by reaching into the tool. A module never requires the bridge: guard every call with `if (window.App.HostBridge)` and keep standalone behaviour unchanged. Inside the suite a tool may sit in a frame of another origin (the folder build) where file dialogs are refused, so saving must still work there (a `SecurityError` from the save dialog falls back to a download).
 - The suite's single HTML carries each tool's own single-HTML build unchanged; after a module change, rebuild and check the suite too (`tools/build.ps1 -Module suite -As html`), not only the module.
 - Files several modules use have one canonical copy in `shared/` or `contracts/`. Edit only that copy, then run `tools/sync-shared.ps1`; `-Check` must pass before a release.
-- One version for everything, in `shared/version.js`. It is shown in the tools and stamped in saved project files, and must NEVER appear in Word or Excel exports (text or document properties); `test-version.html` and `test-risk-version.html` prove it.
+- One version for everything, in `shared/version.js`. It is shown in the tools and stamped in saved project files, and must NEVER appear in Word or Excel exports (text or document properties); `test-version.html`, `test-risk-version.html` and the document tool's `test-doc-version.html` prove it.
 - After any change to a module's `data/**/*.json`, run that module's `scripts/build-data.ps1` and commit the regenerated `.js` too.
-- `shared/vendor/docx.umd.js` (synced into the assessment and risk tools) is hand-patched (`rStyle`/`rFonts` must lead `w:rPr` or Word refuses the file). Do not replace it with an upstream copy; `shared/vendor/docx.umd.js.upstream-unpatched` is kept for reference.
+- `shared/vendor/docx.umd.js` (synced into the assessment, risk and document tools) is hand-patched (`rStyle`/`rFonts` must lead `w:rPr` or Word refuses the file). Do not replace it with an upstream copy; `shared/vendor/docx.umd.js.upstream-unpatched` is kept for reference.
 - `.gitattributes` is `* -text`: files keep their exact bytes and line endings (the tree mixes LF and CRLF). Edit files with an editor or exact string replacement, never by rewriting whole files through PowerShell string handling, which has silently truncated edits before.
 
 ## Testing
@@ -34,9 +34,16 @@ Read `README.md` for the layout and commands, and `docs/platform-architecture.md
 - A pack's blocks are read from the generated Word file (`shared/docx-blocks.js`), not the builders. After a change to how the Word report prints, run `test-review-blocks.html`, and `modules/report-review/scripts/build-demo-pack.ps1` if the demo pack should follow.
 - A new automatic check needs a real positive, a clean negative and a read of what it flags across all 20 demos (`test-review-checks.html`). A false alarm costs trust: leave out what cannot be read reliably.
 
+## Document tool
+
+- `modules/documents` (design: `docs/document-tool-design.md`) writes general documents in the report template and rebuilds an imported Word file in it. It stands beside the other tools: no file passes between it and them, and the suite routes only its project file (`spt-document`), never a `.docx`.
+- Its template is `shared/house-docx.js`, copied from the assessment exporter, which is not changed and does not use it. After a change to the template code in either file, run `modules/assessments/scripts/test-house-parity.html`.
+- Its page has no `connect-src`: read bytes with `Blob.arrayBuffer()`, `FileReader` or `atob`, never `fetch`. Build DOM nodes from file and pasted content, never HTML.
+- The headless tests cannot prove Word opens a file. `tools/word-open-check.ps1` is the release gate for this tool; it starts its own invisible Word and never touches one already running.
+
 ## Releases and safety
 
 - Do not rebuild or publish releases unless asked. `tools/release.ps1` builds, checks and tags; publishing is `git push origin main <tag>` plus `gh release create`.
-- Every version needs `docs/releases/v<x.y.z>.md` before release (`release.ps1` refuses without it); it is the GitHub release notes and the suite's What's new. After editing it, run `platform/scripts/build-data.ps1` and commit `platform/data/suite-data.js`.
+- Every version needs `docs/releases/v<x.y.z>.md` before release (`release.ps1` refuses without it); it is the GitHub release notes and the suite's What's new. After editing it, run `platform/scripts/build-data.ps1` and commit `platform/data/suite-data.js`. The suite shows the newest `v<x.y.z>.md` whatever the version in `shared/version.js`, so notes for a version not yet bumped are drafted under another name (`docs/releases/v0.7.0-draft.md`) and renamed in the commit that bumps the version.
 - Built files, `dist/`, `test-results/` and the licensed reference documents are never committed.
 - Never take screenshots of the desktop to check the UI; use headless rendering or the exe self-tests.

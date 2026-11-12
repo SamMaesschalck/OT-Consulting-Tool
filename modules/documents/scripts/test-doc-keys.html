@@ -1,0 +1,478 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the editor by keyboard</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/documents.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/tables.css" />
+</head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The editor's keyboard map and focus rules (docs/document-tool-design.md 5.3):
+  every key in the map, the toolbar and the outline as one Tab stop each with
+  the arrow keys inside, the paper as one Tab stop, Tab doing nothing in a
+  paragraph and Escape then Tab leaving, a block selection by keys, by
+  Shift+click and by dragging the pointer out of a block, what a screen reader is
+  told during one, the focus never being lost when a block is redrawn or
+  deleted, F6, and a name on every control. The page is the editor with the real
+  model, renderer, history, tables and paste code and a stand-in for the shell.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<div style="display:flex;width:1500px;height:640px">
+  <div id="sidebar" style="flex:none;width:260px;overflow-y:auto"><div id="nav"><button type="button" id="nav-edit">Edit</button></div><div id="outline"></div></div>
+  <div id="edit-view" class="main" style="flex:1;min-width:0"><div id="toolbar" role="toolbar" aria-label="Formatting"></div><div id="paper" tabindex="0"></div></div>
+</div>
+<div id="live" aria-live="polite"></div>
+<div id="toast"></div>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script src="../js/paste.js"></script>
+<script src="../js/editor.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d !== undefined ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  var errors = [];
+  window.addEventListener("error", function (e) { errors.push(e.message); });
+  window.addEventListener("unhandledrejection", function (e) { errors.push("rejected: " + (e.reason && e.reason.message)); });
+
+  var App = window.App, M = App.DocModel, R = App.DocRender, H = App.DocHistory, E = App.DocEditor, T = E.__test;
+  function $(id) { return document.getElementById(id); }
+  var toasts = [], answer = true;
+  App.DocApp = {
+    state: { doc: null, page: "edit", dirty: false, tour: false, recovered: false },
+    go: function () {}, markClean: function () {}, busy: function () {}, setDoc: function () { return Promise.resolve(true); },
+    touched: function () {}, canAdd: function () { return true; },
+    toast: function (text) { toasts.push(String(text)); $("toast").textContent = String(text); },
+    confirmBox: function () { return Promise.resolve(answer); },
+    say: function (text) { $("live").textContent = String(text); },
+    h: R.h
+  };
+  App.DocPictures = { ACCEPT: "image/png", fromFile: function (file) { return Promise.resolve({ blob: file, type: "image/png", width: 300, height: 150, name: file.name }); } };
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  function pngBlob() {
+    var bin = atob(PNG), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return new Blob([u], { type: "image/png" });
+  }
+  var LONG = "The site operates a segmented control network with a firewall between the business systems and the process control domain, and remote access is brokered through a jump host that is patched monthly and reviewed each quarter by the site engineer, who also keeps the list of the accounts that may use it and the reasons each was granted.";
+
+  var doc;
+  function P(id, text, more) { return Object.assign({ id: id, type: "paragraph", runs: text ? [{ t: text }] : [] }, more || {}); }
+  function Hd(id, level, text) { return { id: id, type: "heading", level: level, runs: [{ t: text }] }; }
+  function standard() {
+    return [
+      Hd("b1", 1, "Introduction"), P("b2", LONG), P("b3", "Short line"), Hd("b4", 2, "Scope"),
+      { id: "b5", type: "list", list: "bullet", level: 0, runs: [{ t: "Item" }] },
+      { id: "b6", type: "picture", media: "m1", width: 300, height: 150, caption: "The network" },
+      P("b7", "After the picture"), Hd("b8", 1, "Second section"), P("b9", "Body two"),
+      { id: "b10", type: "table", header: 1, cols: [1, 1], rows: [
+        { cells: [{ blocks: [P("c1", "Zone")] }, { blocks: [P("c2", "Assets")] }] },
+        { cells: [{ blocks: [P("c3", "Control")] }, { blocks: [P("c4", "PLC")] }] }] },
+      { id: "b11", type: "prompt", text: "Add the cost of each option." }, P("b12", "End")
+    ];
+  }
+  function open(blocks, foreignOutline) {
+    E.unmount();
+    $("outline").textContent = "";
+    if (foreignOutline) foreignOutline();
+    doc = M.normalise({ schema: M.SCHEMA, kind: "report", info: { title: "Keys" }, blocks: blocks || standard(), footnotes: {},
+      media: { m1: { type: "image/png", name: "net.png", width: 300, height: 150, source: "insert", blob: pngBlob() } }, parts: {} });
+    App.DocApp.state.doc = doc;
+    H.clear();
+    toasts.length = 0;
+    E.mount($("edit-view"));
+  }
+  function blk(id) { var f = M.find(doc, id); return f ? f.block : null; }
+  function txt(id) { return M.text(blk(id)); }
+  function el(id) { return T.el(id); }
+  function tel(id) { return T.text(id); }
+  function ids() { return doc.blocks.map(function (b) { return b.id; }).join(","); }
+  function order() { return Array.prototype.map.call($("paper").querySelectorAll(":scope > .blk"), function (n) { return n.getAttribute("data-block-id"); }).join(","); }
+  function sel() { return E.selection(); }
+  function caret(id, at, to) { T.selectText(id, at, to); }
+  function end(id) { caret(id, R.textLength(tel(id))); }
+  function editable() { return $("paper").querySelectorAll("[contenteditable]:not([contenteditable=false])"); }
+  function live() { return $("live").textContent; }
+  function act() { return document.activeElement; }
+  function items() { return Array.prototype.slice.call($("outline").querySelectorAll('[role="treeitem"]')); }
+  function key(target, k, more) {
+    var e = new KeyboardEvent("keydown", Object.assign({ key: k, bubbles: true, cancelable: true }, more || {}));
+    target.dispatchEvent(e);
+    return e;
+  }
+  function pointer(type, node, more) {
+    var box = node.getBoundingClientRect();
+    var e = new PointerEvent(type, Object.assign({ bubbles: true, cancelable: true, button: 0, buttons: type === "pointerup" ? 0 : 1, clientX: box.left + 4, clientY: box.top + 4, pointerId: 1, isPrimary: true }, more || {}));
+    node.dispatchEvent(e);
+    return e;
+  }
+  function named(c) {
+    if ((c.textContent || "").trim() && c.tagName === "BUTTON") return true;
+    if ((c.getAttribute("aria-label") || "").trim()) return true;
+    var lab = c.closest("label");
+    return !!lab && !!lab.textContent.trim();
+  }
+
+  (async function () {
+    open();
+
+    // ---- Tab stops ----
+    ok($("paper").getAttribute("tabindex") === "0" && $("paper").querySelectorAll('[tabindex="0"]').length === 0 && editable().length === 0, "the paper is one Tab stop: nothing inside it is in the Tab order until it is used");
+    ok(Array.prototype.every.call($("paper").querySelectorAll(".blk"), function (b) { return b.getAttribute("tabindex") === "-1"; }), "every block can take the focus by script and none by Tab");
+    var tools = Array.prototype.slice.call($("toolbar").querySelectorAll("button, select, input:not([type=file])"));
+    ok(tools.length > 20 && tools.filter(function (c) { return c.getAttribute("tabindex") === "0"; }).length === 1, "the toolbar is one Tab stop: one control has tabindex 0 (" + tools.length + " controls)", String(tools.filter(function (c) { return c.getAttribute("tabindex") === "0"; }).length));
+    tools[0].focus();
+    key(tools[0], "ArrowRight");
+    ok(act() === tools[1] && tools[1].getAttribute("tabindex") === "0" && tools[0].getAttribute("tabindex") === "-1", "Right arrow moves along the toolbar and takes the Tab stop with it");
+    key(tools[1], "ArrowLeft"); key(tools[0], "ArrowLeft");
+    ok(act() === tools[tools.length - 1], "Left arrow from the first control wraps to the last");
+    key(act(), "Home");
+    ok(act() === tools[0], "Home goes to the first");
+    key(act(), "End");
+    ok(act() === tools[tools.length - 1] && tools.filter(function (c) { return c.getAttribute("tabindex") === "0"; }).length === 1, "End to the last, still one Tab stop");
+    ok($("toolbar").getAttribute("role") === "toolbar" && $("paper").getAttribute("role") === "group" && $("paper").getAttribute("aria-label") === "Document", "the toolbar is a toolbar and the paper a named group");
+
+    // ---- every control has a name ----
+    var unnamed = tools.filter(function (c) { return !named(c); });
+    ok(unnamed.length === 0, "every toolbar control has a name", unnamed.map(function (c) { return c.outerHTML.slice(0, 80); }).join(" | "));
+    ok(tools.every(function (c) { return c.tagName !== "BUTTON" || c.getAttribute("type") === "button"; }), "every toolbar button is type=button");
+    E.selectBlocks(["b6"]);
+    var picTools = Array.prototype.slice.call($("toolbar").querySelectorAll(".tb-context button, .tb-context input"));
+    ok(picTools.length >= 10 && picTools.every(named) && picTools.every(function (c) { return c.getAttribute("tabindex") === "-1"; }), "a picture's controls all have a name and add no Tab stop (" + picTools.length + ")", picTools.filter(function (c) { return !named(c); }).length + " unnamed");
+    end("c1");
+    var tblTools = Array.prototype.slice.call($("toolbar").querySelectorAll(".tb-context button, .tb-context input"));
+    ok(tblTools.length >= 8 && tblTools.every(named), "with the caret in a table the table's controls appear beside the toolbar, all named (" + tblTools.length + ")");
+    var outlineControls = Array.prototype.slice.call($("outline").querySelectorAll("button"));
+    ok(outlineControls.length === 3 && outlineControls.every(named), "every outline menu button has a name");
+    ok(el("b6").querySelector(".cap").getAttribute("aria-label") === "Caption", "a caption is named");
+
+    // ---- the keyboard map: text ----
+    caret("b3", 5);
+    T.press("Enter");
+    ok(doc.blocks.length === 13 && txt("b3") === "Short" && M.text(doc.blocks[3]) === " line", "Enter splits the block at the caret");
+    T.press("Backspace");
+    ok(doc.blocks.length === 12 && txt("b3") === "Short line" && sel().from === 5, "Backspace at the start joins with the block before");
+    T.press("Shift+Enter");
+    ok(txt("b3") === "Short\n line" && doc.blocks.length === 12, "Shift+Enter is a line break inside the block");
+    T.press("Ctrl+Z");
+    end("b3");
+    T.press("Delete");
+    ok(txt("b3") === "Short lineScope" && !blk("b4"), "Delete at the end joins the next text block on");
+    T.press("Ctrl+Z");
+    ok(blk("b4") && txt("b3") === "Short line", "Ctrl+Z undoes");
+    T.press("Ctrl+Y");
+    ok(!blk("b4"), "Ctrl+Y redoes");
+    T.press("Ctrl+Z");
+    T.press("Ctrl+Shift+Z");
+    ok(!blk("b4"), "and so does Ctrl+Shift+Z");
+    T.press("Ctrl+Z");
+    [["Ctrl+B", "b"], ["Ctrl+I", "i"], ["Ctrl+U", "u"], ["Ctrl+Shift+X", "s"], ["Ctrl+.", "sup"], ["Ctrl+,", "sub"]].forEach(function (x) {
+      caret("b3", 0, 5);
+      var e = T.press(x[0]);
+      ok(e.defaultPrevented && blk("b3").runs[0][x[1]] === true && blk("b3").runs[0].t === "Short", x[0] + " sets " + x[1] + " on the selection", JSON.stringify(blk("b3").runs));
+      T.press("Ctrl+Z");
+    });
+    caret("b3", 0, 5);
+    E.run("red");
+    T.press("Ctrl+Space");
+    ok(!blk("b3").runs.some(function (r) { return r.red; }), "Ctrl+Space clears red from the selection");
+    T.press("Ctrl+K");
+    ok($("paper").querySelector(".link-panel input") === act(), "Ctrl+K opens the link panel with the keyboard in its field");
+    key(act(), "Escape");
+    ok(!$("paper").querySelector(".link-panel") && act() === tel("b3") && sel().from === 0 && sel().to === 5, "Escape closes it and gives the selection back", JSON.stringify(sel()));
+    [["Ctrl+Alt+1", 1], ["Ctrl+Alt+2", 2], ["Ctrl+Alt+3", 3]].forEach(function (x) {
+      T.press(x[0]);
+      ok(blk("b3").type === "heading" && blk("b3").level === x[1] && act() === tel("b3"), x[0] + " is heading " + x[1] + ", and the caret stays in the block");
+    });
+    T.press("Ctrl+Alt+0");
+    ok(blk("b3").type === "paragraph", "Ctrl+Alt+0 is a paragraph");
+    T.press("Ctrl+Shift+8");
+    ok(blk("b3").type === "list" && blk("b3").list === "bullet", "Ctrl+Shift+8 is a bulleted item");
+    T.press("Ctrl+Shift+7");
+    ok(blk("b3").type === "list" && blk("b3").list === "number", "Ctrl+Shift+7 is a numbered item");
+    var tab = T.press("Tab");
+    ok(tab.defaultPrevented && blk("b3").level === 1, "Tab in a list item indents it");
+    T.press("Shift+Tab");
+    ok(blk("b3").level === 0, "Shift+Tab outdents it");
+    T.press("Ctrl+Alt+0");
+    T.press("Ctrl+Enter");
+    ok(doc.blocks[3].type === "pageBreak" && sel().blockId === "b3", "Ctrl+Enter puts a page break after the block");
+    T.press("Ctrl+Z");
+    end("b3");
+    T.press("Alt+Shift+Up");
+    ok(ids().indexOf("b1,b3,b2") === 0 && order() === ids() && act() === tel("b3"), "Alt+Shift+Up moves the block up, keyboard still in it", ids());
+    T.press("Alt+Shift+Down");
+    ok(ids().indexOf("b1,b2,b3") === 0 && order() === ids(), "Alt+Shift+Down moves it down");
+    caret("b3", 2);
+    T.press("Ctrl+A");
+    ok(sel().type === "text" && sel().from === 0 && sel().to === 10, "Ctrl+A selects all the text in the block", JSON.stringify(sel()));
+    T.press("Ctrl+A");
+    ok(sel().type === "blocks" && sel().ids.length === 12 && act() === $("paper"), "Ctrl+A again selects every block", JSON.stringify(sel().ids.length));
+    T.press("Escape");
+    open([P("b1", ""), P("b2", ""), P("b3", "")]);
+    caret("b1", 0); T.type("- ");
+    caret("b2", 0); T.type("* ");
+    caret("b3", 0); T.type("1. ");
+    ok(blk("b1").list === "bullet" && blk("b2").list === "bullet" && blk("b3").list === "number", "\"- \" and \"* \" make a bulleted item, \"1. \" a numbered one");
+
+    // ---- Tab does nothing in text that is not a list or a table ----
+    open();
+    [["b2", "a paragraph"], ["b1", "a heading"], ["b11", "a prompt"]].forEach(function (x) {
+      end(x[0]);
+      var was = JSON.stringify(doc.blocks), e1 = T.press("Tab"), e2 = T.press("Shift+Tab");
+      ok(e1.defaultPrevented && e2.defaultPrevented && JSON.stringify(doc.blocks) === was && act() === tel(x[0]), "Tab and Shift+Tab in " + x[1] + " do nothing, and the caret stays");
+    });
+    E.selectBlocks(["b6"]);
+    T.press("Enter");
+    ok(act() === el("b6").querySelector(".cap") && sel().kind === "caption", "Enter on a selected picture with a caption goes into the caption", JSON.stringify(sel()));
+    var capTab = T.press("Tab");
+    ok(capTab.defaultPrevented && act() === el("b6").querySelector(".cap"), "Tab in a caption does nothing");
+    var capEnter = T.press("Enter");
+    ok(capEnter.defaultPrevented && doc.blocks.length === 12 && blk("b6").caption === "The network", "Enter in a caption does not split anything");
+    end("b2");
+    T.press("Escape");
+    ok(sel().type === "blocks" && sel().ids.join() === "b2" && act() === $("paper") && editable().length === 0, "Escape goes from the text to a block selection of that block, with the focus on the paper", JSON.stringify(sel()));
+    var leave = key($("paper"), "Tab");
+    ok(!leave.defaultPrevented, "and from there Tab is the browser's, so it leaves the paper");
+
+    // ---- Tab and the arrows in a table belong to the table ----
+    end("c1");
+    var tt = T.press("Tab");
+    ok(tt.defaultPrevented && sel().blockId === "c2", "Tab in a table goes to the next cell", JSON.stringify(sel()));
+    T.press("Shift+Tab");
+    ok(sel().blockId === "c1", "Shift+Tab to the one before");
+    end("c4");
+    T.press("Tab");
+    ok(blk("b10").rows.length === 3 && sel().type === "text" && sel().blockId === blk("b10").rows[2].cells[0].blocks[0].id, "Tab in the last cell adds a row", String(blk("b10").rows.length));
+    T.press("Ctrl+Z");
+    ok(blk("b10").rows.length === 2 && el("b10") && $("paper").contains(act()), "which Ctrl+Z takes back, the keyboard still on the paper");
+    end("c3");
+    T.press("Escape");
+    ok(sel().type === "blocks" && sel().ids.join() === "b10", "Escape in a cell selects the table");
+
+    // ---- up and down between blocks ----
+    caret("b3", 4);
+    var x0 = getSelection().getRangeAt(0).getBoundingClientRect().left || R.rangeAt(tel("b3"), 3, 4).getBoundingClientRect().right;
+    var up = T.press("Up");
+    var s1 = sel();
+    ok(up.defaultPrevented && s1.blockId === "b2", "Up on a block's first line moves to the block above", JSON.stringify(s1));
+    var x1 = R.rangeAt(tel("b2"), Math.max(0, s1.from - 1), s1.from).getBoundingClientRect().right;
+    ok(s1.from > LONG.length - 120 && s1.from < LONG.length && Math.abs(x1 - x0) < 12, "onto its last line, keeping the horizontal position", s1.from + " of " + LONG.length + ", x " + Math.round(x0) + " to " + Math.round(x1));
+    var down = T.press("Down");
+    ok(down.defaultPrevented && sel().blockId === "b3" && Math.abs(sel().from - 4) <= 1, "Down on a block's last line moves to the block below, same position", JSON.stringify(sel()));
+    caret("b2", LONG.length);
+    var inside = T.press("Up");
+    ok(!inside.defaultPrevented && sel().blockId === "b2" && sel().from < LONG.length, "Up on a later line stays in the block: the browser moves the caret", JSON.stringify(sel()));
+    caret("b2", 3);
+    T.press("Up");
+    ok(sel().blockId === "b1", "Up from the first line of a long paragraph reaches the heading above");
+    end("b5");
+    T.press("Down");
+    ok(sel().type === "blocks" && sel().ids.join() === "b6" && act() === $("paper"), "Down onto a picture selects it as a block", JSON.stringify(sel()));
+    end("b9");
+    T.press("Down");
+    ok(sel().type === "text" && sel().blockId === "c1", "Down onto a table goes into its first cell", JSON.stringify(sel()));
+    caret("b11", 0);
+    T.press("Up");
+    ok(sel().type === "text" && sel().blockId === "c4", "Up onto a table goes into its last cell", JSON.stringify(sel()));
+
+    // ---- a block selection, and what a screen reader is told ----
+    end("b2");
+    T.press("Escape");
+    ok($("paper").getAttribute("aria-activedescendant") === "blk-b2" && el("b2").classList.contains("sel") && live() === "1 block selected", "a block selection: aria-activedescendant on the first block, and the live line says how many", live());
+    T.press("Shift+Down");
+    ok(sel().ids.join() === "b2,b3" && live() === "2 blocks selected" && $("paper").getAttribute("aria-activedescendant") === "blk-b2", "Shift+Down extends it", live());
+    T.press("Shift+Down");
+    ok(sel().ids.join() === "b2,b3,b4" && live() === "3 blocks selected", "and again", live());
+    T.press("Shift+Up");
+    ok(sel().ids.join() === "b2,b3", "Shift+Up shrinks it");
+    T.press("Shift+Up"); T.press("Shift+Up");
+    ok(sel().ids.join() === "b1,b2" && $("paper").getAttribute("aria-activedescendant") === "blk-b1", "and extends it the other way past where it began", sel().ids.join());
+    T.press("Down");
+    ok(sel().ids.length === 1 && act() === $("paper"), "an arrow by itself moves a single selection", sel().ids.join());
+    E.selectBlocks(["b3"]);
+    T.press("Enter");
+    ok(sel().type === "text" && sel().blockId === "b3" && sel().from === 10 && act() === tel("b3") && !$("paper").hasAttribute("aria-activedescendant") && !el("b3").classList.contains("sel"), "Enter on a selection of one text block goes back into its text, caret at the end", JSON.stringify(sel()));
+    caret("b3", 4);
+    var su = T.press("Shift+Up");
+    ok(su.defaultPrevented && sel().type === "blocks" && sel().ids.join() === "b2,b3" && act() === $("paper") && getSelection().rangeCount === 0, "Shift+Up at a block's edge turns the text selection into a block selection", JSON.stringify(sel()));
+    end("b3");
+    T.press("Shift+Down");
+    ok(sel().type === "blocks" && sel().ids.join() === "b3,b4", "and Shift+Down at its last line");
+    caret("b2", 5);
+    pointer("pointerdown", tel("b7"), { shiftKey: true });
+    ok(sel().type === "blocks" && sel().ids.join() === "b2,b3,b4,b5,b6,b7" && act() === $("paper"), "Shift+click on another block selects from the caret's block to it", JSON.stringify(sel()));
+
+    // ---- dragging the pointer out of a block ----
+    T.press("Escape");
+    E.focusBlock("b3", { at: 2 });
+    T.dragSelect("b3", "b5");
+    ok(sel().type === "blocks" && sel().ids.join() === "b3,b4,b5" && act() === $("paper") && editable().length === 0, "a pointer drag from one block to another selects the blocks between, whole", JSON.stringify(sel()));
+    ok(live() === "3 blocks selected" && getSelection().rangeCount === 0 && !$("paper").classList.contains("dragging"), "the text selection is dropped and the count is announced", live());
+    T.dragSelect("b9", "b7");
+    ok(sel().ids.join() === "b7,b8,b9", "upwards too", sel().ids.join());
+    pointer("pointerdown", tel("b2"));
+    ok(editable().length === 1 && editable()[0] === tel("b2") && sel() === null || (sel() && sel().type !== "blocks"), "pressing in a block makes its text editable there and then, and drops the block selection");
+    pointer("pointermove", tel("b3"));
+    ok(sel().type === "blocks" && sel().ids.join() === "b2,b3" && $("paper").classList.contains("dragging"), "moving into the next block with the button down starts a block selection");
+    pointer("pointermove", tel("b2"));
+    ok(E.selection() === null || E.selection().type === "text", "dragging back into the block it started in returns to a text selection", JSON.stringify(E.selection()));
+    ok(editable().length === 1 && editable()[0] === tel("b2") && !el("b2").classList.contains("sel") && !el("b3").classList.contains("sel"), "with that block editable again and nothing highlighted");
+    pointer("pointerup", tel("b2"));
+    pointer("pointermove", tel("b5"), { buttons: 0 });
+    ok(!E.selection() || E.selection().type !== "blocks", "a move with no button down selects nothing");
+    pointer("pointerdown", el("b6").querySelector("img"));
+    pointer("pointerup", el("b6").querySelector("img"));
+    ok(sel().type === "blocks" && sel().ids.join() === "b6", "a click on a picture selects it as a block");
+
+    // ---- the focus is never lost ----
+    end("b3");
+    E.redraw(["b3"]);
+    ok(act() === tel("b3") && editable().length === 1, "redrawing the block the caret is in keeps the caret in it");
+    E.redraw(["b2", "b4"]);
+    ok(act() === tel("b3"), "redrawing other blocks leaves it alone");
+    E.selectBlocks(["b3"]);
+    E.redraw(["b3"]);
+    ok(act() === $("paper") && el("b3").classList.contains("sel") && $("paper").getAttribute("aria-activedescendant") === "blk-b3", "a selected block that is redrawn is still selected");
+    T.press("Delete");
+    ok(!blk("b3") && $("paper").contains(act()) && act() !== document.body, "deleting the selected block leaves the keyboard on the paper", act() && act().tagName);
+    T.press("Ctrl+Z");
+    ok(blk("b3") && $("paper").contains(act()), "and so does undoing it");
+    end("c1");
+    E.redraw(["b10"]);
+    ok(act() === tel("c1") && sel().blockId === "c1", "redrawing a table keeps the caret in its cell", JSON.stringify(sel()));
+    end("b9");
+    M.remove(doc, ["b9"]);
+    E.redraw(["b9"]);
+    ok($("paper").contains(act()) && act() !== document.body, "a block removed from under the caret leaves the focus on the paper");
+    H.clear();
+
+    // ---- the toolbar acts on the text without taking the caret ----
+    open();
+    caret("b3", 0, 5);
+    var bold = $("toolbar").querySelector('[data-cmd="bold"]');
+    var md = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    bold.dispatchEvent(md);
+    bold.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    ok(md.defaultPrevented && blk("b3").runs[0].b && act() === tel("b3") && sel().from === 0 && sel().to === 5 && bold.getAttribute("aria-pressed") === "true", "a toolbar button acts on the selection and leaves the caret where it was");
+    var undoBtn = $("toolbar").querySelector('[data-cmd="undo"]'), redoBtn = $("toolbar").querySelector('[data-cmd="redo"]');
+    ok(undoBtn.getAttribute("aria-disabled") === "false" && redoBtn.getAttribute("aria-disabled") === "true", "Undo and Redo show whether there is anything to undo or redo");
+    undoBtn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    ok(!blk("b3").runs[0].b && undoBtn.getAttribute("aria-disabled") === "true" && redoBtn.getAttribute("aria-disabled") === "false", "the Undo button undoes");
+    end("b5");
+    ok($("toolbar").querySelector('[data-cmd="bullet"]').getAttribute("aria-pressed") === "true" && $("toolbar").querySelector(".tb-type").value === "", "the toolbar shows the state of where the caret is: a bulleted item");
+    end("b4");
+    ok($("toolbar").querySelector(".tb-type").value === "heading2" && $("toolbar").querySelector('[data-cmd="bullet"]').getAttribute("aria-pressed") === "false", "a level 2 heading");
+    end("b2");
+    E.run("alignCenter");
+    ok(blk("b2").align === "center" && tel("b2").classList.contains("al-center") && $("toolbar").querySelector('[data-cmd="alignCenter"]').getAttribute("aria-pressed") === "true" && act() === tel("b2"), "alignment is set without redrawing the block");
+    E.run("alignLeft");
+    ok(blk("b2").align === undefined, "left is the default and is not stored");
+    key(tools[0] = $("toolbar").querySelector(".tb-type"), "Escape");
+    ok(act() === tel("b2"), "Escape in the toolbar goes back to the paper", act() && act().tagName);
+
+    // ---- the outline ----
+    T.flush();
+    var rows = items();
+    ok(rows.length === 3 && rows.map(function (r) { return r.getAttribute("aria-level"); }).join() === "1,2,1" && $("outline").querySelector('[role="tree"]'), "the outline is a tree of the headings with their levels", rows.map(function (r) { return r.textContent; }).join(" | "));
+    ok(rows.filter(function (r) { return r.getAttribute("tabindex") === "0"; }).length === 1, "one Tab stop for the whole outline");
+    ok(rows[2].querySelector(".ol-n") && rows[2].querySelector(".ol-n").textContent === "1" && !rows[1].querySelector(".ol-n"), "a section with a prompt in it shows the count beside it");
+    rows[0].focus();
+    key(rows[0], "ArrowDown");
+    ok(act() === rows[1] && rows[1].getAttribute("tabindex") === "0" && rows[0].getAttribute("tabindex") === "-1", "Down arrow moves along the outline");
+    key(rows[1], "End");
+    ok(act() === rows[2], "End to the last entry");
+    key(rows[2], "Home");
+    ok(act() === rows[0], "Home to the first");
+    key(rows[0], "ArrowDown");
+    key(act(), "Enter");
+    ok(sel().type === "text" && sel().blockId === "b4" && act() === tel("b4"), "Enter goes to the heading", JSON.stringify(sel()));
+    E.selectBlocks(["b9"]);
+    T.press("Escape");
+    ok(act() === items()[2] && act().getAttribute("data-heading-id") === "b8", "Escape from a block selection goes to the outline entry of its section", act() && act().textContent);
+    key(act(), "ArrowUp", { altKey: true });
+    ok(ids() === "b8,b9,b10,b11,b12,b1,b2,b3,b4,b5,b6,b7" && order() === ids(), "Alt+Up in the outline moves the whole section up", ids());
+    ok(act() && act().getAttribute("data-heading-id") === "b8" && items()[0] === act(), "and the keyboard stays on its entry");
+    key(act(), "ArrowDown", { altKey: true });
+    ok(ids() === "b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12" && order() === ids(), "Alt+Down moves it back down", ids());
+    key(items()[1], "ArrowUp", { altKey: true });
+    ok(ids() === "b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12", "a subsection does not move out of its parent");
+    T.press("Ctrl+Z");
+    items()[2].focus();
+    key(items()[2], "ContextMenu");
+    var menu = $("outline").querySelector('[role="menu"]');
+    ok(menu && menu.querySelectorAll('[role="menuitem"]').length === 2 && act() === menu.firstChild && /Add a section after/.test(menu.textContent) && /Delete the section/.test(menu.textContent), "the menu key opens the entry's menu: add a section after, delete the section");
+    key(act(), "ArrowDown");
+    ok(act() === menu.lastChild, "arrows move in the menu");
+    key(act(), "Escape");
+    ok(!$("outline").querySelector('[role="menu"]') && act() === items()[2], "Escape closes it, back to the entry");
+    items()[1].querySelector("button").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    $("outline").querySelector('[role="menu"]').firstChild.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    ok(doc.blocks[7].type === "heading" && doc.blocks[7].level === 2 && doc.blocks[8].type === "paragraph" && sel().blockId === doc.blocks[7].id && order() === ids(), "Add a section after: a heading of the same level and a paragraph after the section, caret in the heading", ids());
+    T.type("New part");
+    T.flush();
+    ok(items().length === 4 && /New part/.test(items()[2].textContent), "the outline follows what is typed in a heading", items().map(function (r) { return r.textContent; }).join(" | "));
+    T.press("Ctrl+Z"); T.press("Ctrl+Z");
+    T.flush();
+    ok(doc.blocks.length === 12 && items().length === 3, "undo takes the new section away again");
+    items()[0].focus();
+    key(items()[0], "Delete");
+    await wait(20);
+    ok(ids() === "b8,b9,b10,b11,b12" && order() === ids(), "Delete on an entry deletes its section, after asking", ids());
+    T.press("Ctrl+Z");
+    ok(ids() === "b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12" && order() === ids(), "and one undo brings the whole section back", ids());
+    answer = false;
+    T.flush();
+    items()[0].focus();
+    key(items()[0], "Delete");
+    await wait(20);
+    ok(doc.blocks.length === 12, "answering no deletes nothing");
+    answer = true;
+
+    // ---- F6 ----
+    end("b2");
+    var f6 = key(act(), "F6");
+    ok(f6.defaultPrevented && $("sidebar").contains(act()), "F6 from the paper goes to the sidebar", act() && act().className);
+    key(act(), "F6");
+    ok($("toolbar").contains(act()) && act().getAttribute("tabindex") === "0", "then the toolbar");
+    key(act(), "F6");
+    ok(act() === tel("b2") && sel().blockId === "b2", "then back to the paper, where the caret was", JSON.stringify(sel()));
+    key(act(), "F6", { shiftKey: true });
+    ok($("toolbar").contains(act()), "Shift+F6 goes the other way");
+
+    // ---- the shell's outline ----
+    open(null, function () {
+      var theirs = R.h("div", { class: "doc-outline", role: "tree" }, [R.h("div", { class: "doc-outline-row", role: "treeitem", "data-heading-id": "b8", tabindex: "0", text: "Second section" })]);
+      $("outline").appendChild(theirs);
+    });
+    ok(!E.ownsOutline() && $("outline").children.length === 1 && $("outline").firstChild.className === "doc-outline", "when the shell has drawn an outline the editor leaves it alone");
+    end("b2"); T.type("x"); T.flush();
+    await wait(300);
+    ok($("outline").children.length === 1 && !$("outline").querySelector(".ol-title"), "and never draws over it");
+    E.selectBlocks(["b9"]);
+    T.press("Escape");
+    ok(act() === $("outline").querySelector('[data-heading-id="b8"]'), "Escape from a block selection still goes to the shell's entry for the section");
+    E.unmount();
+    ok($("outline").children.length === 1, "unmount leaves the shell's outline in place");
+    $("outline").textContent = "";
+
+    ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+  })().catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(finish);
+})();
+</script>
+</body></html>

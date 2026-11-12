@@ -1,0 +1,342 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: diagrams in cells and linked pictures</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Two fixes to the Word import, and the defences behind the second.
+
+    - A diagram drawn as loose floating shapes inside a table cell travels as
+      one block of whole paragraphs, the anchors and the blank lines between and
+      after them, as it does in the body: the shapes keep their places against
+      each other and the cell keeps its height. A numbered paragraph with no
+      words in a cell still keeps its number.
+    - A picture linked to a file or a web address outside the document (an
+      image relationship with TargetMode="External", including what an
+      INCLUDEPICTURE field in a text box leaves behind) never reaches the
+      exported file: Word fetches it on open, and an address on a share hands
+      over the reader's Windows sign-in. It is listed as not carried over, with
+      its address. A picture that also holds its own copy keeps the copy; a
+      chart linked to a workbook keeps its figures and loses the link.
+    - A link taken off inside a text box no longer leaves its words in the
+      Hyperlink style.
+    - DocModel.normalise, the writer and the graft each refuse a kept block
+      that still names something outside the file other than a link to click.
+
+  Every file is built here, shaped the way Word writes it, and read by the real
+  reader; the export is the real writer's and the real graft's. The exported
+  zip is unpacked and every relationship part is read.
+-->
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/import-flow.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function eq(a, b, n) { var x = JSON.stringify(a), y = JSON.stringify(b); ok(x === y, n, "got " + x + " wanted " + y); }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Unzipping runs off the main thread, and headless Edge's virtual clock runs
+  // out the moment the page has nothing queued. A message bounced to ourselves
+  // keeps a task queued, without moving the clock, until the tests finish.
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+
+  var App = window.App, I = App.DocxImport, H = App.HouseDocx, G = App.DocxGraft, Zip = App.ZipIO, M = App.DocModel, F = App.DocImportFlow;
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+  var WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+  var DML = "http://schemas.openxmlformats.org/drawingml/2006/main";
+  var PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+  var WPG = "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup";
+  var WPS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape";
+  var RNS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  var REL = RNS + "/";
+  var NS = ' xmlns:w="' + W + '" xmlns:r="' + RNS + '" xmlns:mc="' + MC + '"' + ' xmlns:a="' + DML + '" xmlns:pic="' + PIC + '"' +
+    ' xmlns:wp="' + WP + '" xmlns:wps="' + WPS + '" xmlns:wpg="' + WPG + '"' +
+    ' xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"';
+  var HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  var UNC = "file://///fileserver.example/share/pixel.png";
+
+  // ---- WordprocessingML, briefly ----
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function R(text, rPr) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(text) + '</w:t></w:r>'; }
+  function PX(inner, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + inner + '</w:p>'; }
+  function P(text, pPr) { return PX(R(text), pPr); }
+  var EMPTY = '<w:p/>';
+  function STYLES() {
+    return HEAD + '<w:styles' + NS + '>' +
+      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
+      '<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>' +
+      '</w:styles>';
+  }
+  var NUMBERING = HEAD + '<w:numbering' + NS + '><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>' +
+    '<w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+  function FLD(type) { return '<w:r><w:fldChar w:fldCharType="' + type + '"/></w:r>'; }
+  function INSTR(code) { return '<w:r><w:instrText xml:space="preserve">' + esc(code) + '</w:instrText></w:r>'; }
+  function LINK(rid, text) { return '<w:hyperlink r:id="' + rid + '"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t>' + esc(text) + '</w:t></w:r></w:hyperlink>'; }
+
+  var docPr = 0;
+  // A shape with words, floating loose (no wrap), measured from the column and the paragraph, as Word draws one.
+  function SHAPE(name, x, y) {
+    var id = ++docPr;
+    return '<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="' + (251659264 + id) + '" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">' +
+      '<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>' + x + '</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>' + y + '</wp:posOffset></wp:positionV>' +
+      '<wp:extent cx="1371600" cy="457200"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="' + id + '" name="' + esc(name) + '"/><wp:cNvGraphicFramePr/>' +
+      '<a:graphic><a:graphicData uri="' + WPS + '"><wps:wsp><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1371600" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>' +
+      '<a:solidFill><a:srgbClr val="156082"/></a:solidFill></wps:spPr><wps:txbx><w:txbxContent>' + P(name) + '</w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>';
+  }
+  function FRAME(data, name) {
+    return '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="952500" cy="476250"/><wp:docPr id="' + (++docPr) + '" name="' + esc(name) + '"/>' +
+      '<wp:cNvGraphicFramePr/><a:graphic>' + data + '</a:graphic></wp:inline></w:drawing>';
+  }
+  // A picture. blip: the a:blip's attributes, as Word writes them (r:embed, r:link or both).
+  function PICDATA(blip, name, crop) {
+    return '<a:graphicData uri="' + PIC + '"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="' + esc(name) + '"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip ' + blip + '/>' +
+      (crop ? '<a:srcRect l="12000"/>' : '') + '<a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm>' +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData>';
+  }
+  function PICRUN(blip, name, crop) { return '<w:r>' + FRAME(PICDATA(blip, name, crop), name) + '</w:r>'; }
+  // A group of a shape and a picture, as Word writes one.
+  function GROUP(blip, name) {
+    return '<w:r>' + FRAME('<a:graphicData uri="' + WPG + '"><wpg:wgp><wpg:cNvGrpSpPr/><wpg:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/><a:chOff x="0" y="0"/><a:chExt cx="952500" cy="476250"/></a:xfrm></wpg:grpSpPr>' +
+      '<wps:wsp><wps:cNvPr id="1" name="Box"/><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="476250" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:bodyPr/></wps:wsp>' +
+      '<pic:pic><pic:nvPicPr><pic:cNvPr id="2" name="Logo"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip ' + blip + '/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+      '<pic:spPr><a:xfrm><a:off x="476250" y="0"/><a:ext cx="476250" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></wpg:wgp></a:graphicData>', name) + '</w:r>';
+  }
+  function CHART(rid, name) {
+    return '<w:r>' + FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="' + rid + '"/></a:graphicData>', name) + '</w:r>';
+  }
+  // A text box as Word writes one, DrawingML with a VML copy beside it.
+  function BOX(inner, vmlInner, name) {
+    return '<w:r><mc:AlternateContent><mc:Choice Requires="wps">' + FRAME('<a:graphicData uri="' + WPS + '"><wps:wsp><wps:cNvSpPr txBox="1"/>' +
+      '<wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent>' + inner + '</w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData>', name) +
+      '</mc:Choice><mc:Fallback><w:pict><v:rect id="box' + docPr + '" style="width:75pt;height:37pt"><v:textbox><w:txbxContent>' + vmlInner + '</w:txbxContent></v:textbox></v:rect></w:pict></mc:Fallback></mc:AlternateContent></w:r>';
+  }
+  // What Word writes for a picture fetched by INCLUDEPICTURE: the field, and as its result a VML picture whose image is the address.
+  function INCLUDED(rid) {
+    return FLD("begin") + INSTR(' INCLUDEPICTURE "' + UNC + '" \\d ') + FLD("separate") +
+      '<w:r><w:pict><v:shapetype id="_x0000_t75" coordsize="21600,21600" o:spt="75" path="m@4@5l@4@11@9@11@9@5xe"/><v:shape id="_x0000_i1025" type="#_x0000_t75" style="width:82.5pt;height:82.5pt">' +
+      '<v:imagedata r:id="' + rid + '" o:href="' + UNC + '"/></v:shape></w:pict></w:r>' + FLD("end");
+  }
+  var PNG = (function () {
+    var s = atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="), u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u;
+  })();
+
+  // A package. o: { body, numbering, rels: [[id, kind, target, external]], files: { name: text or bytes } }
+  function RELS(rels) {
+    return HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      rels.map(function (r) { return '<Relationship Id="' + r[0] + '" Type="' + REL + r[1] + '" Target="' + esc(r[2]) + '"' + (r[3] ? ' TargetMode="External"' : '') + '/>'; }).join("") + '</Relationships>';
+  }
+  function make(o) {
+    var CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.";
+    var rels = [["rIdS", "styles", "styles.xml"]].concat(o.numbering ? [["rIdN", "numbering", "numbering.xml"]] : []).concat(o.rels || []);
+    var types = '<Override PartName="/word/styles.xml" ContentType="' + CT + 'styles+xml"/>' + (o.numbering ? '<Override PartName="/word/numbering.xml" ContentType="' + CT + 'numbering+xml"/>' : '') +
+      '<Override PartName="/word/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>';
+    var files = [{ name: "word/styles.xml", bytes: Zip.bytesOf(STYLES()) }];
+    if (o.numbering) files.push({ name: "word/numbering.xml", bytes: Zip.bytesOf(o.numbering) });
+    for (var n in (o.files || {})) files.push({ name: n, bytes: typeof o.files[n] === "string" ? Zip.bytesOf(o.files[n]) : o.files[n] });
+    return Zip.write([
+      { name: "[Content_Types].xml", bytes: Zip.bytesOf(HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+        '<Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="' + CT + 'document.main+xml"/>' + types + '</Types>') },
+      { name: "_rels/.rels", bytes: Zip.bytesOf(RELS([["rId1", "officeDocument", "word/document.xml"]])) },
+      { name: "word/document.xml", bytes: Zip.bytesOf(HEAD + '<w:document' + NS + '><w:body>' + o.body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body></w:document>') },
+      { name: "word/_rels/document.xml.rels", bytes: Zip.bytesOf(RELS(rels)) }
+    ].concat(files));
+  }
+  function imp(o) { return make(o).then(function (blob) { return I.read(blob, { name: "made.docx" }); }); }
+
+  // ---- reading the result ----
+  function text(b) { return b.runs ? b.runs.map(function (r) { return r.t; }).join("") : (b.text || ""); }
+  function brief(blocks) {
+    return blocks.map(function (b) {
+      if (b.type === "kept") return "kept " + b.kind + (b.floating ? " floating" : "");
+      if (b.type === "table") return "table";
+      if (b.type === "list") return "list " + b.list + ":" + text(b);
+      return b.type.charAt(0) + ":" + text(b);
+    });
+  }
+  function entry(report, code) {
+    var found = null;
+    ["toCheck", "changed", "notCarried"].forEach(function (l) { report[l].forEach(function (e) { if (e.code === code) found = e; }); });
+    return found;
+  }
+  function count(xml, re) { return (xml.match(re) || []).length; }
+  function plainWords(s) { return !/[\u2013\u2014]/.test(s) && !/\b[A-Z]{4,}\b/.test(s) && !/the tool/i.test(s) && /\.$/.test(s); }
+  // The exported Word file: { doc, rels (every relationships part, joined), names }.
+  function unpack(blob) {
+    return Zip.read(blob).then(function (files) {
+      var out = { doc: "", rels: "", names: files.map(function (f) { return f.name; }), files: files };
+      files.forEach(function (f) {
+        if (f.name === "word/document.xml") out.doc = Zip.text(f);
+        else if (/\.rels$/.test(f.name)) out.rels += Zip.text(f);
+      });
+      return out;
+    });
+  }
+  function exported(project) {
+    return H.buildDocument(project, { issueStatus: "draft" }).then(function (res) { return unpack(res.blob); });
+  }
+  // Every relationship to something outside the file that is not a web or email link to click.
+  function outsideRels(rels) {
+    return (rels.match(/<Relationship\b[^>]*>/g) || []).filter(function (r) {
+      if (!/TargetMode="External"/.test(r)) return false;
+      var type = /Type="([^"]*)"/.exec(r)[1], target = /Target="([^"]*)"/.exec(r)[1].replace(/&amp;/g, "&");
+      return !(/\/hyperlink$/.test(type) && /^(https?:\/\/|mailto:)/i.test(target));
+    });
+  }
+  function parse(xml) { return new DOMParser().parseFromString(xml, "application/xml"); }
+
+  var chain = Promise.resolve();
+  function test(name, fn) {
+    chain = chain.then(fn).then(null, function (e) { ok(false, name + ": it ran", (e && (e.stack || e.message)) || String(e)); });
+  }
+
+  // ---- 1. a diagram of loose shapes in a table cell ----
+  var CELL_SHAPES = [["Internet", 1600000, 60000], ["Firewall", 1600000, 0], ["Switch", 1600000, 0], ["PLC", 200000, 0], ["HMI", 3000000, 0]];
+  function cellDiagram() {
+    // As Word lays a diagram over blank lines: each shape in a paragraph of its own, blank lines between and after.
+    var paras = [PX(SHAPE.apply(null, CELL_SHAPES[0])), EMPTY, PX(SHAPE.apply(null, CELL_SHAPES[1])), EMPTY, PX(SHAPE.apply(null, CELL_SHAPES[2])), EMPTY,
+      PX(SHAPE.apply(null, CELL_SHAPES[3]) + SHAPE.apply(null, CELL_SHAPES[4])), EMPTY, EMPTY, EMPTY];
+    return paras;
+  }
+  test("diagram in a cell", function () {
+    var paras = cellDiagram();
+    var body = P("Before the table.") +
+      '<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w="9000"/></w:tblGrid><w:tr><w:tc>' + paras.join("") + '</w:tc></w:tr>' +
+      '<w:tr><w:tc>' + P("Words in a cell") + EMPTY + EMPTY + '</w:tc></w:tr>' +
+      '<w:tr><w:tc>' + PX("", '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>') + '</w:tc></w:tr></w:tbl>' + P("After the table.");
+    return imp({ body: body, numbering: NUMBERING }).then(function (r) {
+      var p = r.project, t = p.blocks.filter(function (b) { return b.type === "table"; })[0];
+      var cell = t.rows[0].cells[0].blocks, k = cell[0];
+      eq(brief(cell), ["kept group floating"], "1 the shapes and blank lines of a diagram drawn in a cell are one kept block, not one block for each shape");
+      eq([count(k.xml, /<wp:anchor\b/g), count(k.xml, /<w:p\b[^>]*>(?![^<]*<\/w:t>)/g) >= paras.length, /^\s*<w:p[\s>]/.test(k.xml)], [5, true, true],
+        "1 the block holds every anchor and is whole paragraphs");
+      var outer = parse('<x xmlns:w="' + W + '">' + k.xml + '</x>').documentElement, top = [];
+      for (var c = outer.firstChild; c; c = c.nextSibling) if (c.nodeType === 1 && c.localName === "p") top.push(c.getElementsByTagNameNS(WP, "anchor").length);
+      eq(top, [1, 0, 1, 0, 1, 0, 2, 0, 0, 0], "1 every paragraph of the cell is there in order, blank lines and the ones after the last shape included, so the cell keeps its height");
+      eq(brief(t.rows[1].cells[0].blocks), ["p:Words in a cell"], "1 blank lines in a cell with no drawing go, as before");
+      eq(brief(t.rows[2].cells[0].blocks), ["list number:"], "1 a numbered paragraph with no words in a cell still keeps its number");
+      eq(brief(p.blocks), ["p:Before the table.", "table", "p:After the table."], "1 nothing of the cell leaks out of the table");
+      return exported(M.normalise(p)).then(function (x) {
+        var dom = parse(x.doc), tcs = dom.getElementsByTagNameNS(W, "tc"), tc = null;
+        for (var i = 0; i < tcs.length; i++) if (tcs[i].getElementsByTagNameNS(WP, "anchor").length) tc = tcs[i];
+        ok(!!tc, "1 the export has the diagram in a cell");
+        if (!tc) return;
+        var ps = [], offs = [];
+        for (var c2 = tc.firstChild; c2; c2 = c2.nextSibling) if (c2.nodeType === 1 && c2.localName === "p") ps.push(c2.getElementsByTagNameNS(WP, "anchor").length);
+        var anchors = tc.getElementsByTagNameNS(WP, "anchor");
+        for (var j = 0; j < anchors.length; j++) {
+          var h = anchors[j].getElementsByTagNameNS(WP, "positionH")[0], v = anchors[j].getElementsByTagNameNS(WP, "positionV")[0];
+          offs.push([h.getAttribute("relativeFrom"), +h.textContent, v.getAttribute("relativeFrom"), +v.textContent]);
+        }
+        eq(ps, [1, 0, 1, 0, 1, 0, 2, 0, 0, 0], "1 in the exported cell the paragraphs are the source's: one per anchor and every blank line");
+        eq(offs, CELL_SHAPES.map(function (s) { return ["column", s[1], "paragraph", s[2]]; }), "1 every shape keeps the place its anchor gave it");
+      });
+    });
+  });
+
+  // ---- 2. linked pictures, and a link's look in a text box ----
+  test("linked pictures", function () {
+    var boxWords = PX(LINK("rIdFile", "See the full drawing here") + INCLUDED("rIdRemote1"));
+    var boxVml = PX(LINK("rIdFile2", "See the full drawing here") + INCLUDED("rIdRemote2"));
+    return imp({
+      rels: [["rIdFile", "hyperlink", "file://///fileserver.example/share/drawing.hta", true], ["rIdFile2", "hyperlink", "file://///fileserver.example/share/drawing.hta", true],
+        ["rIdRemote1", "image", UNC, true], ["rIdRemote2", "image", UNC, true], ["rIdOnly", "image", "\\\\fileserver.example\\share\\only.png", true],
+        ["rIdBoth", "image", "http://tracker.example/both.png", true], ["rIdPng", "image", "media/image1.png"], ["rIdGrp", "image", "https://tracker.example/group.png", true],
+        ["rIdEmb", "image", "https://tracker.example/plain.png", true], ["rIdChart", "chart", "charts/chart1.xml"], ["rIdWeb", "hyperlink", "https://example.org/", true]],
+      files: { "word/media/image1.png": PNG,
+        "word/charts/chart1.xml": '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="' + RNS + '"><c:chart/><c:externalData r:id="rId3"><c:autoUpdate val="1"/></c:externalData></c:chartSpace>',
+        "word/charts/_rels/chart1.xml.rels": RELS([["rId3", "oleObject", "file:///\\\\host\\share\\Book1.xlsx", true]]) },
+      body: P("Start") + PX(BOX(boxWords, boxVml, "Call-out")) +
+        PX(PICRUN('r:link="rIdOnly"', "Linked only", true)) +
+        PX(PICRUN('r:embed="rIdPng" r:link="rIdBoth"', "Linked and saved", true)) +
+        PX(GROUP('r:link="rIdGrp"', "Logo group")) +
+        PX(PICRUN('r:embed="rIdEmb"', "Plain from outside")) +
+        PX(CHART("rIdChart", "Chart 1")) + PX(R("A ") + '<w:hyperlink r:id="rIdWeb"><w:r><w:t>web link</w:t></w:r></w:hyperlink>') + P("End")
+    }).then(function (r) {
+      var p = r.project, b = p.blocks;
+      eq(brief(b), ["p:Start", "kept textbox", "kept picture", "kept group", "kept chart", "p:A web link", "p:End"],
+        "2 a picture that was only a link is left out, at the top level and as the only thing in a frame; the rest is kept");
+      var box = b[1], both = b[2], group = b[3], chart = b[4];
+      ok(!/imagedata|v:shape\b|INCLUDEPICTURE/.test(box.xml) && /See the full drawing here/.test(box.xml), "2 the picture INCLUDEPICTURE left in the text box is gone, in both versions of the box; the words stay", box.xml.slice(0, 400));
+      ok(!/0563C1/i.test(box.xml) && !/<w:u\b/.test(box.xml) && !/w:val="Hyperlink"/.test(box.xml), "2 the words of the file link taken off the text box are no longer blue and underlined", box.xml.slice(0, 600));
+      ok(!/:link=/.test(both.xml) && /r:embed="/.test(both.xml), "2 a picture saved in the file and linked keeps its own copy and loses the link");
+      ok(!/<pic:pic\b/.test(group.xml) && /<wps:wsp\b/.test(group.xml), "2 in a group the linked picture goes and the shape stays");
+      var all = b.filter(function (x) { return x.type === "kept"; }).reduce(function (list, x) { return list.concat(x.rels); }, []);
+      Object.keys(p.parts).forEach(function (k) { all = all.concat(p.parts[k].rels || []); });
+      eq(all.filter(function (x) { return x.external != null; }).map(function (x) { return x.external; }), [], "2 no kept block or carried part holds an address outside the file");
+      return p.parts[chart.rels[0].part].blob.text().then(function (chartXml) {
+        ok(!/externalData/.test(chartXml) && /<c:chart\b/.test(chartXml), "2 a chart linked to a workbook keeps its figures and loses the link", chartXml);
+        var pics = entry(r.report, "linked-pictures"), objs = entry(r.report, "linked-objects");
+        ok(pics && r.report.notCarried.indexOf(pics) >= 0 && pics.count === 5, "2 every linked picture is listed as not carried over (count of addresses)", JSON.stringify(pics));
+        eq(pics && pics.examples, [UNC, "\\\\fileserver.example\\share\\only.png", "http://tracker.example/both.png", "https://tracker.example/group.png", "https://tracker.example/plain.png"],
+          "2 with each address");
+        ok(objs && r.report.notCarried.indexOf(objs) >= 0 && objs.count === 1 && objs.examples[0] === "file:///\\\\host\\share\\Book1.xlsx", "2 the chart's workbook link is listed as not carried over, with its address", JSON.stringify(objs));
+        eq(F.sentence({ code: "linked-pictures", count: 1 }), "A picture linked to a file or web address outside the document was left out, because Word would fetch it when the file is opened. Insert the picture itself if it is needed.",
+          "2 the sentence for one");
+        var many = F.sentence(pics), lo = F.sentence(objs);
+        ok(/^5 pictures linked to a file or web address outside the document were left out, because Word would fetch them when the file is opened\. Insert the pictures themselves if they are needed\.$/.test(many) &&
+          plainWords(many) && plainWords(lo) && /left out/.test(lo), "2 the sentences read properly for many and say what was left out", many + " | " + lo);
+        return exported(M.normalise(p));
+      }).then(function (x) {
+        eq(outsideRels(x.rels), [], "2 the exported file has no relationship outside the file but a web or email link");
+        ok(!/fileserver|tracker\.example|Book1\.xlsx|INCLUDEPICTURE/.test(x.rels + x.doc) && /https:\/\/example\.org\//.test(x.rels), "2 no linked address reaches the file; the web link does");
+      });
+    });
+  });
+
+  // ---- 3. the model, the writer and the graft refuse what slipped through ----
+  test("defences", function () {
+    var doc = M.normalise(M.create ? M.create() : { blocks: [] });
+    var blip = '<w:r xmlns:w="' + W + '" xmlns:r="' + RNS + '"><w:drawing><a:blip xmlns:a="' + DML + '" r:embed="sptK1" r:link="sptK2"/></w:drawing></w:r>';
+    var only = '<w:r xmlns:w="' + W + '" xmlns:r="' + RNS + '"><w:pict><v:imagedata xmlns:v="urn:schemas-microsoft-com:vml" r:id="sptK3"/></w:pict></w:r>';
+    var key = M.addPart(doc, new Blob([PNG], { type: "image/png" }), { name: "word/media/image1.png", contentType: "image/png" });
+    var both = { id: "bk1", type: "kept", kind: "picture", xml: blip, rels: [{ id: "sptK1", type: REL + "image", part: key }, { id: "sptK2", type: REL + "image", external: UNC }], width: 50, height: 50, text: "", description: "Picture" };
+    var bare = { id: "bk2", type: "kept", kind: "picture", xml: only, rels: [{ id: "sptK3", type: REL + "image", external: "\\\\server\\share\\a.png" }], width: 50, height: 50, text: "", description: "Picture" };
+    var chartKey = M.addPart(doc, new Blob(["<c/>"]), { name: "word/charts/chart1.xml", contentType: "application/xml", rels: [{ id: "rId1", type: REL + "oleObject", external: "file:///C:/x.xlsx" }, { id: "rId2", type: REL + "hyperlink", external: "javascript:alert(1)" }] });
+    var chart = { id: "bk3", type: "kept", kind: "chart", xml: '<w:r xmlns:w="' + W + '"/>', rels: [{ id: "sptK4", type: REL + "chart", part: chartKey }], width: 50, height: 50, text: "", description: "Chart" };
+    doc.blocks = [M.make.paragraph ? M.make.paragraph(doc, "Text") : { id: "bp", type: "paragraph", runs: [{ t: "Text" }] }, both, bare, chart];
+    var raw = JSON.parse(JSON.stringify({ blocks: doc.blocks }));
+    var n = M.normalise(doc), nb = {};
+    n.blocks.forEach(function (x) { nb[x.id] = x; });
+    eq([/:link=/.test(nb.bk1.xml), nb.bk1.rels.map(function (x) { return x.id; })], [false, ["sptK1"]], "3 normalise: a picture saved and linked keeps its copy; the link and its relationship go");
+    ok(nb.bk2.rels.every(function (x) { return x.external == null; }) && M.missing(n).indexOf("bk2") >= 0, "3 normalise: a picture that is only an address counts as missing, so it prints a prompt", JSON.stringify(nb.bk2.rels));
+    eq(n.parts[chartKey].rels.map(function (x) { return x.external || x.part; }), ["?outside", "about:blank"], "3 normalise: a carried part's link to a workbook is refused the same way; a bad link to click points nowhere");
+    ok(M.missing(n).indexOf("bk3") >= 0, "3 normalise: a chart that depends on such a part counts as missing");
+    // The writer, given blocks that never went through normalise.
+    var rawDoc = { blocks: [raw.blocks[0], raw.blocks[2], raw.blocks[3]], parts: doc.parts, media: {}, info: n.info, options: n.options, footnotes: {} };
+    rawDoc.parts[chartKey].rels = [{ id: "rId1", type: REL + "oleObject", external: "file:///C:/x.xlsx" }];
+    return H.buildDocument(M.normalise ? Object.assign({}, n, { blocks: rawDoc.blocks, parts: rawDoc.parts }) : rawDoc, { issueStatus: "draft" }).then(function (res) {
+      return unpack(res.blob).then(function (x) {
+        eq(outsideRels(x.rels), [], "3 writer: a block that names something outside the file is never written as it was");
+        eq([count(x.doc, /KEPT:/g), count(x.doc, /This picture could not be restored/g)], [0, 2], "3 writer: a prompt prints in the place of each");
+      });
+    }).then(function () {
+      var plan = { kept: [{ token: G.token("bk9"), blockId: "bk9", kind: "picture", xml: only, rels: [{ id: "sptK3", type: REL + "image", external: UNC }] }], parts: {} };
+      return G.apply(new Blob(["x"]), plan).then(function () { ok(false, "3 graft: a plan with a linked picture is refused"); },
+        function (e) { ok(e && e.blockId === "bk9" && /outside the document/.test(e.message), "3 graft: a plan with a linked picture is refused, naming the block", e && e.message); });
+    });
+  });
+
+  chain.then(finish, function (e) { ok(false, "the run", e && e.message); finish(); });
+})();
+</script>
+</body>
+</html>

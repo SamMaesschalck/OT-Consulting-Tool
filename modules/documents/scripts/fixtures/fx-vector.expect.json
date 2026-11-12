@@ -1,0 +1,18 @@
+{
+  "inlineShapes": 2,
+  "inlineTypes": {
+    "graphic": 1,
+    "picture": 1
+  },
+  "shapes": 1,
+  "shapeTypes": {
+    "canvas": 1
+  },
+  "equations": {
+    "min": 1
+  },
+  "textBoxFont": "Aptos",
+  "textBoxSize": 12,
+  "protection": "none",
+  "fitsPage": true
+}

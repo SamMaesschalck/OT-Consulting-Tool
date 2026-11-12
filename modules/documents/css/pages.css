@@ -1,0 +1,113 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* pages.css: the welcome, Document information, Preview, Issue and export,
+   Import report and About pages (js/pages.js). Colours come from the theme's
+   variables, so both themes follow. The sheets of the preview are paper and
+   stay white in the dark theme, as the editor's page does. */
+
+/* ---- welcome ---- */
+.dp-start { border: 2px dashed var(--border-strong); border-radius: var(--radius-lg); padding: 28px 20px; text-align: center; background: var(--surface); margin-bottom: 16px; }
+.dp-start p { margin: 0 0 10px; }
+.dp-start .btn { margin: 6px; }
+.dp-steps { margin: 0; padding-left: 20px; }
+.dp-steps li { margin: 4px 0; }
+
+/* ---- Document information ---- */
+.dp-info { display: flex; gap: 24px; align-items: flex-start; }
+.dp-info-fields { flex: 1 1 0; min-width: 0; }
+.dp-wide { grid-column: 1 / -1; }
+.dp-kinds { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
+.dp-kinds legend { padding: 0; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+.dp-kind, .dp-option { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; cursor: pointer; }
+.dp-kind input, .dp-option input { flex: 0 0 auto; margin: 0; position: relative; top: 1px; }
+.dp-options { margin-top: 4px; }
+.dp-warn { color: var(--gap); }
+
+/* The cover miniature: a picture of the page in a frame. The page inside is
+   drawn at full size and scaled by script (zoom), so the frame only sets the
+   width and clips. */
+.dp-mini { flex: 0 0 240px; width: 240px; }
+.dp-mini-label { font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+.dp-mini-frame { width: 240px; border: 1px solid var(--border-strong); border-radius: 2px; box-shadow: 0 1px 4px rgba(20,33,52,0.18); background: #FFF; color: #1A2533; overflow: hidden; pointer-events: none; user-select: none; }
+/* An A4 page: the frame keeps the shape whatever is drawn in it. */
+.dp-mini-frame.is-cover { aspect-ratio: 794 / 1123; }
+.dp-mini-frame:not(.is-cover) { padding: 12px; box-sizing: border-box; font-size: 11px; }
+/* A short document's opening is not a whole page: it is drawn small and wraps
+   inside the frame, so no line of the title is cut off. */
+.dp-mini-frame:not(.is-cover) .doc-title { font-size: 17px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.dp-mini-frame:not(.is-cover) .cap { font-size: 10px; margin-bottom: 0; overflow-wrap: anywhere; }
+.dp-mini-line { font-size: 12px; margin: 6px 0 0; }
+@media (max-width: 1100px) {
+  .dp-info { flex-direction: column; }
+}
+
+/* ---- lists of things to look at (Issue, Import report) ---- */
+.dp-list, .dp-entries, .dp-quotes { list-style: none; margin: 0; padding: 0; }
+.dp-list li { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--border); }
+.dp-list li:first-child { border-top: 0; }
+.dp-list-t { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+/* What prints red in the Word file is shown red here too. */
+.dp-red { color: #E00000; }
+:root[data-theme="dark"] .dp-red { color: #FF7B72; }
+.dp-list .btn, .dp-entry .btn { padding: 3px 10px; font-size: 12px; flex: 0 0 auto; }
+.dp-export-row { margin: 4px 0 8px; }
+#dp-final-why, #dp-export-name { margin: 6px 0 0; }
+
+.dp-summary { font-size: 15px; margin: 0 0 12px; }
+.dp-report-go { align-items: center; margin-bottom: 18px; }
+.dp-entry { padding: 10px 0; border-top: 1px solid var(--border); }
+.dp-entry:first-child { border-top: 0; padding-top: 0; }
+.dp-entry:last-child { padding-bottom: 0; }
+.dp-entry-t { margin: 0 0 6px; }
+.dp-entry-said { margin: 0 0 2px; font-size: 13px; }
+.dp-quotes { margin: 0 0 8px; }
+.dp-quotes li { border-left: 3px solid var(--border-strong); padding: 2px 0 2px 10px; margin: 4px 0; font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+.dp-drawing { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.dp-drawing-t { flex: 1 1 0; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.dp-drawing-t strong { font-size: 14px; }
+#dp-drawings { margin-top: 12px; }
+
+/* ---- preview ---- */
+.dp-note { border: 1px solid var(--border-strong); border-left: 3px solid var(--brand-blue); border-radius: var(--radius); background: var(--surface); padding: 8px 12px; margin: 0 0 14px; font-size: 13px; }
+.dp-preview { overflow-x: auto; padding-bottom: 24px; }
+/* A4 at 96 dpi with the template's 1 inch margins; landscape is the same
+   sheet turned. The cover and nothing else runs to the edge. */
+.dp-sheet { box-sizing: border-box; width: 794px; min-height: 1123px; margin: 0 auto 18px; padding: 96px; background: #FFF; color: #1A2533; border: 1px solid var(--border-strong); box-shadow: 0 1px 4px rgba(20,33,52,0.18); }
+.dp-sheet.land { width: 1123px; min-height: 794px; }
+.dp-sheet[data-part="cover"] { padding: 0; height: 1123px; overflow: hidden; }
+/* The sheet has the page margins, so a block on it fills the text area and
+   brings none of its own (in the editor each block is a slice of the page,
+   margins included). The landscape block is named so this outranks its width
+   in editor.css whatever the order of the stylesheets. */
+.dp-sheet > .blk, .dp-sheet > .blk.land { width: auto; padding-left: 0; padding-right: 0; background: transparent; }
+/* A sheet's footnotes, under a short rule as Word prints them (9 pt). */
+.dp-fn-list { margin-top: 28px; font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, Arial, sans-serif; }
+.dp-fn-list::before { content: ""; display: block; width: 33%; border-top: 1px solid #1A2533; margin-bottom: 6px; }
+.dp-fn { display: flex; gap: 3px; align-items: baseline; margin: 0 0 4px; font-size: 12px; line-height: 1.33; color: #1A2533; }
+.dp-fn-n { flex: none; font-size: 9px; position: relative; top: -4px; }
+.dp-fn-t { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dp-fn-t a[data-link] { color: #0F5FA6; text-decoration: underline; }
+.dp-fn-t code { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 11px; background: #F4F7FA; padding: 0 2px; border-radius: 2px; }
+/* A reference opens nothing here: its footnote is at the end of the sheet. */
+.dp-sheet sup.fn { cursor: default; }
+/* The contents entries scroll to their heading, which then holds the keyboard. */
+.dp-sheet > .blk:focus-visible { outline: 2px solid #0F5FA6; outline-offset: 4px; }
+/* The cover strip's label and value pairs (render.js coverEl), each one unit
+   as in the Word strip: a pair that fits moves to the next line whole, one
+   too long for a line has a line of its own and wraps inside its value. The
+   spacing is the strip's own (editor.css): 10px from a label to its value,
+   32px to the next label. The pair's size is the value's, so a line is as
+   tall as before. */
+.cover-page .cover-strip > .cover-pair { display: block; max-width: 100%; min-width: 0; font-size: 12.67px; overflow-wrap: anywhere; }
+.cover-page .cover-pair > .cover-v { margin-left: 10px; }
+
+/* ---- about ---- */
+.dp-keys { display: grid; grid-template-columns: minmax(150px, auto) 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+.dp-keys dt { font-weight: 700; }
+.dp-keys dd { margin: 0; }
+.dp-licence { white-space: pre-wrap; font-size: 12px; max-height: 320px; overflow: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+
+@media (max-width: 900px) {
+  .dp-keys { grid-template-columns: 1fr; gap: 0; }
+  .dp-keys dd { margin-bottom: 8px; }
+  .dp-list li, .dp-drawing { flex-direction: column; align-items: flex-start; }
+}

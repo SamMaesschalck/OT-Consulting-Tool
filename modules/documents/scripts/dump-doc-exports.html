@@ -1,0 +1,327 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: exports for the Word check</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'" />
+</head>
+<body>
+<p id="status">running</p>
+<!--
+  Not a test page. tools\word-open-check.ps1 -DumpPage dump-doc-exports.html
+  runs this in headless Edge and opens every document it prints in real Word
+  (docs/document-tool-design.md section 7). A headless page cannot write
+  files, so each document is printed as base64 in a pre element that carries
+  its file name (data-name) and what Word should find in it (data-expect, as
+  JSON), and the script reads them back from the dumped page.
+
+  What is printed:
+    - a document written in the tool, as a report and as a short document,
+      draft and final;
+    - every Word fixture imported and exported, draft and final;
+    - every kept object of the art fixture copied once (two charts on one
+      part is what Word refuses; DocxGraft.unshare is what prevents it);
+    - a chart, a diagram and an embedded sheet in table cells on a landscape
+      page, where each must be made smaller to fit its cell;
+    - a 6,000-block document.
+
+  What Word is asked to confirm (data-expect). For an imported fixture the
+  expected values start from the fixture's own, which make-fixtures.ps1
+  recorded from Word when it made the file (fixtures/<name>.expect.json):
+  the pictures, charts, diagrams, embedded objects and shapes must be there
+  in the same numbers and of the same kinds, text boxes in the source's font
+  and size, the theme's accent colour and font as the source's. Three things
+  differ by design and are allowed for below:
+    - the template adds its own (HOUSE): the cover's two pictures, and on a
+      draft the DRAFT watermark on the cover;
+    - a picture that floated in the source is put in line (4.4), so it moves
+      from the shapes to the in-line pictures;
+    - nothing in line may be wider than the page: the writer makes it fit.
+-->
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script src="fixtures/index.js"></script>
+<script>
+  (window.FixtureIndex || []).forEach(function (f) { document.write('<script src="fixtures/' + f.name + '.js"><\/script>'); });
+</script>
+<script>
+(function () {
+  var A = window.App, M = A.DocModel, H = A.HouseDocx, I = A.DocxImport;
+  // Unzipping runs off the main thread; a bounced message keeps the headless
+  // page alive until the last document is printed (as test-doc-zip.html).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  function log(t) { var p = document.createElement("p"); p.className = "log"; p.textContent = t; document.body.appendChild(p); }
+  window.addEventListener("error", function (e) { log("ERROR " + e.message + " " + e.filename + ":" + e.lineno); });
+  document.addEventListener("securitypolicyviolation", function (e) { log("ERROR policy violation: " + e.violatedDirective + " " + e.blockedURI); });
+
+  function bytes(b64) { var s = atob(b64), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+  function toB64(blob) {
+    return blob.arrayBuffer().then(function (buf) {
+      var u = new Uint8Array(buf), s = "";
+      for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+      return btoa(s);
+    });
+  }
+  function emit(name, blob, expect) {
+    return toB64(blob).then(function (s) {
+      var pre = document.createElement("pre");
+      pre.setAttribute("data-name", name);
+      pre.setAttribute("data-expect", JSON.stringify(expect || {}));
+      pre.textContent = s;
+      document.body.appendChild(pre);
+    });
+  }
+  // The fixture's own expected values, written beside it by make-fixtures.ps1
+  // and carried in fixtures/index.js (the policy above allows no file read).
+  function sourceExpect(name) {
+    var e = (window.FixtureExpect || {})[name];
+    if (!e) log("ERROR the expected values of " + name + " are not in fixtures/index.js: run build-fixtures.ps1");
+    return e ? JSON.parse(JSON.stringify(e)) : null;
+  }
+
+  // What the template itself adds, as Word counts it: on a report's cover the
+  // background art (a floating picture) and the logo (in line), and on a
+  // draft the cover's DRAFT watermark (a text effect). The header's logo and
+  // watermark are in the header story, which these counts do not include.
+  function house(kind, status) {
+    var h = { inline: {}, shapes: {} };
+    if (kind !== "short") {
+      h.inline.picture = 1;
+      h.shapes.picture = 1;
+      if (status !== "final") h.shapes.textEffect = 1;
+    }
+    return h;
+  }
+  function sum(o) { var n = 0; Object.keys(o).forEach(function (k) { n += o[k]; }); return n; }
+  function add(into, from, times) { Object.keys(from || {}).forEach(function (k) { into[k] = (into[k] || 0) + from[k] * (times || 1); }); return into; }
+  // What Word should find in an export, given what it found in the source.
+  // `times` is 2 for the document with every kept object copied.
+  function expectFrom(src, kind, status, o) {
+    o = o || {};
+    var h = house(kind, status), inline = add({}, src.inlineTypes || {}), shapes = add({}, src.shapeTypes || {});
+    var floatingPictures = shapes.picture || 0;
+    delete shapes.picture;
+    if (floatingPictures) inline.picture = (inline.picture || 0) + floatingPictures;
+    if (o.inline) inline = o.inline;
+    if (o.shapes) shapes = o.shapes;
+    add(inline, h.inline); add(shapes, h.shapes);
+    var e = {
+      inlineShapes: sum(inline), inlineTypes: inline, shapes: sum(shapes), shapeTypes: shapes,
+      protection: status === "final" ? "readOnly" : "none", fitsPage: true, tooWide: 0
+    };
+    if (o.progIds || src.progIds) e.progIds = o.progIds || src.progIds;
+    ["textBoxFont", "textBoxSize", "accent1", "minorFont"].forEach(function (k) { if (src[k] != null) e[k] = src[k]; });
+    // With no shape that holds text there is no text box font to read.
+    if (!shapes.textBox && !shapes.autoShape && !shapes.canvas && !shapes.group) { delete e.textBoxFont; delete e.textBoxSize; }
+    if (src.footnotes != null) e.footnotes = src.footnotes + (src.endnotes || 0);
+    if (src.equations != null) e.equations = src.equations;
+    e.footnoteFont = e.footnotes ? "Segoe UI" : undefined;
+    if (!e.footnotes) delete e.footnoteFont;
+    return e;
+  }
+
+  // A draft prints what is still to write in red; a final is refused until
+  // nothing is. For the final of an imported file the prompts are answered.
+  function completed(doc) {
+    var d = M.normalise(doc);
+    if (!String(d.info.title || "").trim()) d.info.title = "Imported document";
+    M.each(d, function (b) {
+      if (b.type === "prompt") { b.type = "paragraph"; b.runs = [{ t: b.text }]; delete b.text; }
+      (b.runs || []).forEach(function (r) { delete r.red; });
+    });
+    Object.keys(d.footnotes || {}).forEach(function (k) { (d.footnotes[k].runs || []).forEach(function (r) { delete r.red; }); });
+    return d;
+  }
+  function build(name, doc, status, expect) {
+    return H.buildDocument(doc, { issueStatus: status }).then(function (res) {
+      return emit(name, res.blob, expect).then(function () { log("BUILT " + name + " " + res.blob.size + " bytes, fitted " + (res.fitted || []).length); return res; });
+    }, function (e) { log("ERROR " + name + " was not built: " + (e && (e.stack || e.message))); });
+  }
+
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFElEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC";
+  function para(doc, t) { return M.make.paragraph(doc, t); }
+
+  // ---- a document written in the tool ---------------------------------------
+  function written(kind, withPrompts) {
+    var doc = M.create(kind);
+    doc.info.title = kind === "short" ? "Site visit note" : "Network segmentation proposal";
+    doc.info.docType = "Proposal"; doc.info.reference = "OPP-10442"; doc.info.client = "Northfield Water";
+    doc.info.site = "Ashby treatment works"; doc.info.author = "A. Consultant"; doc.info.date = "2026-11-11";
+    doc.options.numberHeadings = true; doc.options.contents = kind === "report";
+    var m = M.addMedia(doc, new Blob([bytes(PNG)], { type: "image/png" }), { type: "image/png", name: "plan.png", width: 8, height: 8, source: "insert" });
+    var fn = M.newId(doc, "f");
+    doc.footnotes[fn] = { runs: [{ t: "Costs are budgetary." }] };
+    var bl = [];
+    bl.push(M.make.heading(doc, 1, "Summary"));
+    var p = para(doc, "");
+    p.runs = [{ t: "This proposal sets out " }, { t: "three", b: true }, { t: " options" }, { t: "", fn: fn }, { t: ", in " }, { t: "italic", i: true }, { t: ", " }, { t: "underline", u: true },
+      { t: ", " }, { t: "struck", s: true }, { t: ", x" }, { t: "2", sup: true }, { t: ", H" }, { t: "2", sub: true }, { t: "O and " }, { t: "code", code: true }, { t: ". See " },
+      { t: "IEC 62443", link: "https://example.com/a?b=1&c=2" }, { t: "." }];
+    bl.push(p);
+    if (withPrompts) { bl.push(M.make.prompt(doc, "Add the cost of each option.")); var r = para(doc, ""); r.runs = [{ t: "The site is " }, { t: "to be confirmed", red: true }, { t: "." }]; bl.push(r); }
+    bl.push(M.make.heading(doc, 2, "Options"));
+    [["number", 0, "Separate the control network."], ["number", 1, "With a firewall."], ["number", 2, "And rules."], ["number", 0, "Add a demilitarised zone."], ["bullet", 0, "A bullet."], ["bullet", 1, "A deeper bullet."]]
+      .forEach(function (x) { bl.push(M.make.list(doc, x[0], x[1], x[2])); });
+    bl.push(M.make.heading(doc, 3, "Detail"));
+    var t = M.make.table(doc, 3, 3);
+    t.header = 1; t.caption = "Zones and their assets";
+    ["Zone", "Assets", "Level", "Control", "PLCs and HMIs", "2", "Supervisory", "Servers", "3"].forEach(function (txt, i) { t.rows[Math.floor(i / 3)].cells[i % 3].blocks[0].runs = [{ t: txt }]; });
+    bl.push(t);
+    var pic = M.make.picture(doc, m, 96, 96);
+    pic.caption = "Current network"; pic.alt = "Diagram of the current network";
+    bl.push(pic);
+    bl.push(M.make.pageBreak(doc));
+    var wideHead = M.make.heading(doc, 2, "Wide register"); wideHead.land = true; bl.push(wideHead);
+    var wide = M.make.table(doc, 2, 6); wide.land = true; wide.header = 1; bl.push(wide);
+    bl.push({ id: M.newId(doc, "b"), type: "kept", kind: "equation", xml: '<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:w="' + W + '"><m:r><m:t>a+b=c</m:t></m:r></m:oMath>', rels: [], width: 0, height: 0, floating: false, text: "a+b=c", label: "", description: "Equation" });
+    bl.push(para(doc, "The end."));
+    doc.blocks = bl;
+    return doc;
+  }
+  function writtenExpect(kind, status) {
+    var h = house(kind, status), inline = add({ picture: 1 }, h.inline), shapes = add({}, h.shapes);
+    return { inlineShapes: sum(inline), inlineTypes: inline, shapes: sum(shapes), shapeTypes: shapes, footnotes: 1, footnoteFont: "Segoe UI", footnoteSize: 9,
+      listParagraphs: 6, equations: 1, protection: status === "final" ? "readOnly" : "none", fitsPage: true, headerShapes: status === "final" ? 0 : { min: 1 } };
+  }
+
+  var chain = Promise.resolve();
+  ["report", "short"].forEach(function (kind) {
+    chain = chain.then(function () { return build("written-" + kind + "-draft.docx", written(kind, true), "draft", writtenExpect(kind, "draft")); })
+      .then(function () { return build("written-" + kind + "-final.docx", written(kind, false), "final", writtenExpect(kind, "final")); });
+  });
+
+  // ---- what Word refused or printed wrongly before (review fixes) -------------
+  // Characters XML cannot hold, in every kind of text; numbered lists that
+  // open below their top level; a page break before anything else; pictures
+  // taller than a page, on a portrait page, on a landscape page and in a
+  // table cell. Word must open it, and nothing in line may be wider or
+  // taller than the text area of its page.
+  function tallPng(w, h) {
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var g = c.getContext("2d"); g.fillStyle = "#DCE9F3"; g.fillRect(0, 0, w, h); g.fillStyle = "#173267"; g.fillRect(0, 0, w, 6); g.fillRect(0, h - 6, w, 6);
+    return new Promise(function (res) { c.toBlob(function (b) { res(b); }, "image/png"); });
+  }
+  chain = chain.then(function () { return tallPng(300, 668); }).then(function (blob) {
+    var doc = M.create("report"), bl = [];
+    doc.info.title = "Awkward\u000B text and \u0001tall pictures"; doc.info.client = "Northfield\u000C Water"; doc.info.author = "A. Consultant￿";
+    doc.info.classification = "Commercial in confidence"; doc.info.date = "2026-11-11";
+    doc.options.numberHeadings = true; doc.options.contents = true;
+    var m = M.addMedia(doc, blob, { type: "image/png", name: "phone.png", width: 601, height: 1336, source: "insert" });
+    function pic(w, h, cap) { var p = M.make.picture(doc, m, w, h); p.caption = cap; p.alt = "A tall screenshot\u0002"; return p; }
+    bl.push(M.make.pageBreak(doc));
+    bl.push(M.make.heading(doc, 2, "A level 2 heading\u0003 first"));
+    var p = para(doc, ""); p.runs = [{ t: "Line one\u000Bline two, x￾y and half a pair \uD83D here." }]; bl.push(p);
+    [[1, "Opens at the second level."], [2, "Then the third."], [0, "Then the first."], [1, "And the second again."]].forEach(function (x) { bl.push(M.make.list(doc, "number", x[0], x[1])); });
+    bl.push(para(doc, "A list that opens at the third level:"));
+    var first = M.make.list(doc, "number", 2, "Third level first."); first.restart = true; bl.push(first);
+    bl.push(M.make.list(doc, "number", 2, "Third level again."));
+    bl.push(M.make.heading(doc, 1, "Tall pictures"));
+    bl.push(pic(601, 1336, "A phone screenshot\u0004, whole on its page"));
+    var t = M.make.table(doc, 1, 2); t.rows[0].cells[0].blocks[0].runs = [{ t: "In a cell" }]; t.rows[0].cells[1].blocks = [pic(280, 2000, "")]; delete t.rows[0].cells[1].blocks[0].caption;
+    bl.push(t);
+    var lh = M.make.heading(doc, 1, "On a landscape page"); lh.land = true; bl.push(lh);
+    var lp = pic(601, 1336, "The same picture on a landscape page"); lp.land = true; bl.push(lp);
+    doc.blocks = bl;
+    var h = house("report", "draft"), inline = add({ picture: 3 }, h.inline);
+    return build("awkward-text-and-tall-pictures-draft.docx", doc, "draft", { inlineShapes: sum(inline), inlineTypes: inline, shapes: sum(h.shapes), shapeTypes: h.shapes,
+      listParagraphs: 6, protection: "none", fitsPage: true, tooTall: 0, landscapeSections: 1 })
+      .then(function (res) { if (res && (res.fitted || []).length !== 3) log("ERROR 3 pictures are taller than their page, " + (res.fitted || []).length + " made smaller"); });
+  });
+
+  // ---- every fixture, imported and exported ---------------------------------
+  function importFixture(name) {
+    var b64 = (window.Fixtures || {})[name];
+    if (!b64) { log("ERROR the fixture " + name + " did not load"); return Promise.resolve(null); }
+    return I.read(new File([bytes(b64)], name + ".docx"), { name: name + ".docx" }).then(function (r) { return r.project; },
+      function (e) { log("ERROR " + name + " was not imported: " + (e && e.message)); return null; });
+  }
+  (window.FixtureIndex || []).forEach(function (fx) {
+    chain = chain.then(function () {
+      var src = sourceExpect(fx.name);
+      return importFixture(fx.name).then(function (doc) {
+        if (!doc || !src) return;
+        return build("imported-" + fx.name + "-draft.docx", doc, "draft", expectFrom(src, "report", "draft"))
+          .then(function () { return build("imported-" + fx.name + "-final.docx", completed(doc), "final", expectFrom(src, "report", "final")); });
+      });
+    });
+  });
+
+  // ---- copies of every kept object ------------------------------------------
+  chain = chain.then(function () {
+    var src = sourceExpect("fx-art");
+    return importFixture("fx-art").then(function (doc) {
+      if (!doc || !src) return;
+      doc = M.normalise(doc);
+      doc.info.title = "Every kept object, twice";
+      var kept = doc.blocks.filter(function (b) { return b.type === "kept"; });
+      doc.blocks = doc.blocks.concat([M.make.heading(doc, 1, "The copies")], M.copyBlocks(doc, kept));
+      // Kept: the cropped picture, the diagram, two charts and the sheet in
+      // line; two shapes and a text box floating. Each is there twice.
+      var e = expectFrom(src, "report", "draft", {
+        inline: { picture: 3 + 1 + 2, smartArt: 2, chart: 4, embeddedObject: 2 },
+        shapes: { autoShape: 4, textBox: 2 },
+        progIds: ["Excel.Sheet.12", "Excel.Sheet.12"]
+      });
+      return build("copies-of-kept-draft.docx", doc, "draft", e);
+    });
+  });
+
+  // ---- kept objects in table cells on a landscape page -----------------------
+  chain = chain.then(function () {
+    var src = sourceExpect("fx-art");
+    return importFixture("fx-art").then(function (doc) {
+      if (!doc || !src) return;
+      doc = M.normalise(doc);
+      doc.info.title = "Kept objects in a table";
+      var pick = {};
+      doc.blocks.forEach(function (b) { if (b.type === "kept" && !b.floating && !pick[b.kind]) pick[b.kind] = b; });
+      var kinds = ["chart", "smartart", "ole"].filter(function (k) { return pick[k]; });
+      var t = M.make.table(doc, 2, kinds.length);
+      t.land = true; t.header = 1; t.caption = "Each object must fit its cell";
+      kinds.forEach(function (k, c) { t.rows[0].cells[c].blocks[0].runs = [{ t: k }]; t.rows[1].cells[c].blocks = [pick[k]]; });
+      var head = M.make.heading(doc, 1, "In cells"); head.land = true;
+      doc.blocks = [head, t];
+      return build("kept-in-cells-landscape-draft.docx", doc, "draft", expectFrom(src, "report", "draft", {
+        inline: { chart: 1, smartArt: 1, embeddedObject: 1 }, shapes: {}, progIds: ["Excel.Sheet.12"]
+      })).then(function (res) { if (res && (res.fitted || []).length !== kinds.length) log("ERROR " + kinds.length + " objects in cells, " + (res.fitted || []).length + " made smaller"); });
+    });
+  });
+
+  // ---- a long document --------------------------------------------------------
+  chain = chain.then(function () {
+    var doc = M.create("report"), bl = [], n = 0;
+    doc.info.title = "A long document"; doc.info.client = "Northfield Water"; doc.options.numberHeadings = true; doc.options.contents = true;
+    var m = M.addMedia(doc, new Blob([bytes(PNG)], { type: "image/png" }), { type: "image/png", name: "dot.png", width: 8, height: 8, source: "insert" });
+    for (var s = 0; s < 60; s++) {
+      bl.push(M.make.heading(doc, 1, "Section " + (s + 1)));
+      for (var k = 0; k < 99; k++) {
+        n++;
+        if (k % 33 === 0) bl.push(M.make.heading(doc, 2, "Part " + n));
+        else if (k % 33 === 16) { var t = M.make.table(doc, 3, 3); t.header = 1; bl.push(t); }
+        else if (k % 33 === 20) bl.push(M.make.picture(doc, m, 48, 48));
+        else if (k % 11 === 5) bl.push(M.make.list(doc, k % 2 ? "number" : "bullet", 0, "Item " + n));
+        else bl.push(para(doc, "Paragraph " + n + " of a document long enough to be three hundred pages when Word lays it out."));
+      }
+    }
+    doc.blocks = bl;
+    var pictures = bl.filter(function (b) { return b.type === "picture"; }).length;
+    log("LONG " + bl.length + " blocks, " + pictures + " pictures");
+    var h = house("report", "draft");
+    return build("long-6000-blocks-draft.docx", doc, "draft", { inlineShapes: pictures + h.inline.picture, shapes: sum(h.shapes), protection: "none", fitsPage: true, pages: { min: 100 } });
+  });
+
+  chain.then(function () { alive = false; document.getElementById("status").textContent = "DUMP_DONE"; },
+    function (e) { log("ERROR " + (e && (e.stack || e.message))); alive = false; document.getElementById("status").textContent = "DUMP_DONE"; });
+})();
+</script>
+</body></html>

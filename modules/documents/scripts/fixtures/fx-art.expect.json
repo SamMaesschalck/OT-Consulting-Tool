@@ -1,0 +1,24 @@
+{
+  "inlineShapes": 8,
+  "inlineTypes": {
+    "picture": 4,
+    "smartArt": 1,
+    "chart": 2,
+    "embeddedObject": 1
+  },
+  "progIds": [
+    "Excel.Sheet.12"
+  ],
+  "shapes": 4,
+  "shapeTypes": {
+    "picture": 1,
+    "autoShape": 2,
+    "textBox": 1
+  },
+  "tooWide": 1,
+  "textBoxFont": "Aptos",
+  "textBoxSize": 12,
+  "accent1": "156082",
+  "minorFont": "Aptos",
+  "protection": "none"
+}

@@ -1,0 +1,457 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: fixes to the template and the writer</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Regression tests for the review of the Word template (shared/house-docx.js)
+  and the export (js/export.js). Each step is one finding, built into a real
+  Word file with the real library, zip reader and graft pass, and read back
+  from the XML:
+
+    1. the cover is two rows of exact height that cannot split, so a wrapped
+       line cannot push it onto a second page; text too long to fit is said
+       at export;
+    2. heading numbers never hold a nought when a level is skipped;
+    3. the footer's left cell follows the classification;
+    4. the cover's strip leaves out an empty date and an empty author;
+    5. the contents list has no line for a heading with no words, as the
+       preview has none;
+    6. the file's properties never say "Un-named";
+    7. characters XML cannot hold are left out wherever text is written;
+    8. a picture taller than the page is made to fit it, and is listed;
+    9. a numbered list that opens below its top level is written so that
+       Word prints the numbers the screen shows.
+
+  What only Word can show (the cover on one page, a tall picture on its page,
+  the list numbers Word prints) was read back from Word when these fixes were
+  made; the XML that produced those results is what is pinned here.
+-->
+<script>
+// A script that fails to load or throws is a failure, not a page that says "running" for ever.
+window.addEventListener("error", function (e) { document.getElementById("out").textContent = "FAIL the page threw: " + (e.message || (e.target && e.target.src) || "a script did not load") + "\n\n1 FAILED"; }, true);
+</script>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/export.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Packing runs off the main thread, and headless Edge's virtual clock runs
+  // out the moment the page has nothing queued, which under load dumped a
+  // page part way through. A message bounced to ourselves keeps a task
+  // queued, without moving the clock, until the tests finish (as
+  // test-doc-zip.html).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  var A = window.App, HD = A.HouseDocx, Zip = A.ZipIO;
+
+  // ---- helpers ----
+  function unzip(blob) {
+    return Zip.read(blob).then(function (list) {
+      var map = {};
+      list.forEach(function (x) { map[x.name] = { name: x.name, bytes: x.bytes, text: /\.(xml|rels)$/.test(x.name) && x.bytes ? new TextDecoder().decode(x.bytes) : "" }; });
+      return map;
+    });
+  }
+  function text(z, name) { return (z[name] && z[name].text) || ""; }
+  function wellFormed(z) {
+    return Object.keys(z).filter(function (n) { return z[n].text && new DOMParser().parseFromString(z[n].text, "application/xml").getElementsByTagName("parsererror").length > 0; });
+  }
+  function build(p, status) {
+    return HD.buildDocument(p, { issueStatus: status || "draft" }).then(function (r) {
+      return unzip(r.blob).then(function (z) { return { z: z, doc: text(z, "word/document.xml"), fitted: r.fitted, blob: r.blob }; });
+    });
+  }
+  function coverXml(doc) { return doc.slice(doc.indexOf("<w:body>"), doc.indexOf("</w:sectPr>") + 11); }
+  // The cover strip holds each label to its value with no-break spaces and
+  // hyphens (test-doc-fix-r2-cover.html pins those); here they read as plain.
+  function texts(xml) { return (xml.match(/<w:t [^>]*>[^<]*<\/w:t>|<w:t>[^<]*<\/w:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/\u00a0/g, " ").replace(/\u2011/g, "-"); }); }
+  function paras(xml) { return xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p\/>/g) || []; }
+  function paraWith(xml, needle) { return paras(xml).filter(function (p) { return p.indexOf(">" + needle + "<") !== -1; })[0] || ""; }
+  // The last paragraph holding the words: the heading itself, not its line in the contents list.
+  function lastParaWith(xml, needle) { return paras(xml).filter(function (p) { return p.indexOf(needle + "<") !== -1; }).pop() || ""; }
+  // A typed heading number is followed by an em space; a plain one here.
+  function plain(s) { return String(s).replace(/\s/g, " "); }
+  function footers(z) { return Object.keys(z).filter(function (n) { return /^word\/footer\d+\.xml$/.test(n); }).sort(); }
+  function footerLeftOf(z) {
+    return footers(z).map(function (n) { return texts((text(z, n).match(/<w:tc>[\s\S]*?<\/w:tc>/g) || [""])[0]).join(""); });
+  }
+  function numIdOf(p) { return (p.match(/<w:numId w:val="(\d+)"\/>/) || [])[1]; }
+  function numOf(nx, numId) { return (nx.match(new RegExp('<w:num w:numId="' + numId + '"[^>]*>[\\s\\S]*?</w:num>')) || [""])[0]; }
+  function absIdOf(num) { return (num.match(/<w:abstractNumId w:val="(\d+)"\/>/) || [])[1]; }
+  // "0:1,1:1,2:1": the start each level of a numbering instance is given.
+  function startsOf(num) {
+    return (num.match(/<w:lvlOverride w:ilvl="\d"><w:startOverride w:val="\d+"\/><\/w:lvlOverride>/g) || []).map(function (m) {
+      return m.match(/ilvl="(\d)"/)[1] + ":" + m.match(/startOverride w:val="(\d+)"/)[1];
+    }).join(",");
+  }
+
+  var seq = 0;
+  function id() { seq += 1; return "b" + seq; }
+  function para(runs, extra) { return Object.assign({ id: id(), type: "paragraph", runs: typeof runs === "string" ? [{ t: runs }] : runs }, extra || {}); }
+  function head(level, t, extra) { return Object.assign({ id: id(), type: "heading", level: level, runs: typeof t === "string" ? [{ t: t }] : t }, extra || {}); }
+  function item(level, t, extra) { return Object.assign({ id: id(), type: "list", list: "number", level: level, runs: [{ t: t }] }, extra || {}); }
+  var INFO = { title: "Network segmentation proposal", docType: "Proposal", client: "Northfield Water", site: "Ashby treatment works", reference: "OPP-10234",
+    revision: "1.2", issuedDate: "2026-11-11", author: "A. Consultant", classification: "Confidential" };
+  function project(blocks, over) {
+    var p = { schema: "spt-document/1.0", kind: "report", info: Object.assign({}, INFO), options: {}, footnotes: {}, media: {}, parts: {},
+      blocks: blocks || [head(1, "Summary"), para("Body text.")] };
+    over = over || {};
+    Object.keys(over).forEach(function (k) { if (k === "info") p.info = Object.assign(p.info, over.info); else p[k] = over[k]; });
+    return p;
+  }
+  // A real PNG of a given size, drawn here.
+  function png(w, h) {
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var g = c.getContext("2d"); g.fillStyle = "#DCE9F3"; g.fillRect(0, 0, w, h); g.fillStyle = "#173267"; g.fillRect(0, 0, w, 4);
+    return new Promise(function (res) { c.toBlob(function (b) { res(b); }, "image/png"); });
+  }
+
+  var chain = Promise.resolve();
+  // Progress is written after each step, as a failure until the last one has
+  // run: a page cut short by the time budget must not read as a short pass.
+  // A step that throws is one failure, and the steps after it still run: each
+  // is a finding of its own.
+  var stepNo = 0;
+  function step(fn) {
+    var no = ++stepNo;
+    chain = chain.then(fn).then(null, function (e) { ok(false, "step " + no + " threw: " + (e && e.message), e && e.stack); })
+      .then(function () { document.getElementById("out").textContent = lines.join("\n") + "\nFAIL the page did not finish: re-run it alone with a larger time budget"; });
+  }
+
+  // ---- 1. the cover cannot spill onto a second page ----
+  var LONG_AUTHOR = "Alexandra Featherstonehaugh and Bartholomew Winterbottom";
+  var TITLE_160 = "Operational technology remote access, network segmentation and security monitoring improvement programme for the northern region water treatment works estate 2027";
+  function coverChecks(r, label, isDraft) {
+    var cov = coverXml(r.doc);
+    var rows = cov.match(/<w:tr><w:trPr><w:cantSplit\/><w:trHeight w:val="\d+" w:hRule="exact"\/><\/w:trPr>/g) || [];
+    var heights = rows.map(function (x) { return +x.match(/w:val="(\d+)"/)[1]; });
+    ok(rows.length === 2 && (cov.match(/<w:tr>/g) || []).length === 3, label + ": the cover table is two rows of exact height that cannot split (the third row is the rule under the document type)", String(rows.length) + "/" + (cov.match(/<w:tr>/g) || []).length);
+    ok(heights.length === 2 && heights[0] === HD.COVER.topRow && heights[1] === HD.COVER.footRow && heights[0] + heights[1] <= 15900,
+       label + ": the two heights are within what Word was seen to keep on one page (about 16000 twips together)", heights.join("+"));
+    ok(!/w:line="\d{4,}" w:lineRule="exact"/.test(cov), label + ": no spacer paragraph pushes the strip down", (cov.match(/w:line="\d{4,}"/g) || []).join(","));
+    var at = cov.indexOf(rows[1] || "\u0000"), top = cov.slice(0, at), foot = cov.slice(at, cov.lastIndexOf("</w:tbl>"));
+    var tt = texts(top), ft = texts(foot);
+    ok(at > 0 && tt.indexOf("ISSUE   ") === -1 && ft[0] === "ISSUE   " && ft.indexOf(HD.COMPANY.addressLine) !== -1 && ft.indexOf(HD.COMPANY.contactLine) === ft.length - 1,
+       label + ": the strip and the two address lines are the second row, and nothing else is", ft.join("|"));
+    ok(/<w:vAlign w:val="bottom"\/>/.test(foot.slice(0, foot.indexOf("<w:p>"))), label + ": set against the bottom of it, so a strip that wraps grows upwards");
+    ok(tt.indexOf("OPP-10234") !== -1 && tt.indexOf("Northfield Water") !== -1 && /<w:drawing>/.test(top), label + ": the title block, the client, the site and the reference are the first row", tt.join("|"));
+    var after = cov.slice(cov.lastIndexOf("</w:tbl>"));
+    ok((after.match(/<w:p>/g) || []).length <= 2 && (isDraft ? /string="DRAFT"/.test(after) && /fillcolor="#FFFFFF"/.test(after) : !/string="DRAFT"/.test(cov)),
+       label + ": the paragraph after the table " + (isDraft ? "anchors the draft watermark, so it stays on the cover" : "carries no watermark on a final"));
+  }
+  step(function () {
+    var claimed = project(null, { info: { author: LONG_AUTHOR, classification: "Commercial in confidence" } });
+    return build(claimed, "draft").then(function (r) {
+      ok(wellFormed(r.z).length === 0, "cover, long author and classification: every XML part parses", wellFormed(r.z).join(", "));
+      coverChecks(r, "long author and classification, draft", true);
+      return build(claimed, "final");
+    }).then(function (r) {
+      coverChecks(r, "the same as a final", false);
+      return build(project(null, { info: { title: TITLE_160 } }), "draft");
+    }).then(function (r) {
+      coverChecks(r, "a title of 160 characters", true);
+      ok(texts(coverXml(r.doc)).filter(function (t) { return TITLE_160.indexOf(t) !== -1 && t.length > 30; }).length === 3, "and its three lines are all there");
+      return build(project(null, { info: { coverTitleLines: ["Remote access", "and monitoring", "improvement plan"] } }), "draft");
+    }).then(function (r) {
+      coverChecks(r, "three lines at the largest size", true);
+      // What fits and what does not.
+      ok(HD.coverFits(project()) && HD.coverFits(claimed) && HD.coverFits(project(null, { info: { title: TITLE_160 } })) && HD.coverFits({ info: {} }),
+         "coverFits: an ordinary cover, the long author and the 160 character title all fit");
+      var huge = new Array(60).join("an improvement programme ");
+      var room = HD.coverRoom(HD.coverInput(project(null, { info: { coverTitleLines: [huge, huge, huge] } })));
+      ok(room.fits === false && room.top === false && room.foot === true, "coverFits: a title of some thousands of characters does not fit the first row", JSON.stringify(room));
+      room = HD.coverRoom(HD.coverInput(project(null, { info: { author: new Array(120).join("A. Consultant and ") } })));
+      ok(room.fits === false && room.top === true && room.foot === false, "coverFits: an author line of some thousands of characters does not fit the second", JSON.stringify(room));
+    });
+  });
+  // The export says when the cover's text is cut off (js/export.js).
+  step(function () {
+    var calls = { toast: [], down: [] };
+    A.DocApp = { state: { doc: null }, toast: function (t, k) { calls.toast.push([t, k]); }, busy: function () {} };
+    A.DocStorage = A.DocStorage || {};
+    A.DocStorage.download = function (blob, name) { calls.down.push(name); };   // a download hangs a headless page
+    var huge = new Array(60).join("an improvement programme ");
+    A.DocApp.state.doc = project(null, { info: { coverTitleLines: [huge, huge, huge] } });
+    return A.DocExport.word("draft").then(function (res) {
+      ok(res && res.coverCut === true && calls.down.length === 1 && calls.toast.length === 1 && calls.toast[0][1] === "warn" &&
+         /The cover has more text than its page holds, so some of it is cut off\. Shorten the title or the other cover lines\.$/.test(calls.toast[0][0]),
+         "export: a cover with far too much text is exported with a warning that says what to do", JSON.stringify(calls.toast));
+      calls.toast = [];
+      A.DocApp.state.doc = project();
+      return A.DocExport.word("draft");
+    }).then(function (res) {
+      ok(res && res.coverCut === false && calls.toast.length === 1 && calls.toast[0][1] === undefined && /^Exported Northfield-Water-Network-segmentation-proposal-1\.2-draft\.docx\.$/.test(calls.toast[0][0]),
+         "export: an ordinary document is exported with no warning", JSON.stringify(calls.toast));
+      calls.toast = [];
+      A.DocApp.state.doc = project(null, { kind: "short", info: { coverTitleLines: [huge, huge, huge] } });
+      return A.DocExport.word("draft");
+    }).then(function (res) {
+      ok(res && res.coverCut === false && calls.toast[0][1] === undefined, "export: a short document has no cover, so nothing is said about one");
+    });
+  });
+
+  // ---- 2. heading numbers when a level is skipped ----
+  step(function () {
+    function nums(levels) { var hs = levels.map(function (l) { return head(l, "h"); }), n = HD.headingNumbers(hs); return hs.map(function (h) { return n[h.id]; }); }
+    ok(nums([2, 1, 3, 1, 2]).join(" ") === "1 2 2.1 3 3.1", "heading numbers: a level 2 heading before any level 1 is 1, and a level 3 directly under a level 1 is 2.1", nums([2, 1, 3, 1, 2]).join(" "));
+    ok(nums([1, 3, 2]).join(" ") === "1 1.1 1.2", "a level 3 then a level 2 under one level 1 are 1.1 and 1.2", nums([1, 3, 2]).join(" "));
+    ok(nums([3, 3, 2, 3, 1]).join(" ") === "1 2 3 3.1 4", "headings that only ever go up a level count on at the top", nums([3, 3, 2, 3, 1]).join(" "));
+    ok(nums([1, 2, 3, 2, 1, 2, 3, 3]).join(" ") === "1 1.1 1.1.1 1.2 2 2.1 2.1.1 2.1.2", "a document whose levels do not skip is numbered as before", nums([1, 2, 3, 2, 1, 2, 3, 3]).join(" "));
+    var every = [[2, 1, 3, 1, 2], [1, 3, 2], [3, 2, 1], [3, 1, 3, 2, 2, 3], [2, 2, 3, 1, 3]].map(nums).reduce(function (a, b) { return a.concat(b); }, []);
+    ok(every.every(function (n) { return !/(^|\.)0(\.|$)/.test(n); }), "no number holds a nought", every.join(" "));
+    var blocks = [head(2, "Background"), para("Text."), head(1, "Scope"), head(3, "Detail"), head(1, "Costs")];
+    return build(project(blocks, { options: { contents: true, numberHeadings: true } })).then(function (r) {
+      var at = r.doc.indexOf(">Contents<"), list = r.doc.slice(at, r.doc.indexOf("<w:bookmarkStart"));
+      var links = (list.match(/<w:hyperlink [^>]*>[\s\S]*?<\/w:hyperlink>/g) || []).map(function (l) { return plain(texts(l).join("")); });
+      ok(links.join("|") === "1 Background|2 Scope|3 Costs", "the contents list of a report whose first heading is level 2 prints 1, 2, 3", links.join("|"));
+      var hDetail = lastParaWith(r.doc, "Detail"), hBack = lastParaWith(r.doc, "Background");
+      ok(plain(texts(hDetail).join("")) === "2.1 Detail" && plain(texts(hBack).join("")) === "1 Background", "and so do the headings", texts(hDetail).join("") + " / " + texts(hBack).join(""));
+      ok(/<w:pStyle w:val="Heading2"\/>/.test(hBack) && /<w:pStyle w:val="Heading3"\/>/.test(hDetail), "each still in the style of its own level", hBack.slice(0, 200));
+      ok(!/>0\.1\s|>1\.0\.1\s/.test(r.doc), "0.1 and 1.0.1 are printed nowhere");
+    });
+  });
+
+  // ---- 3. the footer follows the classification ----
+  step(function () {
+    ok(HD.footerLeft("") === HD.COMPANY.footerLeft && HD.footerLeft(undefined) === HD.COMPANY.footerLeft && HD.footerLeft("Confidential") === "Confidential · © SolutionsPT Ltd" &&
+       HD.footerLeft("  Commercial in  confidence ") === "Commercial in confidence · © SolutionsPT Ltd", "footerLeft: the classification then the company; Confidential when there is none");
+    return build(project(null, { info: { classification: "Commercial in confidence" } })).then(function (r) {
+      var left = footerLeftOf(r.z);
+      ok(left.length >= 1 && left.every(function (t) { return t === "Commercial in confidence · © SolutionsPT Ltd"; }), "a report classified Commercial in confidence says so in every footer", left.join("|"));
+      ok(texts(coverXml(r.doc)).indexOf("Commercial in confidence") !== -1 && /Commercial in confidence/.test(paraWith(r.doc, "Commercial in confidence")), "as on its cover and in document control");
+      return Promise.all([build(project(null, { info: { classification: "" } })), build(project(null, { info: { classification: "Confidential" } }))]);
+    }).then(function (rs) {
+      ok(rs.every(function (r) { return footerLeftOf(r.z).every(function (t) { return t === "Confidential · © SolutionsPT Ltd"; }); }),
+         "with no classification, or Confidential, the footer is the assessment's to the letter", footerLeftOf(rs[0].z).join("|"));
+      ok(text(rs[0].z, footers(rs[0].z)[0]) === text(rs[1].z, footers(rs[1].z)[0]), "the two footers are the same XML");
+      return build(project(null, { kind: "short", info: { classification: "Public" } }), "final");
+    }).then(function (r) {
+      var all = footers(r.z).map(function (n) { return text(r.z, n); }).join("\n");
+      ok(/>Public · © SolutionsPT Ltd</.test(all) && !/Confidential/.test(all) && !/Confidential/.test(r.doc), "a short document classified Public says Public in its footer and Confidential nowhere", footerLeftOf(r.z).join("|"));
+    });
+  });
+
+  // ---- 4. the strip leaves out what is empty ----
+  step(function () {
+    return build(project(null, { info: { author: "", date: "", issuedDate: "", revision: "" } })).then(function (r) {
+      var ct = texts(coverXml(r.doc)), at = ct.indexOf("ISSUE   ");
+      ok(at !== -1 && ct.slice(at, at + 4).join("|") === "ISSUE   |0.1|        CLASSIFICATION   |Confidential", "with no author and no date the strip is the issue and the classification", ct.slice(at, at + 5).join("|"));
+      ok(!ct.some(function (t) { return /AUTHOR/.test(t); }) && ct[at + 1].indexOf("·") === -1, "no AUTHOR label with nothing after it, and no dot after the revision");
+      return build(project(null, { info: { author: "", issuedDate: "", date: "2026-11-12" } }));
+    }).then(function (r) {
+      var ct = texts(coverXml(r.doc)), at = ct.indexOf("ISSUE   ");
+      ok(ct.slice(at, at + 4).join("|") === "ISSUE   |1.2  ·  2026-11-12|        CLASSIFICATION   |Confidential", "a date with no author prints the date", ct.slice(at, at + 4).join("|"));
+      return build(project(null, { info: { issuedDate: "", date: "" } }));
+    }).then(function (r) {
+      var ct = texts(coverXml(r.doc)), at = ct.indexOf("ISSUE   ");
+      ok(ct.slice(at, at + 6).join("|") === "ISSUE   |1.2|        AUTHOR   |A. Consultant|        CLASSIFICATION   |Confidential", "an author with no date prints the author", ct.slice(at, at + 6).join("|"));
+      return build(project());
+    }).then(function (r) {
+      var ct = texts(coverXml(r.doc)), at = ct.indexOf("ISSUE   ");
+      ok(ct.slice(at, at + 6).join("|") === "ISSUE   |1.2  ·  2026-11-11|        AUTHOR   |A. Consultant|        CLASSIFICATION   |Confidential", "with every value given the strip is the assessment's", ct.slice(at, at + 6).join("|"));
+    });
+  });
+
+  // ---- 5. the contents list and a heading with no words ----
+  step(function () {
+    var M = A.DocModel, R = A.DocRender;
+    function doc(numbered) {
+      var d = M.create("report");
+      d.info.title = "Listing test";
+      d.options.contents = true; d.options.numberHeadings = numbered;
+      d.footnotes = { f1: { runs: [{ t: "A note." }] } };
+      d.blocks = [head(1, "Scope"), head(1, [], { id: "empty1" }), head(2, [{ t: "   " }], { id: "blank2" }), head(1, [{ fn: "f1" }], { id: "noteonly" }), head(2, "After"), para("Text.")];
+      return M.normalise(d);
+    }
+    function wordLines(r) {
+      var at = r.doc.indexOf(">Contents<"), list = r.doc.slice(at, r.doc.indexOf('<w:br w:type="page"/>', at));
+      // `list` opens inside the Contents heading, so its whole paragraphs are the lines.
+      return { xml: list, lines: paras(list).map(function (p) { return plain(texts(p).join("")); }) };
+    }
+    function screenLines(d) { return Array.prototype.map.call(R.contentsEl(d).querySelectorAll(".contents-line"), function (n) { return plain(n.textContent); }); }
+    var d1 = doc(true), d2 = doc(false);
+    var wordless = d1.blocks.filter(function (b) { return b.type === "heading" && !(b.runs || []).some(function (r) { return r.t && r.t.trim(); }); });
+    var after = HD.headingNumbers(d1.blocks)[d1.blocks.filter(function (b) { return b.type === "heading" && b.level === 2 && (b.runs || []).some(function (r) { return r.t === "After"; }); })[0].id];
+    return build(d1).then(function (r) {
+      var w = wordLines(r);
+      ok(wellFormed(r.z).length === 0, "contents: every XML part parses", wellFormed(r.z).join(", "));
+      ok(wordless.length >= 2 && wordless.some(function (b) { return b.level === 1; }), "the document holds headings with no words: an empty one, and one that is only spaces or only a footnote mark", String(wordless.length));
+      ok(w.lines.join("|") === "1 Scope|" + after + " After" && /^\d\.1$/.test(after), "numbered: the contents list has a line for each heading with words and none for those without", w.lines.join("|"));
+      ok(wordless.every(function (b) { return w.xml.indexOf('w:anchor="h_' + b.id + '"') === -1; }) && !w.lines.some(function (l) { return /^[\d.]*\s*$/.test(l); }), "no link to an empty heading and no line that is only a number");
+      ok(w.lines.join("|") === screenLines(d1).join("|"), "and it is the preview's list, line for line", screenLines(d1).join("|"));
+      return build(d2);
+    }).then(function (r) {
+      var w = wordLines(r);
+      ok(w.lines.join("|") === "Scope|After" && w.lines.join("|") === screenLines(d2).join("|"), "not numbered: no blank line in the list, and again the preview's", w.lines.join("|"));
+    });
+  });
+
+  // ---- 6. the file's properties ----
+  step(function () {
+    function prop(core, name) { return (core.match(new RegExp("<" + name + ">([^<]*)</" + name + ">")) || [])[1]; }
+    return build(project()).then(function (r) {
+      var core = text(r.z, "docProps/core.xml");
+      ok(prop(core, "dc:creator") === "A. Consultant" && prop(core, "cp:lastModifiedBy") === "A. Consultant", "properties: the author is the creator and the one who last changed it", core.slice(0, 500));
+      ok(!/Un-named/.test(core), "Un-named is written nowhere");
+      return build(project(null, { info: { author: "" } }));
+    }).then(function (r) {
+      var core = text(r.z, "docProps/core.xml");
+      ok(prop(core, "dc:creator") === "SolutionsPT" && prop(core, "cp:lastModifiedBy") === "SolutionsPT" && !/Un-named/.test(core), "with no author both are the company", core.slice(0, 500));
+      var all = Object.keys(r.z).map(function (n) { return text(r.z, n); }).join("\n");
+      ok(!/Un-named|OT Cyber|Document Tool/.test(all), "and no part names the tool or a stand-in");
+      // A caller that gives the template no properties at all.
+      var bare = HD.assemble({ kind: "short", segments: [{ land: false, children: [HD.body("x")] }], footerCentre: "x" }, { issueStatus: "draft" });
+      return new Promise(function (res, rej) { HD.pack(bare, { issueStatus: "draft" }, function (e, b) { if (e) rej(e); else res(b); }); }).then(unzip);
+    }).then(function (z) {
+      ok(!/Un-named/.test(text(z, "docProps/core.xml")) && /<cp:lastModifiedBy>SolutionsPT<\/cp:lastModifiedBy>/.test(text(z, "docProps/core.xml")), "assemble given no properties still writes the company, never Un-named");
+    });
+  });
+
+  // ---- 7. characters XML cannot hold ----
+  var FORBIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/;
+  function loneSurrogate(s) { return /[\uD800-\uDFFF]/.test(s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")); }
+  step(function () {
+    ok(HD.xmlSafe("plain text, a tab\t and a line\nfeed\r") === "plain text, a tab\t and a line\nfeed\r" && HD.xmlSafe("😀 café •") === "😀 café •" && HD.xmlSafe(null) === "",
+       "xmlSafe: a clean string comes back as it went in, tabs, line ends, accents and whole emoji included");
+    ok(HD.xmlSafe("a\u0000b\u0001c\u0008d\u000Ce\u000Ef\u001Fg￾h￿i") === "abcdefghi", "the control characters, U+FFFE and U+FFFF are left out");
+    ok(HD.xmlSafe("one\u000Btwo") === "one two" && HD.xmlSafe("one\u000Btwo", "\n") === "one\ntwo", "a vertical tab becomes a space, or a line break where the caller prints breaks");
+    ok(HD.xmlSafe("half \uD83D end") === "half  end" && HD.xmlSafe("\uDE00 start") === " start" && HD.xmlSafe("tail \uD83D") === "tail " && HD.xmlSafe("\uD83D😀") === "😀", "half a surrogate pair is left out and a whole pair is kept");
+    return png(40, 30).then(function (blob) {
+      var p = project([head(1, "Head\u0001ing"), para("line one\u000Bline two"), para("x￿y￾z"), para("half emoji \uD83D end 😀"),
+        para([{ t: "A link", link: "https://example.org/a\u0001b" }, { t: " and red\u0002 text", red: true }, { fn: "f1" }]),
+        { id: "pic1", type: "picture", media: "m1", width: 40, height: 30, alt: "Alt\u0001 text", caption: "Pic\u0001ture caption" },
+        { id: "tb1", type: "table", header: 1, cols: [1, 1], rows: [{ cells: [{ blocks: [para("A\u0002")] }, { blocks: [para("B")] }] }], caption: "Cap\u0001tion" },
+        { id: "pr\u00011", type: "prompt", text: "Write\u0001 this" }, { id: "li1", type: "list", list: "number", level: 0, runs: [{ t: "Item\u0003 one" }] }],
+        { options: { contents: true, numberHeadings: true }, footnotes: { f1: { runs: [{ t: "Note\u0004 text" }] } }, media: { m1: { blob: blob, type: "image/png", width: 40, height: 30 } },
+          info: { title: "Title\u000Bwith vt", client: "Client\u000CName", docType: "Pro\u0001posal", reference: "REF\u0008-1", site: "Site\u001F", author: "A.\u0000 Consultant",
+            classification: "Confi\u0001dential", revision: "1\u0003.0", qaReviewBy: "B.\u0001 Reviewer", authorisedBy: "C￿", issuedTo: "D￾", issuedDate: "2026\u0001-11-11", coverTitleLines: ["Title\u000Bwith", "v\u0001t"] } });
+      p.blocks[0].id = "h\u00011";
+      return build(p, "draft").then(function (r) {
+        var bad = Object.keys(r.z).filter(function (n) { return r.z[n].text && (FORBIDDEN.test(r.z[n].text) || loneSurrogate(r.z[n].text)); });
+        ok(bad.length === 0, "a document with control characters in every field: no XML part holds a character XML 1.0 forbids", bad.join(", "));
+        ok(wellFormed(r.z).length === 0, "and every part parses", wellFormed(r.z).join(", "));
+        ok(Object.keys(r.z).filter(function (n) { return r.z[n].text; }).length >= 10 && !!r.z["docProps/core.xml"] && !!r.z["word/footnotes.xml"] && footers(r.z).length > 0, "the properties, footnotes, footers and relationships were among the parts read");
+        var ct = texts(coverXml(r.doc));
+        ok(ct.indexOf("Title with") !== -1 && ct.indexOf("vt") !== -1 && ct.indexOf("PROPOSAL") !== -1 && ct.indexOf("ClientName") !== -1 && ct.indexOf("REF-1") !== -1, "the cover keeps the words around them", ct.slice(0, 8).join("|"));
+        ok(/<dc:title>Title with vt - ClientName<\/dc:title>/.test(text(r.z, "docProps/core.xml")) && /<dc:creator>A\. Consultant<\/dc:creator>/.test(text(r.z, "docProps/core.xml")), "so do the file's properties", text(r.z, "docProps/core.xml").slice(0, 400));
+        ok(footerLeftOf(r.z)[0] === "Confidential · © SolutionsPT Ltd" && /Title with vt · ClientName/.test(text(r.z, footers(r.z)[0])), "and the footer");
+        var two = paraWith(r.doc, "line one");
+        ok(/>line one<\/w:t><\/w:r><w:r>[\s\S]*<w:br\/>[\s\S]*>line two</.test(two), "a vertical tab in the text is a line break, as it was in Word", two);
+        ok(/>xyz</.test(r.doc) && />half emoji  end 😀</.test(r.doc) && />Heading</.test(r.doc) && />Caption</.test(r.doc) && />Picture caption</.test(r.doc) && />Write this</.test(r.doc) && />Item one</.test(r.doc),
+           "the text, heading, captions, prompt and list item keep their words");
+        ok(/descr="Alt text"/.test(r.doc), "the alternative text is clean", (r.doc.match(/descr="[^"]*"/g) || []).join(","));
+        ok(/Target="https:\/\/example\.org\/ab"/.test(text(r.z, "word/_rels/document.xml.rels")), "so is the link's address", (text(r.z, "word/_rels/document.xml.rels").match(/Target="http[^"]*"/g) || []).join(","));
+        ok(/w:anchor="h_h1"/.test(r.doc) && /<w:bookmarkStart w:name="h_h1"/.test(r.doc), "and the bookmark's name, the same at both ends of the contents link");
+        ok(/>Note text</.test(text(r.z, "word/footnotes.xml")), "and the footnote");
+        return HD.issueList(p);
+      }).then(function (list) {
+        ok(list.some(function (x) { return x.where.blockId === "pr\u00011"; }), "the issue check still names the block by its own id");
+      });
+    });
+  });
+
+  // ---- 8. a picture taller than the page ----
+  step(function () {
+    var P = HD.PAGE, EMU = 9525;
+    var f = HD.fitPx(601, 1336, P.portraitPx, P.portraitMaxHPx);
+    ok(P.portraitMaxHPx === 860 && P.landscapeMaxHPx === 570 && f.height === 860 && f.width === 387 && f.lower === true, "fitPx: 601 by 1336 on a portrait page is held to the page's height and keeps its shape", JSON.stringify(f));
+    f = HD.fitPx(1200, 400, P.portraitPx, P.portraitMaxHPx);
+    ok(f.width === 601 && f.height === 200 && f.lower === false, "one that is only too wide is held to the width, as before", JSON.stringify(f));
+    f = HD.fitPx(601, 800, P.portraitPx, P.portraitMaxHPx);
+    ok(f.width === 601 && f.height === 800 && f.lower === false && HD.fitPx(900, 2000, 601).height === 1336, "one that fits is left alone; with no height given only the width is held", JSON.stringify(f));
+    return Promise.all([png(108, 240), png(40, 300)]).then(function (b) {
+      var media = { phone: { blob: b[0], type: "image/png", width: 1080, height: 2400 }, long: { blob: b[1], type: "image/png", width: 400, height: 3000 } };
+      function pic(pid, key, w, h, extra) { return Object.assign({ id: pid, type: "picture", media: key, width: w, height: h }, extra || {}); }
+      var blocks = [pic("p1", "phone", 601, 1336, { caption: "A phone screenshot" }), pic("p2", "long", 400, 3000), pic("p3", "phone", 601, 800),
+        pic("p4", "long", 400, 3000, { land: true }), pic("p5", "phone", 1026, 500, { land: true }),
+        { id: "t1", type: "table", header: 0, cols: [1, 2], rows: [{ cells: [{ blocks: [para("Capture")] }, { blocks: [pic("p6", "long", 400, 3000), pic("p7", "phone", 90, 200)] }] }] }];
+      return build(project(blocks, { kind: "short", media: media }), "draft");
+    }).then(function (r) {
+      var ext = (r.doc.match(/<wp:extent cx="\d+" cy="\d+"\/>/g) || []).map(function (e) { return { cx: +e.match(/cx="(\d+)"/)[1], cy: +e.match(/cy="(\d+)"/)[1] }; });
+      function shape(e, w, h) { return Math.abs(e.cx / e.cy - w / h) < 0.01; }
+      ok(ext.length === 7 && wellFormed(r.z).length === 0, "seven pictures are written", String(ext.length));
+      ok(ext[0].cy === 860 * EMU && shape(ext[0], 601, 1336), "601 by 1336 (a phone screenshot at the page's width) prints 860 px high, its shape kept", JSON.stringify(ext[0]));
+      ok(ext[1].cy === 860 * EMU && shape(ext[1], 400, 3000), "400 by 3000 prints 860 px high", JSON.stringify(ext[1]));
+      ok(ext[2].cx === 601 * EMU && ext[2].cy === 800 * EMU, "601 by 800 is unchanged", JSON.stringify(ext[2]));
+      ok(ext[3].cy === 570 * EMU && shape(ext[3], 400, 3000), "on a landscape page the limit is 570 px", JSON.stringify(ext[3]));
+      ok(ext[4].cx === 1026 * EMU && ext[4].cy === 500 * EMU, "and one that fits a landscape page is unchanged", JSON.stringify(ext[4]));
+      ok(ext[5].cy === (860 - HD.PAGE.cellHLessPx) * EMU && shape(ext[5], 400, 3000), "in a table cell it is held a little lower, for the row", JSON.stringify(ext[5]));
+      ok(ext[6].cx === 90 * EMU && ext[6].cy === 200 * EMU, "a small picture in a cell is unchanged", JSON.stringify(ext[6]));
+      ok(ext.every(function (e) { return e.cy <= 860 * EMU; }), "nothing is taller than the page's text area");
+      ok(r.fitted.join(",") === "p1,p2,p4,p6", "the four made smaller are listed for the message after the export; the three left alone are not", r.fitted.join(","));
+      // The message (js/export.js).
+      var calls = [];
+      A.DocApp = { state: { doc: null }, toast: function (t, k) { calls.push([t, k]); }, busy: function () {} };
+      A.DocStorage = A.DocStorage || {}; A.DocStorage.download = function () {};
+      return png(40, 300).then(function (b) {
+        A.DocApp.state.doc = project([{ id: "p1", type: "picture", media: "long", width: 400, height: 3000 }], { kind: "short", media: { long: { blob: b, type: "image/png", width: 400, height: 3000 } } });
+        return A.DocExport.word("draft");
+      }).then(function (res) {
+        ok(res && res.fitted.join(",") === "p1" && /\. 1 picture or drawing was made smaller to fit the page\.$/.test(calls[0][0]), "export: the message says a picture was made smaller", JSON.stringify(calls));
+      });
+    });
+  });
+
+  // ---- 9. numbered lists that open below the top level ----
+  step(function () {
+    function markers(blocks) { var n = HD.listNumbers(blocks); return blocks.filter(function (b) { return b.type === "list"; }).map(function (b) { return n[b.id].marker; }).join(" "); }
+    function named(levels, prefix, extra) { return levels.map(function (l, i) { return item(l, prefix + i, extra && extra[i]); }); }
+    var a = named([1, 1, 0, 0], "A"), b0 = named([0, 1, 0], "B"), b = named([1, 1, 0, 1, 0], "C"), c = named([2, 1, 2, 1, 0], "D"), d = named([2, 2, 0, 1, 2, 0], "E"), e = named([0, 1, 2, 0], "F");
+    var g = named([1, 0, 1], "G"), g2 = named([0, 1], "H", [{ "continue": true }]);
+    ok(markers(a) === "a. b. 1. 2." && markers(b) === "a. b. 1. a. 2." && markers(c) === "i. a. i. b. 1." && markers(d) === "i. ii. 1. a. i. 2.", "the screen's rule is unchanged: a list that opens below the top level still reads a. b. 1. 2.",
+       [markers(a), markers(b), markers(c), markers(d)].join(" / "));
+    var all = [para("one")].concat(a, [para("two")], b0, [para("three")], b, [para("four")], c, [para("five")], d, [para("six")], e, [para("seven")], g, [para("eight")], g2);
+    var n = HD.listNumbers(all);
+    ok(a.every(function (x) { return n[x.id].open === 1 && !n[x.id].tail; }) && c.slice(0, 4).every(function (x) { return n[x.id].open === 2; }) && e.concat(b0).every(function (x) { return !n[x.id].open && !n[x.id].tail; }),
+       "listNumbers marks every item of a list that opened at level 1 or 2 with the level it opened at; an ordinary list is not marked");
+    ok(d.slice(0, 2).every(function (x) { return n[x.id].open === 2 && !n[x.id].tail; }) && d.slice(2).concat([c[4]]).every(function (x) { return n[x.id].tail === true && !n[x.id].open; }) &&
+       d.every(function (x) { return n[x.id].instance === n[d[0].id].instance; }), "a list that opened at level 2 is marked as ordinary again from its first top-level item, and is still one list on screen");
+    ok(g2.every(function (x) { return n[x.id].instance === n[g[0].id].instance && n[x.id].open === 1; }) && markers(g.concat([para("x")], g2)) === "a. 1. a. 2. a.", "a continued item carries on an opened list and its marking");
+    return build(project(all, { kind: "short" })).then(function (r) {
+      var nx = text(r.z, "word/numbering.xml");
+      ok(wellFormed(r.z).length === 0, "lists: every XML part parses", wellFormed(r.z).join(", "));
+      function numsOf(items) { return items.map(function (x) { return numIdOf(paraWith(r.doc, x.runs[0].t)); }); }
+      function one(items) { var ids = numsOf(items); return ids.every(function (x) { return x && x === ids[0]; }) ? ids[0] : null; }
+      var nA = one(a), nB0 = one(b0), nB = one(b), nC = one(c.slice(0, 4)), nC2 = one(c.slice(4)), nE = one(e), nD1 = one(d.slice(0, 2)), nD2 = one(d.slice(2)), nG = one(g.concat(g2));
+      ok(nA && nB0 && nB && nC && nC2 && nE && nD1 && nD2 && nG && nC !== nC2 && nD1 !== nD2 && [nA, nB0, nB, nC, nC2, nE, nD1, nD2, nG].every(function (x, i, l) { return l.indexOf(x) === i; }),
+         "each list is on a Word numbering instance of its own (one that opened at level 2 on two, before and after its first top-level item)", [nA, nB0, nB, nC, nC2, nE, nD1, nD2, nG].join(","));
+      var absOf = function (id) { return absIdOf(numOf(nx, id)); };
+      var shared = absOf(nB0);
+      ok(absOf(nE) === shared && absOf(nD2) === shared && absOf(nC2) === shared, "ordinary lists, and the ordinary part of one that opened at level 2, share the house definition");
+      var own = [nA, nB, nC, nD1, nG].map(absOf);
+      ok(own.every(function (x, i) { return x && x !== shared && own.indexOf(x) === i; }), "each list that opens below the top level has a definition no other list uses, so it cannot carry on another list's count", own.join(",") + " against " + shared);
+      var uses = function (abs) { return (nx.match(new RegExp('<w:abstractNumId w:val="' + abs + '"/>', "g")) || []).length; };
+      ok(own.every(function (x) { return uses(x) === 1; }), "one instance each");
+      ok(startsOf(numOf(nx, nA)) === "0:0,1:1,2:1" && startsOf(numOf(nx, nB)) === "0:0,1:1,2:1" && startsOf(numOf(nx, nG)) === "0:0,1:1,2:1",
+         "opened at level 1: the top level starts at 0, so the parent Word counts but nobody wrote is the nought and the first real one is 1", startsOf(numOf(nx, nA)));
+      ok(startsOf(numOf(nx, nC)) === "0:0,1:0,2:1" && startsOf(numOf(nx, nD1)) === "0:0,1:0,2:1", "opened at level 2: the two levels above start at 0", startsOf(numOf(nx, nC)));
+      ok(startsOf(numOf(nx, nB0)) === "0:1,1:1,2:1" && startsOf(numOf(nx, nE)) === "0:1,1:1,2:1" && startsOf(numOf(nx, nD2)) === "0:1,1:1,2:1" && startsOf(numOf(nx, nC2)) === "0:1,1:1,2:1",
+         "an ordinary list starts every level at 1, as before, and so does the ordinary part of one that opened at level 2", startsOf(numOf(nx, nB0)) + " / " + startsOf(numOf(nx, nD2)));
+      var lvl1 = function (abs) { return ((nx.match(new RegExp('<w:abstractNum w:abstractNumId="' + abs + '"[^>]*>[\\s\\S]*?</w:abstractNum>')) || [""])[0].match(/<w:lvl w:ilvl="1"[^>]*>[\s\S]*?<\/w:lvl>/) || [""])[0]; };
+      ok(lvl1(own[0]) !== "" && lvl1(own[0]).replace(/w:tplc="[^"]*"/, "") === lvl1(shared).replace(/w:tplc="[^"]*"/, ""), "an opened list's definition has the house levels: the same format, text and indent", lvl1(own[0]));
+      ok(/<w:ilvl w:val="1"\/>/.test(paraWith(r.doc, "A0")) && /<w:ilvl w:val="0"\/>/.test(paraWith(r.doc, "A2")) && /<w:ilvl w:val="2"\/>/.test(paraWith(r.doc, "D0")), "and every item keeps its level");
+    });
+  });
+
+  chain.then(finish, function (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); finish(); });
+})();
+</script>
+</body></html>

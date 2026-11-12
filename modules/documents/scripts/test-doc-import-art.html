@@ -1,0 +1,553 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: Word import, pictures and drawings</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.DocxImport on everything in a Word file that is not text
+  (docs/document-tool-design.md 4.4, "Pictures and drawings"): which pictures
+  become picture blocks, what is kept as the original XML and with which parts,
+  what is done to a kept object on the way (relationship ids, the SmartArt
+  drawing id, the text inside text boxes, the theme), and what is never carried.
+
+  Fixtures are XML written here in the shape Word 365 writes it, zipped by this
+  page's own writer. Every kept block is also checked the way the graft will
+  use it: it must parse on its own, with every prefix declared.
+-->
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-import.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function eq(a, b, n) { var x = JSON.stringify(a), y = JSON.stringify(b); ok(x === y, n, "got " + x + " wanted " + y); }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Unzipping is real work, not a timer: without a timer pending, virtual time
+  // would run out while it is still going.
+  var tick = setInterval(function () {}, 20);
+  var I = window.App.DocxImport;
+
+  // ---- a zip writer of this page's own -----------------------------------------
+  var CRC = (function () { var t = [], n, c, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc(u) { var c = 0xFFFFFFFF; for (var i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function bytes(v) { return typeof v === "string" ? new TextEncoder().encode(v) : v; }
+  function zip(parts) {
+    var chunks = [], central = [], offset = 0;
+    parts.forEach(function (p) {
+      var name = bytes(p.name), data = bytes(p.data), sum = crc(data);
+      var lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+      lh.setUint32(14, sum, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true);
+      chunks.push(new Uint8Array(lh.buffer), name, data);
+      var ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+      ch.setUint32(16, sum, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, name.length, true);
+      ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), name);
+      offset += 30 + name.length + data.length;
+    });
+    var size = 0; central.forEach(function (c) { size += c.length; });
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, parts.length, true); e.setUint16(10, parts.length, true);
+    e.setUint32(12, size, true); e.setUint32(16, offset, true);
+    return new Blob(chunks.concat(central, [new Uint8Array(e.buffer)]));
+  }
+
+  // ---- picture bytes: only as much of each format as says what it is ------------------
+  function png(w, h) { return new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, w >>> 24, (w >> 16) & 255, (w >> 8) & 255, w & 255, h >>> 24, (h >> 16) & 255, (h >> 8) & 255, h & 255, 8, 6, 0, 0, 0, 1, 2, 3, 4]); }
+  function jpeg(w, h) { return new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0xFF, 0xC0, 0, 17, 8, h >> 8, h & 255, w >> 8, w & 255, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xFF, 0xD9]); }
+  function emf() { var u = new Uint8Array(96); u[0] = 1; u[4] = 96; u[40] = 0x20; u[41] = 0x45; u[42] = 0x4D; u[43] = 0x46; return u; }
+  function wmf() { var u = new Uint8Array(40); u.set([0xD7, 0xCD, 0xC6, 0x9A]); return u; }
+  function tiff() { var u = new Uint8Array(40); u.set([0x49, 0x49, 0x2A, 0, 8, 0, 0, 0]); return u; }
+  function gif(w, h) { return new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, w & 255, w >> 8, h & 255, h >> 8, 0, 0, 0, 0x3B]); }
+  function bmp(w, h) { var u = new Uint8Array(54); u[0] = 0x42; u[1] = 0x4D; u[18] = w & 255; u[19] = w >> 8; u[22] = h & 255; u[23] = h >> 8; return u; }
+  var SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect width="200" height="100" fill="#0b2a4a"/></svg>';
+
+  // ---- WordprocessingML and DrawingML, briefly ------------------------------------------
+  var A = "http://schemas.openxmlformats.org/drawingml/2006/main", W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var RNS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  var NS = ' xmlns:w="' + W + '" xmlns:r="' + RNS + '"' +
+    ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"' +
+    ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"' +
+    ' xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"' +
+    ' xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"' +
+    ' xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" mc:Ignorable="w14 wp14"';
+  var HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  var REL = RNS + "/";
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function R(text, rPr) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(text) + '</w:t></w:r>'; }
+  function PX(inner, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + inner + '</w:p>'; }
+  function P(text, pPr, rPr) { return PX(R(text, rPr), pPr); }
+  function S(id) { return '<w:pStyle w:val="' + id + '"/>'; }
+  function RUN(inner) { return '<w:r><w:rPr><w:noProof/><w:lang w:val="en-GB"/></w:rPr>' + inner + '</w:r>'; }
+  function STYLE(id, name, o) {
+    o = o || {};
+    return '<w:style w:type="' + (o.type || "paragraph") + '"' + (o.dflt ? ' w:default="1"' : '') + ' w:styleId="' + id + '"><w:name w:val="' + name + '"/>' +
+      (o.based ? '<w:basedOn w:val="' + o.based + '"/>' : '') + (o.pPr ? '<w:pPr>' + o.pPr + '</w:pPr>' : '') + (o.rPr ? '<w:rPr>' + o.rPr + '</w:rPr>' : '') + '</w:style>';
+  }
+  function STYLES(list, defaults) { return HEAD + '<w:styles' + NS + '>' + (defaults || '') + STYLE("Normal", "Normal", { dflt: true }) + list.join("") + '</w:styles>'; }
+  var PX_EMU = 9525, docPr = 0;
+  // The frame every DrawingML object sits in. o: { w, h (px), name, descr, anchor }
+  function FRAME(graphicData, o) {
+    o = o || {};
+    var ext = '<wp:extent cx="' + (o.cx != null ? o.cx : (o.w || 200) * PX_EMU) + '" cy="' + (o.cy != null ? o.cy : (o.h || 100) * PX_EMU) + '"/>';
+    var pr = '<wp:docPr id="' + (++docPr) + '" name="' + esc(o.name || "Object " + docPr) + '"' + (o.descr ? ' descr="' + esc(o.descr) + '"' : '') + '/>';
+    var g = '<a:graphic xmlns:a="' + A + '">' + graphicData + '</a:graphic>';
+    if (o.anchor) return '<w:drawing><wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="251659264" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1" wp14:anchorId="2E563170">' +
+      '<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>' +
+      ext + '<wp:wrapSquare wrapText="bothSides"/>' + pr + '<wp:cNvGraphicFramePr/>' + g + '</wp:anchor></w:drawing>';
+    return '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">' + ext + pr + '<wp:cNvGraphicFramePr/>' + g + '</wp:inline></w:drawing>';
+  }
+  // A picture. o adds: crop, rot, flip, svg (rel id), link (rel id), noEmbed, effect, oval, duotone
+  function PIC(rid, o) {
+    o = o || {};
+    var blip = '<a:blip' + (o.noEmbed ? '' : ' r:embed="' + rid + '"') + (o.link ? ' r:link="' + o.link + '"' : '') + '>' + (o.duotone ? '<a:grayscl/>' : '') +
+      (o.svg ? '<a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="' + o.svg + '"/></a:ext></a:extLst>' : '') + '</a:blip>';
+    return FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      '<pic:nvPicPr><pic:cNvPr id="0" name="Picture"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill>' + blip + (o.crop ? '<a:srcRect l="12000" r="8000"/>' : '<a:srcRect/>') + '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+      '<pic:spPr><a:xfrm' + (o.rot ? ' rot="5400000"' : '') + (o.flip ? ' flipH="1"' : '') + '><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm><a:prstGeom prst="' + (o.oval ? "ellipse" : "rect") + '"><a:avLst/></a:prstGeom>' +
+      (o.effect ? '<a:effectLst><a:outerShdw blurRad="50800"/></a:effectLst>' : '<a:ln w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>') + '</pic:spPr></pic:pic></a:graphicData>', o);
+  }
+  // A shape or text box as Word writes one: DrawingML with a VML copy beside it.
+  function SHAPE(paras, o) {
+    o = o || {};
+    var body = paras ? '<wps:txbx><w:txbxContent>' + paras + '</w:txbxContent></wps:txbx>' : '';
+    var fb = paras ? '<v:textbox><w:txbxContent>' + paras + '</w:txbxContent></v:textbox>' : '';
+    return '<mc:AlternateContent><mc:Choice Requires="wps">' + FRAME('<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr' + (o.txBox ? ' txBox="1"' : '') + '/>' +
+      '<wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></wps:spPr>' + body + '<wps:bodyPr/></wps:wsp></a:graphicData>', o) +
+      '</mc:Choice><mc:Fallback><w:pict><v:shapetype id="_x0000_t202" coordsize="21600,21600" o:spt="202" path="m,l,21600r21600,l21600,xe"/><v:shape id="' + esc(o.name || "Shape") + '" o:spid="_x0000_s1026" type="#_x0000_t202" style="position:absolute;width:150pt;height:75pt;z-index:1">' + fb + '<w10:wrap type="square"/></v:shape></w:pict></mc:Fallback></mc:AlternateContent>';
+  }
+  var PORTRAIT = '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>';
+  function make(o) {
+    var main = "word/document.xml", rels = (o.rels || []).slice(), files = [], types = (o.types || []).slice();
+    function add(name, kind, text, type) {
+      if (text == null) return;
+      files.push({ name: "word/" + name, data: text });
+      rels.push(["rIdAuto" + rels.length, REL + kind, name]);
+      types.push(["/word/" + name, type]);
+    }
+    var wml = "application/vnd.openxmlformats-officedocument.wordprocessingml.";
+    add("styles.xml", "styles", o.styles, wml + "styles+xml");
+    add("numbering.xml", "numbering", o.numbering, wml + "numbering+xml");
+    add("footnotes.xml", "footnotes", o.footnotes, wml + "footnotes+xml");
+    add("theme/theme1.xml", "theme", o.theme, "application/vnd.openxmlformats-officedocument.theme+xml");
+    for (var n in (o.files || {})) files.push({ name: n, data: o.files[n] });
+    var defaults = { rels: "application/vnd.openxmlformats-package.relationships+xml", xml: "application/xml", png: "image/png", jpeg: "image/jpeg", jpg: "image/jpeg",
+      emf: "image/x-emf", wmf: "image/x-wmf", tif: "image/tiff", gif: "image/gif", bmp: "image/bmp", svg: "image/svg+xml", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      vsdx: "application/vnd.ms-visio.drawing", bin: "application/vnd.ms-office.vbaProject" };
+    var parts = [
+      { name: "[Content_Types].xml", data: HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+        Object.keys(defaults).map(function (k) { return '<Default Extension="' + k + '" ContentType="' + defaults[k] + '"/>'; }).join("") +
+        '<Override PartName="/' + main + '" ContentType="' + wml + 'document.main+xml"/>' +
+        types.map(function (t) { return '<Override PartName="' + esc(t[0]) + '" ContentType="' + t[1] + '"/>'; }).join("") + '</Types>' },
+      { name: "_rels/.rels", data: HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + REL + 'officeDocument" Target="' + main + '"/></Relationships>' },
+      { name: main, data: HEAD + '<w:document' + NS + '><w:body>' + o.body + PORTRAIT + '</w:body></w:document>' },
+      { name: "word/_rels/document.xml.rels", data: RELS(rels) }
+    ];
+    return zip(parts.concat(files));
+  }
+  function RELS(rels) {
+    return HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      rels.map(function (r) { return '<Relationship Id="' + r[0] + '" Type="' + r[1] + '" Target="' + esc(r[2]) + '"' + (r[3] ? ' TargetMode="External"' : '') + '/>'; }).join("") + '</Relationships>';
+  }
+  function imp(o, opts) { return I.read(make(o), opts || { name: "art.docx" }); }
+  var IMG = REL + "image";
+
+  // ---- reading the result ---------------------------------------------------------
+  function text(b) { return b.runs ? b.runs.map(function (r) { return r.t; }).join("") : (b.text || ""); }
+  function brief(blocks) {
+    return blocks.map(function (b) {
+      if (b.type === "picture") return "pic " + b.width + "x" + b.height;
+      if (b.type === "kept") return "kept " + b.kind;
+      return (b.type === "heading" ? "h" + b.level : b.type === "paragraph" ? "p" : b.type) + (text(b) ? ":" + text(b) : "");
+    });
+  }
+  function entry(report, code) {
+    var found = null;
+    ["toCheck", "changed", "notCarried"].forEach(function (l) { report[l].forEach(function (e) { if (e.code === code) found = e; }); });
+    return found;
+  }
+  function count(report, code) { var e = entry(report, code); return e ? e.count : 0; }
+  function keptOf(p) { var out = []; (function walk(l) { l.forEach(function (b) { if (b.type === "kept") out.push(b); if (b.type === "table") b.rows.forEach(function (r) { r.cells.forEach(function (c) { walk(c.blocks); }); }); }); })(p.blocks); return out; }
+  function partNames(p, block) {
+    var seen = {}, out = [];
+    (function walk(rels) { rels.forEach(function (r) { if (r.part && !seen[r.part]) { seen[r.part] = 1; out.push(p.parts[r.part].name); walk(p.parts[r.part].rels); } }); })(block.rels);
+    return out.sort();
+  }
+  function xmlOf(block) { return new DOMParser().parseFromString(block.xml, "application/xml"); }
+  function same(a, b) { if (a.length !== b.length) return false; for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+  function bytesOf(blob) { return blob.arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+  // What the graft needs of every kept block, whatever it holds.
+  function checkKept(p, name) {
+    var kept = keptOf(p), ids = {}, bad = [];
+    kept.forEach(function (b) {
+      // Floating drawings that belong together travel as one block: several runs, or whole paragraphs.
+      var d = new DOMParser().parseFromString("<kept>" + b.xml + "</kept>", "application/xml"), root = d.documentElement;
+      if (d.getElementsByTagName("parsererror").length) { bad.push(b.id + " does not parse on its own"); return; }
+      [].forEach.call(root.children, function (top) {
+        var many = root.children.length > 1 || top.localName === "p";
+        if (!((top.namespaceURI === W && (top.localName === "r" || (b.floating && top.localName === "p"))) || (!many && (top.localName === "oMath" || top.localName === "oMathPara")))) bad.push(b.id + " root is " + top.nodeName);
+        if (!top.lookupNamespaceURI(top.prefix)) bad.push(b.id + " does not declare " + top.prefix);
+      });
+      var all = [root].concat([].slice.call(root.getElementsByTagName("*"))), declared = {};
+      b.rels.forEach(function (r) { declared[r.id] = 1; if (ids[r.id]) bad.push("relationship id " + r.id + " used twice"); ids[r.id] = 1; if (!!r.part === !!r.external) bad.push(r.id + " needs exactly one of part and external"); if (r.part && !p.parts[r.part]) bad.push(r.id + " names a part that is not stored"); });
+      all.forEach(function (e) { [].forEach.call(e.attributes, function (a) { if (a.namespaceURI === RNS && !/^sptK\d+$/.test(a.value)) bad.push(b.id + " still has relationship id " + a.value); }); });
+      if (typeof b.width !== "number" || typeof b.height !== "number" || typeof b.floating !== "boolean" || typeof b.text !== "string" || !b.description) bad.push(b.id + " lacks a contract field");
+      if (/lastRenderedPageBreak/.test(b.xml)) bad.push(b.id + " keeps a rendered page break");
+    });
+    for (var k in p.parts) { var e = p.parts[k]; if (!(e.blob instanceof Blob) || "data" in e || !e.contentType || !/^p\d+$/.test(k)) bad.push("part " + k + " is not in the memory form"); }
+    for (var m in p.media) { var x = p.media[m]; if (!(x.blob instanceof Blob) || "data" in x || x.source !== "import" || !/^m\d+$/.test(m)) bad.push("media " + m + " is not in the memory form"); }
+    ok(bad.length === 0, name + ": every kept block parses on its own with its prefixes declared, its ids are ours and unique, and bytes are Blobs", bad.join("; "));
+  }
+
+  var tests = [];
+  function test(name, fn) { tests.push({ name: name, fn: fn }); }
+  function run(i) {
+    if (i >= tests.length) { clearInterval(tick); finish(); return; }
+    var t = tests[i];
+    Promise.resolve().then(t.fn).then(null, function (e) { ok(false, t.name + ": threw", (e && (e.cause ? e.cause.stack : e.stack)) || String(e)); })
+      .then(function () { run(i + 1); });
+  }
+
+  // ---- plain pictures --------------------------------------------------------------------
+  test("plain pictures", function () {
+    var pngBytes = png(400, 200);
+    return imp({ styles: STYLES([STYLE("Caption", "caption")]),
+      rels: [["rIdP", IMG, "media/image1.png"], ["rIdJ", IMG, "media/image2.jpeg"], ["rIdE", IMG, "media/image3.emf"], ["rIdT", IMG, "media/image4.tif"],
+        ["rIdG", IMG, "media/image5.gif"], ["rIdB", IMG, "media/image6.bmp"], ["rIdW", IMG, "media/image7.wmf"], ["rIdLie", IMG, "media/really-a-png.jpg"],
+        ["rIdOdd", IMG, "media/my%20pic%20&%20co.png"], ["rIdAbs", IMG, "/word/media/image1.png"]],
+      files: { "word/media/image1.png": pngBytes, "word/media/image2.jpeg": jpeg(640, 480), "word/media/image3.emf": emf(), "word/media/image4.tif": tiff(),
+        "word/media/image5.gif": gif(30, 20), "word/media/image6.bmp": bmp(64, 48), "word/media/image7.wmf": wmf(), "word/media/really-a-png.jpg": png(8, 8),
+        "word/media/my pic & co.png": png(10, 10) },
+      body:
+      PX(RUN(PIC("rIdP", { w: 200, h: 100, name: "Picture 1", descr: "Diagram of the current network" })), '<w:jc w:val="center"/>') + P("Figure 1: Current network", S("Caption")) +
+      PX(RUN(PIC("rIdJ", { w: 320, h: 240 })), '<w:jc w:val="right"/>') + PX(RUN(PIC("rIdE", { w: 211, h: 131 }))) + PX(RUN(PIC("rIdT", { w: 160, h: 90 }))) +
+      PX(RUN(PIC("rIdG", { w: 30, h: 20 })) + RUN(PIC("rIdB", { w: 64, h: 48 })) + RUN(PIC("rIdW", { w: 50, h: 50 }))) +
+      PX(RUN(PIC("rIdLie", { w: 8, h: 8 })) + RUN(PIC("rIdOdd", { w: 10, h: 10 })) + RUN(PIC("rIdAbs", { w: 100, h: 50 }))) +
+      PX(R("Text with a picture ") + RUN(PIC("rIdP", { w: 20, h: 10 })) + R(" in the line.")) +
+      PX(R("Text beside a floating picture.") + RUN(PIC("rIdP", { w: 300, h: 150, anchor: true }))) +
+      PX(RUN('<w:pict><v:shapetype id="_x0000_t75" coordsize="21600,21600" o:spt="75"/><v:shape id="_x0000_i1025" type="#_x0000_t75" alt="Old logo" style="width:150pt;height:75pt"><v:imagedata r:id="rIdP" o:title="logo"/></v:shape></w:pict>'))
+    }).then(function (r) {
+      var p = r.project, b = p.blocks;
+      eq(brief(b), ["pic 200x100", "pic 320x240", "pic 211x131", "pic 160x90", "pic 30x20", "pic 64x48", "pic 50x50", "pic 8x8", "pic 10x10", "pic 100x50",
+        "p:Text with a picture  in the line.", "pic 20x10", "p:Text beside a floating picture.", "pic 300x150", "pic 200x100"],
+        "pictures: png, jpeg, emf, tiff, gif, bmp and wmf are picture blocks at the size in wp:extent; so is a legacy VML picture");
+      eq([b[0].alt, b[0].align, b[0].caption, b[1].align, b[2].align], ["Diagram of the current network", "center", "Figure 1: Current network", "right", null].map(function (x) { return x == null ? undefined : x; }),
+        "pictures: alternative text from wp:docPr, alignment from the paragraph, the Caption paragraph after it as its caption");
+      var types = b.filter(function (x) { return x.type === "picture"; }).map(function (x) { return p.media[x.media].type; });
+      eq(types, ["image/png", "image/jpeg", "image/x-emf", "image/tiff", "image/gif", "image/bmp", "image/x-wmf", "image/png", "image/png", "image/png", "image/png", "image/png", "image/png"],
+        "pictures: the type is read from the bytes, so a PNG named .jpg is a PNG");
+      var m1 = p.media[b[0].media];
+      eq([m1.name, m1.width, m1.height, m1.source, p.media[b[1].media].width, p.media[b[4].media].width, p.media[b[5].media].height, p.media[b[2].media].width],
+        ["image1.png", 400, 200, "import", 640, 30, 48, 0], "pictures: the media entry holds the name, the natural size where the format says it, and source import");
+      ok(b[0].media === b[11].media && b[0].media === b[9].media && b[0].media === b[14].media && Object.keys(p.media).length === 9, "pictures: one media entry for a picture used several times, however its target is written");
+      eq(p.media[b[8].media].name, "my pic & co.png", "pictures: a part named with a space and an ampersand is found through its escaped target");
+      eq([b[14].alt, b[14].width], ["Old logo", 200], "pictures: a legacy picture's size comes from its VML style and its text from alt");
+      var inl = entry(r.report, "inline-objects"), fl = entry(r.report, "floating-pictures");
+      eq([inl && inl.count, inl && inl.blockIds, fl && fl.count, fl && fl.blockIds], [1, [b[11].id], 1, [b[13].id]],
+        "pictures: one in a line of text moves to after its paragraph and is reported; a floating one is put in line and reported as that only");
+      eq([r.report.carried.pictures, r.report.carried.keptObjects, r.report.carried.captions, Object.keys(p.parts).length, "theme" in p], [13, 0, 1, 0, false],
+        "pictures: counted; with nothing kept there are no parts and no theme");
+      return bytesOf(m1.blob).then(function (got) { ok(same(got, pngBytes) && m1.blob.type === "image/png", "pictures: the bytes are stored exactly as they were, as a Blob of the right type"); });
+    });
+  });
+
+  // ---- pictures that are kept as they are --------------------------------------------------
+  test("pictures kept as they are", function () {
+    return imp({
+      rels: [["rIdP", IMG, "media/image1.png"], ["rIdS", IMG, "media/image2.svg"], ["rIdLink", IMG, "https://example.com/logo.png", true], ["rIdWebp", IMG, "media/image3.webp"]],
+      files: { "word/media/image1.png": png(400, 200), "word/media/image2.svg": SVG, "word/media/image3.webp": new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x45, 0x42, 0x50]) },
+      body:
+      PX(RUN(PIC("rIdP", { crop: true, name: "Picture 4", descr: "Cropped photo" }))) + PX(RUN(PIC("rIdP", { rot: true }))) + PX(RUN(PIC("rIdP", { flip: true }))) +
+      PX(RUN(PIC("rIdP", { effect: true }))) + PX(RUN(PIC("rIdP", { oval: true }))) + PX(RUN(PIC("rIdP", { duotone: true }))) +
+      PX(RUN(PIC("rIdP", { svg: "rIdS", name: "Graphic 1" }))) + PX(RUN(PIC("rIdP", { link: "rIdLink" }))) + PX(RUN(PIC("", { noEmbed: true, link: "rIdLink" }))) +
+      PX(RUN(PIC("rIdWebp", {}))) +
+      PX(RUN('<w:pict><v:shape id="x" type="#_x0000_t75" style="width:100pt;height:50pt"><v:imagedata r:id="rIdP" cropleft="6554f" o:title=""/></v:shape></w:pict>'))
+    }).then(function (r) {
+      var p = r.project, k = keptOf(p);
+      eq(brief(p.blocks), ["kept picture", "kept picture", "kept picture", "kept picture", "kept picture", "kept picture", "kept picture", "kept picture", "kept picture", "kept picture"],
+        "kept pictures: a crop, a rotation, a flip, an effect, a shaped frame, a recolour, an SVG, a picture saved in the file and linked, an unprintable type and a cropped legacy picture are kept, kind picture; a picture that is only a link is left out");
+      checkKept(p, "kept pictures");
+      eq([k[0].label, k[0].description, k[0].width, k[0].floating, !!k[0].preview && p.media[k[0].preview].type], ["Picture 4: Cropped photo", "Picture, 5.3 x 2.6 cm", 200, false, "image/png"],
+        "kept pictures: label from the name and description, a plain description with the size, and the picture's own image as the preview");
+      eq(partNames(p, k[6]), ["word/media/image1.png", "word/media/image2.svg"], "kept pictures: an SVG travels with its PNG beside it");
+      ok(k[6].preview && k[6].preview === k[0].preview, "kept pictures: the SVG's preview is the PNG, stored once");
+      eq([k[7].rels.map(function (x) { return x.external || p.parts[x.part].name; }), /:link=/.test(k[7].xml)],
+        [["word/media/image1.png"], false], "kept pictures: a picture saved in the file and linked keeps its own copy; the link is never carried, so Word never fetches it");
+      eq(count(r.report, "linked-pictures"), 2, "kept pictures: linked pictures are reported");
+      ok(!k[8].preview && partNames(p, k[8])[0] === "word/media/image3.webp", "kept pictures: a type the browser route does not cover has its part and no preview");
+    });
+  });
+
+  // ---- shapes, text boxes, groups, canvases ------------------------------------------------------
+  var THEME = HEAD + '<a:theme xmlns:a="' + A + '" name="Custom"><a:themeElements><a:clrScheme name="Custom"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>' +
+    '<a:dk2><a:srgbClr val="0E2841"/></a:dk2><a:lt2><a:srgbClr val="E8E8E8"/></a:lt2><a:accent1><a:srgbClr val="C00000"/></a:accent1><a:accent2><a:srgbClr val="E97132"/></a:accent2></a:clrScheme>' +
+    '<a:fontScheme name="Custom"><a:majorFont><a:latin typeface="Aptos Display"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Georgia"/><a:ea typeface="MS Mincho"/><a:cs typeface=""/></a:minorFont></a:fontScheme>' +
+    '<a:fmtScheme name="Office"/></a:themeElements></a:theme>';
+  var DEFAULTS = '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:asciiTheme="minorHAnsi" w:eastAsiaTheme="minorEastAsia" w:hAnsiTheme="minorHAnsi" w:cstheme="minorBidi"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="en-GB"/></w:rPr></w:rPrDefault>' +
+    '<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="278" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>';
+  var BOX_STYLES = STYLES([
+    STYLE("BoxBase", "Box base", { pPr: '<w:jc w:val="center"/><w:spacing w:before="60" w:after="0"/><w:ind w:left="284"/>', rPr: '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:b/><w:sz w:val="28"/>' }),
+    STYLE("BoxTitle", "Box title", { based: "BoxBase", rPr: '<w:i/><w:color w:val="FF0000" w:themeColor="accent1"/>' }),
+    STYLE("Strong", "Strong", { type: "character", rPr: '<w:b/><w:u w:val="double"/>' }),
+    STYLE("ListNumber", "List Number", { pPr: '<w:numPr><w:numId w:val="1"/></w:numPr>' })
+  ], DEFAULTS);
+  var INS = ' w:id="9" w:author="A" w:date="2026-01-01T00:00:00Z"';
+  var BOX_TEXT =
+    PX(R("Plain words") + '<w:bookmarkStart w:id="3" w:name="here"/><w:bookmarkEnd w:id="3"/>') +
+    PX(R("Styled title"), S("BoxTitle")) +
+    PX(R("Strong part", '<w:rStyle w:val="Strong"/><w:sz w:val="30"/><w:highlight w:val="yellow"/><w14:ligatures w14:val="none"/>') + R(" tinted", '<w:color w:val="F1A983" w:themeColor="accent2" w:themeTint="99"/>')) +
+    PX(R("A numbered line"), S("ListNumber")) +
+    PX(R("Kept ") + '<w:ins' + INS + '>' + R("inserted") + '</w:ins><w:del' + INS + '><w:r><w:delText> deleted</w:delText></w:r></w:del>' + '<w:r><w:footnoteReference w:id="2"/></w:r><w:r><w:commentReference w:id="0"/></w:r>') +
+    '<w:p w14:paraId="067B7658" w14:textId="3FD6A4AC"><w:pPr><w:pStyle w:val="BoxTitle"/><w:rPr><w:rStyle w:val="Strong"/></w:rPr></w:pPr></w:p>';
+  function rPrOf(run) { for (var c = run.firstChild; c; c = c.nextSibling) if (c.localName === "rPr") return c; return null; }
+  function names(el) { return [].map.call(el.children, function (c) { return c.localName + [].map.call(c.attributes, function (a) { return " " + a.localName + "=" + a.value; }).join(""); }); }
+  test("text boxes and shapes", function () {
+    return imp({ styles: BOX_STYLES, theme: THEME,
+      numbering: HEAD + '<w:numbering' + NS + '><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>',
+      rels: [["rIdP", IMG, "media/image1.png"]], files: { "word/media/image1.png": png(40, 40) },
+      body:
+      PX(R("A callout sits beside this paragraph.") + RUN(SHAPE(BOX_TEXT, { txBox: true, anchor: true, name: "Text Box 2", descr: "Callout", w: 200, h: 100 }) + '<w:lastRenderedPageBreak/>')) +
+      PX(RUN(SHAPE(P("PLC"), { anchor: true, name: "Rectangle 3" }))) + PX(RUN(SHAPE(null, { name: "Straight Connector 5", w: 107, cy: 0 }))) +
+      PX(RUN('<mc:AlternateContent><mc:Choice Requires="wpg">' + FRAME('<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"><wpg:wgp><wpg:cNvGrpSpPr/><wpg:grpSpPr/>' +
+        '<wps:wsp><wps:cNvSpPr/><wps:spPr/><wps:txbx><w:txbxContent>' + P("In the group") + '</w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp>' +
+        '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="p"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdP"/></pic:blipFill><pic:spPr/></pic:pic></wpg:wgp></a:graphicData>', { anchor: true, name: "Group 7" }) +
+        '</mc:Choice><mc:Fallback><w:pict><v:group id="Group 7" style="position:absolute;width:100pt;height:50pt"><v:rect style="width:10pt;height:10pt"/></v:group></w:pict></mc:Fallback></mc:AlternateContent>')) +
+      PX(RUN('<mc:AlternateContent><mc:Choice Requires="wpc">' + FRAME('<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"><wpc:wpc><wpc:bg/><wpc:whole/></wpc:wpc></a:graphicData>', { name: "Canvas 8" }) +
+        '</mc:Choice><mc:Fallback><w:pict><v:group id="Canvas 8" editas="canvas" style="width:300pt;height:150pt"/></w:pict></mc:Fallback></mc:AlternateContent>')) +
+      PX(RUN('<w:pict><v:rect id="Rectangle 9" alt="An old box" style="position:absolute;margin-left:0;width:72pt;height:36pt"><v:textbox><w:txbxContent>' + P("Old style box", S("BoxTitle")) + '</w:txbxContent></v:textbox></v:rect></w:pict>')) +
+      PX(RUN('<w:pict><v:line id="Line 10" style="position:absolute" from="0,0" to="100pt,0"/></w:pict>'))
+    }).then(function (r) {
+      var p = r.project, k = keptOf(p);
+      // A floating drawing comes before the text it was anchored in, and the two old-style shapes
+      // floating on neighbouring lines with no words between them are one drawing.
+      eq(brief(p.blocks), ["kept textbox", "p:A callout sits beside this paragraph.", "kept shape", "kept shape", "kept group", "kept canvas", "kept group"],
+        "drawings: a text box, shapes, a group, a canvas and VML shapes are kept with the right kind");
+      checkKept(p, "drawings");
+      eq([k[0].label, k[0].floating, k[0].width, k[0].height, k[0].description, k[2].floating, k[2].description, k[5].floating, k[5].width, k[5].label],
+        ["Text Box 2: Callout", true, 200, 100, "Text box, 5.3 x 2.6 cm", false, "Shape", true, 96, "An old box"], "drawings: label, floating, size and description, for DrawingML and VML alike");
+      eq([k[0].text, k[1].text, k[3].text, k[5].text], ["Plain words Styled title Strong part tinted A numbered line Kept inserted", "PLC", "In the group", "Old style box"], "drawings: the words inside, once, without the VML copy's repeat or deleted text");
+      eq(partNames(p, k[3]), ["word/media/image1.png"], "drawings: a picture inside a group travels with it");
+      ok(!entry(r.report, "inline-objects") && !entry(r.report, "floating-pictures"), "drawings: a floating drawing beside text is neither an in-line object nor a floating picture");
+
+      var d = xmlOf(k[0]), root = d.documentElement;
+      eq([names(rPrOf(root)), root.lookupNamespaceURI("wps"), /lastRenderedPageBreak|w:lang/.test(k[0].xml.slice(0, 900))], [["noProof"], "http://schemas.microsoft.com/office/word/2010/wordprocessingShape", false],
+        "kept XML: the wrapping run keeps only noProof, and declares the prefix that mc:Choice Requires names");
+      var boxes = d.getElementsByTagNameNS(W, "txbxContent");
+      ok(boxes.length === 2 && !/w:pStyle|w:rStyle|w:numPr|w:ins |w:del |bookmark|footnoteReference|commentReference|deleted|w14:paraId|w14:textId/.test(k[0].xml),
+        "text box: style references, numbering, tracked changes, bookmarks, note and comment marks and paragraph ids are gone, in the drawing and in its VML copy");
+      [0, 1].forEach(function (n) {
+        var ps = boxes[n].getElementsByTagNameNS(W, "p"), which = n ? "VML copy" : "drawing";
+        function run(pi, ri) { return rPrOf(ps[pi].getElementsByTagNameNS(W, "r")[ri]); }
+        function pPr(pi) { return ps[pi].getElementsByTagNameNS(W, "pPr")[0]; }
+        eq(names(run(0, 0)), ["rFonts ascii=Georgia hAnsi=Georgia eastAsia=MS Mincho", "sz val=24", "szCs val=24"], "text box (" + which + "): unformatted text takes the document defaults, with the theme font turned into its name");
+        eq(names(pPr(0)).slice(0, 2), ["spacing before=0 after=160 line=278 lineRule=auto", "jc val=left"], "text box (" + which + "): paragraph spacing and alignment from the defaults are written on the paragraph");
+        eq(names(run(1, 0)), ["rFonts ascii=Arial hAnsi=Arial eastAsia=MS Mincho cs=Arial", "b", "bCs", "i", "iCs", "color val=C00000", "sz val=28", "szCs val=28"],
+          "text box (" + which + "): a style chain gives font, size, bold and italic, and a theme colour becomes the theme's hex value, in schema order");
+        eq(names(pPr(1)).slice(0, 3), ["spacing before=60 after=0 line=278 lineRule=auto", "ind left=284", "jc val=center"], "text box (" + which + "): the chain's spacing, indent and alignment");
+        eq(names(run(2, 0)), ["rFonts ascii=Georgia hAnsi=Georgia eastAsia=MS Mincho", "b", "bCs", "sz val=30", "szCs val=30", "highlight val=yellow", "u val=double", "ligatures val=none"],
+          "text box (" + which + "): a character style is resolved, the run's own settings win, and settings outside the model (highlight, w14) stay");
+        eq(names(run(2, 1)).slice(1, 2), ["color val=F1A983"], "text box (" + which + "): a tinted theme colour keeps the value Word worked out");
+        ok(!ps[3].getElementsByTagNameNS(W, "numPr").length && ps[3].textContent === "A numbered line", "text box (" + which + "): a numbered paragraph keeps its words and loses its number");
+        eq(ps[4].textContent, "Kept inserted", "text box (" + which + "): an insertion is accepted and a deletion dropped");
+        var mark = pPr(5).getElementsByTagNameNS(W, "rPr")[0];
+        eq(names(mark), ["rFonts ascii=Arial hAnsi=Arial eastAsia=MS Mincho cs=Arial", "b", "bCs", "i", "iCs", "color val=C00000", "sz val=28", "szCs val=28", "u val=double"], "text box (" + which + "): an empty line's paragraph mark carries the formatting, so the line keeps its height");
+      });
+      var lost = entry(r.report, "lists-in-drawings");
+      eq([lost && lost.count, lost && lost.blockIds], [1, [k[0].id]], "text box: the lost number is reported once for the object");
+      var old = xmlOf(k[5]).getElementsByTagNameNS(W, "r")[1];
+      eq(names(rPrOf(old)).slice(0, 2), ["rFonts ascii=Arial hAnsi=Arial eastAsia=MS Mincho cs=Arial", "b"], "text box: a VML-only text box is stamped the same way");
+
+      ok(p.theme && p.parts[p.theme] && p.parts[p.theme].name === "word/theme/theme1.xml" && /theme\+xml$/.test(p.parts[p.theme].contentType), "theme: stored as a part and named by project.theme, because something was kept");
+      return p.parts[p.theme].blob.text().then(function (t) { ok(t === THEME, "theme: the part's bytes are the source's"); });
+    });
+  });
+  test("effectiveFormat", function () {
+    var styles = I.parseStyles(BOX_STYLES), theme = I.parseTheme(THEME);
+    var d = new DOMParser().parseFromString('<w:body' + NS + '>' + PX(R("x", '<w:rStyle w:val="Strong"/>') + R("y", '<w:b w:val="0"/><w:vertAlign w:val="superscript"/>'), S("BoxTitle") + '<w:jc w:val="right"/>') + P("z") + '</w:body>', "application/xml");
+    var runs = d.getElementsByTagNameNS(W, "r"), ps = d.getElementsByTagNameNS(W, "p");
+    var a = I.effectiveFormat(runs[0], styles, theme), b = I.effectiveFormat(runs[1], styles, theme), c = I.effectiveFormat(runs[2], styles, theme);
+    eq([a.font, a.size, a.b, a.i, a.u, a.color], ["Arial", 28, true, true, "double", "C00000"], "effectiveFormat: a run over its character style, paragraph style chain and theme");
+    eq([b.b, b.vertAlign, c.font, c.eastAsia, c.size, c.b, c.color], [false, "superscript", "Georgia", "MS Mincho", 24, false, null], "effectiveFormat: a run's own setting wins; with no style the document defaults and theme fonts apply");
+    var pf = I.effectiveFormat(ps[0], styles, theme), plain = I.effectiveFormat(ps[1], styles, theme);
+    eq([pf.jc, pf.spacing.before, pf.spacing.after, pf.spacing.line, pf.ind.left, pf.mark.font, plain.jc, plain.spacing.after, plain.numbered], ["right", "60", "0", "278", "284", "Arial", "left", "160", false],
+      "effectiveFormat: a paragraph's alignment, spacing and indent, and its mark's run format");
+    var none = I.effectiveFormat(runs[2], I.parseStyles(""), I.parseTheme(""));
+    eq([none.font, none.size], ["Times New Roman", 20], "effectiveFormat: with nothing said anywhere it is Word's own fallback, written out so the generated file cannot change it");
+  });
+
+  // ---- SmartArt, charts, embedded objects, equations ---------------------------------------------------
+  var DATA = HEAD + '<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:a="' + A + '"><dgm:ptLst>' +
+    ["Plan", "Do", "Check"].map(function (t) { return '<dgm:pt modelId="{1}"><dgm:prSet/><dgm:spPr/><dgm:t><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-GB"/><a:t>' + t + '</a:t></a:r></a:p></dgm:t></dgm:pt>'; }).join("") +
+    '</dgm:ptLst><dgm:cxnLst/><dgm:bg/><dgm:whole/><dgm:extLst><a:ext uri="http://schemas.microsoft.com/office/drawing/2008/diagram"><dsp:dataModelExt xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" relId="rId18" minVer="http://schemas.openxmlformats.org/drawingml/2006/diagram"/></a:ext></dgm:extLst></dgm:dataModel>';
+  var OLE = function (image, pkg, progId, alt) {
+    return '<w:object w:dxaOrig="6918" w:dyaOrig="3065" w14:anchorId="069CA864"><v:shapetype id="_x0000_t75" coordsize="21600,21600" o:spt="75" o:preferrelative="t" path="m@4@5l@4@11@9@11@9@5xe" filled="f" stroked="f"/>' +
+      '<v:shape id="_x0000_i1027" type="#_x0000_t75"' + (alt ? ' alt="' + alt + '"' : '') + ' style="width:346pt;height:153.5pt" o:ole=""><v:imagedata r:id="' + image + '" o:title=""/></v:shape>' +
+      '<o:OLEObject Type="Embed" ProgID="' + progId + '" ShapeID="_x0000_i1027" DrawAspect="Content" ObjectID="_1855919606" r:id="' + pkg + '"/></w:object>';
+  };
+  test("SmartArt, charts, embedded objects, equations", function () {
+    var D = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagram", dataBytes = new TextEncoder().encode(DATA);
+    return imp({ theme: THEME,
+      rels: [["rId14", D + "Data", "diagrams/data1.xml"], ["rId15", D + "Layout", "diagrams/layout1.xml"], ["rId16", D + "QuickStyle", "diagrams/quickStyle1.xml"], ["rId17", D + "Colors", "diagrams/colors1.xml"],
+        ["rId18", "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing", "diagrams/drawing1.xml"],
+        ["rId19", REL + "chart", "charts/chart1.xml"], ["rId20", IMG, "media/image3.emf"], ["rId21", REL + "package", "embeddings/Microsoft_Excel_Worksheet1.xlsx"],
+        ["rId22", IMG, "media/image4.png"], ["rId23", REL + "package", "embeddings/Drawing1.vsdx"], ["rId24", "http://schemas.microsoft.com/office/2014/relationships/chartEx", "charts/chartEx1.xml"],
+        ["rId25", REL + "customXml", "ink/ink1.xml"]],
+      types: [["/word/diagrams/data1.xml", "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml"], ["/word/diagrams/drawing1.xml", "application/vnd.ms-office.drawingml.diagramDrawing+xml"],
+        ["/word/charts/chart1.xml", "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"], ["/word/charts/style1.xml", "application/vnd.ms-office.chartstyle+xml"]],
+      files: { "word/diagrams/data1.xml": dataBytes, "word/diagrams/layout1.xml": "<layout/>", "word/diagrams/quickStyle1.xml": "<qs/>", "word/diagrams/colors1.xml": "<colors/>",
+        "word/diagrams/drawing1.xml": '<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"/>',
+        "word/diagrams/_rels/drawing1.xml.rels": RELS([["rId1", IMG, "../media/image9.png"]]), "word/media/image9.png": png(5, 5),
+        "word/charts/chart1.xml": '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>',
+        "word/charts/_rels/chart1.xml.rels": RELS([["rId3", REL + "package", "../embeddings/Microsoft_Excel_Worksheet.xlsx"], ["rId2", "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle", "colors1.xml"],
+          ["rId1", "http://schemas.microsoft.com/office/2011/relationships/chartStyle", "style1.xml"], ["rId4", REL + "oleObject", "file:///C:/data/book.xlsx", true]]),
+        "word/charts/style1.xml": "<cs/>", "word/charts/colors1.xml": "<cc/>", "word/charts/chartEx1.xml": "<cx/>", "word/embeddings/Microsoft_Excel_Worksheet.xlsx": new Uint8Array([80, 75, 3, 4, 1]),
+        "word/embeddings/Microsoft_Excel_Worksheet1.xlsx": new Uint8Array([80, 75, 3, 4, 2]), "word/embeddings/Drawing1.vsdx": new Uint8Array([80, 75, 3, 4, 3]),
+        "word/media/image3.emf": emf(), "word/media/image4.png": png(60, 30), "word/ink/ink1.xml": "<ink/>" },
+      body:
+      PX(RUN(FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" r:dm="rId14" r:lo="rId15" r:qs="rId16" r:cs="rId17"/></a:graphicData>', { w: 576, h: 336, name: "Diagram 6" }))) +
+      PX(RUN(FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId19"/></a:graphicData>', { w: 720, h: 336, name: "Chart 7" })), '<w:jc w:val="center"/>') +
+      PX(RUN(FRAME('<a:graphicData uri="http://schemas.microsoft.com/office/drawing/2014/chartex"><cx:chart xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" r:id="rId24"/></a:graphicData>', { name: "Chart 8" }))) +
+      PX(RUN(OLE("rId20", "rId21", "Excel.Sheet.12", ""))) + PX(RUN(OLE("rId22", "rId23", "Visio.Drawing.15", "Site network drawing"))) +
+      PX('<m:oMathPara><m:oMath><m:r><w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math"/></w:rPr><m:t>a</m:t></m:r><m:r><m:t>+b=c</m:t></m:r></m:oMath></m:oMathPara>') +
+      PX(R("Where ") + '<m:oMath><m:r><m:t>x&gt;1</m:t></m:r></m:oMath>' + R(" holds.")) +
+      PX(RUN(FRAME('<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"><w14:contentPart bwMode="auto" r:id="rId25"/></a:graphicData>', { name: "Ink 9" })))
+    }).then(function (r) {
+      var p = r.project, k = keptOf(p);
+      eq(brief(p.blocks), ["kept smartart", "kept chart", "kept chart", "kept ole", "kept ole", "kept equation", "p:Where  holds.", "kept equation", "kept other"],
+        "objects: SmartArt, a chart, a newer chart, embedded objects, equations and anything else with a relationship are kept with the right kind");
+      checkKept(p, "objects");
+      eq(partNames(p, k[0]), ["word/diagrams/colors1.xml", "word/diagrams/data1.xml", "word/diagrams/drawing1.xml", "word/diagrams/layout1.xml", "word/diagrams/quickStyle1.xml", "word/media/image9.png"],
+        "SmartArt: its data, layout, style and colour parts, the drawing part found through the data part, and what that depends on");
+      var dataRel = k[0].rels.filter(function (x) { return /diagramData$/.test(x.type); })[0], drawRel = k[0].rels.filter(function (x) { return /diagramDrawing$/.test(x.type); })[0];
+      ok(drawRel && /^sptK\d+$/.test(drawRel.id) && p.parts[drawRel.part].name === "word/diagrams/drawing1.xml", "SmartArt: the drawing part has a relationship of the block's own", JSON.stringify(k[0].rels));
+      eq([k[0].text, k[0].description, k[0].label, k[0].width, k[0].floating], ["Plan Do Check", "Diagram (SmartArt), 15.2 x 8.9 cm", "Diagram 6", 576, false], "SmartArt: its words, description, label and size");
+      eq(p.parts[drawRel.part].rels.map(function (x) { return [x.id, p.parts[x.part].name]; }), [["rId1", "word/media/image9.png"]], "parts: a carried part's own relationship ids stay as they were");
+      return p.parts[dataRel.part].blob.text().then(function (t) {
+        ok(t === DATA.replace('relId="rId18"', 'relId="' + drawRel.id + '"'), "SmartArt: dsp:dataModelExt relId is rewritten to the new id in the stored data part, and nothing else in it changes");
+        eq([partNames(p, k[1]), k[1].align, k[1].width], [["word/charts/chart1.xml", "word/charts/colors1.xml", "word/charts/style1.xml", "word/embeddings/Microsoft_Excel_Worksheet.xlsx"], "center", 720],
+          "chart: the chart part with its style, colours and workbook; its paragraph's alignment; its size although wider than a page");
+        var chart = p.parts[k[1].rels[0].part];
+        eq([chart.contentType, chart.rels.filter(function (x) { return x.external; }).map(function (x) { return [x.id, x.external]; })], ["application/vnd.openxmlformats-officedocument.drawingml.chart+xml", []],
+          "chart: its content type from the source; a carried part's link to a file outside the document is not carried, so Word never fetches it");
+        eq(partNames(p, k[2]), ["word/charts/chartEx1.xml"], "chart: a cx:chart is a chart too");
+        eq([partNames(p, k[3]), k[3].description, k[3].width, k[3].height, "preview" in k[3], "label" in k[3]], [["word/embeddings/Microsoft_Excel_Worksheet1.xlsx", "word/media/image3.emf"], "Embedded object (Excel.Sheet.12), 12.2 x 5.4 cm", 461, 205, false, false],
+          "embedded object: the embedding and its EMF picture; size from the VML style; no preview when the picture is not a raster");
+        eq([partNames(p, k[4]), k[4].label, !!k[4].preview && p.media[k[4].preview].width, k[4].description], [["word/embeddings/Drawing1.vsdx", "word/media/image4.png"], "Site network drawing", 60, "Embedded object (Visio.Drawing.15), 12.2 x 5.4 cm"],
+          "embedded object: a Visio-style object is the same markup; a raster picture of it is the preview; its alt text is the label");
+        ok(/ObjectID="_1855919606"/.test(k[3].xml) && /ShapeID="_x0000_i1027"/.test(k[3].xml), "embedded object: shape and object ids are left for the graft to make unique");
+        eq([k[5].xml.indexOf("<m:oMathPara"), k[5].rels, k[5].text, k[5].width, k[6].text, k[5].description], [0, [], "a+b=c", 0, "x>1", "Equation"], "equation: kept as the math element itself, with no parts and its text");
+        var inl = entry(r.report, "inline-objects");
+        eq([inl && inl.count, inl && inl.blockIds], [1, [k[6].id]], "equation: one inside a sentence moves to after its paragraph and is reported");
+        eq(partNames(p, k[7]), ["word/ink/ink1.xml"], "other: an unknown drawing is kept with whatever it points to");
+        eq(r.report.carried.keptObjects, 8, "objects: counted");
+        return bytesOf(p.parts[k[3].rels[1].part].blob);
+      }).then(function (got) { ok(same(got, new Uint8Array([80, 75, 3, 4, 2])), "parts: an embedding's bytes are stored exactly as they were"); });
+    });
+  });
+
+  test("SmartArt without its drawing part", function () {
+    var D = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagram";
+    return imp({ rels: [["rId14", D + "Data", "diagrams/data1.xml"], ["rId18", REL + "footer", "footer1.xml"]],
+      files: { "word/diagrams/data1.xml": DATA.replace('relId="rId18"', 'relId="rId77"'), "word/footer1.xml": HEAD + '<w:ftr' + NS + '/>' },
+      body: PX(RUN(FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" r:dm="rId14"/></a:graphicData>', { name: "Diagram 2" })))
+    }).then(function (r) {
+      var p = r.project, k = keptOf(p)[0], gone = entry(r.report, "unreadable-part");
+      // real Word: with the drawing part gone Word draws the diagram again from its data, so the diagram is worth keeping
+      eq([k && k.kind, k && k.rels.length, gone && gone.count, gone && gone.blockIds], ["smartart", 1, 1, [k.id]], "SmartArt: with no drawing part the diagram is still kept, and the gap reported");
+      return p.parts[k.rels[0].part].blob.text().then(function (t) {
+        ok(/relId="sptK\d+"/.test(t) && !/rId77/.test(t), "SmartArt: the old drawing id does not survive, so it cannot meet an unrelated id in the generated file", t.slice(-260));
+      });
+    });
+  });
+
+  // real Word: a chart whose workbook is missing makes Word refuse the whole file ("The file appears to be
+  // corrupted"), although the chart part itself is there. So a gap anywhere in what an object depends on counts.
+  test("a chart without its workbook", function () {
+    return imp({ rels: [["rId19", REL + "chart", "charts/chart1.xml"], ["rIdT", REL + "theme", "theme/theme1.xml"]],
+      files: { "word/charts/chart1.xml": '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>', "word/charts/style1.xml": "<cs/>", "word/theme/theme1.xml": THEME,
+        "word/charts/_rels/chart1.xml.rels": RELS([["rId3", REL + "package", "../embeddings/Gone.xlsx"], ["rId1", "http://schemas.microsoft.com/office/2011/relationships/chartStyle", "style1.xml"]]) },
+      body: P("Before") + PX(RUN(FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId19"/></a:graphicData>', { name: "Chart 7" })))
+    }).then(function (r) {
+      var gone = entry(r.report, "objects-lost");
+      eq([brief(r.project.blocks), Object.keys(r.project.parts), "theme" in r.project, gone && gone.count, gone && gone.examples], [["p:Before"], [], false, 1, ["Chart 7"]],
+        "a chart that has lost its workbook is left out and named, and none of its parts, nor a theme nothing needs, is stored");
+    });
+  });
+
+  // ---- where a picture can hide, and what is never carried ----------------------------------------------
+  test("wrappers, notes, chunks, controls, macros, missing parts", function () {
+    var foot = HEAD + '<w:footnotes' + NS + '><w:footnote w:id="2">' + PX('<w:r><w:footnoteRef/></w:r>' + R(" See the sketch ") + RUN(PIC("rIdN", {}))) + '<w:tbl><w:tr><w:tc>' + P("cell") + '</w:tc></w:tr></w:tbl></w:footnote></w:footnotes>';
+    return imp({ footnotes: foot,
+      rels: [["rIdP", IMG, "media/image1.png"], ["rIdL", REL + "hyperlink", "https://example.com/", true], ["rIdChunk", REL + "aFChunk", "afchunk.docx"],
+        ["rIdCtl", REL + "control", "activeX/activeX1.xml"], ["rIdCtlImg", IMG, "media/image2.wmf"], ["rIdVba", "http://schemas.microsoft.com/office/2006/relationships/vbaProject", "vbaProject.bin"],
+        ["rIdGone", IMG, "media/gone.png"], ["rIdDm", REL + "diagramData", "diagrams/data1.xml"], ["rIdQs", REL + "diagramQuickStyle", "diagrams/quickStyle1.xml"]],
+      files: { "word/media/image1.png": png(40, 20), "word/diagrams/quickStyle1.xml": "<qs/>", "word/afchunk.docx": new Uint8Array([80, 75, 3, 4]), "word/activeX/activeX1.xml": "<ax/>", "word/activeX/activeX1.bin": new Uint8Array(8),
+        "word/media/image2.wmf": wmf(), "word/vbaProject.bin": new Uint8Array(16), "word/_rels/footnotes.xml.rels": RELS([["rIdN", IMG, "media/image1.png"]]) },
+      body:
+      PX('<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> INCLUDEPICTURE "C:\\\\pics\\\\a.png" \\* MERGEFORMATINET </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>' + RUN(PIC("rIdP", { w: 40, h: 20 })) + '<w:r><w:fldChar w:fldCharType="end"/></w:r>') +
+      PX('<w:hyperlink r:id="rIdL">' + RUN(PIC("rIdP", { w: 41, h: 20 })) + '</w:hyperlink>') +
+      '<w:sdt><w:sdtPr><w:picture/></w:sdtPr><w:sdtContent>' + PX(RUN(PIC("rIdP", { w: 42, h: 20 }))) + '</w:sdtContent></w:sdt>' +
+      PX('<w:ins w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z">' + RUN(PIC("rIdP", { w: 43, h: 20 })) + '</w:ins><w:del w:id="2" w:author="A" w:date="2026-01-01T00:00:00Z">' + RUN(PIC("rIdP", { w: 99, h: 99 })) + '</w:del>') +
+      '<w:tbl><w:tblGrid><w:gridCol w:w="5000"/></w:tblGrid><w:tr><w:tc>' + PX(R("In a cell ") + RUN(PIC("rIdP", { w: 44, h: 20 }))) + PX(RUN(SHAPE(P("Boxed"), { txBox: true }))) + '</w:tc></w:tr></w:tbl>' +
+      PX(R("A note") + '<w:r><w:footnoteReference w:id="2"/></w:r>') +
+      '<w:altChunk r:id="rIdChunk"/>' +
+      PX(RUN('<w:object w:dxaOrig="1440" w:dyaOrig="360"><v:shape id="_x0000_i1030" type="#_x0000_t75" style="width:1in;height:18pt"><v:imagedata r:id="rIdCtlImg" o:title=""/></v:shape><w:control r:id="rIdCtl" w:name="CheckBox1" w:shapeid="_x0000_i1030"/></w:object>')) +
+      PX(RUN(PIC("rIdGone", { name: "Picture 12", descr: "Lost photo" }))) + PX(RUN(PIC("rIdNowhere", { name: "Picture 13" }))) +
+      PX(RUN(FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" r:dm="rIdDm" r:lo="rIdUnknown" r:qs="rIdQs"/></a:graphicData>', { name: "Diagram 14" }))) +
+      PX(RUN(PIC("rIdGone", { crop: true, name: "Picture 15", descr: "Cropped and lost" })))
+    }).then(function (r) {
+      var p = r.project, rep = r.report, cell = p.blocks[4].rows[0].cells[0].blocks;
+      eq(brief(p.blocks.slice(0, 4)), ["pic 40x20", "pic 41x20", "pic 42x20", "pic 43x20"], "wrappers: a picture in a field result, a hyperlink, a content control and an insertion is a picture block; one in a deletion is not");
+      eq(brief(cell), ["p:In a cell ", "pic 44x20", "kept textbox"], "table cells: pictures and kept objects are blocks of the cell");
+      eq(brief(p.blocks.slice(5)), ["p:A note", "kept picture"], "a control, a chunk, pictures with no bytes and a diagram with no data part leave no block; a kept picture whose image is missing stays");
+      checkKept(p, "missing parts");
+      var note = entry(rep, "objects-in-notes"), fn = p.footnotes[Object.keys(p.footnotes)[0]];
+      eq([note && note.count, note && note.examples, fn.runs], [2, ["See the sketch cell"], [{ t: "See the sketch \ncell" }]], "notes: a picture and a table in a footnote are not carried; the note's text, with the words of the table, is quoted and kept");
+      var chunk = entry(rep, "embedded-chunks");
+      eq([chunk && chunk.count, chunk && chunk.examples], [1, ["afchunk.docx"]], "chunks: an embedded file is reported by name");
+      eq([count(rep, "controls"), count(rep, "macros")], [1, 1], "controls and macros are reported");
+      var stored = Object.keys(p.parts).map(function (k) { return p.parts[k].name; }).concat(Object.keys(p.media).map(function (k) { return p.media[k].name; }));
+      ok(!stored.some(function (n) { return /activeX|vbaProject|afchunk|image2\.wmf|quickStyle/.test(n); }), "active content, the chunk, a control's picture and the parts of a diagram that was left out are never stored", stored.join(", "));
+      var gone = entry(rep, "unreadable-part"), left = entry(rep, "objects-lost"), lostPic = p.blocks[6];
+      eq([left && left.count, left && left.examples, gone && gone.count, gone && gone.examples, gone && gone.blockIds], [3, ["Picture 12: Lost photo", "Picture 13", "Diagram 14"], 1, ["Picture 15: Cropped and lost"], [lostPic.id]],
+        "missing parts: a picture whose bytes are missing, a relationship that does not exist, a diagram with no data part and a kept picture with no image are each reported once, by name");
+      // real Word: a chart, diagram or embedded object pointing at a missing relationship makes Word refuse the whole file; a picture does not
+      eq([lostPic.rels, lostPic.label, /r:embed="sptK\d+"/.test(lostPic.xml)], [[], "Picture 15: Cropped and lost", true], "missing parts: the kept picture has an id of ours and no relationship pointing at nothing");
+      eq([rep.carried.links, count(rep, "picture-links")], [0, 1], "wrappers: the link around a picture is reported as left off, not counted as carried");
+    });
+  });
+
+  // One of our own draft exports carries a DRAFT watermark in the body, on the cover. Kept as a drawing it
+  // would print across a Final made from the import.
+  test("a watermark in the body", function () {
+    var MARK = '<w:pict><v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" path="m@7,l@8,m@5,21600l@6,21600e"><v:textpath on="t" fitshape="t"/></v:shapetype>' +
+      '<v:shape id="DraftWatermark1" o:spid="_x0000_s2049" type="#_x0000_t136" style="position:absolute;width:440pt;height:146pt;rotation:315" fillcolor="#FFFFFF" stroked="f"><v:textpath style="font-family:&quot;Segoe UI&quot;;font-size:1pt" string="DRAFT"/></v:shape></w:pict>';
+    var ART = MARK.replace("DraftWatermark1", "WordArt 3").replace('string="DRAFT"', 'string="Welcome"');
+    return imp({ body: PX(RUN(MARK) + R("Cover text")) + PX(RUN(ART)) }).then(function (r) {
+      var h = entry(r.report, "headers-footers");
+      eq([brief(r.project.blocks), h && h.count, h && h.examples], [["p:Cover text", "kept shape"], 1, ["Watermark: DRAFT"]],
+        "a draft watermark in the body is not carried, and is reported with the headers and footers the template replaces; other WordArt is a kept shape");
+    });
+  });
+
+  // ---- classifyDrawing on its own -----------------------------------------------------------------------------
+  test("classifyDrawing", function () {
+    function node(xml) { return new DOMParser().parseFromString('<w:r' + NS + '>' + xml + '</w:r>', "application/xml").documentElement.firstElementChild; }
+    var a = I.classifyDrawing(node(PIC("rId5", { w: 300, h: 150, name: "Picture 1", descr: "Alt" })));
+    eq([a.kind, a.plain, a.floating, a.width, a.height, a.name, a.descr, a.embed, a.reasons], ["picture", true, false, 300, 150, "Picture 1", "Alt", "rId5", []], "classifyDrawing: a plain picture, in line");
+    var b = I.classifyDrawing(node(PIC("rId5", { crop: true, rot: true, anchor: true })));
+    eq([b.kind, b.plain, b.floating, b.reasons], ["picture", false, true, ["crop", "rotation"]], "classifyDrawing: a cropped, rotated, floating picture is not plain, and says why");
+    eq([I.classifyDrawing(node(SHAPE(P("x"), { txBox: true }))).kind, I.classifyDrawing(node(SHAPE(P("x"), {}))).kind, I.classifyDrawing(node(SHAPE(P("x"), {}))).plain], ["textbox", "shape", false], "classifyDrawing: mc:AlternateContent is read through to the drawing inside");
+    eq([I.classifyDrawing(node(OLE("rId1", "rId2", "Excel.Sheet.12", ""))).kind, I.classifyDrawing(node(OLE("rId1", "rId2", "Excel.Sheet.12", ""))).progId], ["ole", "Excel.Sheet.12"], "classifyDrawing: an embedded object and its ProgID");
+    eq(I.classifyDrawing(node('<w:object><v:shape id="s" style="width:1in;height:1in"/><w:control r:id="rId9" w:name="c"/></w:object>')).kind, "control", "classifyDrawing: a control");
+    eq([I.classifyDrawing(node('<m:oMath><m:r><m:t>e</m:t></m:r></m:oMath>')).kind, I.classifyDrawing(node('<w:t>text</w:t>')), I.classifyDrawing(null)], ["equation", null, null], "classifyDrawing: an equation; null for what is not a drawing");
+  });
+
+  run(0);
+})();
+</script>
+</body></html>

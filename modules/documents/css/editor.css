@@ -1,0 +1,250 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* editor.css: the paper, its blocks and the toolbar (docs/document-tool-design.md
+   5.3, 5.4). The block rules are not tied to the editor: the preview draws the
+   same blocks with App.DocRender and looks the same.
+
+   The sheet is white in both themes, with the Word template's own values
+   (shared/house-docx.js buildStyles: Segoe UI, body 11 pt, headings 16, 13 and
+   12 pt in navy 173267, captions 9 pt italic), so what is typed looks like what
+   prints. Sizes are px at 96 dpi: an A4 page is 794 px wide with 96 px margins,
+   which leaves the 601 px of text the writer prints; a landscape page leaves
+   1026 px. */
+
+/* ---- the Edit page ---- */
+/* The view scrolls both ways (a landscape sheet is wider than most windows).
+   The toolbar is pinned on both axes, so it stays whole and in place when the
+   paper is scrolled sideways; the side gutters are the paper's own, since a
+   gutter on the view would need the toolbar pulled back over it with a
+   negative margin, which a pinned toolbar cannot have. */
+#edit-view { padding: 0; }
+#edit-view > * { max-width: none; }
+
+#toolbar {
+  position: sticky; top: 0; left: 0; z-index: 5; box-sizing: border-box;
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  padding: 8px 12px; margin: 0;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.tb-main, .tb-context, .tb-group, .tbl-controls { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+/* The row for a table's or a picture's controls is always there and always
+   one line high: with the caret in text it holds a quiet hint, and controls
+   wider than the view scroll sideways instead of wrapping. Its height is fixed
+   (room for a control, its focus ring and a thin scroll bar), so the toolbar
+   never changes height as the caret moves and the page never moves under the
+   pointer between the two clicks of a double-click. */
+.tb-context {
+  flex: 1 0 100%; min-width: 0; box-sizing: border-box; height: 46px;
+  flex-wrap: nowrap; gap: 12px; padding: 0 3px; margin-bottom: -4px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent;
+  border-top: 1px solid var(--border);
+}
+.tb-context .tb-group, .tb-context .tbl-controls { flex: none; flex-wrap: nowrap; }
+.tb-context .tb-field, .tb-context .btn.tb { flex: none; white-space: nowrap; }
+.tb-hint { flex: none; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.tb-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
+.btn.tb { padding: 4px 8px; font-size: 12.5px; min-height: 28px; }
+.btn.tb[aria-pressed="true"] { background: var(--brand-blue-tint); border-color: var(--brand-blue); color: var(--brand-blue-dark); }
+.btn.tb[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+.btn.tb:focus-visible, .tb-type:focus-visible, .tb-num:focus-visible, .tb-alt:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+.tb-bold { font-weight: 700; }
+.tb-italic { font-style: italic; }
+.tb-underline { text-decoration: underline; }
+.tb-strike { text-decoration: line-through; }
+.tb-red { color: #E00000; }
+.tb-type, .tb-num, .tb-alt {
+  font: inherit; font-size: 12.5px; min-height: 28px; padding: 3px 6px;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius);
+}
+.tb-num { width: 64px; }
+.tb-alt { width: 180px; }
+.tb-field { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
+
+/* A block scrolled into view stops below the pinned toolbar (the editor sets
+   the toolbar's height on the view). */
+#paper .blk, #paper .panel-row { scroll-margin-top: calc(var(--doc-toolbar-h, 0px) + 8px); }
+
+/* ---- the paper ---- */
+#paper {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 20px 24px 120px; min-width: min-content; outline: none;
+}
+/* The paper is one stop for Tab; what is selected inside it shows where the keyboard is. */
+#paper:focus-visible:not([aria-activedescendant]) > .blk:first-child { box-shadow: inset 0 3px 0 var(--brand-blue); }
+#paper.dragging { user-select: none; cursor: default; }
+
+.blk {
+  box-sizing: border-box; position: relative;
+  width: 794px; padding: 0 96px;
+  background: #FFFFFF; color: #1A2533;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, Arial, sans-serif;
+  font-size: 14.67px; line-height: 1.36;
+  outline: none;
+  /* An unseen block is kept out of layout and paint; its text stays in the page,
+     so the browser's find and every jump still land on it. */
+  content-visibility: auto;
+}
+.blk.land { width: 1218px; }
+/* Block heights are fractions of a pixel, and the page behind showed through
+   between two blocks as a hairline (plain to see in the dark theme). Each
+   block overlaps the one above by a pixel. :where keeps this weaker than the
+   new-sheet rule below. */
+:where(#paper) > .blk + .blk { margin-top: -1px; padding-top: 1px; }
+#paper > .blk:first-child { padding-top: 72px; }
+#paper > .blk:last-child { padding-bottom: 96px; }
+/* A change of orientation is a new sheet. */
+.blk.land + .blk:not(.land), .blk:not(.land) + .blk.land { margin-top: 18px; padding-top: 56px; }
+.blk.land:has(+ .blk:not(.land)), .blk:not(.land):has(+ .blk.land) { padding-bottom: 56px; }
+
+.blk .txt { margin: 0; padding: 0 0 8px; min-height: 1.36em; white-space: pre-wrap; overflow-wrap: anywhere; outline: none; }
+.blk p.txt.al-center { text-align: center; }
+.blk p.txt.al-right { text-align: right; }
+.blk p.txt.al-justify { text-align: justify; }
+.blk h1.txt, .blk h2.txt, .blk h3.txt { color: #173267; font-weight: 400; line-height: 1.25; flex: 1; min-width: 0; }
+.blk h1.txt { font-size: 21.33px; padding: 21px 0 9px; }
+.blk h2.txt { font-size: 17.33px; padding: 16px 0 7px; }
+.blk h3.txt { font-size: 16px; padding: 13px 0 5px; }
+/* A heading prints regular weight and upright whatever its runs say: in the
+   Word file only its number is bold. */
+.blk h1.txt b, .blk h2.txt b, .blk h3.txt b { font-weight: inherit; }
+.blk h1.txt i, .blk h2.txt i, .blk h3.txt i { font-style: normal; }
+.blk[data-type="heading"] { display: flex; align-items: baseline; gap: 0.75em; }
+.blk .hnum { color: #0F5FA6; font-weight: 700; flex: none; }
+.blk .hnum:empty { display: none; }
+.blk[data-type="heading"] .hnum { line-height: 1.25; }
+.blk[data-type="heading"]:has(h1) .hnum { font-size: 21.33px; }
+.blk[data-type="heading"]:has(h2) .hnum { font-size: 17.33px; }
+.blk[data-type="heading"]:has(h3) .hnum { font-size: 16px; }
+
+/* A list item: the marker is real text beside the item's own text. */
+.blk[data-type="list"] { display: flex; align-items: baseline; }
+.blk[data-type="list"] .marker { flex: none; width: 22px; margin-left: 12px; color: #1A2533; user-select: none; }
+.blk[data-type="list"].lvl-1 .marker { margin-left: 36px; }
+.blk[data-type="list"].lvl-2 .marker { margin-left: 60px; }
+.blk[data-type="list"] .txt { flex: 1; min-width: 0; padding-bottom: 4px; }
+
+.blk .txt.prompt, .blk .red, .red { color: #E00000; }
+/* A prompt prints bold and upright. */
+.blk .txt.prompt { font-weight: 700; }
+.blk code { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 13.33px; background: #F4F7FA; padding: 0 2px; border-radius: 2px; }
+.blk a[data-link] { color: #0F5FA6; text-decoration: underline; cursor: text; }
+.blk sup.fn { color: #0F5FA6; font-weight: 600; cursor: pointer; padding: 0 1px; user-select: none; }
+.blk .txt[contenteditable] { caret-color: #1A2533; }
+
+.blk .cap { margin: 4px 0 8px; font-size: 12px; font-style: italic; color: #5A6B7B; white-space: pre-wrap; outline: none; min-height: 1.3em; }
+#paper .cap:has(> br:only-child)::before { content: "Caption"; color: #94A0AD; }
+#paper .cap[contenteditable] { box-shadow: 0 1px 0 #C8D2DD; }
+
+.blk figure { margin: 4px 0 8px; display: flex; flex-direction: column; }
+.blk figure.al-left { align-items: flex-start; }
+.blk figure.al-center { align-items: center; }
+.blk figure.al-right { align-items: flex-end; }
+.blk figure img { display: block; max-width: 100%; height: auto; }
+.blk figure figcaption { align-self: stretch; }
+.blk figure.al-center figcaption { text-align: center; }
+.blk figure.al-right figcaption { text-align: right; }
+.blk .ph {
+  box-sizing: border-box; max-width: 100%; min-height: 64px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding: 8px; text-align: center; font-size: 12px; color: #5A6B7B;
+  border: 1px dashed #94A0AD; background: #F4F7FA;
+}
+.blk .ph.lost { border-color: #E00000; color: #B23A33; background: #FBEDEC; }
+
+.kept-card { max-width: 100%; display: flex; flex-direction: column; align-items: inherit; gap: 2px; }
+.kept-card p { margin: 0; font-size: 12px; color: #5A6B7B; }
+.kept-card .kept-line { margin-top: 6px; color: #1A2533; }
+.kept-card .kept-n { font-weight: 600; }
+.kept-card .kept-label, .kept-card .kept-text { overflow-wrap: anywhere; }
+.kept-card .kept-text::before { content: "Text inside: "; }
+.kept-card .kept-note.lost { color: #B23A33; font-weight: 600; }
+.kept-card img.kept-preview { display: block; max-width: 100%; height: auto; border: 1px solid #E2E7EE; }
+.kept-icon { width: 40px; height: 40px; fill: none; stroke: #5A6B7B; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+
+.blk[data-type="pageBreak"] { background: transparent; padding-top: 12px; padding-bottom: 12px; }
+.pb { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); user-select: none; }
+.pb::before, .pb::after { content: ""; flex: 1; border-top: 1px dashed var(--border-strong); }
+.blk .unknown { margin: 0; padding: 6px 0; font-size: 12px; color: #5A6B7B; }
+
+/* A block inside a table cell is laid out by its cell, not as a sheet. */
+.doc-table .blk { width: auto; padding: 0; background: transparent; color: inherit; content-visibility: visible; font-size: inherit; }
+.doc-table .blk[data-type="list"] .marker { color: inherit; }
+.doc-table .blk .txt { padding-bottom: 0; }
+
+/* ---- the editor's own marks on the paper ---- */
+#paper > .blk.sel { background: #E6EEF6; box-shadow: inset 4px 0 0 #0F5FA6; }
+#paper > .blk.sel[data-type="pageBreak"] { background: var(--brand-blue-tint); }
+#paper .doc-table .blk.sel { outline: 2px solid #0F5FA6; outline-offset: 2px; }
+#paper .blk[data-type="picture"], #paper .blk[data-type="kept"], #paper .blk[data-type="pageBreak"] { cursor: pointer; }
+@keyframes blk-flash { from { background-color: #FFF3C4; } to { background-color: #FFFFFF; } }
+#paper > .blk.flash { animation: blk-flash 1.6s ease-out 1; }
+@media (prefers-reduced-motion: reduce) { #paper > .blk.flash { animation: none; box-shadow: inset 4px 0 0 #C28A1E; } }
+
+/* The panel under a block: a footnote's text, or a link's address. */
+.panel-row {
+  box-sizing: border-box; width: 794px; padding: 8px 96px 10px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+  background: #F4F7FA; color: #1A2533; border-top: 1px solid #C8D2DD; border-bottom: 1px solid #C8D2DD;
+  font-family: "Segoe UI", system-ui, Arial, sans-serif; font-size: 12.5px;
+}
+.panel-row .panel-label { font-weight: 600; display: inline-flex; gap: 8px; align-items: baseline; }
+.panel-row .fn-text { flex: 1 1 320px; margin: 0; padding: 4px 6px; min-height: 1.4em; font-size: 12px; background: #FFFFFF; border: 1px solid #C8D2DD; border-radius: 3px; white-space: pre-wrap; outline: none; }
+.panel-row .fn-text[contenteditable] { border-color: #0F5FA6; }
+.panel-row .panel-input { font: inherit; width: 320px; max-width: 100%; padding: 3px 6px; border: 1px solid #C8D2DD; border-radius: 3px; background: #FFFFFF; color: #1A2533; }
+.panel-row .panel-note { flex-basis: 100%; color: #B23A33; }
+.panel-row .panel-note:empty { display: none; }
+
+/* ---- the outline, when the editor draws it (the shell draws its own) ---- */
+.ol-title { font-size: 12.5px; font-weight: 600; color: var(--text-muted); padding: 7px 18px; }
+.ol-empty { margin: 0; padding: 6px 18px; font-size: 12.5px; color: var(--text-muted); }
+.ol-item { display: flex; gap: 6px; align-items: baseline; padding: 3px 6px 3px 18px; font-size: 12.5px; color: var(--text); cursor: pointer; }
+.ol-item.lvl-2 { padding-left: 30px; color: var(--text-muted); }
+.ol-item.lvl-3 { padding-left: 42px; color: var(--text-muted); }
+.ol-item:hover { background: var(--surface-2); }
+.ol-item:focus-visible, .ol-menu:focus-visible, .ol-pop-item:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
+.ol-item .ol-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ol-item .ol-n { flex: none; font-size: 11px; font-weight: 700; background: var(--gap-bg); color: var(--gap); border-radius: 999px; padding: 0 6px; }
+.ol-menu { flex: none; border: 0; background: none; color: var(--text-muted); font: inherit; line-height: 1; padding: 2px 6px; border-radius: var(--radius); cursor: pointer; }
+.ol-menu:hover { background: var(--surface-3); color: var(--text); }
+.ol-pop { margin: 2px 10px 6px 18px; display: grid; padding: 4px 0; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); }
+.ol-pop-item { border: 0; background: none; color: var(--text); font: inherit; font-size: 12.5px; text-align: left; padding: 5px 12px; cursor: pointer; }
+.ol-pop-item:hover { background: var(--surface-2); }
+
+/* ---- front matter, drawn for the preview and Document information ---- */
+/* The cover at its printed size. The capitals on it are the Word cover's own:
+   it is a picture of the page, not a label of the tool. */
+.cover-page {
+  position: relative; box-sizing: border-box; width: 794px; height: 1123px; overflow: hidden;
+  padding: 51px 53px 37px; background: #0F1C3F; color: #FFFFFF;
+  font-family: "Segoe UI", system-ui, Arial, sans-serif; line-height: 1.25;
+}
+.cover-page .cover-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cover-page .cover-top, .cover-page .cover-foot { position: relative; }
+.cover-page .cover-logo { display: block; width: 250px; height: auto; }
+.cover-page .cover-kicker { margin-top: 55px; font-size: 14px; font-weight: 700; color: #7FC4E8; }
+.cover-page .cover-bar { width: 60px; height: 4px; margin-top: 6px; background: #3399CC; }
+.cover-page .cover-title { margin-top: 15px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.cover-page .cover-client { margin-top: 16px; font-size: 20px; color: #C7D8E8; }
+.cover-page .cover-site { font-size: 14px; color: #9DB8D6; }
+.cover-page .cover-sub { margin-top: 10px; font-size: 13.33px; font-weight: 700; color: #7FC4E8; }
+.cover-page .cover-foot { position: absolute; left: 53px; right: 53px; bottom: 37px; }
+.cover-page .cover-strip { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin-bottom: 8px; }
+.cover-page .cover-k { font-size: 10.67px; font-weight: 700; color: #7FC4E8; }
+.cover-page .cover-v { font-size: 12.67px; margin-right: 22px; }
+.cover-page .cover-addr { font-size: 10px; color: #DBE6F1; }
+/* The small cover beside the Document information fields: wrap coverEl in this. */
+.cover-mini { width: 270px; height: 382px; overflow: hidden; border: 1px solid var(--border-strong); }
+.cover-mini > .cover-page { zoom: 0.34; }
+
+.doc-control h1, .doc-contents h1 { font-size: 21.33px; font-weight: 400; color: #173267; margin: 21px 0 9px; }
+.control-table { width: 100%; border-collapse: collapse; font-size: 14.67px; }
+.control-table th, .control-table td { border: 1px solid #E2E7EE; padding: 5px 8px; text-align: left; vertical-align: top; font-weight: 400; }
+.control-table th { width: 32%; background: #F4F7FA; }
+.contents-line { margin: 0 0 6px; }
+.contents-line.lvl-1 { padding-left: 24px; }
+/* Blue and not underlined, as the Word file prints them. */
+.contents-line a { color: #0F5FA6; text-decoration: none; cursor: pointer; }
+.contents-line a:focus-visible { outline: 2px solid #0F5FA6; outline-offset: 2px; }
+.doc-short-head .doc-title { margin: 0 0 13px; font-size: 29.33px; font-weight: 400; color: #173267; line-height: 1.2; overflow-wrap: anywhere; }
+.doc-short-head .cap { margin: 0 0 8px; font-size: 12px; font-style: italic; color: #5A6B7B; }
+
+@media print { #toolbar, .panel-row { display: none; } }

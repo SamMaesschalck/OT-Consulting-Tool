@@ -1,0 +1,288 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the whole tool, start to finish</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The real page (../index.html) with nothing replaced but the autosave store
+  and the download, driven as a person would use it. The other pages test
+  one package each, with stand-ins for its neighbours; this one is where the
+  real shell, model, editor, tables, pages, writer, graft and importer meet.
+
+    1. New, type and format, lists, a table, a picture, undo and redo.
+    2. Document information, the cover miniature, the preview.
+    3. The Issue check, Draft and Final, a prompt that refuses Final.
+    4. Save, load the saved file, export again.
+    5. Load a Word file: the import report, Show, export, and Save as .json.
+    6. The tour.
+-->
+<iframe id="f" style="width:1300px;height:900px;border:0"></iframe>
+<script src="fixtures/fx-art.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Until the page finishes it ends in a failure, so a run cut short cannot
+  // read as a short pass.
+  document.getElementById("out").textContent = "FAIL the page did not finish: re-run it alone with a larger time budget";
+  // Zipping runs off the main thread; a bounced message keeps the headless
+  // page alive without moving its clock (as test-doc-zip.html).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  function pause(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function bytes(b64) { var s = atob(b64), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFElEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC";
+
+  var f = document.getElementById("f");
+  f.onload = function () {
+    var w = f.contentWindow, d = w.document, A = w.App, T = w.DocumentTool, M = A.DocModel, E, errors = [];
+    w.addEventListener("error", function (e) { errors.push("error: " + e.message + " " + e.filename + ":" + e.lineno); });
+    w.addEventListener("unhandledrejection", function (e) { errors.push("rejection: " + (e.reason && (e.reason.message || e.reason))); });
+    d.addEventListener("securitypolicyviolation", function (e) { errors.push("policy: " + e.violatedDirective + " " + e.blockedURI); });
+    w.confirm = function () { errors.push("window.confirm was used"); return true; };
+    // IndexedDB cannot be waited for under a virtual clock; the tool's own
+    // seam takes a store that answers at once.
+    var kept = {};
+    A.DocStorage.bytesStore = {
+      putDoc: function (id, json) { (kept[id] = kept[id] || { blobs: {} }).doc = json; return Promise.resolve(); },
+      getDoc: function (id) { return Promise.resolve(kept[id] ? kept[id].doc : null); },
+      putBlob: function (id, key, blob) { (kept[id] = kept[id] || { blobs: {} }).blobs[key] = blob; return Promise.resolve(); },
+      getBlobs: function (id) { return Promise.resolve(kept[id] ? kept[id].blobs : {}); },
+      remove: function (id) { delete kept[id]; return Promise.resolve(); },
+      ok: function () { return Promise.resolve(true); }
+    };
+    var downloads = [];
+    A.DocStorage.download = function (blob, name) { downloads.push({ blob: blob, name: name }); };
+    w.showSaveFilePicker = undefined; w.showOpenFilePicker = undefined;
+
+    function $(id) { return d.getElementById(id); }
+    function main() { return $("main").textContent.replace(/\s+/g, " "); }
+    function types(doc) { return doc.blocks.map(function (b) { return b.type === "list" ? b.list + b.level : b.type === "heading" ? "h" + b.level : b.type; }).join(","); }
+    function unzip(blob) {
+      return A.ZipIO.read(blob).then(function (parts) {
+        var o = { names: parts.map(function (p) { return p.name; }) };
+        parts.forEach(function (p) { if (/\.(xml|rels)$/.test(p.name)) o[p.name] = A.ZipIO.text(p); });
+        o.body = o["word/document.xml"] || "";
+        o.headers = o.names.filter(function (n) { return /^word\/header\d*\.xml$/.test(n); }).map(function (n) { return o[n]; }).join("");
+        return o;
+      });
+    }
+    function setField(id, v) {
+      var el = $(id);
+      if (!el) { ok(false, "the field " + id + " is on the page"); return; }
+      el.value = v;
+      el.dispatchEvent(new w.Event("input", { bubbles: true }));
+      el.dispatchEvent(new w.Event("change", { bubbles: true }));
+    }
+    function answer(act) {
+      var b = $("modal").querySelector('[data-act="' + act + '"]');
+      if (b) b.click();
+      return !!b;
+    }
+
+    var savedText = "", firstExport;
+    Promise.resolve().then(function () {
+      // ---- 1. new, write --------------------------------------------------
+      ok(T.state.page === "welcome" && !T.state.doc && /Try the demo/.test(main()), "it starts with no document, on the start page");
+      $("btn-new").click();
+      return pause(100);
+    }).then(function () {
+      var doc = T.state.doc;
+      ok(!!doc && doc.kind === "report" && T.state.page === "info" && T.state.dirty === false, "New opens a document with a cover, on Document information, with nothing to save");
+      T.go("edit"); E = T.editor;
+      ok(!$("edit-view").classList.contains("hidden") && d.querySelectorAll("#paper [data-block-id]").length === 1 && d.querySelectorAll("#toolbar button").length > 20, "Edit shows the page with one empty block and the toolbar");
+      A.DocEditor.focusBlock(doc.blocks[0].id, { at: "end" });
+      E.type("Introduction");
+      A.DocEditor.run("heading1");
+      E.press("Enter");
+      E.type("This is bold text and plain.");
+      var sel = A.DocEditor.selection(), pid = sel.blockId || sel.id;
+      E.selectText(pid, 8, 12);
+      E.press("Ctrl+B");
+      A.DocEditor.focusBlock(pid, { at: "end" });
+      E.press("Enter");
+      E.type("- first bullet");
+      E.press("Enter"); E.type("second bullet");
+      E.press("Enter"); E.press("Enter");
+      E.type("1. step one");
+      E.press("Enter"); E.type("step two"); E.press("Tab");
+      E.press("Enter"); E.press("Enter"); E.press("Enter");
+      E.type("After the lists.");
+      ok(types(doc) === "h1,paragraph,bullet0,bullet0,number0,number1,paragraph", "typing gives a heading, a paragraph, two bullets, a numbered item with one under it, and a paragraph", types(doc));
+      ok(M.text(doc.blocks[0]) === "Introduction" && JSON.stringify(doc.blocks[1].runs) === JSON.stringify([{ t: "This is " }, { t: "bold", b: true }, { t: " text and plain." }]), "the words are in the model, with the bold run", JSON.stringify(doc.blocks[1].runs));
+      var marks = Array.prototype.map.call(d.querySelectorAll("#paper .marker"), function (m) { return m.textContent; }).join(" ");
+      ok(marks === "• • 1. a.", "the list markers on the page are the ones the writer will print", marks);
+      A.DocEditor.run("insertTable");
+      // The outline and the badge are refreshed a moment after a change.
+      return pause(600);
+    }).then(function () {
+      var doc = T.state.doc, t = doc.blocks.filter(function (b) { return b.type === "table"; })[0];
+      ok(T.state.dirty === true && /Introduction/.test($("outline").textContent), "the document is unsaved and the outline lists the heading", $("outline").textContent);
+      ok(!!t && t.rows.length >= 2 && t.cols.length >= 2 && !!d.querySelector("#paper table.doc-table"), "Insert table adds a table and draws it", t ? t.rows.length + "x" + t.cols.length : "none");
+      if (t) {
+        A.DocEditor.focusBlock(t.rows[0].cells[0].blocks[0].id, { at: "end" });
+        E.type("Zone"); E.press("Tab"); E.type("Assets");
+        ok(M.text(t.rows[0].cells[0].blocks[0]) === "Zone" && M.text(t.rows[0].cells[1].blocks[0]) === "Assets", "typing and Tab fill its cells");
+      }
+      var last = doc.blocks[doc.blocks.length - 1];
+      return Promise.resolve(A.DocEditor.insertPictureFile(new w.File([bytes(PNG)], "plan.png", { type: "image/png" }), last.id)).then(function () { return pause(400); });
+    }).then(function () {
+      var doc = T.state.doc, pic = doc.blocks.filter(function (b) { return b.type === "picture"; })[0];
+      ok(!!pic && !!doc.media[pic.media] && doc.media[pic.media].blob.size > 0 && d.querySelectorAll("#paper img").length === 1, "a picture goes in from a file, with its bytes, and is drawn");
+      var img = d.querySelector("#paper img");
+      ok(!!img && /^blob:/.test(img.getAttribute("src") || ""), "it is shown from an object URL, which the page's policy allows");
+      E.press("Ctrl+Z");
+      ok(doc.blocks.filter(function (b) { return b.type === "picture"; }).length === 0 && d.querySelectorAll("#paper img").length === 0, "Ctrl+Z takes the picture out again");
+      E.press("Ctrl+Y");
+      ok(doc.blocks.filter(function (b) { return b.type === "picture"; }).length === 1 && d.querySelectorAll("#paper img").length === 1, "and Ctrl+Y puts it back");
+
+      // ---- 2. information, preview ----------------------------------------
+      T.go("info");
+      setField("info-title", "Network segmentation proposal");
+      setField("info-docType", "Proposal");
+      setField("info-client", "Northfield Water");
+      setField("info-author", "A. Consultant");
+      ok(doc.info.title === "Network segmentation proposal" && doc.info.client === "Northfield Water" && doc.info.docType === "Proposal", "Document information fields save into the document as they change");
+      var line = ($("dp-cover-line") || {}).textContent || "";
+      ok(/Proposal/.test(line) && /Network segmentation proposal/.test(line) && /Northfield Water/.test(line) && !!d.querySelector("#dp-cover-mini .dp-mini-frame").firstChild, "the cover miniature and its line follow them", line);
+      T.go("preview");
+      var sheets = Array.prototype.map.call(d.querySelectorAll(".dp-sheet"), function (s) { return s.getAttribute("data-part"); }).join(",");
+      ok(/^cover,control,/.test(sheets) && /body/.test(sheets) && /NETWORK|Network segmentation/.test($("dp-preview").textContent) && d.querySelectorAll("#dp-preview table").length >= 2, "the preview shows the cover, document control and the body", sheets);
+      ok(d.querySelectorAll("#dp-preview [contenteditable=true]").length === 0, "and nothing in it can be edited");
+
+      // ---- 3. issue, draft and final ----------------------------------------
+      T.go("issue");
+      return pause(1500);
+    }).then(function () {
+      ok(!!$("dp-todo-none") && /blank in document control/.test(($("dp-worth") || {}).textContent || ""), "the Issue check finds nothing outstanding, and mentions the blank document control names");
+      $("dp-export").click();
+      return pause(3000);
+    }).then(function () {
+      ok(downloads.length === 1 && downloads[0].name === "Northfield-Water-Network-segmentation-proposal-0.1-draft.docx", "Export Word downloads a draft, named from the client, title and revision", downloads.map(function (x) { return x.name; }).join(","));
+      var r = $("dp-status-final"); r.checked = true; r.dispatchEvent(new w.Event("change", { bubbles: true }));
+      return pause(300);
+    }).then(function () {
+      ok(!$("dp-export").disabled, "Final is allowed with nothing outstanding");
+      $("dp-export").click();
+      return pause(3000);
+    }).then(function () {
+      ok(downloads.length === 2 && downloads[1].name === "Northfield-Water-Network-segmentation-proposal-0.1.docx", "and downloads under the plain name", downloads.map(function (x) { return x.name; }).join(","));
+      return downloads.length === 2 ? unzip(downloads[0].blob).then(function (draft) {
+        firstExport = draft;
+        return unzip(downloads[1].blob).then(function (fin) {
+          ok(/DRAFT/.test(draft.headers) && !/documentProtection/.test(draft["word/settings.xml"]) && /Draft/.test(draft.body), "the draft has the watermark, Status Draft and no lock");
+          ok(!/DRAFT/.test(fin.headers) && /documentProtection/.test(fin["word/settings.xml"]) && /_MarkAsFinal/.test(fin["docProps/custom.xml"] || ""), "the final has no watermark, opens read-only and is marked as final");
+          ok(/Introduction/.test(draft.body) && /first bullet/.test(draft.body) && /<w:tbl>/.test(draft.body) && /Zone/.test(draft.body) && /<w:numPr>/.test(draft.body) && /NORTHFIELD WATER|Northfield Water/.test(draft.body), "the Word file holds what was typed: heading, lists, table, client");
+          var all = draft.names.map(function (n) { return draft[n] || ""; }).join("");
+          ok(all.indexOf(A.Version.number) === -1 && all.indexOf(A.Version.product) === -1, "and neither the tool's name nor its version");
+        });
+      }) : null;
+    }).then(function () {
+      // A prompt, as the toolbar makes one: Final is then refused.
+      var doc = T.state.doc;
+      T.go("edit");
+      var p = doc.blocks.filter(function (b) { return b.type === "paragraph" && M.text(b) === "After the lists."; })[0];
+      A.DocEditor.focusBlock(p.id, { at: "end" });
+      E.press("Enter");
+      E.type("Add the cost of each option.");
+      A.DocEditor.run("prompt");
+      ok(doc.blocks.filter(function (b) { return b.type === "prompt"; }).length === 1 && M.promptCount(doc) === 1, "a paragraph becomes a red prompt, and the sidebar counts it");
+      T.go("issue");
+      var r = $("dp-status-final"); r.checked = true; r.dispatchEvent(new w.Event("change", { bubbles: true }));
+      return pause(1500);
+    }).then(function () {
+      var list = $("dp-todo-list");
+      ok(!!list && list.children.length === 1 && /Add the cost of each option\./.test(list.textContent), "the Issue check lists it", list ? list.textContent : "no list");
+      ok($("dp-export").disabled && !$("dp-final-why").classList.contains("hidden") && $("dp-final-why").textContent.length > 10, "and Final is refused, with the reason beside the button", $("dp-final-why").textContent);
+      return T.exportBlob("final").then(function () { ok(false, "the writer refuses a Final too"); }, function (e) { ok(/cannot be issued as final/.test(e.message), "the writer refuses a Final too", e.message); });
+    }).then(function () {
+      var go = $("dp-todo-list") && $("dp-todo-list").querySelector("button");
+      if (go) go.click();
+      var sel = A.DocEditor.selection(), doc = T.state.doc, prompt = doc.blocks.filter(function (b) { return b.type === "prompt"; })[0];
+      ok(T.state.page === "edit" && !!d.querySelector('#paper [data-block-id="' + prompt.id + '"]'), "Go to it opens the editor at the prompt", JSON.stringify(sel));
+
+      // ---- 4. save, load, export ---------------------------------------------
+      downloads = [];
+      return T.save({});
+    }).then(function (res) {
+      ok(!!res && downloads.length === 1 && downloads[0].name === "Network segmentation proposal 0.1.json" && T.state.dirty === false, "Save with no file dialog downloads the document file and clears the unsaved mark", downloads.map(function (x) { return x.name; }).join(","));
+      return downloads[0] ? downloads[0].blob.text() : "";
+    }).then(function (text) {
+      savedText = text;
+      var before = types(T.state.doc);
+      return T.load(text).then(function (opened) {
+        var doc = T.state.doc;
+        ok(opened === true && types(doc) === before && Object.keys(doc.media).length === 1 && doc.media[Object.keys(doc.media)[0]].blob.size > 0 && T.state.dirty === false, "the saved file opens as the same document, picture and all", types(doc));
+        return T.exportBlob("draft").then(unzip);
+      });
+    }).then(function (again) {
+      ok(firstExport && again.names.length === firstExport.names.length && /Add the cost of each option\./.test(again.body) && /w:pStyle w:val="PlaceholderText"/.test(again.body), "and exports again, the prompt in the red prompt style", String(again.names.length) + " parts against " + (firstExport && firstExport.names.length));
+
+      // ---- 5. a Word file ----------------------------------------------------
+      downloads = [];
+      return T.load(new w.File([bytes(window.Fixtures["fx-art"])], "Customer report.docx"));
+    }).then(function (opened) {
+      return pause(300).then(function () {
+        var doc = T.state.doc, kinds = {};
+        M.each(doc, function (b) { var k = b.type === "kept" ? "kept:" + b.kind : b.type; kinds[k] = (kinds[k] || 0) + 1; });
+        ok(opened === true && T.state.page === "report" && !!doc.importReport && doc.importReport.source.name === "Customer report.docx", "Load of a Word file imports it and opens the import report");
+        ok(kinds.picture === 4 && kinds["kept:chart"] === 2 && kinds["kept:smartart"] === 1 && kinds["kept:ole"] === 1 && kinds["kept:group"] === 1 && kinds["kept:textbox"] === 1 && kinds["kept:picture"] === 1 && !!doc.theme,
+          "its pictures are pictures and its chart, diagram, sheet, shapes and text box are kept, with the theme", JSON.stringify(kinds));
+        // The two shapes anchored in one paragraph are one drawing, so seven and not eight.
+        ok(/Brought across: .*4 pictures, 7 drawings and diagrams kept as they were/.test(main()) && /Drawing 1 of 7/.test(main()) && /Export a draft to check in Word/.test(main()), "the report says what came across and lists every drawing");
+        ok(T.state.dirty === true && A.DocStorage.currentName() === "", "the import is unsaved work with no file of its own");
+        var show = Array.prototype.filter.call(d.querySelectorAll("#main button"), function (b) { return b.textContent === "Show"; });
+        ok(show.length >= 7, "each drawing has a Show link", String(show.length));
+        if (show.length) show[show.length - 1].click();
+        ok(T.state.page === "edit" && d.querySelectorAll("#paper .kept-card").length === 7, "Show opens the editor, where each kept drawing has its card", String(d.querySelectorAll("#paper .kept-card").length));
+        T.go("report");
+        var draft = Array.prototype.filter.call(d.querySelectorAll("#main button"), function (b) { return b.textContent === "Export a draft to check in Word"; })[0];
+        if (draft) draft.click();
+        return pause(4000);
+      });
+    }).then(function () {
+      ok(downloads.length === 1 && /-draft\.docx$/.test(downloads[0].name), "Export a draft to check in Word downloads one", downloads.map(function (x) { return x.name; }).join(","));
+      return downloads[0] ? unzip(downloads[0].blob).then(function (z) {
+        var keptParts = z.names.filter(function (n) { return /^word\/kept\//.test(n); }).length;
+        ok(!/KEPT:/.test(z.body) && keptParts >= 10 && z.names.indexOf("word/theme/theme1.xml") !== -1 && /<c:chart /.test(z.body) && /relIds/.test(z.body) && /<o:OLEObject /.test(z.body), "the export holds the chart, the diagram and the embedded sheet, their parts and the theme (" + keptParts + " parts)");
+        ok(z.names.some(function (n) { return /^word\/media\/.*\.emf$/.test(n); }) && z.names.some(function (n) { return /^word\/media\/.*\.jpe?g$/.test(n); }), "and the EMF and JPEG pictures under their own types");
+      }) : null;
+    }).then(function () {
+      downloads = [];
+      return T.save({});
+    }).then(function () {
+      ok(downloads.length === 1 && /\.json$/.test(downloads[0].name) && !/Customer report/.test(downloads[0].name), "the first Save after an import is a new .json file, never the Word file", downloads.map(function (x) { return x.name; }).join(","));
+
+      // ---- 6. the tour, over unsaved work -------------------------------------
+      T.go("edit");
+      var p = T.state.doc.blocks.filter(function (b) { return b.type === "paragraph"; })[0];
+      A.DocEditor.focusBlock(p.id, { at: "end" });
+      E.type(" More.");
+      ok(T.state.dirty === true, "typing after the save is unsaved work again");
+      A.DocApp.openTour();
+      return pause(300);
+    }).then(function () {
+      ok(/Save your changes first\?/.test($("modal").textContent), "opening the demo over unsaved work asks first, in the page");
+      ok(answer("discard"), "Discard changes is one of the answers");
+      return pause(500);
+    }).then(function () {
+      var doc = T.state.doc;
+      ok(T.state.tour === true && doc.id === "doc-demo" && doc.blocks.length > 15 && T.state.dirty === false, "the demo opens as a tour", doc.id);
+      T.go("edit");
+      var p = doc.blocks.filter(function (b) { return b.type === "paragraph"; })[0];
+      A.DocEditor.focusBlock(p.id, { at: "end" });
+      E.type(" Typed.");
+      ok(/Typed\.$/.test(M.text(p)) && T.state.dirty === false, "and typing in it never makes unsaved work");
+      ok(errors.length === 0, "no script error, policy violation or window.confirm in the whole run", errors.join(" | "));
+    }).then(finish, function (e) { ok(false, "the page ran to the end", e && (e.stack || e.message)); finish(); });
+  };
+  f.src = "../index.html";
+})();
+</script>
+</body></html>

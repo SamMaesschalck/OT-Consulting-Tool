@@ -1,0 +1,290 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: a long document is not drawn again for each key</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/documents.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/tables.css" />
+</head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  A generated document of 1,500 blocks: 60 sections, 150 pictures, 15 tables,
+  numbered and bulleted lists, the rest paragraphs (docs/document-tool-design.md
+  5.4). Every block's text must be in the page from the start (the browser's
+  find and every jump rely on it), nothing may be editable until it is used,
+  and for each thing a writer does the blocks far from it must be the same
+  objects afterwards, the DOM may change inside the blocks concerned and nowhere
+  else, and only a handful of elements may be made. A return to drawing the
+  paper for a key fails every one of these. Then a jump to the last block, and
+  an export with every paragraph in it.
+  No times are asserted: the runner's clock is virtual.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<div style="display:flex;width:1500px;height:640px">
+  <div id="sidebar" style="flex:none;width:260px;overflow-y:auto"><div id="nav"><button type="button" id="nav-edit">Edit</button></div><div id="outline"></div></div>
+  <div id="edit-view" class="main" style="flex:1;min-width:0"><div id="toolbar" role="toolbar" aria-label="Formatting"></div><div id="paper" tabindex="0"></div></div>
+</div>
+<div id="live" aria-live="polite"></div>
+<div id="toast"></div>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script src="../js/paste.js"></script>
+<script src="../js/editor.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d !== undefined ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var errors = [];
+  window.addEventListener("error", function (e) { errors.push(e.message); });
+  window.addEventListener("unhandledrejection", function (e) { errors.push("rejected: " + (e.reason && e.reason.message)); });
+
+  var App = window.App, M = App.DocModel, R = App.DocRender, H = App.DocHistory, E = App.DocEditor, T = E.__test;
+  function $(id) { return document.getElementById(id); }
+  App.DocApp = {
+    state: { doc: null, page: "edit", dirty: false, tour: false, recovered: false },
+    go: function () {}, markClean: function () {}, busy: function () {}, setDoc: function () { return Promise.resolve(true); },
+    touched: function () {}, canAdd: function () { return true; }, toast: function (t) { $("toast").textContent = String(t); },
+    confirmBox: function () { return Promise.resolve(true); }, say: function (t) { $("live").textContent = String(t); }, h: R.h
+  };
+  App.DocPictures = { ACCEPT: "image/png", fromFile: function (file) { return Promise.resolve({ blob: file, type: "image/png", width: 400, height: 200, name: file.name }); } };
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  function pngBlob() {
+    var bin = atob(PNG), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return new Blob([u], { type: "image/png" });
+  }
+
+  // ---- the document ----
+  var WORDS = "the site operates a segmented control network with a firewall between the business systems and the process control domain and remote access is brokered through a jump host that is patched monthly".split(" ");
+  function sentence(n, seed) { var o = []; for (var i = 0; i < n; i++) o.push(WORDS[(i * 7 + seed * 13) % WORDS.length]); return o.join(" "); }
+  var N = 1500;
+  function bigDoc() {
+    var blocks = [], media = {}, cellN = 0;
+    for (var k = 1; k <= 5; k++) media["m" + k] = { type: "image/png", name: "figure" + k + ".png", width: 800, height: 400, source: "insert", blob: pngBlob() };
+    function para(id, text) { return { id: id, type: "paragraph", runs: [{ t: text }] }; }
+    for (var n = 1; n <= N; n++) {
+      var id = "b" + n, r = n % 25;
+      if (r === 1) blocks.push({ id: id, type: "heading", level: 1, runs: [{ t: "Section " + Math.ceil(n / 25) }] });
+      else if (r === 12) blocks.push({ id: id, type: "heading", level: 2, runs: [{ t: "Part " + n }] });
+      else if (r >= 3 && r <= 6) blocks.push({ id: id, type: "list", list: "number", level: 0, runs: [{ t: "step" + n + "x " + sentence(8, n) }] });
+      else if (r === 14 || r === 15) blocks.push({ id: id, type: "list", list: "bullet", level: r === 15 ? 1 : 0, runs: [{ t: "point" + n + "x " + sentence(6, n) }] });
+      else if (r === 8 || r === 18 || (r === 22 && Math.ceil(n / 25) % 2 === 0)) blocks.push({ id: id, type: "picture", media: "m" + (Math.ceil(n / 25) % 5 + 1), width: 400, height: 200, caption: "Figure " + n, alt: "Figure " + n });
+      else if (n % 100 === 60) {
+        var rows = [];
+        for (var i = 0; i < 4; i++) {
+          var cells = [];
+          for (var c = 0; c < 3; c++) { cellN++; cells.push({ blocks: [para("c" + cellN, "cell" + cellN + "x " + sentence(3, cellN))] }); }
+          rows.push({ cells: cells });
+        }
+        blocks.push({ id: id, type: "table", header: 1, cols: [1, 2, 2], rows: rows });
+      } else blocks.push(para(id, "para" + n + "x Example Water Ltd. " + sentence(40, n)));
+    }
+    return M.normalise({ schema: M.SCHEMA, kind: "report", info: { title: "A long document", client: "Example Water Ltd" }, blocks: blocks, footnotes: {}, media: media, parts: {} });
+  }
+
+  var doc = bigDoc();
+  App.DocApp.state.doc = doc;
+  var made = 0, realCreate = document.createElement, realNS = document.createElementNS;
+  document.createElement = function () { made++; return realCreate.apply(document, arguments); };
+  document.createElementNS = function () { made++; return realNS.apply(document, arguments); };
+  E.mount($("edit-view"));
+  var atMount = made;
+
+  var paper = $("paper"), view = $("edit-view");
+  function blk(id) { var f = M.find(doc, id); return f ? f.block : null; }
+  function txt(id) { return M.text(blk(id)); }
+  function el(id) { return T.el(id); }
+  function tel(id) { return T.text(id); }
+  function order() { return Array.prototype.map.call(paper.querySelectorAll(":scope > .blk"), function (n) { return n.getAttribute("data-block-id"); }); }
+  function editable() { return paper.querySelectorAll("[contenteditable]:not([contenteditable=false])"); }
+  function marker(id) { return el(id).querySelector(".marker").textContent; }
+  function sel() { return E.selection(); }
+
+  (async function () {
+    // ---- everything is in the page from the start ----
+    var top = paper.querySelectorAll(":scope > .blk");
+    ok(doc.blocks.length === N && top.length === N && order().join() === doc.blocks.map(function (b) { return b.id; }).join(), "a document of 1,500 blocks opens, every block drawn, in order", String(top.length));
+    var wrong = 0, texts = 0;
+    M.each(doc, function (b) {
+      if (!R.TEXT_TYPES[b.type]) return;
+      texts++;
+      var t = tel(b.id);
+      if (!t || t.textContent !== M.text(b)) wrong++;
+    });
+    ok(texts > 1300 && wrong === 0, "every text block's words are in the page, table cells included (" + texts + " text blocks)", wrong + " wrong");
+    ok(paper.textContent.indexOf("para1499x") !== -1 && paper.textContent.indexOf("cell180x") !== -1, "so the browser's find can reach the last paragraph and the last table");
+    ok(editable().length === 0 && paper.querySelectorAll('[tabindex="0"]').length === 0, "nothing is editable, and nothing in the paper is a Tab stop, until it is used");
+    var imgs = paper.querySelectorAll("img");
+    ok(imgs.length === 150 && Array.prototype.every.call(imgs, function (i) { return i.getAttribute("loading") === "lazy" && i.getAttribute("decoding") === "async" && i.width === 400 && i.height === 200 && /^blob:/.test(i.src); }), "150 pictures, each lazy, decoded off the main thread, at its printed size, from an object URL", String(imgs.length));
+    ok(new Set(Array.prototype.map.call(imgs, function (i) { return i.src; })).size === 5, "one object URL for each stored picture, however often it is used");
+    var cs = getComputedStyle(el("b900"));
+    ok(cs.contentVisibility === "auto" && /contain-intrinsic-block-size:\s*auto \d+px/.test(el("b900").getAttribute("style")), "an unseen block is kept out of layout and paint, with a height to stand in for it", cs.contentVisibility + " / " + el("b900").getAttribute("style"));
+    ok(Array.prototype.every.call(top, function (b) { return /contain-intrinsic-block-size/.test(b.getAttribute("style") || ""); }), "every block has one");
+    ok(view.scrollHeight > 20000, "and the scroll bar is about right from the start", String(view.scrollHeight));
+    ok(marker("b3") === "1." && marker("b6") === "4." && marker("b1478") === "1." && marker("b1481") === "4." && marker("b1490") === "◦", "list markers are real text, numbered as Word will number them", [marker("b3"), marker("b6"), marker("b1481"), marker("b1490")].join(" "));
+    ok(atMount < N * 8, "built in one pass (" + atMount + " elements for " + N + " blocks)");
+    T.flush();
+    ok($("outline").querySelectorAll('[role="treeitem"]').length === 120, "the outline lists the 120 headings", String($("outline").querySelectorAll('[role="treeitem"]').length));
+
+    // ---- each action draws only what it changes ----
+    var far = el("b40"), farText = tel("b40"), farList = el("b1481"), farTable = el("b60"), farCell = tel("c5"), img = paper.querySelector("img"), lastEl = el("b" + N);
+    var observer = new MutationObserver(function () {});
+    observer.observe(paper, { subtree: true, childList: true, characterData: true, attributes: true });
+    function changedBlocks() {
+      var seen = {};
+      observer.takeRecords().forEach(function (rec) {
+        var n = rec.target.nodeType === 1 ? rec.target : rec.target.parentNode;
+        if (n === paper) { seen["(paper)"] = 1; return; }
+        while (n && n.parentNode !== paper) n = n.parentNode;
+        seen[n && n.getAttribute ? (n.getAttribute("data-block-id") || "(panel)") : "(gone)"] = 1;
+      });
+      return Object.keys(seen);
+    }
+    var CEILING = 150, worst = 0;
+    function newIds() { return doc.blocks.filter(function (b) { return +b.id.slice(1) > N; }).map(function (b) { return b.id; }); }
+    // `only`: the blocks whose DOM may change, with "(paper)" when blocks are added, moved,
+    // removed or replaced (an element taken out then shows as "(gone)"). Blocks the action
+    // itself made are always allowed.
+    function act(name, fn, only) {
+      observer.takeRecords();
+      var scrollTop = view.scrollTop;
+      made = 0;
+      fn();
+      var n = made, touched = changedBlocks(), why = [];
+      worst = Math.max(worst, n);
+      if ($("paper") !== paper) why.push("the paper is a new element");
+      if (el("b40") !== far || tel("b40") !== farText || !far.isConnected) why.push("a far paragraph is a new element");
+      if (el("b1481") !== farList) why.push("a far list item is a new element");
+      if (el("b60") !== farTable || tel("c5") !== farCell) why.push("a far table is a new element");
+      if (paper.querySelector("img") !== img || !img.isConnected) why.push("a picture is a new element");
+      if (el("b" + N) !== lastEl) why.push("the last block is a new element");
+      if (n > CEILING) why.push(n + " elements made");
+      var allowed = only.concat(newIds()).concat(only.indexOf("(paper)") !== -1 ? ["(gone)"] : []);
+      var extra = touched.filter(function (id) { return allowed.indexOf(id) === -1; });
+      if (extra.length) why.push("the DOM changed in " + extra.slice(0, 6).join(", ") + (extra.length > 6 ? " and " + (extra.length - 6) + " more" : ""));
+      void scrollTop;
+      ok(!why.length, name + " (" + n + " elements made, DOM changed in " + touched.length + " block" + (touched.length === 1 ? "" : "s") + ")", why.join("; "));
+      touched.made = n;
+      return touched;
+    }
+
+    var HERE = "b1210", NEXT = "b1211";   // two plain paragraphs deep in the document
+    act("putting the caret in a paragraph changes that block only", function () { E.focusBlock(HERE, { at: 9 }); }, [HERE]);
+    ok(editable().length === 1 && editable()[0] === tel(HERE), "and exactly one element is now editable", String(editable().length));
+    var touchedByKey = act("typing a character changes the DOM of one block only", function () { T.type("Z"); }, [HERE]);
+    ok(touchedByKey.join() === HERE && /^para1210xZ /.test(txt(HERE)), "that block, and the model has the character", touchedByKey.join() + " " + txt(HERE).slice(0, 14));
+    act("typing a word", function () { T.type(" word"); }, [HERE]);
+    act("undoing the typing redraws that block", function () { T.press("Ctrl+Z"); }, [HERE, "(paper)"]);
+    ok(/^para1210x Example/.test(txt(HERE)) && tel(HERE).textContent === txt(HERE), "puts the text back");
+    act("moving the caret to the next block", function () { E.focusBlock(NEXT, { at: 3 }); }, [HERE, NEXT]);
+    ok(editable().length === 1 && editable()[0] === tel(NEXT), "still exactly one editable element");
+    act("making a selection bold", function () { T.selectText(NEXT, 0, 9); T.press("Ctrl+B"); }, [NEXT]);
+    act("a line break", function () { T.selectText(NEXT, 12); T.press("Shift+Enter"); }, [NEXT]);
+    var before = doc.blocks.length;
+    var keptText = tel(NEXT);
+    act("splitting a paragraph adds one block and redraws nothing else", function () { T.selectText(NEXT, 30); T.press("Enter"); }, [NEXT, "(paper)"]);
+    ok(doc.blocks.length === before + 1 && paper.querySelectorAll(":scope > .blk").length === before + 1 && tel(NEXT) === keptText, "the new block is in the model and on the page, and the block that was split is the same element");
+    act("joining it back", function () { T.press("Backspace"); }, [NEXT, "(paper)"]);
+    ok(doc.blocks.length === before && tel(NEXT) === keptText, "takes it out again");
+    act("turning a paragraph into a heading", function () { T.selectText(HERE, 2); T.press("Ctrl+Alt+2"); }, [HERE, NEXT, "(paper)"]);
+    act("and back", function () { T.press("Ctrl+Alt+0"); }, [HERE, "(paper)"]);
+    H.clear();
+
+    // a new list item: one new block, and the marker text of the items after it
+    var L1 = "b1203", L2 = "b1204", L3 = "b1205", L4 = "b1206";
+    var keep3 = el(L3), keep4 = el(L4), t3 = tel(L3);
+    T.selectText(L2, R.textLength(tel(L2)));
+    var nu = null;
+    var listTouched = act("a new list item draws one block and corrects the markers after it", function () { T.press("Enter"); nu = doc.blocks[M.find(doc, L2).index + 1].id; }, [L2, L3, L4, "(paper)"]);
+    ok(blk(nu).type === "list" && marker(nu) === "3." && marker(L3) === "4." && marker(L4) === "5.", "the items after it are renumbered", [marker(nu), marker(L3), marker(L4)].join(" "));
+    ok(el(L3) === keep3 && el(L4) === keep4 && tel(L3) === t3, "by changing their marker text, not by drawing them again");
+    ok(listTouched.indexOf(L3) !== -1 && listTouched.indexOf(L4) !== -1 && listTouched.indexOf(L1) === -1, "the item before it is not touched at all", listTouched.join());
+    act("indenting it", function () { T.press("Tab"); }, [nu, L3, L4]);
+    ok(marker(nu) === "a." && marker(L3) === "3.", "changes its marker and the ones after", [marker(nu), marker(L3)].join(" "));
+    act("undoing both", function () { T.press("Ctrl+Z"); T.press("Ctrl+Z"); }, [L2, L3, L4, "(paper)"]);
+    ok(!blk(nu) && marker(L3) === "3." && marker(L4) === "4.", "puts the numbers back", [marker(L3), marker(L4)].join(" "));
+
+    // blocks
+    act("selecting a block", function () { E.selectBlocks([HERE]); }, [HERE, NEXT, L2, "(paper)"]);
+    var moved = act("moving it down", function () { T.press("Alt+Shift+Down"); }, ["(paper)", HERE, NEXT]);
+    ok(moved.made === 0 && el(HERE).previousElementSibling === el(NEXT), "moves the elements it has: none is made", String(moved.made));
+    act("moving it back", function () { T.press("Alt+Shift+Up"); }, ["(paper)", HERE, NEXT]);
+    act("deleting it", function () { T.press("Delete"); }, ["(paper)", HERE, NEXT, "b1209"]);
+    ok(!blk(HERE) && !el(HERE), "takes one element out");
+    act("undoing the delete", function () { T.press("Ctrl+Z"); }, ["(paper)", HERE, NEXT, "b1209"]);
+    ok(blk(HERE) && el(HERE) && el(HERE).previousElementSibling === el("b1209"), "puts one element back where it was");
+    act("selecting three blocks and making them bold", function () { E.selectBlocks([HERE, NEXT, "b1212"]); T.press("Ctrl+B"); }, ["(paper)", HERE, NEXT, "b1212", "b1209"]);
+    act("undoing that", function () { T.press("Ctrl+Z"); }, ["(paper)", HERE, NEXT, "b1212", "b1209"]);
+    act("a page break", function () { E.focusBlock(HERE, { at: 0 }); T.press("Ctrl+Enter"); }, ["(paper)", HERE, NEXT, "b1212"]);
+    act("undoing it", function () { T.press("Ctrl+Z"); }, ["(paper)", HERE, NEXT]);
+    // a table cell
+    act("typing in a table cell changes that table only", function () { E.focusBlock("c150", { at: 0 }); T.type("Q"); }, ["b1260", HERE]);
+    ok(/^Qcell150x/.test(txt("c150")), "and the cell has the character");
+    // a picture
+    var pid = null;
+    observer.takeRecords(); made = 0;
+    pid = await E.insertPictureFile(new File([pngBlob()], "new.png", { type: "image/png" }), HERE);
+    var picMade = made, picTouched = changedBlocks();
+    ok(blk(pid) && blk(pid).type === "picture" && picMade <= CEILING && el("b40") === far && paper.querySelector("img") === img && picTouched.every(function (id) { return [pid, HERE, "(paper)", "b1260"].indexOf(id) !== -1; }),
+      "inserting a picture draws one block (" + picMade + " elements made)", picTouched.join());
+    act("making the picture narrower", function () { var w = $("toolbar").querySelector(".tb-num"); w.value = "5"; w.dispatchEvent(new Event("change", { bubbles: true })); }, [pid, "(paper)"]);
+    act("undoing that and the insert", function () { T.press("Ctrl+Z"); T.press("Ctrl+Z"); }, [pid, HERE, "b1260", "(paper)"]);
+    ok(!blk(pid) && paper.querySelectorAll("img").length === 150, "and it is gone again");
+    // everything at once
+    act("selecting every block makes no elements", function () { E.focusBlock(HERE, { at: 0 }); T.press("Ctrl+A"); T.press("Ctrl+A"); }, doc.blocks.map(function (b) { return b.id; }).concat(["(paper)"]));
+    ok(sel().type === "blocks" && sel().ids.length === N && paper.querySelectorAll(":scope > .blk.sel").length === N, "all 1,500 selected");
+    act("and letting go of them", function () { E.focusBlock(HERE, { at: 0 }); }, doc.blocks.map(function (b) { return b.id; }).concat(["(paper)"]));
+    ok(paper.querySelectorAll(".blk.sel").length === 0 && editable().length === 1, "none selected, one editable");
+    ok(worst <= CEILING, "no action made more than " + CEILING + " elements (most: " + worst + ")");
+
+    // ---- a jump to the last block lands on it ----
+    view.scrollTop = 0;
+    E.focusBlock("b" + N);
+    var box = el("b" + N).getBoundingClientRect(), port = view.getBoundingClientRect();
+    ok(sel().blockId === "b" + N && document.activeElement === tel("b" + N) && view.scrollTop > 10000, "a jump to the last block puts the caret in it and scrolls to it", view.scrollTop + " " + JSON.stringify(sel()));
+    ok(box.bottom > port.top && box.top < port.bottom && el("b" + N) === lastEl && el("b" + N).classList.contains("flash"), "it is in view, shown up for a moment, and is the element built at the start", Math.round(box.top) + " in " + Math.round(port.top) + ".." + Math.round(port.bottom));
+    E.focusBlock("c179");
+    ok(sel().blockId === "c179" && document.activeElement === tel("c179"), "a jump to a block in a table cell lands in the cell");
+    E.selectBlocks(["b1497"]);
+    ok(sel().type === "blocks" && el("b1497").classList.contains("sel") && document.activeElement === paper, "and a jump to a picture selects it");
+    ok(editable().length === 0, "after all of it, still no editable element left behind");
+    document.createElement = realCreate;
+    document.createElementNS = realNS;
+
+    // ---- an export has every paragraph ----
+    var out = await App.HouseDocx.buildDocument(doc, { issueStatus: "draft" });
+    var parts = await App.ZipIO.read(out.blob);
+    var main = parts.filter(function (p) { return p.name === "word/document.xml"; })[0];
+    var xml = main ? App.ZipIO.text(main) : "";
+    var want = 0;
+    M.each(doc, function (b) { if (R.TEXT_TYPES[b.type] && /^(para|step|point|cell)\d+x/.test(M.text(b).replace(/^Q/, ""))) want++; });
+    var got = (xml.match(/>(?:Q)?(?:para|step|point|cell)\d+x/g) || []).length;
+    ok(out.blob && out.blob.size > 100000 && main, "the 1,500-block document exports to a Word file (" + (out.blob ? Math.round(out.blob.size / 1024) : 0) + " KB)");
+    ok(got === want && want > 1350, "with every paragraph, list item and table cell in it (" + got + " of " + want + ")", got + " of " + want);
+    ok((xml.match(/<w:p[ >]/g) || []).length >= N, "at least one Word paragraph for each block", String((xml.match(/<w:p[ >]/g) || []).length));
+    ok((xml.match(/<w:drawing>/g) || []).length >= 150, "and its 150 pictures", String((xml.match(/<w:drawing>/g) || []).length));
+
+    ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+  })().catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+    document.createElement = realCreate;
+    document.createElementNS = realNS;
+    finish();
+  });
+})();
+</script>
+</body></html>

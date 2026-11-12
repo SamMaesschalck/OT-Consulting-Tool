@@ -1,0 +1,843 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the shell</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The tool's shell from file://, in a frame, used as a person would use it: New,
+  Load, Save and Save as, the question about unsaved changes, which file Save
+  writes to after each way a document can arrive (above all that an import
+  never writes over the Word file), another tool's file refused by name,
+  autosave and restoring it with every picture, a copy whose pictures are gone,
+  autosave switched off, drag and drop, the sidebar and its outline, the suite
+  bridge against a fake suite, and the tour. The pages, the editor, the history
+  and the Word import are other files' work: here they are replaced by small
+  stand-ins that record what the shell asked of them, so this page tests the
+  shell alone. IndexedDB never answers in headless Edge, so the store behind
+  autosave is an object in this page, kept across reloads of the frame.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  // Written out as it goes: a step that never comes back then shows as the
+  // last line reached, with no "ALL TESTS PASSED" after it.
+  function ok(c, n, d) {
+    lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++;
+    document.getElementById("out").textContent = lines.join("\n") + "\n\nincomplete";
+  }
+  // Virtual time jumps to its end as soon as no timer is waiting, and reading
+  // a Blob is real work no timer stands for: one is kept waiting throughout.
+  var beat = setInterval(function () {}, 20);
+  function finish() {
+    clearInterval(beat);
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  window.addEventListener("error", function (e) { ok(false, "the page ran without a script error", e.message + " (line " + e.lineno + ")"); finish(); });
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 160)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  function later(ms) { return new Promise(function (res) { setTimeout(res, ms || 60); }); }
+  function J(v) { return JSON.stringify(v); }
+  function bytes(n, seed) { var b = new Uint8Array(n); for (var i = 0; i < n; i++) b[i] = (i * 31 + (seed || 7)) & 255; return b; }
+  function same(a, b) { if (a.length !== b.length) return false; for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+
+  var POINTERS = "spt-document:autosave:v1";
+  // The store behind autosave, in this page, so it outlives a reload of the frame.
+  var mem = { docs: {}, blobs: {}, puts: 0 };
+  function memStore() {
+    return {
+      putDoc: function (id, json) { mem.docs[id] = json; mem.puts++; return Promise.resolve(); },
+      getDoc: function (id) { return Promise.resolve(mem.docs[id] || null); },
+      // Kept as a Blob of THIS page: one that belongs to the frame stops
+      // answering when the frame is reloaded, which a real store's would not.
+      putBlob: function (id, key, blob) { (mem.blobs[id] = mem.blobs[id] || {})[key] = new Blob([blob], { type: blob.type }); return Promise.resolve(); },
+      getBlobs: function (id) { return Promise.resolve(mem.blobs[id] || {}); },
+      remove: function (id) { delete mem.docs[id]; delete mem.blobs[id]; return Promise.resolve(); },
+      ok: function () { return Promise.resolve(true); }
+    };
+  }
+
+  var errors = [], spy, pick, downloads, W, A, D, S, M;
+  // A file handle as the browser gives one, recording what is written to it.
+  function fakeHandle(name, text) {
+    var st = { text: text == null ? null : text, writes: 0, opened: 0 };
+    return { kind: "file", name: name, store: st,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      requestPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () {
+        st.opened++;
+        return Promise.resolve({
+          write: function (b) { return Promise.resolve(typeof b === "string" ? b : b.text()).then(function (t) { st.text = t; st.writes++; }); },
+          close: function () { return Promise.resolve(); }
+        });
+      },
+      getFile: function () { return Promise.resolve(new W.File([st.text == null ? "{}" : st.text], name, { type: "application/json" })); } };
+  }
+  // The stand-ins. Each page draws a heading, so the shell's own fallback is
+  // not what is being looked at; Document information also draws one field.
+  function standIns() {
+    spy = { mount: [], unmount: 0, focus: [], select: [], redraw: [], record: [], clear: 0, pages: [], imports: [] };
+    A.DocEditor.mount = function (el) { spy.mount.push(el); };
+    A.DocEditor.unmount = function () { spy.unmount++; };
+    A.DocEditor.focusBlock = function (id, o) { spy.focus.push(id); };
+    A.DocEditor.selectBlocks = function (ids) { spy.select.push(ids); };
+    A.DocEditor.redraw = function (ids) { spy.redraw.push(ids); };
+    A.DocHistory.record = function (e) { spy.record.push(e); };
+    A.DocHistory.clear = function () { spy.clear++; };
+    ["info", "preview", "issue", "report", "about", "welcome"].forEach(function (p) {
+      A.DocPages[p] = function (main, arg) {
+        spy.pages.push(p);
+        main.appendChild(D.h("h1", { class: "page-title", tabindex: "-1", text: "Stand-in " + p }));
+        if (p === "info") main.appendChild(D.h("input", { type: "text", "data-field": "title" }));
+      };
+    });
+  }
+  function boot(frame, q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        w.addEventListener("unhandledrejection", function (e) { errors.push("rejection: " + ((e.reason && e.reason.message) || e.reason)); });
+        poll(function () { return w.DocumentTool; }).then(function () {
+          W = w; A = w.App; D = A.DocApp; S = A.DocStorage; M = A.DocModel;
+          S.bytesStore = memStore();
+          downloads = [];
+          S.download = function (blob, name) { downloads.push({ blob: blob, name: name }); };
+          // The file dialogs cannot be shown headless: these answer for them.
+          pick = { save: [], open: [], nextSave: null, nextOpen: null };
+          w.showSaveFilePicker = function (o) {
+            pick.save.push(o);
+            if (!pick.nextSave) { var e = new Error("closed"); e.name = "AbortError"; return Promise.reject(e); }
+            var hd = pick.nextSave; pick.nextSave = null;
+            return Promise.resolve(hd);
+          };
+          w.showOpenFilePicker = function (o) {
+            pick.open.push(o);
+            if (!pick.nextOpen) { var e = new Error("closed"); e.name = "AbortError"; return Promise.reject(e); }
+            var hd = pick.nextOpen; pick.nextOpen = null;
+            return Promise.resolve([hd]);
+          };
+          standIns();
+          res(w);
+        });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+  function $(id) { return W.document.getElementById(id); }
+  function q(sel) { return W.document.querySelector(sel); }
+  function toastText() { return $("toast").textContent; }
+  function navPages() { return Array.prototype.map.call(W.document.querySelectorAll("#nav .nav-item"), function (n) { return n.getAttribute("data-page"); }).join(" "); }
+  function modalBtn(act) { return q('.doc-modal [data-act="' + act + '"]'); }
+  function key(el, k, o) {
+    var e = new W.KeyboardEvent("keydown", Object.assign({ key: k, bubbles: true, cancelable: true }, o || {}));
+    el.dispatchEvent(e);
+    return e;
+  }
+  function pointers() { try { return JSON.parse(W.localStorage.getItem(POINTERS) || "{}"); } catch (e) { return {}; } }
+  // A project file's text, made by the model itself.
+  function fileText(build) {
+    var d = M.create();
+    d.info.title = "Loaded document";
+    if (build) build(d);
+    return M.toFile(d).then(function (b) { return b.text(); }).then(function (t) { return { id: d.id, text: t, doc: d }; });
+  }
+  function chooseWithInput(file) {
+    var dt = new W.DataTransfer();
+    dt.items.add(file);
+    $("file-input").files = dt.files;
+    $("file-input").dispatchEvent(new W.Event("change", { bubbles: true }));
+  }
+  function unloadAsks() {
+    var e = new W.Event("beforeunload", { cancelable: true });
+    W.dispatchEvent(e);
+    return e.defaultPrevented;
+  }
+
+  var frame = document.getElementById("f");
+  var hA, hB, hDocx, savedText, docId, pngBytes = bytes(300, 1), bigBytes = bytes(200000, 5), kPng, kBig;
+
+  boot(frame).then(function () {
+    W.localStorage.removeItem(POINTERS);
+
+    // ---------- starting, and the page-level helpers ----------
+    ok(D.state.doc === null && D.state.page === "welcome" && navPages() === "welcome about", "it starts with no document, on the start page", navPages());
+    ok($("btn-save").disabled && $("btn-save").textContent === "Save" && $("save-state").textContent === "", "Save is off until there is a document");
+    ok($("version-badge").textContent === A.Version.label && /OT Cyber Document Tool/.test(q(".sidebar-legal").textContent), "the version is in the header and the sidebar");
+    ok($("main").firstChild !== null && !$("main").classList.contains("hidden") && $("edit-view").classList.contains("hidden"), "the start page is drawn in the main view, and the editor's view is hidden");
+    var el = D.h("div", { class: "x", text: "<b>not bold</b>", "data-k": "v", hidden: false, onClick: function () { el.clicked = true; } }, ["<i>text</i>", D.h("span", { text: "kid" }), null]);
+    el.click();
+    ok(el.querySelector("b") === null && el.querySelector("i") === null && /<b>not bold<\/b><i>text<\/i>kid$/.test(el.textContent) && el.className === "x" && el.getAttribute("data-k") === "v" && !el.hasAttribute("hidden") && el.clicked, "h builds nodes: text is text, never markup; listeners and attributes are set");
+    D.say("Three blocks selected");
+    D.busy("Reading", 0.25);
+    ok(q(".doc-busy .doc-busy-label").textContent === "Reading" && q(".doc-busy progress").value === 0.25, "busy shows a label and how far it has got");
+    D.busy("Reading more");
+    ok(!q(".doc-busy progress").hasAttribute("value") && W.document.querySelectorAll(".doc-busy").length === 1, "with no fraction the bar only shows that work is going on");
+    D.busy(null);
+    ok(q(".doc-busy") === null, "busy(null) takes it away");
+    $("btn-load").focus();
+    var asked = D.confirmBox({ title: "Delete it?", text: "It will go.", ok: "Delete", cancel: "Keep" });
+    ok(q(".doc-modal") && q(".doc-modal").getAttribute("role") === "dialog" && q(".doc-modal h2").textContent === "Delete it?" && modalBtn("ok").textContent === "Delete" && modalBtn("cancel").textContent === "Keep" && !$("modal").classList.contains("hidden"), "confirmBox is a dialog in the page");
+    ok(W.document.activeElement === modalBtn("ok"), "the keyboard goes into it");
+    key(W.document.activeElement, "Escape");
+    return asked.then(function (v) {
+      ok(v === false && q(".doc-modal") === null && $("modal").classList.contains("hidden") && W.document.activeElement === $("btn-load"), "Escape answers no, and the keyboard goes back where it was");
+      var p2 = D.confirmBox({ title: "Sure?" });
+      modalBtn("ok").click();
+      return p2;
+    }).then(function (v) {
+      ok(v === true, "the ok button answers yes");
+      return poll(function () { return $("live").textContent === "Three blocks selected"; });
+    });
+  }).then(function () {
+    ok(true, "say writes to the live region");
+    D.toast("Done", "warn");
+    ok(toastText() === "Done" && /warn/.test($("toast").className) && !/hidden/.test($("toast").className), "toast shows a message");
+
+    // ---------- New, unsaved changes, Save ----------
+    $("btn-new").click();
+    return poll(function () { return D.state.doc; });
+  }).then(function () {
+    docId = D.state.doc.id;
+    ok(D.state.page === "info" && navPages() === "info edit preview issue about" && spy.pages.slice(-1)[0] === "info", "New starts a document and opens Document information", navPages());
+    ok(D.state.dirty === false && !$("btn-save").disabled && $("btn-save").textContent === "Save" && unloadAsks() === false, "a new document is not unsaved work yet");
+    ok(/^Untitled document · not saved yet$/.test($("save-state").textContent), "the header says it is not saved", $("save-state").textContent);
+    ok(q('#nav .nav-item[data-page="issue"] .badge').textContent === "1" && q('#nav .nav-item[data-page="info"]').getAttribute("aria-current") === "page", "the Issue entry counts what is still to complete (the title), and the page in view is marked");
+    D.state.doc.info.title = "First document";
+    D.touched({ info: true });
+    ok(D.state.dirty === true && $("btn-save").textContent === "Save*" && $("btn-save").classList.contains("btn-unsaved") && unloadAsks() === true, "a change makes it unsaved: Save*, and closing the window asks");
+    return poll(function () { return !q('#nav .nav-item[data-page="issue"] .badge') && /^First document · unsaved changes$/.test($("save-state").textContent); });
+  }).then(function () {
+    ok(true, "the badge and the header follow the change a moment later");
+    hA = fakeHandle("First document 0.1.json");
+    pick.nextSave = hA;
+    $("btn-save").click();
+    return poll(function () { return hA.store.writes === 1 && !D.state.dirty; });
+  }).then(function () {
+    var o = pick.save[0], saved = JSON.parse(hA.store.text);
+    ok(pick.save.length === 1 && o.suggestedName === "First document 0.1.json" && J(o.types[0].accept) === J({ "application/json": [".json"] }), "the first Save asks where, offering <title> <revision>.json", o.suggestedName);
+    ok(saved.schema === "spt-document/1.0" && saved.id === docId && saved.info.title === "First document" && saved.savedBy.product === "OT Cyber Document Tool" && !!saved.savedAt, "and writes the project file there");
+    ok($("btn-save").textContent === "Save" && unloadAsks() === false && /Saved to First document 0\.1\.json/.test(toastText()) && /· First document 0\.1\.json$/.test($("save-state").textContent), "it is then saved, and says where");
+    D.touched({ blocks: [D.state.doc.blocks[0].id] });
+    $("btn-save").click();
+    return poll(function () { return hA.store.writes === 2 && !D.state.dirty; });
+  }).then(function () {
+    ok(pick.save.length === 1, "the next Save writes the same file without asking");
+    var hCopy = fakeHandle("Copy.json");
+    pick.nextSave = hCopy;
+    $("btn-save").dispatchEvent(new W.MouseEvent("click", { bubbles: true, shiftKey: true }));
+    return poll(function () { return hCopy.store.writes === 1; }).then(function () {
+      ok(pick.save.length === 2 && hA.store.writes === 2 && S.currentName() === "Copy.json", "Shift+click is Save as: it asks again and the new file becomes the document's file");
+      // Saved into another file, it is a document of its own from here on.
+      ok(D.state.doc.id !== docId && JSON.parse(hCopy.store.text).id === D.state.doc.id && JSON.parse(hA.store.text).id === docId, "and it takes an id of its own, which the earlier file does not share");
+      docId = D.state.doc.id;
+      D.touched({ info: true });
+      // Closing the dialog is not a failure and saves nothing.
+      $("btn-save").dispatchEvent(new W.MouseEvent("click", { bubbles: true, shiftKey: true }));
+      return later(200);
+    }).then(function () {
+      ok(D.state.dirty === true && pick.save.length === 3 && !/not saved/.test(toastText()), "closing the save dialog leaves the document unsaved and says nothing alarming");
+      var e = key(W.document.body, "s", { ctrlKey: true });
+      return poll(function () { return hCopy.store.writes === 2 && !D.state.dirty; }).then(function () {
+        ok(e.defaultPrevented && pick.save.length === 3, "Ctrl+S saves, in place of the browser's own save");
+      });
+    });
+  }).then(function () {
+
+    // ---------- the question about unsaved changes ----------
+    D.touched({ info: true });
+    $("btn-new").click();
+    ok(q(".doc-modal h2").textContent === "Save your changes first?" && /First document/.test(q(".doc-modal p").textContent) && W.document.activeElement === modalBtn("save"), "New over unsaved changes asks first, and Save is the button in hand");
+    modalBtn("cancel").click();
+    return later(100);
+  }).then(function () {
+    ok(D.state.doc.id === docId && D.state.dirty === true, "Cancel keeps the document as it was");
+    $("btn-new").click();
+    modalBtn("discard").click();
+    return poll(function () { return D.state.doc.id !== docId; });
+  }).then(function () {
+    ok(D.state.dirty === false && D.state.page === "info" && spy.clear >= 2, "Discard changes goes on to the new document, with its history cleared");
+    ok(S.currentName() === "", "and New forgets the file: nothing can be saved over the earlier document's file");
+    var second = D.state.doc.id;
+    D.state.doc.info.title = "Second";
+    D.touched({ info: true });
+    var hSecond = fakeHandle("Second 0.1.json");
+    pick.nextSave = hSecond;
+    $("btn-new").click();
+    modalBtn("save").click();
+    return poll(function () { return D.state.doc.id !== second; }).then(function () {
+      ok(hSecond.store.writes === 1 && JSON.parse(hSecond.store.text).id === second && D.state.dirty === false, "Save in the question saves the document, then goes on");
+      D.touched({ info: true });
+      $("btn-new").click();
+      modalBtn("save").click();   // and the save dialog is then closed
+      return later(200);
+    }).then(function () {
+      ok(D.state.dirty === true && q(".doc-modal") === null, "if that save is abandoned, the document stays open and unsaved");
+      D.markClean();
+      ok(D.state.dirty === false && $("btn-save").textContent === "Save", "markClean clears the flag");
+    });
+  }).then(function () {
+
+    // ---------- Load: which file Save writes to ----------
+    return fileText(function (d) {
+      kPng = M.addMedia(d, new W.Blob([pngBytes], { type: "image/png" }), { name: "a.png", width: 3, height: 3 });
+      kBig = M.addMedia(d, new W.Blob([bigBytes], { type: "image/jpeg" }), { name: "b.jpg", width: 9, height: 9 });
+      d.blocks.push(M.make.heading(d, 1, "Alpha"), M.make.picture(d, kPng, 3, 3), M.make.heading(d, 2, "Alpha one"), M.make.prompt(d, "Fill in"),
+        M.make.heading(d, 1, "Beta"), M.make.picture(d, kBig, 9, 9), M.make.heading(d, 1, "Gamma"), M.make.paragraph(d, "end"));
+    });
+  }).then(function (f) {
+    savedText = f.text; docId = f.id;
+    hB = fakeHandle("Loaded document 0.1.json", savedText);
+    pick.nextOpen = hB;
+    $("btn-load").click();
+    return poll(function () { return D.state.doc && D.state.doc.id === docId; });
+  }).then(function () {
+    var o = pick.open[0], acc = J(o.types[0].accept);
+    ok(/\.json/.test(acc) && /\.docx/.test(acc) && o.multiple === false, "Load offers document files and Word files");
+    ok(D.state.page === "edit" && D.state.dirty === false && spy.mount.length === 1 && spy.mount[0] === $("edit-view") && $("main").classList.contains("hidden") && !$("edit-view").classList.contains("hidden"), "a project file opens in the editor, which is given its own view");
+    ok(D.state.doc.media[kBig].blob.size === 200000 && M.missing(D.state.doc).length === 0 && /Opened Loaded document 0\.1\.json/.test(toastText()), "with its pictures");
+    ok(S.currentName() === "Loaded document 0.1.json", "a file opened through the dialog is adopted once it has loaded");
+    D.touched({ blocks: [D.state.doc.blocks[0].id] });
+    var before = pick.save.length;
+    $("btn-save").click();
+    return poll(function () { return hB.store.writes === 1 && !D.state.dirty; }).then(function () {
+      ok(pick.save.length === before && JSON.parse(hB.store.text).id === docId, "so Save writes back to it without asking");
+    });
+  }).then(function () {
+    // The same file through the plain file input: no handle comes with it.
+    chooseWithInput(new W.File([savedText], "Loaded document 0.1.json", { type: "application/json" }));
+    return poll(function () { return spy.mount.length === 2; });
+  }).then(function () {
+    ok(D.state.doc.id === docId && S.currentName() === "" && spy.unmount === 1, "a file from the file input opens too, and the handle there was is forgotten");
+    D.touched({ info: true });
+    var before = pick.save.length, hNew = fakeHandle("Elsewhere.json");
+    pick.nextSave = hNew;
+    $("btn-save").click();
+    return poll(function () { return hNew.store.writes === 1; }).then(function () {
+      ok(pick.save.length === before + 1 && hB.store.writes === 1, "so its first Save asks where, and the file opened earlier is not written");
+    });
+  }).then(function () {
+    // Dropped on the tool.
+    var dt = new W.DataTransfer();
+    dt.items.add(new W.File([savedText], "Dropped.json", { type: "application/json" }));
+    var over = new W.DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt });
+    W.document.body.dispatchEvent(over);
+    var drop = new W.DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt });
+    W.document.body.dispatchEvent(drop);
+    return poll(function () { return spy.mount.length === 3; }).then(function () {
+      ok(over.defaultPrevented && drop.defaultPrevented && S.currentName() === "" && /Opened Dropped\.json/.test(toastText()), "a file dropped anywhere on the tool is opened, taken by the tool itself, with no handle");
+      var dt2 = new W.DataTransfer();
+      dt2.items.add(new W.File(["x"], "photo.png", { type: "image/png" }));
+      W.document.body.dispatchEvent(new W.DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt2 }));
+      ok(/drop it on the page in Edit/.test(toastText()) && D.state.doc.id === docId, "a picture dropped outside the page is not opened as a document; the message says where it goes");
+    });
+  }).then(function () {
+
+    // ---------- another tool's file, by name ----------
+    var cases = [
+      ['{"schema":"spt-review-pack/1.1","packId":"p"}', "pack.json", /pack\.json is a review pack\. Open it in the OT Cyber Report Review Tool\./],
+      ['{"schema":"spt-review/1.0"}', "rev.json", /rev\.json is a review file\. Open it in the OT Cyber Report Review Tool/],
+      ['{"schema":"spt-risk-project/1.4"}', "risk.json", /risk\.json is a risk assessment project file\. Open it in the OT Cyber Risk Assessment Tool\./],
+      ['{"schemaVersion":"2.3","project":{}}', "acme.json", /acme\.json is an assessment project file\. Open it in the OT Cyber Assessment Tool\./],
+      ['{"hello":1}', "other.json", /other\.json is not a document file\./],
+      ['this is not json', "notes.json", /notes\.json is not a document file\./],
+      ['{"schema":"spt-document/9.0","blocks":[]}', "future.json", /spt-document\/9\.0.*newer version/]
+    ];
+    var chain = Promise.resolve(), mounts = spy.mount.length;
+    cases.forEach(function (c) {
+      chain = chain.then(function () { return W.DocumentTool.load(new W.File([c[0]], c[1])); }).then(function (opened) {
+        ok(opened === false && c[2].test(toastText()) && /err/.test($("toast").className), "refused: " + c[1], toastText());
+      });
+    });
+    return chain.then(function () {
+      ok(D.state.doc.id === docId && spy.mount.length === mounts && D.state.dirty === false, "and the open document is left as it was each time");
+      return W.DocumentTool.load(new W.File([new Uint8Array([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])], "old.bin"));
+    }).then(function (opened) {
+      ok(opened === false && /old Word file \(\.doc\)/.test(toastText()), "an old .doc is refused with what to do about it, by its name or by its first bytes", toastText());
+      return W.DocumentTool.load(savedText);
+    }).then(function (opened) {
+      ok(opened === true && D.state.doc.id === docId, "DocumentTool.load takes the text of a file as well as a File");
+    });
+  }).then(function () {
+
+    // ---------- a Word file starts an import, and can never be saved over ----------
+    var imported;
+    A.DocImportFlow.start = function (file) {
+      spy.imports.push(Array.prototype.slice.call(arguments));
+      imported = M.create();
+      imported.info.title = "Customer report";
+      imported.importReport = { source: { name: file.name, size: file.size, importedAt: "" }, carried: { paragraphs: 1 }, toCheck: [], changed: [], notCarried: [] };
+      return D.setDoc(imported, { from: "import" });
+    };
+    hDocx = fakeHandle("Customer report.docx");
+    hDocx.getFile = function () { return Promise.resolve(new W.File([new Uint8Array([0x50, 0x4B, 3, 4, 20, 0, 6, 0])], "Customer report.docx")); };
+    // The document open now was opened through the dialog, so there IS a handle to forget.
+    pick.nextOpen = fakeHandle("Loaded document 0.1.json", savedText);
+    $("btn-load").click();
+    return poll(function () { return S.currentName() === "Loaded document 0.1.json"; }).then(function () {
+      pick.nextOpen = hDocx;
+      $("btn-load").click();
+      return poll(function () { return D.state.doc === imported; });
+    }).then(function () {
+      ok(spy.imports.length === 1 && spy.imports[0].length === 1 && spy.imports[0][0].name === "Customer report.docx" && typeof spy.imports[0][0].getFile !== "function", "a Word file goes to the import, which is given the file and nothing else: never its handle");
+      ok(D.state.page === "report" && navPages() === "info edit preview issue report about" && spy.pages.slice(-1)[0] === "report", "the import report opens, and has its entry in the sidebar", navPages());
+      ok(D.state.dirty === true && unloadAsks() === true, "an imported document is unsaved work from the start");
+      ok(S.currentName() === "" && S.adopt(hDocx, imported.id) === false && S.currentName() === "", "there is no file behind it, and a Word file's handle cannot be made its file even if one is offered");
+      var hJson = fakeHandle("Customer report 0.1.json"), before = pick.save.length;
+      pick.nextSave = hJson;
+      $("btn-save").click();
+      return poll(function () { return hJson.store.writes === 1; }).then(function () {
+        var o = pick.save[pick.save.length - 1];
+        ok(pick.save.length === before + 1 && o.suggestedName === "Customer report 0.1.json" && o.excludeAcceptAllOption === true && J(o.types[0].accept) === J({ "application/json": [".json"] }), "the first Save after an import is a Save as with a .json name", o.suggestedName);
+        ok(hDocx.store.writes === 0 && hDocx.store.opened === 0, "and the Word file is never opened for writing");
+        // Even if the save dialog is made to hand back the Word file itself.
+        D.touched({ info: true });
+        pick.nextSave = hDocx;
+        $("btn-save").dispatchEvent(new W.MouseEvent("click", { bubbles: true, shiftKey: true }));
+        return poll(function () { return /not saved/.test(toastText()); });
+      }).then(function () {
+        ok(hDocx.store.opened === 0 && D.state.dirty === true && /\.json/.test(toastText()), "a Save as pointed at a .docx is refused with a message, and the document stays unsaved", toastText());
+        D.markClean();
+      });
+    }).then(function () {
+      // Known by its first bytes, whatever it is called; and the question comes before the reading.
+      D.touched({ info: true });
+      var first = imported, n = spy.imports.length, p = W.DocumentTool.load(new W.File([new Uint8Array([0x50, 0x4B, 3, 4])], "odd name.bin"));
+      return poll(function () { return q(".doc-modal"); }).then(function () {
+        ok(spy.imports.length === n, "with unsaved changes, the question is asked before the Word file is read");
+        modalBtn("cancel").click();
+        return p;
+      }).then(function (opened) {
+        ok(opened === false && spy.imports.length === n && D.state.doc === first, "Cancel there and nothing is read");
+        var p2 = W.DocumentTool.load(new W.File([new Uint8Array([0x50, 0x4B, 3, 4])], "odd name.bin"));
+        return poll(function () { return q(".doc-modal"); }).then(function () { modalBtn("discard").click(); return p2; });
+      }).then(function (opened) {
+        ok(opened === true && spy.imports.length === n + 1 && q(".doc-modal") === null && D.state.doc !== first, "Discard, and a file that starts as a zip is imported whatever its name, without being asked twice");
+        A.DocImportFlow.start = function () { return Promise.resolve(false); };
+        var keep = D.state.doc;
+        var p3 = W.DocumentTool.load(new W.File([new Uint8Array([0x50, 0x4B, 3, 4])], "bad.docx"));
+        return poll(function () { return q(".doc-modal"); }).then(function () { modalBtn("discard").click(); return p3; }).then(function (opened2) {
+          ok(opened2 === false && D.state.doc === keep && D.state.dirty === true, "an import that is refused leaves the open document as it was, still unsaved, even after Discard was chosen");
+          D.markClean();
+          // A write that is still waiting for the documents above must not land in what follows.
+          return later(1600);
+        });
+      });
+    });
+  }).then(function () {
+
+    // ---------- the sidebar: pages and outline ----------
+    return W.DocumentTool.load(savedText);
+  }).then(function () {
+    var doc = D.state.doc, heads = doc.blocks.filter(function (b) { return b.type === "heading"; }), mounts = spy.mount.length;
+    var rows = function () { return Array.prototype.slice.call(W.document.querySelectorAll("#outline .doc-outline-row")); };
+    var names = function () { return rows().map(function (r) { return r.querySelector(".t").textContent; }).join(" | "); };
+    ok(D.state.page === "edit" && q("#outline [role=tree]") && rows().length === 4 && names() === "Alpha | Alpha one | Beta | Gamma", "on Edit the sidebar shows the headings as a tree", names());
+    ok(rows()[0].getAttribute("role") === "treeitem" && rows()[1].getAttribute("aria-level") === "2" && rows()[0].querySelector(".n").textContent === "1" && /1 still to complete/.test(rows()[0].getAttribute("aria-label")) && !rows()[2].querySelector(".n"), "with levels, and a count beside a section that has something to complete");
+    ok(rows().filter(function (r) { return r.getAttribute("tabindex") === "0"; }).length === 1 && rows()[0].getAttribute("tabindex") === "0", "one row takes the Tab key");
+    rows()[0].focus();
+    key(rows()[0], "ArrowDown"); key(W.document.activeElement, "ArrowDown");
+    ok(W.document.activeElement === rows()[2] && rows()[2].getAttribute("tabindex") === "0" && rows()[0].getAttribute("tabindex") === "-1", "Down moves between rows, and the Tab stop goes with it");
+    key(W.document.activeElement, "Home"); key(W.document.activeElement, "ArrowRight");
+    ok(W.document.activeElement === rows()[1], "Right goes to a heading under this one");
+    key(W.document.activeElement, "ArrowLeft"); key(W.document.activeElement, "End");
+    ok(W.document.activeElement === rows()[3], "Left goes back up to it; Home and End go to the ends");
+    key(rows()[2], "Enter");
+    ok(J(spy.focus.slice(-1)) === J([heads[2].id]) && spy.mount.length === mounts, "Enter goes to the heading in the editor, which is not built again");
+    rows()[1].click();
+    ok(J(spy.focus.slice(-1)) === J([heads[1].id]), "so does a click");
+    D.go("edit", { blockIds: [heads[0].id, heads[1].id] });
+    ok(J(spy.select.slice(-1)[0]) === J([heads[0].id, heads[1].id]), "go(\"edit\", { blockIds }) asks the editor to select those blocks");
+
+    // Moving a whole section, with its subsection.
+    rows()[0].focus();
+    var e = key(rows()[0], "ArrowDown", { altKey: true });
+    ok(e.defaultPrevented && names() === "Beta | Alpha | Alpha one | Gamma", "Alt+Down moves the section, subsection and all, below the next one", names());
+    ok(doc.blocks[1] === heads[2] && doc.blocks[3] === heads[0] && doc.blocks[5] === heads[1] && doc.blocks[7] === heads[3], "in the document itself");
+    var rec = spy.record.slice(-1)[0];
+    ok(rec && rec.label === "Move section" && rec.before.length === 4 && rec.after.length === 4 && rec.before[0].id === heads[0].id && rec.before[0].index === 1 && rec.after[0].index === 3 && JSON.parse(rec.before[0].json).id === heads[0].id, "it is recorded for undo: the blocks, where they were and where they are");
+    ok(spy.redraw.slice(-1)[0].length === 4 && spy.redraw.slice(-1)[0][0] === heads[0].id && D.state.dirty === true, "the editor is told which blocks to draw again, and the document is unsaved");
+    ok(W.document.activeElement === rows()[1] && rows()[1].getAttribute("data-heading-id") === heads[0].id, "the keyboard stays on the section that moved");
+    key(W.document.activeElement, "ArrowUp", { altKey: true });
+    ok(names() === "Alpha | Alpha one | Beta | Gamma", "Alt+Up moves it back", names());
+    var n = spy.record.length;
+    key(rows()[0], "ArrowUp", { altKey: true }); key(rows()[3], "ArrowDown", { altKey: true }); key(rows()[1], "ArrowDown", { altKey: true });
+    ok(spy.record.length === n && names() === "Alpha | Alpha one | Beta | Gamma", "the first cannot go up, the last cannot go down, and a subsection stays inside its section");
+
+    // The row's menu.
+    var more = rows()[2].querySelector(".doc-outline-more");
+    ok(more.getAttribute("aria-haspopup") === "menu" && /Actions for Beta/.test(more.getAttribute("aria-label")), "each row has a menu button with a name");
+    more.click();
+    var items = function () { return Array.prototype.map.call(W.document.querySelectorAll(".doc-menu [role=menuitem]"), function (b) { return b.textContent; }).join(" | "); };
+    ok(items() === "Add a section after | Move up | Move down | Delete this section" && W.document.activeElement.textContent === "Add a section after", "the menu: add a section after, move, delete", items());
+    key(W.document.activeElement, "Escape");
+    ok(q(".doc-menu") === null && W.document.activeElement === rows()[2], "Escape closes it and the keyboard goes back to the row");
+    key(rows()[2], "F10", { shiftKey: true });
+    ok(q(".doc-menu") !== null, "Shift+F10 opens it from the keyboard");
+    W.document.activeElement.click();
+    var added = doc.blocks[doc.blocks.indexOf(heads[3]) - 2];
+    ok(added && added.type === "heading" && added.level === 1 && M.text(added) === "" && doc.blocks[doc.blocks.indexOf(added) + 1].type === "paragraph" && J(spy.focus.slice(-1)) === J([added.id]), "Add a section after puts a new heading of the same level after the section and goes to it");
+    ok(spy.record.slice(-1)[0].label === "Add section" && spy.record.slice(-1)[0].before.length === 0 && spy.record.slice(-1)[0].after.length === 2 && rows().length === 5 && rows()[3].querySelector(".t").textContent === "Untitled heading", "recorded for undo, and listed in the outline");
+
+    // Deleting a section asks first.
+    var count = doc.blocks.length;
+    key(rows()[0], "Delete");
+    ok(q(".doc-modal h2").textContent === "Delete this section?" && /Alpha and the 3 blocks under it/.test(q(".doc-modal p").textContent), "Delete asks, saying what goes", q(".doc-modal p").textContent);
+    modalBtn("cancel").click();
+    return later(60).then(function () {
+      ok(doc.blocks.length === count, "Cancel deletes nothing");
+      rows()[0].focus();
+      key(rows()[0], "Delete");
+      modalBtn("ok").click();
+      return poll(function () { return doc.blocks.length === count - 4; });
+    }).then(function () {
+      var r = spy.record.slice(-1)[0];
+      ok(r.label === "Delete section" && r.before.length === 4 && r.after.length === 0 && !M.find(doc, heads[0].id) && !M.find(doc, heads[1].id) && names() === "Beta | Untitled heading | Gamma", "the section and what is under it go, recorded for undo", names());
+      ok(W.document.activeElement === rows()[0], "and the keyboard is on the next section");
+
+      // Pages.
+      var item = q('#nav .nav-item[data-page="preview"]');
+      item.focus();
+      key(item, "Enter");
+      ok(D.state.page === "preview" && W.document.activeElement === q('#nav .nav-item[data-page="preview"]') && q('#nav .nav-item[data-page="preview"]').classList.contains("active") && q("#main h1").textContent === "Stand-in preview", "Enter on a page's entry opens it and the keyboard stays on the entry");
+      ok(!$("main").classList.contains("hidden") && $("edit-view").classList.contains("hidden") && $("outline").firstChild === null, "the editor's view is hidden, not unmounted, and the outline goes with it");
+      D.go("info", { field: "title" });
+      ok(W.document.activeElement === q('#main [data-field="title"]'), "go(\"info\", { field }) puts the keyboard in that field");
+      var m = spy.mount.length;
+      D.go("edit");
+      ok(spy.mount.length === m, "coming back to Edit does not build the paper again");
+      D.go("info"); doc.options.numberHeadings = true; D.touched({ info: true }); D.go("edit");
+      ok(spy.mount.length === m + 1 && /^1 Beta$/.test(rows()[0].querySelector(".t").textContent), "unless what the paper shows around the text has changed: heading numbers, here", rows()[0].querySelector(".t").textContent);
+      D.go("report");
+      ok(D.state.page === "edit", "a document that was not imported has no import report to go to");
+      D.go("nowhere");
+      ok(D.state.page === "info", "and an unknown page is Document information");
+      D.markClean();
+    });
+  }).then(function () {
+
+    // ---------- autosave ----------
+    // First let any write still waiting from the edits above land, so the
+    // store starts empty.
+    return later(1600);
+  }).then(function () {
+    W.localStorage.removeItem(POINTERS);
+    mem.docs = {}; mem.blobs = {}; mem.puts = 0;
+    hA = fakeHandle("Loaded document 0.1.json", savedText);
+    pick.nextOpen = hA;
+    $("btn-load").click();
+    return poll(function () { return S.currentName() === "Loaded document 0.1.json" && mem.blobs[docId] && Object.keys(mem.blobs[docId]).length === 2; });
+  }).then(function () {
+    ok(mem.blobs[docId][kBig].size === 200000 && mem.docs[docId] === undefined && pointers()[docId] && pointers()[docId].newer === false, "opening a project file writes its pictures to the autosave store in the background, and nothing is offered for it yet");
+    ok($("autosave-note").textContent === "", "with a working store the header says nothing about autosave");
+    var doc = D.state.doc, extra = bytes(5000, 9);
+    var k = M.addMedia(doc, new W.Blob([extra], { type: "image/png" }), { name: "new.png", width: 5, height: 5 });
+    doc.blocks.push(M.make.picture(doc, k, 5, 5));
+    D.touched({ media: [k] });
+    doc.blocks[0].runs = [{ t: "Typed after the save" }];
+    D.touched({ blocks: [doc.blocks[0].id] });
+    ok(mem.blobs[docId][k] && mem.blobs[docId][k].size === 5000, "a new picture's bytes are written when it arrives");
+    return poll(function () { return mem.docs[docId] && pointers()[docId].newer === true; }).then(function () {
+      var rec = JSON.parse(mem.docs[docId]);
+      ok(rec.blocks[0].runs[0].t === "Typed after the save" && rec.media[k].data === undefined && rec.media[k].blob === undefined && mem.docs[docId].length < 20000, "the document itself follows a moment later, without any bytes in it", String(mem.docs[docId].length));
+      $("btn-save").click();
+      return poll(function () { return hA.store.writes === 1 && !D.state.dirty; });
+    }).then(function () {
+      ok(pointers()[docId].newer === false && Object.keys(mem.blobs[docId]).length === 3 && !!mem.docs[docId], "a Save does not remove the copy; it is just no longer newer than the file");
+      doc.blocks[0].runs = [{ t: "Typed after the second save" }];
+      D.touched({ blocks: [doc.blocks[0].id] });
+      return poll(function () { return pointers()[docId].newer === true && /second save/.test(mem.docs[docId]); });
+    }).then(function () {
+      ok(true, "an edit after the save makes the copy newer again");
+      // The window goes away without a save: a crash, or the browser closed.
+      return boot(frame);
+    }).then(function () {
+      ok(D.state.doc === null && q("#doc-offer") && /Unsaved work was found in this browser: Loaded document/.test(q("#doc-offer .t").textContent), "on the next start the copy is offered, never applied by itself", q("#doc-offer") && q("#doc-offer").textContent);
+      ok(mem.docs[docId] && Object.keys(mem.blobs[docId]).length === 3, "and is untouched while it is on offer");
+      $("doc-offer-restore").click();
+      return poll(function () { return D.state.doc && D.state.doc.id === docId; });
+    }).then(function () {
+      var r = D.state.doc;
+      ok(r.blocks[0].runs[0].t === "Typed after the second save" && D.state.page === "edit" && q("#doc-offer") === null, "Restore opens it as it was at the last edit");
+      ok(M.missing(r).length === 0 && D.state.recovered === false && q("#doc-missing") === null, "nothing is missing");
+      return Promise.all([r.media[kPng].blob.arrayBuffer(), r.media[kBig].blob.arrayBuffer(), r.media[k].blob.arrayBuffer()]).then(function (b) {
+        ok(same(new Uint8Array(b[0]), pngBytes) && same(new Uint8Array(b[1]), bigBytes) && same(new Uint8Array(b[2]), extra), "save, edit, reload, restore: every picture comes back, byte for byte");
+        ok(D.state.dirty === true && unloadAsks() === true && S.currentName() === "", "a restored copy is unsaved work with no file behind it");
+        var hR = fakeHandle("Restored.json"), before = pick.save.length;
+        pick.nextSave = hR;
+        $("btn-save").click();
+        return poll(function () { return hR.store.writes === 1; }).then(function () {
+          ok(pick.save.length === before + 1 && hA.store.writes === 1, "so Save asks where: the handle is never taken up again for a restored copy");
+          savedText = hR.store.text;
+        });
+      });
+    });
+  }).then(function () {
+
+    // ---------- a copy whose pictures did not come back ----------
+    var doc = D.state.doc;
+    doc.blocks[0].runs = [{ t: "Typed before the crash" }];
+    D.touched({ blocks: [doc.blocks[0].id] });
+    return poll(function () { return /before the crash/.test(mem.docs[docId] || ""); }).then(function () {
+      // The browser cleared the bytes but not the record.
+      delete mem.blobs[docId][kPng]; delete mem.blobs[docId][kBig];
+      return boot(frame);
+    }).then(function () {
+      $("doc-offer-restore").click();
+      return poll(function () { return D.state.doc && D.state.doc.id === docId; });
+    }).then(function () {
+      var r = D.state.doc;
+      ok(D.state.recovered === true && M.missing(r).length === 2 && r.media[kPng].missing === true && r.media[kPng].blob === null, "a copy that comes back without two of its pictures opens marked incomplete");
+      ok(q("#doc-missing") && /^2 pictures or drawings could not be restored from the autosave copy\./.test(q("#doc-missing .t").textContent) && $("doc-missing-fill").textContent === "Bring them back from the saved file", "a notice says how many, with the way to bring them back", q("#doc-missing") && q("#doc-missing").textContent);
+      ok(q('#nav .nav-item[data-page="issue"] .badge').textContent === "3", "each counts as something still to complete", q('#nav .nav-item[data-page="issue"] .badge').textContent);
+      ok(S.currentName() === "", "there is no file behind it");
+      var before = pick.save.length, hI = fakeHandle("Incomplete.json");
+      pick.nextSave = hI;
+      $("btn-save").click();
+      ok(q(".doc-modal h2").textContent === "Save an incomplete copy?" && /2 pictures or drawings are missing from this copy/.test(q(".doc-modal p").textContent) && pick.save.length === before, "Save says how many are missing before it asks where", q(".doc-modal p").textContent);
+      modalBtn("cancel").click();
+      return later(100).then(function () {
+        ok(pick.save.length === before && D.state.dirty === true, "Cancel there saves nothing");
+        $("btn-save").click();
+        modalBtn("ok").click();
+        return poll(function () { return hI.store.writes === 1; });
+      }).then(function () {
+        var o = JSON.parse(hI.store.text);
+        ok(pick.save.length === before + 1 && o.media[kPng].data === undefined && typeof o.media[Object.keys(o.media).filter(function (x) { return x !== kPng && x !== kBig; })[0]].data === "string", "it is a Save as: the incomplete copy goes to a new file, with the missing pictures marked and the rest whole");
+        ok(q("#doc-missing") !== null && D.state.recovered === true, "the notice stays until the pictures are back");
+        return D.fillFrom('{"schema":"spt-document/1.0","id":"doc-someone-else","blocks":[]}');
+      }).then(function (n) {
+        ok(n === 0 && /different document/.test(toastText()) && M.missing(r).length === 2, "another document's file is not taken from");
+        var redraws = spy.redraw.length;
+        return D.fillFrom(new W.File([savedText], "Restored.json")).then(function (n2) {
+          ok(n2 === 2 && M.missing(r).length === 0 && D.state.recovered === false && q("#doc-missing") === null && /2 pictures or drawings were brought back/.test(toastText()), "the saved file gives both back: the notice goes and the document is whole", toastText());
+          ok(spy.redraw.length === redraws + 1 && spy.redraw.slice(-1)[0].length === 2, "the editor is told to draw those two blocks again");
+          return poll(function () { return mem.blobs[docId][kPng] && mem.blobs[docId][kBig]; });
+        }).then(function () {
+          ok(true, "and the bytes go back into the autosave copy");
+          return r.media[kBig].blob.arrayBuffer();
+        }).then(function (buf) {
+          ok(same(new Uint8Array(buf), bigBytes) && q('#nav .nav-item[data-page="issue"] .badge').textContent === "1", "byte for byte, and only the document's own prompt is still to complete");
+        });
+      });
+    });
+  }).then(function () {
+
+    // ---------- declining, closing clean, and a store that fails ----------
+    var doc = D.state.doc;
+    D.touched({ info: true });
+    return poll(function () { return pointers()[docId] && pointers()[docId].newer === true; }).then(function () { return boot(frame); }).then(function () {
+      ok(q("#doc-offer") !== null, "unsaved work is offered again after another reload");
+      $("doc-offer-discard").click();
+      ok(q("#doc-offer") === null && mem.docs[docId] === undefined && mem.blobs[docId] === undefined && pointers()[docId] === undefined, "Discard it removes the copy, record and bytes");
+      return boot(frame);
+    }).then(function () {
+      ok(q("#doc-offer") === null, "and it is not offered again");
+      pick.nextOpen = fakeHandle("Loaded document 0.1.json", savedText);
+      $("btn-load").click();
+      return poll(function () { return mem.blobs[docId] && Object.keys(mem.blobs[docId]).length === 3; });
+    }).then(function () {
+      $("btn-new").click();
+      return poll(function () { return D.state.doc.id !== docId; });
+    }).then(function () {
+      ok(mem.blobs[docId] === undefined && pointers()[docId] === undefined, "closing a document with nothing unsaved removes its copy");
+      var id = D.state.doc.id;
+      D.state.doc.info.title = "Given up";
+      D.touched({ info: true });
+      return poll(function () { return mem.docs[id]; }).then(function () {
+        $("btn-new").click();
+        modalBtn("discard").click();
+        return poll(function () { return D.state.doc.id !== id; });
+      }).then(function () {
+        ok(mem.docs[id] === undefined && pointers()[id] === undefined, "and so does choosing Discard changes: work given up on purpose is not offered back");
+      });
+    }).then(function () {
+      var failing = memStore();
+      failing.ok = function () { return Promise.resolve(false); };
+      S.bytesStore = failing;
+      return poll(function () { return $("autosave-note").textContent === "Autosave is off. Save often."; });
+    }).then(function () {
+      ok(true, "a store that says it does not work: the header says autosave is off");
+      var puts = mem.puts;
+      D.state.doc.info.title = "No autosave";
+      D.touched({ info: true });
+      var hd = fakeHandle("No autosave 0.1.json");
+      pick.nextSave = hd;
+      $("btn-save").click();
+      return poll(function () { return hd.store.writes === 1 && !D.state.dirty; }).then(function () {
+        ok(mem.puts === puts && pointers()[D.state.doc.id] === undefined && JSON.parse(hd.store.text).info.title === "No autosave", "nothing is written to it, and Save still works");
+      });
+    }).then(function () {
+      var breaking = memStore();
+      breaking.putDoc = function () { return Promise.reject(new Error("quota")); };
+      S.bytesStore = breaking;
+      return poll(function () { return $("autosave-note").textContent === ""; }).then(function () {
+        D.touched({ info: true });
+        return poll(function () { return $("autosave-note").textContent === "Autosave is off. Save often."; });
+      });
+    }).then(function () {
+      ok(true, "a store that fails on a write: the header says so from then on");
+      var throwing = { ok: function () { throw new Error("no storage"); } };
+      S.bytesStore = throwing;
+      return poll(function () { return $("autosave-note").textContent === "Autosave is off. Save often."; });
+    }).then(function () {
+      D.touched({ info: true });
+      ok(D.state.dirty === true && errors.length === 0, "and a store that is not there at all breaks nothing", errors.join(" | "));
+      D.markClean();
+    });
+  }).then(function () {
+
+    // ---------- the tour ----------
+    W.localStorage.removeItem(POINTERS);
+    mem.docs = {}; mem.blobs = {};
+    return boot(frame, "?tour");
+  }).then(function () {
+    return poll(function () { return D.state.doc; });
+  }).then(function () {
+    var id = D.state.doc.id;
+    ok(D.state.tour === true && D.state.page === "edit" && q("#doc-tour-note") && /demo document/.test(q("#doc-tour-note").textContent), "the tour opens the demo document, and says what it is");
+    D.state.doc.info.title = "Changed in the tour";
+    D.touched({ info: true });
+    D.touched({ blocks: [D.state.doc.blocks[0].id] });
+    return later(1600).then(function () {
+      ok(D.state.dirty === false && $("btn-save").textContent === "Save" && unloadAsks() === false, "the tour is never unsaved work, whatever is changed");
+      ok(mem.docs[id] === undefined && pointers()[id] === undefined, "and nothing of it is autosaved");
+      ok(/· tour$/.test($("save-state").textContent), "the header says it is the tour", $("save-state").textContent);
+      $("btn-new").click();
+      return poll(function () { return D.state.doc.id !== id; });
+    }).then(function () {
+      ok(q(".doc-modal") === null && D.state.tour === false && q("#doc-tour-note") === null, "leaving it asks nothing, and a real document opened in the tour's window behaves as one");
+    });
+  }).then(function () {
+
+    // ---------- in the suite ----------
+    var msgs = [];
+    window.addEventListener("message", function (e) { if (e.data && e.data.protocol === "spt-suite/1" && e.data.from === "module") msgs.push(e.data); });
+    function got(type) { return msgs.filter(function (m) { return m.type === type; }); }
+    function tell(type, data) { W.postMessage({ protocol: "spt-suite/1", from: "suite", type: type, data: data }, "*"); }
+    var hosted = document.createElement("iframe");
+    hosted.style.cssText = "width:1280px;height:800px;border:0";
+    // The suite opens each tool in a frame named like this (shared/host-bridge.js).
+    hosted.name = "spt-suite:" + JSON.stringify({ module: "documents", frame: "documents", tour: false });
+    document.body.appendChild(hosted);
+    return boot(hosted).then(function () {
+      return poll(function () { return got("ready").length; });
+    }).then(function () {
+      var r = got("ready")[0];
+      ok(A.HostBridge.hosted === true && r.module === "documents" && r.data.product === "OT Cyber Document Tool" && r.data.reopen === true && r.data.dirty === false, "in the suite's frame the tool registers with the bridge and says it is ready", J(r && r.data));
+      ok(W.getComputedStyle($("btn-theme")).display === "none", "its own theme toggle is hidden: the suite has one");
+      tell("theme", { theme: "dark" });
+      return poll(function () { return W.document.documentElement.getAttribute("data-theme") === "dark"; });
+    }).then(function () {
+      ok($("btn-theme").getAttribute("aria-pressed") === "true", "the suite's theme is followed, the tool's own way");
+      tell("theme", { theme: "light" });
+      tell("open-text", { name: "Handed over.json", text: savedText });
+      return poll(function () { return D.state.doc && D.state.doc.id === docId; });
+    }).then(function () {
+      ok(S.currentName() === "" && D.state.page === "edit", "a project file passed in by the suite opens, with no handle");
+      return poll(function () { return got("recent").length === 1; });
+    }).then(function () {
+      var rc = got("recent")[0].data;
+      ok(rc.action === "open" && rc.name === "Handed over.json" && rc.kind === "Document" && rc.label === "Loaded document" && rc.hasHandle === false, "it is noted in Recent files as a Document, labelled with its title", J(rc));
+      D.touched({ info: true });
+      return poll(function () { return got("dirty").length === 1; });
+    }).then(function () {
+      ok(got("dirty")[0].data.dirty === true, "the suite is told when there are unsaved changes");
+      var hs = fakeHandle("From the suite.json");
+      pick.nextSave = hs;
+      $("btn-save").click();
+      return poll(function () { return got("dirty").length === 2 && got("recent").length === 2; });
+    }).then(function () {
+      var rc = got("recent")[1].data;
+      ok(got("dirty")[1].data.dirty === false && rc.action === "save" && rc.name === "From the suite.json" && rc.kind === "Document" && rc.hasHandle === true, "and when they are saved, with the save noted in Recent files", J(rc));
+      // A file the user reopens from Recent files comes with the handle the browser kept.
+      var hr = fakeHandle("Reopened.json", savedText);
+      A.HostBridge.__setHandleLookup(function (name, cb) { cb(hr); });
+      tell("open-recent", { name: "Reopened.json", label: "Loaded document" });
+      return poll(function () { return q(".spt-host-banner .btn.primary"); }).then(function (btn) {
+        btn.click();
+        return poll(function () { return S.currentName() === "Reopened.json"; });
+      }).then(function () {
+        D.touched({ info: true });
+        var before = pick.save.length;
+        $("btn-save").click();
+        return poll(function () { return hr.store.writes === 1; }).then(function () {
+          ok(pick.save.length === before, "a file reopened from Recent files with its handle is saved back in place, as in the assessment tool");
+        });
+      });
+    }).then(function () {
+      document.body.removeChild(hosted);
+    });
+  }).then(function () {
+
+    // ---------- the real store, where the browser lets it run ----------
+    // Everything above used the store in this page. The one the tool ships
+    // with is a thin wrapper over IndexedDB, which answers in real time while
+    // this run's clock is virtual: the timer below burns a little real time
+    // on every tick so that it has the chance to. Where it still does not
+    // answer, the tool must say autosave is off, and that is what is checked.
+    var sink = 0, burn = setInterval(function () { for (var i = 0; i < 2e7; i++) sink += i % 7; }, 20);
+    return boot(frame).then(function () {
+      S.bytesStore = null;   // back to the tool's own
+      return poll(function () { return S.autosave.status() !== "unknown"; }, 60000);
+    }).then(function () {
+      var st = S.bytesStore;
+      if (S.autosave.status() !== "on") {
+        clearInterval(burn);
+        ok($("autosave-note").textContent === "Autosave is off. Save often.", "IndexedDB did not answer in this run: the header says autosave is off (the real store is then a manual check)");
+        return;
+      }
+      var doc = M.create(), raw = bytes(70000, 4), other = "doc-real-store-other";
+      doc.info.title = "Real store";
+      var k = M.addMedia(doc, new W.Blob([raw], { type: "image/png" }), { name: "r.png", width: 2, height: 2 });
+      doc.blocks.push(M.make.picture(doc, k, 2, 2));
+      return st.putBlob(other, "m1", new W.Blob(["zz"])).then(function () {
+        S.autosave.note(doc, { all: true });
+        return poll(function () { return pointers()[doc.id] && pointers()[doc.id].newer === true; });
+      }).then(function () {
+        // The record is written without anyone waiting for it: ask until it is there.
+        return new Promise(function (res, rej) {
+          var tries = 0;
+          (function again() {
+            st.getDoc(doc.id).then(function (v) { if (v) res(); else if (++tries > 200) rej(new Error("the record never reached the real store")); else setTimeout(again, 50); }, rej);
+          })();
+        });
+      }).then(function () {
+        return Promise.all([st.getDoc(doc.id), st.getBlobs(doc.id), st.getDoc("doc-nobody")]);
+      }).then(function (r) {
+        ok(typeof r[0] === "string" && JSON.parse(r[0]).info.title === "Real store" && J(Object.keys(r[1])) === J([k]) && r[1][k].size === 70000 && r[2] === null, "the real store keeps the document's record and its picture, each under the document's id");
+        return S.autosave.restore(doc.id);
+      }).then(function (back) {
+        ok(back && back.id === doc.id && M.missing(back).length === 0 && back.media[k].blob.size === 70000, "and a restore from it gives the document back with nothing missing");
+        return back.media[k].blob.arrayBuffer();
+      }).then(function (buf) {
+        ok(same(new Uint8Array(buf), raw), "byte for byte");
+        S.autosave.discard(doc.id);
+        return later(1500);
+      }).then(function () {
+        return Promise.all([st.getDoc(doc.id), st.getBlobs(doc.id), st.getBlobs(other)]);
+      }).then(function (r) {
+        ok(r[0] === null && Object.keys(r[1]).length === 0 && J(Object.keys(r[2])) === J(["m1"]) && pointers()[doc.id] === undefined, "discarding removes that document's record and bytes, and no other document's");
+        clearInterval(burn);
+        return st.remove(other);
+      });
+    }).then(null, function (e) { clearInterval(burn); throw e; });
+  }).then(function () {
+    ok(errors.length === 0, "no script error or unhandled rejection in the tool throughout", errors.join(" | "));
+    finish();
+  }, function (e) { ok(false, "the page ran to the end", (e && e.stack) || String(e)); finish(); });
+})();
+</script>
+</body></html>

@@ -1,0 +1,628 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the pages</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/documents.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/tables.css" />
+<link rel="stylesheet" href="../css/pages.css" />
+</head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The pages of the document tool (js/pages.js) and the import flow
+  (js/import-flow.js), drawn into a bare #main with a stand-in for the shell
+  (App.DocApp) that records what the pages ask of it. Document information
+  saves as it is typed and keeps the cover miniature in step; the import
+  report words every code, offers Show and Remove for the front matter and
+  lists the pictures and drawings; the preview lays out cover, control,
+  contents and landscape sheets; the welcome page opens a new document and the
+  demo. The model and the renderer are the real ones when they are built; a
+  small stand-in is used for whichever is still a stub, and the page says so.
+-->
+<button id="btn-load" type="button">Load</button>
+<div id="main" style="width:1100px"></div>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../data/licence.js"></script>
+<script src="../data/demo-document.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/pictures.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script src="../js/export.js"></script>
+<script src="../js/import-flow.js"></script>
+<script src="../js/pages.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  // Written out as it goes, ending in a FAIL line until the last test has run:
+  // a page cut short by the runner's time budget must not read as a short pass.
+  function show(end) { document.getElementById("out").textContent = lines.join("\n") + "\n" + end; }
+  function ok(c, n, d) {
+    lines.push((c ? "PASS " : "FAIL ") + n + (!c && d != null ? " - " + d : "")); if (!c) fail++;
+    show("FAIL the page did not finish: re-run it alone with a larger time budget");
+  }
+  // Every package is built now, so a stand-in being used means a real object
+  // has gone missing: that is a failure, not a note.
+  function note(t) { ok(false, "no stand-in is used", t); }
+  function finish() {
+    alive = false;
+    show("\n" + (fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"));
+  }
+  // Packing and zipping run off the main thread, and headless Edge's virtual
+  // clock runs out the moment the page has nothing queued, which dumps the page
+  // half way through. A message bounced to ourselves keeps a task queued,
+  // without moving the clock, until the tests finish (as test-doc-zip.html does).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  window.addEventListener("error", function (e) { ok(false, "no script error", e.message); });
+  var A = window.App, M = A.DocModel, R = A.DocRender, P = A.DocPages, F = A.DocImportFlow;
+  var main = document.getElementById("main");
+  function $(id) { return document.getElementById(id); }
+  function tick() { return new Promise(function (res) { setTimeout(res, 0); }); }
+
+  // ---- the shell, standing in -------------------------------------------
+  var calls;
+  function reset() { calls = { go: [], touched: [], toast: [], say: [], busy: [], setDoc: [] }; }
+  reset();
+  var state = { doc: null, page: "", dirty: false, tour: false, recovered: false };
+  A.DocApp = {
+    state: state,
+    go: function (page, arg) { calls.go.push([page, arg]); state.page = page; },
+    touched: function (w) { calls.touched.push(w); state.dirty = true; },
+    markClean: function () { state.dirty = false; },
+    setDoc: function (d, o) { calls.setDoc.push([d, o]); state.doc = d; return Promise.resolve(true); },
+    canAdd: function () { return true; },
+    toast: function (t, k) { calls.toast.push([t, k]); },
+    confirmBox: function () { return Promise.resolve(true); },
+    busy: function (l, f) { calls.busy.push([l, f]); },
+    say: function (t) { calls.say.push(t); },
+    h: function (tag, attrs, kids) {
+      var el = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) {
+        var v = attrs[k];
+        if (v == null || v === false) return;
+        if (k === "text") el.textContent = v; else if (k === "class") el.className = v;
+        else el.setAttribute(k, v === true ? "" : v);
+      });
+      (kids || []).forEach(function (c) { if (c != null && c !== false) el.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+      return el;
+    }
+  };
+
+  // ---- stand-ins for whatever is still a stub -----------------------------
+  if (M.create("report") === null) {
+    note("App.DocModel is still a stub: a stand-in model is used");
+    M.runsText = function (runs) { return (runs || []).map(function (r) { return r.t || ""; }).join(""); };
+    M.text = function (b) { return b.type === "prompt" ? b.text || "" : M.runsText(b.runs); };
+    M.find = function (d, id) {
+      for (var i = 0; i < d.blocks.length; i++) {
+        var b = d.blocks[i];
+        if (b.id === id) return { block: b, list: d.blocks, index: i };
+        if (b.type !== "table") continue;
+        for (var r = 0; r < b.rows.length; r++) for (var c = 0; c < b.rows[r].cells.length; c++) {
+          var cell = b.rows[r].cells[c];
+          for (var k = 0; k < cell.blocks.length; k++) if (cell.blocks[k].id === id) return { block: cell.blocks[k], list: cell.blocks, index: k, table: b, cell: cell };
+        }
+      }
+      return null;
+    };
+    M.remove = function (d, ids) { d.blocks = d.blocks.filter(function (b) { return ids.indexOf(b.id) === -1; }); return ids; };
+    M.table.grid = function (t) {
+      return t.rows.map(function (row) {
+        var out = [], c = 0;
+        row.cells.forEach(function (cell) { for (var s = 0; s < (cell.span || 1); s++) out.push({ cell: cell, c: c++, covered: s > 0 }); });
+        return out;
+      });
+    };
+    M.sizeOf = function (d) { return Object.keys(d.media || {}).reduce(function (s, k) { return s + ((d.media[k].blob && d.media[k].blob.size) || 0); }, 0); };
+    M.missing = function () { return []; };
+    M.normalise = function (o) { return o; };
+    M.fromText = function (t) { return JSON.parse(t); };
+    M.create = function (kind) { return docOf({ kind: kind || "report", info: { title: "" }, blocks: [{ id: "b1", type: "paragraph", runs: [{ t: "" }] }] }); };
+  }
+  (function () {
+    var probe = R.coverEl(docOf({ info: { title: "Probe" } }));
+    if (probe && probe.childNodes.length) return;
+    note("App.DocRender is still a stub: a stand-in renderer is used");
+    function box(cls, text, w, hgt) {
+      var el = document.createElement("div");
+      el.className = cls; el.textContent = text;
+      if (w) { el.style.width = w + "px"; el.style.height = hgt + "px"; }
+      return el;
+    }
+    R.coverEl = function (d) { return box("cover", [(d.info.docType || "Document").toUpperCase(), d.info.title || "Untitled document", d.info.client || ""].join(" "), 794, 1123); };
+    R.controlEl = function (d, st) { return box("control", "Document control and confidentiality Status " + (st === "final" ? "Final" : "Draft")); };
+    R.contentsEl = function () { return box("contents", "Contents"); };
+    R.shortHeadEl = function (d) { return box("short-head", d.info.title || ""); };
+    R.blockEl = function (d, b) {
+      var el = box("blk", M.text(b) || b.type);
+      el.id = "blk-" + b.id; el.setAttribute("data-block-id", b.id); el.setAttribute("data-type", b.type);
+      return el;
+    };
+  })();
+
+  // ---- documents ---------------------------------------------------------
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  function pngBlob() {
+    var s = atob(PNG), u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return new Blob([u], { type: "image/png" });
+  }
+  function para(id, t) { return { id: id, type: "paragraph", runs: [{ t: t }] }; }
+  function docOf(over) {
+    var d = {
+      schema: "spt-document/1.0", id: "doc-test-" + Math.random().toString(36).slice(2, 8),
+      createdAt: "2026-11-11T09:00:00.000Z", savedAt: "2026-11-11T09:00:00.000Z",
+      createdWithVersion: A.Version.number, savedBy: { product: A.Product.name, version: A.Version.number },
+      kind: "report",
+      info: { title: "", docType: "", reference: "", client: "", site: "", author: "", revision: "0.1", date: "",
+        qaReviewBy: "", authorisedBy: "", issuedTo: "", issuedDate: "", classification: "Confidential" },
+      options: { numberHeadings: false, contents: false },
+      nextId: 100, blocks: [], footnotes: {}, media: {}, parts: {}
+    };
+    over = over || {};
+    Object.keys(over).forEach(function (k) { if (k === "info") Object.assign(d.info, over.info); else d[k] = over[k]; });
+    return d;
+  }
+  function open(d) { state.doc = M.normalise(d) || d; reset(); return state.doc; }
+  function draw(page, arg) { main.textContent = ""; page(main, arg); }
+  function type(el, value, ev) { el.value = value; el.dispatchEvent(new Event(ev || "input", { bubbles: true })); }
+  function click(el) { el.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+  function last(a) { return a[a.length - 1]; }
+  // No uppercase labels, and no em or en dashes, in what the tool itself draws.
+  // The cover is a picture of the printed page and is left out.
+  function wordingProblems() {
+    var bad = [];
+    Array.prototype.forEach.call(main.querySelectorAll("*"), function (el) {
+      if (el.closest(".dp-mini-frame, .dp-sheet")) return;
+      if (getComputedStyle(el).textTransform === "uppercase") bad.push("uppercase: " + el.className);
+    });
+    var clone = main.cloneNode(true);
+    Array.prototype.forEach.call(clone.querySelectorAll(".dp-mini-frame, .dp-sheet, .dp-licence, .dp-quotes"), function (n) { n.remove(); });
+    if (/[–—]/.test(clone.textContent)) bad.push("a dash: " + (clone.textContent.match(/.{0,30}[–—].{0,30}/) || [""])[0]);
+    return bad;
+  }
+
+  var chain = Promise.resolve();
+  function step(name, fn) {
+    chain = chain.then(fn).catch(function (e) { ok(false, name + " ran without throwing", e && (e.stack || e.message)); });
+  }
+
+  // ======================= welcome ========================================
+  step("welcome", function () {
+    state.doc = null; reset();
+    draw(P.info);
+    ok(!!$("dp-new") && !!$("dp-load") && !!$("dp-demo"), "with no document open, a page draws the welcome page: new, load, the demo");
+    ok(wordingProblems().length === 0, "welcome: no uppercase labels and no dashes", wordingProblems().join(" | "));
+    click($("dp-new"));
+    ok(calls.setDoc.length === 1 && calls.setDoc[0][1].from === "new" && calls.setDoc[0][0] && calls.setDoc[0][0].kind === "report",
+       "New document opens a new report through the shell", JSON.stringify(calls.setDoc[0] && calls.setDoc[0][1]));
+    var loads = 0;
+    $("btn-load").addEventListener("click", function () { loads++; });
+    state.doc = null; draw(P.welcome);
+    click($("dp-load"));
+    ok(loads === 1, "Load goes through the header's Load button, where the picker and the guard are");
+    reset();
+    click($("dp-demo"));
+    ok(calls.setDoc.length === 1 && calls.setDoc[0][1].from === "tour", "Try the demo opens the demo document as a tour", JSON.stringify(calls.setDoc[0] && calls.setDoc[0][1]));
+    ok(calls.setDoc[0] && calls.setDoc[0][0].info.title === window.SPT_DOCUMENT_DEMO.info.title, "and it is the demo document");
+    ok(calls.setDoc[0] && calls.setDoc[0][0] !== window.SPT_DOCUMENT_DEMO, "a copy, so the demo itself is never edited");
+  });
+
+  // ======================= Document information ===========================
+  step("info", function () {
+    var d = open(docOf({ info: { title: "Network segmentation proposal", docType: "Proposal", client: "Northfield Water", author: "A. Consultant", date: "2026-11-11" },
+      blocks: [para("b1", "Hello")] }));
+    draw(P.info);
+    var keys = ["title", "docType", "reference", "client", "site", "author", "revision", "date", "qaReviewBy", "authorisedBy", "issuedTo", "issuedDate", "classification"];
+    var missing = keys.filter(function (k) { return !$("info-" + k); });
+    ok(missing.length === 0, "every document information field is on the page", missing.join(", "));
+    var unlabelled = keys.filter(function (k) { return !main.querySelector('label[for="info-' + k + '"]'); });
+    ok(unlabelled.length === 0, "each with its own label", unlabelled.join(", "));
+    ok($("info-title").value === "Network segmentation proposal" && $("info-revision").value === "0.1" && $("info-classification").value === "Confidential",
+       "the fields show the document's values");
+    ok($("info-date").type === "date" && $("info-issuedDate").type === "date" && $("info-date").value === "2026-11-11", "the two dates are date fields");
+    var sugg = Array.prototype.map.call(main.querySelectorAll("#info-docType-list option"), function (o) { return o.value; });
+    ok($("info-docType").getAttribute("list") === "info-docType-list" && sugg.join("|") === "Proposal|Method statement|Report|Procedure|Technical note",
+       "document type suggests the five usual kinds and takes anything typed", sugg.join("|"));
+    ok(main.querySelectorAll(".card").length === 3 && !!$("dp-card-document") && !!$("dp-card-control") && !!$("dp-card-file"), "three cards: Document, Document control, File");
+
+    // the miniature
+    var frame = main.querySelector(".dp-mini-frame");
+    ok($("dp-cover-label").textContent === "Cover as it will print", "the miniature is labelled in plain words", $("dp-cover-label").textContent);
+    ok(frame.getAttribute("aria-hidden") === "true", "it is hidden from a screen reader");
+    ok($("dp-cover-line").textContent === "Cover: Proposal, Network segmentation proposal, Northfield Water, revision 0.1",
+       "which gets one line of ordinary text in its place", $("dp-cover-line").textContent);
+    var page = frame.querySelector(".dp-mini-page");
+    ok(page.firstChild && /Network segmentation/i.test(page.textContent.replace(/\s+/g, " ")), "the miniature is the cover, with the title on it", page.textContent.slice(0, 80));
+    var w = page.firstChild.getBoundingClientRect().width;
+    ok(w > 0 && w <= 242 && getComputedStyle(frame).overflow === "hidden", "scaled to fit its frame, which lets nothing spill", w + " in " + frame.clientWidth);
+
+    // saving on change
+    reset();
+    var before = page.firstChild;
+    type($("info-title"), "Remote access method statement");
+    ok(d.info.title === "Remote access method statement", "typing a title is saved as it is typed", d.info.title);
+    ok(calls.touched.length === 1 && calls.touched[0].info === true, "and the shell is told the information changed", JSON.stringify(calls.touched));
+    ok(/Remote access method statement/.test($("dp-cover-line").textContent) && page.firstChild !== before && /Remote access/i.test(page.textContent.replace(/\s+/g, " ")),
+       "the miniature and its text line follow", $("dp-cover-line").textContent);
+    type($("info-title"), "Remote access method statement", "change");
+    ok(calls.touched.length === 1, "a change that changes nothing does not mark the document");
+    type($("info-issuedDate"), "2026-12-01", "change");
+    ok(d.info.issuedDate === "2026-12-01", "a date is stored as the field gives it", d.info.issuedDate);
+    type($("info-client"), "");
+    ok(d.info.client === "" && $("dp-cover-line").textContent === "Cover: Proposal, Remote access method statement, revision 0.1", "an emptied client leaves the line", $("dp-cover-line").textContent);
+    ["reference", "site", "author", "revision", "qaReviewBy", "authorisedBy", "issuedTo", "classification", "docType"].forEach(function (k) { type($("info-" + k), "x-" + k); });
+    ok(["reference", "site", "author", "revision", "qaReviewBy", "authorisedBy", "issuedTo", "classification", "docType"].every(function (k) { return d.info[k] === "x-" + k; }),
+       "every other field saves the same way");
+
+    // cover title lines
+    type($("info-coverTitleLines"), "Remote access\n  method  \n\nstatement\nfourth");
+    ok(JSON.stringify(d.info.coverTitleLines) === JSON.stringify(["Remote access", "method", "statement"]), "the cover title lines are kept, three at most, blank ones dropped", JSON.stringify(d.info.coverTitleLines));
+    type($("info-coverTitleLines"), "  ");
+    ok(!("coverTitleLines" in d.info), "emptied, the title is split automatically again");
+
+    // options
+    reset();
+    $("opt-numberHeadings").checked = true; $("opt-numberHeadings").dispatchEvent(new Event("change", { bubbles: true }));
+    $("opt-contents").checked = true; $("opt-contents").dispatchEvent(new Event("change", { bubbles: true }));
+    ok(d.options.numberHeadings === true && d.options.contents === true && calls.touched.length === 2, "the two options save on change", JSON.stringify(d.options));
+
+    // focus a field
+    draw(P.info, { field: "issuedTo" });
+    ok(document.activeElement === $("info-issuedTo"), "opened for a field, the keyboard is in that field", document.activeElement && document.activeElement.id);
+    ok(wordingProblems().length === 0, "information: no uppercase labels and no dashes", wordingProblems().join(" | "));
+
+    // kind
+    reset();
+    ok($("info-kind-report").checked && !$("info-kind-short").checked, "the kind shows as two choices");
+    $("info-kind-short").checked = true; $("info-kind-short").dispatchEvent(new Event("change", { bubbles: true }));
+    ok(d.kind === "short" && calls.touched.length === 1, "choosing Short document saves the kind", d.kind);
+    ok($("info-kind-short") && $("info-kind-short").checked && document.activeElement === $("info-kind-short"), "the page is drawn again with the keyboard still on the choice");
+    ok($("dp-cover-label").textContent === "Opening as it will print" && /^A short document has no cover\./.test($("dp-cover-line").textContent), "a short document shows its opening, and says it has no cover", $("dp-cover-line").textContent);
+    ok(!$("info-coverTitleLines") && $("opt-contents").disabled && !$("opt-contents").checked && !!$("dp-control-note"), "cover lines and the contents list are not offered for it");
+    ok(d.options.contents === true, "its contents choice is kept in case the kind changes back");
+
+    // file card
+    ok(/^Pictures and kept content: /.test($("dp-file-size").textContent) && !$("dp-file-warn"), "the File card gives the size of pictures and kept content", $("dp-file-size").textContent);
+    var real = M.sizeOf;
+    M.sizeOf = function () { return M.LIMITS.warnBytes + 5 * 1024 * 1024; };
+    draw(P.info);
+    ok($("dp-file-warn") && /over 100 MB/.test($("dp-file-warn").textContent) && /still saves/.test($("dp-file-warn").textContent) && /105\.0 MB/.test($("dp-file-size").textContent),
+       "over the limit it warns, and says the file still saves", $("dp-file-warn") && $("dp-file-warn").textContent);
+    M.sizeOf = real;
+  });
+
+  // ======================= import: the words ==============================
+  step("sentences", function () {
+    var C = A.DocxImport.CODES, all = C.toCheck.concat(C.notCarried, C.changed), seen = {}, bad = [];
+    ok(all.length === 37, "the reader lists 37 report codes", all.length);
+    all.forEach(function (code) {
+      [1, 3].forEach(function (n) {
+        var s = F.sentence({ code: code, count: n });
+        if (!s || !/\.$/.test(s) || /undefined|NaN|null/.test(s) || /[–—]/.test(s) || /Something else/.test(s)) bad.push(code + ": " + s);
+        if (seen[s] && seen[s] !== code) bad.push(code + " reads the same as " + seen[s]);
+        seen[s] = code;
+      });
+    });
+    ok(bad.length === 0, "every code has its own sentence, for one and for many", bad.join(" | "));
+    ok(F.sentence({ code: "front-matter", count: 9 }) === "The original starts with 9 blocks before its first heading. This is often its own cover, document control table or contents list, which the template now provides. Check whether you still need them.",
+       "front matter reads as designed", F.sentence({ code: "front-matter", count: 9 }));
+    ok(/^1 comment was not/.test(F.sentence({ code: "comments", count: 1 })) && /^4 comments were not/.test(F.sentence({ code: "comments", count: 4 })), "one and many agree with their verb");
+    ok(/^Headers and footers were not carried over\. The SolutionsPT header and footer replace them\.$/.test(F.sentence({ code: "headers-footers", count: 2 })), "headers and footers read as designed");
+    ok(/12 insertions accepted and 1 deletion removed/.test(F.sentence({ code: "tracked-changes", count: 13, insertions: 12, deletions: 1 })), "tracked changes give both counts when the reader does");
+    ok(/later-code/.test(F.sentence({ code: "later-code", count: 2 })), "a code from a later version still gets a line", F.sentence({ code: "later-code", count: 2 }));
+    ok(F.summary({ carried: { headings: 31, paragraphs: 212, listItems: 0, tables: 8, pictures: 14, keptObjects: 6, captions: 9, footnotes: 3, links: 0 } }) ===
+       "Brought across: 212 paragraphs, 31 headings, 8 tables, 14 pictures, 6 drawings and diagrams kept as they were, 9 captions, 3 footnotes.",
+       "the summary line reads as designed, zero counts left out", F.summary({ carried: { headings: 31, paragraphs: 212, tables: 8, pictures: 14, keptObjects: 6, captions: 9, footnotes: 3 } }));
+    ok(/^Brought across: 1 paragraph, 1 drawing or diagram kept as it was\.$/.test(F.summary({ carried: { paragraphs: 1, keptObjects: 1 } })), "and for one of each");
+  });
+
+  // ======================= import: the report page ========================
+  function importedDoc() {
+    var HOSTILE = "<img src=x onerror=\"window.__pwned=1\"> Confidential draft";
+    return docOf({
+      info: { title: "Imported", author: "Fixture Author" },
+      media: {
+        m1: { type: "image/png", name: "ok.png", width: 1, height: 1, source: "import", blob: pngBlob() },
+        m2: { type: "image/x-emf", name: "plan.emf", width: 0, height: 0, source: "import", blob: new Blob([new Uint8Array(8)], { type: "image/x-emf" }) }
+      },
+      parts: { p1: { name: "word/embeddings/sheet.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", blob: new Blob([new Uint8Array(4)]), rels: [] } },
+      blocks: [
+        para("b1", "Acme cover text"), para("b2", "Version 3"), para("b3", "Old contents"),
+        { id: "b4", type: "heading", level: 1, runs: [{ t: "Introduction" }] },
+        para("b5", "Body text."),
+        { id: "b6", type: "kept", kind: "smartart", xml: "<w:r xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:t>x</w:t></w:r>", rels: [], width: 576, height: 336, floating: false, text: "Plan Do Check", label: "Diagram 2", description: "Diagram (SmartArt), 15.2 x 8.9 cm", caption: "The cycle" },
+        { id: "b7", type: "picture", media: "m1", width: 100, height: 50, alt: "A dot" },
+        { id: "b8", type: "heading", level: 2, runs: [{ t: "Network" }] },
+        { id: "b9", type: "picture", media: "m2", width: 454, height: 302 },
+        { id: "b10", type: "kept", kind: "ole", xml: "<w:r xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:t>y</w:t></w:r>", rels: [], width: 900, height: 300, floating: false, text: "", description: "Embedded object, 23.8 x 7.9 cm" },
+        { id: "b11", type: "table", header: 1, cols: [1, 1], rows: [
+          { cells: [{ blocks: [para("b12", "Zone")] }, { blocks: [para("b13", "Drawing")] }] },
+          { cells: [{ blocks: [para("b14", "Control")] }, { blocks: [{ id: "b15", type: "kept", kind: "shape", xml: "<w:r xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:t>z</w:t></w:r>", rels: [], width: 120, height: 60, floating: true, text: "", description: "" }] }] }
+        ] },
+        { id: "b16", type: "list", list: "number", level: 0, runs: [{ t: "Step one" }] }
+      ],
+      importReport: {
+        source: { name: "Acme proposal.docx", size: 123456, importedAt: "2026-11-11T09:00:00.000Z" },
+        carried: { headings: 2, paragraphs: 8, listItems: 1, tables: 1, pictures: 2, keptObjects: 3, captions: 1, footnotes: 0, links: 0 },
+        toCheck: [{ code: "front-matter", count: 3, blockIds: ["b1", "b2", "b3"] }],
+        notCarried: [
+          { code: "headers-footers", count: 2, examples: [HOSTILE, "Page 1 of 9"] },
+          { code: "comments", count: 1, examples: ["Check this figure"], blockIds: ["b5"] }
+        ],
+        changed: [
+          { code: "list-numbering", count: 1, blockIds: ["b16"] },
+          { code: "inline-objects", count: 2, blockIds: ["b6", "b10"] },
+          { code: "formatting", count: 1 }
+        ]
+      }
+    });
+  }
+
+  step("report", function () {
+    var d = open(docOf({ info: { title: "Typed" }, blocks: [para("b1", "x")] }));
+    draw(P.report);
+    ok(!!$("dp-report-none"), "a document that was not imported says there is nothing to report");
+
+    d = open(importedDoc());
+    var recorded = [], realRecord = A.DocHistory.record;
+    A.DocHistory.record = function (e) { recorded.push(e); return realRecord.apply(A.DocHistory, arguments); };
+    var exported = [], realWord = A.DocExport.word;
+    A.DocExport.word = function (s) { exported.push(s); return Promise.resolve(null); };
+    draw(P.report);
+    ok(main.querySelector(".page-sub") && /Acme proposal\.docx/.test(main.querySelector(".page-sub").textContent), "the report names the Word file");
+    ok($("dp-report-summary").textContent === "Brought across: 8 paragraphs, 2 headings, 1 list item, 1 table, 2 pictures, 3 drawings and diagrams kept as they were, 1 caption.",
+       "the summary line", $("dp-report-summary").textContent);
+    var cards = Array.prototype.map.call(main.querySelectorAll(".card"), function (c) { return c.id; });
+    ok(cards.join(",") === "dp-card-check,dp-card-not,dp-card-changed,dp-card-drawings", "Check first comes first, then not carried, changed, pictures and drawings", cards.join(","));
+
+    // front matter
+    var fm = $("dp-card-check").querySelector('[data-code="front-matter"]');
+    ok(/starts with 3 blocks before its first heading/.test(fm.textContent), "the front matter is explained");
+    reset();
+    click(fm.querySelector(".btn"));
+    ok(calls.go.length === 1 && calls.go[0][0] === "edit" && JSON.stringify(calls.go[0][1]) === '{"blockIds":["b1","b2","b3"]}', "Show opens the editor with those blocks selected", JSON.stringify(calls.go));
+
+    // not carried: quotes are text
+    var hf = $("dp-card-not").querySelector('[data-code="headers-footers"]');
+    ok(/The original said:/.test(hf.textContent) && hf.querySelectorAll(".dp-quotes li").length === 2 && /<img src=x/.test(hf.querySelector(".dp-quotes li").textContent),
+       "what was left out is quoted", hf.textContent.slice(0, 120));
+    ok(main.querySelectorAll("img").length === 0 && !window.__pwned, "and a quote is only ever text, never markup");
+    ok(!hf.querySelector(".btn") && !!$("dp-card-not").querySelector('[data-code="comments"] .btn'), "Show is offered where there is a block to go to");
+    reset();
+    click($("dp-card-not").querySelector('[data-code="comments"] .btn'));
+    ok(calls.go.length === 1 && JSON.stringify(calls.go[0][1]) === '{"blockId":"b5"}', "one block is opened at that block", JSON.stringify(calls.go));
+
+    // changed
+    var ch = $("dp-card-changed").querySelectorAll(".dp-entry");
+    ok(ch.length === 3 && !ch[2].querySelector(".btn") && /house style/.test(ch[2].textContent), "each change has its entry; the house style note has nowhere to go", ch.length);
+    reset();
+    click(ch[1].querySelector(".btn"));
+    ok(JSON.stringify(calls.go[0]) === '["edit",{"blockIds":["b6","b10"]}]', "a change's Show goes to the blocks concerned", JSON.stringify(calls.go));
+
+    // pictures and drawings
+    var rows = $("dp-drawings").querySelectorAll(".dp-drawing");
+    ok(rows.length === 4, "the list has every kept object and every picture shown as a placeholder (not the PNG)", rows.length);
+    ok(/^Drawing 1 of 3/.test(rows[0].textContent) && /Diagram \(SmartArt\), 15\.2 x 8\.9 cm/.test(rows[0].textContent) && /Diagram 2/.test(rows[0].textContent) &&
+       /Plan Do Check/.test(rows[0].textContent) && /Caption: The cycle/.test(rows[0].textContent) && /Under: Introduction/.test(rows[0].textContent),
+       "a drawing's row: number, kind and size, its name, its text, its caption, the heading it sits under", rows[0].textContent);
+    ok(/^Picture/.test(rows[1].textContent) && /EMF picture, 12\.0 x 8\.0 cm, plan\.emf/.test(rows[1].textContent) && /placeholder/.test(rows[1].textContent) && /Under: Network/.test(rows[1].textContent),
+       "a picture the browser cannot draw is listed with its type, size and name", rows[1].textContent);
+    ok(/^Drawing 2 of 3/.test(rows[2].textContent) && /without being opened or checked/.test(rows[2].textContent), "an embedded object says it is carried unopened", rows[2].textContent);
+    ok(/^Drawing 3 of 3/.test(rows[3].textContent) && /Shape, 3\.2 x 1\.6 cm/.test(rows[3].textContent) && /In a table under: Network/.test(rows[3].textContent) && /floats/.test(rows[3].textContent),
+       "a drawing inside a table cell is listed too, described from its kind and size", rows[3].textContent);
+    reset();
+    click(rows[3].querySelector(".btn"));
+    ok(JSON.stringify(calls.go[0]) === '["edit",{"blockId":"b15"}]', "its Show goes to the drawing", JSON.stringify(calls.go));
+    ok($("dp-drawings-note").textContent === "Drawings kept from the Word file cannot be shown here. Export a draft and open it in Word to see them.", "the list explains itself");
+    ok($("dp-report-draft").textContent === "Export a draft to check in Word", "with the button to export a draft");
+    click($("dp-report-draft"));
+    ok(exported.join() === "draft", "which exports a draft", exported.join());
+    reset();
+    click($("dp-report-edit"));
+    ok(JSON.stringify(calls.go[0]) === '["edit",null]' || (calls.go[0] && calls.go[0][0] === "edit" && calls.go[0][1] === undefined), "Go to the document opens the editor", JSON.stringify(calls.go));
+    ok(/stays in the sidebar/.test(main.querySelector(".dp-report-go").textContent), "and the page says it stays available");
+    ok(wordingProblems().length === 0, "report: no uppercase labels and no dashes", wordingProblems().join(" | "));
+
+    // Remove them
+    reset();
+    var rm = $("dp-front-remove");
+    ok(rm && rm.textContent === "Remove them", "the front matter can be removed");
+    click(rm);
+    ok(!M.find(d, "b1") && !M.find(d, "b2") && !M.find(d, "b3") && !!M.find(d, "b4"), "Remove them deletes exactly those blocks");
+    ok(recorded.length === 1 && recorded[0].before.length === 3 && recorded[0].after.length === 0 && recorded[0].before[0].id === "b1" && recorded[0].before[0].index === 0 &&
+       JSON.parse(recorded[0].before[1].json).runs[0].t === "Version 3", "as one history entry, so Undo brings them back", JSON.stringify(recorded).slice(0, 200));
+    ok(calls.touched.length === 1 && calls.touched[0].structure === true && calls.toast.length === 1 && /3 blocks removed\. Undo/.test(calls.toast[0][0]), "the shell is told, and the user is told how to get them back", JSON.stringify(calls.toast));
+    ok(!$("dp-front-remove") && /have been removed\. Undo on the Edit page/.test($("dp-card-check").textContent), "the entry now says they were removed");
+    A.DocHistory.record = realRecord; A.DocExport.word = realWord;
+
+    // nothing kept
+    open(docOf({ info: { title: "Plain" }, blocks: [para("b1", "x")], importReport: { source: { name: "plain.docx" }, carried: { paragraphs: 1 }, toCheck: [], notCarried: [], changed: [{ code: "formatting", count: 1 }] } }));
+    draw(P.report);
+    ok(!$("dp-card-check") && !!$("dp-drawings-none") && /Nothing was left out/.test($("dp-card-not").textContent), "a plain import has no Check first card and says nothing was left out");
+  });
+
+  // ======================= import: the flow ===============================
+  step("flow", function () {
+    var before = open(docOf({ info: { title: "Open already" }, blocks: [para("b1", "x")] }));
+    var realRead = A.DocxImport.read, got = null, project = importedDoc();
+    A.DocxImport.read = function (blob, opts) {
+      got = { blob: blob, opts: opts };
+      opts.onProgress(0.2, "Reading the text"); opts.onProgress(0.8, "Reading pictures and drawings");
+      return Promise.resolve({ project: project, report: project.importReport });
+    };
+    var file = new File([new Uint8Array([80, 75, 3, 4])], "Acme proposal.docx");
+    return F.start(file).then(function (res) {
+      ok(res === true, "an import that works resolves true");
+      ok(got && got.blob === file && got.opts.name === "Acme proposal.docx" && got.opts.maxBytes === M.LIMITS.refuseBytes, "the reader is given the file, its name and the size limit");
+      var labels = calls.busy.map(function (b) { return b[0]; });
+      ok(labels[0] === "Reading the Word file" && labels.indexOf("Reading the text") !== -1 && labels.indexOf("Reading pictures and drawings") !== -1 && last(labels) === null,
+         "progress is shown as the reader reports it, and cleared", JSON.stringify(labels));
+      ok(calls.setDoc.length === 1 && calls.setDoc[0][0] === project && JSON.stringify(calls.setDoc[0][1]) === '{"from":"import"}',
+         "the document is opened as an import, with no file handle passed along", JSON.stringify(calls.setDoc[0] && calls.setDoc[0][1]));
+      ok(F.start.length === 1, "start takes the file and nothing else");
+      ok(calls.go.length === 1 && calls.go[0][0] === "report", "and the Import report opens", JSON.stringify(calls.go));
+      ok(calls.say.length === 1 && /^Brought across: /.test(calls.say[0]), "the summary is announced");
+
+      state.doc = before; reset();
+      A.DocxImport.read = function () { return Promise.reject(new Error("This file is saved as Strict Open XML. In Word, use Save as and choose Word Document (.docx), then load that.")); };
+      return F.start(file);
+    }).then(function (res) {
+      ok(res === false && calls.setDoc.length === 0 && state.doc === before, "a file that cannot be read leaves the open document as it was");
+      ok(calls.toast.length === 1 && /^This file is saved as Strict Open XML/.test(calls.toast[0][0]) && calls.toast[0][1] === "err", "with one message that says why", JSON.stringify(calls.toast));
+      ok(last(calls.busy)[0] === null, "and the progress panel is cleared");
+
+      // The shell's guard said no: the user kept their document.
+      reset();
+      A.DocxImport.read = function () { return Promise.resolve({ project: project, report: project.importReport }); };
+      var realSet = A.DocApp.setDoc;
+      A.DocApp.setDoc = function () { return Promise.resolve(false); };
+      return F.start(file).then(function (res2) {
+        ok(res2 === false && calls.go.length === 0 && calls.toast.length === 0, "when the unsaved-changes guard is declined, nothing opens and nothing is said");
+        A.DocApp.setDoc = realSet; A.DocxImport.read = realRead;
+      });
+    });
+  });
+
+  // ======================= preview ========================================
+  step("preview", function () {
+    var d = open(docOf({
+      info: { title: "Segmentation", docType: "Proposal", client: "Northfield Water" },
+      options: { numberHeadings: false, contents: true },
+      blocks: [
+        { id: "b1", type: "heading", level: 1, runs: [{ t: "Summary" }] }, para("b2", "First page."),
+        { id: "b3", type: "pageBreak" },
+        para("b4", "Second page."),
+        { id: "b5", type: "heading", level: 2, land: true, runs: [{ t: "Zones" }] },
+        { id: "b6", type: "table", land: true, header: 1, cols: [1, 1], rows: [{ cells: [{ blocks: [para("b7", "Zone")] }, { blocks: [para("b8", "Assets")] }] }] },
+        para("b9", "Back to portrait."),
+        { id: "b10", type: "list", list: "number", level: 0, runs: [{ t: "One" }] }
+      ]
+    }));
+    draw(P.preview);
+    ok($("dp-preview-note").textContent === "A preview. Word decides where pages break. Drawings kept from an imported file are shown as placeholders here and print in the Word export as they were.",
+       "the preview says once what it is", $("dp-preview-note").textContent);
+    var sheets = Array.prototype.slice.call(main.querySelectorAll(".dp-sheet"));
+    var parts = sheets.map(function (s) { return s.getAttribute("data-part") + (s.classList.contains("land") ? "-land" : ""); });
+    ok(parts.join(",") === "cover,control,contents,body,body,body-land,body", "a report: cover, document control, contents, then the body on sheets, a page break and a landscape run each starting one", parts.join(","));
+    ok(sheets[0].firstElementChild && /Segmentation/i.test(sheets[0].textContent), "the cover carries the title");
+    ok(/Draft/.test(sheets[1].textContent), "document control shows Status Draft until Final is chosen", sheets[1].textContent.slice(0, 120));
+    ok(sheets[3].children.length === 2 && sheets[4].children.length === 1 && sheets[5].children.length === 2 && sheets[6].children.length === 2, "each block is on its sheet, in order, and the page break is not drawn as a block",
+       sheets.slice(3).map(function (s) { return s.children.length; }).join(","));
+    ok(/First page/.test(sheets[3].textContent) && /Second page/.test(sheets[4].textContent) && /Zones/.test(sheets[5].textContent) && /Back to portrait/.test(sheets[6].textContent), "with its text");
+    ok(sheets[5].getBoundingClientRect().width > sheets[4].getBoundingClientRect().width, "a landscape sheet is wider");
+    ok(main.querySelectorAll("[contenteditable=true], [contenteditable='']").length === 0, "nothing in the preview can be edited");
+    ok(main.querySelectorAll('[id^="blk-"]').length === 0 && main.querySelectorAll("[data-block-id]").length >= 7, "its blocks carry no ids, so they never clash with the editor's own, which stay in the page",
+       main.querySelectorAll('[id^="blk-"]').length + " ids, " + main.querySelectorAll("[data-block-id]").length + " blocks");
+
+    d.options.contents = false;
+    draw(P.preview);
+    ok(main.querySelectorAll('.dp-sheet[data-part="contents"]').length === 0, "no contents sheet when the option is off");
+
+    d.kind = "short";
+    draw(P.preview);
+    sheets = Array.prototype.slice.call(main.querySelectorAll(".dp-sheet"));
+    ok(sheets.every(function (s) { return s.getAttribute("data-part") === "body"; }) && sheets.length === 4, "a short document has no cover and no document control", sheets.length);
+    ok(sheets[0].children.length === 3 && /Segmentation/.test(sheets[0].firstElementChild.textContent), "it opens with the title block, then the body", sheets[0].children.length);
+
+    open(docOf({ info: { title: "Empty" }, blocks: [] }));
+    draw(P.preview);
+    ok(main.querySelectorAll('.dp-sheet[data-part="body"]').length === 1, "an empty document still shows a page");
+  });
+
+  // ======================= about ==========================================
+  step("about", function () {
+    draw(P.about);
+    ok(main.textContent.indexOf(A.Product.name + " " + A.Version.label) !== -1 && main.textContent.indexOf("version " + A.Version.number) !== -1, "About shows the product and its version");
+    ok(main.querySelector(".dp-licence") && main.querySelector(".dp-licence").textContent.length > 200, "and the licence");
+    ok(main.querySelectorAll(".dp-keys dt").length >= 15 && /spt-document\/1\.0/.test(main.textContent), "the keyboard map and the file format it reads");
+    ok(wordingProblems().length === 0, "about: no uppercase labels and no dashes", wordingProblems().join(" | "));
+  });
+
+  // ======================= in the real shell ===============================
+  // The same pages, reached the way a person reaches them: the tool itself in
+  // a frame, with its own shell. Kept short; the shell has its own tests.
+  step("shell", function () {
+    function poll(test, ms) {
+      var end = Date.now() + (ms || 30000);
+      return new Promise(function (resolve, reject) {
+        (function go() {
+          var v; try { v = test(); } catch (e) { v = null; }
+          if (v) return resolve(v);
+          if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+          setTimeout(go, 20);
+        })();
+      });
+    }
+    var frame = document.createElement("iframe");
+    frame.style.cssText = "width:1280px;height:800px;border:0";
+    document.body.appendChild(frame);
+    var w, errors = [];
+    return new Promise(function (res) {
+      frame.onload = function () {
+        w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        res();
+      };
+      frame.src = "../index.html";
+    }).then(function () {
+      return poll(function () { return w.DocumentTool && w.document.getElementById("dp-new"); });
+    }).then(function () {
+      // IndexedDB never settles in headless Edge: the autosave store is replaced.
+      var mem = {};
+      w.App.DocStorage.bytesStore = {
+        putDoc: function (id, json) { mem[id] = json; return Promise.resolve(); }, getDoc: function (id) { return Promise.resolve(mem[id] || null); },
+        putBlob: function () { return Promise.resolve(); }, getBlobs: function () { return Promise.resolve({}); },
+        remove: function (id) { delete mem[id]; return Promise.resolve(); }, ok: function () { return Promise.resolve(true); }
+      };
+      var d = w.document;
+      ok(w.DocumentTool.state.page === "welcome" && !!d.getElementById("dp-demo"), "the tool starts on the welcome page");
+      d.getElementById("dp-new").click();
+      return poll(function () { return d.getElementById("info-title"); }).then(function () {
+        var st = w.DocumentTool.state;
+        ok(st.page === "info" && st.doc && st.doc.kind === "report", "New document opens Document information on a new report", st.page);
+        var t = d.getElementById("info-title");
+        t.value = "Shell test"; t.dispatchEvent(new w.Event("input", { bubbles: true }));
+        ok(st.doc.info.title === "Shell test" && st.dirty === true, "typing a title there changes the document and marks it unsaved");
+        ok(/Shell test/.test(d.getElementById("dp-cover-line").textContent) && /Shell\s*test/i.test(d.querySelector(".dp-mini-page").textContent), "and the cover miniature follows", d.querySelector(".dp-mini-page").textContent.slice(0, 80));
+        w.DocumentTool.go("info", { field: "issuedTo" });
+        ok(d.activeElement === d.getElementById("info-issuedTo"), "the shell can open the page at a field");
+        w.DocumentTool.go("preview");
+        var parts = Array.prototype.map.call(d.querySelectorAll("#main .dp-sheet"), function (s) { return s.getAttribute("data-part"); });
+        ok(parts.join(",") === "cover,control,body", "Preview draws the cover, document control and the body", parts.join(","));
+        w.DocumentTool.go("issue");
+        return poll(function () { return d.getElementById("dp-todo-none") || d.getElementById("dp-todo-list") || d.getElementById("dp-todo-error"); });
+      }).then(function () {
+        ok(!!d.getElementById("dp-todo-none") && !d.getElementById("dp-export").disabled, "Issue and export runs the check: a titled new document has nothing outstanding", d.getElementById("dp-todo").textContent);
+        w.DocumentTool.state.doc.info.title = "";
+        w.DocumentTool.go("issue");
+        return poll(function () { return d.getElementById("dp-todo-list"); });
+      }).then(function () {
+        d.querySelector('#dp-todo-list li[data-kind="info"] .btn').click();
+        ok(w.DocumentTool.state.page === "info" && d.activeElement === d.getElementById("info-title"), "Go to it on the missing title lands in the title field", w.DocumentTool.state.page);
+        w.DocumentTool.go("about");
+        ok(/OT Cyber Document Tool v/.test(d.getElementById("main").textContent), "About draws");
+        ok(errors.length === 0, "with no script errors in the tool", errors.join(" | "));
+      });
+    });
+  });
+
+  chain.then(tick).then(finish, function (e) { ok(false, "threw: " + (e && e.message)); finish(); });
+})();
+</script>
+</body></html>

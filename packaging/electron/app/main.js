@@ -1,7 +1,7 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only. */
 /* main.js - Electron shell for one module of the OT Cyber suite (the OT Cyber
- * Assessment Tool, the OT Cyber Risk Assessment Tool or the OT Cyber Report
- * Review Tool), or for
+ * Assessment Tool, the OT Cyber Risk Assessment Tool, the OT Cyber Report
+ * Review Tool or the OT Cyber Document Tool), or for
  * the SolutionsPT OT Cyber Suite itself, whose page holds each tool in a
  * frame (its manifest, platform/suite.json, is copied in as module.json).
  *
@@ -122,7 +122,9 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
           ? "A tool in the suite has changes since its last Save that are not in its file. Each tool offers its autosave copy the next time it starts (the Report Review Tool when you open the same pack again), but only Save updates the file itself."
           : MODULE.id === "report-review"
             ? "Changes since your last Save are not in your review file. The review tool will offer your autosaved review when you open the same pack again, but only Save updates your review file."
-            : "Changes since your last Save are not in your project file. The tool will offer its autosave copy next time it starts, but only Save updates the file itself."
+            : MODULE.id === "documents"
+              ? "Changes since your last Save are not in your document file. The tool will offer its autosave copy next time it starts, but only Save updates the file itself."
+              : "Changes since your last Save are not in your project file. The tool will offer its autosave copy next time it starts, but only Save updates the file itself."
       });
       if (choice === 0) event.preventDefault();  // preventDefault here means "let it close"
     });
@@ -162,10 +164,13 @@ if (!SELF_TEST && !app.requestSingleInstanceLock()) {
         return;
       }
       const ext = path.extname(name).slice(1).toLowerCase();
-      // A .json is named by the names the tools give their files.
+      // A .json is named by the names the tools give their files. A document
+      // file is named for its title, so only the document tool's own exe can
+      // tell one; in the suite's it is saved as a project file.
       const json = /-review-pack-round-\d+/i.test(name) ? "Review pack"
         : /-review-round-\d+-/i.test(name) ? "Review file"
         : /-risk-context\.json$/i.test(name) ? "Risk context file"
+        : MODULE.id === "documents" ? "Document file"
         : "Project file";
       const kinds = { docx: "Word document", xlsx: "Excel workbook", json: json };
       item.setSaveDialogOptions({

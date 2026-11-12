@@ -1,0 +1,104 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* tables.css: tables on the paper and in the preview, and the table controls in the toolbar (docs/document-tool-design.md 5.3). */
+
+/* ---------- The table ----------
+   The paper is a picture of the printed page, so these are the Word template's
+   own values (shared/house-docx.js: header fill 173267, rule E2E7EE, caption
+   9 pt italic 5A6B7B) and do not follow the tool's dark theme. */
+
+table.doc-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 6px 0 10px;
+  font: inherit;
+  color: #1A2533;
+}
+.doc-table th,
+.doc-table td {
+  border: 1px solid #E2E7EE;
+  padding: 4px 8px;
+  vertical-align: middle;
+  text-align: left;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.doc-table th {
+  background: #173267;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+/* A cell's blocks sit closer together than blocks on the page. */
+.doc-table td > .blk,
+.doc-table th > .blk { margin: 0; }
+.doc-table td > .blk + .blk,
+.doc-table th > .blk + .blk { margin-top: 4px; }
+.doc-table td p,
+.doc-table th p { margin: 0; }
+.doc-table img { max-width: 100%; height: auto; }
+
+/* The cell holding the caret. */
+.doc-table td:focus-within,
+.doc-table th:focus-within {
+  outline: 2px solid #3399CC;
+  outline-offset: -2px;
+}
+
+.doc-table caption {
+  caption-side: bottom;
+  padding-top: 4px;
+  text-align: left;
+}
+.doc-table caption .cap {
+  margin: 0;
+  font-size: 9pt;
+  font-style: italic;
+  color: #5A6B7B;
+}
+
+/* ---------- The table controls in the toolbar ---------- */
+
+.tbl-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.tbl-controls .tbl-btn {
+  padding: 4px 8px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.tbl-controls .tbl-btn[aria-pressed="true"] {
+  background: var(--brand-blue-tint);
+  border-color: var(--brand-blue);
+  color: var(--brand-blue-dark);
+}
+.tbl-controls .tbl-btn:focus-visible,
+.tbl-caption-input:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 1px;
+}
+.tbl-caption-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.tbl-caption-input {
+  width: 180px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+@media print {
+  .tbl-controls { display: none; }
+  .doc-table td:focus-within,
+  .doc-table th:focus-within { outline: none; }
+}

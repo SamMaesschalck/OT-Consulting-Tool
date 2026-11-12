@@ -1,0 +1,238 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Check: document tool single-file build</title></head>
+<body>
+<!--
+  Proves the document tool's single-file build is the same app as the folder
+  version (modules/documents). Loads both with the tour open, one after the
+  other, and compares what each can tell us about itself: title, version, App
+  modules and globals, the demo document, every page as it renders, a Word
+  export of the demo, then a Word file imported, a picture inserted, the
+  result exported and the document file saved. The tool's own
+  Content-Security-Policy is in force in both, and nothing may break it.
+
+  Open it in Edge after running build-single-html.ps1 -Module documents.
+  Headless runs need --allow-file-access-from-files, since it reaches into the
+  frame. Prints ALL TESTS PASSED.
+-->
+<pre id="out">running...</pre>
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script src="../../modules/documents/scripts/fixtures/fx-vector.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Zipping and unzipping run off the main thread, and a headless run's
+  // virtual clock ends the page when nothing is queued; a message bounced to
+  // ourselves keeps a task queued until the check is done.
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  var frame = document.getElementById("f");
+
+  function load(url, tour) {
+    return new Promise(function (resolve, reject) {
+      frame.onload = function () {
+        var w = frame.contentWindow, tries = 0;
+        (function wait() {
+          var up = w.DocumentTool && w.App && w.App.Version && w.App.DocApp && w.App.DocPages;
+          if (up && (!tour || w.DocumentTool.state.doc)) return resolve(w);
+          if (++tries > 400) return reject(new Error("app did not start: " + url));
+          setTimeout(wait, 50);
+        })();
+      };
+      frame.src = url;
+    });
+  }
+  function keys(o) { return o ? Object.keys(o).sort().join(",") : ""; }
+  function flat(t) { return String(t || "").replace(/\s+/g, " "); }
+  function pause(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function bytes(b64) { var s = atob(b64), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFElEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC";
+
+  // What a Word export holds, in a form two builds must agree on: the part
+  // names (the library names pictures at random, so those are counted), and
+  // how many paragraphs, tables and drawings the body has.
+  function describe(w, blob) {
+    return w.App.ZipIO.read(blob).then(function (parts) {
+      var body = "", names = [], media = 0;
+      parts.forEach(function (p) {
+        if (/^word\/media\//.test(p.name)) { media++; return; }
+        names.push(p.name);
+        if (p.name === "word/document.xml") body = w.App.ZipIO.text(p);
+      });
+      function count(re) { return (body.match(re) || []).length; }
+      // The cover is its own first section, with no page margins.
+      var margins = body.match(/<w:pgMar\b[^>]*>/) || [""];
+      return { names: names.sort().join(","), media: media,
+        cover: /w:top="0"/.test(margins[0]) && /w:right="0"/.test(margins[0]),
+        body: count(/<w:p[ >]/g) + " paragraphs, " + count(/<w:tbl>/g) + " tables, " + count(/<w:drawing>/g) + " drawings, " + count(/<w:sectPr/g) + " sections",
+        text: /Northfield Water/.test(body), tokens: /KEPT:/.test(body) };
+    });
+  }
+
+  function probe(w, label) {
+    var A = w.App, doc = w.document, T = w.DocumentTool;
+    var errors = [];
+    w.addEventListener("error", function (e) { errors.push("error: " + (e.message || e.type)); });
+    w.addEventListener("unhandledrejection", function (e) { errors.push("rejection: " + (e.reason && e.reason.message || e.reason)); });
+    doc.addEventListener("securitypolicyviolation", function (e) { errors.push("policy: " + e.violatedDirective + " " + e.blockedURI); });
+    var realErr = w.console.error;
+    w.console.error = function () { errors.push("console.error: " + Array.prototype.join.call(arguments, " ")); return realErr.apply(w.console, arguments); };
+    w.confirm = function () { return true; }; w.alert = function () {};
+    // The real autosave store is IndexedDB, which a headless run cannot wait
+    // for; the tool's own seam takes one that answers at once.
+    var kept = {};
+    A.DocStorage.bytesStore = {
+      putDoc: function (id, json) { (kept[id] = kept[id] || { blobs: {} }).doc = json; return Promise.resolve(); },
+      getDoc: function (id) { return Promise.resolve(kept[id] ? kept[id].doc : null); },
+      putBlob: function (id, key, blob) { (kept[id] = kept[id] || { blobs: {} }).blobs[key] = blob; return Promise.resolve(); },
+      getBlobs: function (id) { return Promise.resolve(kept[id] ? kept[id].blobs : {}); },
+      remove: function (id) { delete kept[id]; return Promise.resolve(); },
+      ok: function () { return Promise.resolve(true); }
+    };
+    var saved = [];
+    A.DocStorage.download = function (blob, name) { saved.push({ blob: blob, name: name }); };
+    w.showSaveFilePicker = undefined;
+
+    var demo = T.state.doc;
+    var r = {
+      label: label,
+      title: doc.title,
+      product: A.Version.product,
+      version: A.Version.label,
+      number: A.Version.number,
+      badge: (doc.getElementById("version-badge") || {}).textContent || "",
+      logo: ((doc.querySelector(".brand-logo img") || {}).naturalWidth || 0) > 0,
+      legal: ((doc.querySelector(".sidebar-legal") || {}).textContent || ""),
+      modules: keys(A),
+      data: keys(A.Data),
+      contracts: keys(A.Data.contracts),
+      schema: A.DocModel.SCHEMA + " / " + A.Data.contracts.document.schema,
+      tool: keys(T),
+      house: keys(A.HouseDocx),
+      model: keys(A.DocModel),
+      docx: !!(w.docx && w.docx.Document),
+      globals: ["DocumentTool", "SPT_DOCUMENT_DEMO"].filter(function (g) { return !!w[g]; }).join(","),
+      demo: demo.id + " | " + demo.info.title + " | " + demo.blocks.length + " blocks | " + Object.keys(demo.media).length + " pictures | " + Object.keys(demo.parts).length + " parts",
+      tour: T.state.tour,
+      pages: [],
+      errors: errors
+    };
+    var chain = Promise.resolve();
+    ["info", "preview", "issue", "report", "about", "edit"].forEach(function (p) {
+      chain = chain.then(function () {
+        T.go(p);
+        // The Issue page runs its check after it is drawn.
+        return pause(p === "issue" ? 1500 : 100).then(function () {
+          var el = doc.getElementById(p === "edit" ? "paper" : "main");
+          r.pages.push({ name: p, len: flat(el.textContent).length });
+          if (p === "about") r.about = /Copyright and licence/.test(el.textContent) && el.textContent.indexOf(A.Version.product + " " + A.Version.label) !== -1;
+          if (p === "edit") { r.blocks = doc.querySelectorAll("#paper [data-block-id]").length; r.editable = doc.querySelectorAll("#paper [contenteditable]:not([contenteditable=false])").length; }
+        });
+      });
+    });
+    return chain.then(function () {
+      // Type in the demo: a tour's changes are never unsaved work.
+      var first = demo.blocks.filter(function (b) { return b.type === "paragraph"; })[0];
+      A.DocEditor.focusBlock(first.id, { at: "end" });
+      T.editor.type(" Typed in the tour.");
+      r.typed = /Typed in the tour\.$/.test(A.DocModel.text(first)) && T.state.dirty === false;
+      return T.exportBlob("draft").then(function (blob) { return describe(w, blob); });
+    }).then(function (d) {
+      r.demoExport = d;
+      // A Word file, as Load gives one: it is read, and the report opens.
+      return T.load(new w.File([bytes(window.Fixtures["fx-vector"])], "A Word file.docx"));
+    }).then(function (opened) {
+      return pause(200).then(function () {
+        var d = T.state.doc, kinds = [];
+        A.DocModel.each(d, function (b) { kinds.push(b.type === "kept" ? "kept:" + b.kind : b.type); });
+        r.imported = opened + " | " + T.state.page + " | " + kinds.join(",") + " | " + JSON.stringify(d.importReport && d.importReport.carried);
+        r.importedNotTour = T.state.tour === false && T.state.dirty === true;
+        r.reportLen = flat(doc.getElementById("main").textContent).length;
+        d.info.title = "Brought in";
+        T.go("edit");
+        var last = d.blocks[d.blocks.length - 1];
+        return Promise.resolve(A.DocEditor.insertPictureFile(new w.File([bytes(PNG)], "dot.png", { type: "image/png" }), last.id));
+      });
+    }).then(function () { return pause(300); }).then(function () {
+      var d = T.state.doc;
+      r.inserted = d.blocks.filter(function (b) { return b.type === "picture"; }).length + " pictures after the insert";
+      return T.exportBlob("draft").then(function (blob) { return describe(w, blob); });
+    }).then(function (d) {
+      r.importExport = d;
+      return T.save({ saveAs: true });
+    }).then(function () {
+      var s = saved[0];
+      r.savedName = s ? s.name : "";
+      return s ? s.blob.text() : "";
+    }).then(function (text) {
+      var f = null;
+      try { f = JSON.parse(text); } catch (e) {}
+      r.saved = !!f && f.schema === "spt-document/1.0" && f.info.title === "Brought in" && Object.keys(f.parts || {}).length > 0 &&
+        Object.keys(f.media || {}).length > 0 && Object.keys(f.media).every(function (k) { return typeof f.media[k].data === "string" && f.media[k].data.length > 0; });
+      r.clean = T.state.dirty === false;
+      return r;
+    });
+  }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  var folder, single, bundle;
+  load("../../modules/documents/index.html?tour=1", true).then(function (w) { return probe(w, "folder"); })
+    .then(function (r) {
+      folder = r;
+      bundle = encodeURIComponent(r.product + " " + r.version) + ".html";
+      return load(bundle + "?tour=1", true);
+    })
+    .then(function (w) {
+      ok(w.location.href.indexOf(bundle) !== -1, "the single file for this version loads (" + decodeURIComponent(bundle) + ")");
+      ok(w.document.querySelectorAll("script[src],link[href],img[src]:not([src^='data:']):not([src^='blob:'])").length === 0, "it loads nothing from beside itself: no script src, stylesheet link or image file, even with the tour open");
+      return probe(w, "single");
+    })
+    .then(function (r) {
+      single = r;
+      ok(single.title === folder.title && single.title === "OT Cyber Document Tool", "same page title (" + single.title + ")", folder.title + " vs " + single.title);
+      ok(single.product === folder.product && single.product === single.title, "the same product name", single.product);
+      ok(single.number === folder.number && single.version === folder.version, "the same suite version (" + single.version + ")", folder.number + " vs " + single.number);
+      ok(single.badge === single.version && single.badge === folder.badge, "and the header badge shows it", single.badge);
+      ok(single.logo, "the header logo shows (embedded)");
+      ok(/SolutionsPT/.test(single.legal) && single.legal === folder.legal, "the copyright notice is in the sidebar", single.legal);
+      ok(single.about && folder.about, "the About page carries the licence notice and the version");
+      ok(single.modules === folder.modules && /DocApp/.test(single.modules) && /HouseDocx/.test(single.modules), "the same App modules are present (" + single.modules + ")", folder.modules);
+      ok(single.data === folder.data && single.contracts === folder.contracts && /document/.test(single.contracts), "the same App data and contracts", single.data + " / " + single.contracts);
+      ok(single.schema === folder.schema && single.schema === "spt-document/1.0 / spt-document/1.0", "the model and the contract name the same schema", single.schema);
+      ok(single.globals === folder.globals && single.globals.split(",").length === 2, "the same globals (" + single.globals + ")", folder.globals);
+      ok(single.tool === folder.tool && single.house === folder.house && single.model === folder.model, "DocumentTool, HouseDocx and DocModel expose the same functions");
+      ok(single.docx && folder.docx, "the docx library is loaded in both");
+      ok(single.demo === folder.demo && /^doc-demo \| .+ \| \d+ blocks \| 1 pictures \| [1-9]\d* parts$/.test(single.demo) && single.tour && folder.tour, "the tour opens the demo document (" + single.demo + ")", folder.demo);
+      ok(single.pages.length === folder.pages.length && single.pages.length === 6, "the same pages (" + single.pages.length + ")", folder.pages.length + " vs " + single.pages.length);
+      folder.pages.forEach(function (a, i) {
+        var b = single.pages[i] || {};
+        ok(b.name === a.name && b.len === a.len && b.len > 200, "page '" + a.name + "' renders identically (" + b.len + " chars)", a.len + " vs " + b.len);
+      });
+      ok(single.blocks === folder.blocks && single.blocks > 20 && single.editable === 0 && folder.editable === 0, "the editor draws every block, and none is editable until used (" + single.blocks + ")", folder.blocks + " vs " + single.blocks + ", editable " + single.editable);
+      ok(single.typed && folder.typed, "typing in the demo changes it and never marks it unsaved");
+      ok(same(single.demoExport, folder.demoExport) && single.demoExport.cover && single.demoExport.text && !single.demoExport.tokens, "the demo exports to the same Word file, with its cover (" + single.demoExport.body + ")", JSON.stringify(folder.demoExport) + " vs " + JSON.stringify(single.demoExport));
+      ok(/word\/kept\//.test(single.demoExport.names) && /word\/theme\/theme1\.xml/.test(single.demoExport.names), "and the kept diagram's parts and the source theme are in it");
+      ok(single.imported === folder.imported && /^true \| report \| /.test(single.imported) && /kept:canvas/.test(single.imported) && /kept:equation/.test(single.imported), "a Word file imports the same, and opens the import report (" + single.imported + ")", folder.imported);
+      ok(single.importedNotTour && folder.importedNotTour && single.reportLen === folder.reportLen, "the import ends the tour, as unsaved work");
+      ok(single.inserted === folder.inserted && /^2 pictures after the insert/.test(single.inserted), "a picture is inserted (" + single.inserted + ")", folder.inserted);
+      ok(same(single.importExport, folder.importExport) && !single.importExport.tokens && /word\/kept\//.test(single.importExport.names), "the imported document exports to the same Word file (" + single.importExport.body + ", " + single.importExport.media + " pictures)", JSON.stringify(folder.importExport) + " vs " + JSON.stringify(single.importExport));
+      ok(single.saved && folder.saved && single.savedName === folder.savedName && /\.json$/.test(single.savedName) && single.clean && folder.clean, "the document file saves the same, with its pictures and kept parts (" + single.savedName + ")", folder.savedName + " vs " + single.savedName);
+      ok(folder.errors.length === 0, "(the folder version ran with no script errors, console errors or policy violations)", folder.errors.join(" | "));
+      ok(single.errors.length === 0, "no script errors, console errors or policy violations through the import, the insert, the exports and the save", single.errors.join(" | "));
+      return load(bundle, false);
+    })
+    .then(function (w) {
+      ok(!!w.SPT_DOCUMENT_DEMO && !w.DocumentTool.state.doc && /Try the demo/.test(w.document.getElementById("main").textContent), "opened normally it starts with no document, though it carries the demo for ?tour");
+      finish();
+    })
+    .catch(function (e) { ok(false, "check threw: " + (e && (e.stack || e.message))); finish(); });
+})();
+</script>
+</body></html>

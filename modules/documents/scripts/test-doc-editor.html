@@ -1,0 +1,665 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the editor</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/documents.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/tables.css" />
+</head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The editor on its own page, with the real model, renderer, history, tables and
+  paste code and a small stand-in for the shell (App.DocApp) and the picture
+  reader, driven through App.DocEditor.__test as a person would: typing,
+  formatting, splitting and joining, lists and their markers, headings and
+  prompts, pictures, kept objects, block selection and moving, formats on a
+  block selection, footnotes, links, copy and paste, and undo and redo of each.
+  Then the DOM contract for runs: text typed beside a footnote mark, at the end
+  of a link and of red text, an emptied block, a replacement that leaves a font
+  element behind, and keys during an IME composition.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<div style="display:flex;width:1500px;height:640px">
+  <div id="sidebar" style="flex:none;width:260px;overflow-y:auto"><div id="nav"><button type="button" id="nav-edit">Edit</button></div><div id="outline"></div></div>
+  <div id="edit-view" class="main" style="flex:1;min-width:0"><div id="toolbar" role="toolbar" aria-label="Formatting"></div><div id="paper" tabindex="0"></div></div>
+</div>
+<div id="live" aria-live="polite"></div>
+<div id="toast"></div>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script src="../js/paste.js"></script>
+<script src="../js/editor.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d !== undefined ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  var errors = [];
+  window.addEventListener("error", function (e) { errors.push(e.message); });
+  window.addEventListener("unhandledrejection", function (e) { errors.push("rejected: " + (e.reason && e.reason.message)); });
+
+  var App = window.App, M = App.DocModel, R = App.DocRender, H = App.DocHistory, E = App.DocEditor, T = E.__test;
+  function $(id) { return document.getElementById(id); }
+
+  // ---- the stand-in for the shell ----
+  var touches = [], toasts = [], answer = true;
+  App.DocApp = {
+    state: { doc: null, page: "edit", dirty: false, tour: false, recovered: false },
+    go: function () {}, markClean: function () {}, busy: function () {}, setDoc: function () { return Promise.resolve(true); },
+    touched: function (what) { touches.push(what); },
+    canAdd: function () { return true; },
+    toast: function (text) { toasts.push(String(text)); $("toast").textContent = String(text); },
+    confirmBox: function () { return Promise.resolve(answer); },
+    say: function (text) { $("live").textContent = String(text); },
+    h: R.h
+  };
+  // A picture file is taken as it is; its size comes from its name ("600x300.png").
+  App.DocPictures = {
+    ACCEPT: "image/png",
+    fromFile: function (file) {
+      var m = /(\d+)x(\d+)/.exec(file.name || "");
+      if (/bad/.test(file.name || "")) return Promise.reject(new Error("That file is not a picture the tool can use."));
+      return Promise.resolve({ blob: file, type: file.type || "image/png", width: m ? +m[1] : 100, height: m ? +m[2] : 50, name: file.name || "picture.png" });
+    }
+  };
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  function png(name) {
+    var bin = atob(PNG), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return new File([u], name || "100x50.png", { type: "image/png" });
+  }
+
+  var doc;
+  function open(blocks, more) {
+    E.unmount();
+    var o = Object.assign({ schema: M.SCHEMA, kind: "report", info: { title: "Test document" }, blocks: blocks, footnotes: {}, media: {}, parts: {} }, more || {});
+    doc = M.normalise(o);
+    App.DocApp.state.doc = doc;
+    H.clear();
+    touches.length = 0; toasts.length = 0;
+    E.mount($("edit-view"));
+    return doc;
+  }
+  function P(id, text, more) { return Object.assign({ id: id, type: "paragraph", runs: text ? [{ t: text }] : [] }, more || {}); }
+  function Hd(id, level, text) { return { id: id, type: "heading", level: level, runs: [{ t: text }] }; }
+  function L(id, kind, level, text) { return { id: id, type: "list", list: kind, level: level, runs: text ? [{ t: text }] : [] }; }
+  function blk(id) { var f = M.find(doc, id); return f ? f.block : null; }
+  function txt(id) { return M.text(blk(id)); }
+  function el(id) { return T.el(id); }
+  function tel(id) { return T.text(id); }
+  function ids() { return doc.blocks.map(function (b) { return b.id; }).join(","); }
+  function order() { return Array.prototype.map.call($("paper").querySelectorAll(":scope > .blk"), function (n) { return n.getAttribute("data-block-id"); }).join(","); }
+  function marker(id) { var m = el(id) && el(id).querySelector(".marker"); return m ? m.textContent : null; }
+  function editable() { return $("paper").querySelectorAll("[contenteditable]:not([contenteditable=false])"); }
+  function sel() { return E.selection(); }
+  function caret(id, at, to) { T.selectText(id, at, to); }
+  function end(id) { caret(id, R.textLength(tel(id))); }
+  function pressedBtn(cmd) { return $("toolbar").querySelector('[data-cmd="' + cmd + '"]').getAttribute("aria-pressed") === "true"; }
+  function click(node) { node.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); }
+  function ctxButton(text) {
+    return Array.prototype.filter.call($("toolbar").querySelectorAll(".tb-context button"), function (b) { return b.textContent === text; })[0];
+  }
+  function inDom(id) { return R.matches(tel(id), R.blockRuns(blk(id))); }
+  function clip(type, data) {
+    var e = new ClipboardEvent(type, { bubbles: true, cancelable: true, clipboardData: data || new DataTransfer() });
+    (document.activeElement || document.body).dispatchEvent(e);
+    return e;
+  }
+
+  (async function () {
+    // ---- opening ----
+    open([Hd("b1", 1, "Summary"), P("b2", "This proposal sets out three options."), P("b3", "Second paragraph."), P("b4", "")]);
+    ok(order() === "b1,b2,b3,b4" && el("b1").querySelector("h1.txt") && el("b2").querySelector("p.txt"), "a document opens as one element per block, in order", order());
+    ok(el("b2").id === "blk-b2" && el("b2").getAttribute("data-type") === "paragraph" && el("b2").getAttribute("tabindex") === "-1", "a block is div.blk#blk-id with its type, out of the Tab order");
+    ok(editable().length === 0, "nothing is editable until it is used", String(editable().length));
+    ok(tel("b4").childNodes.length === 1 && tel("b4").firstChild.tagName === "BR", "an empty block holds one br");
+    ok(E.ownsOutline() && $("outline").querySelectorAll('[role="treeitem"]').length === 1, "with no outline in the sidebar the editor draws its own");
+
+    // ---- typing ----
+    end("b2");
+    ok(editable().length === 1 && editable()[0] === tel("b2") && document.activeElement === tel("b2"), "putting the caret in a block makes that one element editable", String(editable().length));
+    var before = tel("b2"), first = tel("b2").firstChild;
+    T.type(" More");
+    ok(txt("b2") === "This proposal sets out three options. More", "typing is read back into the block's runs", txt("b2"));
+    ok(tel("b2") === before && tel("b2").firstChild === first && inDom("b2"), "and redraws nothing: the same element and text node");
+    ok(touches.length > 0 && touches[touches.length - 1].blocks && touches[touches.length - 1].blocks[0] === "b2", "the shell is told which block changed", JSON.stringify(touches[touches.length - 1]));
+    ok(H.canUndo() && !H.canRedo(), "typing is in the history");
+    T.press("Ctrl+Z");
+    ok(txt("b2") === "This proposal sets out three options." && tel("b2").textContent === "This proposal sets out three options.", "one undo takes back the run of typing, on the page too", txt("b2"));
+    ok(sel() && sel().type === "text" && sel().blockId === "b2", "and the caret is back in the block", JSON.stringify(sel()));
+    T.press("Ctrl+Y");
+    ok(txt("b2") === "This proposal sets out three options. More", "redo puts it back", txt("b2"));
+    end("b3");
+    T.type(" One. Two");
+    T.press("Ctrl+Z");
+    ok(txt("b3") === "Second paragraph. One.", "the end of a sentence ends the entry: undo takes back the sentence being typed", txt("b3"));
+    T.press("Ctrl+Z");
+    ok(txt("b3") === "Second paragraph.", "and again for the sentence before", txt("b3"));
+    end("b2"); T.type("x"); end("b3"); T.type("y");
+    T.press("Ctrl+Z");
+    ok(txt("b3") === "Second paragraph." && /Morex$/.test(txt("b2")), "typing in another block is another entry", txt("b2") + " | " + txt("b3"));
+    T.press("Ctrl+Z");
+    ok(editable().length === 1, "only ever one editable element", String(editable().length));
+
+    // ---- inline formats ----
+    open([P("b1", "Plain bold text here"), Hd("b2", 2, "A heading"), { id: "b3", type: "prompt", text: "Add the cost" }]);
+    caret("b1", 6, 10);
+    T.press("Ctrl+B");
+    ok(JSON.stringify(blk("b1").runs) === JSON.stringify([{ t: "Plain " }, { t: "bold", b: true }, { t: " text here" }]), "Ctrl+B makes the selected text bold in the model", JSON.stringify(blk("b1").runs));
+    ok(tel("b1").querySelector("b") && tel("b1").querySelector("b").textContent === "bold" && inDom("b1"), "and on the page, by the contract");
+    ok(sel().from === 6 && sel().to === 10 && pressedBtn("bold"), "the selection is kept and the Bold button shows pressed", JSON.stringify(sel()));
+    T.press("Ctrl+I"); T.press("Ctrl+U"); T.press("Ctrl+Shift+X"); T.press("Ctrl+.");
+    var r = blk("b1").runs[1];
+    ok(r.b && r.i && r.u && r.s && r.sup && !r.sub, "italic, underline, strikethrough and superscript by their keys", JSON.stringify(r));
+    var nest = [], n = tel("b1").querySelector("b");
+    while (n && n.nodeType === 1) { nest.push(n.tagName); n = n.firstChild; }
+    ok(nest.join(">") === "B>I>U>S>SUP", "the elements nest in the fixed order", nest.join(">"));
+    T.press("Ctrl+,");
+    ok(blk("b1").runs[1].sub && !blk("b1").runs[1].sup, "subscript takes superscript's place", JSON.stringify(blk("b1").runs[1]));
+    E.run("code"); E.run("red");
+    ok(blk("b1").runs[1].code && blk("b1").runs[1].red && tel("b1").querySelector("span.red code"), "code and red from the toolbar's commands");
+    T.press("Ctrl+Space");
+    ok(!blk("b1").runs[1].red && !tel("b1").querySelector(".red"), "Ctrl+Space clears red");
+    for (var u = 0; u < 9; u++) T.press("Ctrl+Z");
+    ok(JSON.stringify(blk("b1").runs) === JSON.stringify([{ t: "Plain bold text here" }]) && !tel("b1").querySelector("b"), "each format is one undo", JSON.stringify(blk("b1").runs));
+    // a format with nothing selected is for what is typed next
+    end("b1");
+    T.press("Ctrl+B");
+    ok(pressedBtn("bold") && JSON.stringify(blk("b1").runs) === JSON.stringify([{ t: "Plain bold text here" }]), "with nothing selected, Bold is switched on for what comes next");
+    T.type("!!");
+    ok(JSON.stringify(blk("b1").runs) === JSON.stringify([{ t: "Plain bold text here" }, { t: "!!", b: true }]), "and what is typed is bold", JSON.stringify(blk("b1").runs));
+    caret("b2", 2, 9);
+    T.press("Ctrl+B");
+    ok(!blk("b2").runs.some(function (x) { return x.b; }), "bold is not offered on a heading: it prints bold anyway");
+    caret("b3", 0, 3);
+    T.press("Ctrl+B");
+    ok(blk("b3").text === "Add the cost" && !tel("b3").querySelector("b"), "nor any format on a prompt, which is plain text");
+
+    // ---- split and join ----
+    open([Hd("b1", 1, "Scope"), P("b2", "FirstSecond", { align: "center" }), { id: "b3", type: "pageBreak" }, P("b4", "After the break"), P("b5", "Last")]);
+    caret("b2", 5);
+    T.press("Enter");
+    var made = doc.blocks[2];
+    ok(txt("b2") === "First" && made.type === "paragraph" && M.text(made) === "Second" && made.align === "center", "Enter splits the block at the caret, into the same kind of paragraph", ids() + " " + JSON.stringify(made));
+    ok(order() === ids() && sel().blockId === made.id && sel().from === 0 && document.activeElement === tel(made.id), "the new block is drawn after it and has the caret at its start", order() + " " + JSON.stringify(sel()));
+    T.press("Backspace");
+    ok(txt("b2") === "FirstSecond" && !blk(made.id) && order() === "b1,b2,b3,b4,b5", "Backspace at the start joins it to the block before", ids());
+    ok(sel().blockId === "b2" && sel().from === 5, "with the caret at the join", JSON.stringify(sel()));
+    T.press("Ctrl+Z");
+    ok(doc.blocks.length === 6 && blk(made.id) && order() === ids(), "undo of the join brings the block back under its old id", ids());
+    T.press("Ctrl+Z");
+    ok(ids() === "b1,b2,b3,b4,b5" && txt("b2") === "FirstSecond" && order() === ids(), "and undo of the split", ids());
+    end("b1");
+    T.press("Enter");
+    ok(doc.blocks[1].type === "paragraph" && txt("b1") === "Scope", "Enter at the end of a heading starts a paragraph");
+    T.press("Ctrl+Z");
+    caret("b1", 0);
+    T.press("Enter");
+    ok(doc.blocks[0].type === "paragraph" && M.text(doc.blocks[0]) === "" && doc.blocks[1].id === "b1" && txt("b1") === "Scope" && sel().blockId === "b1", "Enter at the start of a heading opens a paragraph above; the heading keeps its id and the caret", ids());
+    T.press("Ctrl+Z");
+    end("b4");
+    T.press("Delete");
+    ok(txt("b4") === "After the breakLast" && !blk("b5") && sel().from === 15, "Delete at the end joins the next block on", txt("b4"));
+    T.press("Ctrl+Z");
+    caret("b4", 0);
+    T.press("Backspace");
+    ok(sel().type === "blocks" && sel().ids.join() === "b3" && txt("b4") === "After the break", "Backspace after a page break selects it instead of joining", JSON.stringify(sel()));
+    T.press("Backspace");
+    ok(!blk("b3") && order() === "b1,b2,b4,b5", "and a second Backspace deletes it", order());
+    T.press("Ctrl+Z");
+    ok(order() === "b1,b2,b3,b4,b5", "undo brings the page break back", order());
+    caret("b2", 5);
+    T.press("Shift+Enter");
+    ok(txt("b2") === "First\nSecond" && tel("b2").querySelector("br") && doc.blocks.length === 5 && sel().from === 6, "Shift+Enter is a line break inside the block", JSON.stringify(txt("b2")));
+    T.type("x");
+    ok(txt("b2") === "First\nxSecond", "and typing carries on after it", JSON.stringify(txt("b2")));
+
+    // ---- lists ----
+    open([P("b1", ""), P("b2", "Tail")]);
+    caret("b1", 0);
+    T.type("- ");
+    ok(blk("b1").type === "list" && blk("b1").list === "bullet" && blk("b1").level === 0 && txt("b1") === "", "\"- \" at the start of a paragraph makes a bulleted item", JSON.stringify(blk("b1")));
+    ok(marker("b1") === "•" && el("b1").querySelector(".marker").getAttribute("contenteditable") === "false" && !tel("b1").contains(el("b1").querySelector(".marker")), "its marker is real text, outside the editable text", String(marker("b1")));
+    T.type("One");
+    T.press("Enter");
+    var li2 = doc.blocks[1].id;
+    T.type("Two");
+    T.press("Enter");
+    var li3 = doc.blocks[2].id;
+    T.type("Three");
+    ok(doc.blocks.slice(0, 3).every(function (b) { return b.type === "list" && b.list === "bullet"; }) && txt(li2) === "Two", "Enter in an item starts the next item", ids());
+    E.selectBlocks(["b1", li2, li3]);
+    T.press("Ctrl+Shift+7");
+    ok(marker("b1") === "1." && marker(li2) === "2." && marker(li3) === "3.", "Ctrl+Shift+7 numbers the selected items, with the numbers Word will show", [marker("b1"), marker(li2), marker(li3)].join(" "));
+    var keepEl = el(li3), keepText = tel(li3);
+    end(li2);
+    T.press("Tab");
+    ok(blk(li2).level === 1 && marker(li2) === "a." && marker(li3) === "2.", "Tab indents an item; its marker and the ones after it follow", [marker("b1"), marker(li2), marker(li3)].join(" "));
+    ok(el(li3) === keepEl && tel(li3) === keepText, "the items after it are not redrawn: only their marker text changes");
+    T.press("Tab"); T.press("Tab");
+    ok(blk(li2).level === 2 && marker(li2) === "i.", "Tab stops at the third level", marker(li2));
+    T.press("Shift+Tab"); T.press("Shift+Tab");
+    ok(blk(li2).level === 0 && marker(li2) === "2." && marker(li3) === "3.", "Shift+Tab outdents", [marker(li2), marker(li3)].join(" "));
+    end(li2);
+    T.press("Enter");
+    var mid = doc.blocks[2].id;
+    ok(blk(mid).type === "list" && marker(mid) === "3." && marker(li3) === "4." && el(li3) === keepEl, "a new item in the middle renumbers the items after it", [marker(mid), marker(li3)].join(" "));
+    T.press("Enter");
+    ok(blk(mid).type === "paragraph" && marker(li3) === "1.", "Enter in an empty item leaves the list, and the list after it starts again", blk(mid).type + " " + marker(li3));
+    T.press("Ctrl+Z"); T.press("Ctrl+Z");
+    ok(!blk(mid) && marker(li3) === "3.", "undo of both puts the numbers back", String(marker(li3)));
+    caret(li3, 0);
+    T.press("Backspace");
+    ok(blk(li3).type === "paragraph" && txt(li3) === "Three", "Backspace at the start of an item makes it a paragraph");
+    T.press("Ctrl+Shift+8");
+    ok(blk(li3).type === "list" && blk(li3).list === "bullet" && marker(li3) === "•", "Ctrl+Shift+8 makes a bulleted item");
+    T.press("Ctrl+Shift+8");
+    ok(blk(li3).type === "paragraph", "and again turns it back into a paragraph");
+    caret("b2", 0);
+    T.type("1. ");
+    ok(blk("b2").type === "list" && blk("b2").list === "number" && txt("b2") === "Tail" && marker("b2") === "1.", "\"1. \" at the start of a paragraph makes a numbered item", JSON.stringify(blk("b2")));
+    T.press("Ctrl+Z");
+    ok(blk("b2").type === "paragraph" && txt("b2") === "1. Tail", "one undo gives the typed characters back", txt("b2"));
+    caret(li2, 0); T.press("Tab"); T.press("Backspace");
+    ok(blk(li2).type === "list" && blk(li2).level === 0, "Backspace at the start of an indented item outdents it first");
+
+    // ---- headings and prompts ----
+    open([P("b1", "A title"), P("b2", "To be written")]);
+    end("b1");
+    T.press("Ctrl+Alt+2");
+    ok(blk("b1").type === "heading" && blk("b1").level === 2 && el("b1").querySelector("h2.txt") && sel().blockId === "b1", "Ctrl+Alt+2 makes a level 2 heading, a real h2, and keeps the caret", JSON.stringify(sel()));
+    ok($("toolbar").querySelector(".tb-type").value === "heading2", "the block type list shows it", $("toolbar").querySelector(".tb-type").value);
+    T.press("Ctrl+Alt+1");
+    ok(blk("b1").level === 1 && el("b1").querySelector("h1.txt"), "Ctrl+Alt+1");
+    T.press("Ctrl+Alt+3");
+    ok(blk("b1").level === 3 && el("b1").querySelector("h3.txt"), "Ctrl+Alt+3");
+    T.press("Ctrl+Alt+0");
+    ok(blk("b1").type === "paragraph" && el("b1").querySelector("p.txt"), "Ctrl+Alt+0 is a paragraph again");
+    var pick = $("toolbar").querySelector(".tb-type");
+    end("b2");
+    pick.value = "prompt"; pick.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(blk("b2").type === "prompt" && blk("b2").text === "To be written" && el("b2").querySelector("p.txt.prompt"), "Prompt from the block type list: a red prompt block", JSON.stringify(blk("b2")));
+    end("b2");
+    T.type(" soon");
+    ok(blk("b2").text === "To be written soon", "a prompt is typed in like any block", blk("b2").text);
+    T.press("Ctrl+Z"); T.press("Ctrl+Z");
+    ok(blk("b2").type === "paragraph" && txt("b2") === "To be written", "undo of the typing and of the change of type");
+    ok(doc.blocks[0].id === "b1" && doc.blocks[1].id === "b2", "a change of type keeps the block's id");
+
+    // ---- pictures ----
+    open([P("b1", "Before"), P("b2", "After")]);
+    end("b1");
+    var picId = await E.insertPictureFile(png("1200x600.png"));
+    var pic = blk(picId);
+    ok(pic && pic.type === "picture" && doc.blocks[1].id === picId && doc.media[pic.media] && doc.media[pic.media].blob, "a picture from a file goes in after the block the caret is in, with its bytes in media", ids());
+    ok(pic.width === 601 && pic.height === 301, "a picture wider than the page starts at the page width, in proportion", pic.width + "x" + pic.height);
+    ok(sel().type === "blocks" && sel().ids[0] === picId && el(picId).classList.contains("sel"), "and is selected as a block");
+    var img = el(picId).querySelector("img");
+    ok(img && /^blob:/.test(img.src) && img.getAttribute("loading") === "lazy" && img.width === 601, "it is drawn from an object URL, lazily, at its printed size", img && img.src.slice(0, 5));
+    ok(touches.some(function (t) { return t.media && t.media[0] === pic.media; }), "the shell is told about the new bytes");
+    var w = $("toolbar").querySelector(".tb-num");
+    ok(w && w.value === "15.9" && ctxButton("Fit to page width") && ctxButton("Replace") && $("toolbar").querySelector(".tb-alt"), "its controls appear in the toolbar: width in centimetres, fit, alignment, caption, alternative text, replace", w && w.value);
+    w.value = "8"; w.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(blk(picId).width === 302 && blk(picId).height === 151 && el(picId).querySelector("img").width === 302, "a width in centimetres sets the printed width; the height follows", blk(picId).width + "x" + blk(picId).height);
+    var alt = $("toolbar").querySelector(".tb-alt");
+    alt.value = "Diagram of the network"; alt.dispatchEvent(new Event("change", { bubbles: true }));
+    ok(blk(picId).alt === "Diagram of the network" && el(picId).querySelector("img").alt === "Diagram of the network", "alternative text is stored and put on the picture");
+    click(ctxButton("Right"));
+    ok(blk(picId).align === "right" && el(picId).querySelector("figure.al-right"), "alignment");
+    click(ctxButton("Caption"));
+    var cap = el(picId).querySelector(".cap");
+    ok(cap && document.activeElement === cap && blk(picId).caption === "", "Caption adds a caption and puts the caret in it");
+    T.type("Current network");
+    ok(blk(picId).caption === "Current network", "typing in it sets the caption", blk(picId).caption);
+    click(ctxButton("Fit to page width"));
+    ok(blk(picId).width === 601, "Fit to page width");
+    await E.replaceWithFile(picId, png("400x400.png"));
+    var after = blk(picId);
+    ok(after.id === picId && after.media !== pic.media && after.width === 601 && after.height === 601 && after.caption === "Current network" && after.alt === "Diagram of the network", "Replace keeps the block, its width, caption and alternative text", JSON.stringify(after));
+    T.press("Ctrl+Z");
+    ok(blk(picId).media === pic.media && doc.media[after.media], "undo brings the old picture back; no bytes are ever dropped while the document is open");
+    for (var k = 0; k < 6; k++) T.press("Ctrl+Z");
+    ok(blk(picId) && blk(picId).width === 601 && blk(picId).height === 301 && blk(picId).caption === undefined && !blk(picId).alt, "each picture change is one undo", JSON.stringify(blk(picId)));
+    T.press("Ctrl+Z");
+    ok(!blk(picId) && order() === "b1,b2", "and the last undo takes the picture out", order());
+    T.press("Ctrl+Y");
+    ok(blk(picId) && order() === "b1," + picId + ",b2" && el(picId).querySelector("img"), "redo puts it back", order());
+    toasts.length = 0;
+    var none = await E.insertPictureFile(png("bad.png"));
+    ok(none === null && toasts.length === 1 && doc.blocks.length === 3, "a file that is not a usable picture gives a message and changes nothing", toasts.join());
+    // a type the browser cannot draw, and bytes that did not come back
+    open([{ id: "b1", type: "picture", media: "m1", width: 300, height: 200 }, { id: "b2", type: "picture", media: "m2", width: 300, height: 200 }], {
+      media: { m1: { type: "image/x-emf", name: "plan.emf", width: 300, height: 200, source: "import", blob: new Blob(["x"]) }, m2: { type: "image/png", name: "lost.png", width: 300, height: 200, source: "insert", blob: null, missing: true } }
+    });
+    ok(!el("b1").querySelector("img") && /plan\.emf \(EMF\)/.test(el("b1").textContent) && /Shown as a placeholder here\. It prints in the Word file\./.test(el("b1").textContent), "a picture the browser cannot draw is a placeholder with its name and type", el("b1").textContent);
+    ok(/could not be restored/.test(el("b2").textContent), "a picture whose bytes are missing says so", el("b2").textContent);
+
+    // ---- kept objects ----
+    var kept = { id: "b2", type: "kept", kind: "smartart", xml: "<w:r xmlns:w=\"x\"><w:drawing/></w:r>", rels: [{ id: "sptK1", type: "t", part: "p1" }], width: 576, height: 336, floating: false, text: "Plan Do Check", label: "Diagram 1", description: "Diagram (SmartArt), 15.2 x 8.9 cm" };
+    var wide = { id: "b4", type: "kept", kind: "chart", xml: "<w:r xmlns:w=\"x\"/>", rels: [], width: 720, height: 300, floating: false, text: "", description: "Chart, 19.1 x 7.9 cm" };
+    open([P("b1", "Before"), kept, P("b3", "Between"), wide, P("b5", "After")], { parts: { p1: { name: "word/diagrams/data1.xml", contentType: "application/xml", blob: new Blob(["<x/>"]), rels: [] } } });
+    var card = el("b2").querySelector(".kept-card");
+    ok(card && card.getAttribute("role") === "group" && card.getAttribute("aria-label") === "Drawing 1 of 2. Diagram (SmartArt), 15.2 x 8.9 cm", "a kept object is a card, a group named by its number and description", card && card.getAttribute("aria-label"));
+    ok(/Diagram 1/.test(card.textContent) && /Plan Do Check/.test(card.textContent) && /Kept from the original Word file\. It prints in the Word export as it was\./.test(card.textContent), "with its own name, the text inside it and the line that it is kept");
+    ok(!/wider than the page/.test(card.textContent) && /It is wider than the page and will be made smaller to fit\./.test(el("b4").textContent), "one wider than the page says it will be made smaller");
+    E.selectBlocks(["b2"]);
+    ok(ctxButton("Replace with a picture") && ctxButton("Duplicate") && ctxButton("Caption") && ctxButton("Move down") && ctxButton("Delete"), "selected, its controls appear");
+    click(ctxButton("Duplicate"));
+    var copy = doc.blocks[2];
+    ok(copy.type === "kept" && copy.id !== "b2" && copy.xml === kept.xml && copy.rels[0].id === "sptK1" && copy.rels[0].part === "p1", "Duplicate makes a block with the same content, relationship ids and part keys, and a new id", JSON.stringify(copy.rels));
+    ok(/Drawing 2 of 3\./.test(el(copy.id).textContent) && /Drawing 1 of 3\./.test(el("b2").textContent) && /Drawing 3 of 3\./.test(el("b4").textContent), "the cards are renumbered where they stand", el("b4").querySelector(".kept-n").textContent);
+    T.press("Ctrl+Z");
+    ok(!blk(copy.id) && /Drawing 2 of 2\./.test(el("b4").textContent), "undo takes the copy away");
+    E.selectBlocks(["b2"]);
+    T.press("Alt+Shift+Down");
+    ok(ids() === "b1,b3,b2,b4,b5" && order() === ids(), "Alt+Shift+Down moves it", ids());
+    T.press("Ctrl+Z");
+    click(ctxButton("Caption"));
+    T.type("The cycle");
+    ok(blk("b2").caption === "The cycle", "a caption");
+    E.selectBlocks(["b2"]);
+    click(ctxButton("Right"));
+    ok(blk("b2").align === "right", "alignment");
+    await E.replaceWithFile("b2", png("800x400.png"));
+    var now = blk("b2");
+    ok(now.type === "picture" && now.id === "b2" && now.width === 576 && now.height === 288 && now.caption === "The cycle" && now.align === "right" && el("b2").querySelector("img"), "Replace with a picture: a picture block of the same printed width, in its place", JSON.stringify(now));
+    ok(/Drawing 1 of 1\./.test(el("b4").textContent), "and the other card is renumbered");
+    T.press("Ctrl+Z");
+    ok(blk("b2").type === "kept" && blk("b2").xml === kept.xml && el("b2").querySelector(".kept-card") && doc.parts.p1, "undo brings the object back, with its parts still there");
+    E.selectBlocks(["b2"]);
+    T.press("Delete");
+    ok(!blk("b2") && !el("b2") && doc.parts.p1 && order() === "b1,b3,b4,b5", "Delete removes the block and leaves its parts for undo", order());
+    ok(document.activeElement && $("paper").contains(document.activeElement), "the keyboard stays on the paper after a delete");
+    T.press("Ctrl+Z");
+    ok(blk("b2") && order() === "b1,b2,b3,b4,b5" && sel().type === "blocks" && sel().ids[0] === "b2", "and undo puts it back, selected", order() + " " + JSON.stringify(sel()));
+    // bytes that did not come back
+    open([{ id: "b1", type: "kept", kind: "chart", xml: "<w:r/>", rels: [{ id: "sptK1", type: "t", part: "p1" }], width: 300, height: 200, floating: false, text: "" }], { parts: { p1: { name: "word/charts/chart1.xml", contentType: "application/xml", blob: null, missing: true, rels: [] } } });
+    ok(/This drawing could not be restored/.test(el("b1").textContent) && !/Kept from the original/.test(el("b1").textContent), "a kept object with a missing part says it could not be restored", el("b1").textContent);
+
+    // ---- block selection, moving, and formats on a block selection ----
+    var table = { id: "b4", type: "table", header: 1, cols: [1, 1], rows: [
+      { cells: [{ blocks: [P("c1", "Zone")] }, { blocks: [P("c2", "Assets")] }] },
+      { cells: [{ blocks: [P("c3", "Control")] }, { blocks: [L("c4", "bullet", 0, "PLC")] }] }] };
+    open([Hd("b1", 1, "Title"), P("b2", "One"), P("b3", "Two"), table, P("b5", "Three")]);
+    E.selectBlocks(["b3", "b2"]);
+    ok(sel().type === "blocks" && sel().ids.join() === "b2,b3" && el("b2").classList.contains("sel") && el("b3").classList.contains("sel") && document.activeElement === $("paper"), "selectBlocks selects whole blocks in reading order, with the keyboard on the paper", JSON.stringify(sel()));
+    ok(editable().length === 0, "and nothing is editable while blocks are selected");
+    T.press("Alt+Shift+Down");
+    ok(ids() === "b1,b4,b2,b3,b5" && order() === ids() && sel().ids.join() === "b2,b3", "Alt+Shift+Down moves the selection past the next block", ids());
+    T.press("Alt+Shift+Up"); T.press("Alt+Shift+Up");
+    ok(ids() === "b2,b3,b1,b4,b5" && order() === ids(), "Alt+Shift+Up moves it up", ids());
+    T.press("Alt+Shift+Up");
+    ok(ids() === "b2,b3,b1,b4,b5", "and stops at the top");
+    T.press("Ctrl+Z"); T.press("Ctrl+Z"); T.press("Ctrl+Z");
+    ok(ids() === "b1,b2,b3,b4,b5" && order() === ids(), "each move is one undo", ids());
+    end("b3");
+    var held = tel("b3");
+    T.press("Alt+Shift+Up");
+    ok(ids() === "b1,b3,b2,b4,b5" && tel("b3") === held && document.activeElement === held && sel().blockId === "b3", "moving the block the caret is in keeps its element and the caret", ids());
+    T.press("Ctrl+Z");
+    E.selectBlocks(["b2", "b3", "b4"]);
+    var undoBefore = 0; while (H.canUndo()) { H.undo(); undoBefore++; }
+    E.selectBlocks(["b2", "b3", "b4"]);
+    T.press("Ctrl+B");
+    ok(blk("b2").runs[0].b && blk("b3").runs[0].b && blk("c1").runs[0].b && blk("c4").runs[0].b, "Ctrl+B on a block selection makes every run of every text block bold, table cells included");
+    ok(el("b2").querySelector("b") && el("c4").querySelector("b") && pressedBtn("bold") && sel().ids.join() === "b2,b3,b4", "on the page too, and the selection stays");
+    E.run("red");
+    ok(blk("b3").runs[0].red && blk("c3").runs[0].red, "red too");
+    T.press("Ctrl+Space");
+    ok(!blk("b3").runs[0].red && !blk("c3").runs[0].red && blk("b3").runs[0].b, "and Ctrl+Space clears it from all of them");
+    T.press("Ctrl+B");
+    ok(!blk("b2").runs[0].b && !blk("c1").runs[0].b, "a second Ctrl+B takes bold off them all");
+    T.press("Ctrl+Z"); T.press("Ctrl+Z"); T.press("Ctrl+Z");
+    ok(blk("b2").runs[0].b && blk("c4").runs[0].b && !blk("b3").runs[0].red, "each is one history entry for the whole selection");
+    T.press("Ctrl+Z");
+    ok(!blk("b2").runs[0].b && !blk("c1").runs[0].b && !H.canUndo(), "one undo takes bold off every block again");
+    E.selectBlocks(["b2", "b3"]);
+    T.press("Ctrl+Alt+2");
+    ok(blk("b2").type === "heading" && blk("b3").type === "heading" && blk("b3").level === 2, "a block selection can be turned into another block type");
+    T.press("Ctrl+Z");
+    E.run("landscape");
+    ok(blk("b2").land === true && blk("b3").land === true && el("b2").classList.contains("land") && pressedBtn("landscape"), "and flagged landscape");
+    E.run("landscape");
+    ok(!blk("b2").land && !el("b2").classList.contains("land"), "and back");
+    E.selectBlocks(["b2", "b3"]);
+    T.press("Delete");
+    ok(ids() === "b1,b4,b5" && order() === ids(), "Delete removes the selected blocks", ids());
+    T.press("Ctrl+Z");
+    ok(ids() === "b1,b2,b3,b4,b5" && order() === ids() && sel().ids.join() === "b2,b3", "and one undo brings them back where they were, selected", ids());
+    E.selectBlocks(["b1", "b2", "b3", "b4", "b5"]);
+    T.press("Delete");
+    ok(doc.blocks.length === 1 && doc.blocks[0].type === "paragraph" && order() === ids() && sel().type === "text", "deleting everything leaves one empty paragraph to type in", ids());
+    T.press("Ctrl+Z");
+    ok(ids() === "b1,b2,b3,b4,b5" && order() === ids(), "and undo restores the document", ids());
+    // inside a table cell
+    end("c3");
+    T.type("!");
+    ok(txt("c3") === "Control!" && editable().length === 1, "a paragraph in a table cell is typed in like any other", txt("c3"));
+    T.press("Enter");
+    var cellBlocks = blk("b4").rows[1].cells[0].blocks;
+    ok(cellBlocks.length === 2 && cellBlocks[1].type === "paragraph" && sel().blockId === cellBlocks[1].id && el(cellBlocks[1].id), "Enter in a cell makes a new paragraph in the same cell", JSON.stringify(cellBlocks.map(function (b) { return b.id; })));
+    T.press("Ctrl+Z");
+    ok(blk("b4").rows[1].cells[0].blocks.length === 1 && el("c3") && $("paper").contains(el("c3")), "undo takes it out of the cell");
+    end("c3");
+    T.press("Ctrl+Alt+1");
+    ok(blk("c3").type === "paragraph" && toasts.length > 0, "a heading is refused in a table cell, with a message", toasts.join());
+    E.run("landscape");
+    ok(blk("b4").land === true && !blk("c3").land && el("b4").classList.contains("land"), "landscape from inside a cell turns the whole table");
+
+    // ---- page break and table ----
+    open([P("b1", "One"), P("b2", "Two")]);
+    end("b1");
+    T.press("Ctrl+Enter");
+    ok(doc.blocks[1].type === "pageBreak" && order() === ids() && el(doc.blocks[1].id).querySelector('[role="separator"]') && sel().blockId === "b1", "Ctrl+Enter puts a page break after the block", ids());
+    E.run("insertTable");
+    var tb = doc.blocks[1];
+    ok(tb.type === "table" && tb.rows.length === 3 && el(tb.id).querySelector("table") && sel().type === "text" && sel().blockId === tb.rows[0].cells[0].blocks[0].id, "Insert table adds a table and puts the caret in its first cell", JSON.stringify(sel()));
+    T.type("Head");
+    ok(M.text(tb.rows[0].cells[0].blocks[0]) === "Head", "and it can be typed in");
+    T.press("Ctrl+Z"); T.press("Ctrl+Z"); T.press("Ctrl+Z");
+    ok(ids() === "b1,b2" && order() === ids(), "undo of the table and the page break", ids());
+
+    // ---- footnotes ----
+    open([P("b1", "Costs are set out below."), P("b2", "Next")]);
+    caret("b1", 5);
+    E.run("footnote");
+    var fnRun = blk("b1").runs.filter(function (x) { return x.fn; })[0], key = fnRun && fnRun.fn;
+    ok(key && doc.footnotes[key] && JSON.stringify(blk("b1").runs.map(function (x) { return x.fn ? "#" : x.t; })) === JSON.stringify(["Costs", "#", " are set out below."]), "Insert footnote puts a reference at the caret and makes the footnote", JSON.stringify(blk("b1").runs));
+    var mark = tel("b1").querySelector("sup.fn");
+    ok(mark && mark.getAttribute("contenteditable") === "false" && mark.getAttribute("data-fn") === key && mark.textContent === "1" && mark.previousSibling.nodeValue.slice(-1) === "​" && mark.nextSibling.nodeValue.charAt(0) === "​", "the mark is sup.fn, not editable, showing its number, with a zero-width space either side");
+    var panel = $("paper").querySelector(".fn-panel"), ftext = panel && panel.querySelector("[data-fn-key]");
+    ok(panel && panel.previousElementSibling === el("b1") && document.activeElement === ftext && /Footnote 1/.test(panel.textContent), "its panel opens under the block, with the caret in the footnote's text");
+    T.type("Budgetary only.");
+    ok(M.runsText(doc.footnotes[key].runs) === "Budgetary only." && txt("b1") === "Costs are set out below.", "typing there edits the footnote, not the block", JSON.stringify(doc.footnotes[key]));
+    T.press("Ctrl+Z");
+    ok(M.runsText(doc.footnotes[key].runs) === "" && ftext.textContent.replace(/​/g, "") === "", "a footnote edit is a history entry: undo empties it, in the panel too", JSON.stringify(doc.footnotes[key]));
+    T.press("Ctrl+Y");
+    ok(M.runsText(doc.footnotes[key].runs) === "Budgetary only.", "and redo");
+    T.press("Escape");
+    ok(!$("paper").querySelector(".fn-panel") && sel().type === "text" && sel().blockId === "b1", "Escape closes the panel and goes back to the block");
+    // a second footnote earlier in the text takes number 1
+    caret("b1", 2);
+    E.run("footnote");
+    var marks = tel("b1").querySelectorAll("sup.fn");
+    ok(marks.length === 2 && marks[0].textContent === "1" && marks[1].textContent === "2", "references are numbered in reading order", marks[0].textContent + marks[1].textContent);
+    T.press("Escape");
+    T.press("Ctrl+Z");
+    ok(tel("b1").querySelectorAll("sup.fn").length === 1 && tel("b1").querySelector("sup.fn").textContent === "1", "undo of the insertion renumbers the one left");
+    // typing beside the mark
+    caret("b1", 6);   // straight after the mark
+    T.type("z");
+    ok(JSON.stringify(blk("b1").runs.map(function (x) { return x.fn ? "#" : x.t; })) === JSON.stringify(["Costs", "#", "z are set out below."]) && tel("b1").querySelector("sup.fn").textContent === "1", "typing straight after a footnote mark stays outside it", JSON.stringify(blk("b1").runs));
+    caret("b1", 5);   // straight before it
+    T.type("y");
+    ok(JSON.stringify(blk("b1").runs.map(function (x) { return x.fn ? "#" : x.t; })) === JSON.stringify(["Costsy", "#", "z are set out below."]) && tel("b1").querySelector("sup.fn").textContent === "1" && inDom("b1"), "and straight before it", JSON.stringify(blk("b1").runs));
+    ok(sel().from === 6, "the caret offset counts the mark as one position", JSON.stringify(sel()));
+    // deleting the reference
+    caret("b1", 7);
+    T.press("Backspace");
+    ok(!blk("b1").runs.some(function (x) { return x.fn; }) && !tel("b1").querySelector("sup.fn") && txt("b1") === "Costsyz are set out below.", "Backspace after the mark deletes the reference", JSON.stringify(blk("b1").runs));
+    ok(doc.footnotes[key] && M.runsText(doc.footnotes[key].runs) === "Budgetary only.", "the footnote itself stays in memory");
+    T.press("Ctrl+Z");
+    ok(blk("b1").runs.some(function (x) { return x.fn === key; }) && tel("b1").querySelector("sup.fn") && tel("b1").querySelector("sup.fn").textContent === "1", "so undo brings the reference back to its footnote");
+    tel("b1").querySelector("sup.fn").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0, buttons: 1 }));
+    ok($("paper").querySelector(".fn-panel [data-fn-key]").textContent.replace(/​/g, "") === "Budgetary only.", "a click on a mark opens its footnote");
+    E.redraw(["b1"]);
+    ok($("paper").querySelector(".fn-panel") && $("paper").querySelector(".fn-panel").previousElementSibling === el("b1"), "the panel stays under its block when the block is redrawn");
+
+    // ---- links ----
+    open([P("b1", "See the standard for more."), P("b2", "")]);
+    caret("b1", 8, 16);
+    T.press("Ctrl+K");
+    var lp = $("paper").querySelector(".link-panel"), field = lp && lp.querySelector("input");
+    ok(lp && lp.previousElementSibling === el("b1") && document.activeElement === field && field.getAttribute("aria-label") === "Link address", "Ctrl+K opens a small panel at the block with an address field");
+    field.value = "javascript:alert(1)";
+    click(Array.prototype.filter.call(lp.querySelectorAll("button"), function (b) { return b.textContent === "Apply"; })[0]);
+    ok(!blk("b1").runs.some(function (x) { return x.link; }) && /https:\/\//.test(lp.querySelector(".panel-note").textContent), "an address that is not http, https or mailto is refused, and the panel says why", lp.querySelector(".panel-note").textContent);
+    field.value = "https://www.isa.org/";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    ok(JSON.stringify(blk("b1").runs[1]) === JSON.stringify({ t: "standard", link: "https://www.isa.org/" }) && !$("paper").querySelector(".link-panel"), "a good one makes the selected text a link", JSON.stringify(blk("b1").runs));
+    var a = tel("b1").querySelector("a");
+    ok(a && a.getAttribute("data-link") === "https://www.isa.org/" && !a.hasAttribute("href"), "drawn as a[data-link] with no href, so it cannot be followed by accident");
+    ok(sel().type === "text" && sel().blockId === "b1" && sel().from === 16 && document.activeElement === tel("b1"), "and the caret goes back to the text, at the end of the link", JSON.stringify(sel()));
+    T.type("s");
+    ok(JSON.stringify(blk("b1").runs) === JSON.stringify([{ t: "See the " }, { t: "standard", link: "https://www.isa.org/" }, { t: "s for more." }]) && inDom("b1"), "typing at the end of a link does not extend it", JSON.stringify(blk("b1").runs));
+    caret("b1", 12);
+    T.type("X");
+    ok(blk("b1").runs[1].t === "stanXdard" && blk("b1").runs[1].link, "typing inside a link is part of it");
+    caret("b1", 11);
+    T.press("Ctrl+K");
+    var lp2 = $("paper").querySelector(".link-panel");
+    ok(lp2 && lp2.querySelector("input").value === "https://www.isa.org/", "Ctrl+K with the caret in a link opens it with its address");
+    click(Array.prototype.filter.call(lp2.querySelectorAll("button"), function (b) { return b.textContent === "Remove link"; })[0]);
+    ok(!blk("b1").runs.some(function (x) { return x.link; }) && !tel("b1").querySelector("a"), "Remove link");
+    T.press("Ctrl+Z");
+    ok(blk("b1").runs.some(function (x) { return x.link; }), "and undo");
+    // red text does extend
+    open([P("b1", "Owner: "), P("b2", "x")]);
+    blk("b1").runs = [{ t: "Owner: " }, { t: "to confirm", red: true }];
+    E.redraw(["b1"]);
+    end("b1");
+    T.type("ed");
+    ok(JSON.stringify(blk("b1").runs) === JSON.stringify([{ t: "Owner: " }, { t: "to confirmed", red: true }]) && inDom("b1"), "typing at the end of red text extends it", JSON.stringify(blk("b1").runs));
+    T.press("Ctrl+Space");
+    T.type(" ok");
+    ok(JSON.stringify(blk("b1").runs) === JSON.stringify([{ t: "Owner: " }, { t: "to confirmed", red: true }, { t: " ok" }]), "until Ctrl+Space switches red off for what is typed next", JSON.stringify(blk("b1").runs));
+
+    // ---- the DOM contract ----
+    open([P("b1", "Empty me"), P("b2", "Network segmentation is teh answer."), P("b3", "Composing")]);
+    caret("b1", 0, 8);
+    T.press("Backspace");
+    ok(JSON.stringify(blk("b1").runs) === "[]" && inDom("b1") && tel("b1").childNodes.length === 1 && tel("b1").firstChild.tagName === "BR", "an emptied block is no runs and one br", tel("b1").innerHTML);
+    T.type("a");
+    ok(txt("b1") === "a" && inDom("b1"), "and typing in it again is read correctly", tel("b1").innerHTML);
+    // a spelling replacement that leaves a font element behind
+    caret("b2", 28);
+    var p2 = tel("b2"), tn = p2.firstChild;
+    var tail = tn.splitText(24), rest = tail.splitText(3), font = document.createElement("font");
+    font.setAttribute("face", "Arial");
+    font.textContent = "the";
+    p2.replaceChild(font, tail);
+    void rest;
+    getSelection().collapse(font.firstChild, 3);
+    p2.dispatchEvent(new InputEvent("input", { inputType: "insertReplacementText", data: "the", bubbles: true }));
+    ok(JSON.stringify(blk("b2").runs) === JSON.stringify([{ t: "Network segmentation is the answer." }]), "a replacement that leaves a font element is read as plain text", JSON.stringify(blk("b2").runs));
+    ok(!tel("b2").querySelector("font") && inDom("b2") && tel("b2") === p2, "the block is redrawn from its runs: the font element is gone");
+    ok(sel().from === 27 && sel().to === 27, "and the caret is put back where it was", JSON.stringify(sel()));
+    T.press("Ctrl+Z");
+    ok(txt("b2") === "Network segmentation is teh answer.", "the replacement is one undo", txt("b2"));
+    ok(JSON.stringify(R.runsFrom((function () { var d = document.createElement("p"); var s = document.createElement("span"); s.textContent = "x"; var st = document.createElement("strong"); st.appendChild(s); d.appendChild(st); d.appendChild(document.createElement("br")); d.appendChild(document.createElement("br")); return d; })())) === JSON.stringify([{ t: "x", b: true }, { t: "\n" }]), "runsFrom: an unknown wrapper is transparent, strong is bold, and the last br is not text");
+    // an IME composition
+    end("b3");
+    var count = doc.blocks.length;
+    tel("b3").dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    var kev = T.press("Enter", { isComposing: true });
+    ok(doc.blocks.length === count && !kev.defaultPrevented, "Enter during a composition is left to the composition: no split", String(doc.blocks.length));
+    T.press("Backspace", { isComposing: true });
+    ok(doc.blocks.length === count && txt("b3") === "Composing", "nor does Backspace join or delete");
+    tel("b3").firstChild.nodeValue = "Composing 日";
+    tel("b3").dispatchEvent(new InputEvent("input", { inputType: "insertCompositionText", data: "日", isComposing: true, bubbles: true }));
+    ok(txt("b3") === "Composing", "nothing is read while it is still composing", txt("b3"));
+    tel("b3").firstChild.nodeValue = "Composing 日本";
+    tel("b3").dispatchEvent(new CompositionEvent("compositionend", { data: "日本", bubbles: true }));
+    ok(txt("b3") === "Composing 日本", "the text is read when the composition ends", txt("b3"));
+
+    // ---- copy and paste ----
+    var kept2 = { id: "b2", type: "kept", kind: "shape", xml: "<w:r xmlns:w=\"x\"><w:pict/></w:r>", rels: [{ id: "sptK1", type: "t", part: "p1" }], width: 200, height: 100, floating: false, text: "Firewall" };
+    open([P("b1", "Alpha"), kept2, P("b3", "Omega")], { parts: { p1: { name: "word/media/image1.png", contentType: "image/png", blob: new Blob(["png"]), rels: [] } } });
+    E.selectBlocks(["b2"]);
+    var data = new DataTransfer();
+    var ce = clip("copy", data);
+    ok(ce.defaultPrevented && data.getData("text/plain").indexOf("Firewall") !== -1 && data.getData("application/x-spt-doc-blocks"), "copying a block selection puts our own format and plain text on the clipboard", Array.prototype.join.call(data.types));
+    end("b3");
+    clip("paste", data);
+    await wait(50);
+    var pasted = doc.blocks[3];
+    ok(pasted && pasted.type === "kept" && pasted.id !== "b2" && pasted.xml === kept2.xml && pasted.rels[0].part === "p1" && order() === ids(), "pasting it makes a new block with the same content", ids() + " " + (pasted && pasted.type));
+    T.press("Ctrl+Z");
+    ok(doc.blocks.length === 3 && order() === ids(), "a paste is one undo");
+    E.selectBlocks(["b1"]);
+    var cut = new DataTransfer();
+    clip("cut", cut);
+    ok(ids() === "b2,b3" && cut.getData("text/plain") === "Alpha", "cut copies and deletes", ids());
+    E.selectBlocks(["b3"]);
+    clip("paste", cut);
+    await wait(50);
+    ok(doc.blocks.length === 3 && M.text(doc.blocks[2]) === "Alpha" && doc.blocks[2].id !== "b1", "and paste puts it after the selection, under a new id", ids());
+    // plain text
+    open([P("b1", "Hello world"), P("b2", "End")]);
+    caret("b1", 5);
+    var plain = new DataTransfer();
+    plain.setData("text/plain", ", dear");
+    var pe = clip("paste", plain);
+    await wait(50);
+    ok(pe.defaultPrevented && txt("b1") === "Hello, dear world" && sel().from === 11, "plain text is pasted at the caret", txt("b1") + " " + JSON.stringify(sel()));
+    caret("b1", 0, 5);
+    var two = new DataTransfer();
+    two.setData("text/plain", "First para\n\nSecond para");
+    clip("paste", two);
+    await wait(50);
+    ok(doc.blocks.length === 4 && M.text(doc.blocks[1]) === "First para" && M.text(doc.blocks[2]) === "Second para" && order() === ids(), "text with a blank line in it becomes paragraphs after the block", ids());
+    var html = new DataTransfer();
+    html.setData("text/html", "<p onclick=\"x()\">Safe <b>bold</b><script>window.hacked = 1<\/script></p><img src=x onerror=\"window.hacked = 1\">");
+    html.setData("text/plain", "Safe bold");
+    end("b2");
+    clip("paste", html);
+    await wait(50);
+    ok(!window.hacked && !$("paper").querySelector("script, [onclick], [onerror]") && /Safe bold/.test(txt("b2")), "pasted HTML is never put into the page as HTML", txt("b2"));
+
+    // ---- redraw, focus and the rest ----
+    open([P("b1", "One"), P("b2", "Two"), P("b3", "Three")]);
+    caret("b2", 1, 2);
+    blk("b2").runs = [{ t: "Two, changed elsewhere" }];
+    var oldEl = el("b2"), other = el("b3");
+    E.redraw(["b2"]);
+    ok(el("b2") !== oldEl && el("b3") === other && el("b2").textContent === "Two, changed elsewhere", "redraw replaces the elements named and no others");
+    ok(document.activeElement === tel("b2") && sel().from === 1 && sel().to === 2 && editable().length === 1, "and the caret is put back in the new element", JSON.stringify(sel()));
+    M.remove(doc, ["b2"]);
+    E.redraw(["b2"]);
+    ok(order() === "b1,b3" && $("paper").contains(document.activeElement), "a block that is gone loses its element, and the keyboard stays on the paper", order());
+    var nu = M.make.paragraph(doc, "New");
+    M.insertAfter(doc, "b1", [nu]);
+    E.redraw([nu.id]);
+    ok(order() === "b1," + nu.id + ",b3", "a new block is drawn where it stands", order());
+    E.focusBlock("b3", { at: "end" });
+    ok(sel().blockId === "b3" && sel().from === 5, "focusBlock puts the caret where asked", JSON.stringify(sel()));
+    E.unmount();
+    ok(!$("paper").firstChild && !$("toolbar").firstChild && E.selection() === null, "unmount empties the paper and the toolbar");
+    ok(errors.length === 0, "no script errors in any of this", errors.join(" | "));
+  })().catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(finish);
+})();
+</script>
+</body></html>

@@ -1,0 +1,650 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: kept content put into a packed file</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.DocxGraft (shared/docx-graft.js, docs/document-tool-design.md 4.2) on
+  hand-built plans and files packed by the vendored docx library: the token's
+  run becomes the original XML, byte for byte; carried parts, their names,
+  relationships and content types; escaping; ids made unique; unshare, the
+  rule that makes copies safe; the theme; scaleXml; media renamed and typed;
+  what is added to the root. That Word opens the result is proven outside
+  this page (tools/word-open-check.ps1): a headless page cannot ask Word.
+-->
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Inflating and deflating run off the main thread, and headless Edge's
+  // virtual clock runs out the moment the page has nothing queued, which dumps
+  // the page half way through. A message bounced to ourselves keeps a task
+  // queued, without moving the clock, until the tests finish.
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+
+  var Zip = window.App.ZipIO, G = window.App.DocxGraft, D = window.docx;
+
+  // ---- namespaces and relationship types ----------------------------------
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+  var A = "http://schemas.openxmlformats.org/drawingml/2006/main";
+  var R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  var PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+  var REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+  var T = {
+    image: REL + "image", chart: REL + "chart", pkg: REL + "package", ole: REL + "oleObject", link: REL + "hyperlink",
+    dm: REL + "diagramData", lo: REL + "diagramLayout", qs: REL + "diagramQuickStyle", cs: REL + "diagramColors",
+    dsp: "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+    chartStyle: "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
+    chartColors: "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle"
+  };
+  var CT = {
+    png: "image/png", emf: "image/x-emf", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    chart: "application/vnd.openxmlformats-officedocument.drawingml.chart+xml",
+    chartStyle: "application/vnd.ms-office.chartstyle+xml", chartColors: "application/vnd.ms-office.chartcolorstyle+xml",
+    dm: "application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml",
+    lo: "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml",
+    qs: "application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml",
+    cs: "application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml",
+    dsp: "application/vnd.ms-office.drawingml.diagramDrawing+xml",
+    theme: "application/vnd.openxmlformats-officedocument.theme+xml"
+  };
+
+  // ---- kept XML, written as XMLSerializer writes it: every namespace declared where it is first used ----
+  function picXml(relId, linkId) {
+    return '<w:r xmlns:w="' + W + '"><w:rPr><w:noProof/></w:rPr><w:drawing><wp:inline xmlns:wp="' + WP + '" distT="0" distB="0" distL="0" distR="0">' +
+      '<wp:extent cx="1905000" cy="1143000"/><wp:docPr id="7" name="Picture 7" descr="a &amp; b &lt;c&gt;">' +
+      (linkId ? '<a:hlinkClick xmlns:a="' + A + '" xmlns:r="' + R + '" r:id="' + linkId + '"/>' : "") + '</wp:docPr>' +
+      '<a:graphic xmlns:a="' + A + '"><a:graphicData uri="' + PIC + '"><pic:pic xmlns:pic="' + PIC + '"><pic:nvPicPr><pic:cNvPr id="0" name="x"/><pic:cNvPicPr/></pic:nvPicPr>' +
+      '<pic:blipFill><a:blip xmlns:r="' + R + '" r:embed="' + relId + '"><a:extLst><a:ext uri="{28A0092B-C50C-407E-A947-70E740481C1C}"/></a:extLst></a:blip><a:srcRect l="10000"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+      '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="1143000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  }
+  var CHART_XML = '<w:r xmlns:w="' + W + '"><w:drawing><wp:inline xmlns:wp="' + WP + '" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="5486400" cy="3200400"/>' +
+    '<wp:docPr id="7" name="Chart 7"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="' + A + '"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">' +
+    '<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="' + R + '" r:id="sptK2"/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  var SMART_XML = '<w:r xmlns:w="' + W + '"><w:drawing><wp:inline xmlns:wp="' + WP + '" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="5486400" cy="3200400"/>' +
+    '<wp:docPr id="7" name="Diagram 6"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="' + A + '"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram">' +
+    '<dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:r="' + R + '" r:dm="sptK3" r:lo="sptK4" r:qs="sptK5" r:cs="sptK6"/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  var OLE_XML = '<w:r xmlns:w="' + W + '"><w:object w:dxaOrig="6918" w:dyaOrig="3065"><v:shapetype xmlns:v="urn:schemas-microsoft-com:vml" id="_x0000_t75" coordsize="21600,21600" xmlns:o="urn:schemas-microsoft-com:office:office" o:spt="75" filled="f" stroked="f"><v:stroke joinstyle="miter"/></v:shapetype>' +
+    '<v:shape xmlns:v="urn:schemas-microsoft-com:vml" id="_x0000_i1027" type="#_x0000_t75" style="width:346pt;height:153.5pt" xmlns:o="urn:schemas-microsoft-com:office:office" o:ole=""><v:imagedata xmlns:r="' + R + '" r:id="sptK8" o:title=""/></v:shape>' +
+    '<o:OLEObject xmlns:o="urn:schemas-microsoft-com:office:office" Type="Embed" ProgID="Excel.Sheet.12" ShapeID="_x0000_i1027" DrawAspect="Content" ObjectID="_1855919606" xmlns:r="' + R + '" r:id="sptK9"/></w:object></w:r>';
+  // A text box with a picture fill: the DrawingML choice and the VML fallback, as Word writes one.
+  var BOX_XML = '<w:r xmlns:w="' + W + '"><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="wps"><w:drawing>' +
+    '<wp:anchor xmlns:wp="' + WP + '" distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="251659264" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" wp14:anchorId="1A2B3C4D">' +
+    '<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>100</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>100</wp:posOffset></wp:positionV>' +
+    '<wp:extent cx="2794000" cy="508000"/><wp:wrapTopAndBottom/><wp:docPr id="7" name="Text Box 5"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="' + A + '"><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">' +
+    '<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2794000" cy="508000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>' +
+    '<a:blipFill><a:blip xmlns:r="' + R + '" r:embed="sptK10"/><a:stretch><a:fillRect/></a:stretch></a:blipFill></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>Words in a box, "sptK10" in quotes</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp>' +
+    '</a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice><mc:Fallback><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml" id="_x0000_s1026" xmlns:o="urn:schemas-microsoft-com:office:office" o:spid="_x0000_s1026" type="#_x0000_t202" style="position:absolute;width:220pt;height:40pt">' +
+    '<v:fill xmlns:r="' + R + '" r:id="sptK10" type="frame"/><v:textbox><w:txbxContent><w:p><w:r><w:t>Words in a box</w:t></w:r></w:p></w:txbxContent></v:textbox></v:shape></w:pict></mc:Fallback></mc:AlternateContent></w:r>';
+  var MATH_XML = '<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:r><m:t>a+b</m:t></m:r></m:oMath>';
+
+  var DATA_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:a="' + A + '"><dgm:ptLst/><dgm:extLst>' +
+    '<a:ext uri="http://schemas.microsoft.com/office/drawing/2008/diagram"><dsp:dataModelExt xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" relId="sptK7" minVer="http://schemas.openxmlformats.org/drawingml/2006/diagram"/></a:ext></dgm:extLst></dgm:dataModel>';
+  var THEME_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="' + A + '" name="Source theme"><a:themeElements/></a:theme>';
+
+  function blobOf(text, type) { return new Blob([typeof text === "string" ? Zip.bytesOf(text) : text], { type: type || "" }); }
+  function part(name, type, content, rels) { return { name: name, contentType: type, blob: blobOf(content, type), rels: rels || [] }; }
+
+  // The parts a real import would store, with the awkward source names real files have.
+  function allParts() {
+    return {
+      p1: part("word/media/my pic & more.PNG", CT.png, new Uint8Array([137, 80, 78, 71, 1, 2, 3, 4])),
+      p2: part("word/charts/chart1.xml", CT.chart, "<c:chartSpace/>", [
+        { id: "rId1", type: T.pkg, part: "p3" }, { id: "rId2", type: T.chartStyle, part: "p4" }, { id: "rId3", type: T.chartColors, part: "p5" }]),
+      p3: part("word/embeddings/Microsoft_Excel_Worksheet.xlsx", CT.xlsx, new Uint8Array([80, 75, 3, 4, 9, 9])),
+      p4: part("word/charts/style1.xml", CT.chartStyle, "<cs:chartStyle/>"),
+      p5: part("word/charts/colors1.xml", CT.chartColors, "<cs:colorStyle/>"),
+      p6: part("word/diagrams/data1.xml", CT.dm, DATA_XML),
+      p7: part("word/diagrams/layout1.xml", CT.lo, "<dgm:layoutDef/>"),
+      p8: part("word/diagrams/quickStyle1.xml", CT.qs, "<dgm:styleDef/>"),
+      p9: part("word/diagrams/colors1.xml", CT.cs, "<dgm:colorsDef/>"),
+      p10: part("word/diagrams/drawing1.xml", CT.dsp, "<dsp:drawing/>", [{ id: "rId1", type: T.image, part: "p16" }]),
+      p11: part("word/media/image3.emf", CT.emf, new Uint8Array([1, 0, 0, 0, 5, 5, 5])),
+      p12: part("word/embeddings/Microsoft_Excel_Worksheet1.xlsx", CT.xlsx, new Uint8Array([80, 75, 3, 4, 7, 7])),
+      p13: part("word/theme/theme1.xml", CT.theme, THEME_XML, [{ id: "rId1", type: T.image, part: "p14" }]),
+      p14: part("word/media/no extension", "image/jpeg", new Uint8Array([255, 216, 255, 1])),
+      p15: part("word/media/\u56FE.\u00E9m\u00F8", "application/x-thing", new Uint8Array([4, 4])),
+      p16: part("word/media/image9.png", CT.png, new Uint8Array([137, 80, 78, 71, 9]))
+    };
+  }
+  var RELS = {
+    pic: [{ id: "sptK1", type: T.image, part: "p1" }],
+    chart: [{ id: "sptK2", type: T.chart, part: "p2" }],
+    smart: [{ id: "sptK3", type: T.dm, part: "p6" }, { id: "sptK4", type: T.lo, part: "p7" }, { id: "sptK5", type: T.qs, part: "p8" },
+      { id: "sptK6", type: T.cs, part: "p9" }, { id: "sptK7", type: T.dsp, part: "p10" }],
+    ole: [{ id: "sptK8", type: T.image, part: "p11" }, { id: "sptK9", type: T.pkg, part: "p12" }],
+    box: [{ id: "sptK10", type: T.image, part: "p1" }]
+  };
+  function entry(blockId, kind, xml, rels, extra) {
+    var e = { token: G.token(blockId), blockId: blockId, kind: kind, xml: xml, rels: rels };
+    if (extra) Object.keys(extra).forEach(function (k) { e[k] = extra[k]; });
+    return e;
+  }
+
+  // ---- a host file from the library, in the house shape -------------------
+  function importedXml(xml) { var c = D.ImportedXmlComponent.fromXmlString(xml); return (c && !c.rootKey && c.root && c.root[0]) || c; }
+  var WATERMARK = '<w:r><w:rPr><w:noProof/></w:rPr><w:pict><v:shape id="DraftWatermark1" o:spid="_x0000_s2049" type="#_x0000_t136" style="position:absolute;margin-left:0;margin-top:0;width:440pt;height:146pt;rotation:315" o:allowincell="f" fillcolor="#B8C2CE" stroked="f"><v:fill opacity=".45"/><v:textpath style="font-family:&quot;Segoe UI&quot;;font-size:1pt" string="DRAFT"/></v:shape></w:pict></w:r>';
+  var TINY_PNG = (function () { var s = atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; })();
+  function P(kids, o) { var a = { children: kids }; if (o) Object.keys(o).forEach(function (k) { a[k] = o[k]; }); return new D.Paragraph(a); }
+  function Rn(t, o) { var a = { text: t }; if (o) Object.keys(o).forEach(function (k) { a[k] = o[k]; }); return new D.TextRun(a); }
+  // `ids` are block ids to type tokens for; `opts.styled` types them in formatted runs; `opts.extra` are more paragraphs.
+  function host(ids, opts) {
+    opts = opts || {};
+    var hp = P([Rn("Header")]); hp.root.push(importedXml(WATERMARK));
+    var kids = [P([Rn("Kept objects")], { heading: D.HeadingLevel.HEADING_1 })];
+    ids.forEach(function (id) {
+      kids.push(P([Rn("Before " + id)]));
+      kids.push(P([Rn(G.token(id), opts.styled ? { bold: true, color: "FF0000", size: 30 } : null)], { alignment: D.AlignmentType.CENTER }));
+    });
+    (opts.extra || []).forEach(function (x) { kids.push(x); });
+    kids.push(P([Rn("After the objects.")]));
+    return D.Packer.toBlob(new D.Document({
+      creator: "Test", title: "Graft test",
+      sections: [{ headers: { default: new D.Header({ children: [hp] }) }, children: kids }]
+    }));
+  }
+  function unzip(blob) {
+    return Zip.read(blob).then(function (files) {
+      var by = {}; files.forEach(function (f) { by[f.name] = f; });
+      return { files: files, by: by, text: function (n) { return by[n] ? Zip.text(by[n]) : null; }, names: files.map(function (f) { return f.name; }) };
+    });
+  }
+  function parse(xml) { return new DOMParser().parseFromString(xml, "application/xml"); }
+  function wellFormed(xml) { return !!xml && parse(xml).getElementsByTagName("parsererror").length === 0; }
+  function relsIn(xml) {
+    return Array.prototype.map.call(parse(xml).getElementsByTagName("Relationship"), function (r) {
+      return { id: r.getAttribute("Id"), type: r.getAttribute("Type"), target: r.getAttribute("Target"), mode: r.getAttribute("TargetMode") };
+    });
+  }
+  function relById(xml, id) { return relsIn(xml).filter(function (r) { return r.id === id; }); }
+  function overridesIn(xml) {
+    var out = {};
+    Array.prototype.forEach.call(parse(xml).getElementsByTagName("Override"), function (o) { out[o.getAttribute("PartName")] = o.getAttribute("ContentType"); });
+    return out;
+  }
+  function count(hay, needle) { return hay.split(needle).length - 1; }
+  function same(a, b) { if (!a || !b || a.length !== b.length) return false; for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+  function bytesOf(blob) { return blob.arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+  function rejects(promise, test, name) {
+    return promise.then(function () { ok(false, name, "it was accepted"); }, function (e) { ok(test(e), name, e && e.message); });
+  }
+  function uniq(list) { var s = {}; return list.every(function (x) { if (s[x]) return false; s[x] = true; return true; }); }
+  function keysOf(plan, e) {
+    var seen = {}, out = [];
+    (function walk(rels) { (rels || []).forEach(function (r) { if (r.part && !seen[r.part] && plan.parts[r.part]) { seen[r.part] = true; out.push(r.part); walk(plan.parts[r.part].rels); } }); })(e.rels);
+    return out;
+  }
+
+  Promise.resolve().then(function () {
+    // ---- the small functions ----------------------------------------------
+    ok(G.token("b12") === "\uE000KEPT:b12\uE000", "the token is U+E000, KEPT:, the block id, U+E000");
+    ok(G.escapeAttr('a&b<c>d"e') === "a&amp;b&lt;c&gt;d&quot;e", "escapeAttr escapes &, <, > and \"");
+    ok(G.escapeAttr(null) === "" && G.escapeAttr(7) === "7", "escapeAttr takes nothing and numbers");
+    ok(G.needsGraft(null) === false && G.needsGraft({ kept: [], parts: {}, media: [] }) === false, "an empty plan needs no graft");
+    ok(G.needsGraft({ kept: [entry("b1", "equation", MATH_XML, [])], parts: {} }) === true, "a plan with a kept object needs one");
+    ok(G.needsGraft({ kept: [], media: [{ fileName: "x.png", ext: "emf", contentType: CT.emf }] }) === true, "a plan with media to rename needs one");
+    var err = new G.SharedPartError("m", ["b1", "b2"]);
+    ok(err instanceof Error && err instanceof G.SharedPartError && err.name === "SharedPartError" && err.message === "m" && err.blockIds.join() === "b1,b2",
+      "SharedPartError is an Error that names the blocks");
+    return host([]);
+  }).then(function (packed) {
+    return G.apply(packed, { kept: [], parts: {}, media: [] }).then(function (out) {
+      ok(out === packed, "with nothing to do, apply hands back the very Blob the library packed");
+    });
+  }).then(function () {
+
+    // ---- placing: one of everything ---------------------------------------
+    var plan = {
+      kept: [
+        entry("b1", "picture", picXml("sptK1", "sptK11"), RELS.pic.concat([{ id: "sptK11", type: T.link, external: "https://example.com/?a=1&b=2\"<x>" }])),
+        entry("b2", "chart", CHART_XML, RELS.chart),
+        entry("b3", "smartart", SMART_XML, RELS.smart),
+        entry("b4", "ole", OLE_XML, RELS.ole),
+        entry("b5", "textbox", BOX_XML, RELS.box),
+        entry("b6", "equation", MATH_XML, [])
+      ],
+      parts: allParts(), theme: "p13", media: []
+    };
+    var frozen = JSON.stringify(plan.kept);
+    var extra = [P([new D.ImageRun({ data: TINY_PNG, transformation: { width: 20, height: 20 } })])];
+    return host(["b1", "b2", "b3", "b4", "b5", "b6"], { extra: extra }).then(function (packed) {
+      return G.apply(packed, plan).then(function (out) {
+        ok(out instanceof Blob && out !== packed, "apply gives a new Blob");
+        ok(out.type === packed.type && /wordprocessingml/.test(out.type), "of the Word document type the library gave");
+        ok(JSON.stringify(plan.kept) === frozen && Object.keys(plan.parts).length === 16, "the plan it was given is not changed");
+        return Promise.all([unzip(packed), unzip(out)]);
+      });
+    }).then(function (both) {
+      var before = both[0], z = both[1], doc = z.text("word/document.xml"), rels = z.text("word/_rels/document.xml.rels"), types = z.text("[Content_Types].xml");
+      ok(z.names[0] === "[Content_Types].xml", "[Content_Types].xml is the first entry");
+      ok(!z.names.some(function (n) { return /\/$/.test(n); }), "no directory entries");
+      ok(doc.indexOf("\uE000") === -1 && doc.indexOf("KEPT:") === -1, "every token is gone");
+      ok(count(before.text("word/document.xml"), "\uE000KEPT:") === 6, "(the packed file held six)");
+      // The first entry's docPr id and the object's ids are renumbered; everything else must be the stored text.
+      var chartPlaced = CHART_XML.replace('<wp:docPr id="7"', '<wp:docPr id="X"');
+      ok(doc.replace(/(<wp:docPr id=")\d+/g, "$1X").indexOf(chartPlaced) !== -1, "the chart's XML is in the document byte for byte (bar the drawing id)");
+      ok(doc.indexOf(MATH_XML) !== -1, "an equation, which is not a run, is placed byte for byte");
+      ok(doc.indexOf("<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr>" + MATH_XML + "</w:p>") !== -1, "it takes the place of the whole run, inside the writer's paragraph", doc.substr(doc.indexOf(MATH_XML) - 60, 60));
+      ok(doc.indexOf('descr="a &amp; b &lt;c&gt;"') !== -1, "escaped text inside the kept XML stays escaped");
+      ok(doc.indexOf('Words in a box, "sptK10" in quotes') !== -1, "text inside a text box is untouched");
+      ok(wellFormed(doc), "word/document.xml is well formed");
+      ok(doc.indexOf("Before b1") < doc.indexOf('name="Picture 7"') && doc.indexOf('name="Picture 7"') < doc.indexOf("Before b2") &&
+        doc.indexOf("Before b2") < doc.indexOf('name="Chart 7"') && doc.indexOf('name="Chart 7"') < doc.indexOf("Before b3"), "each object sits where its token was");
+      ok(doc.indexOf("After the objects.") !== -1 && doc.indexOf("Kept objects") !== -1, "the rest of the document is still there");
+
+      // Parts and their names.
+      var kept = z.names.filter(function (n) { return /^word\/kept\//.test(n); }).sort();
+      ok(z.by["word/kept/p1.png"] && same(z.by["word/kept/p1.png"].bytes, new Uint8Array([137, 80, 78, 71, 1, 2, 3, 4])),
+        "a source part named with a space and an ampersand is word/kept/p1.png, with its bytes");
+      ok(!z.names.some(function (n) { return /[ &]|my pic|%/.test(n); }), "no part name carries the source name");
+      ok(z.by["word/kept/p2.xml"] && z.by["word/kept/p3.xlsx"] && z.by["word/kept/p4.xml"] && z.by["word/kept/p5.xml"], "the chart, its workbook, style and colours parts are added");
+      ok(["p6", "p7", "p8", "p9", "p10"].every(function (k) { return z.by["word/kept/" + k + ".xml"]; }), "the five SmartArt parts are added");
+      ok(z.by["word/kept/p11.emf"] && z.by["word/kept/p12.xlsx"], "the embedded object's preview and workbook are added");
+      ok(same(z.by["word/kept/p3.xlsx"].bytes, new Uint8Array([80, 75, 3, 4, 9, 9])) && Zip.text(z.by["word/kept/p6.xml"]) === DATA_XML, "carried parts are byte for byte what was stored");
+      ok(z.by["word/kept/p14.bin"], "a source name with no extension becomes .bin");
+      ok(!z.by["word/kept/p15.m"] && !z.names.some(function (n) { return /p15/.test(n); }), "a part nothing reaches is not added");
+      ok(kept.every(function (n) { return /^word\/kept\/(_rels\/)?[A-Za-z0-9_\-]+\.[a-z0-9]+(\.rels)?$/.test(n); }), "every carried part name is plain ASCII", kept.join(" "));
+
+      // A part's own relationships sit beside it.
+      var chartRels = z.text("word/kept/_rels/p2.xml.rels");
+      ok(wellFormed(chartRels) && relsIn(chartRels).length === 3, "the chart part has a .rels file beside it");
+      ok(relById(chartRels, "rId1")[0].target === "/word/kept/p3.xlsx" && relById(chartRels, "rId1")[0].type === T.pkg && relById(chartRels, "rId3")[0].target === "/word/kept/p5.xml",
+        "its relationships keep their own ids and point at the carried parts by absolute target");
+      ok(relById(z.text("word/kept/_rels/p10.xml.rels"), "rId1")[0].target === "/word/kept/p16.png" && z.by["word/kept/p16.png"], "a part reached only through another part is carried too");
+      ok(z.names.filter(function (n) { return /^word\/kept\/p1[^0-9]/.test(n); }).length === 1, "a part two objects reach (the picture, from the text box too) is added once");
+      ok(!z.by["word/kept/_rels/p1.png.rels"] && !z.by["word/kept/_rels/p3.xlsx.rels"], "a part with no relationships gets no .rels file");
+
+      // The document's relationships.
+      ok(wellFormed(rels), "word/_rels/document.xml.rels is well formed");
+      var all = relsIn(rels), ids = all.map(function (r) { return r.id; });
+      ok(uniq(ids), "every relationship id is used once");
+      ok(["sptK1", "sptK2", "sptK3", "sptK4", "sptK5", "sptK6", "sptK7", "sptK8", "sptK9", "sptK11"].every(function (id) { return relById(rels, id).length === 1; }),
+        "one relationship for each id the kept XML uses, the diagram drawing included");
+      ok(relById(rels, "sptK2")[0].target === "/word/kept/p2.xml" && relById(rels, "sptK2")[0].type === T.chart && !relById(rels, "sptK2")[0].mode, "an internal target is absolute, with its type");
+      var onPic = all.filter(function (r) { return r.target === "/word/kept/p1.png"; });
+      ok(onPic.length === 2 && onPic[0].id === "sptK1" && /^sptK10c\d+$/.test(onPic[1].id), "two objects on one picture both point at the one part, the second by an id of its own (" + (onPic[1] && onPic[1].id) + ")");
+      ok(onPic[1] && count(doc, '"' + onPic[1].id + '"') === 2 && doc.indexOf('"sptK10"') === doc.indexOf('"sptK10" in quotes'), "and its XML was given that id");
+      var link = relById(rels, "sptK11")[0];
+      ok(link.target === "https://example.com/?a=1&b=2\"<x>" && link.mode === "External", "a link target with &, a quote and angle brackets comes back exactly, as an external target");
+      ok(rels.indexOf("?a=1&amp;b=2&quot;&lt;x&gt;") !== -1, "(it is escaped in the file)");
+      ok(relsIn(before.text("word/_rels/document.xml.rels")).every(function (r) { return relById(rels, r.id).length === 1; }), "the library's own relationships are all still there");
+
+      // Content types.
+      ok(wellFormed(types), "[Content_Types].xml is well formed");
+      var ov = overridesIn(types);
+      ok(ov["/word/kept/p1.png"] === CT.png && ov["/word/kept/p2.xml"] === CT.chart && ov["/word/kept/p3.xlsx"] === CT.xlsx && ov["/word/kept/p6.xml"] === CT.dm &&
+        ov["/word/kept/p10.xml"] === CT.dsp && ov["/word/kept/p11.emf"] === CT.emf && ov["/word/kept/p14.bin"] === "image/jpeg", "every carried part has an Override with its stored content type");
+      ok(z.names.filter(function (n) { return /^word\/kept\/[^\/]+$/.test(n); }).every(function (n) { return ov["/" + n]; }), "no carried part is without one");
+      ok(ov["/word/document.xml"] && ov["/word/styles.xml"], "the library's own content types are still there");
+
+      // The theme.
+      ok(z.text("word/theme/theme1.xml") === THEME_XML, "the source theme is added as word/theme/theme1.xml");
+      ok(ov["/word/theme/theme1.xml"] === CT.theme, "with an Override");
+      var themeRel = all.filter(function (r) { return /\/theme$/.test(r.type); });
+      ok(themeRel.length === 1 && themeRel[0].target === "theme/theme1.xml", "and one theme relationship from the document");
+      ok(relById(z.text("word/theme/_rels/theme1.xml.rels") || "<x/>", "rId1").length === 1 && relById(z.text("word/theme/_rels/theme1.xml.rels"), "rId1")[0].target === "/word/kept/p14.bin",
+        "the theme's own relationships are written and its picture carried");
+      ok(!before.names.some(function (n) { return /theme/.test(n); }), "(the library writes no theme of its own)");
+
+      // Ids.
+      var docPr = (doc.match(/<wp:docPr\b[^>]*?\sid="\d+"/g) || []).map(function (t) { return /\sid="(\d+)"/.exec(t)[1]; });
+      ok(docPr.length === 5 && uniq(docPr), "every wp:docPr id is different (" + docPr.join(",") + ")");
+      ok(docPr.every(function (v, n) { return n === 0 || Number(v) === Number(docPr[n - 1]) + 1; }), "in one sequence, the library's own picture included");
+      ok(/<v:shape [^>]*id="_x0000_i1025"/.test(doc) && /ShapeID="_x0000_i1025"/.test(doc), "the embedded object's shape id and ShapeID are renumbered together");
+      ok(/ObjectID="_\d+"/.test(doc) && doc.indexOf("_1855919606") === -1, "its ObjectID is renumbered");
+      ok(doc.indexOf('<v:shapetype xmlns:v="urn:schemas-microsoft-com:vml" id="_x0000_t75"') !== -1, "the shape type id is left alone");
+      ok(doc.indexOf('id="_x0000_s1026"') !== -1 && doc.indexOf('o:spid="_x0000_s1026"') !== -1, "a VML shape that is not an embedded object keeps its id");
+      var header = z.names.filter(function (n) { return /^word\/header\d*\.xml$/.test(n); })[0];
+      ok(header && z.text(header).indexOf('o:spid="_x0000_s2049"') !== -1 && z.text(header) === before.text(header), "the watermark in the header is untouched");
+
+      // Everything the library wrote and the graft had no reason to touch is unchanged.
+      var untouched = before.names.filter(function (n) { return !/\/$/.test(n) && ["word/document.xml", "word/_rels/document.xml.rels", "[Content_Types].xml"].indexOf(n) === -1; });
+      ok(untouched.length > 4 && untouched.every(function (n) { return z.by[n] && same(z.by[n].bytes, before.by[n].bytes); }), "every other part of the packed file is byte for byte as it was (" + untouched.length + ")");
+      ok(z.names.every(function (n) { return !/\.(xml|rels)$/.test(n) || /^word\/kept\/p\d+\.xml$/.test(n) || wellFormed(z.text(n)); }), "every XML part the graft wrote is well formed");
+    });
+  }).then(function () {
+
+    // ---- the run that is replaced -----------------------------------------
+    return host(["b1", "b2"], { styled: true }).then(function (packed) {
+      return unzip(packed).then(function (before) {
+        ok(/<w:r><w:rPr>.*?<\/w:rPr><w:t[^>]*>\uE000KEPT:b1\uE000<\/w:t><\/w:r>/.test(before.text("word/document.xml")), "(a token typed in a formatted run has run properties)");
+        return G.apply(packed, { kept: [entry("b1", "equation", MATH_XML, []), entry("b2", "picture", picXml("sptK1"), RELS.pic)], parts: allParts() });
+      }).then(unzip).then(function (z) {
+        var doc = z.text("word/document.xml");
+        ok(doc.indexOf("</w:pPr>" + MATH_XML + "</w:p>") !== -1 && doc.indexOf("FF0000") === -1, "the token's run goes with its run properties");
+        ok(!z.by["word/theme/theme1.xml"], "no theme is added when the plan names none");
+        ok(z.names.filter(function (n) { return /^word\/kept\//.test(n); }).join() === "word/kept/p1.png", "only the parts the placed objects reach are added");
+      });
+    });
+  }).then(function () {
+    return host(["b1"]).then(function (packed) {
+      return rejects(G.apply(packed, { kept: [entry("b1", "equation", MATH_XML, []), entry("b77", "equation", MATH_XML, [])], parts: {} }),
+        function (e) { return /A drawing could not be placed/.test(e.message) && /b77/.test(e.message) && e.blockId === "b77"; },
+        "a token that is not in the file fails the export and names the block");
+    });
+  }).then(function () {
+    // A token sharing its run's text with other words is not a placeholder run.
+    return D.Packer.toBlob(new D.Document({ sections: [{ children: [P([Rn("see " + G.token("b1") + " here")])] }] })).then(function (packed) {
+      return rejects(G.apply(packed, { kept: [entry("b1", "equation", MATH_XML, [])], parts: {} }),
+        function (e) { return /could not be placed/.test(e.message) && e.blockId === "b1"; }, "a token that is not alone in its run is refused, not half replaced");
+    });
+  }).then(function () {
+    var parts = allParts(); parts.p1 = { name: "word/media/image1.png", contentType: CT.png, blob: null, missing: true, rels: [] };
+    return host(["b1"]).then(function (packed) {
+      return rejects(G.apply(packed, { kept: [entry("b1", "picture", picXml("sptK1"), RELS.pic)], parts: parts }),
+        function (e) { return /could not be placed/.test(e.message) && /missing/.test(e.message); }, "a part with no bytes fails the export instead of writing a damaged file");
+    });
+  }).then(function () {
+    return rejects(G.apply(new Blob([Zip.bytesOf("not a zip, and long enough to be looked at properly")]), { kept: [entry("b1", "equation", MATH_XML, [])], parts: {} }),
+      function (e) { return /not a zip/.test(e.message); }, "a Blob that is not a packed file is refused");
+  }).then(function () {
+
+    // ---- awkward keys and names -------------------------------------------
+    var parts = {
+      "../../evil key": part("word/media/a.png", CT.png, new Uint8Array([1])),
+      P1: part("word/media/b.PNG", CT.png, new Uint8Array([2])),
+      p1: part("word/media/c.png", CT.png, new Uint8Array([3])),
+      p2: part("word/x.rels", "application/x-odd", new Uint8Array([4])),
+      p3: part("word/media/d.J P&G", "image/jpeg", new Uint8Array([5]))
+    };
+    var rels = [{ id: "sptK1", type: T.image, part: "../../evil key" }, { id: "sptK2", type: T.image, part: "P1" }, { id: "sptK3", type: T.image, part: "p1" },
+      { id: "sptK4", type: T.image, part: "p2" }, { id: "sptK5", type: T.image, part: "p3" }, { id: "sptK6", type: T.image, part: "gone" }];
+    var xml = picXml("sptK1").replace("</w:r>", '<w:t>sptK2 sptK3 sptK4 sptK5 sptK6</w:t></w:r>');
+    return host(["b1"]).then(function (packed) { return G.apply(packed, { kept: [entry("b1", "other", xml, rels)], parts: parts }); }).then(unzip).then(function (z) {
+      var kept = z.names.filter(function (n) { return /^word\/kept\//.test(n); });
+      ok(kept.length === 5 && uniq(kept.map(function (n) { return n.toLowerCase(); })), "part keys that differ only by case get different part names", kept.join(" "));
+      ok(kept.every(function (n) { return /^word\/kept\/[A-Za-z0-9_\-]+\.[a-z0-9]+$/.test(n); }), "a part key that is not a plain id never reaches a part name", kept.join(" "));
+      ok(kept.some(function (n) { return /\.bin$/.test(n); }) && kept.some(function (n) { return /\.jpg$/.test(n); }), "an extension is lower-cased and reduced to letters and digits; .rels becomes .bin", kept.join(" "));
+      var r = relsIn(z.text("word/_rels/document.xml.rels"));
+      ok(r.filter(function (x) { return x.id === "sptK6"; }).length === 0, "a relationship whose part is not in the plan is left out");
+      ok(Object.keys(overridesIn(z.text("[Content_Types].xml"))).filter(function (n) { return /^\/word\/kept\//.test(n); }).length === 5, "each gets its Override");
+    });
+  }).then(function () {
+
+    // ---- unshare ----------------------------------------------------------
+    var parts = allParts();
+    var plan = { kept: [
+      entry("b1", "picture", picXml("sptK1"), RELS.pic), entry("b2", "picture", picXml("sptK1"), RELS.pic),
+      entry("b3", "textbox", BOX_XML, RELS.box), entry("b4", "textbox", BOX_XML, RELS.box),
+      entry("b5", "chart", CHART_XML, RELS.chart), entry("b6", "chart", CHART_XML, RELS.chart),
+      entry("b7", "smartart", SMART_XML, RELS.smart), entry("b8", "smartart", SMART_XML, RELS.smart),
+      entry("b9", "ole", OLE_XML, RELS.ole), entry("b10", "ole", OLE_XML, RELS.ole),
+      entry("b11", "chart", CHART_XML, RELS.chart)
+    ], parts: parts, theme: "p13", media: [] };
+    var frozen = JSON.stringify(plan.kept), keyCount = Object.keys(parts).length;
+    var u = G.unshare(plan), k = u.kept;
+    ok(JSON.stringify(plan.kept) === frozen && Object.keys(plan.parts).length === keyCount && u !== plan, "unshare leaves the plan it was given alone");
+    ok(u.theme === "p13" && u.media === plan.media, "and carries the theme and the media list across");
+    ok(k[0] === plan.kept[0] && k[4] === plan.kept[4] && k[6] === plan.kept[6] && k[8] === plan.kept[8], "the first use of each object is left exactly as it is");
+
+    ok(k[1].rels[0].part === "p1" && k[1].rels[0].id !== "sptK1" && /^sptK1c\d+$/.test(k[1].rels[0].id), "a copied picture shares its image part and gets a relationship id of its own (" + k[1].rels[0].id + ")");
+    ok(k[1].xml.indexOf('r:embed="' + k[1].rels[0].id + '"') !== -1 && k[1].xml.indexOf('"sptK1"') === -1, "its XML uses the new id");
+    ok(k[2].rels[0].part === "p1" && k[2].rels[0].id !== "sptK10", "a text box on a picture another object already uses shares it too");
+    ok(k[3].rels[0].part === "p1" && count(k[3].xml, 'r:embed="' + k[3].rels[0].id + '"') === 1 && count(k[3].xml, 'r:id="' + k[3].rels[0].id + '"') === 1,
+      "a copied text box shares its image part, in the drawing and in the fallback");
+    ok(k[3].xml.indexOf('Words in a box, "sptK10" in quotes') !== -1, "an id that only appears in quotes inside the text is not an attribute and is left alone");
+
+    var c = k[5], cKey = c.rels[0].part, cp = u.parts[cKey];
+    ok(cKey !== "p2" && cp && cp !== parts.p2 && cp.blob === parts.p2.blob && cp.contentType === CT.chart && cp.name === parts.p2.name, "a copied chart gets its own chart part, with the same bytes");
+    var sub = cp.rels.map(function (r) { return r.part; });
+    ok(sub.length === 3 && sub.indexOf("p3") === -1 && sub.indexOf("p4") === -1 && sub.indexOf("p5") === -1 && uniq(sub), "and its own workbook, style and colours parts (the whole closure is cloned)");
+    ok(cp.rels.map(function (r) { return r.id; }).join() === "rId1,rId2,rId3" && u.parts[sub[0]].blob === parts.p3.blob, "the cloned part keeps its own relationship ids");
+    ok(parts.p2.rels[0].part === "p3", "the original chart part still points at the original workbook");
+    ok(c.xml.indexOf('r:id="' + c.rels[0].id + '"') !== -1 && c.rels[0].id !== "sptK2", "the copy's XML points at its own relationship");
+    var c3 = k[10];
+    ok(c3.rels[0].part !== cKey && c3.rels[0].part !== "p2" && c3.rels[0].id !== c.rels[0].id, "a third copy gets a third chart part and a third id");
+    ok(uniq(keysOf(u, k[4]).concat(keysOf(u, c), keysOf(u, c3))), "no part of the three charts is shared");
+
+    var s = k[7], sMap = {};
+    RELS.smart.forEach(function (r, n) { sMap[r.id] = s.rels[n].id; });
+    ok(s.rels.every(function (r, n) { return r.part !== RELS.smart[n].part && r.id !== RELS.smart[n].id && r.type === RELS.smart[n].type; }), "copied SmartArt gets its own data, layout, style, colours and drawing parts");
+    ok(["dm", "lo", "qs", "cs"].every(function (a, n) { return s.xml.indexOf("r:" + a + '="' + s.rels[n].id + '"') !== -1; }), "its XML names the new relationships");
+    var sData = u.parts[s.rels[0].part];
+    ok(sData.relIds && sData.relIds.sptK7 === s.rels[4].id, "its data part is marked to have relId rewritten to the copy's drawing relationship (" + s.rels[4].id + ")");
+    ok(!parts.p6.relIds && !u.parts[k[6].rels[0].part].relIds, "the original's data part is not marked");
+    var sDraw = u.parts[s.rels[4].part];
+    ok(sDraw.rels[0].part !== "p16" && u.parts[sDraw.rels[0].part].blob === parts.p16.blob, "a picture inside a cloned part is cloned with it");
+
+    // A diagram whose drawing uses a picture that an earlier object also uses: by the
+    // rule it reaches a part already used, so it is cloned whole. Wasteful, never wrong.
+    var mixed = allParts(); mixed.p10 = part("word/diagrams/drawing1.xml", CT.dsp, "<dsp:drawing/>", [{ id: "rId1", type: T.image, part: "p1" }]);
+    var mu = G.unshare({ kept: [entry("b1", "picture", picXml("sptK1"), RELS.pic), entry("b2", "smartart", SMART_XML, RELS.smart)], parts: mixed });
+    ok(mu.kept[1].rels.every(function (r, n) { return r.part !== RELS.smart[n].part; }) && mu.parts[mu.kept[1].rels[0].part].relIds.sptK7 === mu.kept[1].rels[4].id,
+      "a diagram that reaches a picture an earlier object uses is cloned whole, with its relId kept right");
+
+    var o = k[9];
+    ok(o.rels[0].part === "p11" && o.rels[1].part === "p12", "a copied embedded object shares its preview image and its embedding");
+    ok(o.rels[0].id !== "sptK8" && o.rels[1].id !== "sptK9" && o.xml.indexOf('r:id="' + o.rels[0].id + '"') !== -1 && o.xml.indexOf('r:id="' + o.rels[1].id + '"') !== -1, "and gets relationship ids of its own");
+    var allIds = []; k.forEach(function (e) { e.rels.forEach(function (r) { allIds.push(r.id); }); });
+    ok(uniq(allIds), "after unshare no two entries use the same relationship id");
+
+    // The same plan through apply: what Word will be given.
+    return host(plan.kept.map(function (e) { return e.blockId; })).then(function (packed) { return G.apply(packed, plan); }).then(unzip).then(function (z) {
+      var doc = z.text("word/document.xml"), rels = relsIn(z.text("word/_rels/document.xml.rels"));
+      ok(wellFormed(doc) && doc.indexOf("\uE000") === -1, "the plan with copies grafts into a well formed document");
+      var chartRels = rels.filter(function (r) { return r.type === T.chart; });
+      ok(chartRels.length === 3 && uniq(chartRels.map(function (r) { return r.target; })), "three charts, three chart parts");
+      var books = z.names.filter(function (n) { return /^word\/kept\/p3[^\/]*\.xlsx$/.test(n); });
+      ok(books.length === 3, "three workbooks (" + books.join(" ") + ")");
+      var dataRels = rels.filter(function (r) { return r.type === T.dm; }), drawRels = rels.filter(function (r) { return r.type === T.dsp; });
+      ok(dataRels.length === 2 && drawRels.length === 2 && dataRels[0].target !== dataRels[1].target && drawRels[0].target !== drawRels[1].target, "two diagrams, each with its own data and drawing part");
+      var d1 = Zip.text(z.by[dataRels[0].target.slice(1)]), d2 = Zip.text(z.by[dataRels[1].target.slice(1)]);
+      ok(d1 === DATA_XML, "the original data part still says relId=\"sptK7\", byte for byte");
+      ok(d2 === DATA_XML.replace('relId="sptK7"', 'relId="' + drawRels[1].id + '"') && drawRels[1].id !== "sptK7", "the copy's data part names the copy's drawing relationship, and nothing else in it changed");
+      ok(rels.filter(function (r) { return r.target === "/word/kept/p12.xlsx"; }).length === 2 && z.names.filter(function (n) { return /p12/.test(n); }).length === 1, "two embedded objects, one embedding part");
+      ok(rels.filter(function (r) { return r.target === "/word/kept/p1.png"; }).length === 4, "four relationships to the one shared picture");
+      var shapeIds = (doc.match(/<v:shape [^>]*?\sid="_x0000_i\d+"/g) || []).map(function (t) { return /id="(_x0000_i\d+)"/.exec(t)[1]; });
+      var oleShape = (doc.match(/ShapeID="[^"]*"/g) || []).map(function (t) { return t.slice(9, -1); }), objIds = doc.match(/ObjectID="[^"]*"/g) || [];
+      ok(shapeIds.length === 2 && uniq(shapeIds) && shapeIds.join() === oleShape.join(), "the two embedded objects have different shape ids, each matching its ShapeID (" + shapeIds.join(",") + ")");
+      ok(objIds.length === 2 && uniq(objIds), "and different ObjectIDs");
+      var docPr = (doc.match(/<wp:docPr\b[^>]*?\sid="\d+"/g) || []).map(function (t) { return /\sid="(\d+)"/.exec(t)[1]; });
+      ok(docPr.length === 9 && uniq(docPr), "nine drawings, nine different wp:docPr ids");
+      ok(uniq(rels.map(function (r) { return r.id; })), "every relationship id in the file is used once");
+      ok(z.names.filter(function (n) { return /^word\/theme\/theme1\.xml$/.test(n); }).length === 1 && rels.filter(function (r) { return /\/theme$/.test(r.type); }).length === 1, "the theme part is added once, however many kept objects there are");
+      var ov = overridesIn(z.text("[Content_Types].xml"));
+      ok(z.names.filter(function (n) { return /^word\/kept\/[^\/]+$/.test(n); }).every(function (n) { return ov["/" + n]; }), "every cloned part has its Override");
+    });
+  }).then(function () {
+    // Forced sharing: the check behind the rule.
+    var parts = allParts();
+    var forced = [{ id: "sptK2", type: T.image, part: "p2" }];           // a chart part reached by a relationship typed as an image
+    var thrown = null;
+    try { G.unshare({ kept: [entry("b1", "chart", CHART_XML, RELS.chart), entry("b2", "picture", CHART_XML, forced)], parts: parts }); } catch (e) { thrown = e; }
+    ok(thrown instanceof G.SharedPartError && thrown.blockIds.join() === "b1,b2", "a plan forced to share a chart part throws SharedPartError naming both blocks", thrown && thrown.message);
+    ok(thrown && thrown.message.length > 20 && !/[\u2013\u2014]/.test(thrown.message), "with a message a person can read");
+    thrown = null;
+    try { G.unshare({ kept: [entry("b1", "smartart", SMART_XML, RELS.smart), entry("b2", "picture", "<x/>", [{ id: "sptK90", type: T.pkg, part: "p10" }])], parts: parts }); } catch (e) { thrown = e; }
+    ok(thrown instanceof G.SharedPartError, "the same for a diagram part");
+    return host(["b1", "b2"]).then(function (packed) {
+      return rejects(G.apply(packed, { kept: [entry("b1", "chart", CHART_XML, RELS.chart), entry("b2", "picture", CHART_XML, forced)], parts: parts }),
+        function (e) { return e instanceof G.SharedPartError; }, "apply refuses that plan, so the file Word would reject is never written");
+    });
+  }).then(function () {
+    // Kind "other": nothing is shared.
+    var parts = allParts(), rels = [{ id: "sptK1", type: T.image, part: "p1" }];
+    var u = G.unshare({ kept: [entry("b1", "other", picXml("sptK1"), rels), entry("b2", "other", picXml("sptK1"), rels)], parts: parts });
+    ok(u.kept[1].rels[0].part !== "p1" && u.parts[u.kept[1].rels[0].part].blob === parts.p1.blob, "a copy of an object of kind other is cloned whole, picture included");
+    // Two different objects that reach nothing in common are not touched at all.
+    var plain = { kept: [entry("b1", "chart", CHART_XML, RELS.chart), entry("b2", "smartart", SMART_XML, RELS.smart)], parts: parts };
+    var v = G.unshare(plain);
+    ok(v.kept[0] === plain.kept[0] && v.kept[1] === plain.kept[1] && Object.keys(v.parts).length === Object.keys(parts).length, "objects with nothing in common are left alone and no part is cloned");
+    ok(G.unshare({ kept: [], parts: {} }).kept.length === 0 && G.unshare(null) === null, "an empty plan passes through");
+    // Ids that are prefixes of each other.
+    var two = [{ id: "sptK1", type: T.image, part: "p1" }, { id: "sptK12", type: T.image, part: "p11" }];
+    var xml = '<w:r><a r:embed="sptK1"/><b r:embed="sptK12"/></w:r>';
+    var w = G.unshare({ kept: [entry("b1", "picture", xml, two), entry("b2", "picture", xml, two)], parts: parts }).kept[1];
+    ok(w.xml === '<w:r><a r:embed="' + w.rels[0].id + '"/><b r:embed="' + w.rels[1].id + '"/></w:r>' && w.rels[0].id !== w.rels[1].id, "sptK1 and sptK12 are renamed separately (" + w.rels[0].id + ", " + w.rels[1].id + ")");
+    // A loop in the parts must not hang.
+    var loop = { a: part("a.xml", "x/a", "a", [{ id: "rId1", type: T.chart, part: "b" }]), b: part("b.xml", "x/b", "b", [{ id: "rId1", type: T.chart, part: "a" }]) };
+    var lr = [{ id: "sptK1", type: T.chart, part: "a" }];
+    var lu = G.unshare({ kept: [entry("b1", "other", "<x/>", lr), entry("b2", "other", "<x/>", lr)], parts: loop });
+    ok(Object.keys(lu.parts).length === 4, "parts that point at each other are cloned once each");
+  }).then(function () {
+
+    // ---- scaleXml ---------------------------------------------------------
+    var half = G.scaleXml(CHART_XML, 0.5);
+    ok(half.indexOf('<wp:extent cx="2743200" cy="1600200"/>') !== -1, "wp:extent is scaled");
+    ok(half.replace('cx="2743200" cy="1600200"', 'cx="5486400" cy="3200400"') === CHART_XML, "and nothing else in a chart's XML changes");
+    var pic = G.scaleXml(picXml("sptK1"), 0.5);
+    ok(pic.indexOf('<wp:extent cx="952500" cy="571500"/>') !== -1 && pic.indexOf('<a:ext cx="952500" cy="571500"/>') !== -1, "a picture's wp:extent and the a:ext of its a:xfrm are scaled together");
+    ok(pic.indexOf('<a:ext uri="{28A0092B-C50C-407E-A947-70E740481C1C}"/>') !== -1 && pic.indexOf('<a:srcRect l="10000"/>') !== -1 && pic.indexOf('<wp:docPr id="7"') !== -1,
+      "an extension element, the crop and the ids are left alone");
+    var ole = G.scaleXml(OLE_XML, 0.5);
+    ok(ole.indexOf('style="width:173pt;height:76.75pt"') !== -1, "the width and height in a VML shape's style are scaled");
+    ok(ole.indexOf('w:dxaOrig="6918"') !== -1 && ole.indexOf('coordsize="21600,21600"') !== -1 && ole.replace("width:173pt;height:76.75pt", "width:346pt;height:153.5pt") === OLE_XML, "and nothing else in the object");
+    ok(G.scaleXml('<v:shape style="position:absolute;margin-left:10pt;width:100pt;mso-width-percent:400;height:50.5pt;z-index:1"/>', 0.3) ===
+      '<v:shape style="position:absolute;margin-left:10pt;width:30pt;mso-width-percent:400;height:15.15pt;z-index:1"/>', "only width and height, not margins or mso- properties");
+    ok(G.scaleXml('<v:rect style="width:2in;height:1.5in"/>', 0.5) === '<v:rect style="width:1in;height:0.75in"/>', "units other than points are kept");
+    var group = '<wpg:wgp><wpg:grpSpPr><a:xfrm><a:off x="10" y="20"/><a:ext cx="4000" cy="2000"/><a:chOff x="10" y="20"/><a:chExt cx="4000" cy="2000"/></a:xfrm></wpg:grpSpPr>' +
+      '<wps:wsp><wps:spPr><a:xfrm><a:off x="100" y="100"/><a:ext cx="1000" cy="500"/></a:xfrm></wps:spPr></wps:wsp>' +
+      '<wpg:grpSp><wpg:grpSpPr><a:xfrm><a:off x="1" y="1"/><a:ext cx="800" cy="400"/><a:chOff x="0" y="0"/><a:chExt cx="800" cy="400"/></a:xfrm></wpg:grpSpPr><wps:wsp><wps:spPr><a:xfrm><a:ext cx="80" cy="40"/></a:xfrm></wps:spPr></wps:wsp></wpg:grpSp></wpg:wgp>';
+    ok(G.scaleXml('<wp:inline><wp:extent cx="4000" cy="2000"/>' + group + '</wp:inline>', 0.5) ===
+      '<wp:inline><wp:extent cx="2000" cy="1000"/>' + group.replace('<a:off x="10" y="20"/><a:ext cx="4000" cy="2000"/>', '<a:off x="5" y="10"/><a:ext cx="2000" cy="1000"/>') + '</wp:inline>',
+      "a group is scaled by its own frame; its child coordinates and its children are left alone");
+    var canvas = '<wpc:wpc><wps:wsp><wps:spPr><a:xfrm><a:off x="200" y="-100"/><a:ext cx="1000" cy="500"/></a:xfrm></wps:spPr></wps:wsp><wps:wsp><wps:spPr><a:xfrm><a:off x="1400" y="100"/><a:ext cx="1000" cy="500"/></a:xfrm></wps:spPr></wps:wsp></wpc:wpc>';
+    ok(G.scaleXml(canvas, 0.5) === canvas.replace('x="200" y="-100"/><a:ext cx="1000" cy="500"', 'x="100" y="-50"/><a:ext cx="500" cy="250"').replace('x="1400" y="100"/><a:ext cx="1000" cy="500"', 'x="700" y="50"/><a:ext cx="500" cy="250"'),
+      "shapes straight on a canvas are scaled in place, offsets included");
+    var vgroup = '<v:group style="width:200pt;height:100pt" coordsize="2000,1000"><v:rect style="position:absolute;left:0;top:0;width:900;height:400"/></v:group>';
+    ok(G.scaleXml(vgroup, 0.5) === vgroup.replace("width:200pt;height:100pt", "width:100pt;height:50pt"), "a VML group is scaled by its own frame, not its children");
+    var boxed = '<wp:inline><wp:extent cx="1000" cy="500"/><wps:wsp><wps:txbx><w:txbxContent><w:p><w:r><w:drawing><wp:inline><wp:extent cx="300" cy="200"/><pic:spPr><a:xfrm><a:ext cx="300" cy="200"/></a:xfrm></pic:spPr></wp:inline></w:drawing></w:r></w:p></w:txbxContent></wps:txbx></wps:wsp></wp:inline>';
+    ok(G.scaleXml(boxed, 0.5) === boxed.replace('<wp:extent cx="1000" cy="500"/>', '<wp:extent cx="500" cy="250"/>'), "a picture inside a text box is not scaled with the box");
+    ok(G.scaleXml('<wp:extent cx="3" cy="1"/>', 0.1) === '<wp:extent cx="1" cy="1"/>', "a size never rounds down to nothing");
+    ok(G.scaleXml(CHART_XML, 1) === CHART_XML && G.scaleXml(CHART_XML, 0) === CHART_XML && G.scaleXml(CHART_XML, -2) === CHART_XML && G.scaleXml(CHART_XML, "x") === CHART_XML && G.scaleXml(CHART_XML) === CHART_XML,
+      "a factor of 1, 0, below 0 or not a number changes nothing");
+    ok(wellFormed('<x xmlns:w="' + W + '" xmlns:mc="m" xmlns:wp14="w">' + G.scaleXml(BOX_XML, 0.37) + "</x>") && wellFormed(G.scaleXml(OLE_XML, 0.37)), "scaled XML is still well formed");
+
+    // Through apply: only the entry with a scale is touched.
+    var plan = { kept: [entry("b1", "chart", CHART_XML, RELS.chart, { scale: 0.5 }), entry("b2", "ole", OLE_XML, RELS.ole, { scale: 0.25 }), entry("b3", "smartart", SMART_XML, RELS.smart),
+      entry("b4", "picture", picXml("sptK1"), RELS.pic, { scale: 1.6 })], parts: allParts() };
+    return host(["b1", "b2", "b3", "b4"]).then(function (packed) { return G.apply(packed, plan); }).then(unzip).then(function (z) {
+      var doc = z.text("word/document.xml");
+      ok(doc.indexOf('<wp:extent cx="2743200" cy="1600200"/><wp:docPr id="') !== -1, "apply scales an entry that carries a scale");
+      ok(doc.indexOf('style="width:86.5pt;height:38.38pt"') !== -1, "the embedded object by its own factor");
+      ok(count(doc, '<wp:extent cx="5486400" cy="3200400"/>') === 1, "an entry with no scale keeps its size");
+      ok(doc.indexOf('<wp:extent cx="1905000" cy="1143000"/>') !== -1, "a scale above 1 is ignored: objects are never made larger");
+      ok(plan.kept[0].xml === CHART_XML, "the stored XML is not changed");
+    });
+  }).then(function () {
+
+    // ---- media the library named .png whatever it holds --------------------
+    var emf = new Uint8Array(200); emf[0] = 1; emf[40] = 0x20; emf[41] = 0x45; emf[42] = 0x4D; emf[43] = 0x46;
+    var tif = new Uint8Array([0x49, 0x49, 0x2A, 0, 8, 0, 0, 0, 0, 0, 0, 0]);
+    function img(data) { return new D.ImageRun({ data: data, transformation: { width: 40, height: 30 } }); }
+    var wmf = new Uint8Array([0xD7, 0xCD, 0xC6, 0x9A, 0, 0, 1, 2, 3]);
+    var hp = P([img(wmf)]);
+    return D.Packer.toBlob(new D.Document({ sections: [{ headers: { default: new D.Header({ children: [hp] }) },
+      children: [P([img(emf)]), P([img(tif)]), P([img(TINY_PNG)]), P([Rn(G.token("b1"))])] }] })).then(function (packed) {
+      return unzip(packed).then(function (before) {
+        var media = before.names.filter(function (n) { return /^word\/media\//.test(n); });
+        function fileOf(bytes) { return media.filter(function (n) { return same(before.by[n].bytes, bytes); })[0].split("/").pop(); }
+        var emfName = fileOf(emf), tifName = fileOf(tif), pngName = fileOf(TINY_PNG), wmfName = fileOf(wmf);
+        ok(/\.png$/.test(emfName) && /\.png$/.test(tifName), "(the library names an EMF and a TIFF .png: " + emfName + ")");
+        ok(!/Extension="emf"/.test(before.text("[Content_Types].xml")), "(and its content types know nothing of emf)");
+        var plan = { kept: [entry("b1", "equation", MATH_XML, [])], parts: {}, media: [
+          { fileName: emfName, ext: "emf", contentType: "image/x-emf" }, { fileName: tifName, ext: "TIFF", contentType: "image/tiff" },
+          { fileName: pngName, ext: "png", contentType: "image/png" }, { fileName: wmfName, ext: "wmf", contentType: "image/x-wmf" },
+          { fileName: "not-there.png", ext: "svg", contentType: "image/svg+xml" }] };
+        return G.apply(packed, plan).then(unzip).then(function (z) {
+          var newEmf = "word/media/" + emfName.replace(/\.png$/, ".emf"), newTif = "word/media/" + tifName.replace(/\.png$/, ".tiff");
+          ok(z.by[newEmf] && same(z.by[newEmf].bytes, emf) && !z.by["word/media/" + emfName], "the EMF is renamed .emf, with its bytes");
+          ok(z.by[newTif] && !z.by["word/media/" + tifName], "an extension given in capitals is lower-cased");
+          ok(z.by["word/media/" + pngName], "a PNG keeps its name");
+          var relFiles = z.names.filter(function (n) { return /\.rels$/.test(n); }), targets = [];
+          relFiles.forEach(function (n) { relsIn(z.text(n)).forEach(function (r) { if (/media\//.test(r.target)) targets.push(n + " " + r.target); }); });
+          ok(targets.indexOf("word/_rels/document.xml.rels media/" + emfName.replace(/\.png$/, ".emf")) !== -1 && !targets.some(function (t) { return t.indexOf(emfName) !== -1; }),
+            "its target in the document's relationships is updated", targets.join(" | "));
+          ok(targets.some(function (t) { return /^word\/_rels\/header\d*\.xml\.rels media\/.*\.wmf$/.test(t); }) && !targets.some(function (t) { return t.indexOf(wmfName) !== -1; }),
+            "a picture in the header is renamed in the header's own .rels file", targets.join(" | "));
+          ok(targets.length === 4, "no relationship is lost or added");
+          ok(targets.every(function (t) { return z.by["word/" + t.split(" ")[1]]; }), "every media target names a part that exists");
+          var types = z.text("[Content_Types].xml"), defaults = {};
+          Array.prototype.forEach.call(parse(types).getElementsByTagName("Default"), function (d) { defaults[d.getAttribute("Extension")] = (defaults[d.getAttribute("Extension")] || []).concat(d.getAttribute("ContentType")); });
+          ok(wellFormed(types) && defaults.emf && defaults.emf.join() === "image/x-emf" && defaults.tiff.join() === "image/tiff", "a Default is added for each new extension, once");
+          ok(defaults.png.length === 1 && defaults.wmf.length === 1 && !defaults.svg, "none is added for an extension already listed, or for a file that is not there");
+          ok(parse(types).documentElement.firstElementChild.localName === "Default", "the Defaults come before the Overrides");
+        });
+      });
+    });
+  }).then(function () {
+
+    // ---- what is added to the root ----------------------------------------
+    var A14 = "http://schemas.microsoft.com/office/drawing/2010/main", DU = "http://schemas.microsoft.com/office/word/2023/wordml/word16du";
+    var xml = '<w:r xmlns:w="' + W + '" xmlns:w16du="' + DU + '" w16du:dateUtc="2026-01-01T00:00:00Z"><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">' +
+      '<mc:Choice Requires="a14 zz9"><w:t>new</w:t></mc:Choice><mc:Fallback><w:t>old</w:t></mc:Fallback></mc:AlternateContent>' +
+      '<w:t xmlns:odd="http://example.com/odd" odd:x="1" xmlns:w14="http://example.com/not-word">x</w:t></w:r>';
+    return host(["b1"]).then(function (packed) {
+      return Promise.all([unzip(packed), G.apply(packed, { kept: [entry("b1", "other", xml, [])], parts: {} }).then(unzip)]);
+    }).then(function (both) {
+      var rootOf = function (z) { return /<w:document\b[^>]*>/.exec(z.text("word/document.xml"))[0]; };
+      var before = rootOf(both[0]), after = rootOf(both[1]);
+      ok(before.indexOf("xmlns:a14=") === -1 && after.indexOf('xmlns:a14="' + A14 + '"') !== -1, "a prefix named in mc:Choice Requires and not on the root is declared there");
+      ok(after.indexOf("xmlns:zz9") === -1 && after.indexOf("xmlns:odd") === -1, "a prefix nobody knows the namespace of is not invented, and others are not hoisted");
+      var ign = / mc:Ignorable="([^"]*)"/.exec(after)[1].split(" "), ignBefore = / mc:Ignorable="([^"]*)"/.exec(before)[1].split(" ");
+      ok(ignBefore.indexOf("w16du") === -1 && ign.indexOf("w16du") !== -1, "a Word extension namespace the kept XML uses is added to mc:Ignorable (" + ign.join(" ") + ")");
+      ok(ignBefore.every(function (p) { return ign.indexOf(p) !== -1; }) && uniq(ign), "what the library listed is kept, nothing twice");
+      ok(count(after, "mc:Ignorable=") === 1 && count(after, "xmlns:w16du=") === 1, "nothing on the root is declared twice");
+      ok(wellFormed(both[1].text("word/document.xml")), "the document is well formed");
+      ok(both[1].text("word/document.xml").indexOf(xml) !== -1, "and the kept XML itself is untouched");
+    }).then(function () {
+      return host(["b1"]).then(function (packed) {
+        return Promise.all([unzip(packed), G.apply(packed, { kept: [entry("b1", "equation", MATH_XML, [])], parts: {} }).then(unzip)]);
+      }).then(function (both) {
+        var a = /<w:document\b[^>]*>/.exec(both[0].text("word/document.xml"))[0], b = /<w:document\b[^>]*>/.exec(both[1].text("word/document.xml"))[0];
+        ok(a === b, "kept XML that needs nothing leaves the root exactly as the library wrote it");
+      });
+    });
+  }).then(function () {
+
+    // ---- an existing theme is never replaced -------------------------------
+    return host(["b1"]).then(function (packed) {
+      return Zip.read(packed).then(function (files) {
+        files.forEach(function (f) {
+          if (f.name === "word/_rels/document.xml.rels") f.bytes = Zip.bytesOf(Zip.text(f).replace("</Relationships>", '<Relationship Id="rIdT" Type="' + REL + 'theme" Target="theme/theme1.xml"/></Relationships>'));
+        });
+        files.push({ name: "word/theme/theme1.xml", bytes: Zip.bytesOf("<a:theme>the file's own</a:theme>") });
+        return Zip.write(files);
+      });
+    }).then(function (withTheme) {
+      return G.apply(withTheme, { kept: [entry("b1", "equation", MATH_XML, [])], parts: allParts(), theme: "p13" });
+    }).then(unzip).then(function (z) {
+      ok(z.text("word/theme/theme1.xml") === "<a:theme>the file's own</a:theme>", "a file that already has a theme keeps it");
+      ok(relsIn(z.text("word/_rels/document.xml.rels")).filter(function (r) { return /\/theme$/.test(r.type); }).length === 1, "and gets no second theme relationship");
+      ok(!z.by["word/kept/p14.bin"], "nor the unused theme's parts");
+    });
+  }).then(function () {
+    // A theme key that is not in the parts is ignored, not an error.
+    return host(["b1"]).then(function (packed) { return G.apply(packed, { kept: [entry("b1", "equation", MATH_XML, [])], parts: {}, theme: "p99" }); }).then(unzip).then(function (z) {
+      ok(!z.by["word/theme/theme1.xml"] && wellFormed(z.text("word/document.xml")), "a theme key with no part behind it is ignored");
+    });
+  }).then(function () {
+
+    // ---- many objects in a long document ----------------------------------
+    var ids = [], kept = [], parts = allParts();
+    for (var i = 0; i < 120; i++) { ids.push("b" + (i + 1)); kept.push(entry("b" + (i + 1), i % 2 ? "picture" : "equation", i % 2 ? picXml("sptK1") : MATH_XML, i % 2 ? RELS.pic : [])); }
+    // Out of document order on purpose: the plan's order must not matter to placing.
+    kept.reverse();
+    return host(ids).then(function (packed) { return G.apply(packed, { kept: kept, parts: parts }); }).then(unzip).then(function (z) {
+      var doc = z.text("word/document.xml");
+      ok(wellFormed(doc) && doc.indexOf("\uE000") === -1 && count(doc, "<m:oMath ") === 60 && count(doc, "<pic:pic ") === 60, "120 objects are placed in one pass, whatever order the plan lists them in");
+      var docPr = (doc.match(/<wp:docPr\b[^>]*?\sid="\d+"/g) || []).map(function (t) { return /\sid="(\d+)"/.exec(t)[1]; });
+      ok(docPr.length === 60 && uniq(docPr), "with 60 different drawing ids");
+      ok(z.names.filter(function (n) { return /^word\/kept\//.test(n); }).length === 1 && relsIn(z.text("word/_rels/document.xml.rels")).filter(function (r) { return /kept/.test(r.target); }).length === 60,
+        "60 copies of one picture: one part, 60 relationships");
+    });
+  }).catch(function (e) {
+    ok(false, "the page ran to the end", (e && e.stack) || String(e));
+  }).then(finish);
+})();
+</script>
+</body></html>

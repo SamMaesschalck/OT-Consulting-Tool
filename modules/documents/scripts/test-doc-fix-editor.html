@@ -1,0 +1,620 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: editor fixes</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/documents.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/tables.css" />
+</head>
+<body style="margin:0">
+<!--
+  Regression tests for the editor review findings, on the real editor, model,
+  renderer, history, tables and paste code with a small stand-in for the shell:
+  the toolbar's controls must not move the page under a pressed pointer; Enter
+  in a prompt; a way to write after a table, picture or page break; deleting
+  the only table; deleting a footnote mark; links in a footnote; a paragraph is
+  not folded into a prompt; the arrow keys pass the toolbar's fields; a
+  footnote's panel goes when undo takes its mark; a paste over selected text
+  replaces it; the toolbar stays put when a landscape sheet is scrolled sideways.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<div style="display:flex;width:1200px;height:640px">
+  <div id="sidebar" style="flex:none;width:260px;overflow-y:auto"><div id="nav"><button type="button" id="nav-edit">Edit</button></div><div id="outline"></div></div>
+  <div id="edit-view" class="main" style="flex:1;min-width:0"><div id="toolbar" role="toolbar" aria-label="Formatting"></div><div id="paper" tabindex="0"></div></div>
+</div>
+<div id="live" aria-live="polite"></div>
+<div id="toast"></div>
+<pre id="out">running...</pre>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script src="../js/paste.js"></script>
+<script src="../js/editor.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d !== undefined ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Headless Edge's virtual clock runs out the moment the page has nothing
+  // queued, which dumps the page half way through. A message bounced to
+  // ourselves keeps a task queued, without moving the clock, until the end.
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  var errors = [];
+  window.addEventListener("error", function (e) { errors.push(e.message); });
+  window.addEventListener("unhandledrejection", function (e) { errors.push("rejected: " + (e.reason && e.reason.message)); });
+
+  var App = window.App, M = App.DocModel, R = App.DocRender, H = App.DocHistory, E = App.DocEditor, T = E.__test;
+  function $(id) { return document.getElementById(id); }
+
+  // ---- the stand-in for the shell ----
+  var toasts = [];
+  App.DocApp = {
+    state: { doc: null, page: "edit", dirty: false, tour: false, recovered: false },
+    go: function () {}, markClean: function () {}, busy: function () {}, setDoc: function () { return Promise.resolve(true); },
+    touched: function () {}, canAdd: function () { return true; },
+    toast: function (text) { toasts.push(String(text)); $("toast").textContent = String(text); },
+    confirmBox: function () { return Promise.resolve(true); },
+    say: function (text) { $("live").textContent = String(text); },
+    h: R.h
+  };
+  App.DocPictures = {
+    ACCEPT: "image/png",
+    fromFile: function (file) { return Promise.resolve({ blob: file, type: "image/png", width: 100, height: 50, name: file.name || "picture.png" }); }
+  };
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  function png() {
+    var bin = atob(PNG), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return new File([u], "100x50.png", { type: "image/png" });
+  }
+
+  var doc;
+  function open(blocks, more) {
+    E.unmount();
+    var o = Object.assign({ schema: M.SCHEMA, kind: "report", info: { title: "Test document" }, blocks: blocks, footnotes: {}, media: {}, parts: {} }, more || {});
+    doc = M.normalise(o);
+    App.DocApp.state.doc = doc;
+    H.clear();
+    toasts.length = 0;
+    $("edit-view").scrollTop = 0; $("edit-view").scrollLeft = 0;
+    E.mount($("edit-view"));
+    return doc;
+  }
+  function P(id, text, more) { return Object.assign({ id: id, type: "paragraph", runs: text ? [{ t: text }] : [] }, more || {}); }
+  function Hd(id, level, text) { return { id: id, type: "heading", level: level, runs: [{ t: text }] }; }
+  function Pr(id, text) { return { id: id, type: "prompt", text: text }; }
+  function blk(id) { var f = M.find(doc, id); return f ? f.block : null; }
+  function txt(id) { return M.text(blk(id)); }
+  function el(id) { return T.el(id); }
+  function tel(id) { return T.text(id); }
+  function types() { return doc.blocks.map(function (b) { return b.type; }).join(","); }
+  function sel() { return E.selection(); }
+  function caret(id, at, to) { T.selectText(id, at, to); }
+  function end(id) { caret(id, R.textLength(tel(id))); }
+  function click(node) { node.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); }
+  function ctxButton(text) {
+    return Array.prototype.filter.call($("toolbar").querySelectorAll(".tb-context button"), function (b) { return b.textContent === text; })[0];
+  }
+  function clip(type, data) {
+    var e = new ClipboardEvent(type, { bubbles: true, cancelable: true, clipboardData: data || new DataTransfer() });
+    (document.activeElement || document.body).dispatchEvent(e);
+    return e;
+  }
+  function pointer(type, target, x, y) {
+    var e = new PointerEvent(type, { bubbles: true, cancelable: true, button: 0, buttons: type === "pointerup" ? 0 : 1, clientX: x, clientY: y, pointerId: 1, isPrimary: true });
+    target.dispatchEvent(e);
+    return e;
+  }
+  // What the browser does itself on a press in editable text, which a
+  // synthetic event does not: the caret goes where the pointer is.
+  function browserCaret(node) {
+    node.focus();
+    var r = document.createRange();
+    r.selectNodeContents(node); r.collapse(true);
+    var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+  function beforeInput(node, type) {
+    var e = new InputEvent("beforeinput", { inputType: type, bubbles: true, cancelable: true });
+    node.dispatchEvent(e);
+    return e;
+  }
+  function key(node, name) {
+    var e = new KeyboardEvent("keydown", { key: name, code: name, bubbles: true, cancelable: true });
+    node.dispatchEvent(e);
+    return e;
+  }
+  function cellIds(t) {
+    var out = [];
+    t.rows.forEach(function (row) { row.cells.forEach(function (c) { out.push(c.blocks[0].id); }); });
+    return out;
+  }
+  function theTable() { return doc.blocks.filter(function (b) { return b.type === "table"; })[0]; }
+  function fnRuns(id) { return blk(id).runs.map(function (x) { return x.fn ? "#" : x.t; }).join("|"); }
+  async function section(name, fn) {
+    try { await fn(); } catch (err) { ok(false, name + ": threw", (err && err.stack) || String(err)); }
+  }
+  function filler(n) {
+    var out = [];
+    for (var i = 0; i < n; i++) out.push(P("x" + i, "Filler paragraph " + i + ". The works are planned in three stages and each stage has its own outage window, agreed with operations."));
+    return out;
+  }
+
+  (async function () {
+    var view = $("edit-view"), bar = $("toolbar"), paper = $("paper");
+
+    // ---- 40: the controls do not move the page under a pressed pointer ----
+    await section("40", async function () {
+      open([Hd("b1", 1, "Summary"), P("b2", "The paragraph under the table, long enough to be a line of its own.")].concat(filler(30)));
+      end("b1");
+      E.run("insertTable");
+      var ids = cellIds(theTable());
+      end("b2");
+      T.flush();
+      window.scrollTo(0, 0);
+      view.scrollTop = 0;
+      await wait(20);
+      ok(!bar.querySelector(".tbl-controls") && view.scrollTop === 0 && view.scrollHeight > view.clientHeight, "40 setup: caret in the paragraph, no table controls, view at the top");
+      var h0 = bar.offsetHeight, top0 = paper.getBoundingClientRect().top;
+      var cellText = tel(ids[4]), box = cellText.getBoundingClientRect(), x = Math.round(box.left + 20), y = Math.round(box.top + box.height / 2);
+      var under = document.elementFromPoint(x, y);
+      ok(!!under && el(ids[4]).contains(under), "40 setup: the pointer is over the cell", under && under.outerHTML.slice(0, 60));
+      pointer("pointerdown", under, x, y);
+      browserCaret(cellText);
+      await wait(30);
+      ok(bar.offsetHeight === h0 && Math.abs(paper.getBoundingClientRect().top - top0) < 1, "40 while the button is down in a table cell the toolbar keeps its height and the paper does not move", h0 + " -> " + bar.offsetHeight);
+      var under2 = document.elementFromPoint(x + 1, y);
+      ok(!!under2 && el(ids[4]).contains(under2), "40 so the cell is still what is under the pointer", under2 && under2.outerHTML.slice(0, 60));
+      pointer("pointermove", under2 || under, x + 1, y);
+      ok(!sel() || sel().type !== "blocks", "40 a one pixel move during the click does not select whole blocks", JSON.stringify(sel()));
+      pointer("pointerup", under2 || under, x + 1, y);
+      await wait(20);
+      ok(sel() && sel().type === "text" && sel().id === ids[4], "40 the click ends as a caret in the cell", JSON.stringify(sel()));
+      ok(!!bar.querySelector(".tbl-controls") && bar.offsetHeight === h0, "40 and the table's controls appear on release, in their row, the toolbar the same height", h0 + " -> " + bar.offsetHeight);
+      var under3 = document.elementFromPoint(x, y);
+      ok(!!under3 && el(ids[4]).contains(under3), "40 the cell stays under the pointer after the controls appear (a second click lands in it)", "scrollTop " + view.scrollTop);
+
+      // the other way: out of the table
+      view.scrollTop = 0;
+      await wait(20);
+      var h1 = bar.offsetHeight, top1 = paper.getBoundingClientRect().top;
+      var pb = tel("b2").getBoundingClientRect(), px = Math.round(pb.left + 30), py = Math.round(pb.top + 8);
+      var pu = document.elementFromPoint(px, py);
+      ok(!!pu && el("b2").contains(pu), "40 setup: the pointer is over the paragraph under the table", pu && pu.outerHTML.slice(0, 60));
+      pointer("pointerdown", pu, px, py);
+      browserCaret(tel("b2"));
+      await wait(30);
+      ok(bar.offsetHeight === h1 && Math.abs(paper.getBoundingClientRect().top - top1) < 1, "40 pressing in the paragraph under the table leaves the toolbar as it is until release", h1 + " -> " + bar.offsetHeight);
+      var pu2 = document.elementFromPoint(px + 1, py);
+      pointer("pointermove", pu2 || pu, px + 1, py);
+      pointer("pointerup", pu2 || pu, px + 1, py);
+      await wait(20);
+      ok(sel() && sel().type === "text" && sel().id === "b2", "40 the click ends as a caret in the paragraph", JSON.stringify(sel()));
+      ok(!bar.querySelector(".tbl-controls") && bar.offsetHeight === h1, "40 and the table's controls go on release, the toolbar the same height", h1 + " -> " + bar.offsetHeight);
+
+      // a drag starts a few pixels from the press, not at the first tremor
+      var a = tel("x3").getBoundingClientRect();
+      pointer("pointerdown", tel("x3"), a.left + 10, a.top + 5);
+      pointer("pointermove", tel("x4"), a.left + 12, a.top + 6);
+      ok(!sel() || sel().type !== "blocks", "40 a move of two pixels is not a drag, whatever is under it");
+      var b = tel("x4").getBoundingClientRect();
+      pointer("pointermove", tel("x4"), b.left + 10, b.top + 5);
+      ok(sel() && sel().type === "blocks" && sel().ids.join() === "x3,x4", "40 a real drag into the next block still selects whole blocks", JSON.stringify(sel()));
+      pointer("pointerup", tel("x4"), b.left + 10, b.top + 5);
+
+      // the flag cannot stick: a press with no release, then the keyboard
+      end("x7");
+      T.flush();
+      ok(!ctxButton("Delete"), "40 setup: a caret in a paragraph shows no block controls");
+      pointer("pointerdown", tel("x5"), 0, 0);
+      E.selectBlocks(["x6"]);
+      ok(!ctxButton("Delete"), "40 (a press still held shows no new controls)");
+      key(paper, "ArrowDown");
+      ok(!!ctxButton("Delete"), "40 a key after a press that never ended brings the controls up to date");
+    });
+
+    // ---- 41: Enter in a prompt ----
+    await section("41", async function () {
+      var full = "Confirm the outage window with the duty manager and state it here.";
+      open([P("b1", "Before."), Pr("b2", full), P("b3", "After.")]);
+      var n0 = M.promptCount(doc);
+      caret("b2", 26);
+      T.press("Enter");
+      var nu = doc.blocks[2];
+      ok(doc.blocks.length === 4 && blk("b2").type === "prompt" && nu.type === "prompt" && blk("b2").text + nu.text === full && blk("b2").text === full.slice(0, 26), "41 Enter in the middle of a prompt leaves two prompts", JSON.stringify(doc.blocks.slice(1, 3)));
+      ok(M.promptCount(doc) === n0 + 1, "41 both are counted as still to complete", String(M.promptCount(doc)));
+      ok(tel(nu.id) && tel(nu.id).classList.contains("prompt") && sel().id === nu.id && sel().from === 0, "41 the new one is drawn red, with the caret at its start", JSON.stringify(sel()));
+      T.press("Ctrl+Z");
+      ok(doc.blocks.length === 3 && blk("b2").text === full && tel("b2").textContent === full, "41 one undo puts the prompt back whole");
+
+      caret("b2", 0);
+      T.press("Enter");
+      ok(doc.blocks.length === 4 && doc.blocks[1].type === "paragraph" && M.text(doc.blocks[1]) === "" && doc.blocks[2].id === "b2" && blk("b2").text === full, "41 Enter at the start of a prompt opens an empty paragraph above and leaves the prompt whole", JSON.stringify(doc.blocks.slice(1, 3)));
+      ok(M.promptCount(doc) === n0, "41 with the count unchanged", String(M.promptCount(doc)));
+      T.press("Ctrl+Z");
+      ok(doc.blocks.length === 3 && blk("b2").text === full, "41 and one undo");
+
+      end("b2");
+      T.press("Enter");
+      ok(doc.blocks.length === 4 && blk("b2").text === full && doc.blocks[2].type === "paragraph" && M.text(doc.blocks[2]) === "" && M.promptCount(doc) === n0, "41 Enter at the end of a prompt opens an ordinary paragraph for the answer", JSON.stringify(doc.blocks.slice(1, 3)));
+      T.press("Ctrl+Z");
+      ok(doc.blocks.length === 3, "41 and one undo again");
+    });
+
+    // ---- 42: writing after a table, a picture or a page break ----
+    await section("42", async function () {
+      open([P("b1", "Only paragraph.")]);
+      end("b1");
+      E.run("insertTable");
+      var ids = cellIds(theTable()), lastCell = ids[ids.length - 1];
+      ok(types() === "paragraph,table", "42 setup: the document ends with a table", types());
+      E.focusBlock(lastCell, { at: "end" });
+      var down = T.press("Down");
+      var tail = doc.blocks[doc.blocks.length - 1];
+      ok(down.defaultPrevented && types() === "paragraph,table,paragraph" && sel() && sel().type === "text" && sel().id === tail.id, "42 Arrow Down out of a table that ends the document opens a paragraph after it, with the caret in it", types() + " " + JSON.stringify(sel()));
+      ok(document.activeElement === tel(tail.id), "42 and the keyboard is in it");
+      T.press("Ctrl+Z");
+      ok(types() === "paragraph,table", "42 one undo takes it away", types());
+      E.focusBlock(ids[0], { at: "end" });
+      T.press("Up");
+      ok(types() === "paragraph,table" && sel().id === "b1", "42 Arrow Up out of the table still goes to the block before", JSON.stringify(sel()));
+
+      open([P("b1", "Text."), { id: "b2", type: "pageBreak" }]);
+      E.selectBlocks(["b2"]);
+      var enter = T.press("Enter");
+      ok(enter.defaultPrevented && types() === "paragraph,pageBreak,paragraph" && sel().type === "text" && sel().id === doc.blocks[2].id, "42 Enter on a selected page break that ends the document opens a paragraph after it", types());
+      T.press("Backspace");
+      ok(sel().type === "blocks" && sel().ids.join() === "b2", "42 Backspace in that empty paragraph goes back to the page break", JSON.stringify(sel()));
+
+      open([P("b1", "Text.")]);
+      end("b1");
+      var picId = await E.insertPictureFile(png());
+      ok(types() === "paragraph,picture" && sel().type === "blocks", "42 setup: the document ends with a picture", types());
+      T.press("Enter");
+      ok(types() === "paragraph,picture,paragraph" && sel().type === "text" && sel().id === doc.blocks[2].id, "42 Enter on a selected picture with no caption opens a paragraph after it", types());
+      T.press("Ctrl+Z");
+      ok(types() === "paragraph,picture", "42 one undo", types());
+
+      // the pointer on the empty paper under the last block
+      E.selectBlocks(["b1"]);
+      var last = paper.lastElementChild.getBoundingClientRect();
+      var press = pointer("pointerdown", paper, last.left + 200, last.bottom + 15);
+      pointer("pointerup", paper, last.left + 200, last.bottom + 15);
+      ok(press.defaultPrevented && types() === "paragraph,picture,paragraph" && sel().type === "text" && sel().id === doc.blocks[2].id, "42 a click on the paper under a picture that ends the document opens a paragraph there", types() + " " + JSON.stringify(sel()));
+      E.selectBlocks(["b1"]);
+      last = paper.lastElementChild.getBoundingClientRect();
+      pointer("pointerdown", paper, last.left + 200, last.bottom + 15);
+      pointer("pointerup", paper, last.left + 200, last.bottom + 15);
+      ok(types() === "paragraph,picture,paragraph" && sel().type === "text" && sel().id === doc.blocks[2].id, "42 the same click under a text block adds nothing and puts the caret at its end", types() + " " + JSON.stringify(sel()));
+
+      // between two blocks that hold no text
+      open([P("b1", "Text.")]);
+      end("b1");
+      E.run("insertTable");
+      var tableId = theTable().id;
+      await E.insertPictureFile(png(), tableId);
+      ok(types() === "paragraph,table,picture", "42 setup: a table straight before a picture", types());
+      E.selectBlocks([tableId]);
+      ok(!!ctxButton("Paragraph after"), "42 a selected table offers Paragraph after");
+      click(ctxButton("Paragraph after"));
+      ok(types() === "paragraph,table,paragraph,picture" && sel().type === "text" && sel().id === doc.blocks[2].id, "42 which opens a paragraph between the table and the picture", types());
+      E.selectBlocks([picId = doc.blocks[3].id]);
+      ok(!!ctxButton("Paragraph after"), "42 a selected picture offers it too");
+      ok(E.run("paragraphAfter", tableId) === true && types() === "paragraph,table,paragraph,paragraph,picture", "42 and the command takes the block to go after", types());
+    });
+
+    // ---- 43: deleting the only table ----
+    await section("43", async function () {
+      open([P("b1", "Only paragraph.")]);
+      end("b1");
+      E.run("insertTable");
+      var t = theTable(), ids = cellIds(t);
+      E.selectBlocks(["b1"]);
+      T.press("Delete");
+      ok(types() === "table", "43 setup: the table is the only block", types());
+      H.clear();
+      E.focusBlock(ids[0], { at: 0 });
+      T.flush();
+      var remove = bar.querySelector('[data-act="remove"]');
+      ok(!!remove, "43 setup: the table's controls are in the toolbar");
+      remove.click();
+      ok(doc.blocks.length === 1 && doc.blocks[0].type === "paragraph" && M.text(doc.blocks[0]) === "", "43 Delete table on the only block leaves one empty paragraph", types());
+      ok(paper.querySelectorAll(":scope > .blk").length === 1 && sel() && sel().type === "text" && sel().id === doc.blocks[0].id && document.activeElement === tel(doc.blocks[0].id), "43 drawn on the paper, with the caret in it", JSON.stringify(sel()));
+      T.type("x");
+      ok(M.text(doc.blocks[0]) === "x", "43 and it can be typed in", M.text(doc.blocks[0]));
+      T.press("Ctrl+Z");
+      T.press("Ctrl+Z");
+      ok(doc.blocks.length === 1 && doc.blocks[0].type === "table" && doc.blocks[0].id === t.id && paper.querySelectorAll(":scope > .blk").length === 1, "43 undo brings the table back alone, with no stray paragraph", types());
+      T.press("Ctrl+Y");
+      ok(doc.blocks.length === 1 && doc.blocks[0].type === "paragraph" && paper.querySelectorAll(":scope > .blk").length === 1, "43 and redo gives the single empty paragraph again", types());
+    });
+
+    // ---- 44: a footnote mark and Backspace, Delete and the arrows ----
+    await section("44", async function () {
+      var notes = { footnotes: { f1: { runs: [{ t: "Budgetary only." }] } } };
+      open([P("b1", "", { runs: [{ t: "Costs" }, { t: "", fn: "f1" }, { t: " are set out." }] }), P("b2", "End")], notes);
+      ok(fnRuns("b1") === "Costs|#| are set out." && !!tel("b1").querySelector("sup.fn"), "44 setup: a paragraph with a footnote mark", fnRuns("b1"));
+      caret("b1", 6);
+      var back = beforeInput(tel("b1"), "deleteContentBackward");
+      ok(back.defaultPrevented && fnRuns("b1") === "Costs are set out." && !tel("b1").querySelector("sup.fn"), "44 Backspace straight after the mark deletes the reference, first time", fnRuns("b1"));
+      ok(sel().from === 5 && sel().to === 5 && tel("b1").textContent.replace(/​/g, "") === "Costs are set out.", "44 the text is untouched and the caret is where the mark was", JSON.stringify(sel()));
+      ok(doc.footnotes.f1 && M.runsText(doc.footnotes.f1.runs) === "Budgetary only.", "44 the footnote's text stays in memory");
+      T.press("Ctrl+Z");
+      ok(fnRuns("b1") === "Costs|#| are set out." && !!tel("b1").querySelector("sup.fn"), "44 one undo brings the reference back", fnRuns("b1"));
+      caret("b1", 5);
+      var fwd = beforeInput(tel("b1"), "deleteContentForward");
+      ok(fwd.defaultPrevented && fnRuns("b1") === "Costs are set out." && sel().from === 5, "44 Delete straight before the mark deletes it too", fnRuns("b1"));
+      T.press("Ctrl+Z");
+      caret("b1", 4);
+      var not = beforeInput(tel("b1"), "deleteContentForward");
+      ok(!not.defaultPrevented && fnRuns("b1") === "Costs|#| are set out.", "44 a delete that is not beside the mark is left to the browser");
+
+      // one step of the arrow keys for one mark
+      caret("b1", 5);
+      var right = T.press("Right");
+      ok(right.defaultPrevented && sel().from === 6, "44 Arrow Right crosses the mark in one press", JSON.stringify(sel()));
+      var left = T.press("Left");
+      ok(left.defaultPrevented && sel().from === 5, "44 and Arrow Left crosses back in one", JSON.stringify(sel()));
+
+      // the mark as the last thing in the paragraph, with its panel open
+      open([P("b1", "", { runs: [{ t: "Costs" }, { t: "", fn: "f1" }] }), P("b2", "End")], notes);
+      E.openFootnote("f1", "b1", false);
+      ok(!!paper.querySelector(".fn-panel"), "44 setup: the footnote's panel is open");
+      caret("b1", 6);
+      back = beforeInput(tel("b1"), "deleteContentBackward");
+      ok(back.defaultPrevented && fnRuns("b1") === "Costs" && !tel("b1").querySelector("sup.fn"), "44 Backspace deletes a mark that ends the paragraph", fnRuns("b1"));
+      ok(!paper.querySelector(".fn-panel") && T.state().panel === null, "44 and its open panel closes with it");
+    });
+
+    // ---- 45: a link in a footnote's text ----
+    await section("45", async function () {
+      var note = "The request followed the water quality audit.";
+      open([P("b1", "", { runs: [{ t: "Background" }, { t: "", fn: "f1" }] }), P("b2", "End")], { footnotes: { f1: { runs: [{ t: note }] } } });
+      E.openFootnote("f1", "b1", true);
+      var ft = paper.querySelector(".fn-panel .fn-text");
+      function pick(from, to) { var s = getSelection(); s.removeAllRanges(); s.addRange(R.rangeAt(paper.querySelector(".fn-panel .fn-text"), from, to)); }
+      pick(4, 11);
+      ok(sel() && sel().kind === "fn" && sel().from === 4 && sel().to === 11, "45 setup: text selected in the footnote", JSON.stringify(sel()));
+      H.clear();
+      E.run("link");
+      var input = paper.querySelector(".link-panel input");
+      ok(!!input, "45 setup: the link panel opens");
+      input.value = "https://example.org/a";
+      click(Array.prototype.filter.call(paper.querySelectorAll(".link-panel button"), function (b) { return b.textContent === "Apply"; })[0]);
+      var runs = doc.footnotes.f1.runs, linked = runs.filter(function (r) { return r.link; });
+      ok(linked.length === 1 && linked[0].t === "request" && linked[0].link === "https://example.org/a" && M.runsText(runs) === note, "45 Apply sets the link on the selected footnote text", JSON.stringify(runs));
+      ft = paper.querySelector(".fn-panel .fn-text");
+      ok(!!ft && !!ft.querySelector('a[data-link="https://example.org/a"]') && !paper.querySelector(".link-panel"), "45 the footnote's panel is open again and shows it");
+      ok(H.canUndo() && sel() && sel().kind === "fn", "45 it is in the history and the caret is back in the footnote", JSON.stringify(sel()));
+      E.run("undo");
+      ok(!doc.footnotes.f1.runs.some(function (r) { return r.link; }) && M.runsText(doc.footnotes.f1.runs) === note, "45 one undo takes the link off", JSON.stringify(doc.footnotes.f1.runs));
+      E.run("redo");
+      ok(doc.footnotes.f1.runs.some(function (r) { return r.link; }), "45 and redo puts it back");
+
+      E.openFootnote("f1", "b1", true);
+      pick(6, 6);
+      sel();
+      E.run("link");
+      input = paper.querySelector(".link-panel input");
+      var removeBtn = Array.prototype.filter.call(paper.querySelectorAll(".link-panel button"), function (b) { return b.textContent === "Remove link"; })[0];
+      ok(!!input && input.value === "https://example.org/a" && !!removeBtn, "45 with the caret in the link the panel shows its address and offers Remove link", input && input.value);
+      click(removeBtn);
+      ok(!doc.footnotes.f1.runs.some(function (r) { return r.link; }) && M.runsText(doc.footnotes.f1.runs) === note && !!paper.querySelector(".fn-panel"), "45 Remove link takes it off the footnote text", JSON.stringify(doc.footnotes.f1.runs));
+
+      pick(4, 11);
+      sel();
+      E.run("link");
+      input = paper.querySelector(".link-panel input");
+      key(input, "Escape");
+      ok(!paper.querySelector(".link-panel") && !!paper.querySelector(".fn-panel") && sel() && sel().kind === "fn" && sel().from === 4 && sel().to === 11, "45 Escape from the link panel goes back to the footnote and its selection", JSON.stringify(sel()));
+    });
+
+    // ---- 46: a paragraph is not folded into the prompt above it ----
+    await section("46", async function () {
+      var prompt = "Confirm the outage window.";
+      var rich = [{ t: "Agreed with " }, { t: "operations", b: true }, { t: "", fn: "f1" }];
+      function fresh(promptText) {
+        open([Pr("b1", promptText), P("b2", "", { runs: JSON.parse(JSON.stringify(rich)) }), P("b3", "End")], { footnotes: { f1: { runs: [{ t: "See minutes." }] } } });
+      }
+      fresh(prompt);
+      caret("b2", 0);
+      T.press("Backspace");
+      ok(doc.blocks.length === 3 && blk("b1").text === prompt && JSON.stringify(blk("b2").runs) === JSON.stringify(rich), "46 Backspace at the start of a paragraph under a prompt folds nothing into the prompt", JSON.stringify(doc.blocks.slice(0, 2)));
+      ok(R.fnNumbers(doc).f1 === 1 && !!tel("b2").querySelector("sup.fn"), "46 its footnote is still referenced");
+      ok(sel().type === "text" && sel().id === "b1" && sel().from === prompt.length, "46 the caret crosses to the end of the prompt", JSON.stringify(sel()));
+      var del = T.press("Delete");
+      ok(del.defaultPrevented && doc.blocks.length === 3 && blk("b1").text === prompt && JSON.stringify(blk("b2").runs) === JSON.stringify(rich) && sel().id === "b2" && sel().from === 0, "46 Delete at the end of the prompt folds nothing in either: the caret crosses", JSON.stringify(sel()));
+      ok(!H.canUndo(), "46 and neither made a history entry");
+
+      fresh("");
+      caret("b2", 0);
+      T.press("Backspace");
+      ok(doc.blocks.length === 2 && doc.blocks[0].id === "b2" && JSON.stringify(blk("b2").runs) === JSON.stringify(rich) && sel().id === "b2" && sel().from === 0, "46 an empty prompt above is simply removed, the paragraph untouched", JSON.stringify(doc.blocks[0]));
+      T.press("Ctrl+Z");
+      ok(doc.blocks.length === 3 && doc.blocks[0].type === "prompt", "46 one undo brings the empty prompt back");
+
+      open([Pr("b1", prompt), P("b2", ""), P("b3", "End")]);
+      caret("b2", 0);
+      T.press("Backspace");
+      ok(doc.blocks.length === 2 && blk("b1").text === prompt && sel().id === "b1", "46 an empty paragraph under a prompt is still removed by Backspace", JSON.stringify(doc.blocks));
+
+      open([Pr("b1", "One."), Pr("b2", "Two."), P("b3", "End")]);
+      caret("b2", 0);
+      T.press("Backspace");
+      ok(doc.blocks.length === 2 && blk("b1").text === "One.Two.", "46 two prompts still join", JSON.stringify(doc.blocks[0]));
+
+      // Prompt from the block type list
+      fresh(prompt);
+      caret("b2", 3);
+      toasts.length = 0;
+      E.run("prompt");
+      ok(blk("b2").type === "paragraph" && JSON.stringify(blk("b2").runs) === JSON.stringify(rich) && R.fnNumbers(doc).f1 === 1, "46 a paragraph holding a footnote is not turned into a prompt", JSON.stringify(blk("b2")));
+      ok(toasts.length === 1 && /footnote/.test(toasts[0]) && !/[–—]/.test(toasts[0]), "46 and the reason is said", toasts.join(" | "));
+      caret("b3", 1);
+      E.run("prompt");
+      ok(blk("b3").type === "prompt" && blk("b3").text === "End", "46 a paragraph with no footnote still becomes a prompt");
+    });
+
+    // ---- 47: the arrow keys pass the toolbar's fields ----
+    await section("47", async function () {
+      open([P("b1", "Text."), P("b2", "End")]);
+      end("b1");
+      var picId = await E.insertPictureFile(png());
+      E.selectBlocks([picId]);
+      T.flush();
+      function controls() { return Array.prototype.filter.call(bar.querySelectorAll("button, select, input:not([type=file])"), function (c) { return !c.disabled; }); }
+      function name(c) { return c.getAttribute("aria-label") || c.textContent || c.title; }
+      function walk(keyName) {
+        var all = controls(), seen = [];
+        all[0].focus();
+        for (var i = 0; i < all.length; i++) {
+          key(document.activeElement, keyName);
+          seen.push(document.activeElement);
+        }
+        var missed = all.filter(function (c) { return seen.indexOf(c) === -1; });
+        return { all: all, seen: seen, missed: missed, wrapped: seen[seen.length - 1] === all[0], once: seen.every(function (c, i) { return seen.indexOf(c) === i; }) };
+      }
+      var w = walk("ArrowRight");
+      ok(w.missed.length === 0 && w.once && w.wrapped, "47 Arrow Right walks every control of the toolbar with a picture selected, once each, and wraps", "missed: " + w.missed.map(name).join(", "));
+      var names = w.seen.map(name);
+      ok(names.indexOf("Fit to page width") !== -1 && names.indexOf("Caption") !== -1 && names.indexOf("Centre") !== -1 && names.indexOf("Alternative text") !== -1, "47 Fit to page width, the alignment buttons and Caption are among them", names.join(" > "));
+      w = walk("ArrowLeft");
+      ok(w.missed.length === 0 && w.once && w.wrapped, "47 Arrow Left walks them all too", "missed: " + w.missed.map(name).join(", "));
+
+      var alt = bar.querySelector(".tb-alt");
+      alt.value = "A plan of the site";
+      alt.focus();
+      alt.setSelectionRange(5, 5);
+      key(alt, "ArrowLeft");
+      ok(document.activeElement === alt, "47 inside the text of a field Arrow Left moves the caret, not the focus");
+      key(alt, "ArrowRight");
+      ok(document.activeElement === alt, "47 nor does Arrow Right");
+      alt.setSelectionRange(0, 0);
+      key(alt, "ArrowLeft");
+      ok(document.activeElement !== alt && document.activeElement.textContent === "Caption", "47 from the start of the field Arrow Left goes to the control before", name(document.activeElement));
+      alt.focus();
+      alt.setSelectionRange(alt.value.length, alt.value.length);
+      key(alt, "ArrowRight");
+      ok(document.activeElement !== alt && document.activeElement.textContent === "Replace", "47 and from its end Arrow Right goes to the control after", name(document.activeElement));
+      alt.focus();
+      alt.setSelectionRange(3, 3);
+      key(alt, "Home");
+      ok(document.activeElement === alt, "47 Home stays the field's own key");
+      alt.value = "";
+
+      // a table's controls end with a caption field
+      end("b2");
+      E.run("insertTable");
+      T.flush();
+      w = walk("ArrowRight");
+      ok(!!bar.querySelector(".tbl-caption-input") && w.missed.length === 0 && w.once && w.wrapped, "47 the same walk with the caret in a table reaches every control, the caption field included", "missed: " + w.missed.map(name).join(", "));
+      w = walk("ArrowLeft");
+      ok(w.missed.length === 0 && w.once && w.wrapped, "47 and backwards", "missed: " + w.missed.map(name).join(", "));
+    });
+
+    // ---- 48: undo of a new footnote closes its panel ----
+    await section("48", async function () {
+      open([P("b1", "The three stages take six weeks in all."), P("b2", "End")]);
+      caret("b1", 9);
+      E.run("footnote");
+      T.type("Note text.");
+      ok(!!paper.querySelector(".fn-panel") && blk("b1").runs.some(function (r) { return r.fn; }), "48 setup: a new footnote with its panel open");
+      for (var i = 0; i < 6 && blk("b1").runs.some(function (r) { return r.fn; }); i++) E.run("undo");
+      ok(!blk("b1").runs.some(function (r) { return r.fn; }) && !tel("b1").querySelector("sup.fn"), "48 setup: undo has taken the reference away");
+      ok(paper.querySelector(".fn-panel") === null && T.state().panel === null, "48 the footnote's panel has gone with it", "undos " + i + " panel " + JSON.stringify(T.state().panel && { k: T.state().panel.kind, key: T.state().panel.key }) + " nums " + JSON.stringify(R.fnNumbers(doc)) + " canUndo " + H.canUndo());
+      ok(sel() && sel().type === "text" && sel().id === "b1", "48 and the caret is back in the paragraph", JSON.stringify(sel()));
+      E.run("redo");
+      var label = paper.querySelector(".fn-panel .panel-label");
+      ok(blk("b1").runs.some(function (r) { return r.fn; }) && (!label || /^Footnote \d+$/.test(label.textContent)), "48 redo brings the reference back, and no panel without a number", label && label.textContent);
+      // a panel whose block is redrawn while the reference is there stays
+      var key1 = blk("b1").runs.filter(function (r) { return r.fn; })[0].fn;
+      E.openFootnote(key1, "b1", false);
+      E.redraw(["b1"]);
+      ok(!!paper.querySelector(".fn-panel"), "48 a panel whose reference is still there stays through a redraw");
+    });
+
+    // ---- 49: a paste of several paragraphs over selected text ----
+    await section("49", async function () {
+      open([P("b1", "Hello world"), P("b2", "End")]);
+      caret("b1", 0, 5);
+      var two = new DataTransfer();
+      two.setData("text/plain", "First para\n\nSecond para");
+      clip("paste", two);
+      await wait(50);
+      ok(doc.blocks.length === 4 && M.text(doc.blocks[1]) === "First para" && M.text(doc.blocks[2]) === "Second para", "49 setup: the paragraphs are pasted after the block");
+      ok(txt("b1") === " world" && tel("b1").textContent === " world", "49 and the selected text is replaced, not left beside them", txt("b1"));
+      E.run("undo");
+      ok(doc.blocks.length === 2 && txt("b1") === "Hello world" && tel("b1").textContent === "Hello world", "49 one undo restores the text and takes the paragraphs away", txt("b1") + " " + doc.blocks.length);
+      E.run("redo");
+      ok(doc.blocks.length === 4 && txt("b1") === " world" && tel("b1").textContent === " world", "49 and one redo does both again", txt("b1"));
+
+      open([P("b1", "Hello world"), P("b2", "End")]);
+      caret("b1", 6, 11);
+      var html = new DataTransfer();
+      html.setData("text/html", "<p>Html one.</p><p>Html two.</p>");
+      html.setData("text/plain", "Html one.\n\nHtml two.");
+      clip("paste", html);
+      await wait(80);
+      ok(doc.blocks.length === 4 && txt("b1") === "Hello " && M.text(doc.blocks[1]) === "Html one." && M.text(doc.blocks[2]) === "Html two.", "49 two paragraphs pasted as HTML replace the selection the same way", txt("b1") + " / " + doc.blocks.length);
+      E.run("undo");
+      ok(doc.blocks.length === 2 && txt("b1") === "Hello world", "49 with one undo");
+
+      open([P("b1", "Hello world"), P("b2", "End")]);
+      caret("b1", 5);
+      clip("paste", two);
+      await wait(50);
+      ok(doc.blocks.length === 4 && txt("b1") === "Hello world", "49 with nothing selected the block is left as it is");
+    });
+
+    // ---- 50: the toolbar stays put when a landscape sheet is scrolled sideways ----
+    await section("50", async function () {
+      open([Hd("b1", 1, "Summary"), P("b2", "A portrait paragraph."), P("b3", "A paragraph on a landscape page, wider than the view.", { land: true }), P("b4", "End")]);
+      end("b2");
+      T.flush();
+      await wait(20);
+      var max = view.scrollWidth - view.clientWidth;
+      ok(max > 100, "50 setup: a landscape block makes the view scroll sideways", String(max));
+      function edges() {
+        var v = view.getBoundingClientRect(), t = bar.getBoundingClientRect(), left = v.left + view.clientLeft;
+        var first = bar.querySelector("select, button").getBoundingClientRect();
+        return { ok: Math.abs(t.left - left) <= 1 && Math.abs(t.right - (left + view.clientWidth)) <= 1 && first.left >= left - 0.5, said: "view " + Math.round(left) + ".." + Math.round(left + view.clientWidth) + " toolbar " + Math.round(t.left) + ".." + Math.round(t.right) + " first " + Math.round(first.left) };
+      }
+      var e0 = edges();
+      ok(e0.ok, "50 at rest the toolbar spans the view", e0.said);
+      view.scrollLeft = 24;
+      await wait(20);
+      var e1 = edges();
+      ok(view.scrollLeft === 24 && e1.ok, "50 scrolled 24 px sideways the toolbar has not moved", e1.said);
+      view.scrollLeft = max;
+      await wait(20);
+      var e2 = edges();
+      ok(view.scrollLeft > 100 && e2.ok, "50 scrolled all the way it still spans the view, with its first control in sight", e2.said);
+      view.scrollLeft = 0;
+      E.focusBlock("b3", { at: "end" });
+      await wait(20);
+      var e3 = edges();
+      ok(e3.ok, "50 and after the caret is put in the landscape block", e3.said + " scrollLeft " + view.scrollLeft);
+      view.scrollLeft = 0;
+      var pb = paper.getBoundingClientRect(), b2 = el("b2").getBoundingClientRect(), v = view.getBoundingClientRect();
+      ok(b2.left - v.left >= 24, "50 the sheet keeps its gutter from the edge of the view", String(b2.left - v.left));
+    });
+
+    ok(errors.length === 0, "no script errors", errors.join(" | "));
+    finish();
+  })();
+})();
+</script>
+</body></html>

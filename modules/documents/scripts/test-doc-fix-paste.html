@@ -1,0 +1,488 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: paste and file reading, review fixes</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Regression tests for the review of App.DocPaste and App.DocModel
+  (docs/document-tool-design.md 3, 5.3). Nothing from a paste or a file is
+  dropped or altered without a word:
+
+  - Word's review comments, tracked changes and footnotes in pasted HTML;
+  - HTML made large by the pictures written into it;
+  - numbered lists that carry on after a paragraph or a picture;
+  - text hidden only in the name of another style property;
+  - a project file made by hand: table spans, keys every object has, a block
+    of a later version with odd runs, an import report of the wrong shape.
+
+  The Word markup is real: it is cut from a document made in Word through COM
+  and saved by Word as a web page, which is the markup Word also puts on the
+  clipboard (the clipboard itself cannot be driven headless). The reviewer's
+  name in it was replaced by a made-up one.
+
+  The model, the picture reader and the list numbering are the real ones. The
+  shell is stood in for by the one function a paste asks it (canAdd).
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<script type="text/plain" id="word-review"><div class=WordSection1>
+
+<p class=MsoNormal><a style='mso-comment-reference:FA_1;mso-comment-date:20261111T1903'>Paragraph
+with a comment on it.</a><span class=MsoCommentReference><span
+style='mso-ansi-font-size:12.0pt;mso-bidi-font-size:12.0pt;line-height:115%'><![if !supportAnnotations]><a
+class=msocomanchor id="_anchor_1"
+onmouseover="msoCommentShow('_anchor_1','_com_1')"
+onmouseout="msoCommentHide('_com_1')" href="#_msocom_1" language=JavaScript
+name="_msoanchor_1">[FA1]</a><![endif]><span style='mso-special-character:comment'>&nbsp;</span></span></span></p>
+
+<p class=MsoNormal>Paragraph with a footnote<a style='mso-footnote-id:ftn1'
+href="#_ftn1" name="_ftnref1" title=""><span class=MsoFootnoteReference><span
+style='mso-special-character:footnote'><![if !supportFootnotes]><span
+class=MsoFootnoteReference><span style='font-size:12.0pt;line-height:115%;
+font-family:"Aptos",sans-serif;mso-ascii-theme-font:minor-latin;mso-fareast-font-family:
+Aptos;mso-fareast-theme-font:minor-latin;mso-hansi-theme-font:minor-latin;
+mso-bidi-font-family:"Times New Roman";mso-bidi-theme-font:minor-bidi;
+mso-ansi-language:EN-GB;mso-fareast-language:EN-US;mso-bidi-language:AR-SA'>[1]</span></span><![endif]></span></span></a>
+and more text.</p>
+
+<p class=MsoNormal>Tracked: the <span class=msoDel><del
+cite="mailto:Fixture%20Author" datetime="2026-11-11T19:03">old wording </del></span>stays
+here.</p>
+
+<p class=MsoNormal><span class=msoIns><ins cite="mailto:Fixture%20Author"
+datetime="2026-11-11T19:03">Inserted while tracking.<o:p></o:p></ins></span></p>
+
+<p class=MsoNormal><o:p>&nbsp;</o:p></p>
+
+</div>
+
+<div style='mso-element:footnote-list'><![if !supportFootnotes]><br clear=all>
+
+<hr align=left size=1 width="33%">
+
+<![endif]>
+
+<div style='mso-element:footnote' id=ftn1>
+
+<p class=MsoFootnoteText><a style='mso-footnote-id:ftn1' href="#_ftnref1"
+name="_ftn1" title=""><span class=MsoFootnoteReference><span style='mso-special-character:
+footnote'><![if !supportFootnotes]><span class=MsoFootnoteReference><span
+style='font-size:10.0pt;line-height:115%;font-family:"Aptos",sans-serif;
+mso-ascii-theme-font:minor-latin;mso-fareast-font-family:Aptos;mso-fareast-theme-font:
+minor-latin;mso-hansi-theme-font:minor-latin;mso-bidi-font-family:"Times New Roman";
+mso-bidi-theme-font:minor-bidi;mso-ansi-language:EN-GB;mso-fareast-language:
+EN-US;mso-bidi-language:AR-SA'>[1]</span></span><![endif]></span></span></a> <span
+lang=EN-US style='mso-ansi-language:EN-US'>The footnote <b>text</b>.<o:p></o:p></span></p>
+
+</div>
+
+</div>
+
+<div style='mso-element:comment-list'><![if !supportAnnotations]>
+
+<hr class=msocomoff align=left size=1 width="33%">
+
+<![endif]>
+
+<div style='mso-element:comment'><![if !supportAnnotations]>
+
+<div id="_com_1" class=msocomtxt language=JavaScript
+onmouseover="msoCommentShow('_anchor_1','_com_1')"
+onmouseout="msoCommentHide('_com_1')"><![endif]><span style='mso-comment-author:
+"Fixture Author";mso-comment-providerid:AD;mso-comment-userid:"S\:\:fixture\@example\.org\:\:0000"'><![if !supportAnnotations]><a
+name="_msocom_1"></a><![endif]></span>
+
+<p class=MsoCommentText><span class=MsoCommentReference><span style='font-size:
+8.0pt'><span style='mso-special-character:comment'>&nbsp;<![if !supportAnnotations]><a
+href="#_msoanchor_1" class=msocomoff>[FA1]</a><![endif]></span></span></span>INTERNAL:
+check this figure with Dave before it goes out</p>
+
+<![if !supportAnnotations]></div>
+
+<![endif]></div>
+
+</div>
+</script>
+<script type="text/plain" id="word-steps"><div class=WordSection1>
+
+<p class=MsoListParagraphCxSpFirst style='text-indent:-18.0pt;mso-list:l3 level1 lfo3'><![if !supportLists]><span
+style='mso-bidi-font-family:Aptos;mso-bidi-theme-font:minor-latin'><span
+style='mso-list:Ignore'>1.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]>Step one</p>
+
+<p class=MsoListParagraphCxSpLast style='text-indent:-18.0pt;mso-list:l3 level1 lfo3'><![if !supportLists]><span
+style='mso-bidi-font-family:Aptos;mso-bidi-theme-font:minor-latin'><span
+style='mso-list:Ignore'>2.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]>Step two</p>
+
+<p class=MsoNormal>A note between the steps.</p>
+
+<p class=MsoListParagraphCxSpFirst style='text-indent:-18.0pt;mso-list:l3 level1 lfo3'><![if !supportLists]><span
+style='mso-bidi-font-family:Aptos;mso-bidi-theme-font:minor-latin'><span
+style='mso-list:Ignore'>3.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]>Step three continues</p>
+
+<p class=MsoListParagraphCxSpLast style='text-indent:-18.0pt;mso-list:l3 level1 lfo3'><![if !supportLists]><span
+style='mso-bidi-font-family:Aptos;mso-bidi-theme-font:minor-latin'><span
+style='mso-list:Ignore'>4.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]>Step four</p>
+
+</div>
+</script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/pictures.js"></script>
+<script src="../js/paste.js"></script>
+<script src="../js/import-flow.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Pictures are decoded off the main thread, and headless Edge's virtual
+  // clock runs out the moment the page has nothing queued, which dumps the
+  // page half way through. A message bounced to ourselves keeps a task queued,
+  // without moving the clock, until the tests finish.
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  var errors = [];
+  window.addEventListener("error", function (e) { errors.push(e.message); });
+  window.addEventListener("unhandledrejection", function (e) { errors.push("rejection: " + (e.reason && e.reason.message || e.reason)); });
+
+  var App = window.App, M = App.DocModel, P = App.DocPaste, HD = App.HouseDocx;
+  App.DocApp = { state: { doc: null }, canAdd: function () { return true; } };
+
+  var WORD_REVIEW = document.getElementById("word-review").textContent;
+  var WORD_STEPS = document.getElementById("word-steps").textContent;
+  var DOT = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC";
+
+  function clip(map, files) { return { getData: function (type) { return (map && map[type]) || ""; }, files: files || [] }; }
+  function newDoc() { var d = M.create("report"); d.blocks = []; return d; }
+  function all(blocks) {
+    var out = [];
+    (blocks || []).forEach(function walk(b) {
+      out.push(b);
+      if (b.type === "table") b.rows.forEach(function (r) { r.cells.forEach(function (c) { c.blocks.forEach(walk); }); });
+    });
+    return out;
+  }
+  function txt(b) { return b.type === "prompt" ? b.text : (b.runs || []).map(function (r) { return r.t; }).join(""); }
+  function shape(blocks) {
+    return blocks.map(function (b) {
+      if (b.type === "heading") return "h" + b.level + ":" + txt(b);
+      if (b.type === "list") return (b.list === "number" ? "#" : "*") + b.level + (b.restart ? "!" : "") + (b["continue"] ? "+" : "") + ":" + txt(b);
+      if (b.type === "table") return "table[" + b.rows.map(function (r) { return r.cells.map(function (c) { return shape(c.blocks).join("+"); }).join("|"); }).join(" / ") + "]";
+      if (b.type === "paragraph") return "p:" + txt(b);
+      return b.type;
+    });
+  }
+  // The markers Word will print, by the writer's own rule, for the numbered items.
+  function printed(blocks) {
+    var nums = HD.listNumbers(blocks);
+    return all(blocks).filter(function (b) { return b.type === "list" && b.list === "number"; }).map(function (b) { return nums[b.id].marker; }).join(" ");
+  }
+  function words(blocks) { return all(blocks).map(txt).join(" | "); }
+  // A PNG of noise, which does not compress: about three bytes a pixel.
+  function noisePng(side) {
+    var c = document.createElement("canvas"); c.width = side; c.height = side;
+    var g = c.getContext("2d"), img = g.createImageData(side, side), d = img.data, x = 123456789;
+    for (var i = 0; i < d.length; i += 4) {
+      x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+      d[i] = x & 255; d[i + 1] = (x >>> 8) & 255; d[i + 2] = (x >>> 16) & 255; d[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    return c.toDataURL("image/png");
+  }
+
+  var chain = Promise.resolve();
+  function step(name, fn) {
+    chain = chain.then(fn).catch(function (e) { ok(false, name + ": ran without an error", (e && e.stack) || String(e)); });
+  }
+
+  // ---- Word's comments, tracked changes and footnotes ---------------------
+  step("word review", function () {
+    var doc = newDoc();
+    return P.read(clip({ "text/html": WORD_REVIEW, "text/plain": "not used" }), doc).then(function (r) {
+      var w = words(r.blocks);
+      ok(r.source === "html" && shape(r.blocks).join(" ; ") === "p:Paragraph with a comment on it. ; p:Paragraph with a footnote and more text. ; p:Tracked: the stays here. ; p:Inserted while tracking.",
+        "a passage copied from a reviewed Word draft is pasted as its settled text", shape(r.blocks).join(" ; "));
+      ok(!/FA1|INTERNAL|Dave/.test(w) && !/FA1|INTERNAL|Dave/.test(JSON.stringify(doc.footnotes)), "a review comment is not pasted: not its mark, and not what it says", w);
+      ok(/Paragraph with a comment on it\./.test(w), "the words the comment was made on are kept");
+      ok(!/old wording/.test(w), "text deleted with Track Changes is left out");
+      var ins = r.blocks[3].runs;
+      ok(ins.length === 1 && !ins[0].u && !ins[0].s, "text inserted with Track Changes is ordinary text, not underlined", JSON.stringify(ins));
+      ok(!/\[1\]/.test(w), "a footnote's number is not typed into the sentence");
+      var fn = r.blocks[1].runs.filter(function (x) { return x.fn; });
+      var note = fn.length === 1 ? doc.footnotes[fn[0].fn] : null;
+      ok(fn.length === 1 && r.blocks[1].runs.map(function (x) { return x.fn ? "[fn]" : x.t; }).join("") === "Paragraph with a footnote[fn] and more text.",
+        "the footnote's mark is a footnote reference where the mark stood", JSON.stringify(r.blocks[1].runs));
+      ok(!!note && M.runsText(note.runs) === "The footnote text." && note.runs.some(function (x) { return x.t === "text" && x.b; }) && !note.runs.some(function (x) { return x.fn; }),
+        "and the footnote is a footnote of the document, with its words and their formatting", JSON.stringify(note));
+      ok(!!r.footnotes && r.footnotes[fn[0] && fn[0].fn] === note && M.usedKeys(Object.assign({}, doc, { blocks: r.blocks })).footnotes.length === 1, "the result names the new footnote, and the pasted blocks refer to it");
+      ok(/^1 comment was not pasted\./.test(r.message) && /Tracked changes were settled: inserted text was kept and deleted text was left out\./.test(r.message), "the user is told about the comment and the tracked changes", r.message);
+      ok(!/footnote/.test(r.message), "and nothing is said about a footnote that was brought across", r.message);
+      ok(!/[–—]/.test(r.message), "the message has no dashes");
+    });
+  });
+
+  step("notes that cannot come", function () {
+    var doc = newDoc();
+    var mark = "<p>Body<a style='mso-footnote-id:ftn7' href=\"#_ftn7\"><span class=MsoFootnoteReference>[7]</span></a> text.</p>";
+    return P.fromHtml(mark, doc).then(function (r) {
+      ok(shape(r.blocks).join() === "p:Body text." && !r.blocks[0].runs.some(function (x) { return x.fn; }) && Object.keys(doc.footnotes).length === 0,
+        "a footnote mark whose note did not come with the paste leaves no number in the text", JSON.stringify(r.blocks[0].runs));
+      ok(r.message === "1 footnote could not be pasted. Load the Word file to bring it across.", "and the user is told", r.message);
+      return P.fromHtml(mark + mark.replace(/7/g, "8") + '<p><img src="https://example.org/a.png"></p>', doc);
+    }).then(function (r) {
+      ok(/^1 picture could not be pasted\..* 2 footnotes could not be pasted\. Load the Word file to bring them across\.$/.test(r.message) && r.skippedPictures === 1,
+        "what is said about footnotes follows what is said about pictures and does not replace it", r.message);
+      var end = "<p>See the note<a style='mso-endnote-id:edn1' href=\"#_edn1\"><span class=MsoEndnoteReference>[i]</span></a>.</p>" +
+        "<div style='mso-element:endnote-list'><div style='mso-element:endnote' id=edn1><p class=MsoEndnoteText><a style='mso-endnote-id:edn1' href=\"#_ednref1\">[i]</a> First line.</p><p class=MsoEndnoteText>Second line.</p></div></div>";
+      return P.fromHtml(end, doc);
+    }).then(function (r) {
+      var fn = r.blocks[0].runs.filter(function (x) { return x.fn; })[0];
+      ok(shape(r.blocks).join() === "p:See the note." && !!fn && M.runsText(doc.footnotes[fn.fn].runs) === "First line.\nSecond line." && !r.message,
+        "an endnote becomes a footnote, one paragraph with a line break between its paragraphs", JSON.stringify(r.blocks) + r.message);
+      return P.fromHtml("<table><tr><td>Cell<a style='mso-footnote-id:ftn1'>[1]</a></td><td>B</td></tr></table><div style='mso-element:footnote-list'><div style='mso-element:footnote' id=ftn1><p>Cell note.</p></div><div style='mso-element:footnote' id=ftn2><p>Left behind.</p></div></div>", doc);
+    }).then(function (r) {
+      var cell = r.blocks[0].rows[0].cells[0].blocks[0], fn = cell.runs.filter(function (x) { return x.fn; })[0];
+      ok(!!fn && M.runsText(doc.footnotes[fn.fn].runs) === "Cell note.", "a footnote in a table cell is brought across too");
+      ok(!/Left behind/.test(words(r.blocks)) && r.message === "1 footnote could not be pasted. Load the Word file to bring it across.", "a note with no mark in the pasted text is not typed out as a paragraph, and is said to be left out", r.message);
+    });
+  });
+
+  step("del and ins that are not Word's", function () {
+    return P.fromHtml("<p>a <del>gone</del> b <ins>new</ins> c <s>struck</s></p>", newDoc()).then(function (r) {
+      var runs = r.blocks[0].runs;
+      ok(runs.some(function (x) { return x.t === "gone" && x.s; }) && runs.some(function (x) { return x.t === "new" && x.u; }) && !r.message,
+        "a del or ins from a web page, with no author or date, is still struck or underlined text", JSON.stringify(runs) + r.message);
+      return P.fromHtml('<p>a <del datetime="2026-01-01">gone</del> b <span class="msoIns"><ins>new</ins></span></p>', newDoc());
+    }).then(function (r) {
+      ok(shape(r.blocks).join() === "p:a b new" && r.blocks[0].runs.length === 1 && /Tracked changes were settled/.test(r.message), "one with a date, or in Word's own span, is a tracked change", JSON.stringify(r.blocks[0].runs));
+    });
+  });
+
+  // ---- pictures written into the HTML -------------------------------------
+  step("large pictures", function () {
+    var a = noisePng(950), b = noisePng(951), huge = noisePng(1400);
+    function page(pics) {
+      return "<h1>Site survey</h1><p>Intro <b>bold</b></p><ul><li>one</li><li>two</li></ul>" + pics.map(function (p) { return '<img src="' + p + '">'; }).join("") +
+        "<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>";
+    }
+    var html = page([a, b]), doc = newDoc();
+    return P.read(clip({ "text/html": html, "text/plain": "Site survey\nIntro bold" }), doc).then(function (r) {
+      ok(html.length > P.LIMITS.htmlChars && a.length * 0.75 < P.LIMITS.pictureBytes, "two pictures, each under the limit for one picture, make the HTML longer than the limit for HTML", html.length + " " + a.length);
+      ok(r.source === "html" && shape(r.blocks).join(" ; ") === "h1:Site survey ; p:Intro bold ; *0:one ; *0:two ; picture ; picture ; table[p:a|p:b / p:c|p:d]",
+        "and the paste keeps its heading, list, pictures and table", r.source + " " + shape(r.blocks).join(" ; "));
+      var pics = r.blocks.filter(function (x) { return x.type === "picture"; });
+      ok(Object.keys(r.media).length === 2 && pics.every(function (p) { return r.media[p.media] && r.media[p.media].blob.size > 1000000 && p.width > 0 && p.width <= 601; }) && r.skippedPictures === 0 && !r.message,
+        "both pictures are in the result with their bytes, and nothing is reported as left out", Object.keys(r.media).length + " " + r.message);
+      return P.read(clip({ "text/html": page([huge]), "text/plain": "Site survey" }), newDoc());
+    }).then(function (r) {
+      ok((huge.length - 22) * 0.75 > P.LIMITS.pictureBytes && r.source === "html" && shape(r.blocks).join(" ; ") === "h1:Site survey ; p:Intro bold ; *0:one ; *0:two ; table[p:a|p:b / p:c|p:d]",
+        "a picture over the limit for one picture is left out by itself, and the rest of the paste keeps its structure", r.source + " " + shape(r.blocks).join(" ; "));
+      ok(r.skippedPictures === 1 && r.message === P.skippedMessage(1), "it is counted and the user is told", r.skippedPictures + " " + r.message);
+      var pad = "<p>" + new Array(P.LIMITS.htmlChars / 16 + 2).join("sixteen letters ") + "</p>";
+      return P.read(clip({ "text/html": "<h1>Title</h1>" + pad + '<img src="' + DOT + '"><img src="' + DOT + '">', "text/plain": "Title\n\nthe plain version" }), newDoc());
+    }).then(function (r) {
+      ok(r.source === "text" && shape(r.blocks).join(" ; ") === "p:Title ; p:the plain version", "HTML whose markup alone is over the limit is still pasted as its plain text", r.source + " " + shape(r.blocks).join(" ; ").slice(0, 80));
+      ok(r.skippedPictures === 2 && r.message === "This was too large to paste with its formatting, so only its text was pasted. Its pictures were left out.", "but not silently: the user is told, and its pictures are counted", r.skippedPictures + " " + r.message);
+      var raw = P.LIMITS.htmlRaw; P.LIMITS.htmlRaw = 1000;
+      return P.read(clip({ "text/html": page([a]), "text/plain": "" }), newDoc()).then(function (r2) {
+        P.LIMITS.htmlRaw = raw;
+        ok(r2.source === "none" && r2.blocks.length === 0 && r2.message === "This was too large to paste. Paste it in smaller parts.", "HTML over the ceiling for everything, with no plain text beside it, says so too", r2.source + " " + r2.message);
+      });
+    });
+  });
+
+  // ---- numbered lists ------------------------------------------------------
+  step("numbered lists", function () {
+    var doc = newDoc();
+    return P.fromHtml(WORD_STEPS, doc).then(function (r) {
+      ok(shape(r.blocks).join(" ; ") === "#0:Step one ; #0:Step two ; p:A note between the steps. ; #0+:Step three continues ; #0:Step four",
+        "a Word list that carries on after a paragraph is marked to continue", shape(r.blocks).join(" ; "));
+      ok(printed(r.blocks) === "1. 2. 3. 4." && !r.message, "and prints the numbers Word showed: 1, 2, 3, 4", printed(r.blocks) + " " + r.message);
+      return P.fromHtml('<ol><li>A<br><img src="' + DOT + '"></li><li>B</li><li>C</li></ol>', newDoc());
+    }).then(function (r) {
+      ok(shape(r.blocks).join(" ; ") === "#0:A ; picture ; #0+:B ; #0:C" && printed(r.blocks) === "1. 2. 3." && !r.message, "a procedure with a screenshot in a step keeps its numbers: 1, picture, 2, 3", shape(r.blocks).join(" ; ") + " " + printed(r.blocks));
+      return P.fromHtml('<ol><li>A<img src="' + DOT + '">tail</li><li>B</li></ol>', newDoc());
+    }).then(function (r) {
+      ok(shape(r.blocks).join(" ; ") === "#0:A ; picture ; p:tail ; #0+:B" && printed(r.blocks) === "1. 2.", "text after a picture inside one step is a paragraph, not a step of its own", shape(r.blocks).join(" ; ") + " " + printed(r.blocks));
+      return P.fromHtml("<ul><li>A<ol><li>inner</li></ol>after the inner list</li><li>B</li></ul>", newDoc());
+    }).then(function (r) {
+      ok(shape(r.blocks).join(" ; ") === "*0:A ; #1:inner ; p:after the inner list ; *0:B", "nor is text after an inner list", shape(r.blocks).join(" ; "));
+      return P.fromHtml("<ol><li>A</li><li>B</li></ol><p>x</p><ol start=\"3\"><li>C</li><li>D</li></ol>", newDoc());
+    }).then(function (r) {
+      ok(printed(r.blocks) === "1. 2. 3. 4." && r.blocks[3]["continue"] === true && !r.message, "a list that says it starts at 3, after a list that stopped at 2, carries that list on", shape(r.blocks).join(" ; ") + " " + printed(r.blocks) + " " + r.message);
+      return P.fromHtml("<ol><li>A</li><li>B</li></ol><ol start=\"3\"><li>C</li></ol>", newDoc());
+    }).then(function (r) {
+      ok(printed(r.blocks) === "1. 2. 3." && !r.blocks[2].restart && !r.message, "and so does one that follows it directly", shape(r.blocks).join(" ; "));
+      return P.fromHtml("<ol start=\"5\"><li>Fifth step</li><li>Sixth step</li></ol>", newDoc());
+    }).then(function (r) {
+      ok(printed(r.blocks) === "1. 2." && r.message === "Some numbered items do not have the number they had where they were copied from. Check any reference to them in the text.",
+        "a list that starts at 5 cannot keep its numbers, and the user is told", printed(r.blocks) + " " + r.message);
+      return P.fromHtml("<ol><li>A</li><li>B</li></ol><p>x</p><ol start=\"7\"><li>C</li></ol>", newDoc());
+    }).then(function (r) {
+      ok(printed(r.blocks) === "1. 2. 1." && !r.blocks[3]["continue"] && !!r.message, "a start that does not follow the list before it is not carried on, and is said", printed(r.blocks) + " " + r.message);
+      return P.fromHtml("<ol><li>A</li><li>B</li></ol><ol><li>C</li></ol><p>x</p><ol><li>D</li></ol>", newDoc());
+    }).then(function (r) {
+      ok(shape(r.blocks).join(" ; ") === "#0:A ; #0:B ; #0!:C ; p:x ; #0:D" && printed(r.blocks) === "1. 2. 1. 1." && !r.message, "two lists side by side still start again, and a new list after a paragraph starts at 1", shape(r.blocks).join(" ; "));
+      return P.fromHtml("<ol><li>A</li></ol><table><tr><td><ol start=\"2\"><li>in a cell</li></ol></td><td>x</td></tr></table>", newDoc());
+    }).then(function (r) {
+      var inCell = r.blocks[1].rows[0].cells[0].blocks[0];
+      ok(inCell.type === "list" && !inCell["continue"], "a list in a table cell never carries on a list outside the cell", JSON.stringify(inCell));
+      var lettered = WORD_STEPS.replace(/>1\.</, ">a)<").replace(/>2\.</, ">b)<").replace(/>3\.</, ">c)<").replace(/>4\.</, ">d)<");
+      return P.fromHtml(lettered, newDoc());
+    }).then(function (r) {
+      ok(printed(r.blocks) === "1. 2. 3. 4." && /Some numbered items do not have the number they had/.test(r.message), "a Word list lettered a, b, c prints 1, 2, 3 in the house style, and the user is told", printed(r.blocks) + " " + r.message);
+      var again = WORD_STEPS.replace(/>3\.</, ">1.<").replace(/>4\.</, ">2.<");
+      return P.fromHtml(again, newDoc());
+    }).then(function (r) {
+      ok(printed(r.blocks) === "1. 2. 1. 2." && !r.blocks[3]["continue"] && !r.message, "a Word list that Word itself started again at 1 after a paragraph is not carried on", shape(r.blocks).join(" ; ") + " " + r.message);
+      var pic = WORD_STEPS.replace("<p class=MsoNormal>A note between the steps.</p>", '<p class=MsoNormal><img width=120 height=60 src="' + DOT + '"></p>');
+      return P.fromHtml(pic, newDoc());
+    }).then(function (r) {
+      ok(shape(r.blocks).join(" ; ") === "#0:Step one ; #0:Step two ; picture ; #0+:Step three continues ; #0:Step four" && printed(r.blocks) === "1. 2. 3. 4.", "a Word list with a picture between two steps keeps its numbers", shape(r.blocks).join(" ; "));
+    });
+  });
+
+  // ---- hidden --------------------------------------------------------------
+  step("hidden", function () {
+    var html = '<div style="backface-visibility: hidden; transform: translateZ(0)"><p>Kept one</p></div><p style="-webkit-backface-visibility:hidden">Kept two</p>' +
+      '<p style="visibility:hidden">Gone</p><p style="color:red;display:none !important">Gone too</p><p style="COLOR:red; Visibility : collapse">Gone three</p>' +
+      "<p>Word<span style='display:none;mso-hide:all'> HIDDENTEXT</span> text</p><p style='mso-hide:all'>Gone four</p><p hidden>Gone five</p><p>Plain</p>";
+    return P.fromHtml(html, newDoc()).then(function (r) {
+      ok(shape(r.blocks).join(" ; ") === "p:Kept one ; p:Kept two ; p:Word text ; p:Plain", "text is hidden only by a property that hides it, not by one whose name ends the same way", shape(r.blocks).join(" ; "));
+      return P.fromHtml('<table><tr style="backface-visibility:hidden"><td>r1a</td><td>r1b</td></tr><tr style="display:none"><td>r2a</td><td>r2b</td></tr><tr><td style="-webkit-backface-visibility: hidden">r3a</td><td style="visibility:hidden">r3b</td><td>r3c</td></tr></table>', newDoc());
+    }).then(function (r) {
+      ok(shape(r.blocks).join() === "table[p:r1a|p:r1b / p:r3a|p:r3c]", "the same for the rows and cells of a table", shape(r.blocks).join());
+    });
+  });
+
+  // ---- a project file made by hand ----------------------------------------
+  function project(extra) {
+    return Object.assign({ schema: M.SCHEMA, id: "doc-test-1", kind: "report", info: { title: "T" }, blocks: [] }, extra);
+  }
+  function cell(text, extra) { return Object.assign({ blocks: [{ type: "paragraph", runs: text ? [{ t: text }] : [] }] }, extra); }
+  function even(t) {
+    var g = M.table.grid(t);
+    return g.length === t.rows.length && g.every(function (row) { return row.length === t.cols.length && row.every(function (x) { return !!x; }); });
+  }
+  step("tables in a file", function () {
+    var t0 = Date.now();
+    var d = M.normalise(project({ blocks: [{ type: "table", rows: [
+      { cells: [cell("wide", { span: 1000000 }), cell("next")] },
+      { cells: [cell("a"), cell("b", { span: 2147483647, rowSpan: 2147483647 })] }
+    ] }] }));
+    var t = d.blocks[0], ms = Date.now() - t0;
+    ok(t.cols.length <= 63 && even(t), "a cell that claims to span a million columns gives a table no wider than Word's widest, with every row the same width", t.cols.length + " columns");
+    ok(/wide/.test(M.text(t)) && /next/.test(M.text(t)) && /a\tb|a.*b/.test(M.text(t)) && ms < 2000, "its words are all there, and it is read at once", M.text(t).replace(/\s+/g, " ").slice(0, 60) + " " + ms + " ms");
+    var many = []; for (var i = 0; i < 300; i++) many.push(cell("c" + i));
+    d = M.normalise(project({ blocks: [{ type: "table", rows: [{ cells: many }, { cells: [cell("x")] }] }] }));
+    t = d.blocks[0];
+    var said = M.text(t);
+    ok(t.cols.length === 63 && t.rows[0].cells.length === 63 && even(t), "a row of 300 cells is cut to 63 columns", t.cols.length + " " + t.rows[0].cells.length);
+    ok(many.every(function (c, k) { return said.indexOf("c" + k) !== -1; }) && /c62 c63 .* c299/.test(M.text(t.rows[0].cells[62].blocks[0]) + " " + t.rows[0].cells[62].blocks.map(M.text).join(" ")),
+      "and the words of the cells that were cut are kept, in the last cell", t.rows[0].cells[62].blocks.length + " blocks in the last cell");
+    var big = []; for (var r = 0; r < 400; r++) { var row = []; for (var c = 0; c < 63; c++) row.push(cell("", { span: 63, rowSpan: 400 })); big.push({ cells: row }); }
+    t0 = Date.now();
+    d = M.normalise(project({ blocks: [{ type: "table", rows: big }] }));
+    ok(d.blocks[0].cols.length <= 63 && even(d.blocks[0]) && Date.now() - t0 < 5000, "400 rows of cells that each claim the whole table are bounded too", d.blocks[0].cols.length + " columns, " + (Date.now() - t0) + " ms");
+    var fine = { type: "table", header: 1, cols: [2, 1, 1], rows: [
+      { cells: [cell("h", { span: 2 }), cell("tall", { rowSpan: 2 })] },
+      { cells: [cell("a"), cell("b")] },
+      { cells: [cell("c"), cell("d"), cell("e")] }
+    ] };
+    t = M.normalise(project({ blocks: [fine] })).blocks[0];
+    ok(t.cols.join() === "2,1,1" && t.rows.map(function (row) { return row.cells.map(function (c) { return M.text(c.blocks[0]) + (c.span || "") + (c.rowSpan ? "^" + c.rowSpan : ""); }).join("|"); }).join(" / ") === "h2|tall^2 / a|b / c|d|e" && even(t),
+      "an ordinary table with merged cells is read exactly as it was");
+  });
+
+  step("names every object has", function () {
+    var json = '{"schema":"' + M.SCHEMA + '","id":"doc-test-2","kind":"report","info":{"title":"T"},' +
+      '"blocks":[{"id":"__proto__","type":"paragraph","runs":[{"t":"one"},{"t":"","fn":"__proto__"},{"t":"","fn":"f1"}]},{"id":"__proto__","type":"paragraph","runs":[{"t":"two"}]},' +
+      '{"id":"constructor","type":"picture","media":"__proto__","width":10,"height":10},{"id":"k","type":"picture","media":"m1","width":10,"height":10},' +
+      '{"id":"b9","type":"kept","kind":"shape","xml":"<w:p/>","rels":[{"id":"rId1","type":"t","part":"__proto__"}],"text":""}],' +
+      '"footnotes":{"__proto__":{"runs":[{"t":"bad"}]},"f1":{"runs":[{"t":"good"}]}},' +
+      '"media":{"__proto__":{"type":"image/png","name":"evil.png","data":"AAAA"},"m1":{"type":"image/png","name":"a.png","data":"AAAA"}},' +
+      '"parts":{"__proto__":{"name":"evil","contentType":"x","data":"AAAA"},"constructor":{"name":"evil2","contentType":"x","data":"AAAA"}}}';
+    var d = M.fromText(json), ids = d.blocks.map(function (b) { return b.id; });
+    ok(ids.length === 5 && ids.filter(function (id, i) { return ids.indexOf(id) === i; }).length === 5 && ids.indexOf("__proto__") === -1 && ids.indexOf("constructor") === -1 && ids[3] === "k",
+      "blocks that share the id __proto__ come back with ids of their own, and an ordinary id is kept", ids.join());
+    ok(Object.getPrototypeOf(d.media) === Object.prototype && Object.getPrototypeOf(d.footnotes) === Object.prototype && Object.getPrototypeOf(d.parts) === Object.prototype &&
+      Object.keys(d.media).join() === "m1" && Object.keys(d.footnotes).join() === "f1" && Object.keys(d.parts).length === 0 && ({}).name === undefined && ({}).runs === undefined,
+      "a picture, a part or a footnote stored under such a name is not taken in, and nothing is changed for other objects", Object.keys(d.media).join() + " / " + Object.keys(d.footnotes).join() + " / " + Object.keys(d.parts).join());
+    var used = M.usedKeys(d), gone = M.missing(d);
+    ok(used.media.join() === "m1" && used.footnotes.join() === "f1" && used.parts.length === 0, "what the blocks use is still worked out", JSON.stringify(used));
+    ok(gone.length === 2 && gone.indexOf(ids[2]) !== -1 && gone.indexOf("b9") !== -1 && gone.indexOf("k") === -1, "the picture and the drawing that pointed at one are shown as missing, the real picture is not", gone.join());
+    ok(d.blocks[0].runs.filter(function (r) { return r.fn; }).map(function (r) { return r.fn; }).join() === "f1", "and a footnote reference to one is not kept", JSON.stringify(d.blocks[0].runs));
+    return M.toFile(d).then(function (blob) { return blob.text(); }).then(function (text) {
+      var back = M.fromText(text);
+      ok(back.blocks.length === 5 && Object.keys(back.media).join() === "m1", "the document saves and opens again");
+    });
+  });
+
+  step("a block of a later version", function () {
+    var d = M.fromText(JSON.stringify(project({ blocks: [{ id: "b1", type: "callout", runs: [null, 7, { t: "x", fn: 5 }, { t: "kept" }], tone: "warn" }, { id: "b2", type: "paragraph", runs: [null, { t: "after" }] }] })));
+    ok(d.blocks.length === 2 && d.blocks[0].type === "callout" && d.blocks[0].tone === "warn" && d.blocks[0].runs.length === 4 && M.text(d.blocks[1]) === "after",
+      "a block of a type this version does not know, with runs that are not runs, opens and is kept as it came", JSON.stringify(d.blocks[0]));
+    var n = -1, used = null, copy = null;
+    try { n = M.promptCount(d); used = M.usedKeys(d); copy = M.copyBlocks(d, d.blocks); } catch (e) { ok(false, "counting, saving and copying such a block does not fail", e.message); }
+    ok(n === 0 && !!used && !!copy && copy.length === 2, "the Issue count, the list of what is used and a copy all work with it there");
+    return M.toFile(d).then(function (blob) { return blob.text(); }).then(function (text) {
+      ok(JSON.parse(text).blocks[0].tone === "warn", "and it is saved as it came");
+    });
+  });
+
+  step("import report", function () {
+    var real = { source: { name: "Method.docx", size: 23780, importedAt: "2026-11-11T19:03:00.000Z" },
+      carried: { headings: 3, paragraphs: 12, listItems: 4, tables: 1, pictures: 2, keptObjects: 1, captions: 0, footnotes: 1, links: 2 },
+      toCheck: [{ code: "front-matter", count: 2, blockIds: ["b1", "b2"] }],
+      changed: [{ code: "tracked-changes", count: 3, insertions: 2, deletions: 1 }, { code: "list-numbering", count: 1, blockIds: ["b7"] }],
+      notCarried: [{ code: "comments", count: 1, examples: ["INTERNAL: check this figure"], blockIds: ["b4"] }] };
+    var d = M.normalise(project({ importReport: JSON.parse(JSON.stringify(real)) }));
+    ok(JSON.stringify(d.importReport) === JSON.stringify(real), "a report written by the import is read exactly as it was, field for field", JSON.stringify(d.importReport));
+    var odd = M.fromText('{"schema":"' + M.SCHEMA + '","id":"doc-test-3","kind":"report","info":{},"blocks":[],"importReport":{"source":"nope","carried":["x"],"changed":"x","toCheck":{"a":1},' +
+      '"notCarried":[null,7,{"code":"__proto__","count":"many","examples":"x","blockIds":[1,"b1",{}],"deep":{"a":1}},{"code":"comments","count":2,"examples":["a",3,"b"]}],"__proto__":{"polluted":true},"extra":[1]}}');
+    var rep = odd.importReport, threw = "";
+    ok(Array.isArray(rep.changed) && Array.isArray(rep.toCheck) && Array.isArray(rep.notCarried) && rep.changed.length === 0 && rep.toCheck.length === 0 && rep.source.name === "" && rep.source.size === 0 &&
+      Object.keys(rep.carried).length === 0 && !("extra" in rep) && ({}).polluted === undefined && rep.polluted === undefined,
+      "a report of the wrong shape is brought to the shape the Import report page reads", JSON.stringify(rep));
+    ok(rep.notCarried.length === 2 && rep.notCarried[0].code === "" && rep.notCarried[0].count === 0 && rep.notCarried[0].examples.length === 0 && rep.notCarried[0].blockIds.join() === "b1" && !("deep" in rep.notCarried[0]) &&
+      rep.notCarried[1].examples.join() === "a,b" && rep.notCarried[1].count === 2, "and so is each entry in it", JSON.stringify(rep.notCarried));
+    // What the pages do with it (pages.js: the numbering note, and one sentence an entry).
+    var num, said = [];
+    try {
+      num = (rep.changed || []).filter(function (e) { return e.code === "list-numbering"; })[0];
+      ["toCheck", "notCarried", "changed"].forEach(function (k) { (rep[k] || []).forEach(function (e) { said.push(App.DocImportFlow.sentence(e)); (e.blockIds || []).length; (e.examples || []).filter(Boolean); }); });
+      said.push(App.DocImportFlow.summary(rep));
+    } catch (e) { threw = e.message; }
+    ok(!threw && num === undefined && said.length === 3 && said.every(function (s) { return typeof s === "string" && s.length > 10; }) && /2 comments were not carried over/.test(said[1]),
+      "the pages' own reading of it does not fail, and every entry gets its sentence", threw + " " + JSON.stringify(said));
+    ok(M.normalise(project({ importReport: "x" })).importReport === undefined && M.normalise(project({})).importReport === undefined, "a document with no report still has none");
+  });
+
+  step("a damaged file", function () {
+    var bad = project({});
+    Object.defineProperty(bad, "options", { enumerable: true, get: function () { return null.fn; } });
+    var e1 = null, e2 = null, e3 = null;
+    try { M.normalise(bad); } catch (e) { e1 = e; }
+    ok(!!e1 && e1.message === "This document file is damaged and could not be read." && e1.refusal === true && !e1.foreign && !/Cannot read|null|undefined/.test(e1.message) && e1.cause instanceof TypeError,
+      "a file that makes the reader fail is refused in plain words, never with a script error", e1 && e1.message);
+    try { M.fromText("{ not json"); } catch (e) { e2 = e; }
+    try { M.fromText('{"schema":"spt-review/1.0"}'); } catch (e) { e3 = e; }
+    ok(!!e2 && e2.message === "This is not a document file." && e2.refusal === true && !!e3 && e3.refusal === true && e3.foreign.schema === "spt-review/1.0",
+      "a file that is not ours is refused as before, and every refusal says it is one");
+  });
+
+  chain.then(function () {
+    ok(errors.length === 0, "nothing was thrown or rejected outside the tests", errors.join(" ; "));
+    finish();
+  });
+})();
+</script>
+</body></html>

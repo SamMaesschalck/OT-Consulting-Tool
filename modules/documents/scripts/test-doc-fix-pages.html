@@ -1,0 +1,407 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the pages, review fixes</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/documents.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/tables.css" />
+<link rel="stylesheet" href="../css/pages.css" />
+<!-- A block that is off the screen is not laid out (content-visibility), and
+     these tests measure where its text sits. -->
+<style>.dp-sheet .blk { content-visibility: visible !important; }</style>
+</head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Regression tests for the review findings on the pages (js/pages.js,
+  js/render.js, css/pages.css, css/editor.css), with the real model, renderer,
+  template and exporter and a stand-in only for the shell, as test-doc-pages.html
+  has.
+
+    A short document's opening line on screen is the writer's own line, so the
+    preview, the miniature and the Word file give the same date.
+    Document information says what a short document prints and what it does not.
+    The short document's miniature wraps inside its frame.
+    A preview block sits inside its sheet's margins, portrait and landscape.
+    The preview lists each sheet's footnotes.
+    Headings, prompts and contents entries look as Word prints them, and a
+    contents entry goes to its heading.
+    Worth a look mentions a blank author on a report.
+-->
+<button id="btn-load" type="button">Load</button>
+<div id="main" style="width:1400px"></div>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../data/licence.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/pictures.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script src="../js/export.js"></script>
+<script src="../js/import-flow.js"></script>
+<script src="../js/pages.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function show(end) { document.getElementById("out").textContent = lines.join("\n") + "\n" + end; }
+  function ok(c, n, d) {
+    lines.push((c ? "PASS " : "FAIL ") + n + (!c && d != null ? " - " + d : "")); if (!c) fail++;
+    show("FAIL the page did not finish: re-run it alone with a larger time budget");
+  }
+  function finish() {
+    alive = false;
+    show("\n" + (fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"));
+  }
+  // Packing and zipping run off the main thread, and headless Edge's virtual
+  // clock runs out the moment the page has nothing queued. A message bounced
+  // to ourselves keeps a task queued until the tests finish (as test-doc-zip.html does).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  window.addEventListener("error", function (e) { ok(false, "no script error", e.message); });
+  var A = window.App, M = A.DocModel, R = A.DocRender, P = A.DocPages, HD = A.HouseDocx;
+  var main = document.getElementById("main");
+  function $(id) { return document.getElementById(id); }
+  function tick() { return new Promise(function (res) { setTimeout(res, 0); }); }
+
+  // ---- the shell, standing in (the pages only ask it to go, to note a change) ----
+  var calls;
+  function reset() { calls = { go: [], touched: [] }; }
+  reset();
+  var state = { doc: null, page: "", dirty: false };
+  A.DocApp = {
+    state: state,
+    go: function (page, arg) { calls.go.push([page, arg]); state.page = page; },
+    touched: function (w) { calls.touched.push(w); state.dirty = true; },
+    markClean: function () {}, setDoc: function (d) { state.doc = d; return Promise.resolve(true); },
+    canAdd: function () { return true; }, toast: function () {}, confirmBox: function () { return Promise.resolve(true); },
+    busy: function () {}, say: function () {},
+    h: function (tag, attrs, kids) {
+      var el = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) {
+        var v = attrs[k];
+        if (v == null || v === false) return;
+        if (k === "text") el.textContent = v; else if (k === "class") el.className = v;
+        else el.setAttribute(k, v === true ? "" : v);
+      });
+      (kids || []).forEach(function (c) { if (c != null && c !== false) el.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+      return el;
+    }
+  };
+
+  function para(id, t) { return { id: id, type: "paragraph", runs: [{ t: t }] }; }
+  function docOf(over) {
+    var d = {
+      schema: "spt-document/1.0", id: "doc-test-" + Math.random().toString(36).slice(2, 8),
+      createdAt: "2026-11-11T09:00:00.000Z", savedAt: "2026-11-11T09:00:00.000Z",
+      createdWithVersion: A.Version.number, savedBy: { product: A.Product.name, version: A.Version.number },
+      kind: "report",
+      info: { title: "", docType: "", reference: "", client: "", site: "", author: "", revision: "0.1", date: "",
+        qaReviewBy: "", authorisedBy: "", issuedTo: "", issuedDate: "", classification: "Confidential" },
+      options: { numberHeadings: false, contents: false },
+      nextId: 100, blocks: [], footnotes: {}, media: {}, parts: {}
+    };
+    over = over || {};
+    Object.keys(over).forEach(function (k) { if (k === "info") Object.assign(d.info, over.info); else d[k] = over[k]; });
+    return d;
+  }
+  function open(d) { state.doc = M.normalise(d) || d; reset(); return state.doc; }
+  function draw(page, arg) { main.textContent = ""; page(main, arg); }
+  function click(el) { el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); }
+  function box(el) { return el.getBoundingClientRect(); }
+  function hint(key) { var el = $("info-" + key) && $("info-" + key).closest(".field").querySelector(".hint"); return el ? el.textContent : ""; }
+  function documentXml(blob) {
+    return A.ZipIO.read(blob).then(function (parts) {
+      var p = parts.filter(function (x) { return x.name === "word/document.xml"; })[0];
+      return p ? new TextDecoder().decode(p.bytes) : "";
+    });
+  }
+  function wordText(xml) { return (xml.match(/<w:t[ >][^<]*<\/w:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ""); }).join("|"); }
+
+  var chain = Promise.resolve();
+  function step(name, fn) {
+    chain = chain.then(fn).catch(function (e) { ok(false, name + " ran without throwing", e && (e.stack || e.message)); });
+  }
+
+  var LONG = "Remote access method statement for the northern pumping stations";
+  var SHORT_INFO = { title: LONG, docType: "Method statement", reference: "OPP-2231", client: "Northfield Water", site: "Ashby treatment works",
+    author: "A. Consultant", revision: "1.2", date: "2026-11-02", issuedDate: "2026-11-10", classification: "Commercial in confidence" };
+
+  // ============ 19, 67, 68: one owner of the short document's line ============
+  step("short head", function () {
+    var d = open(docOf({ kind: "short", info: SHORT_INFO, blocks: [para("b1", "Body.")] }));
+    var want = HD.shortHeadLine(d);
+    ok(want === "Northfield Water · 1.2 · 2026-11-10", "the writer's line under a short document's title: client, revision, issued date", want);
+    var cap = R.shortHeadEl(d).querySelector(".cap");
+    ok(cap && cap.textContent === want, "the screen's line is the writer's own", cap && cap.textContent);
+    ok(cap && cap.textContent.indexOf("2026-11-10") !== -1 && cap.textContent.indexOf("2026-11-02") === -1, "so it shows the issued date when both dates are set", cap && cap.textContent);
+    draw(P.preview);
+    var prev = main.querySelector('.dp-sheet[data-part="body"] .doc-short-head .cap');
+    ok(prev && prev.textContent === want, "the preview shows that line", prev && prev.textContent);
+    draw(P.info);
+    var mini = main.querySelector(".dp-mini-page .cap");
+    ok(mini && mini.textContent === want, "and so does the miniature on Document information", mini && mini.textContent);
+    return HD.buildDocument(d, { issueStatus: "draft" }).then(function (r) { return documentXml(r.blob); }).then(function (xml) {
+      var text = wordText(xml);
+      ok(text.indexOf(want) !== -1, "the Word file prints the same line", text.slice(0, 200));
+      ok(text.indexOf("2026-11-02") === -1, "and the other date nowhere", text.slice(0, 200));
+      ok(!/method statement\|/i.test(text.replace(LONG, "")) && text.indexOf("OPP-2231") === -1 && text.indexOf("Ashby") === -1 && text.indexOf("A. Consultant") === -1 && text.indexOf("Commercial in confidence") === -1,
+         "a short document prints no document type, reference, site, author or classification", text.slice(0, 300));
+      d.info.issuedDate = "";
+      var c2 = R.shortHeadEl(d).querySelector(".cap");
+      ok(c2.textContent === HD.shortHeadLine(d) && c2.textContent.indexOf("2026-11-02") !== -1, "with no issued date the line carries the date", c2.textContent);
+      d.info.client = ""; d.info.revision = ""; d.info.date = "";
+      ok(!R.shortHeadEl(d).querySelector(".cap"), "and with nothing to print there is no line");
+    });
+  });
+
+  // ============ 19, 68: Document information follows the kind ============
+  step("hints", function () {
+    var d = open(docOf({ kind: "short", info: SHORT_INFO, blocks: [para("b1", "Body.")] }));
+    draw(P.info);
+    var hints = Array.prototype.map.call(main.querySelectorAll(".hint"), function (h) { return h.textContent; });
+    var wrong = hints.filter(function (t) { return /cover|document control/i.test(t); });
+    ok(wrong.length === 0, "short: no hint speaks of a cover or of document control", wrong.join(" | "));
+    ["docType", "reference", "site", "author"].forEach(function (k) {
+      ok(/^Not printed in a short document\./.test(hint(k)), "short: " + k + " says it is not printed", hint(k));
+    });
+    ok(hint("classification") === "Printed at the left of the footer.", "short: classification says it prints in the footer, which now follows it", hint("classification"));
+    ok(hint("revision") === "Printed under the title." && /^Printed under the title/.test(hint("client")), "short: revision and client say where they print", hint("revision") + " | " + hint("client"));
+    ok(hint("date") === "Printed under the title until an issued date is set.", "short: Date says an issued date takes its place", hint("date"));
+    ok(/printed under the title in place of the date/.test(hint("issuedDate")), "short: Issued date says it is the date printed", hint("issuedDate"));
+    ok(/issued date/i.test($("dp-control-note").textContent) && /^A short document prints no document control page\./.test($("dp-control-note").textContent),
+       "short: the document control note names the issued date as the exception", $("dp-control-note").textContent);
+    ok($("info-docType").getAttribute("aria-describedby") === "info-docType-hint" && $("info-docType-hint").textContent === hint("docType"), "a field is described by its hint");
+    var lead = main.querySelector(".page-sub").textContent;
+    ok(!/cover|document control/i.test(lead), "short: the page's own line does not speak of a cover", lead);
+    var line = $("dp-cover-line").textContent;
+    ok(line === "A short document has no cover. It opens with: " + LONG + ", then Northfield Water, 1.2, 2026-11-10.", "short: the line under the miniature gives what is printed", line);
+    ok(line.indexOf("Method statement") === -1 && !/Document,/.test(line), "short: with no document type in it", line);
+    d.info.revision = ""; d.info.docType = ""; d.info.issuedDate = "";
+    draw(P.info);
+    line = $("dp-cover-line").textContent;
+    ok(line === "A short document has no cover. It opens with: " + LONG + ", then Northfield Water, 2026-11-02.", "short: a blank revision is not made up, and the date stands in for a blank issued date", line);
+    var hasDash = /[–—]/.test(main.textContent);
+    ok(!hasDash, "short: no dashes in the page's words");
+
+    d.kind = "report"; d.info.docType = "Method statement"; d.info.revision = "1.2";
+    draw(P.info);
+    ok(hint("docType") === "Printed in capitals at the top of the cover." && hint("revision") === "Printed on the cover and in document control." &&
+       hint("classification") === "Printed on the cover, in the footer and as Confidentiality in document control.", "report: the hints say where each prints", hint("docType") + " | " + hint("revision") + " | " + hint("classification"));
+    ok(hint("date") === "Printed on the cover until an issued date is set.", "report: Date says an issued date takes its place on the cover", hint("date"));
+    ok(/cover/.test(hint("issuedDate")), "report: Issued date says it prints on the cover too", hint("issuedDate"));
+    ok(hint("site") === "" && hint("author") === "", "report: fields that simply print carry no hint");
+    ok(/^Cover: Method statement, /.test($("dp-cover-line").textContent), "report: the line under the miniature is as it was", $("dp-cover-line").textContent);
+    ok(/cover/.test(main.querySelector(".page-sub").textContent), "report: the page's own line is as it was");
+    // The cover itself: issued date first, as the writer's coverInput gives it.
+    d.info.issuedDate = "2026-11-10";
+    draw(P.info);
+    ok(/2026-11-10/.test(main.querySelector(".dp-mini-page").textContent) && !/2026-11-02/.test(main.querySelector(".dp-mini-page").textContent), "report: the cover shows the issued date once it is set, which is what the Date hint says");
+  });
+
+  // ============ 69: the short document's miniature ============
+  step("miniature", function () {
+    var d = open(docOf({ kind: "short", info: SHORT_INFO, blocks: [para("b1", "Body.")] }));
+    draw(P.info);
+    var frame = main.querySelector(".dp-mini-frame"), page = frame.querySelector(".dp-mini-page"), title = frame.querySelector(".doc-title"), cap = frame.querySelector(".cap");
+    ok(!page.classList.contains("cover-mini"), "short: the miniature is not given the cover's fixed page");
+    var f = box(frame);
+    ok(box(page).right <= f.right + 0.5 && box(page).left >= f.left - 0.5, "short: the page lies inside its frame", box(page).left + "-" + box(page).right + " in " + f.left + "-" + f.right);
+    ok(box(title).width > 0 && box(title).right <= f.right - 11 && box(cap).right <= f.right - 11, "short: the title and the line wrap inside the frame's padding", box(title).right + " and " + box(cap).right + " against " + f.right);
+    var range = document.createRange(); range.selectNodeContents(title);
+    var worst = Array.prototype.reduce.call(range.getClientRects(), function (m, r) { return Math.max(m, r.right); }, 0);
+    ok(worst > 0 && worst <= f.right - 11, "short: no line of the title's text runs past the frame", worst + " against " + f.right);
+    ok(box(page).height < 300, "short: the frame is as tall as the opening, not a mostly empty page", box(page).height);
+    d.info.title = "Supercalifragilisticexpialidociousandthensomemorewithoutanyspace";
+    draw(P.info);
+    frame = main.querySelector(".dp-mini-frame"); title = frame.querySelector(".doc-title"); range = document.createRange(); range.selectNodeContents(title);
+    worst = Array.prototype.reduce.call(range.getClientRects(), function (m, r) { return Math.max(m, r.right); }, 0);
+    ok(worst <= box(frame).right - 11, "short: one long word breaks instead of being cut", worst + " against " + box(frame).right);
+
+    d.kind = "report"; d.info.title = LONG;
+    draw(P.info);
+    frame = main.querySelector(".dp-mini-frame"); page = frame.querySelector(".dp-mini-page");
+    ok(page.classList.contains("cover-mini") && frame.classList.contains("is-cover"), "report: the cover miniature is unchanged");
+    ok(box(page.firstChild).width <= 242, "report: and still scaled to its frame", box(page.firstChild).width);
+  });
+
+  // ============ 65: a preview block sits inside its sheet's margins ============
+  step("margins", function () {
+    var d = open(docOf({
+      info: { title: "Segmentation", client: "Northfield Water" }, options: { numberHeadings: true, contents: true },
+      blocks: [
+        { id: "b1", type: "heading", level: 1, runs: [{ t: "Summary" }] },
+        para("b2", "A paragraph long enough to reach the right margin of the page and wrap on to a second line, so that its right edge is the edge of the text area and nothing less than that."),
+        { id: "b3", type: "list", list: "bullet", level: 0, runs: [{ t: "A bullet" }] },
+        { id: "b4", type: "prompt", text: "Confirm the outage window." },
+        { id: "b5", type: "heading", level: 2, land: true, runs: [{ t: "Zones" }] },
+        { id: "b6", type: "table", land: true, header: 1, cols: [1, 1, 1, 1, 1, 1, 1, 1],
+          rows: [{ cells: [1, 2, 3, 4, 5, 6, 7, 8].map(function (n) { return { blocks: [para("c" + n, "Column " + n)] }; }) }] },
+        para("b7", "A landscape paragraph long enough to reach the right margin of the wide page and wrap on to a second line, so that its right edge is the edge of the wide text area and nothing less than that, which takes rather more words than it does on a portrait page.")
+      ]
+    }));
+    draw(P.preview);
+    var bad = [], n = 0;
+    Array.prototype.forEach.call(main.querySelectorAll('.dp-sheet[data-part="body"]'), function (s) {
+      var sb = box(s);
+      Array.prototype.forEach.call(s.querySelectorAll(":scope > .blk"), function (b) {
+        n++;
+        var r = box(b), inner = b.querySelector(".txt, table"), ir = inner ? box(inner) : r;
+        if (r.left < sb.left + 96 - 1.5 || r.right > sb.right - 96 + 1.5) bad.push(b.getAttribute("data-block-id") + " block " + Math.round(r.left - sb.left) + ".." + Math.round(sb.right - r.right));
+        if (ir.left < sb.left + 96 - 1.5 || ir.right > sb.right - 96 + 1.5) bad.push(b.getAttribute("data-block-id") + " content " + Math.round(ir.left - sb.left) + ".." + Math.round(sb.right - ir.right));
+      });
+    });
+    ok(n === 7 && bad.length === 0, "every body block and its text or table lies inside the sheet's 96 px margins, portrait and landscape", n + " blocks; " + bad.join(" | "));
+    var contents = main.querySelector('.dp-sheet[data-part="contents"] .contents-line');
+    var firstText = main.querySelector('.dp-sheet[data-part="body"] > .blk[data-block-id="b2"] .txt');
+    ok(Math.abs(box(contents).left - box(firstText).left) <= 1, "the body's text starts where the contents sheet's does", box(contents).left + " against " + box(firstText).left);
+    var sheet = main.querySelector('.dp-sheet[data-part="body"]');
+    ok(Math.abs(box(firstText).right - (box(sheet).right - 97)) <= 1.5 && Math.abs(box(firstText).width - 600) <= 2, "a paragraph is the 601 px of text the writer prints", box(firstText).width);
+    var land = main.querySelector('.dp-sheet.land > .blk[data-block-id="b6"]');
+    ok(!!land && Math.abs(box(land).width - 929) <= 3 && box(land.querySelector("table")).width <= box(land).width + 1, "and a landscape table's block fills the turned sheet's text area, the table inside it", land && box(land).width + " / " + box(land.querySelector("table")).width);
+    var blk = main.querySelector('.dp-sheet[data-part="body"] > .blk');
+    ok(getComputedStyle(blk).backgroundColor === "rgba(0, 0, 0, 0)", "a block paints no slab of its own over the sheet", getComputedStyle(blk).backgroundColor);
+    ok($("dp-preview").scrollWidth <= $("dp-preview").clientWidth, "nothing sticks out of the preview sideways at 1400 px", $("dp-preview").scrollWidth + " in " + $("dp-preview").clientWidth);
+
+    d.kind = "short";
+    draw(P.preview);
+    var title = main.querySelector(".dp-sheet .doc-short-head .doc-title"), body = main.querySelector('.dp-sheet > .blk[data-block-id="b2"] .txt');
+    ok(Math.abs(box(title).left - box(body).left) <= 1, "a short document's title lines up with the text under it", box(title).left + " against " + box(body).left);
+  });
+
+  // ============ 66: the preview lists each sheet's footnotes ============
+  step("footnotes", function () {
+    var d = open(docOf({
+      info: { title: "Notes" },
+      footnotes: {
+        f1: { runs: [{ t: "ZEBRA footnote words, with " }, { t: "bold", b: true }, { t: " and a " }, { t: "link", link: "https://example.com/" }, { t: "." }] },
+        f2: { runs: [{ t: "QUAGGA in a table cell." }] },
+        f3: { runs: [{ t: "OKAPI is never referred to." }] }
+      },
+      blocks: [
+        { id: "b1", type: "paragraph", runs: [{ t: "Body sentence with a note." }, { t: "", fn: "f1" }, { t: " And the same note again." }, { t: "", fn: "f1" }] },
+        { id: "b2", type: "pageBreak" },
+        { id: "b3", type: "table", header: 0, cols: [1, 1], rows: [{ cells: [{ blocks: [{ id: "c1", type: "paragraph", runs: [{ t: "Cell" }, { t: "", fn: "f2" }] }] }, { blocks: [para("c2", "Other")] }] }] },
+        { id: "b4", type: "pageBreak" },
+        para("b5", "A page with no notes.")
+      ]
+    }));
+    draw(P.preview);
+    var prev = $("dp-preview"), text = prev.textContent;
+    function count(s) { return text.split(s).length - 1; }
+    // (A note referred to twice is two notes once the document is read: the Word file numbers each reference and prints a note for each.)
+    ok(count("ZEBRA footnote words") === 2 && count("QUAGGA in a table cell.") === 1, "each footnote's words are in the preview, once for each reference", count("ZEBRA footnote words") + " and " + count("QUAGGA in a table cell."));
+    ok(count("OKAPI") === 0, "a footnote nothing refers to is not shown: it does not print");
+    var sheets = Array.prototype.slice.call(prev.querySelectorAll('.dp-sheet[data-part="body"]'));
+    ok(sheets.length === 3, "three sheets", sheets.length);
+    function notes(s) { return Array.prototype.map.call(s.querySelectorAll(".dp-fn-list .dp-fn"), function (p) { return p.querySelector(".dp-fn-n").textContent + ":" + p.querySelector(".dp-fn-t").textContent; }); }
+    function marks(s) { return Array.prototype.map.call(s.querySelectorAll(".blk sup.fn"), function (m) { return m.textContent + "=" + m.getAttribute("data-fn"); }); }
+    ok(notes(sheets[0]).length === 2 && /^1:ZEBRA/.test(notes(sheets[0])[0]) && /^2:ZEBRA/.test(notes(sheets[0])[1]) && /^1=f1,2=f\d+$/.test(marks(sheets[0]).join()), "each is listed on the sheet its reference is on, with the reference's number", notes(sheets[0]).join(" | ") + " ; " + marks(sheets[0]).join());
+    ok(notes(sheets[1]).length === 1 && /^3:QUAGGA/.test(notes(sheets[1])[0]) && marks(sheets[1]).join() === "3=f2", "the one in a table cell likewise", notes(sheets[1]).join(" | ") + " ; " + marks(sheets[1]).join());
+    ok(!sheets[2].querySelector(".dp-fn-list"), "a sheet with no references has no list");
+    var list = sheets[0].querySelector(".dp-fn-list");
+    ok(list === sheets[0].lastElementChild, "the list closes its sheet");
+    ok(list.querySelector(".dp-fn-t b") && list.querySelector(".dp-fn-t b").textContent === "bold" && list.querySelector(".dp-fn-t a[data-link]") && !list.querySelector("a[href]"), "bold and links in a footnote are drawn, a link with no address to follow");
+    ok(parseFloat(getComputedStyle(list.querySelector(".dp-fn")).fontSize) === 12, "in the footnote's printed size (9 pt)", getComputedStyle(list.querySelector(".dp-fn")).fontSize);
+    var sb = box(sheets[0]), lb = box(list);
+    ok(lb.left >= sb.left + 95 && lb.right <= sb.right - 95, "inside the sheet's margins", lb.left + "-" + lb.right);
+    ok(prev.querySelectorAll('[id^="blk-"]').length === 0 && prev.querySelectorAll("[contenteditable=true], [contenteditable='']").length === 0, "the preview still holds no block ids and nothing that can be edited");
+    ok(getComputedStyle(sheets[0].querySelector("sup.fn")).cursor !== "pointer", "a reference does not look as if it opens something here", getComputedStyle(sheets[0].querySelector("sup.fn")).cursor);
+    ok($("dp-preview-note").textContent === "A preview. Word decides where pages break. Drawings kept from an imported file are shown as placeholders here and print in the Word export as they were.", "the preview's note is unchanged");
+    // The same words reach the Word file.
+    return HD.buildDocument(d, { issueStatus: "draft" }).then(function (r) { return A.ZipIO.read(r.blob); }).then(function (parts) {
+      var p = parts.filter(function (x) { return x.name === "word/footnotes.xml"; })[0], xml = p ? new TextDecoder().decode(p.bytes) : "";
+      ok(xml.split("ZEBRA footnote words").length - 1 === 2 && /QUAGGA in a table cell\./.test(xml) && !/OKAPI/.test(xml), "and they are the footnotes the Word file prints, as many times", String(xml.split("ZEBRA footnote words").length - 1));
+    });
+  });
+
+  // ============ 71: the look, and the contents entries ============
+  step("look", function () {
+    var d = open(docOf({
+      info: { title: "Look" }, options: { numberHeadings: true, contents: true },
+      blocks: [
+        { id: "b1", type: "heading", level: 1, runs: [{ t: "First" }] }, para("b2", "Text."),
+        { id: "b3", type: "heading", level: 2, runs: [{ t: "Second" }] },
+        { id: "b4", type: "heading", level: 3, runs: [{ t: "Third" }] },
+        { id: "b5", type: "prompt", text: "Still to write." },
+        { id: "b6", type: "pageBreak" },
+        { id: "b7", type: "heading", level: 1, runs: [{ t: "Last" }] }, para("b8", "End.")
+      ]
+    }));
+    draw(P.preview);
+    function cs(sel) { return getComputedStyle(main.querySelector(sel)); }
+    ["h1", "h2", "h3"].forEach(function (t) {
+      ok(cs(".dp-sheet .blk " + t + ".txt").fontWeight === "400", "a level " + t.slice(1) + " heading's text is regular weight, as Word prints it", cs(".dp-sheet .blk " + t + ".txt").fontWeight);
+    });
+    ok(cs(".dp-sheet .blk .hnum").fontWeight === "700", "its number is bold", cs(".dp-sheet .blk .hnum").fontWeight);
+    ok(cs(".doc-control h1").fontWeight === "400" && cs(".doc-contents h1").fontWeight === "400", "the template's own headings are regular weight too");
+    ok(cs(".blk .txt.prompt").fontStyle === "normal" && cs(".blk .txt.prompt").fontWeight === "700", "a prompt is bold and upright", cs(".blk .txt.prompt").fontStyle + " " + cs(".blk .txt.prompt").fontWeight);
+    ok(cs(".contents-line a").textDecorationLine === "none", "a contents entry is not underlined", cs(".contents-line a").textDecorationLine);
+
+    var entries = Array.prototype.slice.call(main.querySelectorAll('.dp-sheet[data-part="contents"] a[data-goto]'));
+    ok(entries.length === 3 && entries.map(function (a) { return a.getAttribute("data-goto"); }).join() === "b1,b3,b7", "the contents list has the level 1 and 2 headings", entries.length);
+    ok(entries.every(function (a) { return a.tabIndex === 0 && a.getAttribute("role") === "link"; }), "each entry is a tab stop and is announced as a link");
+    ok(entries.every(function (a) { return !a.hasAttribute("href"); }), "with no address of its own, so it cannot leave the page");
+    var scrolled = [], real = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function () { scrolled.push(this.getAttribute("data-block-id")); };
+    try {
+      click(entries[2]);
+      var target = main.querySelector('.dp-sheet > .blk[data-block-id="b7"]');
+      ok(scrolled.join() === "b7", "clicking an entry scrolls to its heading", scrolled.join());
+      ok(document.activeElement === target && target.closest(".dp-sheet") !== entries[2].closest(".dp-sheet"), "which is on its own sheet and now holds the keyboard", document.activeElement && document.activeElement.className);
+      scrolled = [];
+      entries[1].focus();
+      ok(document.activeElement === entries[1], "an entry takes the keyboard");
+      entries[1].dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true, cancelable: true }));
+      ok(scrolled.length === 0, "another key does nothing");
+      var ev = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      entries[1].dispatchEvent(ev);
+      ok(scrolled.join() === "b3" && ev.defaultPrevented && document.activeElement === main.querySelector('.dp-sheet > .blk[data-block-id="b3"]'), "Enter on an entry goes to its heading", scrolled.join());
+      ok(state.page !== "edit" && calls.go.length === 0, "all without leaving the preview");
+    } finally { Element.prototype.scrollIntoView = real; }
+  });
+
+  // ============ 72: Worth a look and a blank author ============
+  step("worth", function () {
+    var full = { title: "Worth", qaReviewBy: "A", authorisedBy: "B", issuedTo: "C", issuedDate: "2026-11-11" };
+    var d = open(docOf({ info: full, blocks: [para("b1", "x")] }));
+    var w = P.worth(d);
+    ok(w.length === 1 && w[0].code === "blank-author" && w[0].text === "Author is blank on the cover.", "a report with no author: Worth a look says the cover's author is blank", JSON.stringify(w.map(function (x) { return x.code + ":" + x.text; })));
+    d.info.author = "   ";
+    ok(P.worth(d).some(function (x) { return x.code === "blank-author"; }), "spaces alone are blank");
+    draw(P.issue);
+    var li = $("dp-worth") && $("dp-worth").querySelector('li[data-code="blank-author"]');
+    ok(!!li && /Author is blank on the cover\./.test(li.textContent), "it is on the Issue page");
+    reset();
+    if (li) click(li.querySelector(".btn"));
+    ok(JSON.stringify(calls.go) === '[["info",{"field":"author"}]]', "its Go to it opens the Author field", JSON.stringify(calls.go));
+    d.info.author = "A. Consultant";
+    ok(P.worth(d).length === 0, "with an author there is nothing to mention");
+    d.info.author = ""; d.info.client = "";
+    ok(P.worth(d).map(function (x) { return x.code; }).join() === "blank-author", "a blank client is not raised: the cover leaves that line out", P.worth(d).map(function (x) { return x.code; }).join());
+    d.kind = "short";
+    ok(P.worth(d).length === 0, "a short document prints no author, so nothing is raised for it");
+    // The cover strip leaves the label out when there is no author (it used to
+    // print it with nothing after it), so this line is the only place a
+    // missing author is seen before the file is issued.
+    d.kind = "report";
+    return HD.buildDocument(d, { issueStatus: "draft" }).then(function (r) { return documentXml(r.blob); }).then(function (xml) {
+      ok(!/AUTHOR/.test(wordText(xml)) && /ISSUE/.test(wordText(xml)), "which is why: with no author the cover prints no Author label at all, so nothing on it shows one is missing");
+      return tick();
+    });
+  });
+
+  chain.then(tick).then(finish, function (e) { ok(false, "threw: " + (e && e.message)); finish(); });
+})();
+</script>
+</body></html>

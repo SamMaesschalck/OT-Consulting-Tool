@@ -1,0 +1,429 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: floating drawings keep their place</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Floating drawings, from a Word file to the export (review findings 1 to 4
+  and 37). A floating drawing is placed by its anchor, measured from the
+  paragraph that holds it, so the paragraph is what has to survive:
+
+    - a diagram drawn as loose shapes over blank lines travels as one block,
+      every anchor in its own paragraph and every blank line with it, each with
+      the font size and spacing it had in the source;
+    - shapes anchored in one paragraph stay in one paragraph;
+    - a drawing anchored in a paragraph of text is written into that
+      paragraph again, not into a new one after it;
+    - the import report names every floating drawing;
+    - a text box made smaller to fit has its words made smaller with it;
+    - no fixture holds a floating drawing far from its paragraph.
+
+  The source is fx-float.docx, made by Word (make-fixtures.ps1), and files built
+  here for the cases it does not hold. What Word makes of the export is the
+  Word check's business (tools/word-open-check.ps1); this page reads the XML.
+-->
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script src="fixtures/fx-float.js"></script>
+<script src="fixtures/fx-art.js"></script>
+<script src="fixtures/fx-theme.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function eq(a, b, n) { var x = JSON.stringify(a), y = JSON.stringify(b); ok(x === y, n, "got " + x + " wanted " + y); }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Unzipping runs off the main thread, and headless Edge's virtual clock runs
+  // out the moment the page has nothing queued. A message bounced to ourselves
+  // keeps a task queued, without moving the clock, until the tests finish.
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+
+  var A = window.App, I = A.DocxImport, H = A.HouseDocx, G = A.DocxGraft, Zip = A.ZipIO, M = A.DocModel;
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+  var MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+  function bytes(b64) { var s = atob(b64), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+  function fixture(name) { return new File([bytes(window.Fixtures[name])], name + ".docx"); }
+  function documentXml(blob) {
+    return Zip.read(blob).then(function (files) {
+      var f = files.filter(function (x) { return x.name === "word/document.xml"; })[0];
+      return Zip.text(f);
+    });
+  }
+  function parse(xml) { return new DOMParser().parseFromString(xml, "application/xml"); }
+  function exported(doc) {
+    return H.buildDocument(doc, { issueStatus: "draft" }).then(function (res) {
+      return documentXml(res.blob).then(function (xml) { return { xml: xml, dom: parse(xml), fitted: res.fitted || [] }; });
+    });
+  }
+  function entry(report, code) {
+    var found = null;
+    ["toCheck", "changed", "notCarried"].forEach(function (l) { report[l].forEach(function (e) { if (e.code === code) found = e; }); });
+    return found;
+  }
+  function textOf(b) { return b.runs ? b.runs.map(function (r) { return r.t; }).join("") : (b.text || ""); }
+  function brief(blocks) {
+    return blocks.map(function (b) {
+      if (b.type === "kept") return "kept " + b.kind + (b.floating ? " floating" : "");
+      if (b.type === "paragraph" || b.type === "heading") return b.type.charAt(0) + ":" + textOf(b).slice(0, 18);
+      return b.type;
+    });
+  }
+
+  // ---- reading a document.xml: the paragraphs of the body and what each holds ----
+  // A paragraph's own words: not those inside a text box, and not a fallback's copy.
+  function ownText(p) {
+    var ts = p.getElementsByTagNameNS(W, "t"), s = "";
+    for (var i = 0; i < ts.length; i++) {
+      var inside = false;
+      for (var n = ts[i].parentNode; n && n !== p; n = n.parentNode) if (n.localName === "txbxContent" || (n.namespaceURI === MC && n.localName === "Fallback")) inside = true;
+      if (!inside) s += ts[i].textContent;
+    }
+    return s;
+  }
+  function offsetOf(anchor, which) {
+    var pos = anchor.getElementsByTagNameNS(WP, which)[0], off = pos && pos.getElementsByTagNameNS(WP, "posOffset")[0];
+    return (pos ? pos.getAttribute("relativeFrom") : "?") + " " + (off ? off.textContent : "?");
+  }
+  // One anchor, as everything that places it.
+  function place(anchor) {
+    var ext = anchor.getElementsByTagNameNS(WP, "extent")[0], pr = anchor.getElementsByTagNameNS(WP, "docPr")[0], wrap = "";
+    for (var c = anchor.firstChild; c; c = c.nextSibling) if (c.nodeType === 1 && /^wrap/.test(c.localName)) wrap = c.localName;
+    return { name: pr.getAttribute("name"), at: offsetOf(anchor, "positionH") + " / " + offsetOf(anchor, "positionV") + " / " + ext.getAttribute("cx") + "x" + ext.getAttribute("cy") + " / " + wrap };
+  }
+  function anchorsIn(p) {
+    var all = p.getElementsByTagNameNS(WP, "anchor"), out = [];
+    for (var i = 0; i < all.length; i++) out.push(place(all[i]));
+    return out;
+  }
+  function spacingOf(p) {
+    var pPr = null, c;
+    for (c = p.firstChild; c; c = c.nextSibling) if (c.nodeType === 1 && c.localName === "pPr") pPr = c;
+    var out = { spacing: "", size: "", font: "", keepNext: false, jc: "" };
+    if (!pPr) return out;
+    for (c = pPr.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType !== 1) continue;
+      if (c.localName === "keepNext") out.keepNext = true;
+      if (c.localName === "jc") out.jc = c.getAttributeNS(W, "val");
+      if (c.localName === "spacing") out.spacing = ["before", "after", "line", "lineRule"].map(function (k) { return k + "=" + (c.getAttributeNS(W, k) || ""); }).join(" ");
+      if (c.localName === "rPr") {
+        var sz = c.getElementsByTagNameNS(W, "sz")[0], f = c.getElementsByTagNameNS(W, "rFonts")[0];
+        out.size = sz ? sz.getAttributeNS(W, "val") : ""; out.font = f ? f.getAttributeNS(W, "ascii") : "";
+      }
+    }
+    return out;
+  }
+  function bodyParas(dom) {
+    var body = dom.getElementsByTagNameNS(W, "body")[0], out = [];
+    for (var c = body.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 1 && c.namespaceURI === W && c.localName === "p") out.push({ el: c, text: ownText(c), anchors: anchorsIn(c), fmt: spacingOf(c) });
+    }
+    return out;
+  }
+  function indexOfText(paras, start) { for (var i = 0; i < paras.length; i++) if (paras[i].text.indexOf(start) === 0) return i; return -1; }
+
+  // ---- a Word file built here, for what the fixture does not hold ----
+  var NS = ' xmlns:w="' + W + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="' + MC + '"' +
+    ' xmlns:wp="' + WP + '" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"' +
+    ' xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"' +
+    ' xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w10="urn:schemas-microsoft-com:office:word" mc:Ignorable="w14 wp14"';
+  var HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  var seq = 0;
+  function P(text, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + (text ? '<w:r><w:t xml:space="preserve">' + text + '</w:t></w:r>' : '') + '</w:p>'; }
+  function PX(inner, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + inner + '</w:p>'; }
+  // A shape with a word in it, as Word writes one: DrawingML with a VML copy
+  // beside it. o: { name, x, y (EMU), wrap, inline, w, h (EMU), words }
+  function shape(o) {
+    var id = ++seq, cx = o.w || 1143000, cy = o.h || 508000;
+    var words = '<w:txbxContent><w:p><w:pPr><w:spacing w:after="160" w:line="240" w:lineRule="exact"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>' + (o.words || o.name) + '</w:t></w:r></w:p></w:txbxContent>';
+    var graphic = '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr' + (o.inline ? ' txBox="1"' : '') + '/>' +
+      '<wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr>' +
+      '<wps:txbx>' + words + '</wps:txbx><wps:bodyPr rot="0" lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="t"><a:noAutofit/></wps:bodyPr></wps:wsp></a:graphicData></a:graphic>';
+    var frame = o.inline
+      ? '<wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:docPr id="' + id + '" name="' + o.name + '"/><wp:cNvGraphicFramePr/>' + graphic + '</wp:inline>'
+      : '<wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="' + (251659264 + id) + '" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">' +
+        '<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>' + (o.x || 0) + '</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>' + (o.y || 0) + '</wp:posOffset></wp:positionV>' +
+        '<wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:' + (o.wrap || "wrapNone") + (o.wrap === "wrapSquare" ? ' wrapText="bothSides"' : '') + '/><wp:docPr id="' + id + '" name="' + o.name + '"/><wp:cNvGraphicFramePr/>' + graphic + '</wp:anchor>';
+    return '<w:r><w:rPr><w:noProof/></w:rPr><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing>' + frame + '</w:drawing></mc:Choice><mc:Fallback><w:pict>' +
+      '<v:rect id="' + o.name + '" style="' + (o.inline ? '' : 'position:absolute;margin-left:' + ((o.x || 0) / 12700) + 'pt;margin-top:' + ((o.y || 0) / 12700) + 'pt;') + 'width:' + (cx / 12700) + 'pt;height:' + (cy / 12700) + 'pt">' +
+      '<v:textbox>' + words + '</v:textbox></v:rect></w:pict></mc:Fallback></mc:AlternateContent></w:r>';
+  }
+  function docx(body) {
+    var CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.";
+    var styles = HEAD + '<w:styles' + NS + '><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr></w:rPrDefault>' +
+      '<w:pPrDefault><w:pPr><w:spacing w:after="200" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="caption"/><w:basedOn w:val="Normal"/></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="Tight"><w:name w:val="Tight"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="40" w:after="0" w:line="300" w:lineRule="exact"/></w:pPr><w:rPr><w:sz w:val="28"/></w:rPr></w:style></w:styles>';
+    return Zip.write([
+      { name: "[Content_Types].xml", bytes: Zip.bytesOf(HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+        '<Override PartName="/word/document.xml" ContentType="' + CT + 'document.main+xml"/><Override PartName="/word/styles.xml" ContentType="' + CT + 'styles+xml"/></Types>') },
+      { name: "_rels/.rels", bytes: Zip.bytesOf(HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>') },
+      { name: "word/document.xml", bytes: Zip.bytesOf(HEAD + '<w:document' + NS + '><w:body>' + body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body></w:document>') },
+      { name: "word/styles.xml", bytes: Zip.bytesOf(styles) },
+      { name: "word/_rels/document.xml.rels", bytes: Zip.bytesOf(HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>') }
+    ]);
+  }
+  function imp(body, name) { return docx(body).then(function (blob) { return I.read(blob, { name: name || "made.docx" }); }); }
+
+  var chain = Promise.resolve();
+  function test(name, fn) {
+    chain = chain.then(fn).then(null, function (e) { ok(false, name + ": it ran", (e && (e.cause ? e.cause.stack || e.cause.message : e.stack || e.message)) || String(e)); });
+  }
+
+  // ---- 1. the fixture made by Word: a wrapped box, a note fixed to the page, a loose diagram ----
+  test("fx-float", function () {
+    var src;
+    return documentXml(fixture("fx-float")).then(function (xml) {
+      src = bodyParas(parse(xml));
+      return I.read(fixture("fx-float"), { name: "fx-float.docx" });
+    }).then(function (r) {
+      var p = r.project, bl = p.blocks;
+      eq(brief(bl), ["h:Floating drawings", "kept shape floating", "p:A box sits beside ", "p:This paragraph has", "kept textbox floating", "p:A note is placed a", "pageBreak",
+        "h:A network drawn on", "p:The boxes and line", "kept group floating", "p:This paragraph fol"],
+        "import: a floating drawing comes before the text it was anchored in, and the loose diagram is one drawing where its blank lines were");
+      var diagram = bl[9], floats = bl.filter(function (b) { return b.type === "kept" && b.floating; });
+      ok((diagram.xml.match(/<wp:anchor\b/g) || []).length === 9 && /^<w:p[ >]/.test(diagram.xml), "import: the diagram's nine shapes and lines are in one block, as whole paragraphs", String((diagram.xml.match(/<wp:anchor\b/g) || []).length));
+      eq([diagram.caption, diagram.text, /^9 shapes drawn on the page, \d+\.\d x \d+\.\d cm$/.test(diagram.description), /Internet/.test(diagram.label || "") && /Link 1/.test(diagram.label || "")],
+        ["Figure 1: The network, drawn on the page", "Internet Firewall Switch HMI PLC", true, true], "import: the caption under the diagram is its caption, and its card says what it is and names its shapes");
+      ok(diagram.width > 300 && diagram.width < 700 && diagram.height > 250 && diagram.height < 700, "import: the diagram's size is the size of the whole drawing", diagram.width + " x " + diagram.height);
+
+      var note = entry(r.report, "floating-drawings");
+      eq(note && [note.count, note.blockIds], [11, floats.map(function (b) { return b.id; })], "report: every floating drawing is counted under floating-drawings, with the blocks to show");
+      ok(r.report.changed.indexOf(note) >= 0 && I.CODES.changed.indexOf("floating-drawings") >= 0, "report: floating-drawings is a code of the changed list");
+      ok(!entry(r.report, "inline-objects") && !entry(r.report, "floating-pictures"), "report: a floating drawing is neither an in-line object nor a floating picture");
+
+      return exported(p).then(function (out) {
+        var ex = bodyParas(out.dom);
+        ok(out.dom.getElementsByTagName("parsererror").length === 0 && out.xml.indexOf("") < 0, "export: the document parses and no token is left in it");
+        var nested = 0, ps = out.dom.getElementsByTagNameNS(W, "p");
+        for (var i = 0; i < ps.length; i++) if (ps[i].parentNode.localName === "p") nested++;
+        ok(nested === 0, "export: no paragraph sits inside another", String(nested));
+
+        // The wrapped box: in its own paragraph of text again, before the words, as in the source.
+        var sBox = src[indexOfText(src, "A box sits beside")], eBox = ex[indexOfText(ex, "A box sits beside")];
+        eq(eBox && eBox.anchors, sBox.anchors, "export: the wrapped box is anchored in the paragraph of text it was anchored in, placed as it was");
+        var first = eBox && eBox.el.getElementsByTagNameNS(W, "r")[0];
+        ok(!!first && first.getElementsByTagNameNS(WP, "anchor").length === 1, "export: its anchor is the first run of that paragraph, as in the source");
+        var ePrev = ex[indexOfText(ex, "A box sits beside") - 1];
+        ok(ePrev && ePrev.text === "Floating drawings", "export: no paragraph is added for it", ePrev && JSON.stringify(ePrev.text));
+        var sNote = src[indexOfText(src, "A note is placed")], eNote = ex[indexOfText(ex, "A note is placed")];
+        eq(eNote && eNote.anchors, sNote.anchors, "export: the note fixed to the page is anchored in its own paragraph of text, placed as it was");
+
+        // The diagram: the same paragraphs between the same two paragraphs of text.
+        var s0 = indexOfText(src, "The boxes and lines below"), s1 = indexOfText(src, "Figure 1"), e0 = indexOfText(ex, "The boxes and lines below"), e1 = indexOfText(ex, "Figure 1");
+        var sRun = src.slice(s0 + 1, s1), eRun = ex.slice(e0 + 1, e1);
+        eq([eRun.length, eRun.every(function (x) { return x.text === ""; })], [sRun.length, true], "export: as many wordless paragraphs between the text and the caption as the source has (" + sRun.length + ")");
+        eq(eRun.map(function (x) { return x.anchors; }), sRun.map(function (x) { return x.anchors; }), "export: every shape and line is anchored in the same one of them, with the same offsets, size and wrap");
+        var total = 0; eRun.forEach(function (x) { total += x.anchors.length; });
+        ok(total === 9 && sRun.some(function (x) { return x.anchors.length > 1; }) && sRun.some(function (x) { return x.anchors.length === 0; }), "export: nine anchors, some sharing a line and some lines empty, so the test means something", String(total));
+        // Word's own Normal in the fixture: Aptos 12 pt, 8 pt after, 1.16 lines.
+        var fmts = {}; eRun.forEach(function (x) { fmts[JSON.stringify(x.fmt)] = 1; });
+        eq(Object.keys(fmts), [JSON.stringify({ spacing: "before=0 after=160 line=278 lineRule=auto", size: "24", font: "Aptos", keepNext: true, jc: "" })],
+          "export: each of them has the source's own font, size and spacing written on it, and stays with the next, so the drawing is as tall as it was and is not split over two pages");
+        ok(ex[e1].text.indexOf("Figure 1: The network") === 0 && ex[e1 + 1].text.indexOf("This paragraph follows") === 0, "export: the caption and the text after it follow the room left for the drawing");
+        ok(ex.every(function (x) { return x.anchors.length === 0 || x.text !== "" || x.fmt.spacing !== "" ; }), "export: no anchor hangs from a paragraph with a line height that is not written down");
+      });
+    });
+  });
+
+  // ---- 2. shapes that share a paragraph, with and without text ----
+  test("one paragraph", function () {
+    var body = P("Before the drawing.") +
+      PX(shape({ name: "Box A", x: 0, y: 63500 }) + shape({ name: "Box B", x: 1524000, y: 63500 }) + shape({ name: "Box C", x: 762000, y: 1270000 }), '<w:pStyle w:val="Tight"/>') +
+      P("") + P("") + P("", '<w:pStyle w:val="Tight"/>') + P("") + P("") +
+      P("Figure 3: three boxes", '<w:pStyle w:val="Caption"/>') + P("After the drawing.") +
+      P("") + P("") +
+      PX(shape({ name: "Box D", x: 0, y: 127000, wrap: "wrapSquare" }) + shape({ name: "Box E", x: 2540000, y: 127000, wrap: "wrapSquare" }) + '<w:r><w:t>Two boxes sit in this paragraph.</w:t></w:r>') +
+      P("The end.");
+    return imp(body).then(function (r) {
+      var bl = r.project.blocks;
+      eq(brief(bl), ["p:Before the drawing", "kept group floating", "p:After the drawing.", "kept group floating", "p:Two boxes sit in t", "p:The end."],
+        "import: three shapes in one wordless paragraph and the blank lines after them are one drawing; blank lines with no drawing near them go as before");
+      eq([bl[1].caption, (bl[1].xml.match(/<w:p[ >]/g) || []).length >= 6, (bl[3].xml.match(/<wp:anchor\b/g) || []).length, /^<w:r[ >]/.test(bl[3].xml)], ["Figure 3: three boxes", true, 2, true],
+        "import: the first is six paragraphs with its caption; the two boxes beside text are two runs in one block");
+      eq(entry(r.report, "floating-drawings").count, 5, "report: five floating drawings");
+      return exported(r.project).then(function (out) {
+        var ex = bodyParas(out.dom), a = indexOfText(ex, "Before the drawing"), c = indexOfText(ex, "Figure 3");
+        var run = ex.slice(a + 1, c);
+        eq(run.map(function (x) { return x.anchors.map(function (y) { return y.name; }).join("+"); }), ["Box A+Box B+Box C", "", "", "", "", ""], "export: the three anchors are in one paragraph, followed by the five blank lines");
+        eq(run.map(function (x) { return x.fmt.spacing + " " + x.fmt.size + " " + x.fmt.font; }), [
+          "before=40 after=0 line=300 lineRule=exact 28 Arial", "before=0 after=200 line=276 lineRule=auto 22 Arial", "before=0 after=200 line=276 lineRule=auto 22 Arial",
+          "before=40 after=0 line=300 lineRule=exact 28 Arial", "before=0 after=200 line=276 lineRule=auto 22 Arial", "before=0 after=200 line=276 lineRule=auto 22 Arial"],
+          "export: each keeps the height its own style and the document defaults gave it in the source");
+        var both = ex[indexOfText(ex, "Two boxes sit")];
+        eq(both.anchors.map(function (y) { return y.name; }), ["Box D", "Box E"], "export: the two boxes beside text are both anchored in that paragraph of text");
+        ok(ex[indexOfText(ex, "Two boxes sit") - 1].text.indexOf("After the drawing") === 0, "export: and nothing is added before it");
+      });
+    });
+  });
+
+  // ---- 3. a drawing over the lines after its paragraph, and what holds no drawing at all ----
+  test("room after", function () {
+    var body = P("Intro.") + PX(shape({ name: "Over", x: 0, y: 381000, h: 1270000 }) + '<w:r><w:t>The drawing hangs below this line.</w:t></w:r>') + P("") + P("") + P("") + P("Text after the room.") +
+      P("") + PX(shape({ name: "Square", x: 0, y: 0, wrap: "wrapSquare" }) + '<w:r><w:t>A wrapped box makes its own room.</w:t></w:r>') + P("") + P("Last.") +
+      PX(shape({ name: "In line", inline: true })) + P("") + P("Done.");
+    return imp(body).then(function (r) {
+      var bl = r.project.blocks;
+      eq(brief(bl), ["p:Intro.", "kept shape floating", "p:The drawing hangs ", "kept other floating", "p:Text after the roo", "kept shape floating", "p:A wrapped box make", "p:Last.", "kept textbox", "p:Done."],
+        "import: blank lines under a drawing that lies over them are kept as its room; after a wrapped box, or an in-line one, a blank line is a blank line");
+      eq([bl[3].description, bl[3].rels.length, (bl[3].xml.match(/<w:p[ >]/g) || []).length], ["Blank lines that left room for a drawing, 2.7 cm", 0, 3], "import: the room says what it is and holds three paragraphs and no drawing");
+      eq([entry(r.report, "floating-drawings").count, entry(r.report, "floating-drawings").blockIds], [2, [bl[1].id, bl[5].id]], "report: two floating drawings; the room and the in-line box are not counted as one");
+      return exported(r.project).then(function (out) {
+        var ex = bodyParas(out.dom), a = indexOfText(ex, "The drawing hangs"), b = indexOfText(ex, "Text after the room");
+        eq([ex[a].anchors.length, b - a - 1, ex.slice(a + 1, b).every(function (x) { return x.text === "" && x.fmt.spacing === "before=0 after=200 line=276 lineRule=auto"; })], [1, 3, true],
+          "export: the drawing is in its paragraph of text and the three blank lines follow it at their own height");
+      });
+    });
+  });
+
+  test("no floats", function () {
+    return imp(P("One.") + P("") + P("") + PX(shape({ name: "In line", inline: true })) + P("") + P("Two.")).then(function (r) {
+      eq([brief(r.project.blocks), !!entry(r.report, "floating-drawings")], [["p:One.", "kept textbox", "p:Two."], false], "a file with no floating drawing: no floating-drawings entry, and its blank lines are not carried");
+    });
+  });
+
+  // ---- 4. where there is no text to hold the anchor ----
+  test("writer", function () {
+    return I.read(fixture("fx-art"), { name: "fx-art.docx" }).then(function (r) {
+      var doc = M.normalise(r.project);
+      var shapes = doc.blocks.filter(function (b) { return b.type === "kept" && b.floating && b.kind === "group"; })[0];
+      var box = doc.blocks.filter(function (b) { return b.type === "kept" && b.floating && b.kind === "textbox"; })[0];
+      var chart = doc.blocks.filter(function (b) { return b.type === "kept" && b.kind === "chart"; })[0];
+      ok(!!shapes && !!box && !!chart && /^<w:r[ >]/.test(shapes.xml) && (shapes.xml.match(/<wp:anchor\b/g) || []).length === 2, "fx-art: the two shapes anchored in one paragraph of text are one block of two runs");
+      var i = doc.blocks.indexOf(shapes);
+      ok(textOf(doc.blocks[i + 1]).indexOf("Two shapes with words in them") === 0, "fx-art: and it comes before that paragraph");
+      var t = M.make.table(doc, 1, 2);
+      t.rows[0].cells[0].blocks[0].runs = [{ t: "A cell" }];
+      doc.blocks = [M.make.heading(doc, 1, "Alone"), box, t, shapes, M.make.paragraph(doc, "The shapes belong to this text."), chart];
+      return exported(doc).then(function (out) {
+        var ex = bodyParas(out.dom), alone = ex[indexOfText(ex, "Alone") + 1];
+        eq([alone.anchors.length, alone.text, alone.fmt.spacing, alone.fmt.jc, alone.fmt.keepNext], [1, "", "before=0 after=0 line=20 lineRule=exact", "", true],
+          "export: a floating drawing with no text after it gets a paragraph of no height, not centred, that stays with what follows");
+        var text = ex[indexOfText(ex, "The shapes belong")];
+        ok(text && text.anchors.length === 2, "export: one with text after it is anchored in that text");
+        var last = ex.filter(function (x) { return x.el.getElementsByTagNameNS("http://schemas.openxmlformats.org/drawingml/2006/chart", "chart").length > 0; })[0];
+        eq(last && [last.fmt.jc, last.fmt.spacing], ["center", ""], "export: an in-line chart still has its centred paragraph with the template's own spacing");
+      });
+    });
+  });
+
+  // ---- 5. fixtures: every floating drawing is near its paragraph, and stays there ----
+  ["fx-float", "fx-art", "fx-theme"].forEach(function (name) {
+    test(name + " anchors", function () {
+      var src;
+      return documentXml(fixture(name)).then(function (xml) {
+        src = bodyParas(parse(xml));
+        var far = [];
+        xml.replace(/<wp:positionV relativeFrom="paragraph"><wp:posOffset>(-?\d+)<\/wp:posOffset>/g, function (m, v) { if (+v < 0 || +v > 1800000) far.push(v); return m; });
+        ok(far.length === 0 && /<wp:anchor\b/.test(xml), name + ": every floating drawing measured from its paragraph is within 5 cm below its top", far.join(", "));
+        return I.read(fixture(name), { name: name + ".docx" });
+      }).then(function (r) { return exported(r.project); }).then(function (out) {
+        var ex = bodyParas(out.dom), bad = [], n = 0;
+        src.forEach(function (sp) {
+          // A floating plain picture becomes a picture in line (reported as floating-pictures); the rest are kept.
+          var kept = sp.anchors.filter(function (a) { return !/^Picture /.test(a.name); });
+          if (!kept.length || !sp.text) return;
+          var ep = ex[indexOfText(ex, sp.text.slice(0, 30))];
+          n += kept.length;
+          if (!ep || JSON.stringify(ep.anchors) !== JSON.stringify(kept)) bad.push(sp.text.slice(0, 30) + ": " + JSON.stringify(ep && ep.anchors) + " against " + JSON.stringify(kept));
+        });
+        ok(n > 0 && bad.length === 0, name + ": each drawing anchored in a paragraph of text is anchored in that paragraph in the export, with the same offsets, size and wrap (" + n + ")", bad.join(" | "));
+      });
+    });
+  });
+
+  // ---- 6. a text box made smaller: its words go with it ----
+  test("scaleXml", function () {
+    var box = shape({ name: "Wide box", inline: true, w: 5588000, h: 762000, words: "START and many more words END" });
+    var half = G.scaleXml(box, 0.5), d = parse("<x" + NS + ">" + half + "</x>");
+    ok(d.getElementsByTagName("parsererror").length === 0, "scaleXml: the result parses");
+    var ext = d.getElementsByTagNameNS(WP, "extent")[0];
+    eq([ext.getAttribute("cx"), ext.getAttribute("cy")], ["2794000", "381000"], "scaleXml: the frame is halved");
+    var sizes = [].map.call(d.getElementsByTagNameNS(W, "sz"), function (e) { return e.getAttributeNS(W, "val"); });
+    var sizesCs = [].map.call(d.getElementsByTagNameNS(W, "szCs"), function (e) { return e.getAttributeNS(W, "val"); });
+    eq([sizes, sizesCs], [["12", "12"], ["12", "12"]], "scaleXml: the font size of the words is halved, in the drawing and in its older copy");
+    var sp = d.getElementsByTagNameNS(W, "spacing")[0];
+    eq([sp.getAttributeNS(W, "after"), sp.getAttributeNS(W, "line")], ["80", "120"], "scaleXml: the spacing after a paragraph and a fixed line height are halved");
+    var bp = d.getElementsByTagNameNS("http://schemas.microsoft.com/office/word/2010/wordprocessingShape", "bodyPr")[0];
+    eq(["lIns", "tIns", "rIns", "bIns"].map(function (k) { return bp.getAttribute(k); }), ["45720", "22860", "45720", "22860"], "scaleXml: the margin between the frame and the words is halved");
+    var bare = G.scaleXml(box.replace(' lIns="91440" tIns="45720" rIns="91440" bIns="45720"', ""), 0.5);
+    ok(/<wps:bodyPr rot="0" anchor="t" lIns="45720" tIns="22860" rIns="45720" bIns="22860">/.test(bare), "scaleXml: a shape that names no margins is given Word's own, halved", (/<wps:bodyPr[^>]*>/.exec(bare) || [""])[0]);
+    var auto = G.scaleXml(box.replace('w:line="240" w:lineRule="exact"', 'w:line="276" w:lineRule="auto"'), 0.5);
+    ok(/w:after="80" w:line="276" w:lineRule="auto"/.test(auto), "scaleXml: a line height given in lines is left alone, since it follows the font");
+    ok(/<w:sz w:val="8"\/>/.test(G.scaleXml(box, 0.1)), "scaleXml: words are never made smaller than 4 pt");
+    eq(G.scaleXml(box, 1), box, "scaleXml: a factor of one changes nothing");
+
+    var group = '<w:r xmlns:w="' + W + '"><w:drawing><wp:inline xmlns:wp="' + WP + '"><wp:extent cx="4000000" cy="2000000"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData>' +
+      '<wpg:wgp xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wpg:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4000000" cy="2000000"/><a:chOff x="0" y="0"/><a:chExt cx="4000000" cy="2000000"/></a:xfrm></wpg:grpSpPr>' +
+      '<wps:wsp><wps:spPr><a:xfrm><a:off x="100" y="100"/><a:ext cx="2000000" cy="1000000"/></a:xfrm></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>In the group</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr lIns="91440"/></wps:wsp>' +
+      '</wpg:wgp></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+    var g2 = G.scaleXml(group, 0.5);
+    ok(/<wpg:grpSpPr><a:xfrm><a:off x="0" y="0"\/><a:ext cx="2000000" cy="1000000"\/><a:chOff x="0" y="0"\/><a:chExt cx="4000000" cy="2000000"\/>/.test(g2) && /<a:off x="100" y="100"\/><a:ext cx="2000000" cy="1000000"\/><\/a:xfrm><\/wps:spPr>/.test(g2),
+      "scaleXml: a group's own frame is halved and its children's places, measured in the group's own units, are left alone");
+    ok(/<w:sz w:val="12"\/><w:szCs w:val="12"\/>/.test(g2) && /<wps:bodyPr lIns="45720"/.test(g2), "scaleXml: the words of a text box inside a group, and its margins, are halved with it");
+
+    var chart = '<w:r xmlns:w="' + W + '"><w:drawing><wp:inline xmlns:wp="' + WP + '"><wp:extent cx="6858000" cy="2540000"/><wp:docPr id="4" name="Chart 1"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="sptK1"/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+    eq(G.scaleXml(chart, 0.5), chart.replace('cx="6858000" cy="2540000"', 'cx="3429000" cy="1270000"'), "scaleXml: a chart is the same but for its frame");
+  });
+
+  test("scaled in a cell", function () {
+    return imp(P("A wide text box follows.") + PX(shape({ name: "Wide box", inline: true, w: 5588000, h: 762000, words: "START and many more words END" })) + P("End.")).then(function (r) {
+      var doc = M.normalise(r.project), box = doc.blocks.filter(function (b) { return b.type === "kept"; })[0];
+      eq([box.kind, box.floating, box.width], ["textbox", false, 587], "a wide in-line text box is kept");
+      var t = M.make.table(doc, 1, 3);
+      t.rows[0].cells[1].blocks = [box];
+      doc.blocks = [M.make.paragraph(doc, "In a cell."), t];
+      return exported(doc).then(function (out) {
+        var ext = out.dom.getElementsByTagNameNS(WP, "extent"), wide = null;
+        for (var i = 0; i < ext.length; i++) if (ext[i].parentNode.getElementsByTagNameNS(WP, "docPr")[0].getAttribute("name") === "Wide box") wide = ext[i];
+        var factor = wide ? +wide.getAttribute("cx") / 5588000 : 0;
+        ok(out.fitted.indexOf(box.id) >= 0 && factor > 0.2 && factor < 0.45, "export: in a narrow cell it is made smaller and named among the fitted", String(factor));
+        var inBox = wide.parentNode.getElementsByTagNameNS(W, "txbxContent")[0], sz = inBox.getElementsByTagNameNS(W, "sz")[0].getAttributeNS(W, "val");
+        ok(Math.abs(+sz - 24 * factor) <= 0.5 && /START and many more words END/.test(inBox.textContent), "export: its words are all there and smaller by the same factor (24 half-points to " + sz + ")", sz + " against " + (24 * factor));
+      });
+    });
+  });
+
+  // ---- 7. the graft: whole paragraphs take the token's paragraph, or nothing is written ----
+  test("graft", function () {
+    return I.read(fixture("fx-float"), { name: "fx-float.docx" }).then(function (r) {
+      var doc = M.normalise(r.project), diagram = doc.blocks.filter(function (b) { return b.type === "kept" && b.kind === "group"; })[0];
+      ok(/^<w:p[ >]/.test(diagram.xml) && diagram.floating === true, "the diagram survives the model's own tidying as whole paragraphs");
+      return M.toFile(doc).then(function (blob) { return blob.text(); }).then(function (text) {
+        var loaded = M.fromText(text), again = loaded.blocks.filter(function (b) { return b.type === "kept" && b.kind === "group"; })[0];
+        ok(!!again && again.xml === diagram.xml, "and a save and a load");
+        // In a table cell the paragraphs go into the cell.
+        var t = M.make.table(loaded, 1, 1);
+        t.rows[0].cells[0].blocks = [again];
+        loaded.blocks = [M.make.paragraph(loaded, "A diagram in a cell."), t];
+        return exported(loaded);
+      }).then(function (out) {
+        var cell = out.dom.getElementsByTagNameNS(W, "tc"), found = null;
+        for (var i = 0; i < cell.length; i++) if (cell[i].getElementsByTagNameNS(WP, "anchor").length === 9) found = cell[i];
+        var direct = found ? [].filter.call(found.children, function (c) { return c.localName === "p"; }) : [];
+        ok(!!found && direct.length >= 14 && out.xml.indexOf("") < 0, "moved into a table cell, its paragraphs are the cell's paragraphs", String(direct.length));
+      });
+    });
+  });
+
+  chain.then(finish);
+})();
+</script>
+</body></html>

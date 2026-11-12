@@ -1,0 +1,507 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the blocks-to-Word writer</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.HouseDocx as a writer (docs/document-tool-design.md 4.3): every block type
+  and every inline format of the contract, built into a real Word file, unzipped
+  and read back from the XML. List numbers (the one rule everything reads), the
+  numbering references and instances that follow from it, tables with spans,
+  pictures clamped to the page and to a cell, captions, footnotes, links,
+  landscape pages, page breaks, prompts and red text, and kept objects handed to
+  the graft pass. App.DocxGraft is replaced by a fake that records the plan and
+  returns the file as it was, so this page tests the writer alone.
+-->
+<script>
+// A script that fails to load or throws is a failure, not a page that says "running" for ever.
+window.addEventListener("error", function (e) { document.getElementById("out").textContent = "FAIL the page threw: " + (e.message || (e.target && e.target.src) || "a script did not load") + "\n\n1 FAILED"; }, true);
+</script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/house-docx.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Packing runs off the main thread, and headless Edge's virtual clock runs
+  // out the moment the page has nothing queued, which under load dumped this
+  // page part way through. A message bounced to ourselves keeps a task
+  // queued, without moving the clock, until the tests finish (as
+  // test-doc-zip.html).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  var HD = window.App.HouseDocx;
+
+  // ---- helpers ----
+  function unzip(blob) {
+    return blob.arrayBuffer().then(function (buf) {
+      var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+      for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+      if (eocd < 0) throw new Error("not a zip");
+      var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true), jobs = [];
+      for (var k = 0; k < n; k++) {
+        var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+        var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+        var local = v.getUint32(p + 42, true);
+        var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        jobs.push((function (name, method, data) {
+          var bytes = method === 0 ? Promise.resolve(data)
+            : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+          return bytes.then(function (b) { return { name: name, bytes: b, text: /\.(xml|rels)$/.test(name) ? new TextDecoder().decode(b) : "" }; });
+        })(name, method, data));
+        p += 46 + nlen + xlen + clen;
+      }
+      return Promise.all(jobs).then(function (list) { var map = {}; list.forEach(function (x) { map[x.name] = x; }); return map; });
+    });
+  }
+  function text(z, name) { return (z[name] && z[name].text) || ""; }
+  function wellFormed(z) {
+    return Object.keys(z).filter(function (n) { return z[n].text && new DOMParser().parseFromString(z[n].text, "application/xml").getElementsByTagName("parsererror").length > 0; });
+  }
+  // The paragraphs, runs and tables of the body after the document control page.
+  function bodyOf(doc) { var at = doc.indexOf("w:type=\"page\""); return at < 0 ? doc : doc.slice(at); }
+  // Paragraphs are matched whole; a table cell's paragraphs are found too.
+  function paras(xml) { return xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p\/>/g) || []; }
+  function paraWith(xml, needle) { return paras(xml).filter(function (p) { return p.indexOf(">" + needle + "<") !== -1; })[0] || ""; }
+  function runWith(xml, needle) {
+    return (xml.match(/<w:r>(?:(?!<\/w:r>)[\s\S])*<\/w:r>/g) || []).filter(function (r) { return r.indexOf(">" + needle + "<") !== -1; })[0] || "";
+  }
+  function numIdOf(p) { return (p.match(/<w:numId w:val="(\d+)"\/>/) || [])[1]; }
+  function ilvlOf(p) { return (p.match(/<w:ilvl w:val="(\d+)"\/>/) || [])[1]; }
+  function abstractOf(nx, numId) {
+    var num = (nx.match(new RegExp('<w:num w:numId="' + numId + '"[^>]*>[\\s\\S]*?</w:num>')) || [""])[0];
+    var absId = (num.match(/<w:abstractNumId w:val="(\d+)"\/>/) || [])[1];
+    return { num: num, abs: (nx.match(new RegExp('<w:abstractNum w:abstractNumId="' + absId + '"[^>]*>[\\s\\S]*?</w:abstractNum>')) || [""])[0] };
+  }
+  function lvl(abs, n) { return (abs.match(new RegExp('<w:lvl w:ilvl="' + n + '"[^>]*>[\\s\\S]*?</w:lvl>')) || [""])[0]; }
+
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  function pngBlob() {
+    var bin = atob(PNG), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return new Blob([u], { type: "image/png" });
+  }
+  var seq = 0;
+  function id() { seq += 1; return "b" + seq; }
+  function para(runs, extra) { return Object.assign({ id: id(), type: "paragraph", runs: typeof runs === "string" ? [{ t: runs }] : runs }, extra || {}); }
+  function head(level, t, extra) { return Object.assign({ id: id(), type: "heading", level: level, runs: typeof t === "string" ? [{ t: t }] : t }, extra || {}); }
+  function item(kind, level, t, extra) { return Object.assign({ id: id(), type: "list", list: kind, level: level, runs: [{ t: t }] }, extra || {}); }
+  function cellOf(t, extra) { return Object.assign({ blocks: typeof t === "string" ? [para(t)] : t }, extra || {}); }
+  function project(blocks, extra) {
+    return Object.assign({ schema: "spt-document/1.0", kind: "report", info: { title: "Writer test", client: "Northfield Water", author: "A. Consultant" },
+      options: {}, blocks: blocks, footnotes: {}, media: {}, parts: {} }, extra || {});
+  }
+
+  // The graft pass, faked: it records what it was given and changes nothing.
+  var grafts = [];
+  window.App.DocxGraft = {
+    token: function (bid) { return "\uE000KEPT:" + bid + "\uE000"; },
+    needsGraft: function (plan) { return !!(plan && ((plan.kept && plan.kept.length) || (plan.media && plan.media.length))); },
+    apply: function (blob, plan) { grafts.push(plan); return Promise.resolve(blob); }
+  };
+  function build(p, status) {
+    return HD.buildDocument(p, { issueStatus: status || "draft" }).then(function (r) {
+      return unzip(r.blob).then(function (z) { return { z: z, doc: text(z, "word/document.xml"), body: bodyOf(text(z, "word/document.xml")), fitted: r.fitted }; });
+    });
+  }
+  function markers(blocks) {
+    var n = HD.listNumbers(blocks), out = [];
+    (function walk(list) {
+      list.forEach(function (b) {
+        if (b.type === "table") b.rows.forEach(function (r) { r.cells.forEach(function (c) { walk(c.blocks); }); });
+        if (b.type === "list") out.push(n[b.id].marker + "/" + n[b.id].instance);
+      });
+    })(blocks);
+    return out.join(" ");
+  }
+
+  var chain = Promise.resolve();
+  // Progress is written after each step, as a failure until the last one has
+  // run: a page cut short by the time budget must not read as a short pass.
+  function step(fn) { chain = chain.then(fn).then(function () { document.getElementById("out").textContent = lines.join("\n") + "\nFAIL the page did not finish: re-run it alone with a larger time budget"; }); }
+
+  // ---- 1. list numbers: the rule ----
+  step(function () {
+    ok(markers([item("number", 0, "a"), item("number", 0, "b"), item("number", 0, "c")]) === "1./1 2./1 3./1", "numbered items directly after each other count on, on one instance");
+    ok(markers([item("number", 0, "a"), item("number", 0, "b"), para("between"), item("number", 0, "c")]) === "1./1 2./1 1./2",
+       "a block that is not a list item ends the list: the next numbered item starts at 1 on a new instance");
+    ok(markers([item("number", 0, "a"), item("number", 0, "b"), para("between"), item("number", 0, "c", { "continue": true }), item("number", 0, "d")]) === "1./1 2./1 3./1 4./1",
+       "continue carries on from the last numbered list across what sits between");
+    ok(markers([item("number", 0, "a"), item("number", 0, "b"), item("number", 0, "c", { restart: true }), item("number", 0, "d")]) === "1./1 2./1 1./2 2./2",
+       "restart starts at 1 although the item before is numbered");
+    ok(markers([item("number", 0, "a", { "continue": true })]) === "1./1", "continue with no list before it simply starts one");
+    ok(markers([item("number", 0, "a"), item("number", 1, "b"), item("number", 1, "c"), item("number", 0, "d"), item("number", 1, "e"), item("number", 2, "f"), item("number", 2, "g")]) ===
+       "1./1 a./1 b./1 2./1 a./1 i./1 ii./1", "each level counts by itself, as letters and roman numerals, and starts again under a new parent");
+    ok(markers([item("bullet", 0, "a"), item("bullet", 1, "b"), item("bullet", 2, "c")]) === "\u2022/0 \u25E6/0 \u25AA/0", "bullets are a dot, a ring and a small square, never a dash");
+    ok(markers([item("number", 0, "a"), item("bullet", 1, "x"), item("number", 0, "b")]) === "1./1 \u25E6/0 2./1", "a bullet under a numbered item does not break the numbers");
+    var many = []; for (var i = 0; i < 28; i++) many.push(item("number", 1, "x"));
+    ok(/ z\.\/1 aa\.\/1 bb\.\/1$/.test(markers(many)), "after z the letters go aa, bb, as Word's do", markers(many).slice(-30));
+    var tbl = { id: id(), type: "table", header: 0, cols: [1, 1], rows: [{ cells: [cellOf([item("number", 0, "x"), item("number", 0, "y")]), cellOf([item("number", 0, "z")])] }] };
+    ok(markers([item("number", 0, "a"), tbl, item("number", 0, "b")]) === "1./1 1./2 2./2 1./3 1./4", "each table cell is a list flow of its own, and a table ends the list around it", markers([tbl]));
+    ok(markers([{ id: "q1", type: "list", list: "number", level: 7, runs: [] }, { id: "q2", type: "list", list: "number", runs: [] }]) === "i./1 1./1", "a level outside 0 to 2 is held to it");
+    var hs = [head(1, "a"), head(2, "b"), head(3, "c"), head(2, "d"), head(1, "e"), head(2, "f")], hn = HD.headingNumbers(hs);
+    ok(hs.map(function (h) { return hn[h.id]; }).join(" ") === "1 1.1 1.1.1 1.2 2 2.1", "heading numbers: 1, 1.1, 1.1.1, counted per level");
+  });
+
+  // ---- 2. lists in the file ----
+  step(function () {
+    var b = [item("bullet", 0, "Dot"), item("bullet", 1, "Ring"), item("bullet", 2, "Square"),
+      para("Gap one"), item("number", 0, "First"), item("number", 1, "First a"), item("number", 2, "First a i"), item("number", 0, "Second"),
+      para("Gap two"), item("number", 0, "Again first"), para("Gap three"), item("number", 0, "Third", { "continue": true })];
+    return build(project(b)).then(function (r) {
+      var nx = text(r.z, "word/numbering.xml"), P = function (t) { return paraWith(r.body, t); };
+      ok(wellFormed(r.z).length === 0, "lists: every XML part parses", wellFormed(r.z).join(", "));
+      var bul = abstractOf(nx, numIdOf(P("Dot")));
+      ok(numIdOf(P("Dot")) && numIdOf(P("Dot")) === numIdOf(P("Ring")) && numIdOf(P("Ring")) === numIdOf(P("Square")), "bullets share one numbering instance");
+      ok(ilvlOf(P("Dot")) === "0" && ilvlOf(P("Ring")) === "1" && ilvlOf(P("Square")) === "2", "with their levels");
+      ok(/<w:lvlText w:val="\u2022"\/>/.test(lvl(bul.abs, 0)) && /<w:lvlText w:val="\u25E6"\/>/.test(lvl(bul.abs, 1)) && /<w:lvlText w:val="\u25AA"\/>/.test(lvl(bul.abs, 2)),
+         "the bullet glyphs are in the numbering part");
+      ok(/<w:ind w:left="360" w:hanging="200"\/>/.test(lvl(bul.abs, 0)) && /<w:ind w:left="720" w:hanging="200"\/>/.test(lvl(bul.abs, 1)) && /<w:ind w:left="1080" w:hanging="200"\/>/.test(lvl(bul.abs, 2)),
+         "bullet indents: 360, 720, 1080, hanging 200");
+      var n1 = numIdOf(P("First")), n2 = numIdOf(P("Again first"));
+      ok(n1 && n1 === numIdOf(P("First a")) && n1 === numIdOf(P("First a i")) && n1 === numIdOf(P("Second")), "one numbered list is one instance at every level");
+      ok(n2 && n2 !== n1 && n1 !== numIdOf(P("Dot")), "a list after other text is another instance", n1 + "," + n2);
+      ok(numIdOf(P("Third")) === n2, "a continued item is written on the instance it carries on");
+      var num = abstractOf(nx, n1), num2 = abstractOf(nx, n2);
+      ok(/<w:numFmt w:val="decimal"\/>/.test(lvl(num.abs, 0)) && /<w:lvlText w:val="%1\."\/>/.test(lvl(num.abs, 0)) &&
+         /<w:numFmt w:val="lowerLetter"\/>/.test(lvl(num.abs, 1)) && /<w:lvlText w:val="%2\."\/>/.test(lvl(num.abs, 1)) &&
+         /<w:numFmt w:val="lowerRoman"\/>/.test(lvl(num.abs, 2)) && /<w:lvlText w:val="%3\."\/>/.test(lvl(num.abs, 2)), "numbers are 1. then a. then i.");
+      ok(/<w:ind w:left="360" w:hanging="300"\/>/.test(lvl(num.abs, 0)) && /<w:ind w:left="720" w:hanging="300"\/>/.test(lvl(num.abs, 1)), "number indents: 360, 720, hanging 300");
+      ok(/<w:startOverride w:val="1"\/>/.test(num.num) && /<w:startOverride w:val="1"\/>/.test(num2.num), "each instance starts at 1");
+      // Without a start on the deeper levels Word carries their count from one
+      // instance into the next (seen in Word: a list opening at level 1 began at b.).
+      var starts = function (x) { return (x.match(/<w:lvlOverride w:ilvl="(\d)"><w:startOverride w:val="1"\/><\/w:lvlOverride>/g) || []).map(function (m) { return m.match(/ilvl="(\d)"/)[1]; }).join(","); };
+      ok(starts(num.num) === "0,1,2" && starts(num2.num) === "0,1,2", "at every level, so a list that opens with a sub-item begins at a.", starts(num.num) + " / " + starts(num2.num));
+      ok(starts(bul.num) === "0", "a bullet instance is left as the library makes it", starts(bul.num));
+      ok(/<w:pStyle w:val="BodyText"\/>/.test(P("First")), "a list item is in the body style");
+    });
+  });
+
+  // ---- 3. inline formats ----
+  step(function () {
+    var runs = [{ t: "plain" }, { t: "bold", b: true }, { t: "ital", i: true }, { t: "under", u: true }, { t: "struck", s: true }, { t: "upper", sup: true }, { t: "lower", sub: true },
+      { t: "fixed", code: true }, { t: "todo", red: true }, { t: "site", link: "https://example.org/a?b=1&c=2" }, { t: "mail", link: "mailto:a@example.org" },
+      { t: "bad", link: "javascript:alert(1)" }, { t: "file", link: "file:///c:/x" },
+      { t: "all", b: true, i: true, u: true, s: true, sup: true, code: true }, { t: "boldlink", b: true, link: "http://example.org" },
+      { t: "line one\nline two" }, { t: "col\tumn" }, { t: "" }, { t: "x<&>\"y" }];
+    return build(project([para(runs)])).then(function (r) {
+      var R = function (t) { return runWith(r.body, t); };
+      var rels = text(r.z, "word/_rels/document.xml.rels");
+      ok(wellFormed(r.z).length === 0, "inline: every XML part parses", wellFormed(r.z).join(", "));
+      ok(/<w:b w:val="false"\/>/.test(R("plain")) && /<w:i w:val="false"\/>/.test(R("plain")) && !/<w:u |<w:strike|<w:vertAlign|<w:color|<w:rFonts|<w:shd/.test(R("plain")), "plain text carries no formatting of its own");
+      ok(/<w:b\/>/.test(R("bold")) && /<w:i w:val="false"\/>/.test(R("bold")), "bold");
+      ok(/<w:i\/>/.test(R("ital")) && /<w:b w:val="false"\/>/.test(R("ital")), "italic");
+      ok(/<w:u w:val="single"\/>/.test(R("under")), "underline");
+      ok(/<w:strike\/>/.test(R("struck")), "strikethrough");
+      ok(/<w:vertAlign w:val="superscript"\/>/.test(R("upper")), "superscript");
+      ok(/<w:vertAlign w:val="subscript"\/>/.test(R("lower")), "subscript");
+      ok(/Consolas/.test(R("fixed")) && /<w:sz w:val="20"\/>/.test(R("fixed")) && /<w:shd [^>]*w:fill="F4F7FA"/.test(R("fixed")), "code is Consolas 10 pt on the light panel shade", R("fixed"));
+      ok(/<w:color w:val="E00000"\/>/.test(R("todo")), "red text is E00000");
+      var link = (r.body.match(/<w:hyperlink [^>]*>(?:(?!<\/w:hyperlink>)[\s\S])*>site<[\s\S]*?<\/w:hyperlink>/) || [""])[0];
+      var rid = (link.match(/r:id="([^"]+)"/) || [])[1];
+      ok(!!rid && new RegExp('Id="' + rid + '"[^>]*').test(rels), "a link is a hyperlink with a relationship");
+      var rel = (rels.match(new RegExp('<Relationship [^>]*Id="' + rid + '"[^>]*>')) || [""])[0];
+      ok(/Target="https:\/\/example\.org\/a\?b=1&amp;c=2"/.test(rel) && /TargetMode="External"/.test(rel), "to its address, escaped, as an external target", rel);
+      ok(/<w:color w:val="0F5FA6"\/>/.test(R("site")) && /<w:u w:val="single"\/>/.test(R("site")) && !/<w:rStyle/.test(R("site")), "blue and underlined by direct formatting, with no character style");
+      ok(/mailto:a@example\.org/.test(rels), "mailto links are kept");
+      ok(!/javascript/.test(rels) && !/file:\/\/\//.test(rels) && R("bad") !== "" && !/<w:u /.test(R("bad")), "any other scheme prints as plain text and is no link");
+      ok((r.body.match(/<w:hyperlink /g) || []).length === 3, "three links in all", String((r.body.match(/<w:hyperlink /g) || []).length));
+      var all = R("all");
+      ok(/<w:b\/>/.test(all) && /<w:i\/>/.test(all) && /<w:u w:val="single"\/>/.test(all) && /<w:strike\/>/.test(all) && /superscript/.test(all) && /Consolas/.test(all), "every format together on one run", all);
+      ok(/<w:b\/>/.test(R("boldlink")) && /0F5FA6/.test(R("boldlink")), "a link keeps its other formatting");
+      ok(/>line one</.test(r.body) && /<w:br\/><w:t [^>]*>line two</.test(r.body), "a newline is a line break in the paragraph");
+      ok(/>col<\/w:t><w:tab\/><w:t [^>]*>umn</.test(r.body), "a tab is a Word tab");
+      ok(/x&lt;&amp;&gt;&quot;y|x&lt;&amp;&gt;"y/.test(r.body), "markup characters in text are escaped");
+      ok(!/<w:rStyle/.test(paraWith(r.body, "plain")), "no character style anywhere on body runs");
+    });
+  });
+
+  // ---- 4. headings, alignment, page breaks, landscape ----
+  step(function () {
+    var b = [head(1, "One"), head(2, [{ t: "Two", b: true, i: true }]), head(3, "Three"), para("centred", { align: "center" }), para("righted", { align: "right" }),
+      para("justified", { align: "justify" }), para("lefted", { align: "left" }), para([]), { id: id(), type: "pageBreak" }, para("after break"),
+      { id: id(), type: "pageBreak" }, head(2, "Wide", { land: true }), para("wide text", { land: true }), { id: id(), type: "pageBreak", land: true }, para("tail"),
+      { id: id(), type: "mystery", runs: [{ t: "from a later version" }] }];
+    return build(project(b)).then(function (r) {
+      ok(wellFormed(r.z).length === 0, "structure: every XML part parses", wellFormed(r.z).join(", "));
+      ok(/<w:pStyle w:val="Heading1"\/>/.test(paraWith(r.body, "One")) && /<w:pStyle w:val="Heading2"\/>/.test(paraWith(r.body, "Two")) && /<w:pStyle w:val="Heading3"\/>/.test(paraWith(r.body, "Three")),
+         "headings 1 to 3 use the heading styles");
+      ok(/<w:b w:val="false"\/>/.test(runWith(r.body, "Two")) && /<w:i w:val="false"\/>/.test(runWith(r.body, "Two")), "bold and italic on a heading's runs are ignored");
+      ok(/<w:jc w:val="center"\/>/.test(paraWith(r.body, "centred")) && /<w:jc w:val="right"\/>/.test(paraWith(r.body, "righted")) && /<w:jc w:val="both"\/>/.test(paraWith(r.body, "justified")) &&
+         !/<w:jc /.test(paraWith(r.body, "lefted")), "paragraph alignment: centre, right, justify; left is the default and unwritten");
+      var sect = r.doc.match(/<w:sectPr>[\s\S]*?<\/w:sectPr>/g) || [];
+      ok(sect.length === 4 && /w:top="0"/.test(sect[0]) && /orient="portrait"/.test(sect[1]) && /orient="landscape"/.test(sect[2]) && /w:w="16838" w:h="11906"/.test(sect[2]) && /orient="portrait"/.test(sect[3]),
+         "blocks flagged landscape are a landscape section between portrait ones", String(sect.length));
+      ok(/w:top="720"/.test(sect[2]) && /w:top="1440"/.test(sect[1]), "with the report's margins: an inch portrait, half an inch landscape");
+      var land = r.doc.slice(r.doc.indexOf(sect[1]) + sect[1].length, r.doc.indexOf(sect[2]));
+      ok(/>Wide</.test(land) && />wide text</.test(land) && !/>tail</.test(land), "the heading and its text sit on the landscape page together");
+      var breaks = (r.body.match(/<w:br w:type="page"\/>/g) || []).length;
+      ok(breaks === 1, "a page break in the text is written; one directly before or after a change of orientation is left out", String(breaks) + " after the one that closes document control");
+      ok(!/from a later version/.test(r.doc), "a block of a type this version does not know prints as nothing");
+    });
+  });
+  step(function () {
+    var b = [head(1, "Alpha"), head(2, "Beta"), head(3, "Gamma"), head(2, "Delta"), head(1, "Epsilon")];
+    return build(project(b, { options: { numberHeadings: true } })).then(function (r) {
+      function numRun(t) { var p = paraWith(r.body, t); return (p.match(/<w:r>(?:(?!<\/w:r>)[\s\S])*3399CC[\s\S]*?<\/w:r>/) || [""])[0]; }
+      ok(/>1\u2003</.test(numRun("Alpha")) && />1\.1\u2003</.test(numRun("Beta")) && />1\.1\.1\u2003</.test(numRun("Gamma")) && />1\.2\u2003</.test(numRun("Delta")) && />2\u2003</.test(numRun("Epsilon")),
+         "numbered headings: the number is typed before the text with an em space", numRun("Gamma"));
+      ok(/<w:b\/>/.test(numRun("Alpha")) && /<w:color w:val="3399CC"\/>/.test(numRun("Alpha")) && !/<w:numPr>/.test(paraWith(r.body, "Alpha")), "in brand blue bold, and it is not Word numbering");
+    });
+  });
+
+  // ---- 5. tables ----
+  step(function () {
+    var t = { id: id(), type: "table", header: 1, cols: [1, 2, 1], caption: "Zones and assets", rows: [
+      { cells: [cellOf("Zone"), cellOf([para([{ t: "Assets", i: true }])]), cellOf("Notes")] },
+      { cells: [cellOf("wide", { span: 2 }), cellOf("tall", { rowSpan: 2 })] },
+      { cells: [cellOf("c1"), cellOf([para("c2"), item("bullet", 0, "c2 point"), para([{ t: "c2 todo", red: true }])])] },
+      { cells: [cellOf("short row")] } ] };
+    var wide = { id: id(), type: "table", header: 0, cols: [3, 1], land: true, rows: [{ cells: [cellOf("L1"), cellOf("L2")] }] };
+    var bare = { id: id(), type: "table", header: 0, rows: [{ cells: [cellOf("n1"), cellOf("n2"), cellOf("n3")] }] };
+    return build(project([para("before"), t, bare, wide, { id: id(), type: "table", header: 0, cols: [], rows: [] }])).then(function (r) {
+      ok(wellFormed(r.z).length === 0, "tables: every XML part parses", wellFormed(r.z).join(", "));
+      var tables = r.body.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || [];
+      ok(tables.length === 3, "three tables written; one with no rows prints as nothing", String(tables.length));
+      var x = tables[0], grid = (x.match(/<w:gridCol w:w="(\d+)"\/>/g) || []).map(function (g) { return +g.match(/\d+/)[0]; });
+      ok(grid.length === 3 && grid[0] + grid[1] + grid[2] === 9026 && grid[1] > grid[0] * 1.9 && grid[1] < grid[0] * 2.1, "column widths keep their shares and add up to the portrait page, 9026", grid.join(","));
+      ok(/<w:tblW w:type="dxa" w:w="9026"\/>/.test(x) && /<w:tblLayout w:type="fixed"\/>/.test(x) && /w:color="E2E7EE"/.test(x), "fixed layout, full width, the report's light rules");
+      var rows = x.match(/<w:tr>[\s\S]*?<\/w:tr>/g) || [];
+      ok(rows.length === 4 && /<w:tblHeader\/>/.test(rows[0]) && !/<w:tblHeader\/>/.test(rows[1]), "the header row is marked to repeat on each page");
+      var hc = (rows[0].match(/<w:tc>[\s\S]*?<\/w:tc>/g) || []);
+      ok(hc.length === 3 && hc.every(function (c) { return /<w:shd w:fill="173267"/.test(c) && /<w:color w:val="FFFFFF"\/>/.test(c) && /<w:b\/>/.test(c); }), "header cells are navy with bold white text");
+      ok(/<w:i\/>/.test(runWith(rows[0], "Assets")), "and keep the cell's own formatting on top");
+      var r1 = rows[1].match(/<w:tc>[\s\S]*?<\/w:tc>/g) || [], r2 = rows[2].match(/<w:tc>[\s\S]*?<\/w:tc>/g) || [], r3 = rows[3].match(/<w:tc>[\s\S]*?<\/w:tc>/g) || [];
+      ok(r1.length === 2 && /<w:gridSpan w:val="2"\/>/.test(r1[0]) && new RegExp('<w:tcW w:type="dxa" w:w="' + (grid[0] + grid[1]) + '"/>').test(r1[0]), "a cell across two columns has gridSpan 2 and both widths", r1[0]);
+      ok(/<w:vMerge w:val="restart"\/>/.test(r1[1]) && r2.length === 3 && /<w:vMerge w:val="continue"\/>/.test(r2[2]), "a cell down two rows starts a vertical merge that the row below continues");
+      ok(r3.length === 3 && />short row</.test(r3[0]), "a row that stops short is filled out to the grid", String(r3.length));
+      ok(/<w:numPr>/.test(paraWith(rows[2], "c2 point")) && /E00000/.test(runWith(rows[2], "c2 todo")), "a cell holds paragraphs, list items and red text");
+      ok(!/<w:shd /.test(r2[0]) && /<w:vAlign w:val="top"\/>/.test(r2[0]), "body cells are unshaded and top aligned");
+      var after = r.body.slice(r.body.indexOf(x) + x.length);
+      ok(/^<w:p><w:pPr><w:pStyle w:val="Caption"\/>[\s\S]*?>Zones and assets</.test(after), "the caption is under the table in the Caption style", after.slice(0, 200));
+      var g2 = (tables[1].match(/<w:gridCol w:w="(\d+)"\/>/g) || []).map(function (g) { return +g.match(/\d+/)[0]; });
+      ok(g2.length === 3 && g2[0] + g2[1] + g2[2] === 9026 && Math.abs(g2[0] - g2[1]) <= 2, "a table with no widths gets equal columns", g2.join(","));
+      ok(new RegExp("</w:tbl><w:p>").test(r.body.slice(r.body.indexOf(tables[1]))), "a paragraph follows a table with no caption, so two tables never join");
+      var g3 = (tables[2].match(/<w:gridCol w:w="(\d+)"\/>/g) || []).map(function (g) { return +g.match(/\d+/)[0]; });
+      ok(g3[0] + g3[1] === 15398 && /<w:tblW w:type="dxa" w:w="15398"\/>/.test(tables[2]), "on a landscape page the columns add up to 15398", g3.join(","));
+    });
+  });
+
+  // ---- 6. pictures ----
+  step(function () {
+    grafts = [];
+    var media = { m1: { type: "image/png", name: "a.png", width: 1600, height: 900, blob: pngBlob() },
+      m2: { type: "image/jpeg", name: "b.jpg", width: 100, height: 50, blob: new Blob([new Uint8Array([255, 216, 255, 224, 1, 2, 3])], { type: "image/jpeg" }) },
+      m3: { type: "image/x-emf", name: "c.emf", width: 0, height: 0, blob: new Blob([new Uint8Array([1, 0, 0, 0, 9, 9])]) } };
+    var b = [
+      { id: "pic1", type: "picture", media: "m1", width: 1600, height: 900, caption: "Current network", alt: "Diagram of the \"current\" network" },
+      { id: "pic2", type: "picture", media: "m1", width: 300, height: 150, align: "left" },
+      { id: "pic3", type: "picture", media: "m2", width: 100, height: 50, align: "right" },
+      { id: "pic4", type: "picture", media: "m3", width: 200, height: 100 },
+      { id: "pic5", type: "picture", media: "m1", width: 2000, height: 1000, land: true },
+      { id: id(), type: "table", header: 0, cols: [1, 3], rows: [{ cells: [cellOf([{ id: "pic6", type: "picture", media: "m1", width: 600, height: 300 }]), cellOf("beside")] }] }];
+    return build(project(b, { media: media })).then(function (r) {
+      ok(wellFormed(r.z).length === 0, "pictures: every XML part parses", wellFormed(r.z).join(", "));
+      var draws = r.body.match(/<w:p>(?:(?!<\/w:p>)[\s\S])*<w:drawing>[\s\S]*?<\/w:p>/g) || [];
+      function ext(p) { var m = p.match(/<wp:extent cx="(\d+)" cy="(\d+)"\/>/); return m ? [m[1] / 9525, m[2] / 9525] : []; }
+      ok(draws.length === 6, "six pictures", String(draws.length));
+      ok(ext(draws[0])[0] === 601 && ext(draws[0])[1] === 338, "a picture wider than the page is clamped to 601 px, its shape kept", ext(draws[0]).join("x"));
+      ok(/<wp:docPr [^>]*descr="Diagram of the &quot;current&quot; network"/.test(draws[0]), "with its alternative text, escaped", (draws[0].match(/<wp:docPr [^>]*>/) || [""])[0]);
+      ok(/<w:jc w:val="center"\/>/.test(draws[0]), "centred by default");
+      var after = r.body.slice(r.body.indexOf(draws[0]) + draws[0].length);
+      ok(/^<w:p><w:pPr><w:pStyle w:val="Caption"\/>[\s\S]*?>Current network</.test(after) && /<w:jc w:val="center"\/>/.test(after.slice(0, 200)), "its caption is under it, aligned with it");
+      ok(/<w:keepNext\/>/.test(draws[0]), "and kept on the same page");
+      ok(ext(draws[1]).join("x") === "300x150" && !/<w:jc /.test(draws[1]) && /<wp:docPr [^>]*descr=""/.test(draws[1]), "a smaller one prints at its size, left when asked, with no alt text when none was given");
+      ok(/<w:jc w:val="right"\/>/.test(draws[2]), "right when asked");
+      ok(ext(draws[4])[0] === 1026 && ext(draws[4])[1] === 513, "on a landscape page the limit is 1026 px", ext(draws[4]).join("x"));
+      var cw = Math.floor((Math.floor(9026 / 4) - 230) / 15);
+      ok(ext(draws[5])[0] === cw && ext(draws[5])[1] === Math.round(300 * cw / 600), "in a table cell the limit is the cell's width", ext(draws[5]).join("x") + " against " + cw);
+      ok(grafts.length === 1 && grafts[0].kept.length === 0 && grafts[0].media.length === 2, "the two pictures that are not PNG are handed to the graft pass", JSON.stringify(grafts[0] && grafts[0].media));
+      var gm = grafts[0].media;
+      ok(gm[0].ext === "jpeg" && gm[0].contentType === "image/jpeg" && gm[1].ext === "emf" && gm[1].contentType === "image/x-emf", "with the extension and content type each needs");
+      ok(gm.every(function (m) { return !!r.z["word/media/" + m.fileName]; }), "named by the media file the library wrote", gm.map(function (m) { return m.fileName; }).join(","));
+      ok(r.z["word/media/" + gm[0].fileName].bytes.length === 7 && r.z["word/media/" + gm[0].fileName].bytes[1] === 216, "whose bytes are the picture's own");
+    });
+  });
+  step(function () {
+    grafts = [];
+    return build(project([{ id: "p1", type: "picture", media: "m1", width: 10, height: 10 }, para("text")], { media: { m1: { type: "image/png", blob: pngBlob() } } })).then(function () {
+      ok(grafts.length === 0, "a document of text and PNG pictures never goes through the graft pass: the file is the library's own");
+    });
+  });
+
+  // ---- 7. footnotes ----
+  step(function () {
+    var b = [para([{ t: "First" }, { t: "", fn: "f1" }, { t: " and " }, { t: "", fn: "f2" }, { t: "", fn: "gone" }]), para([{ t: "Again" }, { t: "", fn: "f1" }])];
+    var notes = { f1: { runs: [{ t: "Costs are " }, { t: "budgetary", b: true }, { t: " see " }, { t: "here", link: "https://example.org" }, { t: "\nsecond line" }] },
+      f2: { runs: [{ t: "Second note" }, { t: "", fn: "f1" }] }, unused: { runs: [{ t: "Never referred to" }] } };
+    return build(project(b, { footnotes: notes })).then(function (r) {
+      var fx = text(r.z, "word/footnotes.xml");
+      ok(wellFormed(r.z).length === 0, "footnotes: every XML part parses", wellFormed(r.z).join(", "));
+      var refs = (r.body.match(/<w:footnoteReference w:id="(\d+)"\/>/g) || []).map(function (m) { return m.match(/\d+/)[0]; });
+      ok(refs.join(",") === "1,2,3", "each reference has a footnote of its own, numbered in reading order; a reference to nothing is dropped", refs.join(","));
+      var notesXml = (fx.match(/<w:footnote w:id="[1-9]\d*">[\s\S]*?<\/w:footnote>/g) || []);
+      ok(notesXml.length === 3 && /Costs are /.test(notesXml[0]) && /Second note/.test(notesXml[1]) && /Costs are /.test(notesXml[2]) && !/Never referred to/.test(fx), "the notes are written in that order; one nothing refers to is left out");
+      var textRuns = [];
+      notesXml.forEach(function (n) { (n.match(/<w:r>(?:(?!<\/w:r>)[\s\S])*<w:t [\s\S]*?<\/w:r>/g) || []).forEach(function (x) { textRuns.push(x); }); });
+      ok(textRuns.length >= 6 && textRuns.every(function (x) { return /w:ascii="Segoe UI"/.test(x) && /<w:sz w:val="18"\/>/.test(x); }),
+         "every text run of every footnote is Segoe UI 9 pt by direct formatting", textRuns.filter(function (x) { return !/Segoe UI/.test(x) || !/w:val="18"/.test(x); })[0]);
+      ok(textRuns.every(function (x) { return /<w:color w:val="(1A2533|0F5FA6)"\/>/.test(x); }), "in the body text colour (a link in its blue)");
+      ok(/<w:b\/>/.test(runWith(notesXml[0], "budgetary")) && /<w:hyperlink /.test(notesXml[0]) && /<w:br\/>/.test(notesXml[0]), "a footnote keeps bold, links and line breaks");
+      ok(notesXml.every(function (n) { return /<w:pStyle w:val="BodyText"\/>/.test(n) && /<w:spacing w:after="60" w:line="240"\/>/.test(n); }),
+         "a footnote's paragraph is in the body style, set closer, so its reference mark is in the house font too", notesXml[0]);
+      ok((fx.match(/<w:footnoteReference /g) || []).length === 0, "a reference inside a footnote is not written");
+      return build(project([para("no notes")])).then(function (plain) {
+        ok(text(plain.z, "word/styles.xml") !== "" && text(plain.z, "word/styles.xml") === text(r.z, "word/styles.xml"), "footnotes add nothing to styles.xml, so the template's styles stay the assessment's");
+      });
+    });
+  });
+
+  // ---- 8. prompts and red text: the issue list is what prints ----
+  step(function () {
+    var b = [para([{ t: "Lead " }, { t: "red one", red: true }, { t: " red two", red: true, b: true }, { t: " gap " }, { t: "red three\nacross a line", red: true }]),
+      { id: "pr1", type: "prompt", text: "Add the cost of each option." },
+      head(2, [{ t: "Heading with " }, { t: "red in it", red: true }]),
+      item("number", 0, "x"), { id: "li9", type: "list", list: "bullet", level: 0, runs: [{ t: "red item", red: true }] },
+      { id: "tb1", type: "table", header: 1, cols: [1], rows: [{ cells: [cellOf([{ id: "ch1", type: "paragraph", runs: [{ t: "red header", red: true }] }])] }, { cells: [cellOf([{ id: "cc1", type: "paragraph", runs: [{ t: "red cell", red: true }] }, { id: "cp1", type: "prompt", text: "Cell prompt" }])] }] },
+      { id: "fnp", type: "paragraph", runs: [{ t: "Noted" }, { t: "", fn: "f1" }] },
+      { id: "lk1", type: "paragraph", runs: [{ t: "red link", red: true, link: "https://example.org" }] }];
+    var p = project(b, { footnotes: { f1: { runs: [{ t: "A note with " }, { t: "red inside", red: true }] } }, options: { contents: true } });
+    var first = b[0].id, h = b[2].id;
+    return HD.issueList(p).then(function (list) {
+      var got = list.map(function (x) { return x.text + "@" + (x.where.blockId || x.where.field); }).join(" | ");
+      var want = ["red one red two@" + first, "red three\nacross a line@" + first, "Add the cost of each option.@pr1", "red in it@" + h, "red item@li9", "red header@ch1", "red cell@cc1",
+        "Cell prompt@cp1", "red inside@fnp", "red link@lk1"].join(" | ");
+      ok(got === want, "the issue list holds every prompt and every stretch of red text once, in reading order, each with its block", got);
+      ok(list.every(function (x) { return x.where.kind === "block"; }), "each says it is in a block");
+      return build(p).then(function (r) {
+        var fx = text(r.z, "word/footnotes.xml");
+        var pp = paraWith(r.body, "Add the cost of each option.");
+        ok(/<w:pStyle w:val="PlaceholderText"\/>/.test(pp) && /<w:b\/>/.test(pp), "a prompt block is a paragraph in the PlaceholderText style");
+        var redRuns = (r.body + fx).match(/<w:r>(?:(?!<\/w:r>)[\s\S])*<w:color w:val="E00000"\/>[\s\S]*?<\/w:r>/g) || [];
+        var redText = redRuns.map(function (x) { return (x.match(/<w:t [^>]*>([^<]*)</) || [])[1]; }).join("|");
+        ok(redText === "red one| red two|red three|across a line|red in it|red item|red header|red cell|red link|red inside", "and the red runs in the file are exactly those", redText);
+        ok(/<w:color w:val="E00000"\/>/.test(runWith(r.body, "red header")) && /<w:b\/>/.test(runWith(r.body, "red header")), "red text in a header cell is red, not white");
+        ok((r.body.match(/w:val="PlaceholderText"/g) || []).length === 2, "two prompt paragraphs in the body");
+        return HD.buildDocument(p, { issueStatus: "final" }).then(function () { ok(false, "a final with prompts outstanding is refused"); }, function (e) {
+          ok(/^This document still has 10 things to write, so it cannot be issued as final\. Export it as a draft, or complete it first\.$/.test(e.message), "a final with prompts outstanding is refused, with the count", e.message);
+        });
+      });
+    });
+  });
+
+  // ---- 9. kept objects ----
+  step(function () {
+    grafts = [];
+    var K = function (bid, extra) {
+      return Object.assign({ id: bid, type: "kept", kind: "chart", xml: '<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:drawing/></w:r>',
+        rels: [{ id: "sptK1", type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart", part: "p1" }], width: 400, height: 200, floating: false, text: "", description: "Chart" }, extra || {});
+    };
+    var parts = { p1: { name: "word/charts/chart1.xml", contentType: "application/vnd.openxmlformats-officedocument.drawingml.chart+xml", blob: new Blob(["<c/>"]), rels: [{ id: "rId1", type: "t", part: "p2" }, { id: "rId2", type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", external: "https://example.org/x" }] },
+      p2: { name: "word/embeddings/Sheet 1 & co.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", blob: new Blob(["xl"]), rels: [] },
+      p3: { name: "word/media/image9.png", contentType: "image/png", blob: new Blob(["png"]), rels: [] },
+      p7: { name: "word/theme/theme1.xml", contentType: "application/vnd.openxmlformats-officedocument.theme+xml", blob: new Blob(["<a/>"]), rels: [{ id: "rId1", type: "t", part: "p8" }] },
+      p8: { name: "word/theme/media/x.png", contentType: "image/png", blob: new Blob(["t"]), rels: [] },
+      p9: { name: "unused", contentType: "x", blob: new Blob(["u"]), rels: [] } };
+    var b = [K("k1", { caption: "Throughput", align: "left" }), K("k1copy"), K("kwide", { width: 900, height: 450 }), K("kfloat", { width: 900, floating: true }),
+      K("kland", { width: 900, land: true }), K("kpic", { kind: "picture", rels: [{ id: "sptK5", type: "image", part: "p3" }, { id: "sptK6", type: "hyperlink", external: "https://example.org" }], width: 0 }),
+      { id: id(), type: "table", header: 0, cols: [1, 1], land: false, rows: [{ cells: [cellOf([K("kcell", { width: 400 })]), cellOf("beside")] }] },
+      K("keq", { kind: "equation", xml: '<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"/>', rels: [], width: 0 })];
+    return build(project(b, { parts: parts, theme: "p7" })).then(function (r) {
+      var plan = grafts[0];
+      ok(grafts.length === 1 && !!plan, "a document with kept objects goes through the graft pass once");
+      ok(plan.kept.map(function (k) { return k.blockId; }).join(",") === "k1,k1copy,kwide,kfloat,kland,kpic,kcell,keq", "one plan entry per use, in reading order, a copy included", plan.kept.map(function (k) { return k.blockId; }).join(","));
+      ok(plan.kept[0].xml === b[0].xml && plan.kept[1].xml === b[0].xml && plan.kept[0].rels === b[0].rels && plan.kept[0].kind === "chart", "each carries the block's XML, relationships and kind as they are");
+      ok(plan.kept.every(function (k) { return k.token === "\uE000KEPT:" + k.blockId + "\uE000" && r.doc.indexOf(">" + k.token + "<") !== -1; }), "and its token is the text of one run in the file");
+      ok(plan.kept[0].scale === undefined && plan.kept[1].scale === undefined, "one that fits is not scaled");
+      ok(plan.kept[2].scale === 0.6677, "one wider than the page is scaled to 601 px", String(plan.kept[2].scale));
+      ok(plan.kept[3].scale === undefined, "a floating one is never scaled");
+      ok(plan.kept[4].scale === undefined, "900 px fits a landscape page, so it is not scaled there");
+      var cw = Math.floor((4513 - 230) / 15);
+      ok(plan.kept[6].scale === Math.floor(cw / 400 * 10000) / 10000, "one wider than its table cell is scaled to the cell", String(plan.kept[6].scale));
+      ok(r.fitted.join(",") === "kwide,kcell", "the ones made smaller are listed", r.fitted.join(","));
+      ok(Object.keys(plan.parts).sort().join(",") === "p1,p2,p3,p7,p8", "the plan holds every part reached, through parts' own relationships, and the theme's; nothing else", Object.keys(plan.parts).sort().join(","));
+      ok(plan.parts.p1.blob === parts.p1.blob && plan.parts.p1.contentType === parts.p1.contentType && plan.parts.p2.name === parts.p2.name && plan.parts.p1.rels === parts.p1.rels, "each with its name, content type, bytes and relationships");
+      ok(plan.theme === "p7", "the source theme goes with them");
+      ok(plan.media.length === 0, "and no media to rename");
+      var tp = paras(r.body).filter(function (p) { return p.indexOf("KEPT:k1\uE000") !== -1; })[0] || "";
+      ok(!/<w:jc /.test(tp) && /<w:keepNext\/>/.test(tp), "the token's paragraph has the block's alignment and stays with its caption");
+      ok(/<w:jc w:val="center"\/>/.test(paras(r.body).filter(function (p) { return p.indexOf("KEPT:kwide\uE000") !== -1; })[0] || ""), "centred when nothing is said");
+      ok(/>Throughput</.test(r.body), "the caption is printed");
+      ok((tp.match(/<w:r>/g) || []).length === 1, "the token is alone in its run and its paragraph");
+    });
+  });
+  step(function () {
+    grafts = [];
+    return build(project([para("no kept here")], { parts: { p7: { name: "t", contentType: "x", blob: new Blob(["a"]), rels: [] } }, theme: "p7" })).then(function () {
+      ok(grafts.length === 0, "without a kept object the theme is not written and the graft pass is not used");
+    });
+  });
+
+  // ---- 10. what could not be restored ----
+  step(function () {
+    grafts = [];
+    var K = { id: "k1", type: "kept", kind: "smartart", xml: "<w:r/>", rels: [{ id: "sptK1", type: "t", part: "p1" }], width: 100, height: 100, floating: false };
+    var parts = { p1: { name: "a", contentType: "x", blob: new Blob(["a"]), rels: [{ id: "rId1", type: "t", part: "p2" }] }, p2: { name: "b", contentType: "x", blob: null, missing: true, rels: [] } };
+    var b = [{ id: "pm", type: "picture", media: "m1", width: 10, height: 10 }, { id: "pn", type: "picture", media: "nothing", width: 10, height: 10 }, K,
+      { id: "k2", type: "kept", kind: "chart", xml: "<w:r/>", rels: [{ id: "sptK2", type: "t", part: "absent" }], width: 1, height: 1 },
+      { id: "k3", type: "kept", kind: "shape", xml: "<w:r/>", rels: [], width: 1, height: 1 }];
+    var p = project(b, { parts: parts, media: { m1: { type: "image/png", blob: null, missing: true } } });
+    return HD.issueList(p).then(function (list) {
+      ok(list.map(function (x) { return x.where.blockId; }).join(",") === "pm,pn,k1,k2" && list.every(function (x) { return x.text === "This picture could not be restored. Replace it or delete it." && x.where.kind === "block"; }),
+         "a picture with missing bytes and a kept object with a missing part are each a prompt, by block", JSON.stringify(list));
+      return build(p);
+    }).then(function (r) {
+      ok((r.body.match(/This picture could not be restored\. Replace it or delete it\./g) || []).length === 4 && (r.body.match(/w:val="PlaceholderText"/g) || []).length === 4, "the prompt prints in place of each");
+      ok(r.doc.indexOf("KEPT:k1") === -1 && r.doc.indexOf("KEPT:k2") === -1 && r.doc.indexOf("KEPT:k3") !== -1, "a kept object with a missing part is never written as a token; a whole one still is");
+      ok(grafts.length === 1 && grafts[0].kept.length === 1 && grafts[0].kept[0].blockId === "k3" && Object.keys(grafts[0].parts).length === 0, "and neither it nor its parts reach the plan");
+      return HD.buildDocument(p, { issueStatus: "final" }).then(function () { ok(false, "an incomplete document cannot be a final"); }, function (e) { ok(/still has 4 things to write/.test(e.message), "an incomplete document cannot be issued as final", e.message); });
+    });
+  });
+
+  // ---- 11. a check reads no bytes ----
+  step(function () {
+    var reads = 0, blob = pngBlob(), real = blob.arrayBuffer.bind(blob);
+    blob.arrayBuffer = function () { reads += 1; return real(); };
+    grafts = [];
+    var p = project([{ id: "p1", type: "picture", media: "m1", width: 10, height: 10 }, { id: "k1", type: "kept", kind: "shape", xml: "<w:r/>", rels: [], width: 1, height: 1 }, { id: "pr", type: "prompt", text: "Still to do" }],
+      { media: { m1: { type: "image/jpeg", blob: blob } } });
+    return HD.buildDocument(p, { issueCheck: true }).then(function (r) {
+      ok(reads === 0 && grafts.length === 0, "an issue check reads no picture and packs nothing", reads + "," + grafts.length);
+      ok(r.placeholders.length === 1 && r.placeholders[0].text === "Still to do" && r.blob === undefined, "and resolves the prompts alone");
+      return HD.blocksToDocx(p, { issueStatus: "draft" });
+    }).then(function (w) {
+      ok(reads === 1 && Array.isArray(w.segments) && w.segments.length === 1 && w.graft.kept.length === 1 && w.graft.media.length === 1 && Array.isArray(w.fitted) && typeof w.footnotes === "object",
+         "blocksToDocx resolves segments, footnotes, the graft plan and the fitted list", reads + " reads");
+    });
+  });
+
+  // ---- 12. with no graft pass at all ----
+  step(function () {
+    var saved = window.App.DocxGraft;
+    window.App.DocxGraft = undefined;
+    var p = project([{ id: "k1", type: "kept", kind: "shape", xml: "<w:r/>", rels: [], width: 1, height: 1 }]);
+    return HD.buildDocument(p, { issueStatus: "draft" }).then(function () { ok(false, "kept content without the graft pass is refused"); }, function (e) {
+      ok(/kept from a Word file/.test(e.message), "kept content without the graft pass is refused, not written as a token", e.message);
+    }).then(function () {
+      return HD.buildDocument(project([para("plain")]), { issueStatus: "draft" });
+    }).then(function (r) {
+      ok(r.blob && r.blob.size > 1000, "while a plain document needs no graft pass at all");
+      window.App.DocxGraft = saved;
+    });
+  });
+
+  chain.then(finish, function (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); finish(); });
+})();
+</script>
+</body></html>

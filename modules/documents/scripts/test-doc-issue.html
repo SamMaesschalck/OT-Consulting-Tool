@@ -1,0 +1,485 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the Issue check, Draft and Final</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/documents.css" />
+<link rel="stylesheet" href="../css/pages.css" />
+</head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The Issue and export page (js/pages.js) and the export (js/export.js).
+
+  The list under "Still to complete" has to be what prints red, not a second
+  reading of the document: a draft is exported, unzipped, and the red text in
+  word/document.xml (PlaceholderText paragraphs and E00000 runs) is compared
+  with the list, for a prompt block, red text in a paragraph and in a table
+  cell, a missing title and a picture that could not be restored. Then "Go to
+  it", Final refused and then allowed, the file names, and Worth a look.
+
+  The shell (App.DocApp) is a stand-in that records what is asked of it. The
+  writer and the model are the real ones when they are built; a small stand-in
+  is used for whichever is still a stub, and the page says so in a NOTE line.
+-->
+<div id="main" style="width:1100px"></div>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../data/licence.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/pictures.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script src="../js/export.js"></script>
+<script src="../js/import-flow.js"></script>
+<script src="../js/pages.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  // Written out as it goes, ending in a FAIL line until the last test has run:
+  // a page cut short by the runner's time budget must not read as a short pass.
+  function show(end) { document.getElementById("out").textContent = lines.join("\n") + "\n" + end; }
+  function ok(c, n, d) {
+    lines.push((c ? "PASS " : "FAIL ") + n + (!c && d != null ? " - " + d : "")); if (!c) fail++;
+    show("FAIL the page did not finish: re-run it alone with a larger time budget");
+  }
+  // Every package is built now, so a stand-in being used means a real object
+  // has gone missing: that is a failure, not a note.
+  function note(t) { ok(false, "no stand-in is used", t); }
+  function finish() {
+    alive = false;
+    show("\n" + (fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"));
+  }
+  // Packing and zipping run off the main thread, and headless Edge's virtual
+  // clock runs out the moment the page has nothing queued, which dumps the page
+  // half way through. A message bounced to ourselves keeps a task queued,
+  // without moving the clock, until the tests finish (as test-doc-zip.html does).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  window.addEventListener("error", function (e) { ok(false, "no script error", e.message); });
+  var A = window.App, M = A.DocModel, H = A.HouseDocx, R = A.DocRender, P = A.DocPages, X = A.DocExport;
+  var main = document.getElementById("main");
+  function $(id) { return document.getElementById(id); }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+
+  // ---- the shell, standing in -------------------------------------------
+  var calls;
+  function reset() { calls = { go: [], touched: [], toast: [], busy: [], down: [] }; }
+  reset();
+  var state = { doc: null, page: "", dirty: false, tour: false, recovered: false };
+  A.DocApp = {
+    state: state,
+    go: function (page, arg) { calls.go.push([page, arg]); },
+    touched: function (w) { calls.touched.push(w); },
+    setDoc: function (d) { state.doc = d; return Promise.resolve(true); },
+    toast: function (t, k) { calls.toast.push([t, k]); },
+    busy: function (l, f) { calls.busy.push([l, f]); },
+    say: function () {}, canAdd: function () { return true; }, confirmBox: function () { return Promise.resolve(true); },
+    h: function (tag, attrs, kids) {
+      var el = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) {
+        var v = attrs[k];
+        if (v == null || v === false) return;
+        if (k === "text") el.textContent = v; else if (k === "class") el.className = v;
+        else el.setAttribute(k, v === true ? "" : v);
+      });
+      (kids || []).forEach(function (c) { if (c != null && c !== false) el.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+      return el;
+    }
+  };
+  // Export is a download; here it is caught.
+  A.DocStorage.download = function (blob, name) { calls.down.push({ blob: blob, name: name }); };
+
+  // ---- stand-ins for whatever is still a stub -----------------------------
+  function eachBlock(d, fn) {
+    (d.blocks || []).forEach(function (b) {
+      fn(b);
+      if (b.type === "table") b.rows.forEach(function (r) { r.cells.forEach(function (c) { c.blocks.forEach(fn); }); });
+    });
+  }
+  if (M.create("report") === null) {
+    note("App.DocModel is still a stub: a stand-in model is used");
+    M.runsText = function (runs) { return (runs || []).map(function (r) { return r.t || ""; }).join(""); };
+    M.text = function (b) { return b.type === "prompt" ? b.text || "" : M.runsText(b.runs); };
+    M.find = function (d, id) { var hit = null; eachBlock(d, function (b) { if (b.id === id) hit = { block: b }; }); return hit; };
+    M.remove = function (d, ids) { d.blocks = d.blocks.filter(function (b) { return ids.indexOf(b.id) === -1; }); return ids; };
+    M.table.grid = function (t) {
+      return t.rows.map(function (row) {
+        var out = [], c = 0;
+        row.cells.forEach(function (cell) { for (var s = 0; s < (cell.span || 1); s++) out.push({ cell: cell, c: c++, covered: s > 0 }); });
+        return out;
+      });
+    };
+    M.missing = function (d) {
+      var ids = [];
+      eachBlock(d, function (b) { if (b.type === "picture" && (!d.media[b.media] || d.media[b.media].missing)) ids.push(b.id); });
+      return ids;
+    };
+    M.promptCount = function (d) {
+      var n = String(d.info.title || "").trim() ? 0 : 1;
+      eachBlock(d, function (b) {
+        if (b.type === "prompt") n++;
+        (b.runs || []).forEach(function (r) { if (r.red) n++; });
+      });
+      return n + M.missing(d).length;
+    };
+    M.normalise = function (o) { return o; };
+  }
+  // The stand-in writer prints the same things red that the design says the
+  // real one does, into a real .docx, so the page and the export are still
+  // tested end to end against a file.
+  function standInWriter() {
+    var dx = window.docx;
+    function build(project) {
+      var out = [];
+      function red(text, where) { out.push({ text: text, where: where }); return new dx.TextRun({ text: text, color: "E00000" }); }
+      function block(b) {
+        if (b.type === "prompt") {
+          out.push({ text: b.text, where: { kind: "block", blockId: b.id } });
+          return [new dx.Paragraph({ style: "PlaceholderText", children: [new dx.TextRun({ text: b.text, bold: true })] })];
+        }
+        if (b.type === "picture") {
+          var m = project.media[b.media];
+          return [new dx.Paragraph({ children: [!m || m.missing ? red("This picture could not be restored. Replace it or delete it.", { kind: "block", blockId: b.id }) : new dx.TextRun("[picture]")] })];
+        }
+        if (b.type === "table") {
+          return [new dx.Table({ rows: b.rows.map(function (r) {
+            return new dx.TableRow({ children: r.cells.map(function (c) { return new dx.TableCell({ children: [].concat.apply([], c.blocks.map(block)) }); }) });
+          }) })];
+        }
+        if (!b.runs) return [];
+        return [new dx.Paragraph({ children: b.runs.map(function (r) { return r.red ? red(r.t, { kind: "block", blockId: b.id }) : new dx.TextRun(r.t || ""); }) })];
+      }
+      var title = String(project.info.title || "").trim();
+      var kids = [new dx.Paragraph({ children: [title ? new dx.TextRun(title) : red("Add the document title", { kind: "info", field: "title" })] })];
+      project.blocks.forEach(function (b) { kids.push.apply(kids, block(b)); });
+      return { kids: kids, out: out };
+    }
+    H.buildDocument = function (project, opts) {
+      var b = build(project), fin = opts && opts.issueStatus === "final";
+      if (opts && opts.issueCheck) return Promise.resolve({ placeholders: b.out });
+      if (fin && b.out.length) return Promise.reject(new Error("This document still has " + b.out.length + " things to write, so it cannot be issued as final. Export it as a draft, or complete it first."));
+      b.kids.unshift(new dx.Paragraph("Status " + (fin ? "Final" : "Draft")));
+      var doc = new dx.Document({
+        creator: project.info.author || "SolutionsPT", title: project.info.title, description: project.info.docType || "Document",
+        styles: { paragraphStyles: [{ id: "PlaceholderText", name: "Placeholder", basedOn: "Normal", run: { color: "E00000" } }] },
+        sections: [{ children: b.kids }]
+      });
+      return dx.Packer.toBlob(doc).then(function (blob) { return { blob: blob, fitted: [] }; });
+    };
+    H.issueList = function (project) { return H.buildDocument(project, { issueCheck: true }).then(function (r) { return r.placeholders; }); };
+  }
+
+  // ---- documents ---------------------------------------------------------
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  function pngBlob() {
+    var s = atob(PNG), u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return new Blob([u], { type: "image/png" });
+  }
+  function para(id, t) { return { id: id, type: "paragraph", runs: [{ t: t }] }; }
+  function docOf(over) {
+    var d = {
+      schema: "spt-document/1.0", id: "doc-test-" + Math.random().toString(36).slice(2, 8),
+      createdAt: "2026-11-11T09:00:00.000Z", savedAt: "2026-11-11T09:00:00.000Z",
+      createdWithVersion: A.Version.number, savedBy: { product: A.Product.name, version: A.Version.number },
+      kind: "report",
+      info: { title: "", docType: "", reference: "", client: "", site: "", author: "", revision: "0.1", date: "",
+        qaReviewBy: "", authorisedBy: "", issuedTo: "", issuedDate: "", classification: "Confidential" },
+      options: { numberHeadings: false, contents: false },
+      nextId: 100, blocks: [], footnotes: {}, media: {}, parts: {}
+    };
+    over = over || {};
+    Object.keys(over).forEach(function (k) { if (k === "info") Object.assign(d.info, over.info); else d[k] = over[k]; });
+    return d;
+  }
+  function open(d) { state.doc = M.normalise(d) || d; reset(); return state.doc; }
+  function draw(page, arg) { main.textContent = ""; page(main, arg); }
+  function click(el) { el.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+  function choose(id) { $(id).checked = true; $(id).dispatchEvent(new Event("change", { bubbles: true })); }
+  function sorted(a) { return a.slice().sort(); }
+
+  // What prints red in a Word file: PlaceholderText paragraphs and E00000 runs.
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  function textOf(node) {
+    return Array.prototype.map.call(node.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join("");
+  }
+  function first(node, name) { var k = node && node.getElementsByTagNameNS(W, name); return k && k.length ? k[0] : null; }
+  function redInXml(xml) {
+    var dom = new DOMParser().parseFromString(xml, "application/xml"), out = [];
+    Array.prototype.forEach.call(dom.getElementsByTagNameNS(W, "p"), function (p) {
+      var style = first(first(p, "pPr"), "pStyle");
+      if (style && style.getAttributeNS(W, "val") === "PlaceholderText") { out.push(textOf(p)); return; }
+      Array.prototype.forEach.call(p.getElementsByTagNameNS(W, "r"), function (r) {
+        var color = first(first(r, "rPr"), "color");
+        if (color && String(color.getAttributeNS(W, "val")).toUpperCase() === "E00000") out.push(textOf(r));
+      });
+    });
+    return out;
+  }
+  function partsOf(blob) {
+    return A.ZipIO.read(blob).then(function (parts) {
+      var by = {};
+      parts.forEach(function (p) { by[p.name] = /\.(xml|rels)$/.test(p.name) ? A.ZipIO.text(p) : ""; });
+      return by;
+    });
+  }
+
+  function exportDoc() {
+    return docOf({
+      info: { client: "Northfield Water", author: "A. Consultant", date: "2026-11-11" },
+      media: {
+        m1: { type: "image/png", name: "ok.png", width: 1, height: 1, source: "insert", blob: pngBlob() },
+        m2: { type: "image/png", name: "lost.png", width: 1, height: 1, source: "insert", blob: null, missing: true }
+      },
+      blocks: [
+        { id: "b1", type: "heading", level: 1, runs: [{ t: "Summary" }] },
+        { id: "b2", type: "paragraph", runs: [{ t: "The site is " }, { t: "the site name", red: true }, { t: "." }] },
+        { id: "b3", type: "prompt", text: "Add the cost of each option." },
+        { id: "b4", type: "table", header: 1, cols: [1, 1], rows: [
+          { cells: [{ blocks: [para("b5", "Zone")] }, { blocks: [para("b6", "Assets")] }] },
+          { cells: [{ blocks: [para("b7", "Control")] }, { blocks: [{ id: "b8", type: "paragraph", runs: [{ t: "To be confirmed on site", red: true }] }] }] }
+        ] },
+        { id: "b9", type: "picture", media: "m1", width: 96, height: 96, alt: "A dot" },
+        { id: "b10", type: "picture", media: "m2", width: 96, height: 96, alt: "Lost" },
+        para("b11", "The end.")
+      ]
+    });
+  }
+
+  var REAL = true;
+  var probe = docOf({ info: { title: "Probe" }, blocks: [para("b1", "x")] });
+  var chain = H.buildDocument(probe, { issueStatus: "draft" }).then(function () {}, function (e) {
+    if (!/not built yet/.test(String(e && e.message))) { ok(false, "the writer builds a plain document", e && e.message); return; }
+    REAL = false;
+    note("App.HouseDocx is still a stub: a stand-in writer is used, which prints the same things red into a real .docx");
+    standInWriter();
+  });
+  function step(name, fn) {
+    chain = chain.then(fn).catch(function (e) { ok(false, name + " ran without throwing", e && (e.stack || e.message)); });
+  }
+
+  // ======================= the list is the build ==========================
+  var d, list;
+  step("list", function () {
+    d = open(exportDoc());
+    return X.issues().then(function (l) {
+      list = l;
+      var where = sorted(list.map(function (p) { return p.where.kind === "info" ? "info:" + p.where.field : "block:" + p.where.blockId; }));
+      ok(where.join(",") === "block:b10,block:b2,block:b3,block:b8,info:title",
+         "the check lists the prompt block, red text in a paragraph and in a table cell, the missing title and the picture that could not be restored", where.join(","));
+      var by = {};
+      list.forEach(function (p) { by[p.where.blockId || p.where.field] = p.text; });
+      ok(by.b3 === "Add the cost of each option." && by.b2 === "the site name" && by.b8 === "To be confirmed on site", "each quoting the red text", JSON.stringify(by));
+      ok(/could not be restored/.test(by.b10 || ""), "a picture that could not be restored is a prompt in its place", by.b10);
+      ok(M.promptCount(d) === list.length, "the sidebar's count (promptCount) agrees with the check", M.promptCount(d) + " against " + list.length);
+      return X.blob("draft");
+    }).then(function (blob) {
+      ok(blob instanceof Blob && blob.size > 1000, "a draft is exported although things are outstanding");
+      return partsOf(blob);
+    }).then(function (parts) {
+      var red = sorted(redInXml(parts["word/document.xml"] || "")), want = sorted(list.map(function (p) { return p.text; }));
+      ok(!!parts["word/document.xml"] && red.length === 5, "the exported file was opened and five things print red in it", red.length + ": " + red.join(" | "));
+      ok(JSON.stringify(red) === JSON.stringify(want), "what prints red in the Word file is exactly the list, no more and no less", JSON.stringify(red) + " against " + JSON.stringify(want));
+      ok(/Draft/.test(parts["word/document.xml"]), "the draft says Draft");
+    });
+  });
+
+  // ======================= the page =======================================
+  step("page", function () {
+    draw(P.issue);
+    ok(/Checking the document/.test($("dp-todo").textContent), "the page draws at once and says it is checking");
+    ok($("dp-status-draft").checked && !$("dp-status-final").checked && !$("dp-export").disabled, "Draft is chosen to begin with and can be exported");
+    return poll(function () { return $("dp-todo-list"); }).then(function () {
+      var items = $("dp-todo-list").querySelectorAll("li");
+      ok(items.length === list.length && /^5 things still to complete/.test($("dp-todo-count").textContent), "Still to complete shows the same list", items.length);
+      var texts = sorted(Array.prototype.map.call(items, function (li) { return li.querySelector(".dp-red").textContent; }));
+      ok(JSON.stringify(texts) === JSON.stringify(sorted(list.map(function (p) { return p.text; }))), "quoting each red text");
+      ok(Array.prototype.every.call(items, function (li) { var b = li.querySelector(".btn"); return b && b.textContent === "Go to it"; }), "each with Go to it");
+
+      reset();
+      click($("dp-todo-list").querySelector('li[data-block="b3"] .btn'));
+      ok(JSON.stringify(calls.go) === '[["edit",{"blockId":"b3"}]]', "Go to it on a prompt opens the editor at that block", JSON.stringify(calls.go));
+      reset();
+      click($("dp-todo-list").querySelector('li[data-block="b8"] .btn'));
+      ok(JSON.stringify(calls.go) === '[["edit",{"blockId":"b8"}]]', "on red text in a table cell, at the block inside the cell", JSON.stringify(calls.go));
+      reset();
+      click($("dp-todo-list").querySelector('li[data-kind="info"] .btn'));
+      ok(JSON.stringify(calls.go) === '[["info",{"field":"title"}]]', "on the missing title, at the title field", JSON.stringify(calls.go));
+
+      // Final refused
+      ok(/-draft\.docx\.$/.test($("dp-export-name").textContent), "the page names the file a draft will have", $("dp-export-name").textContent);
+      choose("dp-status-final");
+      ok($("dp-export").disabled && !$("dp-final-why").classList.contains("hidden") && /^Final is not available/.test($("dp-final-why").textContent),
+         "choosing Final disables Export Word and says why beside it", $("dp-final-why").textContent);
+      ok(/could not be restored/.test($("dp-final-why").textContent), "a picture that could not be restored is named as the reason first", $("dp-final-why").textContent);
+      ok(!/-draft/.test($("dp-export-name").textContent), "and the file name loses -draft");
+      return X.blob("final").then(function () { ok(false, "the writer refuses a Final with things outstanding"); }, function (e) {
+        ok(/final/i.test(e.message) && /5 things/.test(e.message), "the writer refuses a Final too, in its own words", e.message);
+      });
+    }).then(function () {
+      reset();
+      return X.word("final");
+    }).then(function (res) {
+      ok(res === null && calls.down.length === 0, "a refused export downloads nothing");
+      ok(calls.toast.length === 1 && calls.toast[0][1] === "err" && /^The Word file was not exported\. This document still has/.test(calls.toast[0][0]), "and the reason is shown", JSON.stringify(calls.toast));
+      ok(calls.busy.length === 2 && calls.busy[1][0] === null, "the busy panel is cleared after a refusal");
+
+      // Draft through the button
+      choose("dp-status-draft");
+      ok(!$("dp-export").disabled && $("dp-final-why").classList.contains("hidden"), "back on Draft, Export Word is available again");
+      reset();
+      click($("dp-export"));
+      ok($("dp-export").disabled, "the button waits while the file is built");
+      return poll(function () { return calls.down.length === 1 && !$("dp-export").disabled; });
+    }).then(function () {
+      ok(calls.down[0].name === "Northfield-Water-document-0.1-draft.docx", "Export Word downloads the draft under its name", calls.down[0].name);
+      ok(calls.toast.length === 1 && /^Exported Northfield-Water-document-0\.1-draft\.docx\./.test(calls.toast[0][0]), "and says so", JSON.stringify(calls.toast));
+    });
+  });
+
+  // ======================= completed: Final allowed ========================
+  step("final", function () {
+    choose("dp-status-final");
+    // Complete everything except the lost picture.
+    d.info.title = "Network segmentation proposal";
+    M.remove(d, ["b3"]);
+    delete M.find(d, "b2").block.runs[1].red;
+    delete M.find(d, "b8").block.runs[0].red;
+    draw(P.issue);
+    ok($("dp-status-final").checked, "the page remembers that Final was chosen for this document");
+    ok($("dp-export").disabled && /Checking/.test($("dp-final-why").textContent), "Final waits for the check before it can be exported", $("dp-final-why").textContent);
+    return poll(function () { return $("dp-todo-list"); }).then(function () {
+      ok($("dp-todo-list").querySelectorAll("li").length === 1 && $("dp-export").disabled, "with only the lost picture left, Final is still refused", $("dp-final-why").textContent);
+      // The picture is brought back.
+      d.media.m2.blob = pngBlob(); delete d.media.m2.missing;
+      draw(P.issue);
+      return poll(function () { return $("dp-todo-none"); });
+    }).then(function () {
+      ok($("dp-todo-none").textContent === "Nothing is outstanding." && !$("dp-export").disabled && $("dp-final-why").classList.contains("hidden"),
+         "with nothing outstanding, Final can be exported", $("dp-final-why").textContent);
+      ok(M.promptCount(d) === 0, "and the sidebar's count is zero too", M.promptCount(d));
+      // The preview's document control follows the choice.
+      var seen = [], realControl = R.controlEl;
+      R.controlEl = function (doc, st) { seen.push(st); return realControl.apply(R, arguments); };
+      var holder = document.createElement("div");
+      try { P.preview(holder); } catch (e) { ok(false, "the preview draws", e.message); }
+      R.controlEl = realControl;
+      ok(seen.join() === "final", "the preview's Status row follows the choice", seen.join());
+      reset();
+      click($("dp-export"));
+      return poll(function () { return calls.down.length === 1; });
+    }).then(function () {
+      ok(calls.down[0].name === "Northfield-Water-Network-segmentation-proposal-0.1.docx", "the final carries the plain name", calls.down[0].name);
+      return partsOf(calls.down[0].blob);
+    }).then(function (parts) {
+      ok(redInXml(parts["word/document.xml"]).length === 0, "nothing prints red in the final");
+      ok(/Final/.test(parts["word/document.xml"]) && !/Status<\/w:t>[\s\S]{0,400}Draft/.test(parts["word/document.xml"]), "it says Final");
+      if (REAL) {
+        ok(/documentProtection/.test(parts["word/settings.xml"] || "") && /_MarkAsFinal/.test(parts["docProps/custom.xml"] || ""), "it opens read-only and is marked as final");
+        var headers = Object.keys(parts).filter(function (n) { return /^word\/header\d*\.xml$/.test(n); }).map(function (n) { return parts[n]; }).join("");
+        ok(!/DRAFT/.test(headers), "and carries no draft watermark");
+      } else {
+        note("read-only protection and the watermark are the real writer's (test-doc-house.html); not checked against the stand-in");
+      }
+    });
+  });
+
+  // ======================= the check cannot run ============================
+  step("error", function () {
+    var realList = H.issueList;
+    H.issueList = function () { return Promise.reject(new Error("A drawing could not be placed.")); };
+    draw(P.issue);
+    return poll(function () { return $("dp-todo-error"); }).then(function () {
+      ok(/The check could not be run\. A drawing could not be placed\./.test($("dp-todo-error").textContent), "a check that fails says so");
+      ok($("dp-status-final").checked && $("dp-export").disabled && /could not be run/.test($("dp-final-why").textContent), "and Final is refused, because nothing vouches for it");
+      choose("dp-status-draft");
+      ok(!$("dp-export").disabled, "a draft can still be exported");
+      H.issueList = realList;
+    });
+  });
+
+  // ======================= file names ======================================
+  step("names", function () {
+    var f = X.filename;
+    ok(f(docOf({ info: { title: "Network segmentation proposal", client: "Northfield Water", revision: "1.0" } }), "draft") === "Northfield-Water-Network-segmentation-proposal-1.0-draft.docx", "client, title and revision, with -draft for a draft");
+    ok(f(docOf({ info: { title: "Network segmentation proposal", client: "Northfield Water", revision: "1.0" } }), "final") === "Northfield-Water-Network-segmentation-proposal-1.0.docx", "and the plain name for a final");
+    ok(f(docOf({ info: { title: "Site note" } }), "draft") === "Site-note-0.1-draft.docx", "no client: the title and revision", f(docOf({ info: { title: "Site note" } }), "draft"));
+    ok(f(docOf({ info: { title: "", revision: "" } }), "final") === "document.docx", "nothing at all still gives a name", f(docOf({ info: { title: "", revision: "" } }), "final"));
+    var odd = f(docOf({ info: { title: "Plan: A/B \\ \"C\" <D> | E? *", client: "Smith & Sons (UK) Ltd.", revision: "2" } }), "draft");
+    ok(odd === "Smith-Sons-UK-Ltd-Plan-A-B-C-D-E-2-draft.docx", "characters a file system refuses become hyphens", odd);
+    var all = [f(docOf({ info: { title: "T", client: "C" } }), "draft"), f(docOf({ info: { title: "T" } }), "final")].join(" ");
+    ok(all.indexOf(A.Version.number) === -1 && all.indexOf(A.Version.label) === -1 && !/OT.Cyber/i.test(all), "the tool's version and name are never in a file name", all);
+    ok(f(null, "draft") === "document-draft.docx", "and a missing document does not throw");
+  });
+
+  // ======================= Worth a look ====================================
+  step("worth", function () {
+    function kept(id, w, over) { return Object.assign({ id: id, type: "kept", kind: "chart", xml: "", rels: [], width: w, height: 200, floating: false, text: "", description: "Chart" }, over || {}); }
+    var w = open(docOf({
+      info: { title: "Worth" },
+      media: { m1: { type: "image/png", name: "a.png", width: 1, height: 1, source: "insert", blob: pngBlob() } },
+      blocks: [
+        { id: "b1", type: "picture", media: "m1", width: 96, height: 96 },
+        { id: "b2", type: "picture", media: "m1", width: 96, height: 96, alt: "Described" },
+        { id: "b3", type: "table", header: 0, cols: [1, 1, 1, 1, 1, 1, 1], rows: [{ cells: [1, 2, 3, 4, 5, 6, 7].map(function (n) { return { blocks: [para("c" + n, "x")] }; }) }] },
+        { id: "b4", type: "table", header: 0, land: true, cols: [1, 1, 1, 1, 1, 1, 1, 1], rows: [{ cells: [1, 2, 3, 4, 5, 6, 7, 8].map(function (n) { return { blocks: [para("d" + n, "x")] }; }) }] },
+        kept("b5", 900), kept("b6", 900, { floating: true }), kept("b7", 900, { land: true }), kept("b8", 1100, { land: true }), kept("b9", 500),
+        { id: "b10", type: "table", header: 0, cols: [1, 1], rows: [{ cells: [{ blocks: [kept("b11", 400)] }, { blocks: [kept("b12", 200)] }] }] },
+        { id: "b13", type: "list", list: "number", level: 0, runs: [{ t: "Step" }] }
+      ],
+      importReport: { source: { name: "w.docx" }, carried: {}, toCheck: [], notCarried: [], changed: [{ code: "list-numbering", count: 1, blockIds: ["b13"] }] }
+    }));
+    var codes = P.worth(w).map(function (x) { return x.code; });
+    ok(codes.join(",") === "blank-author,blank-qaReviewBy,blank-authorisedBy,blank-issuedTo,blank-issuedDate,no-alt,wide-table,fitted,list-numbering", "Worth a look: blank control fields, pictures without alternative text, a wide table, drawings to be made smaller, changed list numbering", codes.join(","));
+    draw(P.issue);
+    var li = function (code) { return $("dp-worth").querySelector('li[data-code="' + code + '"]'); };
+    ok(/^1 picture has no alternative text/.test(li("no-alt").textContent), "one picture has no alternative text; the described one is not counted", li("no-alt").textContent);
+    ok(/^1 table has more than six columns on a portrait page/.test(li("wide-table").textContent), "a table of seven columns on a portrait page; the landscape one is not counted", li("wide-table").textContent);
+    ok(/^3 drawings are wider/.test(li("fitted").textContent), "three drawings will be made smaller: on a portrait page, on a landscape page and in a table cell; a floating one is left alone", li("fitted").textContent);
+    reset();
+    click(li("fitted").querySelector(".btn"));
+    ok(JSON.stringify(calls.go) === '[["edit",{"blockIds":["b5","b8","b11"]}]]', "Show selects them", JSON.stringify(calls.go));
+    reset();
+    click(li("blank-issuedTo").querySelector(".btn"));
+    ok(JSON.stringify(calls.go) === '[["info",{"field":"issuedTo"}]]', "a blank field's Go to it opens that field", JSON.stringify(calls.go));
+    reset();
+    click(li("list-numbering").querySelector(".btn"));
+    ok(JSON.stringify(calls.go) === '[["edit",{"blockId":"b13"}]]', "changed numbering goes to the item", JSON.stringify(calls.go));
+    return poll(function () { return $("dp-todo-none") || $("dp-todo-list") || $("dp-todo-error"); }).then(function () {
+      choose("dp-status-final");
+      ok(!!$("dp-todo-none") ? !$("dp-export").disabled : true, "Worth a look never blocks a Final");
+
+      w.kind = "short";
+      ok(P.worth(w).every(function (x) { return !/^blank-/.test(x.code); }), "a short document prints no document control, so its blank fields are not raised");
+      var clean = open(docOf({ info: { title: "Clean", author: "Z", qaReviewBy: "A", authorisedBy: "B", issuedTo: "C", issuedDate: "2026-11-11" }, blocks: [para("b1", "x")] }));
+      draw(P.issue);
+      ok(P.worth(clean).length === 0 && !!$("dp-worth-none"), "with nothing to mention, the card says so");
+      return poll(function () { return $("dp-todo-none") || $("dp-todo-list") || $("dp-todo-error"); });
+    });
+  });
+
+  chain.then(finish, function (e) { ok(false, "threw: " + (e && e.message)); finish(); });
+})();
+</script>
+</body></html>

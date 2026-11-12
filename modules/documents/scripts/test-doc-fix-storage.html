@@ -1,0 +1,539 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: saving, autosave and windows, review fixes</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Regression tests for the review of saving and autosave (js/app.js,
+  js/storage.js) and of the suite's refusal of a very large file
+  (platform/js/suite.js):
+    - a change made while the file is being written is not called saved;
+    - turning down an autosave offer leaves the open document's copy whole;
+    - a second window neither clears nor offers the first window's copy, and a
+      copy taken from under an open document is written again in full;
+    - Save as into another file makes a document of its own (a new id), and
+      files that already share an id cannot take each other's pictures or
+      write over each other's copy on offer;
+    - pictures brought back from the saved file are unsaved work;
+    - the suite says a file over its limit is too large, and names the tool.
+  The tool runs from file:// in frames, as in test-doc-app.html, with the same
+  stand-ins for the pages and the editor. IndexedDB and Web Locks never answer
+  in headless Edge, so the store behind autosave and the lock manager are
+  objects in this page (App.DocStorage.bytesStore and App.DocStorage.locks are
+  the seams), shared by every frame as the real ones are shared by every
+  window. Two frames of the same page share localStorage, as two windows do.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<iframe id="g" style="width:1280px;height:800px;border:0"></iframe>
+<iframe id="s" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) {
+    lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++;
+    document.getElementById("out").textContent = lines.join("\n") + "\n\nincomplete";
+  }
+  // Reading a Blob is real work no timer stands for, and headless Edge's
+  // virtual clock runs out the moment nothing is queued: a timer is kept
+  // waiting, and a message bounced to ourselves keeps a task queued, until
+  // the tests finish (as in test-doc-zip.html).
+  var beat = setInterval(function () {}, 20);
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  function finish() {
+    clearInterval(beat); alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  window.addEventListener("error", function (e) { ok(false, "the page ran without a script error", e.message + " (line " + e.lineno + ")"); finish(); });
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 160)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  function later(ms) { return new Promise(function (res) { setTimeout(res, ms || 60); }); }
+  function J(v) { return JSON.stringify(v); }
+  function bytes(n, seed) { var b = new Uint8Array(n); for (var i = 0; i < n; i++) b[i] = (i * 31 + (seed || 7)) & 255; return b; }
+  function same(a, b) { if (a.length !== b.length) return false; for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+  function blobBytes(blob) { return blob.arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+
+  var POINTERS = "spt-document:autosave:v1";
+  // The store behind autosave: one for every frame, as IndexedDB is one for
+  // every window.
+  var mem = { docs: {}, blobs: {} };
+  function memStore() {
+    return {
+      putDoc: function (id, json) { mem.docs[id] = json; return Promise.resolve(); },
+      getDoc: function (id) { return Promise.resolve(mem.docs[id] || null); },
+      putBlob: function (id, key, blob) { (mem.blobs[id] = mem.blobs[id] || {})[key] = new Blob([blob], { type: blob.type }); return Promise.resolve(); },
+      getBlobs: function (id) { return Promise.resolve(mem.blobs[id] || {}); },
+      remove: function (id) { delete mem.docs[id]; delete mem.blobs[id]; return Promise.resolve(); },
+      ok: function () { return Promise.resolve(true); }
+    };
+  }
+  // The lock manager, as navigator.locks behaves: a lock is held until the
+  // promise its callback returned settles; query lists what is held. drop()
+  // is a window that has gone (the browser lets go of its locks).
+  var lockList = [];
+  function lockManager(who) {
+    return {
+      request: function (name, opts, cb) {
+        var e = { name: name, mode: (opts && opts.mode) || "exclusive", who: who };
+        lockList.push(e);
+        return Promise.resolve().then(cb).then(function (v) { var i = lockList.indexOf(e); if (i !== -1) lockList.splice(i, 1); return v; });
+      },
+      query: function () { return Promise.resolve({ held: lockList.map(function (e) { return { name: e.name, mode: e.mode }; }), pending: [] }); }
+    };
+  }
+  function dropLocks(who) { lockList = lockList.filter(function (e) { return e.who !== who; }); }
+  function heldBy(who) { return lockList.filter(function (e) { return e.who === who; }).map(function (e) { return e.name; }).join(","); }
+
+  // One frame of the tool: its window and the parts of it the tests use.
+  function fakeHandle(T, name, text, delay) {
+    var st = { text: text == null ? null : text, writes: 0, fail: false };
+    return { kind: "file", name: name, store: st,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      requestPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () {
+        return Promise.resolve({
+          write: function (b) {
+            if (st.fail) return Promise.reject(new Error("the disk is full"));
+            return Promise.resolve(typeof b === "string" ? b : b.text()).then(function (t) {
+              return (delay ? later(delay) : Promise.resolve()).then(function () { st.text = t; st.writes++; });
+            });
+          },
+          close: function () { return Promise.resolve(); }
+        });
+      } };
+  }
+  function boot(frame, who) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        poll(function () { return w.DocumentTool; }).then(function () {
+          var T = { W: w, A: w.App, D: w.App.DocApp, S: w.App.DocStorage, M: w.App.DocModel, who: who, errors: [], pick: { save: [], nextSave: null } };
+          w.addEventListener("error", function (e) { T.errors.push(e.message); });
+          w.addEventListener("unhandledrejection", function (e) { T.errors.push("rejection: " + ((e.reason && e.reason.message) || e.reason)); });
+          T.S.bytesStore = memStore();
+          T.S.locks = lockManager(who);
+          T.S.download = function () {};
+          w.showSaveFilePicker = function (o) {
+            T.pick.save.push(o);
+            if (!T.pick.nextSave) { var e = new Error("closed"); e.name = "AbortError"; return Promise.reject(e); }
+            var hd = T.pick.nextSave; T.pick.nextSave = null;
+            return Promise.resolve(hd);
+          };
+          w.showOpenFilePicker = function () { var e = new Error("closed"); e.name = "AbortError"; return Promise.reject(e); };
+          // The pages and the editor are other files' work (test-doc-app.html).
+          T.A.DocEditor.mount = function () {}; T.A.DocEditor.unmount = function () {};
+          T.A.DocEditor.focusBlock = function () {}; T.A.DocEditor.selectBlocks = function () {}; T.A.DocEditor.redraw = function () {};
+          T.A.DocHistory.record = function () {}; T.A.DocHistory.clear = function () {};
+          ["info", "preview", "issue", "report", "about", "welcome"].forEach(function (p) {
+            T.A.DocPages[p] = function (main) { main.appendChild(T.D.h("h1", { class: "page-title", tabindex: "-1", text: "Stand-in " + p })); };
+          });
+          T.$ = function (id) { return w.document.getElementById(id); };
+          T.q = function (sel) { return w.document.querySelector(sel); };
+          T.pointers = function () { try { return JSON.parse(w.localStorage.getItem(POINTERS) || "{}"); } catch (e) { return {}; } };
+          // The look for offers made as the page started asked the browser's
+          // own locks, which never answer here: it is made again with ours.
+          T.D.lookForOffer().then(function () { res(T); });
+        });
+      };
+      frame.src = "../index.html";
+    });
+  }
+  // A project file's text, made by the model itself: a paragraph and one
+  // picture. Resolves { id, text, key, doc }.
+  function fileOf(T, title, pic, picName, id) {
+    var d = T.M.create();
+    if (id) d.id = id;
+    d.info.title = title;
+    var k = T.M.addMedia(d, new T.W.Blob([pic], { type: "image/png" }), { name: picName || "diagram.png", width: 4, height: 4 });
+    d.blocks.push(T.M.make.paragraph(d, "First text of " + title), T.M.make.picture(d, k, 4, 4));
+    return T.M.toFile(d).then(function (b) { return b.text(); }).then(function (t) { return { id: d.id, text: t, key: k, doc: d }; });
+  }
+  function para(T) { return T.D.state.doc.blocks.filter(function (b) { return b.type === "paragraph"; })[0]; }
+  function type(T, text) {
+    var p = para(T);
+    if (!p) { T.D.state.doc.info.title = text; T.D.touched({ info: true }); return; }
+    p.runs = [{ t: text }];
+    T.D.touched({ blocks: [p.id] });
+  }
+  function toastOf(T) { return T.$("toast").textContent; }
+  function modalBtn(T, act) { return T.q('.doc-modal [data-act="' + act + '"]'); }
+  function reset(T) { T.W.localStorage.removeItem(POINTERS); mem.docs = {}; mem.blobs = {}; }
+  // Whether guard() stops to ask, answered with Cancel.
+  function guardAsks(T) {
+    var p = T.D.guard();
+    var asks = !!T.q(".doc-modal");
+    if (asks) modalBtn(T, "cancel").click();
+    return p.then(function (answer) { return asks && answer === false; });
+  }
+
+  var fA = document.getElementById("f"), fB = document.getElementById("g"), fS = document.getElementById("s");
+  var picX = bytes(900, 3), picZ = bytes(700, 11), picOther = bytes(1300, 23);
+  var A, B, X, Z, hX;
+
+  boot(fA, "A").then(function (T) {
+    A = T; reset(A);
+
+    // ================= 59: a change made while the file is being written =================
+    return fileOf(A, "Doc X", picX);
+  }).then(function (f) {
+    X = f;
+    hX = fakeHandle(A, "X.json", X.text, 400);
+    return A.D.loadText("X.json", X.text, hX);
+  }).then(function () {
+    type(A, "Edit one, before the save.");
+    var saving = A.D.save({});
+    return later(150).then(function () {
+      ok(hX.store.writes === 0, "59: the file is still being written when the next change is made");
+      type(A, "Edit two, typed while the file was being written.");
+      return saving;
+    });
+  }).then(function (res) {
+    ok(!!res && hX.store.writes === 1 && /Edit one/.test(hX.store.text) && !/Edit two/.test(hX.store.text), "59: the file holds what was there when it was built, and not the later change");
+    ok(A.D.state.dirty === true && A.$("btn-save").textContent === "Save*", "59: so the document is still unsaved: Save*", A.$("btn-save").textContent);
+    ok(/unsaved changes$/.test(A.$("save-state").textContent), "59: the header says unsaved changes, not the file name", A.$("save-state").textContent);
+    ok(/Saved to X\.json\./.test(toastOf(A)) && /is not in the file yet: save again/.test(toastOf(A)), "59: and the message says the later change is not in the file", toastOf(A));
+    return guardAsks(A);
+  }).then(function (asks) {
+    ok(asks, "59: New or Load would ask about unsaved changes");
+    return later(1500);
+  }).then(function () {
+    var p = A.pointers()[X.id];
+    ok(p && p.newer === true && /Edit two/.test(mem.docs[X.id] || ""), "59: the autosave copy holds the later change and is marked newer than the file", J(p));
+    // The control: nothing changes while the file is written.
+    return A.D.save({});
+  }).then(function () {
+    ok(hX.store.writes === 2 && /Edit two/.test(hX.store.text) && A.D.state.dirty === false && A.$("btn-save").textContent === "Save" && A.pointers()[X.id].newer === false && !/not in the file yet/.test(toastOf(A)),
+      "59: a save with no change during it is a clean save, as before", toastOf(A));
+    // A change made while the save dialog is open does reach the file, and is saved.
+    var hLate = fakeHandle(A, "X.json", null, 0), ask = null;
+    A.W.showSaveFilePicker = function (o) { return new Promise(function (resolve) { ask = function () { resolve(hLate); }; }); };
+    A.S.forget();
+    type(A, "Edit three.");
+    var saving = A.D.save({});
+    return poll(function () { return ask; }).then(function () {
+      type(A, "Edit four, typed while the save dialog was open.");
+      ask();
+      return saving;
+    }).then(function () {
+      ok(/Edit four/.test(hLate.store.text) && A.D.state.dirty === false, "59: a change made while the save dialog is open is in the file, and the save is clean");
+      A.W.showSaveFilePicker = function (o) {
+        A.pick.save.push(o);
+        if (!A.pick.nextSave) { var e = new Error("closed"); e.name = "AbortError"; return Promise.reject(e); }
+        var hd = A.pick.nextSave; A.pick.nextSave = null;
+        return Promise.resolve(hd);
+      };
+    });
+  }).then(function () {
+
+    // ================= 63: pictures brought back are unsaved work =================
+    return fileOf(A, "Doc Q", picZ);
+  }).then(function (Q) {
+    var o = JSON.parse(Q.text);
+    delete o.media[Q.key].data;
+    var incomplete = JSON.stringify(o), hQ = fakeHandle(A, "Q-incomplete.json", incomplete);
+    return A.D.loadText("Q-incomplete.json", incomplete, hQ).then(function () {
+      ok(A.D.state.dirty === false && A.M.missing(A.D.state.doc).length === 1 && A.S.currentName() === "Q-incomplete.json", "63: a file saved without one picture opens clean, with the picture missing");
+      return A.D.fillFrom(incomplete);
+    }).then(function (n) {
+      ok(n === 0 && A.D.state.dirty === false && A.$("btn-save").textContent === "Save", "63: a file that does not hold the picture either changes nothing, and the document stays clean");
+      return A.D.fillFrom(Q.text.replace(Q.id, "doc-someone-else"));
+    }).then(function (n) {
+      ok(n === 0 && A.D.state.dirty === false, "63: nor does another document's file");
+      return A.D.fillFrom(Q.text);
+    }).then(function (n) {
+      ok(n === 1 && A.M.missing(A.D.state.doc).length === 0, "63: the complete file brings the picture back");
+      ok(A.D.state.dirty === true && A.$("btn-save").textContent === "Save*" && /unsaved changes$/.test(A.$("save-state").textContent), "63: and the document is then unsaved: Save*, and the header says so", A.$("btn-save").textContent + " | " + A.$("save-state").textContent);
+      return guardAsks(A);
+    }).then(function (asks) {
+      ok(asks, "63: closing it would ask about unsaved changes");
+      return A.D.save({});
+    }).then(function () {
+      var saved = JSON.parse(hQ.store.text);
+      ok(hQ.store.writes === 1 && typeof saved.media[Q.key].data === "string" && saved.media[Q.key].data.length > 100 && A.D.state.dirty === false, "63: Save then writes the picture into the file, and the document is clean");
+
+      // ---- 62 (d): the same id and key, but not the same picture ----
+      // Two files that share an id (made by Save as before this fix) with a
+      // picture each under the same key.
+      return fileOf(A, "Doc Q", picOther, "another-client.png", Q.id);
+    }).then(function (sibling) {
+      ok(sibling.key === Q.key && sibling.id === Q.id, "62: (a sibling file with the same id and the same picture key)");
+      return A.D.loadText("Q-incomplete.json", incomplete, null).then(function () {
+        return A.D.fillFrom(sibling.text);
+      }).then(function (n) {
+        var e = A.D.state.doc.media[Q.key];
+        ok(n === 0 && A.M.missing(A.D.state.doc).length === 1 && !e.blob, "62: a picture under the same key that is not the same picture is not put into the document", "filled " + n);
+        ok(/Nothing was taken from that file/.test(toastOf(A)) && A.D.state.dirty === false, "62: and the message says nothing was taken", toastOf(A));
+      });
+    });
+  }).then(function () {
+
+    // ================= 62: Save as into another file =================
+    reset(A);
+    return fileOf(A, "Proposal for Alpha", picX);
+  }).then(function (Alpha) {
+    var hAlpha = fakeHandle(A, "Alpha.json", Alpha.text), hBeta = fakeHandle(A, "Beta.json"), betaId;
+    return A.D.loadText("Alpha.json", Alpha.text, hAlpha).then(function () {
+      return poll(function () { return mem.blobs[Alpha.id] && mem.blobs[Alpha.id][Alpha.key]; });
+    }).then(function () {
+      A.D.state.doc.info.title = "Proposal for Beta";
+      A.D.touched({ info: true });
+      // A plain Save writes the document's own file and keeps its id.
+      return A.D.save({});
+    }).then(function (res) {
+      ok(hAlpha.store.writes === 1 && JSON.parse(hAlpha.store.text).id === Alpha.id && A.D.state.doc.id === Alpha.id && !res.oldId, "62: a plain Save keeps the document's id");
+      A.pick.nextSave = hAlpha;
+      return A.D.save({ saveAs: true });
+    }).then(function (res) {
+      ok(hAlpha.store.writes === 2 && JSON.parse(hAlpha.store.text).id === Alpha.id && A.D.state.doc.id === Alpha.id && !res.oldId, "62: Save as back into the same file keeps it too");
+      A.pick.nextSave = hBeta;
+      return A.D.save({ saveAs: true });
+    }).then(function (res) {
+      var written = JSON.parse(hBeta.store.text);
+      betaId = written.id;
+      ok(betaId && betaId !== Alpha.id && /^doc-/.test(betaId), "62: Save as into another file writes it with an id of its own", betaId + " against " + Alpha.id);
+      ok(A.D.state.doc.id === betaId && res.oldId === Alpha.id && A.S.currentName() === "Beta.json", "62: and the open document is then that document");
+      ok(hAlpha.store.writes === 2 && JSON.parse(hAlpha.store.text).id === Alpha.id, "62: the earlier file is not written and keeps its id");
+      ok(typeof written.media[Alpha.key].data === "string" && written.info.title === "Proposal for Beta", "62: the new file is whole: the text and the picture");
+      return poll(function () { return mem.blobs[betaId] && mem.blobs[betaId][Alpha.key]; });
+    }).then(function () {
+      var p = A.pointers();
+      ok(p[betaId] && p[betaId].newer === false && p[Alpha.id] === undefined && mem.blobs[Alpha.id] === undefined, "62: the autosave copy moves to the new id, pictures and all, and none is left under the old one", J(p));
+      ok(heldBy("A") === "spt-document:open:" + betaId, "62: other windows are told the open document by its new id", heldBy("A"));
+      ok(A.D.state.dirty === false && A.$("btn-save").textContent === "Save", "62: it is a clean save");
+      type(A, "Typed in Beta.");
+      return poll(function () { return A.pointers()[betaId].newer === true && /Typed in Beta/.test(mem.docs[betaId] || ""); });
+    }).then(function () {
+      ok(mem.docs[Alpha.id] === undefined, "62: later changes are autosaved under the new id only");
+      return A.D.save({});
+    }).then(function () {
+      ok(hBeta.store.writes === 2 && JSON.parse(hBeta.store.text).id === betaId && A.pick.save.length >= 1, "62: and the next Save writes the new file, keeping its id");
+      // A write that fails leaves the document as it was.
+      var hBad = fakeHandle(A, "Gamma.json");
+      hBad.store.fail = true;
+      A.pick.nextSave = hBad;
+      type(A, "Typed before the failed save.");
+      return A.D.save({ saveAs: true });
+    }).then(function (res) {
+      ok(res === false && A.D.state.doc.id === betaId && A.S.currentName() === "Beta.json" && A.D.state.dirty === true && /was not saved/.test(toastOf(A)), "62: a Save as that fails changes nothing: the id, the file and the unsaved flag stay", toastOf(A));
+      A.D.markClean();
+
+      // A file loaded with no handle (dropped, or handed over): saved under
+      // its own name it stays the same document, under another it does not.
+      return A.D.loadText("Alpha.json", Alpha.text, null);
+    }).then(function () {
+      var hSame = fakeHandle(A, "Alpha.json");
+      A.pick.nextSave = hSame;
+      type(A, "x");
+      return A.D.save({}).then(function () {
+        ok(JSON.parse(hSame.store.text).id === Alpha.id && A.D.state.doc.id === Alpha.id, "62: a file loaded without its handle and saved under its own name keeps its id");
+        return A.D.loadText("Alpha.json", Alpha.text, null);
+      });
+    }).then(function () {
+      var hOther = fakeHandle(A, "Alpha for another client.json");
+      A.pick.nextSave = hOther;
+      type(A, "y");
+      return A.D.save({}).then(function () {
+        ok(JSON.parse(hOther.store.text).id !== Alpha.id && A.D.state.doc.id === JSON.parse(hOther.store.text).id, "62: saved under another name, it is a document of its own");
+        return A.D.newDocument();
+      });
+    }).then(function () {
+      var id = A.D.state.doc.id, hNew = fakeHandle(A, "Brand new.json");
+      A.pick.nextSave = hNew;
+      type(A, "z");
+      return A.D.save({}).then(function () {
+        ok(JSON.parse(hNew.store.text).id === id && A.D.state.doc.id === id, "62: a document that has never been in a file keeps its id on its first save");
+      });
+    }).then(function () { return Alpha; });
+  }).then(function (Alpha) {
+
+    // ---- 62 (c): files that already share an id, with one's work on offer ----
+    reset(A);
+    var sibling;
+    return fileOf(A, "Proposal for Beta", picOther, "beta-network.png", Alpha.id).then(function (s) {
+      sibling = s;
+      ok(sibling.key === Alpha.key, "62: (a sibling of Alpha.json with the same id and picture key)");
+      return A.D.loadText("Alpha.json", Alpha.text, fakeHandle(A, "Alpha.json", Alpha.text));
+    }).then(function () {
+      type(A, "An hour of unsaved work on Alpha.");
+      return poll(function () { return A.pointers()[Alpha.id] && A.pointers()[Alpha.id].newer === true && /An hour of unsaved work/.test(mem.docs[Alpha.id] || ""); });
+    }).then(function () {
+      // The window goes without a save.
+      dropLocks("A");
+      return boot(fA, "A");
+    }).then(function (T) {
+      A = T;
+      ok(A.D.offer() && A.D.offer().id === Alpha.id && /Unsaved work was found in this browser: Proposal for Alpha/.test(A.q("#doc-offer .t").textContent), "62: Alpha's unsaved work is offered at the next start", A.q("#doc-offer") && A.q("#doc-offer").textContent);
+      return A.D.loadText("Beta.json", sibling.text, fakeHandle(A, "Beta.json", sibling.text));
+    }).then(function () {
+      var text = A.q("#doc-offer .t").textContent;
+      ok(/^This browser holds unsaved work on this document: Proposal for Alpha, from \d/.test(text) && /Autosave is paused until you choose\.$/.test(text), "62: with the sibling open, the banner names the copy it holds by its own title and time", text);
+      return later(300).then(function () { return blobBytes(mem.blobs[Alpha.id][Alpha.key]); });
+    }).then(function (b) {
+      ok(same(b, picX), "62: opening the sibling does not write its picture over the one in the copy on offer");
+      type(A, "Typed in Beta while the banner is up.");
+      return later(1500);
+    }).then(function () {
+      ok(/An hour of unsaved work on Alpha/.test(mem.docs[Alpha.id]) && !/Typed in Beta/.test(mem.docs[Alpha.id]), "62: nor is the copy on offer written over by the sibling's changes");
+
+      // ================= 60 (B): the offer turned down is for the id that is open =================
+      A.$("doc-offer-discard").click();
+      ok(A.q("#doc-offer") === null, "60: Discard it takes the offer away");
+      return poll(function () { return mem.blobs[Alpha.id] && mem.blobs[Alpha.id][Alpha.key] && /Typed in Beta/.test(mem.docs[Alpha.id] || ""); });
+    }).then(function () {
+      return blobBytes(mem.blobs[Alpha.id][Alpha.key]);
+    }).then(function (b) {
+      ok(same(b, picOther) && A.pointers()[Alpha.id] && A.pointers()[Alpha.id].newer === true, "60: and the open document is then autosaved in full: its text and its own picture", J(A.pointers()));
+      return A.S.autosave.restore(Alpha.id);
+    }).then(function (doc) {
+      ok(doc && A.M.missing(doc).length === 0 && doc.info.title === "Proposal for Beta", "60: restoring that copy gives every picture back");
+    });
+  }).then(function () {
+
+    // ================= 60 (A): the offer turned down is for another document =================
+    reset(A);
+    dropLocks("A");
+    return boot(fA, "A");
+  }).then(function (T) {
+    A = T;
+    return Promise.all([fileOf(A, "Doc Z", picZ), fileOf(A, "Doc X", picX)]);
+  }).then(function (r) {
+    Z = r[0]; X = r[1];
+    return A.D.loadText("Z.json", Z.text, fakeHandle(A, "Z.json", Z.text));
+  }).then(function () {
+    type(A, "Unsaved work on Z.");
+    return poll(function () { return A.pointers()[Z.id] && A.pointers()[Z.id].newer === true && mem.docs[Z.id]; });
+  }).then(function () {
+    // A copy with nothing unsaved in it, of a document closed with the browser.
+    var map = A.pointers();
+    map["doc-closed"] = { id: "doc-closed", title: "Closed", time: "2026-11-01T10:00:00.000Z", newer: false };
+    A.W.localStorage.setItem(POINTERS, JSON.stringify(map));
+    mem.blobs["doc-closed"] = { m1: new Blob([picZ]) };
+    dropLocks("A");
+    return boot(fA, "A");
+  }).then(function (T) {
+    A = T;
+    ok(A.D.offer() && A.D.offer().id === Z.id, "60: Z's unsaved work is on offer after the restart");
+    ok(A.pointers()["doc-closed"] === undefined && mem.blobs["doc-closed"] === undefined, "60: a copy with nothing unsaved, of a document open nowhere, is still cleared away at the start");
+    return A.D.loadText("X.json", X.text, fakeHandle(A, "X.json", X.text));
+  }).then(function () {
+    return poll(function () { return mem.blobs[X.id] && mem.blobs[X.id][X.key]; });
+  }).then(function () {
+    ok(A.pointers()[X.id] && A.pointers()[X.id].newer === false, "60: X, opened from its file, has its pictures in the store and nothing unsaved");
+    A.$("doc-offer-discard").click();
+    return later(200);
+  }).then(function () {
+    ok(A.pointers()[Z.id] === undefined && mem.docs[Z.id] === undefined && mem.blobs[Z.id] === undefined, "60: Discard it removes the copy that was on offer");
+    ok(mem.blobs[X.id] && mem.blobs[X.id][X.key] && A.pointers()[X.id] && A.pointers()[X.id].newer === false, "60: and leaves the copy of the document that is open, pictures and pointer", J(A.pointers()) + " blobs " + J(Object.keys(mem.blobs)));
+    ok(A.q("#doc-offer") === null && A.D.offer() === null, "60: the open document is not offered to itself");
+    type(A, "An hour of work on X.");
+    return poll(function () { return A.pointers()[X.id].newer === true && /An hour of work on X/.test(mem.docs[X.id] || ""); });
+  }).then(function () {
+    return A.S.autosave.restore(X.id);
+  }).then(function (doc) {
+    ok(doc && A.M.missing(doc).length === 0 && /An hour of work on X/.test(J(doc.blocks)), "60: after a crash the restored copy has the text and every picture");
+
+    // ================= 61: a second window =================
+    reset(A);
+    dropLocks("A");
+    return boot(fA, "A");
+  }).then(function (T) {
+    A = T;
+    return A.D.loadText("X.json", X.text, fakeHandle(A, "X.json", X.text));
+  }).then(function () {
+    return poll(function () { return mem.blobs[X.id] && mem.blobs[X.id][X.key] && heldBy("A"); });
+  }).then(function () {
+    ok(heldBy("A") === "spt-document:open:" + X.id && A.pointers()[X.id].newer === false, "61: window A has X open, unchanged, and says so to other windows", heldBy("A"));
+    return boot(fB, "B");
+  }).then(function (T) {
+    B = T;
+    ok(B.D.offer() === null && B.q("#doc-offer") === null, "61: a second window starting offers nothing");
+    ok(B.pointers()[X.id] && mem.blobs[X.id] && mem.blobs[X.id][X.key], "61: and leaves the copy of the document open in the first window where it is", J(B.pointers()));
+    type(A, "Unsaved in window A.");
+    return poll(function () { return A.pointers()[X.id].newer === true && /Unsaved in window A/.test(mem.docs[X.id] || ""); });
+  }).then(function () {
+    ok(mem.blobs[X.id][X.key], "61: window A's autosave copy still has its picture");
+    return B.D.lookForOffer();
+  }).then(function (offer) {
+    ok(offer === null && B.q("#doc-offer") === null, "61: work that is live in window A is not offered in window B as work a crash left behind", J(offer));
+    // Window A goes without a save: the browser lets go of its lock.
+    dropLocks("A");
+    return B.D.lookForOffer();
+  }).then(function (offer) {
+    ok(offer && offer.id === X.id && /Unsaved work was found in this browser: Doc X/.test(B.q("#doc-offer .t").textContent), "61: once window A has gone, its unsaved work is offered", J(offer));
+
+    // The copy is taken up again elsewhere while this offer is still showing
+    // (window A, still running here, writes it): turning the offer down must
+    // not remove live work.
+    type(A, "Written after the offer was made.");
+    return poll(function () { return /Written after the offer was made/.test(mem.docs[X.id] || "") && A.pointers()[X.id].time !== offer.time; });
+  }).then(function () {
+    B.$("doc-offer-discard").click();
+    return later(200);
+  }).then(function () {
+    ok(B.q("#doc-offer") === null || B.D.offer().id === X.id, "61: (the offer is answered)");
+    ok(mem.docs[X.id] && /Written after the offer was made/.test(mem.docs[X.id]) && mem.blobs[X.id] && mem.blobs[X.id][X.key] && A.pointers()[X.id], "61: Discard it on an offer whose copy has been written since leaves that copy alone");
+
+    // The copy is taken from under the open document (a window of an earlier
+    // version, or a browser with no locks): the next autosave puts it all back.
+    var map = A.pointers();
+    delete map[X.id];
+    A.W.localStorage.setItem(POINTERS, JSON.stringify(map));
+    delete mem.docs[X.id]; delete mem.blobs[X.id];
+    type(A, "Typed after the copy was taken away.");
+    return poll(function () { return A.pointers()[X.id] && /Typed after the copy was taken away/.test(mem.docs[X.id] || ""); });
+  }).then(function () {
+    return later(100).then(function () { return B.S.autosave.restore(X.id); });
+  }).then(function (doc) {
+    ok(doc && B.M.missing(doc).length === 0 && mem.blobs[X.id] && mem.blobs[X.id][X.key], "61: an open document whose copy was removed from outside is autosaved again with every picture");
+    return blobBytes(mem.blobs[X.id][X.key]);
+  }).then(function (b) {
+    ok(same(b, picX), "61: byte for byte");
+
+    // No lock manager at all: a window is on its own, and nothing waits.
+    B.S.locks = null;
+    return B.S.autosave.check();
+  }).then(function () {
+    ok(true, "61: a browser without locks is asked nothing and the look for offers still answers");
+    ok(A.errors.concat(B.errors).length === 0, "no script errors in the tool's frames", A.errors.concat(B.errors).join(" | "));
+
+    // ================= 64: the suite and a file over its limit =================
+    return new Promise(function (resolve) { fS.onload = resolve; fS.src = "../../../platform/index.html"; });
+  }).then(function () {
+    return poll(function () { return fS.contentWindow.Suite && fS.contentWindow.Suite.Shell; });
+  }).then(function () {
+    var SW = fS.contentWindow, Sh = SW.Suite.Shell, read = 0, sliced = [];
+    function toast() { var t = SW.document.getElementById("toast"); return t && !t.classList.contains("hidden") ? t.textContent : ""; }
+    function big(name, head) {
+      return { name: name, size: 100 * 1024 * 1024 + 1,
+        text: function () { read++; return Promise.resolve(head); },
+        slice: function (a, b) { sliced.push([a, b]); return { text: function () { return Promise.resolve(head.slice(a, b)); } }; } };
+    }
+    return Sh.openDropped([big("big report.json", '{"schema":"spt-document/1.0","id":"doc-big","createdAt":"2026-11-11T10:00:00.000Z"')]).then(function (order) {
+      ok(read === 0 && sliced.length === 1 && sliced[0][0] === 0 && sliced[0][1] <= 1024, "64: a file over the suite's limit is not read: only its first bytes are looked at", J(sliced));
+      ok(order.length === 0 && Sh.current() === null && !Sh.frames.documents, "64: nothing is passed to a tool");
+      ok(toast() === "big report.json is too large to pass on from here (over 100 MB). Open it with Load in the OT Cyber Document Tool.", "64: the message says it is too large, and names the tool for a document file", toast());
+      ok(!/is not a file the suite opens/.test(toast()), "64: it is no longer called a file the suite does not open");
+      return Sh.openDropped([big("big project.json", '{"schemaVersion":"2.3","project":{}}')]);
+    }).then(function () {
+      ok(read === 0 && toast() === "big project.json is too large to pass on from here (over 100 MB). Open it with Load in its own tool.", "64: another tool's file over the limit is called too large as well", toast());
+      return Sh.openDropped([{ name: "notes.json", size: 12, text: function () { return Promise.resolve('{"hello":1}'); } }]);
+    }).then(function () {
+      ok(/notes\.json is not a file the suite opens\. Open it with Load in its own tool\.$/.test(toast()), "64: a small file that is not one of ours keeps its own message", toast());
+    });
+  }).then(finish, function (e) { ok(false, "the tests ran to the end", (e && e.stack) || String(e)); finish(); });
+})();
+</script>
+</body></html>

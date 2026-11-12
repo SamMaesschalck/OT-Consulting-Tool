@@ -1,0 +1,352 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the house template around a document</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.HouseDocx as a template (docs/document-tool-design.md 2 and 4.3): what is
+  printed around the blocks, built into real Word files and read back from the
+  XML. A report has the cover in a section with no margins, document control with
+  its rows in order, the logo header and the three-cell footer; a short document
+  has a title block and no cover. A draft has the watermark in every header and
+  on the cover; a final is protected, marked as final and says Status Final, and
+  is refused while anything prints red. The contents list links to bookmarks on
+  the headings. Dates print as stored.
+
+  The line that ties this to the assessment reports: a project built through
+  buildDocument has a cover whose XML equals cover() fed the same values by
+  hand, and modules/assessments/scripts/test-house-parity.html proves cover()
+  against the assessment exporter.
+-->
+<script>
+// A script that fails to load or throws is a failure, not a page that says "running" for ever.
+window.addEventListener("error", function (e) { document.getElementById("out").textContent = "FAIL the page threw: " + (e.message || (e.target && e.target.src) || "a script did not load") + "\n\n1 FAILED"; }, true);
+</script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/house-docx.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Packing runs off the main thread, and headless Edge's virtual clock runs
+  // out the moment the page has nothing queued, which under load dumped this
+  // page part way through. A message bounced to ourselves keeps a task
+  // queued, without moving the clock, until the tests finish (as
+  // test-doc-zip.html).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  var HD = window.App.HouseDocx;
+  // No kept content here, so the graft pass must never be asked for.
+  var graftCalls = 0;
+  window.App.DocxGraft = { token: function (i) { return "KEPT:" + i + ""; }, needsGraft: function () { return false; }, apply: function (b) { graftCalls += 1; return Promise.resolve(b); } };
+
+  function unzip(blob) {
+    return blob.arrayBuffer().then(function (buf) {
+      var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+      for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+      if (eocd < 0) throw new Error("not a zip");
+      var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true), jobs = [];
+      for (var k = 0; k < n; k++) {
+        var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+        var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+        var local = v.getUint32(p + 42, true);
+        var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+        var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+        var data = u8.subarray(start, start + csize);
+        jobs.push((function (name, method, data) {
+          var bytes = method === 0 ? Promise.resolve(data)
+            : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+          return bytes.then(function (b) { return { name: name, bytes: b, text: /\.(xml|rels)$/.test(name) ? new TextDecoder().decode(b) : "" }; });
+        })(name, method, data));
+        p += 46 + nlen + xlen + clen;
+      }
+      return Promise.all(jobs).then(function (list) { var map = {}; list.forEach(function (x) { map[x.name] = x; }); return map; });
+    });
+  }
+  function text(z, name) { return (z[name] && z[name].text) || ""; }
+  function wellFormed(z) {
+    return Object.keys(z).filter(function (n) { return z[n].text && new DOMParser().parseFromString(z[n].text, "application/xml").getElementsByTagName("parsererror").length > 0; });
+  }
+  // What the library makes up for each file, put aside.
+  function norm(xml) {
+    return String(xml).replace(/r:(embed|id|pict)="[^"]*"/g, 'r:$1="R"').replace(/<wp:docPr id="\d+"/g, '<wp:docPr id="N"')
+      .replace(/DraftWatermark\d+/g, "DraftWatermarkN").replace(/_x0000_s\d+/g, "_x0000_sN");
+  }
+  function sects(doc) { return doc.match(/<w:sectPr>[\s\S]*?<\/w:sectPr>/g) || []; }
+  function coverXml(doc) { return doc.slice(doc.indexOf("<w:body>"), doc.indexOf("</w:sectPr>") + 11); }
+  // The cover strip holds each label to its value with no-break spaces and
+  // hyphens (test-doc-fix-r2-cover.html pins those); here they read as plain.
+  function texts(xml) { return (xml.match(/<w:t [^>]*>[^<]*<\/w:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/\u00a0/g, " ").replace(/\u2011/g, "-"); }); }
+  function controlTable(doc) {
+    var at = doc.indexOf(">Document control and confidentiality<"), from = doc.indexOf("<w:tbl>", at);
+    return at < 0 || from < 0 ? "" : doc.slice(from, doc.indexOf("</w:tbl>", from) + 8);
+  }
+  function rowsOf(tbl) {
+    return (tbl.match(/<w:tr>[\s\S]*?<\/w:tr>/g) || []).map(function (tr) {
+      return (tr.match(/<w:tc>[\s\S]*?<\/w:tc>/g) || []).map(function (tc) { return texts(tc).join(""); });
+    });
+  }
+  function headers(z) { return Object.keys(z).filter(function (n) { return /^word\/header\d+\.xml$/.test(n); }).sort(); }
+  function footers(z) { return Object.keys(z).filter(function (n) { return /^word\/footer\d+\.xml$/.test(n); }).sort(); }
+  function firstDiff(a, b) {
+    var i = 0;
+    while (i < a.length && i < b.length && a.charCodeAt(i) === b.charCodeAt(i)) i++;
+    return "at " + i + " of " + a.length + "/" + b.length + ": [" + a.slice(Math.max(0, i - 60), i + 80) + "] against [" + b.slice(Math.max(0, i - 60), i + 80) + "]";
+  }
+
+  var INFO = { title: "Network segmentation proposal", docType: "Proposal", reference: "OPP-10442", client: "Northfield Water", site: "Ashby treatment works",
+    author: "A. Consultant", revision: "0.3", date: "2026-11-12", qaReviewBy: "B. Reviewer", authorisedBy: "C. Director", issuedTo: "D. Client",
+    issuedDate: "2026-11-11", classification: "Commercial in confidence" };
+  function project(over) {
+    var p = { schema: "spt-document/1.0", kind: "report", info: Object.assign({}, INFO), options: {}, footnotes: {}, media: {}, parts: {},
+      blocks: [{ id: "b1", type: "heading", level: 1, runs: [{ t: "Summary" }] }, { id: "b2", type: "paragraph", runs: [{ t: "This proposal sets out three options." }] },
+        { id: "b3", type: "heading", level: 2, runs: [{ t: "Background" }] }, { id: "b4", type: "heading", level: 3, runs: [{ t: "History" }] },
+        { id: "b5", type: "heading", level: 1, runs: [{ t: "Options & costs" }] }, { id: "b6", type: "paragraph", runs: [{ t: "Wide." }], land: true },
+        { id: "b7", type: "paragraph", runs: [{ t: "Portrait again." }] }] };
+    over = over || {};
+    Object.keys(over).forEach(function (k) { if (k === "info") p.info = Object.assign(p.info, over.info); else p[k] = over[k]; });
+    return p;
+  }
+  function build(p, status) {
+    return HD.buildDocument(p, { issueStatus: status || "draft" }).then(function (r) {
+      return unzip(r.blob).then(function (z) { return { z: z, doc: text(z, "word/document.xml"), blob: r.blob }; });
+    });
+  }
+  function packed(doc, opts) {
+    return new Promise(function (res, rej) { HD.pack(doc, opts, function (e, b) { if (e) rej(e); else res(b); }); }).then(unzip);
+  }
+
+  var chain = Promise.resolve();
+  // Progress is written after each step, as a failure until the last one has
+  // run: a page cut short by the time budget must not read as a short pass.
+  function step(fn) { chain = chain.then(fn).then(function () { document.getElementById("out").textContent = lines.join("\n") + "\nFAIL the page did not finish: re-run it alone with a larger time budget"; }); }
+
+  // ---- the cover's inputs ----
+  step(function () {
+    ok(HD.coverTitleSize(["Twenty characters ok!"]) === 52 && HD.coverTitleSize(["Exactly twenty chars"]) === 60, "cover title size: 60 up to 20 characters on the longest line");
+    ok(HD.coverTitleSize(["x".repeat(30)]) === 52 && HD.coverTitleSize(["x".repeat(31), "y"]) === 44 && HD.coverTitleSize(["x".repeat(38)]) === 44 && HD.coverTitleSize(["a", "x".repeat(39)]) === 36,
+       "52 up to 30, 44 up to 38, otherwise 36");
+    var c = HD.coverInput(project());
+    ok(JSON.stringify(c) === JSON.stringify({ kicker: "PROPOSAL", titleLines: ["Network segmentation", "proposal"], titleSize: 60, client: "Northfield Water", site: "Ashby treatment works",
+      subLine: "OPP-10442", revision: "0.3", date: "2026-11-11", author: "A. Consultant", classification: "Commercial in confidence" }), "coverInput maps the document information to the cover", JSON.stringify(c));
+    var d = HD.coverInput({ info: {} });
+    ok(d.kicker === "DOCUMENT" && d.titleLines.join("|") === "Untitled|document" && d.client === "" && d.site === "" && d.subLine === "" && d.revision === "0.1" && d.date === "" && d.classification === "Confidential",
+       "with nothing filled in: DOCUMENT, Untitled document, revision 0.1, Confidential and no client line", JSON.stringify(d));
+    ok(HD.coverInput(project({ info: { issuedDate: "" } })).date === "2026-11-12", "the cover's date is the issued date, or the document's date when that is empty");
+    var own = HD.coverInput(project({ info: { coverTitleLines: ["Network", "segmentation", "proposal", "ignored"] } }));
+    ok(own.titleLines.join("|") === "Network|segmentation|proposal" && own.titleSize === 60, "the author's own cover lines are used, three at most", own.titleLines.join("|"));
+    var long = HD.coverInput(project({ info: { title: "A method statement for the replacement of the supervisory control system at Ashby treatment works" } }));
+    ok(long.titleLines.length === 3 && long.titleSize === 36 && long.titleLines.join(" ") === "A method statement for the replacement of the supervisory control system at Ashby treatment works" &&
+       Math.max.apply(null, long.titleLines.map(function (l) { return l.length; })) <= 40, "a title too long for two lines is split into three even ones at the smallest size", long.titleLines.join("|"));
+    var mid = HD.coverInput(project({ info: { title: "Supervisory control system replacement: method statement" } }));
+    ok(mid.titleLines.length === 2 && mid.titleSize === 52, "one that fits two lines stays on two", mid.titleLines.join("|") + " " + mid.titleSize);
+
+    var pairs = HD.controlPairs(project(), { issueStatus: "draft" });
+    ok(pairs.map(function (r) { return r[0]; }).join("|") === "Document revision|Status|QA review by|Authorised by|Issued to|Issued date|Confidentiality|Document|Document type|Reference|Client|Author",
+       "document control rows, in order", pairs.map(function (r) { return r[0]; }).join("|"));
+    ok(pairs.map(function (r) { return r[1]; }).join("|") === "0.3|Draft|B. Reviewer|C. Director|D. Client|2026-11-11|Commercial in confidence|Network segmentation proposal|Proposal|OPP-10442|Northfield Water|A. Consultant",
+       "with their values, the issued date as stored");
+    ok(HD.controlPairs(project(), { issueStatus: "final" })[1][1] === "Final", "Status Final for a final");
+    var bare = HD.controlPairs({ info: {} }, {});
+    ok(bare.length === 8 && bare[0][1] === "0.1" && bare[6][1] === "Confidential" && bare[2][1] === "" && bare[7][1] && bare[7][1].__placeholder &&
+       bare[7][1].__placeholder.text === "Add the document title" && bare[7][1].__placeholder.where.kind === "info" && bare[7][1].__placeholder.where.field === "title",
+       "with nothing filled in: the first seven rows and Document, whose value is a red prompt for the title field");
+    ok(HD.COMPANY.footerLeft === "Confidential · © SolutionsPT Ltd" && /^SolutionsPT Ltd {3}· {3}Unit 1, Oakfield Road/.test(HD.COMPANY.addressLine) && /^Telephone \+44/.test(HD.COMPANY.contactLine), "the company wording is in one constant");
+    ok(HD.footerCentre(project()) === "Network segmentation proposal · Northfield Water" && HD.footerCentre(project({ info: { client: "" } })) === "Network segmentation proposal",
+       "footer centre text: the title and the client, or the title alone");
+  });
+
+  // ---- a report, as a draft ----
+  var draft;
+  step(function () {
+    return build(project(), "draft").then(function (r) {
+      draft = r;
+      var z = r.z, doc = r.doc, s = sects(doc), cov = coverXml(doc);
+      ok(wellFormed(z).length === 0, "report draft: every XML part parses", wellFormed(z).join(", "));
+      ok(graftCalls === 0, "a plain document is the library's own file: no graft pass");
+      ok(s.length === 4 && /<w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" w:header="0" w:footer="0" w:gutter="0"\/>/.test(s[0]) && !/headerReference|footerReference/.test(s[0]),
+         "the cover is a section of its own with no margins, no header and no footer", s[0]);
+      ok(/w:top="1440"/.test(s[1]) && /headerReference/.test(s[1]) && /footerReference/.test(s[1]) && /orient="landscape"/.test(s[2]), "the body sections follow, with header and footer");
+      var ct = texts(cov);
+      ok(ct.indexOf("PROPOSAL") !== -1 && ct.indexOf("Network segmentation") < ct.indexOf("proposal") && ct.indexOf("Network segmentation") > ct.indexOf("PROPOSAL"), "cover: the document type in capitals, then the title on two lines", ct.join("|"));
+      ok(ct.indexOf("Northfield Water") !== -1 && ct.indexOf("Ashby treatment works") === ct.indexOf("Northfield Water") + 1 && ct.indexOf("OPP-10442") === ct.indexOf("Ashby treatment works") + 1, "then the client, the site and the reference");
+      ok(ct.join("|").indexOf("ISSUE   |0.3  ·  2026-11-11|        AUTHOR   |A. Consultant|        CLASSIFICATION   |Commercial in confidence") !== -1, "the strip: issue with the date as stored, author, classification", ct.join("|"));
+      ok(ct.indexOf(HD.COMPANY.addressLine) !== -1 && ct.indexOf(HD.COMPANY.contactLine) !== -1, "and the address and contact lines");
+      ok((cov.match(/<w:drawing>/g) || []).length === 2 && /<wp:anchor [^>]*behindDoc="1"/.test(cov), "with the background picture behind the text and the logo card");
+      var tbl = rowsOf(controlTable(doc));
+      ok(tbl.map(function (r) { return r[0]; }).join("|") === "Document revision|Status|QA review by|Authorised by|Issued to|Issued date|Confidentiality|Document|Document type|Reference|Client|Author",
+         "document control is printed with its rows in order", tbl.map(function (r) { return r[0]; }).join("|"));
+      ok(tbl[1][1] === "Draft" && tbl[5][1] === "2026-11-11" && tbl[7][1] === "Network segmentation proposal", "Status Draft, the issued date as stored, the title");
+      var afterCover = doc.slice(doc.indexOf(s[0]) + s[0].length);
+      ok(afterCover.indexOf(">Document control and confidentiality<") < afterCover.indexOf('w:type="page"') && afterCover.indexOf('w:type="page"') < afterCover.indexOf(">Summary<"),
+         "it is the first page of the body, then a page break, then the blocks");
+      var hs = headers(z), fs = footers(z);
+      ok(hs.length === 3 && hs.every(function (n) { return /<w:drawing>/.test(text(z, n)) && /<w:jc w:val="right"\/>/.test(text(z, n)); }), "every body section's header is the logo, right aligned", String(hs.length));
+      ok(/<wp:extent cx="1428750"/.test(text(z, hs[0])), "150 px wide");
+      var f = text(z, fs[0]), cells = f.match(/<w:tc>[\s\S]*?<\/w:tc>/g) || [];
+      ok(fs.length === 3 && cells.length === 3 && texts(cells[0]).join("") === "Commercial in confidence · © SolutionsPT Ltd" && texts(cells[1]).join("") === "Network segmentation proposal · Northfield Water" && /PAGE/.test(cells[2]),
+         "the footer has three cells: the document's classification with the company line, the title and client, the page number", texts(f).join("|"));
+      ok(hs.every(function (n) { return (text(z, n).match(/<v:textpath [^>]*string="DRAFT"/g) || []).length === 1; }), "draft: the watermark is in every header");
+      ok((cov.match(/<v:textpath [^>]*string="DRAFT"/g) || []).length === 1 && /fillcolor="#FFFFFF"/.test(cov), "and on the cover, in white");
+      ok(!/documentProtection/.test(text(z, "word/settings.xml")) && !/_MarkAsFinal/.test(text(z, "docProps/custom.xml")), "draft: neither protected nor marked as final");
+      var st = text(z, "word/styles.xml"), h3 = (st.match(/<w:style [^>]*w:styleId="Heading3"[^>]*>[\s\S]*?<\/w:style>/) || [""])[0];
+      ok(/Segoe UI/.test(h3) && /<w:sz w:val="24"\/>/.test(h3) && /<w:b\/>/.test(h3) && /173267/.test(h3) && /w:before="200"/.test(h3) && /w:after="80"/.test(h3) && /<w:keepNext\/>/.test(h3), "the styles hold Heading 3", h3);
+      ok(/w:styleId="BodyText"/.test(st) && /w:styleId="Caption"/.test(st) && /w:styleId="PlaceholderText"/.test(st) && /w:styleId="Heading1"/.test(st) && /w:styleId="Heading2"/.test(st) && /w:styleId="Title"/.test(st), "beside the report's own");
+      var core = text(z, "docProps/core.xml");
+      ok(/<dc:creator>A\. Consultant<\/dc:creator>/.test(core) && /<dc:title>Network segmentation proposal - Northfield Water<\/dc:title>/.test(core) && /<dc:description>Proposal<\/dc:description>/.test(core),
+         "file properties: the author, the title and client, the document type", core.slice(0, 600));
+      var all = Object.keys(z).map(function (n) { return text(z, n); }).join("\n");
+      ok(!/OT Cyber Document Tool|spt-document|createdWithVersion|savedBy/.test(all), "nothing in the file names the tool or its file format");
+    });
+  });
+
+  // ---- the cover and document control against the template functions fed by hand ----
+  step(function () {
+    var opts = { issueStatus: "draft" };
+    var byHand = HD.assemble({
+      kind: "report",
+      cover: HD.cover({ kicker: "PROPOSAL", titleLines: ["Network segmentation", "proposal"], titleSize: 60, client: "Northfield Water", site: "Ashby treatment works",
+        subLine: "OPP-10442", revision: "0.3", date: "2026-11-11", author: "A. Consultant", classification: "Commercial in confidence" }),
+      segments: [{ land: false, children: HD.documentControl([["Document revision", "0.3"], ["Status", "Draft"], ["QA review by", "B. Reviewer"], ["Authorised by", "C. Director"],
+        ["Issued to", "D. Client"], ["Issued date", "2026-11-11"], ["Confidentiality", "Commercial in confidence"], ["Document", "Network segmentation proposal"],
+        ["Document type", "Proposal"], ["Reference", "OPP-10442"], ["Client", "Northfield Water"], ["Author", "A. Consultant"]], opts) }],
+      footerCentre: "Network segmentation proposal · Northfield Water", classification: "Commercial in confidence", props: {}, numbering: HD.numberingConfig()
+    }, opts);
+    return packed(byHand, opts).then(function (z) {
+      var hand = text(z, "word/document.xml");
+      var a = norm(coverXml(draft.doc)), b = norm(coverXml(hand));
+      ok(a.length > 2000 && a === b, "a project built through buildDocument has the cover section cover() gives for the same values", firstDiff(a, b));
+      ok(controlTable(draft.doc) !== "" && controlTable(draft.doc) === controlTable(hand), "and the document control table documentControl() gives", firstDiff(controlTable(draft.doc), controlTable(hand)));
+      ok(norm(text(draft.z, headers(draft.z)[0])) === norm(text(z, headers(z)[0])) && norm(text(draft.z, footers(draft.z)[0])) === norm(text(z, footers(z)[0])), "and the same header and footer");
+      ok(text(draft.z, "word/styles.xml") === text(z, "word/styles.xml") && text(draft.z, "word/settings.xml") === text(z, "word/settings.xml"), "and the same styles and settings");
+    });
+  });
+
+  // ---- cover variations ----
+  step(function () {
+    return build(project({ info: { client: "", site: "", reference: "", docType: "", coverTitleLines: ["One", "Two", "Three"] } })).then(function (r) {
+      var cov = coverXml(r.doc), ct = texts(cov);
+      ok(ct.indexOf("DOCUMENT") !== -1 && ct.indexOf("Three") === ct.indexOf("One") + 2 && ct[ct.indexOf("Three") + 1] === "ISSUE   ", "an empty document type prints DOCUMENT; three cover lines print as three", ct.join("|"));
+      ok(!/C7D8E8|9DB8D6/.test(cov) && ct.indexOf("Client") === -1, "with no client the cover leaves the line out, and prints no stand-in");
+      ok(texts(text(r.z, footers(r.z)[0])).indexOf("Network segmentation proposal") !== -1 && !/ · Northfield/.test(text(r.z, footers(r.z)[0])), "and the footer's centre is the title alone");
+      var exactRows = function (x) { return (x.match(/<w:trPr><w:cantSplit\/><w:trHeight w:val="\d+" w:hRule="exact"\/><\/w:trPr>/g) || []).join(""); };
+      ok(!/w:line="\d{4}"/.test(cov) && (exactRows(cov).match(/<w:trPr>/g) || []).length === 2, "three lines at the largest size sit in the cover's first row, and the strip in its second: two rows of exact height and no spacer, so the strip stays on the page", (cov.match(/w:line="\d{4}"/g) || []).join(",") + " " + exactRows(cov));
+      ok(exactRows(coverXml(draft.doc)) === exactRows(cov), "a two-line title has the same two rows, so the strip is in the same place");
+      var tbl = rowsOf(controlTable(r.doc));
+      ok(tbl.length === 9 && tbl[8][0] === "Author", "document control leaves out the rows with nothing to say", tbl.map(function (x) { return x[0]; }).join("|"));
+    });
+  });
+
+  // ---- a final ----
+  step(function () {
+    return build(project(), "final").then(function (r) {
+      var z = r.z, settings = text(z, "word/settings.xml");
+      ok(wellFormed(z).length === 0, "report final: every XML part parses", wellFormed(z).join(", "));
+      ok(/<w:documentProtection w:edit="readOnly" w:enforcement="1"\/>/.test(settings) && !/w:hash|w:salt|cryptProviderType/.test(settings), "final: opens read-only, enforced, with no password");
+      ok(settings.indexOf("<w:documentProtection") > 0 && settings.indexOf("<w:documentProtection") < settings.indexOf("<w:evenAndOddHeaders"), "protection sits where Word expects it in settings.xml");
+      ok(/<property [^>]*name="_MarkAsFinal"[^>]*><vt:bool>true<\/vt:bool><\/property>/.test(text(z, "docProps/custom.xml")), "final: marked as final");
+      ok(rowsOf(controlTable(r.doc))[1].join("|") === "Status|Final", "final: Status Final in document control");
+      ok(!Object.keys(z).some(function (n) { return /string="DRAFT"/.test(text(z, n)); }), "final: no watermark anywhere");
+      ok(!/E00000/.test(r.doc) && !/PlaceholderText"\/>/.test(r.doc), "final: nothing red in the body");
+    });
+  });
+  step(function () {
+    var p = project({ info: { title: "  " } });
+    return HD.issueList(p).then(function (list) {
+      ok(list.length === 1 && list[0].text === "Add the document title" && list[0].where.kind === "info" && list[0].where.field === "title", "an empty title is the one thing still to complete, and it names the field", JSON.stringify(list));
+      return HD.buildDocument(p, { issueStatus: "final" });
+    }).then(function () { ok(false, "a final without a title is refused"); }, function (e) {
+      ok(e.message === "This document still has 1 thing to write, so it cannot be issued as final. Export it as a draft, or complete it first.", "a final is refused while a prompt is outstanding", e.message);
+    }).then(function () { return build(p, "draft"); }).then(function (r) {
+      var tbl = controlTable(r.doc), row = (tbl.match(/<w:tr>[\s\S]*?<\/w:tr>/g) || [])[7] || "";
+      ok(/>Add the document title</.test(row) && /<w:color w:val="E00000"\/>/.test(row), "a draft still builds, with the prompt in red in the Document row");
+      ok(texts(coverXml(r.doc)).join("|").indexOf("Untitled|document") !== -1 && /Untitled document/.test(text(r.z, footers(r.z)[0])), "and Untitled document on the cover and in the footer");
+      return HD.issueList(project());
+    }).then(function (list) { ok(list.length === 0, "a complete document has nothing still to complete"); });
+  });
+
+  // ---- a short document ----
+  step(function () {
+    return build(project({ kind: "short", options: { contents: true } }), "draft").then(function (r) {
+      var z = r.z, doc = r.doc, s = sects(doc);
+      ok(wellFormed(z).length === 0, "short draft: every XML part parses", wellFormed(z).join(", "));
+      ok(s.length === 3 && /w:top="1440"/.test(s[0]) && /headerReference/.test(s[0]) && !/w:top="0"/.test(doc.slice(0, doc.indexOf(s[0]) + s[0].length)), "a short document has no cover section", String(s.length));
+      ok(doc.indexOf("Document control and confidentiality") === -1 && doc.indexOf(">Contents<") === -1 && !/bookmarkStart w:name="h_/.test(doc), "no document control and no contents list");
+      var first = (doc.match(/<w:p>[\s\S]*?<\/w:p>/g) || []).slice(0, 3);
+      ok(/<w:pStyle w:val="Title"\/>/.test(first[0]) && />Network segmentation proposal</.test(first[0]), "it opens with the title in the Title style", first[0]);
+      ok(/<w:pStyle w:val="Caption"\/>/.test(first[1]) && texts(first[1]).join("") === "Northfield Water · 0.3 · 2026-11-11", "then one caption line: client, revision, date", texts(first[1]).join(""));
+      ok(/>Summary</.test(first[2]) && /Heading1/.test(first[2]), "then the blocks");
+      ok(HD.shortHeadLine(project({ info: { client: "", issuedDate: "", date: "" } })) === "0.3" && HD.shortHeadLine({ info: {} }) === "", "empty parts of that line are left out");
+      var hs = headers(z);
+      ok(hs.length === 3 && hs.every(function (n) { return /<w:drawing>/.test(text(z, n)) && /string="DRAFT"/.test(text(z, n)); }) && footers(z).length === 3, "the same header and footer, with the draft watermark");
+      ok(norm(text(z, hs[0])) === norm(text(draft.z, headers(draft.z)[0])) && norm(text(z, footers(z)[0])) === norm(text(draft.z, footers(draft.z)[0])), "identical to a report's");
+      return build(project({ kind: "short" }), "final");
+    }).then(function (r) {
+      ok(/<w:documentProtection w:edit="readOnly" w:enforcement="1"\/>/.test(text(r.z, "word/settings.xml")) && /_MarkAsFinal/.test(text(r.z, "docProps/custom.xml")) && !/string="DRAFT"/.test(text(r.z, headers(r.z)[0])),
+         "a short final is protected and marked as final, with no watermark");
+      var p = project({ kind: "short", info: { title: "", client: "", revision: "", issuedDate: "", date: "" } });
+      return HD.issueList(p).then(function (list) {
+        ok(list.length === 1 && list[0].where.kind === "info" && list[0].where.field === "title", "a short document with no title has the title to complete");
+        return build(p, "draft");
+      });
+    }).then(function (r) {
+      var first = (r.doc.match(/<w:p>[\s\S]*?<\/w:p>/g) || []).slice(0, 2);
+      ok(/PlaceholderText/.test(first[0]) && />Add the document title</.test(first[0]) && /Heading1/.test(first[1]), "the prompt prints in place of the title, and an empty caption line is left out");
+    });
+  });
+
+  // ---- contents ----
+  step(function () {
+    return build(project({ options: { contents: true, numberHeadings: true } }), "draft").then(function (r) {
+      var doc = r.doc, at = doc.indexOf(">Contents<");
+      ok(wellFormed(r.z).length === 0, "contents: every XML part parses", wellFormed(r.z).join(", "));
+      ok(at > doc.indexOf("Document control and confidentiality") && at < doc.indexOf('<w:bookmarkStart'), "the contents list comes after document control and before the body");
+      var list = doc.slice(at, doc.indexOf('<w:bookmarkStart'));
+      var links = list.match(/<w:hyperlink [^>]*w:anchor="[^"]+"[^>]*>[\s\S]*?<\/w:hyperlink>/g) || [];
+      ok(links.length === 3 && links.map(function (l) { return texts(l).join(""); }).join("|") === "1 Summary|1.1 Background|2 Options & costs", "one line for each level 1 and 2 heading, with its number; level 3 is left out",
+         links.map(function (l) { return texts(l).join(""); }).join("|"));
+      var anchors = links.map(function (l) { return l.match(/w:anchor="([^"]+)"/)[1]; });
+      ok(anchors.join(",") === "h_b1,h_b3,h_b5" && anchors.every(function (a) { return (doc.match(new RegExp('<w:bookmarkStart w:name="' + a + '"', "g")) || []).length === 1; }), "every link resolves to one bookmark", anchors.join(","));
+      anchors.forEach(function (a, i) {
+        var from = doc.indexOf('<w:bookmarkStart w:name="' + a + '"'), end = doc.indexOf("<w:bookmarkEnd", from);
+        ok(texts(doc.slice(from, end)).join("") === ["Summary", "Background", "Options & costs"][i], "the bookmark " + a + " is on its heading's text");
+      });
+      var paras = list.match(/<w:p>[\s\S]*?<\/w:p>/g) || [];
+      ok(/<w:ind w:left="360"\/>/.test(paras.filter(function (p) { return /h_b3/.test(p); })[0]) && !/<w:ind /.test(paras.filter(function (p) { return /h_b1/.test(p); })[0]), "level 2 lines are indented");
+      ok(/<w:br w:type="page"\/>/.test(list), "a page break closes the list");
+      ok(!/fldChar|instrText|w:fldSimple/.test(doc), "there is no field in the body, so nothing needs updating in Word");
+      ok(!/bookmarkStart w:name="h_b4"/.test(doc), "a level 3 heading carries no bookmark");
+      return build(project({ options: { contents: true, numberHeadings: true } }), "final");
+    }).then(function (r) {
+      ok(/documentProtection/.test(text(r.z, "word/settings.xml")) && />Contents</.test(r.doc), "a final with a contents list builds and locks");
+      return build(project(), "draft");
+    }).then(function (r) { ok(!/bookmarkStart w:name="h_/.test(r.doc) && r.doc.indexOf(">Contents<") === -1, "without the option there is no list and no bookmark"); });
+  });
+
+  // ---- edges ----
+  step(function () {
+    return build(project({ blocks: [] }), "draft").then(function (r) {
+      ok(sects(r.doc).length === 2 && !/w:type="page"/.test(r.doc), "a report with no blocks is the cover and document control, with no page break left hanging");
+      return build(project({ blocks: [{ id: "b1", type: "paragraph", runs: [{ t: "Wide from the start" }], land: true }] }), "draft");
+    }).then(function (r) {
+      var s = sects(r.doc);
+      ok(s.length === 3 && /landscape/.test(s[2]) && !/w:type="page"/.test(r.doc), "when the first block is landscape the page break after document control is left out: the new section starts the page");
+      return build({ kind: "short", info: { title: "Only a title" } }, "draft");
+    }).then(function (r) {
+      ok(sects(r.doc).length === 1 && />Only a title</.test(r.doc), "a project with nothing but a title still builds");
+      return HD.buildDocument(null, { issueCheck: true });
+    }).then(function (r) { ok(r.placeholders.length === 1, "and nothing at all is a document with a title to add"); });
+  });
+
+  chain.then(finish, function (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); finish(); });
+})();
+</script>
+</body></html>

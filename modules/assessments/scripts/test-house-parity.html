@@ -1,0 +1,339 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>House template: the document tool's Word file against an assessment report</title>
+<link rel="stylesheet" href="../css/app.css" /></head>
+<body>
+<!--
+  shared/house-docx.js is a copy of this module's Word template, for the document
+  tool. A document made with it has to look like an assessment report: same
+  cover, header, footer, styles, document control layout, page setup, Draft
+  watermark and Final lock. This page builds a posture report with the real
+  exporter and a document with App.HouseDocx from the same field values, as a
+  draft and as a final, unzips all four and compares the parts.
+
+  What is allowed to differ, and is put aside before comparing: media file names
+  and relationship ids (the library makes them up for each file), the library's
+  running ids on pictures and on the watermark shape, and the added Heading 3
+  style. Nothing else. The document control rows after the seventh are each
+  tool's own.
+
+  It lives here because it needs the assessment exporter; it loads the shared
+  file directly. Run it whenever either file's template code changes.
+
+  DELIBERATE DIFFERENCES. The shared template differs from the assessment
+  exporter in these ways, each made in shared/house-docx.js only, for a reason
+  that applies to a general document. The assessment exporter is unchanged;
+  whether it should follow is the owner's decision.
+
+    1. The cover's layout. The assessment's cover is one table row with a
+       spacer paragraph of fixed height above the closing strip. A document's
+       cover lines are typed, and one wrapped line (a long author, a long
+       title) made that row taller than the page: Word split it and the
+       address lines and the draft watermark went to a second page. The shared
+       cover is two rows of exact height that cannot split; the strip and the
+       address lines are the second row, set against its bottom. With this
+       page's values the two covers print the same (compared as rasters from
+       Word when the change was made), and this page checks that every
+       paragraph, the table's properties and the first cell's margins are
+       still the assessment's.
+    2. The cover's strip. The assessment always prints ISSUE, a dot, the date,
+       AUTHOR and CLASSIFICATION. The shared strip leaves out the dot and the
+       date when there is no date, and the AUTHOR label when there is no
+       author. With every value given, as here, the runs are the same, word
+       for word. Each label is also held to its value: a long author left
+       CLASSIFICATION at the end of a line and its value on the next (seen in
+       Word). So the spaces from a label to its value are no-break spaces, a
+       pair short enough for one line has no-break spaces and hyphens
+       (U+00A0, U+2011) inside it, and a pair too long for a line starts a
+       line of its own. With this page's values the strip is on one line and
+       prints the same (Word renders of the demo and an ordinary cover had
+       every glyph in the same place when the change was made); this page
+       reads the no-break characters as plain ones when comparing, and checks
+       they are there.
+    3. The footer's left cell. The assessment always prints
+       "Confidential · © SolutionsPT Ltd". The shared footer prints the
+       document's classification before the company; with Confidential, or
+       none, it is the same text, as here.
+    4. File properties. The shared template sets "last modified by" to the
+       author (or the company); the assessment leaves the library's
+       "Un-named". docProps/core.xml is not compared on this page.
+    5. Text is cleaned of characters XML 1.0 cannot hold before it is written
+       (a no-op for clean text, as here).
+-->
+<script src="harness.js"></script>
+<script>H.app({ docx: true, tours: ["posture"] }); H.dom();</script>
+<script src="../../../shared/house-docx.js"></script>
+<script>
+// Every part of a .docx as { name, bytes, text }.
+function unzip(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var v = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= 0; i--) { if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+    if (eocd < 0) throw new Error("not a zip");
+    var n = v.getUint16(eocd + 10, true), p = v.getUint32(eocd + 16, true), jobs = [];
+    for (var k = 0; k < n; k++) {
+      var method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      var nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+      var local = v.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      var start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+      var data = u8.subarray(start, start + csize);
+      jobs.push((function (name, method, data) {
+        var bytes = method === 0 ? Promise.resolve(data)
+          : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+        return bytes.then(function (b) { return { name: name, bytes: b, text: /\.(xml|rels)$/.test(name) ? new TextDecoder().decode(b) : "" }; });
+      })(name, method, data));
+      p += 46 + nlen + xlen + clen;
+    }
+    return Promise.all(jobs).then(function (list) {
+      var map = {};
+      list.forEach(function (x) { map[x.name] = x; });
+      return map;
+    });
+  });
+}
+function text(z, name) { return (z[name] && z[name].text) || ""; }
+// What the library makes up for each file, put aside.
+function norm(xml) {
+  return String(xml)
+    .replace(/r:(embed|id|pict)="[^"]*"/g, 'r:$1="R"')
+    .replace(/<wp:docPr id="\d+"/g, '<wp:docPr id="N"')
+    .replace(/DraftWatermark\d+/g, "DraftWatermarkN")
+    .replace(/_x0000_s\d+/g, "_x0000_sN");
+}
+function sects(doc) { return doc.match(/<w:sectPr>[\s\S]*?<\/w:sectPr>/g) || []; }
+// The cover is the first section: everything up to its section properties.
+function coverXml(doc) {
+  var from = doc.indexOf("<w:body>"), to = doc.indexOf("</w:sectPr>");
+  return doc.slice(from, to + "</w:sectPr>".length);
+}
+function controlTable(doc) {
+  var at = doc.indexOf(">Document control and confidentiality<");
+  var from = doc.indexOf("<w:tbl>", at), to = doc.indexOf("</w:tbl>", from);
+  return at < 0 || from < 0 ? "" : doc.slice(from, to + "</w:tbl>".length);
+}
+function controlHeading(doc) {
+  var at = doc.indexOf(">Document control and confidentiality<");
+  var from = doc.lastIndexOf("<w:p>", at), to = doc.indexOf("</w:p>", at);
+  return at < 0 ? "" : doc.slice(from, to + 6);
+}
+function rowsOf(tbl) { return tbl.match(/<w:tr>[\s\S]*?<\/w:tr>/g) || []; }
+function cellTexts(row) {
+  return (row.match(/<w:tc>[\s\S]*?<\/w:tc>/g) || []).map(function (tc) {
+    return (tc.match(/<w:t[^>]*>[^<]*<\/w:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ""); }).join("");
+  });
+}
+function picts(xml) { return xml.match(/<w:pict>[\s\S]*?<\/w:pict>/g) || []; }
+// The media a part's pictures point at, in the order they appear in it.
+function mediaOf(z, partName) {
+  var rels = text(z, partName.replace(/([^\/]+)$/, "_rels/$1.rels")), xml = text(z, partName), out = [];
+  (xml.match(/r:embed="[^"]*"/g) || []).forEach(function (m) {
+    var id = m.slice(9, -1);
+    var rel = rels.match(new RegExp('<Relationship [^>]*Id="' + id + '"[^>]*>')) || [""];
+    var target = (rel[0].match(/Target="([^"]*)"/) || [])[1];
+    if (target) out.push(z["word/" + target.replace(/^\/?(word\/)?/, "")]);
+  });
+  return out;
+}
+function sameBytes(a, b) {
+  if (!a || !b || !a.bytes || !b.bytes || a.bytes.length !== b.bytes.length) return false;
+  for (var i = 0; i < a.bytes.length; i++) if (a.bytes[i] !== b.bytes[i]) return false;
+  return true;
+}
+function firstDiff(a, b) {
+  var i = 0;
+  while (i < a.length && i < b.length && a.charCodeAt(i) === b.charCodeAt(i)) i++;
+  return "at " + i + " of " + a.length + "/" + b.length + ": [" + a.slice(Math.max(0, i - 60), i + 80) + "] against [" + b.slice(Math.max(0, i - 60), i + 80) + "]";
+}
+
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, X = A.ExportDOCX, HD = A.HouseDocx, I;
+  A.Charts.svgToPngBlob = function (svg, s, cb) { cb(new Blob(["png"], { type: "image/png" })); };
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  I = A.UI.__issue;
+  var SEED = A.TourPosture;
+  E.on("instrument-changed", function (inst) { if (inst && inst.id === "general-ot-posture" && SEED && SEED.apply && !SEED.__busy) { SEED.__busy = true; try { SEED.apply(E); } finally { SEED.__busy = false; } } });
+  E.activateInstrument("general-ot-posture");
+
+  // The values both files are made from.
+  var FIX = { clientName: "Northfield Water", siteName: "Ashby treatment works", documentRevision: "1.2", issuedDate: "2026-11-11",
+    dateOfVisit: "2026-10-01", consultant: "A. Consultant", confidentiality: "Confidential", qaReviewBy: "B. Reviewer",
+    authorisedBy: "C. Director", issuedTo: "D. Client" };
+  var TITLE_LINES = ["General OT Security", "Posture Assessment"];
+
+  function ids() { return E.state.engagement.targets.map(function (t) { return t.id; }); }
+  function check() { return new Promise(function (res) { I.run(I.jobs(ids(), "per"), function (err, list) { res(err ? [] : list); }); }); }
+  // Settles every prompt the way a consultant would, so a final can be built.
+  function fill(list) {
+    list.forEach(function (p) {
+      var w = p.where;
+      if (w.kind === "narrative") { var pt = {}; pt[w.field] = "Written in the tool for " + w.field + "."; E.setReportNarrative(pt); }
+      else if (w.kind === "nextSteps") E.setReportNarrative({ nextSteps: "Agree the owners and dates for the roadmap with the client" });
+      else if (w.kind === "item") { var f = {}; f[w.field] = "Written in the tool."; E.setResponse(p.targetId, w.itemId, f); }
+      else if (w.kind === "basis") { E.getBasisOfAssessment().interviews.push({ name: "A. Engineer", role: "Control systems lead", date: "2026-10-01" }); E.touchBasisOfAssessment(); }
+    });
+  }
+  function assessment(status) {
+    var job = I.jobs(ids(), "per")[0];
+    job.engagement.engagement = Object.assign({}, job.engagement.engagement, FIX);
+    return new Promise(function (res, rej) {
+      X.buildAsync(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(),
+        Object.assign({}, job.opts, { issueStatus: status }), function (err, blob) { if (err) rej(err); else res(blob); });
+    }).then(unzip);
+  }
+  // The same values through the shared template: the cover, document control,
+  // then portrait, landscape and portrait body sections, as the report has.
+  function house(status) {
+    var opts = { issueStatus: status };
+    var pairs = [["Document revision", FIX.documentRevision], ["Status", HD.statusLabel(opts)], ["QA review by", FIX.qaReviewBy],
+      ["Authorised by", FIX.authorisedBy], ["Issued to", FIX.issuedTo], ["Issued date", FIX.issuedDate],
+      ["Confidentiality", FIX.confidentiality], ["Document", "Network segmentation proposal"], ["Document type", "Proposal"]];
+    var doc = HD.assemble({
+      kind: "report",
+      cover: HD.cover({ kicker: "OT CYBER SECURITY ASSESSMENT", titleLines: TITLE_LINES, titleSize: 60, client: FIX.clientName, site: FIX.siteName,
+        revision: FIX.documentRevision, date: FIX.issuedDate, author: FIX.consultant, classification: FIX.confidentiality }),
+      segments: [
+        { land: false, children: HD.documentControl(pairs, opts).concat([HD.pageBreakPara(), HD.h1("Summary"), HD.body("A paragraph.")]) },
+        { land: true, children: [HD.h2("Wide table"), HD.body("On a landscape page.")] },
+        { land: false, children: [HD.h3("After"), HD.body("Portrait again.")] }
+      ],
+      footerCentre: (E.state.instrument.title || "") + " · " + FIX.clientName,
+      props: { creator: FIX.consultant, title: "x", description: "Document" },
+      numbering: HD.numberingConfig()
+    }, opts);
+    return new Promise(function (res, rej) { HD.pack(doc, opts, function (err, blob) { if (err) rej(err); else res(blob); }); }).then(unzip);
+  }
+  function same(a, b, name) { ok(a !== "" && a === b, name, a === "" ? "nothing to compare" : firstDiff(a, b)); }
+
+  function compare(as, ho, label) {
+    var ad = text(as, "word/document.xml"), hd = text(ho, "word/document.xml");
+
+    // styles: identical once the added Heading 3 is taken out
+    var hs = text(ho, "word/styles.xml"), h3 = hs.match(/<w:style [^>]*w:styleId="Heading3"[^>]*>[\s\S]*?<\/w:style>/);
+    var asH3 = text(as, "word/styles.xml").match(/<w:style [^>]*w:styleId="Heading3"[^>]*>[\s\S]*?<\/w:style>/);
+    ok(!!h3 && /w:val="Segoe UI"|w:ascii="Segoe UI"/.test(h3[0]) && /<w:sz w:val="24"\/>/.test(h3[0]) && /173267/.test(h3[0]) && /<w:keepNext\/>/.test(h3[0]) &&
+       /w:before="200"/.test(h3[0]) && /w:after="80"/.test(h3[0]), label + ": the shared template adds Heading 3 in the house font, 12 pt, navy, kept with what follows", h3 && h3[0]);
+    same(text(as, "word/styles.xml").replace(asH3 ? asH3[0] : "", ""), hs.replace(h3 ? h3[0] : "", ""), label + ": styles.xml is the same apart from Heading 3");
+
+    // header and footer: every section's, and they are the same part throughout
+    var aHeads = Object.keys(as).filter(function (n) { return /^word\/header\d+\.xml$/.test(n); }).sort();
+    var hHeads = Object.keys(ho).filter(function (n) { return /^word\/header\d+\.xml$/.test(n); }).sort();
+    var aFoots = Object.keys(as).filter(function (n) { return /^word\/footer\d+\.xml$/.test(n); }).sort();
+    var hFoots = Object.keys(ho).filter(function (n) { return /^word\/footer\d+\.xml$/.test(n); }).sort();
+    ok(aHeads.length === 3 && hHeads.length === 3 && aFoots.length === 3 && hFoots.length === 3, label + ": both have a header and a footer for each of the three body sections",
+       [aHeads.length, hHeads.length, aFoots.length, hFoots.length].join(","));
+    aHeads.forEach(function (n, i) { same(norm(text(as, n)), norm(text(ho, hHeads[i] || "")), label + ": " + n.slice(5) + " is the same"); });
+    aFoots.forEach(function (n, i) { same(norm(text(as, n)), norm(text(ho, hFoots[i] || "")), label + ": " + n.slice(5) + " is the same"); });
+    ok(/Confidential · © SolutionsPT Ltd/.test(text(ho, hFoots[0])) && text(ho, hFoots[0]).indexOf(" · Northfield Water") !== -1 && /<w:fldChar|PAGE/.test(text(ho, hFoots[0])),
+       label + ": the footer's three cells are the company line, the centre text and the page number");
+    var aLogo = mediaOf(as, aHeads[0])[0], hLogo = mediaOf(ho, hHeads[0])[0];
+    ok(sameBytes(aLogo, hLogo), label + ": the header logo is the same picture, byte for byte");
+
+    // the cover section. DELIBERATE DIFFERENCE 1 (see the list at the foot of
+    // this page): the assessment's cover is one table row whose closing strip
+    // is pushed down by a spacer paragraph of fixed height; the shared cover
+    // is two rows of exact height that cannot split, with the strip set
+    // against the bottom of the second, so a wrapped line cannot push the
+    // cover onto a second page. Everything else is the same: every paragraph
+    // in order, the table's own properties, the first cell's margins, and the
+    // watermark anchor and section properties after the table.
+    var aCov = norm(coverXml(ad)), hCov = norm(coverXml(hd));
+    var SPACER = /<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="8800" w:lineRule="exact"\/><\/w:pPr>(?:(?!<\/w:p>)[\s\S])*<\/w:p>/;
+    var coverParas = function (x) { return (x.slice(0, x.lastIndexOf("</w:tbl>")).match(/<w:p>(?:(?!<\/w:p>)[\s\S])*<\/w:p>/g) || []); };
+    ok(SPACER.test(aCov) && !/w:line="\d{4}" w:lineRule="exact"/.test(hCov), label + ": the assessment's cover has the spacer paragraph and the shared cover has none (deliberate)");
+    var exact = hCov.match(/<w:tr><w:trPr><w:cantSplit\/><w:trHeight w:val="\d+" w:hRule="exact"\/><\/w:trPr>/g) || [];
+    ok(exact.length === 2 && (aCov.match(/<w:cantSplit\/>/g) || []).length === 0, label + ": the shared cover is two rows of exact height that cannot split; the assessment's is one row that can grow (deliberate)", String(exact.length));
+    var aP = coverParas(aCov.replace(SPACER, "")), hP = coverParas(hCov);
+    ok(aP.length >= 8 && aP.length === hP.length, label + ": the two covers hold the same number of paragraphs once the spacer is put aside", aP.length + "," + hP.length);
+    // DELIBERATE DIFFERENCE 2: the strip's no-break spaces and hyphens hold each
+    // label to its value; read as plain ones, the strip is the assessment's.
+    var plainNb = function (x) { return x.replace(/\u00a0/g, " ").replace(/\u2011/g, "-"); };
+    same(aP.join("\n"), plainNb(hP.join("\n")), label + ": every paragraph of the cover is the same, in the same order (the strip's no-break spaces and hyphens read as plain)");
+    var hStrip = hP.filter(function (x) { return /ISSUE/.test(x); })[0] || "";
+    ok(/ISSUE\u00a0{3}</.test(hStrip) && /AUTHOR\u00a0{3}</.test(hStrip) && /CLASSIFICATION\u00a0{3}</.test(hStrip) && !/[\u00a0\u2011]/.test(hP.filter(function (x) { return !/ISSUE/.test(x); }).join("")),
+       label + ": the shared strip holds each label to its value with no-break spaces, and nothing else on the cover has them (deliberate)");
+    same(aCov.slice(0, aCov.indexOf("<w:tr>")), hCov.slice(0, hCov.indexOf("<w:tr>")), label + ": the cover table's own properties are the same");
+    same((aCov.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/) || [""])[0], (hCov.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/) || [""])[0], label + ": the cell that holds the title block has the same margins");
+    same(aCov.slice(aCov.lastIndexOf("</w:tbl>")), hCov.slice(hCov.lastIndexOf("</w:tbl>")), label + ": what follows the cover table (the watermark's anchor and the section) is the same");
+    var strip = plainNb(hCov.slice(hCov.indexOf(exact[1] || "\u0000")));
+    ok(/ISSUE {3}/.test(strip) && /Telephone \+44/.test(strip) && /<w:vAlign w:val="bottom"\/>/.test(strip) && !/ISSUE {3}/.test(hCov.slice(0, hCov.indexOf(exact[1] || "\u0000"))),
+       label + ": the strip and the address lines are the shared cover's second row, against its bottom");
+    ok(/OT CYBER SECURITY ASSESSMENT/.test(coverXml(hd)) && /General OT Security/.test(coverXml(hd)) && /Northfield Water/.test(coverXml(hd)) &&
+       /1\.2  ·  2026-11-11/.test(plainNb(coverXml(hd))) && /A\. Consultant/.test(plainNb(coverXml(hd))), label + ": and it carries the values given, the date as stored");
+    var aCover = mediaOf(as, "word/document.xml"), hCover = mediaOf(ho, "word/document.xml");
+    ok(aCover.length >= 2 && sameBytes(aCover[0], hCover[0]), label + ": the cover background is the same picture, byte for byte");
+    ok(sameBytes(aCover[1], hCover[1]), label + ": the cover's logo card is the same picture, byte for byte");
+    var ext = function (x) { return (coverXml(x).match(/<wp:extent [^>]*\/>/g) || []).join(""); };
+    ok(ext(ad) !== "" && ext(ad) === ext(hd), label + ": both cover pictures have the same extents", ext(hd));
+
+    // page setup
+    var aS = sects(ad).map(norm), hS = sects(hd).map(norm);
+    ok(aS.length === 4 && hS.length === 4, label + ": cover, portrait, landscape and portrait sections in both", aS.length + "," + hS.length);
+    ["cover", "first portrait", "landscape", "last portrait"].forEach(function (n, i) { same(aS[i] || "", hS[i] || "", label + ": the " + n + " section's page setup is the same"); });
+    ok(/w:orient="landscape"/.test(hS[2]) && /w:top="0"/.test(hS[0]) && /w:left="0"/.test(hS[0]), label + ": the cover has no margins and the third section is landscape");
+
+    // document control
+    same(controlHeading(ad), controlHeading(hd), label + ": the document control heading is the same");
+    var aT = controlTable(ad), hT = controlTable(hd), aR = rowsOf(aT), hR = rowsOf(hT);
+    same(aT.slice(0, aT.indexOf("<w:tr>")), hT.slice(0, hT.indexOf("<w:tr>")), label + ": the document control table's own properties are the same");
+    ok(aR.length >= 7 && hR.length >= 7, label + ": at least seven rows in both");
+    for (var r = 0; r < 7; r++) same(aR[r] || "", hR[r] || "", label + ": document control row " + (r + 1) + " (" + cellTexts(hR[r] || "")[0] + ") is the same");
+    ok(cellTexts(hR[7])[0] === "Document" && cellTexts(aR[7])[0] === "Instrument", label + ": the rows after the seventh are each tool's own");
+    // the eighth row is laid out as the others are
+    same((aR[7] || "").replace(/<w:t [^>]*>[^<]*<\/w:t>/g, "T"), (hR[7] || "").replace(/<w:t [^>]*>[^<]*<\/w:t>/g, "T"), label + ": and are laid out the same way");
+    return { ad: ad, hd: hd, aHeads: aHeads, hHeads: hHeads };
+  }
+
+  var chain = check().then(function (list) { fill(list); return check(); }).then(function (list) {
+    ok(list.length === 0, "the assessment has nothing left to write, so a final can be built", JSON.stringify(list.slice(0, 3)));
+    return Promise.all([assessment("draft"), house("draft")]);
+  }).then(function (z) {
+    var as = z[0], ho = z[1], c = compare(as, ho, "draft");
+    // the watermark, said out loud although the header and cover already match
+    var aw = picts(text(as, c.aHeads[0])).map(norm), hw = picts(text(ho, c.hHeads[0])).map(norm);
+    ok(aw.length === 1 && hw.length === 1 && aw[0] === hw[0] && /string="DRAFT"/.test(hw[0]), "draft: the header watermark shape is the same");
+    var ac = picts(coverXml(c.ad)).map(norm), hc = picts(coverXml(c.hd)).map(norm);
+    ok(ac.length === 1 && hc.length === 1 && ac[0] === hc[0] && /fillcolor="#FFFFFF"/.test(hc[0]), "draft: the cover watermark shape is the same");
+    ok(c.hHeads.every(function (n) { return picts(text(ho, n)).length === 1; }), "draft: every header of the document carries it");
+    same(text(as, "word/settings.xml"), text(ho, "word/settings.xml"), "draft: settings.xml is the same");
+    ok(!/documentProtection/.test(text(ho, "word/settings.xml")) && !/_MarkAsFinal/.test(text(ho, "docProps/custom.xml")), "draft: neither protected nor marked as final");
+    var st = rowsOf(controlTable(c.hd)).map(cellTexts).filter(function (x) { return x[0] === "Status"; })[0];
+    ok(st && st[1] === "Draft", "draft: Status Draft");
+    return Promise.all([assessment("final"), house("final")]);
+  }).then(function (z) {
+    var as = z[0], ho = z[1], c = compare(as, ho, "final");
+    same(text(as, "word/settings.xml"), text(ho, "word/settings.xml"), "final: settings.xml is the same, protection included");
+    ok(/<w:documentProtection w:edit="readOnly" w:enforcement="1"\/>/.test(text(ho, "word/settings.xml")), "final: read-only, enforced, no password");
+    same(text(as, "docProps/custom.xml"), text(ho, "docProps/custom.xml"), "final: custom.xml is the same, the mark as final included");
+    ok(/name="_MarkAsFinal"[^>]*><vt:bool>true<\/vt:bool>/.test(text(ho, "docProps/custom.xml")), "final: marked as final");
+    ok(!Object.keys(ho).some(function (n) { return /string="DRAFT"/.test(text(ho, n)); }) && !Object.keys(as).some(function (n) { return /string="DRAFT"/.test(text(as, n)); }),
+       "final: no watermark in either");
+    var st = rowsOf(controlTable(c.hd)).map(cellTexts).filter(function (x) { return x[0] === "Status"; })[0];
+    ok(st && st[1] === "Final", "final: Status Final");
+
+    // ---- a bullet: the document tool's real list against the assessment's typed one ----
+    var typed = (c.ad.match(/<w:p>(?:(?!<\/w:p>)[\s\S])*?<w:ind w:left="360" w:hanging="200"\/>(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g) || [])
+      .filter(function (p) { return /<w:t [^>]*>•  /.test(p); });
+    ok(typed.length > 0, "the assessment report prints typed bullets: a dot, hanging 200 at 360", String(typed.length));
+    return HD.buildDocument({ kind: "report", info: { title: "T" }, options: {}, blocks: [
+      { id: "b1", type: "list", list: "bullet", level: 0, runs: [{ t: "A point" }] }], footnotes: {}, media: {}, parts: {} }, { issueStatus: "draft" })
+      .then(function (r) { return unzip(r.blob); }).then(function (dz) {
+        var d = text(dz, "word/document.xml"), nx = text(dz, "word/numbering.xml");
+        var para = (d.match(/<w:p>(?:(?!<\/w:p>)[\s\S])*?A point[\s\S]*?<\/w:p>/) || [""])[0];
+        var numId = (para.match(/<w:numId w:val="(\d+)"\/>/) || [])[1];
+        var num = (nx.match(new RegExp('<w:num w:numId="' + numId + '"[^>]*>[\\s\\S]*?</w:num>')) || [""])[0];
+        var absId = (num.match(/<w:abstractNumId w:val="(\d+)"\/>/) || [])[1];
+        var abs = (nx.match(new RegExp('<w:abstractNum w:abstractNumId="' + absId + '"[^>]*>[\\s\\S]*?</w:abstractNum>')) || [""])[0];
+        var lvl0 = (abs.match(/<w:lvl w:ilvl="0"[^>]*>[\s\S]*?<\/w:lvl>/) || [""])[0];
+        ok(/<w:pStyle w:val="BodyText"\/>/.test(para) && /<w:ilvl w:val="0"\/>/.test(para) && !!numId, "a document's bullet is a real list item in the body style", para);
+        ok(/<w:lvlText w:val="•"\/>/.test(lvl0), "with the assessment's glyph", lvl0);
+        ok(/<w:ind w:left="360" w:hanging="200"\/>/.test(lvl0), "at the assessment's indent: left 360, hanging 200", lvl0);
+        ok(/<w:numFmt w:val="bullet"\/>/.test(lvl0), "as a bullet");
+      });
+  });
+
+  chain.then(done, function (e) { ok(false, "threw: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+});
+</script>
+</body></html>

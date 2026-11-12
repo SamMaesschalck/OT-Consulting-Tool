@@ -16,7 +16,9 @@
       tour cannot;
     - a file dropped on the suite, or on a tool that does not take it, opens
       in the tool that reads it and never replaces the page;
-    - the wording covers all three tools.
+    - the wording covers all four tools, and the Document Tool has its card,
+      rail button, place beside the flow and file routing: its document file
+      opens in it, and a Word file is refused with where to open it.
   Run with tools/run-tests.ps1 -Root platform -Tests test-shell.html (headless
   runs need --allow-file-access-from-files, which run-tests.ps1 passes).
 -->
@@ -82,13 +84,16 @@
     S.confirm = function () { return true; };
     Sh.clearRecent();
 
-    // ---- wording: three tools ----------------------------------------------
+    // ---- wording: four tools -----------------------------------------------
     var d = S.document;
     Sh.openLicence();
     var lic = d.querySelector(".licence-version");
     ok(lic && /every tool in the suite/.test(lic.textContent) && !/both tools/.test(lic.textContent), "the licence covers every tool, not both", lic && lic.textContent);
     d.querySelector(".licence-modal .btn.primary").click();
     ok(/review packs and review files/.test(d.querySelector(".recent-empty").textContent), "Recent files says it holds review packs and review files too");
+    ok(/Project files, document files, review packs and review files/.test(d.querySelector(".recent-empty").textContent), "and document files");
+    var pick = d.querySelector(".recent-pick");
+    ok(pick && /project file, document file, review pack or review file/.test(pick.title), "Open a file names the four sorts of file it takes", pick && pick.title);
     ok(/Drop one anywhere in the suite/.test(d.querySelector(".recent-empty").textContent), "and, while it is empty, that a file can be dropped anywhere in the suite");
     var tips = d.querySelector(".help-tips").textContent;
     ok(/ring on a tool means it is open/.test(tips) && /filled amber dot means it has unsaved changes/.test(tips), "the help says what the rail's markers mean", tips);
@@ -103,11 +108,38 @@
     ok(/Risk context file/.test(flow) && /62443-3-3/.test(flow) && /Review pack/.test(flow) && /Review file/.test(flow),
       "How the tools fit together names the files that pass between the tools", flow);
 
+    // ---- the fourth tool: its card, the grid, its place beside the flow -------
+    var cards = d.querySelectorAll(".tool-grid .tool-card");
+    ok(cards.length === 4 && Array.prototype.map.call(cards, function (c) { return c.getAttribute("data-module"); }).join(",") === "assessments,risk-assessment,report-review,documents",
+      "the home page has four tool cards, the Document Tool last");
+    var dc = d.querySelector(".tool-card[data-module='documents']");
+    ok(dc && dc.querySelector("h2").textContent === "OT Cyber Document Tool" && /SolutionsPT template/.test(dc.querySelector(".tool-summary").textContent) &&
+       /pictures and diagrams kept/.test(dc.querySelector(".tool-summary").textContent), "its card names it and says what it does", dc && dc.textContent);
+    ok(dc && /not an assessment or risk report/.test(dc.querySelector(".help-tool p").textContent) && /draft or a final/.test(dc.querySelector(".help-tool p").textContent) &&
+       dc.querySelector(".tool-tour") && /demo proposal/.test(dc.querySelector(".tool-tour").title), "with when to use it and its tour");
+    var cols = S.getComputedStyle(d.querySelector(".tool-grid")).gridTemplateColumns.split(" ");
+    var tops = Array.prototype.map.call(cards, function (c) { return Math.round(c.getBoundingClientRect().top); });
+    ok(S.innerWidth >= 1200 && cols.length === 2 && tops[0] === tops[1] && tops[2] === tops[3] && tops[2] > tops[0],
+      "at full width the cards sit as two rows of two, so none is alone", S.innerWidth + " wide, columns " + cols.join(" ") + ", tops " + tops.join(","));
+    var tileColours = Array.prototype.map.call(d.querySelectorAll(".tool-card .tool-ic"), function (e) { return S.getComputedStyle(e).color; });
+    ok(dc.querySelectorAll(".tool-ic svg path").length === 6 && tileColours.filter(function (c, i) { return tileColours.indexOf(c) === i; }).length === 4,
+      "it has an icon and a colour of its own", tileColours.join(" | "));
+    var steps = d.querySelectorAll(".help-card .flow > li");
+    var last = steps[steps.length - 1];
+    ok(d.querySelectorAll(".help-card .flow-step").length === 4 && last.getAttribute("data-module") === "documents" && last.classList.contains("flow-apart") &&
+       !last.querySelector(".flow-arrow") && steps[steps.length - 2].classList.contains("flow-link") && /Review file/.test(steps[steps.length - 2].textContent),
+      "How the tools fit together ends with the Document Tool, apart from the flow and with no arrow of its own");
+    ok(/Proposals, method statements and other documents in the SolutionsPT template/.test(last.textContent) && /no file passes between it and the other tools/.test(last.textContent),
+      "and says it works on its own", last.textContent);
+    ok(!/[–—]/.test(d.getElementById("home").textContent), "no en or em dashes anywhere on the home page");
     // ---- the rail ------------------------------------------------------------
     var rail = d.getElementById("suite-bar");
     var home = rail.querySelector(".bar-home");
-    ok(rail.tagName === "NAV" && home && home.getAttribute("aria-current") === "page" && rail.querySelectorAll(".bar-tab").length === 3,
-      "the rail shows Home, current on the home page, and a button for each tool");
+    ok(rail.tagName === "NAV" && home && home.getAttribute("aria-current") === "page" && rail.querySelectorAll(".bar-tab").length === 4,
+      "the rail shows Home, current on the home page, and a button for each of the four tools");
+    var wb = rail.querySelector(".bar-tab[data-key='documents']");
+    ok(wb && wb.querySelector(".rail-label").textContent === "Write" && wb.getAttribute("aria-label") === "Write, OT Cyber Document Tool" && wb.querySelectorAll("svg path").length === 6,
+      "the Document Tool's rail button is labelled Write, with its icon", wb && wb.getAttribute("aria-label"));
     ok(Array.prototype.every.call(rail.querySelectorAll("button"), function (b) {
       var label = (b.querySelector(".rail-label") || {}).textContent || "";
       return label && (b.getAttribute("aria-label") || "").toLowerCase().indexOf(label.toLowerCase()) !== -1;
@@ -126,6 +158,9 @@
     ok(K(JSON.stringify({ schema: "spt-risk-project/0.2" })).module === "risk-assessment", "a risk project goes to the risk tool");
     ok(K(JSON.stringify({ schemaVersion: "2.0", assessments: {} })).module === "assessments", "an assessment project goes to the assessment tool");
     ok(K(JSON.stringify({ schema: "spt-risk-context/1.4" })).module === null, "a risk context file is not opened on its own");
+    var docKind = K(JSON.stringify({ schema: "spt-document/1.0", id: "d1", kind: "report", blocks: [] }));
+    ok(docKind && docKind.module === "documents" && docKind.what === "document file", "a document file goes to the Document Tool");
+    ok(K(JSON.stringify({ schema: "spt-document/1.0", schemaVersion: "2.0" })).module === "documents", "even one that also carries a schemaVersion, which alone would mean an assessment project");
     ok(K("PK\u0003\u0004 not json") === null && K("[1,2]") === null && K(JSON.stringify({ schema: "something/1" })) === null, "anything else is not guessed at");
 
     // ---- a tour's changes and saves do not count -----------------------------
@@ -204,6 +239,47 @@
           S.document.body.dispatchEvent(junk);
           return until(function () { return /notes\.json is not a file the suite opens/.test(toastText()); }, 5000, "the message for an unknown file").then(function () {
             ok(junk.defaultPrevented && Sh.current() === null, "an unknown file gets a message and nothing else");
+            // A Word file is a zip, which cannot be passed to a tool as text.
+            var word = dropEvent(S, "drop", [{ name: "proposal.docx", text: "PK\u0003\u0004 a zip" }]);
+            S.document.body.dispatchEvent(word);
+            return until(function () { return /proposal\.docx is a Word or Excel file/.test(toastText()); }, 5000, "the message for a Word file");
+          }).then(function () {
+            ok(/which the suite does not open\. To put a Word file into the SolutionsPT template, open it with Load in the OT Cyber Document Tool\.$/.test(toastText()) &&
+               Sh.current() === null && !Sh.frames.documents, "a Word file is still refused, and the message points to Load in the Document Tool", toastText());
+            // ---- a document file opens in the Document Tool ------------------------
+            var docFile = function (title) {
+              return JSON.stringify({ schema: "spt-document/1.0", id: "doc-" + title, kind: "short", info: { title: title }, options: {}, nextId: 2,
+                blocks: [{ id: "b1", type: "paragraph", runs: [{ t: "Dropped on the suite." }] }], footnotes: {}, media: {}, parts: {} });
+            };
+            var two = dropEvent(S, "drop", [{ name: "first-doc.json", text: docFile("First") }, { name: "second-doc.json", text: docFile("Second") }]);
+            S.document.body.dispatchEvent(two);
+            return until(function () { return /second-doc\.json was left out/.test(toastText()); }, 5000, "the one at a time note");
+          }).then(function () {
+            ok(/second-doc\.json was left out: open one document file at a time\.$/.test(toastText()), "of two document files dropped together the second is left out, in the document's own words", toastText());
+            ok(Sh.current() === "documents", "and the first opens the Document Tool");
+            return tool("documents");
+          }).then(function (dt) {
+            ok(dt.d.title === "OT Cyber Document Tool" && dt.w.App.Product.id === "documents" && dt.w.App.HostBridge.hosted && dt.f.product === "OT Cyber Document Tool" && dt.f.version === S.App.Version.label,
+              "the Document Tool starts in its frame and tells the suite its name and version", dt.d.title + " / " + dt.f.product + " / " + dt.f.version);
+            ok(/documents\/index\.html$/.test(dt.f.el.getAttribute("src") || "") && /"module":"documents"/.test(dt.f.el.name) && /"tour":false/.test(dt.f.el.name),
+              "from its own page, knowing it is in the suite and not on its tour", dt.f.el.name);
+            ok(S.document.title === "OT Cyber Document Tool - " + S.Suite.Data.product, "the suite's title follows", S.document.title);
+            var here = S.document.querySelector("#suite-bar [aria-current='page']");
+            ok(here && here.getAttribute("data-key") === "documents" && here.querySelector(".dot") && /^Write, OT Cyber Document Tool \(open/.test(here.getAttribute("aria-label")),
+              "and the rail marks it as open and on show", here && here.getAttribute("aria-label"));
+            // What the tool says when it opens or saves a file.
+            dt.w.App.HostBridge.recent({ action: "save", name: "acme-proposal 0.1.json", label: "Acme proposal", kind: "Document" });
+            dt.w.App.HostBridge.recent({ action: "open", name: "unlabelled-doc.json", label: "" });
+            return until(function () { return Sh.readRecent().filter(function (e) { return e.module === "documents" && /acme-proposal|unlabelled-doc/.test(e.name); }).length === 2; }, 5000, "the document recent entries");
+          }).then(function () {
+            Sh.home();
+            var rows = Array.prototype.filter.call(S.document.querySelectorAll(".recent-item"), function (li) { return /unlabelled-doc|acme-proposal/.test(li.textContent); });
+            var metas = rows.map(function (li) { return li.querySelector(".recent-name").textContent + " = " + li.querySelector(".recent-meta").textContent; });
+            ok(metas.indexOf("acme-proposal 0.1.json = Document · Acme proposal · Documents") !== -1, "a document file is labelled Document in Recent files, with its title and tool", metas.join(" | "));
+            ok(metas.indexOf("unlabelled-doc.json = Document · Documents") !== -1, "also when the tool gives no kind", metas.join(" | "));
+            ok(rows.length === 2 && rows[0].querySelector(".tool-ic[data-module='documents']") && /in the OT Cyber Document Tool$/.test(rows[0].querySelector(".recent-open").title),
+              "under the Document Tool's icon");
+            ok(/Drop a project file, document file, review pack or review file anywhere/.test(S.document.querySelector(".help-tips").textContent), "once the list has entries, the help carries the drop hint, document files included");
           });
         }).then(function () {
           // ---- dropped on a tool that does not take files itself ------------------

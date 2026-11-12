@@ -1,0 +1,20 @@
+{
+  "_note": "What the packaging and release scripts need to know about this module (packaging/module-info.ps1 reads it). The version is not here: it is the suite's, in shared/version.js. 'product' must match js/product.js. The tour's demo document is loaded on demand by the folder app, so the single-file build carries it inline (inlineExtras) to keep ?tour working with no sibling files. It reads and writes its own project file, spt-document, and Word files; it needs nothing from any other module.",
+  "id": "documents",
+  "product": "OT Cyber Document Tool",
+  "entry": "index.html",
+  "tests": {
+    "pages": "scripts/test-doc-*.html",
+    "virtualTimeMs": 900000,
+    "timeoutSec": 600
+  },
+  "singleHtml": {
+    "parityCheck": "check-single-html-documents.html",
+    "inlineExtras": ["data/demo-document.js"]
+  },
+  "electron": {
+    "appId": "com.solutionspt.ot-cyber-document-tool",
+    "packageName": "ot-cyber-document-tool",
+    "selfTest": "documents"
+  }
+}

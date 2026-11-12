@@ -1,0 +1,478 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: fixes that cross files</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Regression tests for the review fixes that needed a change in more than one
+  file, made when the separate fixes were brought together. Everything runs
+  in the tool itself (index.html in a frame): its real model, writer, graft
+  pass, editor, pages and shell. Only what a headless page cannot do is
+  stood in for (the save dialog, the autosave store, a download).
+
+    writer   a kept object taller than a page is made smaller, as a picture
+             is; a page break that opens a report's body leaves no empty
+             page; a link in a kept drawing is written only to an http, https
+             or mailto address.
+    model    the outline numbers headings as the Word file does; text is
+             stored without the characters a Word file cannot hold; a missing
+             picture is filled only from an entry described the same way; a
+             link relationship follows the link rule; one note has one
+             reference; pasted text loses the same characters.
+    import   an empty form field inside another field's code is not counted.
+    screen   the cover leaves out an empty author and date as the Word cover
+             does; a kept object taller than a page says so; the hints say
+             the footer follows the classification.
+    pages    Worth a look names a cover with too much text, pictures taller
+             than a page and renumbered headings; removing every block from
+             the import report leaves a paragraph to type in.
+    editor   a picture taller than a page is inserted, replaced and resized
+             no taller than the page shows it.
+    shell    a long message stays up long enough to read; the Draft or Final
+             choice follows a document saved into another file.
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) {
+    lines.push((c ? "PASS " : "FAIL ") + n + (!c && d != null ? " - " + d : "")); if (!c) fail++;
+    document.getElementById("out").textContent = lines.join("\n") + "\n\nFAIL the page did not finish: re-run it alone with a larger time budget";
+  }
+  // Packing and reading a Blob are real work no timer stands for, and headless
+  // Edge's virtual clock runs out the moment nothing is queued: a message
+  // bounced to ourselves keeps a task queued until the tests finish (as
+  // test-doc-zip.html).
+  var beat = setInterval(function () {}, 20);
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  function finish() {
+    clearInterval(beat); alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  window.addEventListener("error", function (e) { ok(false, "the page ran without a script error", e.message + " (line " + e.lineno + ")"); finish(); });
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 160)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  function later(ms) { return new Promise(function (res) { setTimeout(res, ms || 60); }); }
+  function J(v) { return JSON.stringify(v); }
+
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+  var mem = { docs: {}, blobs: {} };
+  function memStore() {
+    return {
+      putDoc: function (id, json) { mem.docs[id] = json; return Promise.resolve(); },
+      getDoc: function (id) { return Promise.resolve(mem.docs[id] || null); },
+      putBlob: function (id, key, blob) { (mem.blobs[id] = mem.blobs[id] || {})[key] = blob; return Promise.resolve(); },
+      getBlobs: function (id) { return Promise.resolve(mem.blobs[id] || {}); },
+      remove: function (id) { delete mem.docs[id]; delete mem.blobs[id]; return Promise.resolve(); },
+      ok: function () { return Promise.resolve(true); }
+    };
+  }
+  function lockManager() {
+    return { request: function (name, opts, cb) { return Promise.resolve().then(cb); }, query: function () { return Promise.resolve({ held: [], pending: [] }); } };
+  }
+  function fakeHandle(name) {
+    var st = { text: null, writes: 0 };
+    return { kind: "file", name: name, store: st,
+      queryPermission: function () { return Promise.resolve("granted"); },
+      requestPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () {
+        return Promise.resolve({
+          write: function (b) { return Promise.resolve(typeof b === "string" ? b : b.text()).then(function (t) { st.text = t; st.writes++; }); },
+          close: function () { return Promise.resolve(); }
+        });
+      } };
+  }
+  // The tool, in a frame: its window and the parts of it the tests use.
+  function boot(frame) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        poll(function () { return w.DocumentTool; }).then(function () {
+          var T = { W: w, A: w.App, D: w.App.DocApp, S: w.App.DocStorage, M: w.App.DocModel, H: w.App.HouseDocx, R: w.App.DocRender, P: w.App.DocPages,
+            E: w.App.DocEditor, errors: [], nextSave: null };
+          w.addEventListener("error", function (e) { T.errors.push(e.message); });
+          w.addEventListener("unhandledrejection", function (e) { T.errors.push("rejection: " + ((e.reason && e.reason.message) || e.reason)); });
+          T.S.bytesStore = memStore();
+          T.S.locks = lockManager();
+          T.S.download = function () {};
+          w.showSaveFilePicker = function () {
+            if (!T.nextSave) { var e = new Error("closed"); e.name = "AbortError"; return Promise.reject(e); }
+            var hd = T.nextSave; T.nextSave = null;
+            return Promise.resolve(hd);
+          };
+          w.showOpenFilePicker = function () { var e = new Error("closed"); e.name = "AbortError"; return Promise.reject(e); };
+          T.$ = function (id) { return w.document.getElementById(id); };
+          T.q = function (sel) { return w.document.querySelector(sel); };
+          res(T);
+        });
+      };
+      frame.src = "../index.html";
+    });
+  }
+
+  var seq = 0;
+  function id() { seq += 1; return "b" + seq; }
+  function para(t, extra) { return Object.assign({ id: id(), type: "paragraph", runs: typeof t === "string" ? [{ t: t }] : t }, extra || {}); }
+  function head(level, t, extra) { return Object.assign({ id: id(), type: "heading", level: level, runs: [{ t: t }] }, extra || {}); }
+  function kept(w, h, extra) {
+    return Object.assign({ id: id(), type: "kept", kind: "chart", xml: '<w:r xmlns:w="' + W + '"><w:t>kept</w:t></w:r>', rels: [], width: w, height: h, floating: false, text: "", description: "Chart" }, extra || {});
+  }
+  var INFO = { title: "Network segmentation proposal", docType: "Proposal", client: "Northfield Water", site: "Ashby treatment works", reference: "OPP-10234",
+    revision: "1.2", date: "2026-11-11", issuedDate: "", author: "A. Consultant", classification: "Confidential", qaReviewBy: "Q", authorisedBy: "A", issuedTo: "I" };
+  function project(blocks, over) {
+    var p = { schema: "spt-document/1.0", id: "doc-int-" + (++seq), kind: "report", info: Object.assign({}, INFO), options: {}, footnotes: {}, media: {}, parts: {}, nextId: 5000,
+      blocks: blocks || [head(1, "Summary"), para("Body text.")] };
+    over = over || {};
+    Object.keys(over).forEach(function (k) { if (k === "info") p.info = Object.assign(p.info, over.info); else p[k] = over[k]; });
+    return p;
+  }
+  function png(T, w, h, name) {
+    var c = T.W.document.createElement("canvas"); c.width = w; c.height = h;
+    var g = c.getContext("2d"); g.fillStyle = "#DCE9F3"; g.fillRect(0, 0, w, h); g.fillStyle = "#173267"; g.fillRect(0, 0, w, 4);
+    return new Promise(function (res) { c.toBlob(function (b) { res(new T.W.File([b], name || "p.png", { type: "image/png" })); }, "image/png"); });
+  }
+  function unzip(T, blob) {
+    return T.A.ZipIO.read(blob).then(function (list) {
+      var map = {};
+      list.forEach(function (x) { map[x.name] = /\.(xml|rels)$/.test(x.name) && x.bytes ? new TextDecoder().decode(x.bytes) : ""; });
+      return map;
+    });
+  }
+  function build(T, p) { return T.H.buildDocument(p, { issueStatus: "draft" }).then(function (r) { return unzip(T, r.blob).then(function (z) { return { z: z, doc: z["word/document.xml"] || "", fitted: r.fitted }; }); }); }
+  function breaks(xml) { return (xml.match(/<w:br w:type="page"\/>/g) || []).length; }
+  // Opens a document in the tool as a new one, with nothing left unsaved to ask about.
+  async function open(T, p) {
+    T.D.markClean();
+    await T.D.setDoc(T.M.normalise(p), { from: "new" });
+    return T.D.state.doc;
+  }
+
+  async function run() {
+    var T = await boot(document.getElementById("f"));
+    var M = T.M, H = T.H, R = T.R, P = T.P;
+
+    // Each part is its own: one that throws is one failure, and the rest still run.
+    var d, linked, linkedPic, bytesA = new T.W.Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
+    async function step(name, fn) { try { await fn(); } catch (e) { ok(false, name + ": ran to its end", e && (e.stack || e.message)); } }
+
+    // ======================= writer ==========================================
+    await step("writer", async function () {
+    // ---- 36: a kept object taller than a page (writeKept) ----
+    var k1 = kept(300, 2000), k2 = kept(1202, 2000), k3 = kept(300, 2000, { land: true }), k4 = kept(100, 2000), k5 = kept(300, 2000, { floating: true }), k6 = kept(300, 800), k7 = kept(1202, 400);
+    var tbl = { id: id(), type: "table", header: 0, cols: [1, 1], rows: [{ cells: [{ blocks: [k4] }, { blocks: [para("beside")] }] }] };
+    var w = await H.blocksToDocx(project([head(1, "Kept"), k1, k2, tbl, k5, para("after"), k6, k7, k3]), {});
+    var scale = {};
+    w.graft.kept.forEach(function (e) { scale[e.blockId] = e.scale; });
+    ok(scale[k1.id] === 0.43, "36: a kept object 2000 px high on a portrait page is scaled to the page's 860 px", String(scale[k1.id]));
+    ok(scale[k2.id] === 0.43, "36: one both too wide and too tall takes the smaller of the two factors, so its shape is kept", String(scale[k2.id]));
+    ok(scale[k3.id] > 0.2845 && scale[k3.id] <= 0.285, "36: on a landscape page the limit is 570 px", String(scale[k3.id]));
+    ok(scale[k4.id] === 0.4, "36: in a table cell it is 60 px less", String(scale[k4.id]));
+    ok(scale[k5.id] === undefined && scale[k6.id] === undefined, "36: a floating one, and one that fits, are left as they are", J([scale[k5.id], scale[k6.id]]));
+    ok(scale[k7.id] === 0.5, "36: one that is only too wide is scaled to the width, as before", String(scale[k7.id]));
+    ok(w.fitted.join() === [k1.id, k2.id, k4.id, k7.id, k3.id].join(), "36: each one made smaller is listed for the message after the export", w.fitted.join());
+
+    // ---- 12: a page break that opens a report's body ----
+    var plain = await build(T, project([head(1, "First"), para("x")], { options: { contents: true } }));
+    var led = await build(T, project([{ id: id(), type: "pageBreak" }, { id: id(), type: "pageBreak" }, head(1, "First"), para("x")], { options: { contents: true } }));
+    ok(breaks(plain.doc) > 0 && breaks(led.doc) === breaks(plain.doc), "12: page breaks before the first block of a report add no page: the front matter ends on a new page already", breaks(led.doc) + " against " + breaks(plain.doc));
+    var ledNo = await build(T, project([{ id: id(), type: "pageBreak" }, head(1, "First"), para("x")]));
+    var plainNo = await build(T, project([head(1, "First"), para("x")]));
+    ok(breaks(ledNo.doc) === breaks(plainNo.doc), "12: the same with no contents list", breaks(ledNo.doc) + " against " + breaks(plainNo.doc));
+    var mid = await build(T, project([head(1, "First"), { id: id(), type: "pageBreak" }, para("x")]));
+    ok(breaks(mid.doc) === breaks(plainNo.doc) + 1, "12: a page break further on is still written", breaks(mid.doc) + " against " + breaks(plainNo.doc));
+    var shortLed = await build(T, project([{ id: id(), type: "pageBreak" }, head(1, "First")], { kind: "short" }));
+    var shortPlain = await build(T, project([head(1, "First")], { kind: "short" }));
+    ok(breaks(shortLed.doc) === breaks(shortPlain.doc) + 1, "12: a short document has no such break of its own, so one typed first is kept", breaks(shortLed.doc) + " against " + breaks(shortPlain.doc));
+    var landFirst = await build(T, project([{ id: id(), type: "pageBreak" }, head(1, "Wide", { land: true }), para("x", { land: true })]));
+    ok(landFirst.doc.indexOf("Wide") !== -1 && new DOMParser().parseFromString(landFirst.doc, "application/xml").getElementsByTagName("parsererror").length === 0,
+       "12: a leading break before a landscape start still builds a sound file");
+
+    // ---- 53: a link in a kept drawing (graft) ----
+    linked = kept(100, 50, { rels: [
+      { id: "sptK1", type: REL + "hyperlink", external: "file:///C:/Windows/System32/calc.exe" },
+      { id: "sptK2", type: REL + "hyperlink", external: "https://example.org/a?b=1" },
+      { id: "sptK3", type: REL + "hyperlink", external: "\\\\host\\share\\a.hta" },
+      { id: "sptK4", type: REL + "hyperlink", external: "mailto:someone@example.org" }] });
+    linkedPic = kept(100, 50, { kind: "picture", xml: '<w:r xmlns:w="' + W + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:pict><v:imagedata xmlns:v="urn:schemas-microsoft-com:vml" r:id="sptK5"/></w:pict></w:r>',
+      rels: [{ id: "sptK5", type: REL + "image", external: "https://example.org/p.png" }] });
+    var raw = await build(T, project([head(1, "Links"), linked, linkedPic]));
+    function target(z, rid) { var m = new RegExp('<Relationship\\b[^>]*\\sId="' + rid + '"[^>]*>').exec(z["word/_rels/document.xml.rels"] || ""); return m ? (/Target="([^"]*)"/.exec(m[0]) || [])[1] : null; }
+    ok(target(raw.z, "sptK1") === "about:blank" && target(raw.z, "sptK3") === "about:blank",
+       "53: the writer never writes a file or network address as a link in a kept drawing, whatever the document holds", target(raw.z, "sptK1") + " | " + target(raw.z, "sptK3"));
+    ok(/^https:\/\/example\.org\/a\?b=1/.test(String(target(raw.z, "sptK2")).replace(/&amp;/g, "&")) && target(raw.z, "sptK4") === "mailto:someone@example.org", "53: http, https and mailto links are written as they are", target(raw.z, "sptK2") + " | " + target(raw.z, "sptK4"));
+    ok(target(raw.z, "sptK5") === null && !/example\.org\/p\.png/.test(Object.keys(raw.z).map(function (n) { return raw.z[n]; }).join("")),
+       "53: a linked picture is never written (Word would fetch it on open): the drawing that names one prints a prompt instead", target(raw.z, "sptK5"));
+    ok(!/calc\.exe|a\.hta/.test(Object.keys(raw.z).map(function (n) { return raw.z[n]; }).join("")), "53: the refused addresses are nowhere in the file");
+
+    });
+
+    // ======================= model ===========================================
+    await step("model", async function () {
+    // ---- 53: the same rule when a project file is read ----
+    var nk = M.normalise(project([linked])).blocks[0];
+    ok(nk.rels[0].external === "about:blank" && nk.rels[2].external === "about:blank" && nk.rels[1].external === "https://example.org/a?b=1" && nk.rels[3].external === "mailto:someone@example.org",
+       "53: reading a document file points a refused link in a kept drawing nowhere and leaves the others", J(nk.rels.map(function (r) { return r.external; })));
+    var np = M.normalise(project([linkedPic]));
+    ok(np.blocks[0].rels[0].external === undefined && M.missing(np).indexOf(np.blocks[0].id) !== -1,
+       "53: a linked picture in a document file is never kept as an address: the drawing counts as missing", J(np.blocks[0].rels));
+    var part = M.normalise(project([para("x")], { parts: { p1: { name: "word/charts/chart1.xml", contentType: "application/xml", rels: [{ id: "rId1", type: REL + "hyperlink", external: "javascript:alert(1)" }] } } })).parts.p1;
+    ok(part.rels[0].external === "about:blank", "53: and so for a carried part's own relationships", J(part.rels));
+
+    // ---- 17: the outline numbers headings as the Word file does ----
+    function numbersOf(levels) {
+      var d = M.normalise(project(levels.map(function (l, i) { return head(l, "H" + i); }), { options: { numberHeadings: true } }));
+      var hn = H.headingNumbers(d.blocks);
+      return { outline: M.outline(d).map(function (o) { return o.number; }), word: d.blocks.map(function (b) { return hn[b.id]; }) };
+    }
+    var n1 = numbersOf([2, 1, 3, 1, 2]), n2 = numbersOf([1, 3, 2]), n3 = numbersOf([1, 2, 3, 2, 1, 2]);
+    ok(n1.outline.join() === "1,2,2.1,3,3.1" && n1.outline.join() === n1.word.join(), "17: the sidebar's numbers for levels 2,1,3,1,2 are the Word file's, with no nought", n1.outline.join() + " | " + n1.word.join());
+    ok(n2.outline.join() === "1,1.1,1.2" && n2.outline.join() === n2.word.join(), "17: and for levels 1,3,2", n2.outline.join() + " | " + n2.word.join());
+    ok(n3.outline.join() === "1,1.1,1.1.1,1.2,2,2.1" && n3.outline.join() === n3.word.join(), "17: a document whose levels do not skip is numbered as before", n3.outline.join());
+
+    // ---- 35: text is stored without what a Word file cannot hold ----
+    var dirty = M.normalise(project([
+      para([{ t: "Line one\u000Bline two, x\uFFFEy\uFFFF and half \uD83D a pair, whole \uD83D\uDE00." }]),
+      { id: id(), type: "prompt", text: "Add\u0001 the cost\u000Bof each" },
+      { id: id(), type: "picture", media: "m1", width: 10, height: 10, caption: "Cap\u0002tion", alt: "Al\u0003t" },
+      { id: id(), type: "table", header: 0, cols: [1], caption: "Table\u0004 caption", rows: [{ cells: [{ blocks: [para("cell\u0005 text")] }] }] },
+      kept(10, 10, { text: "Box\u0006 words", label: "La\u0007bel", description: "Chart\u0008", caption: "Kept\u000E caption" })
+    ], { info: { title: "Ti\u000Btle", client: "Cli\u000Cent", author: "Au\uFFFFthor", coverTitleLines: ["One\u0001", "Two"] },
+      footnotes: {}, media: { m1: { type: "image/png", name: "a.png", width: 10, height: 10 } } }));
+    var bad = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    var stored = J({ info: dirty.info, blocks: dirty.blocks });
+    ok(!bad.test(JSON.parse(stored).info.title + J(JSON.parse(stored))) && !bad.test(dirty.blocks.map(function (b) { return M.text(b) + (b.caption || "") + (b.alt || "") + (b.label || "") + (b.description || ""); }).join("")),
+       "35: no control character, U+FFFE, U+FFFF or half of a pair is left in a document's stored text");
+    ok(dirty.blocks[0].runs[0].t === "Line one\nline two, xy and half  a pair, whole \uD83D\uDE00.", "35: a vertical tab in running text becomes a line break, and a whole pair is kept", J(dirty.blocks[0].runs[0].t));
+    ok(dirty.info.title === "Ti tle" && dirty.info.client === "Client" && dirty.info.author === "Author" && J(dirty.info.coverTitleLines) === '["One","Two"]', "35: document information is cleaned", J(dirty.info));
+    ok(dirty.blocks[1].text === "Add the cost\nof each" && dirty.blocks[2].caption === "Caption" && dirty.blocks[2].alt === "Alt" && dirty.blocks[3].caption === "Table caption" &&
+       dirty.blocks[3].rows[0].cells[0].blocks[0].runs[0].t === "cell text" && dirty.blocks[4].text === "Box words" && dirty.blocks[4].label === "Label" && dirty.blocks[4].description === "Chart" && dirty.blocks[4].caption === "Kept caption",
+       "35: so are prompts, captions, alternative text, table cells and a kept object's words", J(dirty.blocks.slice(1)).slice(0, 400));
+    var clean = project([para("Plain text, with a tab\tand a line\nbreak, and \uD83D\uDE00.")]);
+    ok(M.normalise(clean).blocks[0].runs[0].t === "Plain text, with a tab\tand a line\nbreak, and \uD83D\uDE00.", "35: clean text comes back as it went in");
+    var pasted = T.A.DocPaste.fromText("a\uFFFEb\uFFFFc \uD83D d \uD83D\uDE00", T.M.create("report"));
+    var pastedText = (pasted.blocks || []).map(function (b) { return M.text(b); }).join("|");
+    ok(pastedText === "abc  d \uD83D\uDE00", "35: pasted text loses U+FFFE, U+FFFF and half of a pair too", J(pastedText));
+
+    // ---- 62: a missing picture is filled only from an entry described the same way ----
+    function withMedia(name, blob, w0) { return M.normalise(project([{ id: "pic1", type: "picture", media: "m1", width: 4, height: 4 }], { id: "doc-same", media: { m1: Object.assign({ type: "image/png", name: name, width: w0 || 4, height: 4 }, blob ? { blob: blob } : {}) } })); }
+    var lost = withMedia("diagram.png", null);
+    ok(M.missing(lost).length === 1, "62: a picture with no bytes is missing");
+    ok(M.fill(lost, withMedia("other.png", bytesA)) === 0 && M.missing(lost).length === 1, "62: an entry under the same key with another name is not taken: it is another document's picture");
+    ok(M.fill(lost, withMedia("diagram.png", bytesA, 8)) === 0, "62: nor one of another size");
+    ok(M.fill(lost, withMedia("diagram.png", bytesA)) === 1 && M.missing(lost).length === 0 && lost.media.m1.blob === bytesA, "62: the entry described the same way is taken");
+    ok(typeof M.newDocId === "function" && /^doc-/.test(M.newDocId()) && M.newDocId() !== M.newDocId(), "62: the model gives the new id a document saved into another file takes");
+
+    // ---- one note has one reference ----
+    var twice = M.normalise(project([para([{ t: "One" }, { t: "", fn: "f1" }]), para([{ t: "Two" }, { t: "", fn: "f1" }]), para([{ t: "Three" }, { t: "", fn: "f2" }])],
+      { footnotes: { f1: { runs: [{ t: "The note." }] }, f2: { runs: [{ t: "Another." }] } } }));
+    var keys = twice.blocks.map(function (b) { return b.runs[b.runs.length - 1].fn; });
+    ok(keys[0] === "f1" && keys[1] !== "f1" && keys[2] === "f2" && twice.footnotes[keys[1]] && twice.footnotes[keys[1]].runs[0].t === "The note.",
+       "footnotes: a second reference to one note is given a copy of the note, as a copied paragraph is", J(keys));
+    var shown = R.fnNumbers(twice);
+    var built = await build(T, twice);
+    ok(keys.map(function (k) { return shown[k]; }).join() === "1,2,3" && ((built.z["word/footnotes.xml"] || "").match(/The note\./g) || []).length === 2,
+       "footnotes: so the numbers on screen (1, 2, 3) are the ones Word prints, each with its note", J(shown));
+
+    });
+
+    // ======================= import ==========================================
+    await step("import", async function () {
+    var Zip = T.A.ZipIO, HEADX = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    function docx(body) {
+      var CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.";
+      return Zip.write([
+        { name: "[Content_Types].xml", bytes: Zip.bytesOf(HEADX + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="' + CT + 'document.main+xml"/></Types>') },
+        { name: "_rels/.rels", bytes: Zip.bytesOf(HEADX + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + REL + 'officeDocument" Target="word/document.xml"/></Relationships>') },
+        { name: "word/document.xml", bytes: Zip.bytesOf(HEADX + '<w:document xmlns:w="' + W + '"><w:body>' + body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body></w:document>') }
+      ]).then(function (blob) { return T.A.DocxImport.read(blob, { name: "made.docx" }); });
+    }
+    function fld(type, ff) { return '<w:r><w:fldChar w:fldCharType="' + type + '"' + (ff ? '>' + ff + '</w:fldChar>' : '/>') + '</w:r>'; }
+    function instr(code) { return '<w:r><w:instrText xml:space="preserve">' + code + '</w:instrText></w:r>'; }
+    function txt(t) { return '<w:r><w:t xml:space="preserve">' + t + '</w:t></w:r>'; }
+    var EMPTY_DD = '<w:ffData><w:name w:val="Pick"/><w:enabled/><w:ddList/></w:ffData>';
+    var emptyDrop = fld("begin", EMPTY_DD) + instr(" FORMDROPDOWN ") + fld("end");
+    function controls(rep) { var n = 0; ["toCheck", "changed", "notCarried"].forEach(function (l) { (rep[l] || []).forEach(function (e) { if (e.code === "controls") n += e.count; }); }); return n; }
+    var alone = await docx('<w:p>' + txt("Choose: ") + emptyDrop + txt(" end.") + '</w:p>');
+    ok(controls(alone.project.importReport) === 1, "import: an empty drop-down in the text is reported as a control left out", J(alone.project.importReport.notCarried));
+    var nested = await docx('<w:p>' + txt("If: ") + fld("begin") + instr(" IF ") + emptyDrop + instr(' = "x" "yes" "no" ') + fld("separate") + txt("no") + fld("end") + txt(" end.") + '</w:p>');
+    ok(controls(nested.project.importReport) === 0 && /If: no end\./.test(nested.project.blocks.map(function (b) { return M.text(b); }).join("")),
+       "import: the same drop-down inside another field's code is part of that code and is not counted; the field's result is kept", J(nested.project.importReport.notCarried) + " " + J(nested.project.blocks.map(function (b) { return M.text(b); })));
+
+    });
+
+    // ======================= screen ==========================================
+    await step("screen", async function () {
+    // ---- 20, 16: the cover's strip is the Word cover's ----
+    function strip(d) {
+      var el = R.coverEl(d);
+      return { k: Array.prototype.map.call(el.querySelectorAll(".cover-k"), function (n) { return n.textContent; }), v: Array.prototype.map.call(el.querySelectorAll(".cover-v"), function (n) { return n.textContent; }) };
+    }
+    var full = strip(M.normalise(project()));
+    ok(full.k.join() === "ISSUE,AUTHOR,CLASSIFICATION" && full.v.join("|") === "1.2  ·  2026-11-11|A. Consultant|Confidential", "20: with every value, the cover on screen shows issue, author and classification", J(full));
+    var bare = strip(M.normalise(project(null, { info: { author: "", date: "", issuedDate: "" } })));
+    ok(bare.k.join() === "ISSUE,CLASSIFICATION" && bare.v[0] === "1.2", "20: with no author and no date it shows no author label and no dot after the revision, as the Word cover does", J(bare));
+    var wordStrip = H.stripParts(H.coverInput(M.normalise(project(null, { info: { author: "", date: "", issuedDate: "" } }))));
+    ok(wordStrip.map(function (p) { return p[0].trim(); }).join() === bare.k.join() && wordStrip[0][1] === bare.v[0], "20: the pairs are the template's own", J(wordStrip));
+
+    // ---- 36, 37: a kept object's card says what the export will do ----
+    var tallKept = kept(300, 2000), wideKept = kept(1202, 400), fineKept = kept(300, 400), floatKept = kept(300, 2000, { floating: true });
+    var kd = M.normalise(project([tallKept, wideKept, fineKept, floatKept]));
+    function cardText(i) { return R.blockEl(kd, kd.blocks[i], {}).textContent; }
+    ok(/It is taller than a page and will be made smaller to fit\. Any text inside it is made smaller too, so check it in a draft in Word\./.test(cardText(0)), "36: a kept object taller than a page says it will be made smaller, text and all", cardText(0));
+    ok(/It is wider than the page and will be made smaller to fit\. Any text inside it is made smaller too/.test(cardText(1)), "37: one wider than the page says its text is made smaller too", cardText(1));
+    ok(!/made smaller/.test(cardText(2)) && !/made smaller/.test(cardText(3)), "36: one that fits, and a floating one, say nothing of the kind");
+
+    });
+
+    // ======================= pages ===========================================
+    await step("pages", async function () {
+    // ---- 18, 70: the hints follow the footer ----
+    d = await open(T, project());
+    T.D.go("info");
+    ok(T.$("info-classification-hint").textContent === "Printed on the cover, in the footer and as Confidentiality in document control.", "18: a report's Classification hint names the footer", T.$("info-classification-hint").textContent);
+    d = await open(T, project(null, { kind: "short" }));
+    T.D.go("info");
+    ok(T.$("info-classification-hint").textContent === "Printed at the left of the footer.", "18: a short document's says it prints in the footer", T.$("info-classification-hint").textContent);
+    var shortBuilt = await build(T, M.normalise(project(null, { kind: "short", info: { classification: "Commercial in confidence" } })));
+    var footerText = Object.keys(shortBuilt.z).filter(function (n) { return /^word\/footer\d+\.xml$/.test(n); }).map(function (n) { return shortBuilt.z[n]; }).join("");
+    ok(footerText.indexOf("Commercial in confidence") !== -1, "18: which is true of the Word file");
+
+    // ---- 16, 20, 36, 5: Worth a look ----
+    function codes(list) { return list.map(function (x) { return x.code; }).join(); }
+    var calm = M.normalise(project([head(1, "A"), para("x")], { info: { issuedDate: "2026-11-11" } }));
+    ok(codes(P.worth(calm)) === "", "worth: a complete, ordinary report has nothing to mention", codes(P.worth(calm)));
+    var LONG_TITLE = new Array(40).join("Operational technology remote access and network segmentation ");
+    var longCover = M.normalise(project([para("x")], { info: { title: LONG_TITLE, issuedDate: "2026-11-11" } }));
+    var lw = P.worth(longCover);
+    ok(H.coverFits(longCover) === false && codes(lw) === "cover-long" && /^The cover has more text than its page holds/.test(lw[0].text) && lw[0].label === "Go to it",
+       "16: a cover with more text than its page holds is mentioned before the export", codes(lw));
+    var noDates = P.worth(M.normalise(project([para("x")], { info: { date: "", issuedDate: "" } })));
+    ok(codes(noDates) === "blank-issuedDate" && noDates[0].text === "Issued date is blank in document control, and with Date blank as well the cover prints no date.", "20: with no date at all, the blank issued date says the cover prints no date", J(noDates.map(function (x) { return x.text; })));
+    var oneDate = P.worth(M.normalise(project([para("x")])));
+    ok(codes(oneDate) === "blank-issuedDate" && oneDate[0].text === "Issued date is blank in document control.", "20: with a date, it says only that", J(oneDate.map(function (x) { return x.text; })));
+    var tp = { id: id(), type: "picture", media: "m1", width: 601, height: 1336, alt: "A" }, tk = kept(300, 2000), fp = { id: id(), type: "picture", media: "m1", width: 601, height: 800, alt: "B" },
+      wk = kept(1202, 2000), cp = { id: id(), type: "picture", media: "m1", width: 280, height: 2000, alt: "C" };
+    var tallDoc = M.normalise(project([tp, tk, fp, wk, { id: id(), type: "table", header: 0, cols: [1, 1], rows: [{ cells: [{ blocks: [cp] }, { blocks: [para("y")] }] }] }],
+      { info: { issuedDate: "2026-11-11" }, media: { m1: { type: "image/png", name: "a.png", width: 601, height: 1336, blob: bytesA } } }));
+    var tw = P.worth(tallDoc), tallLine = tw.filter(function (x) { return x.code === "tall"; })[0], fitLine = tw.filter(function (x) { return x.code === "fitted"; })[0];
+    ok(!!tallLine && /^3 pictures or drawings are taller than a page and will be made smaller to fit\.$/.test(tallLine.text), "36: pictures and kept objects taller than a page are mentioned (a picture, a kept object, a picture in a cell; not the one that fits)", tallLine && tallLine.text);
+    ok(!!fitLine && /^1 drawing is wider than the space it sits in and will be made smaller to fit\. Any text inside it is made smaller too, so check it in a draft in Word\.$/.test(fitLine.text),
+       "37: the one that is too wide is on the line for width, which says its text is made smaller too, and is not counted twice", fitLine && fitLine.text);
+    var word = await H.blocksToDocx(tallDoc, {});
+    ok(word.fitted.slice().sort().join() === [tp.id, tk.id, wk.id, cp.id].sort().join(), "36: and those are exactly the ones the writer makes smaller", word.fitted.join());
+    var hb = head(1, "Unnumbered in the original");
+    var renum = M.normalise(project([hb, para("See section 2.1.")], { info: { issuedDate: "2026-11-11" }, options: { numberHeadings: true },
+      importReport: { source: { name: "w.docx" }, carried: {}, toCheck: [], notCarried: [], changed: [{ code: "heading-numbers", count: 2, headings: 1, references: 1, blockIds: [hb.id] }] } }));
+    var rw = P.worth(renum);
+    ok(codes(rw) === "heading-numbers" && rw[0].text === T.A.DocImportFlow.sentence(renum.importReport.changed[0]) && rw[0].label === "Show" && typeof rw[0].run === "function",
+       "5: headings renumbered at import are on Worth a look, with Show", codes(rw) + " " + (rw[0] && rw[0].text));
+
+    // ---- 43 (the import report's Remove them) ----
+    var f1 = para("Original cover line"), f2 = para("Version 3");
+    d = await open(T, project([f1, f2], { importReport: { source: { name: "w.docx" }, carried: { paragraphs: 2 }, toCheck: [{ code: "front-matter", count: 2, blockIds: [f1.id, f2.id] }], changed: [], notCarried: [] } }));
+    T.D.go("report");
+    var rm = T.$("dp-front-remove");
+    ok(!!rm, "43: the import report offers to remove the original's opening blocks");
+    if (rm) rm.click();
+    ok(d.blocks.length === 1 && d.blocks[0].type === "paragraph" && M.text(d.blocks[0]) === "" && d.blocks[0].id !== f1.id && d.blocks[0].id !== f2.id,
+       "43: removing every block leaves one empty paragraph to type in", J(d.blocks));
+    T.D.go("edit");
+    await later(100);
+    ok(T.$("paper").querySelectorAll(".blk").length === 1, "43: and the Edit page shows it", String(T.$("paper").querySelectorAll(".blk").length));
+    T.A.DocHistory.undo();
+    ok(d.blocks.length === 2 && d.blocks[0].id === f1.id && d.blocks[1].id === f2.id, "43: one Undo brings the blocks back and takes the paragraph away", J(d.blocks.map(function (b) { return b.id; })));
+    T.A.DocHistory.redo();
+    ok(d.blocks.length === 1 && M.text(d.blocks[0]) === "", "43: and Redo gives the empty paragraph again", J(d.blocks.map(function (b) { return b.id; })));
+
+    });
+
+    // ======================= editor ==========================================
+    await step("editor", async function () {
+    // ---- 36: a picture is never drawn taller than the page shows it ----
+    d = await open(T, project([para("Text before.")]));
+    T.D.go("edit");
+    await later(100);
+    T.E.focusBlock(d.blocks[0].id);
+    var tallFile = await png(T, 300, 2000, "tall.png"), wideFile = await png(T, 600, 300, "wide.png");
+    var tid = await T.E.insertPictureFile(tallFile);
+    var tb = tid && M.find(d, tid).block;
+    ok(!!tb && tb.height === 860 && tb.width === 129, "36: a 300 x 2000 picture is inserted 860 px high, its shape kept", tb && tb.width + "x" + tb.height);
+    var wid = await T.E.insertPictureFile(wideFile);
+    var wb = wid && M.find(d, wid).block;
+    ok(!!wb && wb.width === 600 && wb.height === 300, "36: one that fits is inserted as it is", wb && wb.width + "x" + wb.height);
+    await T.E.replaceWithFile(wid, await png(T, 300, 2000, "tall2.png"));
+    wb = M.find(d, wid).block;
+    ok(wb.height === 860 && wb.width === 129, "36: replaced by a tall picture, it is not left taller than the page", wb.width + "x" + wb.height);
+    T.E.selectBlocks([tid]);
+    await later(100);
+    var fitBtn = Array.prototype.filter.call(T.$("toolbar").querySelectorAll("button"), function (b) { return /Fit to page width/.test(b.textContent + " " + (b.getAttribute("aria-label") || "") + " " + (b.title || "")); })[0];
+    ok(!!fitBtn, "36: the picture's controls offer Fit to page width");
+    if (fitBtn) fitBtn.click();
+    tb = M.find(d, tid).block;
+    ok(tb.height === 860 && tb.width === 129, "36: Fit to page width does not make a tall picture taller than the page", tb.width + "x" + tb.height);
+
+    });
+
+    // ======================= shell ===========================================
+    await step("shell", async function () {
+    // ---- a message stays up long enough to read ----
+    function toastShown() { return !/\bhidden\b/.test(T.$("toast").className); }
+    T.D.toast("Saved.");
+    await later(4000);
+    var at4 = toastShown();
+    await later(400);
+    ok(at4 && !toastShown(), "toast: a short message still goes after about four seconds");
+    var longMsg = "3 pictures could not be pasted. Insert them from a file, or load the Word file to bring everything across. 1 comment was not pasted. Tracked changes were settled: inserted text was kept and deleted text was left out.";
+    T.D.toast(longMsg, "warn");
+    await later(6000);
+    var at6 = toastShown();
+    await later(longMsg.length * 65 - 6000 + 300);
+    ok(at6 && !toastShown(), "toast: a message of several sentences is still up after six seconds, and goes once there has been time to read it", String(at6));
+    T.D.toast(new Array(60).join("A very long message. "));
+    await later(19000);
+    var at19 = toastShown();
+    await later(1500);
+    ok(at19 && !toastShown(), "toast: and never stays longer than twenty seconds");
+
+    // ---- 62: the Draft or Final choice follows a document saved into another file ----
+    d = await open(T, project([para("Complete.")], { info: { issuedDate: "2026-11-11" } }));
+    T.nextSave = fakeHandle("first.json");
+    await T.D.save();
+    var firstId = T.D.state.doc.id;
+    T.D.go("issue");
+    var fin = T.$("dp-status-final");
+    fin.checked = true; fin.dispatchEvent(new T.W.Event("change", { bubbles: true }));
+    T.D.go("info"); T.D.go("issue");
+    ok(T.$("dp-status-final").checked, "62: Final, once chosen, is still chosen on coming back to the page");
+    T.nextSave = fakeHandle("second.json");
+    var res = await T.D.save({ saveAs: true });
+    ok(!!res && res.oldId === firstId && T.D.state.doc.id !== firstId, "62: saved into another file, the document takes a new id", J(res && res.oldId) + " " + T.D.state.doc.id);
+    T.D.go("issue");
+    ok(T.$("dp-status-final").checked && !T.$("dp-status-draft").checked, "62: and Final is still chosen for it");
+    d = await open(T, project([para("Another document.")]));
+    T.D.go("issue");
+    ok(T.$("dp-status-draft").checked, "62: another document starts as a draft");
+
+    });
+
+    ok(T.errors.length === 0, "the tool raised no error of its own", T.errors.join(" | "));
+  }
+
+  run().then(finish, function (e) { ok(false, "the tests ran to the end", e && (e.stack || e.message)); finish(); });
+})();
+</script>
+</body></html>

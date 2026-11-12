@@ -1,0 +1,181 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the cover strip and the short document's date</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/pages.css" />
+</head>
+<body>
+<pre id="out">running...</pre>
+<div id="stage" style="position:absolute; left:0; top:0;"></div>
+<!--
+  Two fixes, read back from a real Word file and from the screen's cover:
+
+    1. The cover strip keeps each label with its value. With a long author the
+       strip wrapped between CLASSIFICATION and its value (seen in Word). Now a
+       pair that fits on a line is one unit (no-break spaces and hyphens), a
+       pair too long for a line has a line of its own and wraps inside its
+       value with the label held to it, and the normal strip prints as before.
+       The screen's cover wraps its pairs the same way. The cover still fits
+       its page. What Word made of it was read from Word when the fix was made
+       (covers printed to PDF); the XML behind those pages is pinned here.
+    2. A short document prints the issued date when one is given, otherwise
+       the date: in the Word file, in the preview and in the miniature, which
+       all draw the one line (App.HouseDocx.shortHeadLine).
+-->
+<script>
+window.addEventListener("error", function (e) { document.getElementById("out").textContent = "FAIL the page threw: " + (e.message || (e.target && e.target.src) || "a script did not load") + "\n\n1 FAILED"; }, true);
+</script>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/render.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  var A = window.App, HD = A.HouseDocx, Zip = A.ZipIO, R = A.DocRender;
+  var NBSP = "\u00a0", NBHY = "\u2011";
+
+  function build(p, status) {
+    return HD.buildDocument(p, { issueStatus: status || "draft" }).then(function (r) {
+      return Zip.read(r.blob).then(function (list) {
+        var doc = "";
+        list.forEach(function (x) { if (x.name === "word/document.xml") doc = new TextDecoder().decode(x.bytes); });
+        return doc;
+      });
+    });
+  }
+  function coverXml(doc) { return doc.slice(doc.indexOf("<w:body>"), doc.indexOf("</w:sectPr>") + 11); }
+  function unesc(s) { return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&"); }
+  // The strip's paragraph, as its runs: [{ text, br, size }].
+  function stripRuns(doc) {
+    var cov = coverXml(doc);
+    var p = (cov.match(/<w:p>(?:(?!<\/w:p>)[\s\S])*<\/w:p>/g) || []).filter(function (x) { return /ISSUE/.test(x); })[0] || "";
+    return (p.match(/<w:r>[\s\S]*?<\/w:r>/g) || []).map(function (r) {
+      var t = (r.match(/<w:t[^>]*>([^<]*)<\/w:t>/) || [])[1] || "";
+      return { text: unesc(t), br: /<w:br\/>/.test(r), size: (r.match(/<w:sz w:val="(\d+)"\/>/) || [])[1] };
+    });
+  }
+  function plain(s) { return String(s).replace(/\u00a0/g, " ").replace(/\u2011/g, "-"); }
+
+  var INFO = { title: "Network segmentation proposal", docType: "Proposal", client: "Northfield Water", site: "Ashby treatment works", reference: "OPP-10234",
+    revision: "1.2", date: "2026-11-11", author: "A. Consultant", classification: "Confidential" };
+  var seq = 0;
+  function para(t) { seq += 1; return { id: "b" + seq, type: "paragraph", runs: [{ t: t }] }; }
+  function project(over, kind) {
+    var p = { schema: "spt-document/1.0", kind: kind || "report", info: Object.assign({}, INFO, over || {}), options: {}, footnotes: {}, media: {}, parts: {}, blocks: [para("Body text.")] };
+    return p;
+  }
+  var LONG_AUTHOR = "Alexandra Featherstonehaugh and Bartholomew Winterbottom";
+  var LONG_CLASS = "Official sensitive, commercial in confidence, not for onward distribution beyond the named recipients of this document";
+
+  var chain = Promise.resolve(), stepNo = 0;
+  function step(fn) {
+    var no = ++stepNo;
+    chain = chain.then(fn).then(null, function (e) { ok(false, "step " + no + " threw: " + (e && e.message), e && e.stack); })
+      .then(function () { document.getElementById("out").textContent = lines.join("\n") + "\nFAIL the page did not finish: re-run it alone with a larger time budget"; });
+  }
+
+  // ---- 1. Word: the normal strip prints as before, its pairs held together ----
+  step(function () {
+    return build(project()).then(function (doc) {
+      var rs = stripRuns(doc);
+      ok(rs.length === 6 && plain(rs.map(function (r) { return r.text; }).join("|")) === "ISSUE   |1.2  ·  2026-11-11|        AUTHOR   |A. Consultant|        CLASSIFICATION   |Confidential",
+         "normal: the strip is the assessment's six runs, word for word once its no-break spaces are read as spaces", rs.map(function (r) { return JSON.stringify(r.text); }).join("|"));
+      ok(rs.every(function (r) { return !r.br; }) && rs.map(function (r) { return r.size; }).join() === "16,19,16,19,16,19", "normal: on one line with no breaks, labels at 8 pt and values at 9.5 pt as before", rs.map(function (r) { return r.size + (r.br ? "br" : ""); }).join());
+      ok([0, 2, 4].every(function (i) { return /\S\u00a0{3}$/.test(rs[i].text); }), "normal: each label is joined to its value by no-break spaces, so the two cannot part", rs.map(function (r) { return JSON.stringify(r.text); }).join("|"));
+      ok(rs[2].text.indexOf("        ") === 0 && rs[4].text.indexOf("        ") === 0, "normal: the spaces between pairs are ordinary spaces, so the strip wraps there");
+      ok(rs[1].text === "1.2" + NBSP + NBSP + "·" + NBSP + NBSP + "2026" + NBHY + "11" + NBHY + "11" && rs[3].text === "A." + NBSP + "Consultant",
+         "normal: a pair that fits a line has no break inside it, not even at a hyphen", JSON.stringify(rs[1].text) + " " + JSON.stringify(rs[3].text));
+    });
+  });
+
+  // ---- 2. Word: the long case that split CLASSIFICATION from its value ----
+  step(function () {
+    var p = project({ client: "Northfield and District Water and Wastewater Services Joint Operating Company Limited", author: LONG_AUTHOR,
+      classification: "Official sensitive, commercial in confidence, not for onward distribution" });
+    return build(p).then(function (doc) {
+      var rs = stripRuns(doc), cls = rs.filter(function (r) { return /CLASSIFICATION/.test(r.text); })[0] || { text: "" };
+      ok(/CLASSIFICATION\u00a0{3}$/.test(cls.text), "long: CLASSIFICATION is held to its value, so it cannot end a line with the value on the next", JSON.stringify(cls.text));
+      var auth = rs[rs.indexOf(rs.filter(function (r) { return /AUTHOR/.test(r.text); })[0]) + 1] || { text: "" };
+      ok(auth.text === LONG_AUTHOR.replace(/ /g, NBSP), "long: the author, which fits a line, is one unit", JSON.stringify(auth.text));
+      ok(HD.coverFits(p), "long: the cover still fits its page");
+    });
+  });
+
+  // ---- 3. Word: a pair too long for one line ----
+  step(function () {
+    var p = project({ author: LONG_AUTHOR, classification: LONG_CLASS });
+    return build(p).then(function (doc) {
+      var rs = stripRuns(doc), at = -1;
+      rs.forEach(function (r, i) { if (/CLASSIFICATION/.test(r.text)) at = i; });
+      var lab = rs[at] || {}, val = rs[at + 1] || {};
+      ok(lab.br === true && lab.text === "CLASSIFICATION" + NBSP + NBSP + NBSP, "too long: it starts a line of its own, with no spaces before its label", JSON.stringify(lab));
+      ok(val.text === LONG_CLASS, "too long: its value keeps ordinary spaces, so it wraps inside itself", JSON.stringify(val.text));
+      ok(HD.coverFits(p), "too long: the cover still fits its page");
+      var some = project({ author: LONG_AUTHOR, classification: new Array(15).join("not for onward distribution ") });
+      var lots = project({ author: LONG_AUTHOR, classification: new Array(50).join("not for onward distribution ") });
+      ok(HD.coverRoom(HD.coverInput(some)).foot === true && HD.coverRoom(HD.coverInput(lots)).foot === false,
+         "too long: the estimate of the strip's height still says when a pair of many lines no longer fits", JSON.stringify(HD.coverRoom(HD.coverInput(lots))));
+    });
+  });
+
+  // ---- 4. the screen: pairs are units, laid out as Word lays them ----
+  step(function () {
+    var stage = document.getElementById("stage");
+    function draw(over) { stage.textContent = ""; var el = R.coverEl(project(over)); stage.appendChild(el); return el; }
+    var el = draw({});
+    var pairs = el.querySelectorAll(".cover-strip > .cover-pair");
+    ok(pairs.length === 3 && Array.prototype.every.call(pairs, function (q) { return q.children.length === 2 && q.children[0].className === "cover-k" && q.children[1].className === "cover-v"; }),
+       "screen: the strip is three label and value pairs, each one unit", el.querySelector(".cover-strip").innerHTML.slice(0, 200));
+    var tops = Array.prototype.map.call(el.querySelectorAll(".cover-strip .cover-k, .cover-strip .cover-v"), function (n) { return Math.round(n.getBoundingClientRect().bottom); });
+    ok(tops.length === 6 && Math.max.apply(null, tops) - Math.min.apply(null, tops) <= 4, "screen: the normal strip is on one line", tops.join());
+    var stripH = el.querySelector(".cover-strip").getBoundingClientRect().height;
+    ok(stripH > 10 && stripH < 20, "screen: and one line high, as before", String(stripH));
+    [["long", { client: "Northfield and District Water and Wastewater Services Joint Operating Company Limited", author: LONG_AUTHOR, classification: "Official sensitive, commercial in confidence, not for onward distribution" }],
+     ["too long", { author: LONG_AUTHOR, classification: LONG_CLASS }]].forEach(function (c) {
+      var e = draw(c[1]);
+      var parted = Array.prototype.filter.call(e.querySelectorAll(".cover-strip .cover-k"), function (k) {
+        var v = k.nextElementSibling, r = v && v.getClientRects()[0];
+        return !r || Math.abs(r.bottom - k.getBoundingClientRect().bottom) > 4;
+      }).map(function (k) { return k.textContent; });
+      ok(parted.length === 0, "screen, " + c[0] + ": every label is on the line where its value starts", parted.join());
+    });
+    stage.textContent = "";
+  });
+
+  // ---- 5. a short document's date ----
+  step(function () {
+    var both = project({ issuedDate: "12 November 2026" }, "short"), dateOnly = project({ issuedDate: "" }, "short"), blank = project({ issuedDate: "   " }, "short");
+    ok(HD.shortHeadLine(both) === "Northfield Water · 1.2 · 12 November 2026", "short: with an issued date the line under the title gives it, not the date", HD.shortHeadLine(both));
+    ok(HD.shortHeadLine(dateOnly) === "Northfield Water · 1.2 · 2026-11-11" && HD.shortHeadLine(blank) === HD.shortHeadLine(dateOnly), "short: with none, or only spaces, it gives the date", HD.shortHeadLine(blank));
+    var cap = function (d) { var n = R.shortHeadEl(d).querySelector(".cap"); return n ? n.textContent : ""; };
+    ok(cap(both) === HD.shortHeadLine(both) && cap(dateOnly) === HD.shortHeadLine(dateOnly), "short: the preview and the miniature (shortHeadEl) show the writer's line", cap(both) + " / " + cap(dateOnly));
+    return build(both).then(function (doc) {
+      ok(doc.indexOf(">Northfield Water · 1.2 · 12 November 2026<") !== -1 && doc.indexOf("· 2026-11-11<") === -1, "short: the Word file prints the issued date and not the date");
+      return build(dateOnly);
+    }).then(function (doc) {
+      ok(doc.indexOf(">Northfield Water · 1.2 · 2026-11-11<") !== -1, "short: and the date when there is no issued date");
+    });
+  });
+
+  chain.then(finish, function (e) { ok(false, "threw: " + (e && e.message)); finish(); });
+})();
+</script>
+</body></html>

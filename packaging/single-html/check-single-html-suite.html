@@ -10,7 +10,10 @@
   the licence and the newest release notes, records saves and loads in Recent
   files and reopens them, builds Word and Excel inside each tool, saves inside
   a frame (in place, and by download when the save dialog is refused), passes
-  theme changes on, and warns before closing with unsaved work. It first opens
+  theme changes on, routes a document file to the Document Tool and refuses a
+  Word file with where to open it, and warns before closing with unsaved work.
+  (What the Document Tool does once open is its own check's business,
+  check-single-html-documents.html.) It first opens
   the folder build (platform/index.html) to read the product and version and
   to see a tool start there too.
 
@@ -124,10 +127,14 @@
     var badge = (d.querySelector("#suite-name .version-badge") || {}).textContent;
     ok(badge === label, "the header shows the suite version (" + badge + ")", badge);
     var cards = Array.prototype.map.call(d.querySelectorAll(".tool-card h2"), function (e) { return e.textContent; });
-    ok(cards.length === 3 && cards[0] === "OT Cyber Assessment Tool" && cards[1] === "OT Cyber Risk Assessment Tool" && cards[2] === "OT Cyber Report Review Tool", "the home page has a card for each tool, in order (" + cards.join(", ") + ")", cards.join(" | "));
-    ok(d.querySelectorAll(".tool-card .tool-tour").length === 3, "every tool's tour is offered on its card");
-    ok(d.querySelectorAll(".tool-card .help-tool").length === 3 && /62443-3-3/.test(d.querySelector(".help-card").textContent) && /review pack/i.test(d.querySelector(".help-card").textContent), "each card says when to use the tool, and How the tools fit together names the files between them");
-    ok(d.querySelector("#suite-bar .bar-home[aria-current='page']") && d.querySelectorAll("#suite-bar .bar-tab").length === 3, "the rail shows Home, current, and a button for each tool");
+    ok(cards.length === 4 && cards[0] === "OT Cyber Assessment Tool" && cards[1] === "OT Cyber Risk Assessment Tool" && cards[2] === "OT Cyber Report Review Tool" && cards[3] === "OT Cyber Document Tool", "the home page has a card for each tool, in order (" + cards.join(", ") + ")", cards.join(" | "));
+    ok(d.querySelectorAll(".tool-card .tool-tour").length === 4, "every tool's tour is offered on its card");
+    ok(d.querySelectorAll(".tool-card .help-tool").length === 4 && /62443-3-3/.test(d.querySelector(".help-card").textContent) && /review pack/i.test(d.querySelector(".help-card").textContent), "each card says when to use the tool, and How the tools fit together names the files between them");
+    var apart = d.querySelector(".help-card .flow > li:last-child");
+    ok(apart && apart.getAttribute("data-module") === "documents" && apart.classList.contains("flow-apart") && /no file passes between it and the other tools/.test(apart.textContent),
+       "with the Document Tool after the flow, on its own", apart && apart.textContent);
+    ok(w.getComputedStyle(d.querySelector(".tool-grid")).gridTemplateColumns.split(" ").length === 2, "the four cards sit as two rows of two");
+    ok(d.querySelector("#suite-bar .bar-home[aria-current='page']") && d.querySelectorAll("#suite-bar .bar-tab").length === 4, "the rail shows Home, current, and a button for each tool");
     ok(!/developer copy/.test(d.querySelector(".help-card").textContent), "and does not carry the folder build's note about downloads");
     ok(/appear here/.test(d.querySelector(".recent-card").textContent), "Recent files starts empty, saying what will appear");
     ok(/© 2026 SolutionsPT/.test(d.querySelector(".home-legal").textContent) && d.querySelector(".home-legal").textContent.indexOf(product + " " + label) !== -1, "the footer carries the version and the copyright notice");
@@ -154,18 +161,20 @@
     ok(!d.querySelector(".licence-modal"), "and closes again");
 
     // The tools it carries are the tools' own single files.
-    ok(w.Suite.Bundle && w.Suite.Bundle.payloads.join(",") === "assessments,assessments-tour,risk-assessment,report-review", "it carries every tool and the assessment tour (" + (w.Suite.Bundle && w.Suite.Bundle.payloads.join(", ")) + ")");
+    ok(w.Suite.Bundle && w.Suite.Bundle.payloads.join(",") === "assessments,assessments-tour,risk-assessment,report-review,documents", "it carries every tool and the assessment tour (" + (w.Suite.Bundle && w.Suite.Bundle.payloads.join(", ")) + ")");
     function unpack(id) { return new Promise(function (res, rej) { w.Suite.Shell.payloadHtml(id, function (e, html) { if (e) rej(e); else res(html); }); }); }
     return Promise.all([unpack("assessments"), readFile("OT Cyber Assessment Tool " + label + ".html"),
                         unpack("risk-assessment"), readFile("OT Cyber Risk Assessment Tool " + label + ".html"),
                         unpack("assessments-tour"),
-                        unpack("report-review"), readFile("OT Cyber Report Review Tool " + label + ".html")]);
+                        unpack("report-review"), readFile("OT Cyber Report Review Tool " + label + ".html"),
+                        unpack("documents"), readFile("OT Cyber Document Tool " + label + ".html")]);
   })
   .then(function (r) {
     ok(r[0].length > 1000000 && r[0] === r[1], "the assessment tool inside is its own single file, byte for byte (" + r[0].length + " characters)", r[0].length + " vs " + r[1].length);
     ok(r[2].length > 500000 && r[2] === r[3], "the risk tool inside is its own single file, byte for byte (" + r[2].length + " characters)", r[2].length + " vs " + r[3].length);
     ok(/<title>OT Cyber Assessment Tool - demo/.test(r[4]) && /tour-sl-data\.js/.test(r[4]) && !/<script src="[^"]*"><\/script>/.test(r[4]), "the assessment tour is its tour.html, built as a single file");
     ok(r[5].length > 500000 && r[5] === r[6], "the report review tool inside is its own single file, byte for byte (" + r[5].length + " characters)", r[5].length + " vs " + r[6].length);
+    ok(r[7].length > 500000 && r[7] === r[8], "the document tool inside is its own single file, byte for byte (" + r[7].length + " characters)", r[7].length + " vs " + r[8].length);
 
     // ---- 3. Open the risk tool ----------------------------------------------
     S.Suite.Shell.open("risk-assessment");
@@ -412,6 +421,44 @@
           });
         });
       });
+    });
+  })
+
+  // ---- 7c. The document tool in the suite --------------------------------------
+  // That it is carried, starts and is sent its own file. What it does with
+  // one is checked by its own page, check-single-html-documents.html.
+  .then(function (o) {
+    var Sh = S.Suite.Shell, K = Sh.fileKind;
+    function dropped(name, text) { return { name: name, size: text.length, text: function () { return Promise.resolve(text); } }; }
+    function toastText() { var t = S.document.getElementById("toast"); return t && !t.classList.contains("hidden") ? t.textContent : ""; }
+    var docText = JSON.stringify({ schema: "spt-document/1.0", id: "doc-suite-check", createdAt: "2026-11-11T09:00:00.000Z", savedAt: "2026-11-11T09:00:00.000Z",
+      kind: "short", info: { title: "Suite check note", client: "Check Ltd", revision: "0.1", classification: "Confidential" },
+      options: { numberHeadings: false, contents: false }, nextId: 2,
+      blocks: [{ id: "b1", type: "paragraph", runs: [{ t: "Sent to the tool by the suite." }] }], footnotes: {}, media: {}, parts: {} });
+    ok(K(docText).module === "documents" && K(docText).what === "document file", "a document file (spt-document) is one the suite sends to the document tool");
+    Sh.home();
+    return Sh.openDropped([dropped("proposal.docx", "PK\u0003\u0004 a zip")]).then(function (order) {
+      ok(order.length === 0 && Sh.current() === null && !Sh.frames.documents &&
+         /proposal\.docx is a Word or Excel file, which the suite does not open\. To put a Word file into the SolutionsPT template, open it with Load in the OT Cyber Document Tool\.$/.test(toastText()),
+         "a Word file is refused by the suite, with a pointer to Load in the document tool", toastText());
+      return Sh.openDropped([dropped("suite-check-note 0.1.json", docText)]);
+    }).then(function (order) {
+      ok(order.join(",") === "documents" && Sh.current() === "documents", "a document file opens the document tool, for the first time", order.join(","));
+      return tool(S, "documents");
+    }).then(function (t) {
+      watch(t.w, "documents");
+      var launch = JSON.parse(t.f.el.name.replace(/^spt-suite:/, ""));
+      ok(t.f.el.hasAttribute("srcdoc") && !t.f.el.getAttribute("src") && t.d.title === "OT Cyber Document Tool" && t.w.App.Version.product === t.d.title && t.w.App.Version.label === label,
+         "the document tool opens in a frame of its own, with its title and version (" + t.d.title + " " + label + ")", t.d.title + " " + t.w.App.Version.label);
+      ok(t.w.App.HostBridge.hosted && launch.module === "documents" && launch.tour === false && t.f.product === "OT Cyber Document Tool" && t.f.version === label,
+         "it knows it is in the suite, not on its tour, and tells the suite its name and version", t.f.product + " " + t.f.version);
+      ok(/OT Cyber Document Tool/.test(railNow(S)) && /^Write, /.test(railNow(S)) && S.document.title === "OT Cyber Document Tool - " + product,
+         "the rail marks it as the tool on show, and the suite's title follows", railNow(S) + " / " + S.document.title);
+      S.Suite.Shell.open("assessments");
+      S.Suite.Shell.open("documents");
+      ok(t.f.el.contentWindow === t.w && t.f.el.classList.contains("active"), "switching away and back finds the same frame");
+      o.documents = t;
+      return o;
     });
   })
 

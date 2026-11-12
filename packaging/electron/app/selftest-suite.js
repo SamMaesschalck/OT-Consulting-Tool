@@ -8,7 +8,7 @@
  * (platform/suite.json, copied in as module.json).
  *
  * What is DIFFERENT about the suite inside Electron: that it starts on its
- * home page with both tools listed, that each tool opens in its frame (made
+ * home page with every tool listed, that each tool opens in its frame (made
  * from the single file the suite carries) with its title and the exe's
  * version, that the file dialogs and storage work inside those frames, that
  * a Word and an Excel export from EACH tool really reach disk from inside its
@@ -114,9 +114,9 @@ module.exports = function selfTest(win) {
       ok(home.version === app.getVersion() && home.badge === home.label, "the exe and the suite agree on the version, and the home page shows it (" + home.label + ")",
          "exe " + app.getVersion() + ", suite " + home.version + ", badge " + home.badge);
       ok(home.logo > 0, "the header logo shows");
-      ok(home.cards.join(" | ") === "OT Cyber Assessment Tool | OT Cyber Risk Assessment Tool | OT Cyber Report Review Tool" && home.tours === 3, "the home page has a card for each tool, with its tour", home.cards.join(" | "));
-      ok(home.bundled === "assessments,assessments-tour,risk-assessment,report-review", "the suite carries every tool and the assessment tour", String(home.bundled));
-      ok(/^What's new in v/.test(home.notes) && home.recent && home.help === 3, "it shows What's new, Recent files and Getting started", home.notes);
+      ok(home.cards.join(" | ") === "OT Cyber Assessment Tool | OT Cyber Risk Assessment Tool | OT Cyber Report Review Tool | OT Cyber Document Tool" && home.tours === 4, "the home page has a card for each tool, with its tour", home.cards.join(" | "));
+      ok(home.bundled === "assessments,assessments-tour,risk-assessment,report-review,documents", "the suite carries every tool and the assessment tour", String(home.bundled));
+      ok(/^What's new in v/.test(home.notes) && home.recent && home.help === 4, "it shows What's new, Recent files and when to use each tool", home.notes);
       const licence = await run(`(function () {
         document.getElementById("btn-licence").click();
         var t = (document.querySelector(".licence-modal .licence-text") || {}).textContent || "";
@@ -138,6 +138,19 @@ module.exports = function selfTest(win) {
         return { title: w.document.title, hosted: w.App.HostBridge.hosted, version: w.App.Version.label, blocks: w.document.querySelectorAll("#rr-paper [data-block-id]").length, comments: R.state.review.comments.length, srcdoc: Suite.Shell.frames["report-review"].el.hasAttribute("srcdoc") };`));
       ok(review.title === "OT Cyber Report Review Tool" && review.hosted && review.srcdoc && review.version === home.label && review.blocks > 50 && review.comments === 1, "it opens a pack, draws the report and takes a comment inside the suite", JSON.stringify(review));
 
+      // The document tool in its frame. That it starts here is the suite's
+      // to prove; what it does is selftest-documents.js.
+      await run(`Suite.Shell.open("documents"); 0`);
+      const docsUp = await until(IN("documents", "return !!(w.App && w.App.Product && w.App.DocApp && w.DocumentTool && Suite.Shell.frames['documents'].ready);"), 60000);
+      ok(docsUp, "the document tool starts in its frame");
+      const docs = await run(IN("documents", `w.confirm = function () { return true; }; w.alert = function () {};
+        var f = Suite.Shell.frames["documents"];
+        return { title: w.document.title, product: f.product, version: w.App.Version.number, label: f.version, hosted: w.App.HostBridge.hosted, srcdoc: f.el.hasAttribute("srcdoc"),
+          docx: !!w.docx, bar: (document.querySelector("#suite-bar [aria-current='page']") || { getAttribute: function () { return ""; } }).getAttribute("aria-label") || "" };`));
+      ok(docs.title === "OT Cyber Document Tool" && docs.product === docs.title && docs.version === app.getVersion() && docs.label === home.label && docs.hosted && docs.srcdoc && docs.docx,
+         "with its own title and the exe's version, knowing it is in the suite (" + docs.title + " " + docs.label + ")", JSON.stringify(docs));
+      ok(/^Write, OT Cyber Document Tool/.test(docs.bar), "the rail marks it as the tool on show", docs.bar);
+
       // Each tool in its frame.
       await run(`Suite.Shell.open("risk-assessment"); 0`);
       const riskUp = await until(IN("risk-assessment", "return !!(w.RiskTool && w.RiskExports && w.docx && w.ExcelJS && Suite.Shell.frames['risk-assessment'].ready);"), 60000);
@@ -152,7 +165,7 @@ module.exports = function selfTest(win) {
       ok(risk.title === "OT Cyber Risk Assessment Tool" && risk.version === app.getVersion() && risk.badge === risk.label + ", 62443-3-2-aligned",
          "with its own title and the exe's version (" + risk.title + " " + risk.label + ")", JSON.stringify(risk));
       ok(risk.srcdoc && risk.pickers && risk.storage, "the frame is the suite's own origin: the file dialogs and storage work in it", JSON.stringify(risk));
-      ok(/OT Cyber Risk Assessment Tool/.test(risk.bar) && risk.tabs === 3, "the rail marks the tool on show, with a button for every tool", risk.bar);
+      ok(/OT Cyber Risk Assessment Tool/.test(risk.bar) && risk.tabs === 4, "the rail marks the tool on show, with a button for every tool", risk.bar);
 
       await run(`Suite.Shell.open("assessments"); 0`);
       const asUp = await until(IN("assessments", "return !!(w.App && w.App.UI && w.App.Engine && w.App.Engine.state.instruments && Suite.Shell.frames['assessments'].ready);"), 60000);

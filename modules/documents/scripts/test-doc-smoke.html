@@ -1,0 +1,105 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the page loads</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The document tool's page, from file://, in a frame: every script and stylesheet
+  it lists is there and loads, nothing throws or breaks the Content-Security-Policy,
+  and every global and function the design's tables name (docs/document-tool-design.md
+  4 and 5.2) exists, so each package can call the others by name from the first
+  day. Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+
+  // The names in the design's tables. "a.b" is a member of a member.
+  var NAMES = {
+    ZipIO: "read write crc32 text bytesOf",
+    DocxGraft: "apply token needsGraft unshare scaleXml escapeAttr SharedPartError",
+    HouseDocx: "hex COLOR FONT TBL_LIGHT TBL_WHITE TBL_NONE run body h1 h2 h3 hn pageBreakPara caption tagPlaceholder placeholderPara noteRun collectPlaceholders " +
+      "isFinal statusLabel importedXml watermarkRun isParagraph markDraft lockAsFinal cell headerCell table dxaW cellDxa headerCellDxa fixedTable buildHeaderRow " +
+      "logoAsset logoImageRun brandHeaderObj brandHeaders buildStyles splitTitleTwo brandFootersDoc cover DOC_A4_W DOC_A4_H docPO portraitSectionProps " +
+      "landscapeSectionProps widenFirstCol bodySectionsFromSegments documentControl COMPANY numberingConfig listNumbers coverTitleSize controlPairs coverInput " +
+      "assemble pack blocksToDocx buildDocument issueList",
+    DocxImport: "read parseStyles parseNumbering parseTheme headingLevel listInfo effectiveFormat classifyDrawing CODES",
+    DocModel: "SCHEMA KINDS DOC_TYPES LIMITS create normalise newId make.heading make.paragraph make.list make.table make.picture make.pageBreak make.prompt " +
+      "copyBlocks find insertAfter remove move replace outline sectionRange text runsText runs.slice runs.toggle runs.insert runs.remove runs.split runs.join " +
+      "runs.normalise runs.setLink table.grid table.addRow table.removeRow table.addCol table.removeCol table.setHeader table.equalWidths table.nudge " +
+      "footnote.add footnote.set promptCount addMedia addPart mediaUrl releaseUrls usedKeys missing fill sizeOf toFile fromText",
+    DocStorage: "save openWithPicker adopt forget currentName download autosave.note autosave.offer autosave.restore autosave.discard " +
+      "bytesStore.putDoc bytesStore.getDoc bytesStore.putBlob bytesStore.getBlobs bytesStore.remove bytesStore.ok",
+    DocPictures: "fromFile ACCEPT",
+    DocApp: "state go touched markClean setDoc canAdd toast confirmBox busy say h",
+    DocRender: "blockEl runsInto runsFrom matches offsetsOf rangeAt roughHeight keptCard coverEl controlEl contentsEl shortHeadEl",
+    DocEditor: "mount unmount focusBlock selectBlocks redraw selection run commands __test.type __test.press __test.selectText __test.dragSelect",
+    DocHistory: "record undo redo canUndo canRedo clear coalesce",
+    DocTables: "tableEl controls keydown",
+    DocPaste: "read fromHtml fromText copyPayload",
+    DocExport: "word blob issues filename",
+    DocImportFlow: "start sentence",
+    DocPages: "info preview issue report about welcome"
+  };
+  var IDS = "app-header btn-new btn-load btn-save btn-theme file-input save-state autosave-note sidebar nav outline main toolbar paper live toast modal".split(" ");
+  var SCRIPTS = "js/version.js js/product.js js/host-bridge.js js/logo.js js/hero-asset.js vendor/docx.umd.js js/zip-io.js js/docx-graft.js js/house-docx.js js/docx-import.js " +
+    "data/document.js data/licence.js js/model.js js/storage.js js/pictures.js js/render.js js/history.js js/tables.js js/paste.js js/editor.js js/export.js js/import-flow.js " +
+    "js/pages.js js/app.js";
+
+  function reach(o, path) {
+    return path.split(".").reduce(function (x, k) { return x == null ? undefined : x[k]; }, o);
+  }
+
+  var errors = [];
+  frame.onload = function () {
+    var w = frame.contentWindow, doc = w.document;
+    w.addEventListener("error", function (e) { errors.push("error: " + (e.message || e.type)); });
+    w.addEventListener("unhandledrejection", function (e) { errors.push("rejection: " + (e.reason && e.reason.message || e.reason)); });
+    doc.addEventListener("securitypolicyviolation", function (e) { errors.push("policy: " + e.violatedDirective + " " + e.blockedURI); });
+    // Give the page a turn, so anything a script deferred has run.
+    setTimeout(function () {
+      var A = w.App || {};
+      var listed = Array.prototype.map.call(doc.querySelectorAll("script[src]"), function (s) { return s.getAttribute("src"); }).join(" ");
+      ok(listed === SCRIPTS, "the page lists the scripts in the design's order (" + listed.split(" ").length + ")", listed);
+      // A script that failed to load leaves no global, and a script that threw
+      // stops before it sets one; either shows here by name.
+      Object.keys(NAMES).forEach(function (g) {
+        var gone = !A[g] ? ["(the global)"] : NAMES[g].split(" ").filter(function (n) { return reach(A[g], n) === undefined; });
+        ok(gone.length === 0, "App." + g + " has every name in the design (" + NAMES[g].split(" ").length + ")", "missing: " + gone.join(", "));
+      });
+      var T = w.DocumentTool || {};
+      var seam = ["state", "go", "load", "exportBlob", "issues", "editor"].filter(function (n) { return T[n] === undefined; });
+      ok(!!w.DocumentTool && seam.length === 0, "window.DocumentTool is the test seam", "missing: " + seam.join(", "));
+      ok(T.state === (A.DocApp || {}).state && T.editor === (A.DocEditor || {}).__test, "and it shares the app's state and the editor's test hooks");
+      ok(!!w.docx && typeof w.docx.Document === "function" && !!w.docx.Packer, "the docx library is loaded");
+      ok(!!(A.Assets && A.Assets.logo && A.Assets.coverBg && A.Assets.logoCard), "with the logo and the cover art the template needs");
+      ok(!!A.HostBridge, "the suite bridge is loaded");
+      ok(A.Product && A.Product.id === "documents" && A.Version && A.Version.product === "OT Cyber Document Tool" && doc.title === A.Product.name, "the product is the OT Cyber Document Tool, in the page title too", doc.title);
+      ok(A.Data && A.Data.contracts && A.Data.contracts.document && A.Data.contracts.document.schema === "spt-document/1.0" && A.DocModel && A.DocModel.SCHEMA === "spt-document/1.0", "the contract is loaded, and the model names its schema");
+      ok(A.Data && /SolutionsPT/.test(A.Data.licence || ""), "the licence text is loaded");
+      var noId = IDS.filter(function (id) { return !doc.getElementById(id); });
+      ok(noId.length === 0, "every fixed element id is in the page (" + IDS.length + ")", "missing: " + noId.join(", "));
+      ok(doc.getElementById("btn-new").textContent === "New" && doc.getElementById("btn-load").textContent === "Load" && doc.getElementById("btn-save").textContent === "Save", "the header buttons are New, Load and Save");
+      ok(doc.getElementById("live").getAttribute("aria-live") === "polite", "the live region is polite");
+      var sheets = doc.querySelectorAll('link[rel="stylesheet"]');
+      var loaded = Array.prototype.filter.call(sheets, function (l) { try { return l.sheet && l.sheet.cssRules.length >= 0; } catch (e) { return false; } });
+      ok(sheets.length === 5 && loaded.length === 5, "the five stylesheets load", loaded.length + " of " + sheets.length);
+      ok((doc.querySelector(".brand-logo img") || {}).naturalWidth > 0, "the header logo shows");
+      var csp = (doc.querySelector('meta[http-equiv="Content-Security-Policy"]') || { content: "" }).content;
+      ok(/img-src 'self' data: blob:;/.test(csp) && /default-src 'none'/.test(csp) && !/connect-src|unsafe-eval/.test(csp), "the policy allows blob: pictures, and no eval and no connections", csp);
+      ok(doc.getElementById("version-badge").textContent === A.Version.label, "the header shows the version");
+      ok(errors.length === 0, "no script error, rejection or policy violation once it is up", errors.join(" | "));
+      finish();
+    }, 300);
+  };
+  frame.src = "../index.html";
+})();
+</script>
+</body></html>

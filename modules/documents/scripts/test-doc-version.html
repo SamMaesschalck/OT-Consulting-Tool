@@ -1,0 +1,231 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the version is in the tool, never in a Word file</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The tool's version (js/version.js, the suite version copied in from
+  shared/version.js) is shown in the tool and recorded in the document files
+  it saves. It must never reach a Word export: the deliverable is the
+  consultant's, not the tool's. Every export here is opened (it is a zip),
+  every part is decompressed, and the version number, its label, the product
+  name and the project file's own field names must appear nowhere in it, text
+  or properties. Run on new documents of both kinds, on a document with every
+  kind of block (which goes through the graft pass and is zipped again by our
+  own writer), and on an imported Word file, each as a draft and as a final.
+  This is the document tool's version proof, as scripts/test-version.html is
+  the assessment tool's.
+-->
+<div id="main"></div>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../data/licence.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/export.js"></script>
+<script src="../js/import-flow.js"></script>
+<script src="../js/pages.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  // Written out as it goes, ending in a FAIL line until the last test has run:
+  // a page cut short by the runner's time budget must not read as a short pass.
+  function show(end) { document.getElementById("out").textContent = lines.join("\n") + "\n" + end; }
+  function ok(c, n, d) {
+    lines.push((c ? "PASS " : "FAIL ") + n + (!c && d != null ? " - " + d : "")); if (!c) fail++;
+    show("FAIL the page did not finish: re-run it alone with a larger time budget");
+  }
+  // Every package is built now, so a stand-in being used means a real object
+  // has gone missing: that is a failure, not a note.
+  function note(t) { ok(false, "no stand-in is used", t); }
+  function finish() {
+    alive = false;
+    show("\n" + (fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"));
+  }
+  // Packing and zipping run off the main thread, and headless Edge's virtual
+  // clock runs out the moment the page has nothing queued, which dumps the page
+  // half way through. A message bounced to ourselves keeps a task queued,
+  // without moving the clock, until the tests finish (as test-doc-zip.html does).
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  window.addEventListener("error", function (e) { ok(false, "no script error", e.message); });
+  var A = window.App, V = A.Version, M = A.DocModel, X = A.DocExport;
+
+  // The shell, standing in: the export only needs to know which document is open.
+  var state = { doc: null, page: "", dirty: false, tour: false, recovered: false }, downloads = [];
+  A.DocApp = {
+    state: state, go: function () {}, touched: function () {}, toast: function () {}, busy: function () {}, say: function () {},
+    h: function (tag, attrs, kids) {
+      var el = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) { if (k === "text") el.textContent = attrs[k]; else if (k === "class") el.className = attrs[k]; else el.setAttribute(k, attrs[k]); });
+      (kids || []).forEach(function (c) { if (c != null && c !== false) el.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+      return el;
+    }
+  };
+  A.DocStorage.download = function (blob, name) { downloads.push({ blob: blob, name: name }); };
+
+  // ---- the one source, and where it may show -----------------------------
+  ok(V && /^\d+\.\d+\.\d+$/.test(V.number) && V.label === V.labelOf(V.number), "the tool has a version", V && V.number);
+  ok(V.product === "OT Cyber Document Tool" && A.Product && A.Product.id === "documents", "the suite version carries this module's product name", V.product);
+  A.DocPages.about(document.getElementById("main"));
+  ok(document.getElementById("main").textContent.indexOf(V.product + " " + V.label) !== -1 && document.getElementById("main").textContent.indexOf("version " + V.number) !== -1,
+     "the About page shows it");
+
+  // ---- NEVER in a Word file ----------------------------------------------
+  var NEEDLES = [V.number, V.label, V.product, "createdWithVersion", "savedWithVersion", "savedBy", "spt-document", "doc-ver-"];
+  function scan(parts, needles) {
+    var hits = [];
+    parts.forEach(function (p) {
+      needles.forEach(function (nd) {
+        if (p.text.indexOf(nd) !== -1) hits.push(p.name + " has " + nd);
+        if (p.name.indexOf(nd) !== -1) hits.push("a part is named " + p.name);
+      });
+    });
+    return hits;
+  }
+  function unzip(blob) {
+    return A.ZipIO.read(blob).then(function (parts) {
+      return parts.map(function (p) { return { name: p.name, text: /\.(xml|rels)$/.test(p.name) ? A.ZipIO.text(p) : "" }; });
+    });
+  }
+
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  function bytes(b64) {
+    var s = atob(b64), u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u;
+  }
+  // Every document carries the version where a project file does, so there is
+  // something to leak.
+  function stamp(d, marker) {
+    d.id = "doc-ver-" + marker;
+    d.createdWithVersion = V.number;
+    d.savedBy = { product: V.product, version: V.number };
+    return d;
+  }
+  function plain(kind, marker) {
+    var d = M.create(kind);
+    Object.assign(d.info, { title: "Marker " + marker, docType: "Proposal", client: "Version Test Ltd", author: "A. Consultant", revision: "0.1", date: "2026-11-11" });
+    d.blocks = [{ id: "b1", type: "paragraph", runs: [{ t: "Body of " + marker + "." }] }];
+    return stamp(M.normalise(d) || d, marker);
+  }
+  function rich() {
+    var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    var d = M.normalise({
+      schema: "spt-document/1.0", id: "x", kind: "report",
+      info: { title: "Marker rich", docType: "Method statement", reference: "OPP-1", client: "Version Test Ltd", site: "Ashby works", author: "A. Consultant",
+        revision: "2", date: "2026-11-11", qaReviewBy: "Q", authorisedBy: "A", issuedTo: "I", issuedDate: "2026-11-12", classification: "Confidential" },
+      options: { numberHeadings: true, contents: true }, nextId: 50,
+      blocks: [
+        { id: "b1", type: "heading", level: 1, runs: [{ t: "Summary" }] },
+        { id: "b2", type: "paragraph", runs: [{ t: "Bold", b: true }, { t: " and a note" }, { t: "", fn: "f1" }, { t: " and a " }, { t: "link", link: "https://example.com/a?b=1&c=2" }, { t: "." }] },
+        { id: "b3", type: "list", list: "number", level: 0, runs: [{ t: "One" }] },
+        { id: "b4", type: "list", list: "bullet", level: 1, runs: [{ t: "Two" }] },
+        { id: "b5", type: "heading", level: 2, land: true, runs: [{ t: "Zones" }] },
+        { id: "b6", type: "table", land: true, header: 1, cols: [2, 3], caption: "Zones", rows: [
+          { cells: [{ blocks: [{ id: "b7", type: "paragraph", runs: [{ t: "Zone" }] }] }, { blocks: [{ id: "b8", type: "paragraph", runs: [{ t: "Assets" }] }] }] },
+          { cells: [{ span: 2, blocks: [{ id: "b9", type: "paragraph", runs: [{ t: "Control network" }] }] }] }
+        ] },
+        { id: "b10", type: "pageBreak" },
+        { id: "b11", type: "picture", media: "m1", width: 96, height: 96, alt: "A dot", caption: "A picture" },
+        { id: "b12", type: "kept", kind: "equation", xml: '<w:r xmlns:w="' + W + '"><w:t>kept run</w:t></w:r>', rels: [], width: 0, height: 0, floating: false, text: "", description: "Equation" },
+        { id: "b13", type: "heading", level: 3, runs: [{ t: "Detail" }] }
+      ],
+      footnotes: { f1: { runs: [{ t: "A footnote." }] } },
+      media: { m1: { type: "image/png", name: "dot.png", width: 1, height: 1, source: "insert", blob: new Blob([bytes(PNG)], { type: "image/png" }) } },
+      parts: {}
+    });
+    return stamp(d, "rich");
+  }
+  // A Word file made here with the library, standing for a customer's file.
+  function sourceDocx() {
+    var dx = window.docx;
+    var doc = new dx.Document({
+      creator: "Fixture Author", title: "Fixture",
+      sections: [{ children: [
+        new dx.Paragraph({ heading: dx.HeadingLevel.HEADING_1, children: [new dx.TextRun("Imported heading")] }),
+        new dx.Paragraph({ children: [new dx.TextRun("Imported body with "), new dx.TextRun({ text: "bold", bold: true }), new dx.TextRun(".")] }),
+        new dx.Table({ rows: [new dx.TableRow({ children: [new dx.TableCell({ children: [new dx.Paragraph("Cell A")] }), new dx.TableCell({ children: [new dx.Paragraph("Cell B")] })] })] }),
+        new dx.Paragraph({ children: [new dx.ImageRun({ data: bytes(PNG), transformation: { width: 40, height: 40 }, type: "png" })] })
+      ] }]
+    });
+    return dx.Packer.toBlob(doc);
+  }
+  function imported() {
+    return sourceDocx().then(function (blob) {
+      return A.DocxImport.read(new File([blob], "Customer file.docx"), { name: "Customer file.docx" }).then(function (res) {
+        ok(res.project.blocks.length >= 2 && !!res.project.importReport, "a Word file was imported", res.project.blocks.length + " blocks");
+        res.project.info.title = res.project.info.title || "Marker imported";
+        return stamp(res.project, "imported");
+      }, function (e) {
+        if (!/not built yet/.test(String(e && e.message))) throw e;
+        note("App.DocxImport is still a stub: a hand-made imported document stands in for the fixture");
+        var d = plain("report", "imported");
+        d.importReport = { source: { name: "Customer file.docx", size: blob.size, importedAt: "2026-11-11T09:00:00.000Z" }, carried: { paragraphs: 1 }, toCheck: [], notCarried: [], changed: [{ code: "formatting", count: 1 }] };
+        return d;
+      });
+    });
+  }
+
+  function check(label, d, marker) {
+    var chain = Promise.resolve();
+    ["draft", "final"].forEach(function (status) {
+      chain = chain.then(function () {
+        state.doc = d;
+        return X.blob(status).then(unzip).then(function (parts) {
+          var names = parts.map(function (p) { return p.name; });
+          var core = parts.filter(function (p) { return p.name === "docProps/core.xml"; })[0];
+          var body = parts.filter(function (p) { return p.name === "word/document.xml"; })[0];
+          ok(!!core && !!body && parts.length > 5 && scan([body], [marker]).length > 0,
+             label + ", " + status + ": the Word file was opened and read (properties and body)", names.length + " parts");
+          var hits = scan(parts, NEEDLES);
+          ok(hits.length === 0, label + ", " + status + ": no version, product name or project file field anywhere in it, text, properties or part names", hits.join(" | "));
+          ok(/<dc:creator>(A\. Consultant|SolutionsPT|Fixture Author)<\/dc:creator>/.test(core.text) && !/<cp:lastModifiedBy>[^<]*(Tool|Cyber)/i.test(core.text),
+             label + ", " + status + ": the file's author is the document's author, not the tool", (core.text.match(/<dc:creator>[^<]*<\/dc:creator>/) || [""])[0]);
+        });
+      }).catch(function (e) { ok(false, label + ", " + status + ": exports", e && e.message); });
+    });
+    return chain;
+  }
+
+  var chain = Promise.resolve()
+    .then(function () { return check("a new report", plain("report", "new report"), "Marker new report"); })
+    .then(function () { return check("a new short document", plain("short", "short"), "Marker short"); })
+    .then(function () { return check("a document with every kind of block", rich(), "Marker rich"); })
+    .then(imported)
+    .then(function (d) { return check("an imported Word file", d, d.info.title); }, function (e) { ok(false, "a Word file is imported", e && e.message); })
+    .then(function () {
+      // Through the page's own path as well: the download and its name.
+      state.doc = plain("report", "download");
+      return X.word("draft");
+    }).then(function (res) {
+      ok(res && downloads.length === 1 && downloads[0].name === "Version-Test-Ltd-Marker-download-0.1-draft.docx", "Export Word downloads under a name made from the document", downloads[0] && downloads[0].name);
+      ok(scan([{ name: downloads[0].name, text: "" }], NEEDLES).length === 0, "and the name carries no version");
+      return unzip(downloads[0].blob);
+    }).then(function (parts) {
+      ok(scan(parts, NEEDLES).length === 0, "nor does the file it downloads", scan(parts, NEEDLES).join(" | "));
+      // The check can find a version when one is there.
+      ok(scan([{ name: "word/document.xml", text: "<w:t>Made with " + V.label + "</w:t>" }], NEEDLES).length === 1 &&
+         scan([{ name: "docProps/app.xml", text: "<AppVersion>" + V.number + "</AppVersion>" }], NEEDLES).length === 1, "the scan does notice a version when one is planted");
+
+      // ---- recorded in the document file -----------------------------------
+      return M.toFile(plain("report", "file")).then(function (blob) { return blob.text(); });
+    }).then(function (text) {
+      var file = JSON.parse(text);
+      ok(file.createdWithVersion === V.number && file.savedBy && file.savedBy.version === V.number && file.savedBy.product === V.product,
+         "the document file does record the version that made and saved it", JSON.stringify([file.createdWithVersion, file.savedBy]));
+    });
+
+  chain.then(finish, function (e) { ok(false, "threw: " + (e && (e.stack || e.message))); finish(); });
+})();
+</script>
+</body></html>

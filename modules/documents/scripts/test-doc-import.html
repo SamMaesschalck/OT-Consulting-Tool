@@ -1,0 +1,546 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: Word import, text</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.DocxImport on the text of a Word file (docs/document-tool-design.md 4.4):
+  headings, the title, lists, runs, links, fields, notes, tables, alignment,
+  tracked changes, what is reported instead of carried, sections, and the shape
+  of the project and the report it returns.
+
+  Every fixture is written here as XML and zipped by this page's own small
+  writer (stored entries, nothing shared with App.ZipIO), so the reader is
+  never tested against a file its own code produced. The markup follows what
+  Word 365 writes; the cases real files added are marked "real Word".
+-->
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-import.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function eq(a, b, n) { var x = JSON.stringify(a), y = JSON.stringify(b); ok(x === y, n, "got " + x + " wanted " + y); }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Unzipping is real work, not a timer: without a timer pending, virtual time
+  // would run out while it is still going.
+  var tick = setInterval(function () {}, 20);
+  var I = window.App.DocxImport;
+
+  // ---- a zip writer of this page's own -----------------------------------------
+  var CRC = (function () { var t = [], n, c, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc(u) { var c = 0xFFFFFFFF; for (var i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function bytes(v) { return typeof v === "string" ? new TextEncoder().encode(v) : v; }
+  function zip(parts) {
+    var chunks = [], central = [], offset = 0;
+    parts.forEach(function (p) {
+      var name = bytes(p.name), data = bytes(p.data), sum = crc(data);
+      var lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+      lh.setUint32(14, sum, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true);
+      chunks.push(new Uint8Array(lh.buffer), name, data);
+      var ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+      ch.setUint32(16, sum, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, name.length, true);
+      ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), name);
+      offset += 30 + name.length + data.length;
+    });
+    var size = 0; central.forEach(function (c) { size += c.length; });
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, parts.length, true); e.setUint16(10, parts.length, true);
+    e.setUint32(12, size, true); e.setUint32(16, offset, true);
+    return new Blob(chunks.concat(central, [new Uint8Array(e.buffer)]));
+  }
+
+  // ---- WordprocessingML, briefly ---------------------------------------------------
+  var NS = ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' +
+    ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"';
+  var HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  var REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function R(text, rPr) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(text) + '</w:t></w:r>'; }
+  function PX(inner, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + inner + '</w:p>'; }
+  function P(text, pPr, rPr) { return PX(R(text, rPr), pPr); }
+  function S(id) { return '<w:pStyle w:val="' + id + '"/>'; }
+  function NUM(id, lvl) { return '<w:numPr><w:ilvl w:val="' + (lvl || 0) + '"/><w:numId w:val="' + id + '"/></w:numPr>'; }
+  function STYLE(id, name, o) {
+    o = o || {};
+    return '<w:style w:type="' + (o.type || "paragraph") + '"' + (o.dflt ? ' w:default="1"' : '') + ' w:styleId="' + id + '"><w:name w:val="' + name + '"/>' +
+      (o.based ? '<w:basedOn w:val="' + o.based + '"/>' : '') + (o.pPr ? '<w:pPr>' + o.pPr + '</w:pPr>' : '') + (o.rPr ? '<w:rPr>' + o.rPr + '</w:rPr>' : '') + (o.extra || '') + '</w:style>';
+  }
+  function STYLES(list, defaults) { return HEAD + '<w:styles' + NS + '>' + (defaults || '') + STYLE("Normal", "Normal", { dflt: true }) + list.join("") + '</w:styles>'; }
+  function TC(inner, tcPr) { return '<w:tc>' + (tcPr ? '<w:tcPr>' + tcPr + '</w:tcPr>' : '') + (inner.charAt(0) === "<" ? inner : P(inner)) + '</w:tc>'; }
+  function TR(cells, trPr) { return '<w:tr>' + (trPr ? '<w:trPr>' + trPr + '</w:trPr>' : '') + cells.join("") + '</w:tr>'; }
+  function T(rows, grid, tblPr) {
+    return '<w:tbl><w:tblPr>' + (tblPr || '') + '</w:tblPr>' + (grid ? '<w:tblGrid>' + grid.map(function (w) { return '<w:gridCol w:w="' + w + '"/>'; }).join("") + '</w:tblGrid>' : '') + rows.join("") + '</w:tbl>';
+  }
+  var PORTRAIT = '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>';
+  // A package. o: { body, sect, styles, numbering, footnotes, endnotes, comments, core, rels: [[id, type, target, external]],
+  //                 files: { name: text or bytes }, types: [[partName, contentType]], main }
+  function make(o) {
+    var main = o.main || "word/document.xml", dir = main.slice(0, main.lastIndexOf("/") + 1), base = main.slice(dir.length);
+    var rels = (o.rels || []).slice(), files = [], types = (o.types || []).slice();
+    function add(name, kind, text, type) {
+      if (text == null) return;
+      files.push({ name: dir + name, data: text });
+      rels.push(["rIdAuto" + rels.length, REL + kind, name]);
+      types.push(["/" + dir + name, type]);
+    }
+    var wml = "application/vnd.openxmlformats-officedocument.wordprocessingml.";
+    add("styles.xml", "styles", o.styles, wml + "styles+xml");
+    add("numbering.xml", "numbering", o.numbering, wml + "numbering+xml");
+    add("footnotes.xml", "footnotes", o.footnotes, wml + "footnotes+xml");
+    add("endnotes.xml", "endnotes", o.endnotes, wml + "endnotes+xml");
+    add("comments.xml", "comments", o.comments, wml + "comments+xml");
+    for (var n in (o.files || {})) files.push({ name: n, data: o.files[n] });
+    var top = '<Relationship Id="rId1" Type="' + REL + 'officeDocument" Target="' + main + '"/>';
+    if (o.core) { files.push({ name: "docProps/core.xml", data: o.core }); top += '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'; }
+    var parts = [
+      { name: "[Content_Types].xml", data: HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>' +
+        '<Override PartName="/' + main + '" ContentType="' + (o.mainType || wml + "document.main+xml") + '"/>' +
+        types.map(function (t) { return '<Override PartName="' + esc(t[0]) + '" ContentType="' + t[1] + '"/>'; }).join("") + '</Types>' },
+      { name: "_rels/.rels", data: HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + top + '</Relationships>' },
+      { name: main, data: o.document || (HEAD + '<w:document' + NS + '><w:body>' + o.body + (o.sect === undefined ? PORTRAIT : o.sect) + '</w:body></w:document>') },
+      { name: dir + "_rels/" + base + ".rels", data: HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        rels.map(function (r) { return '<Relationship Id="' + r[0] + '" Type="' + r[1] + '" Target="' + esc(r[2]) + '"' + (r[3] ? ' TargetMode="External"' : '') + '/>'; }).join("") + '</Relationships>' }
+    ];
+    return zip(parts.concat(files));
+  }
+  function imp(o, opts) { return I.read(make(o), opts || { name: "fixture.docx" }); }
+
+  // ---- reading the result ---------------------------------------------------------
+  function text(b) { return b.runs ? b.runs.map(function (r) { return r.t; }).join("") : (b.text || ""); }
+  function brief(blocks) {
+    return blocks.map(function (b) {
+      var tag = b.type === "heading" ? "h" + b.level : b.type === "list" ? (b.list === "bullet" ? "•" : "#") + b.level + (b.restart ? "r" : "") + (b.continue ? "c" : "")
+        : b.type === "paragraph" ? "p" : b.type;
+      return tag + (b.land ? "L" : "") + (text(b) ? ":" + text(b) : "");
+    });
+  }
+  function entry(report, code) {
+    var found = null;
+    ["toCheck", "changed", "notCarried"].forEach(function (l) { report[l].forEach(function (e) { if (e.code === code) found = e; }); });
+    return found;
+  }
+  function count(report, code) { var e = entry(report, code); return e ? e.count : 0; }
+  function byText(blocks, t) { for (var i = 0; i < blocks.length; i++) if (text(blocks[i]) === t) return blocks[i]; return null; }
+  function cells(table) { return table.rows.map(function (row) { return row.cells.map(function (c) { return (c.span ? "s" + c.span : "") + (c.rowSpan ? "r" + c.rowSpan : "") + "[" + brief(c.blocks).join("|") + "]"; }).join(" "); }); }
+
+  var tests = [];
+  function test(name, fn) { tests.push({ name: name, fn: fn }); }
+  function run(i) {
+    if (i >= tests.length) { clearInterval(tick); finish(); return; }
+    var t = tests[i];
+    Promise.resolve().then(t.fn).then(null, function (e) { ok(false, t.name + ": threw", (e && (e.cause ? e.cause.stack : e.stack)) || String(e)); })
+      .then(function () { run(i + 1); });
+  }
+
+  // ---- headings ------------------------------------------------------------------------
+  test("headings", function () {
+    var styles = STYLES([
+      STYLE("Heading1", "heading 1", { pPr: '<w:outlineLvl w:val="0"/>', rPr: '<w:b/>' }),
+      STYLE("Heading2", "heading 2", { pPr: '<w:outlineLvl w:val="1"/>' }),
+      STYLE("MySection", "Section title (client)", { based: "Heading2" }),
+      STYLE("berschrift1", "heading 1"),                       // a German install: the id is localised, the name is not
+      STYLE("Lokal", "Überschrift 2"),
+      STYLE("Titre3", "Titre 3"),
+      STYLE("Heading3", "Rubrique", {}),                       // LibreOffice and Google Docs: only the id says so
+      STYLE("Heading5", "heading 5", { pPr: '<w:outlineLvl w:val="4"/>' }),
+      STYLE("BoldBig", "Big and bold", { rPr: '<w:b/><w:sz w:val="40"/>' }),
+      STYLE("LoopA", "Loop a", { based: "LoopB" }), STYLE("LoopB", "Loop b", { based: "LoopA" })
+    ]);
+    return imp({ styles: styles, body:
+      P("By outline level", '<w:outlineLvl w:val="1"/>') + P("By its style", S("Heading1")) + P("By the chain", S("MySection")) +
+      P("Localised id", S("berschrift1")) + P("Localised name", S("Lokal")) + P("French name", S("Titre3")) + P("By id alone", S("Heading3")) +
+      P("Deeper than three", S("Heading5")) + P("Only big and bold", S("BoldBig")) + P("Body level nine", S("Heading1") + '<w:outlineLvl w:val="9"/>') +
+      PX(R("Bold ", '<w:b/>') + R("and italic", '<w:i/>') + R(" heading"), S("Heading2")) + P("In a loop", S("LoopA"))
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(brief(b), ["h2:By outline level", "h1:By its style", "h2:By the chain", "h1:Localised id", "h2:Localised name", "h3:French name", "h3:By id alone",
+        "h3:Deeper than three", "p:Only big and bold", "h1:Body level nine", "h2:Bold and italic heading", "p:In a loop"],
+        "headings: by outline level, style, chain, localised id and name, id alone; never by bold");
+      eq(b[10].runs, [{ t: "Bold and italic heading" }], "headings: bold and italic are not carried on a heading's runs");
+      eq(b[8].runs, [{ t: "Only big and bold", b: true }], "headings: a bold style stays bold body text");
+      var deep = entry(r.report, "headings-deeper");
+      ok(deep && deep.count === 1 && deep.blockIds[0] === b[7].id, "headings: level 5 becomes 3 and is reported with its block", JSON.stringify(deep));
+      ok(r.project.options.numberHeadings === false, "headings: not numbered unless a heading style carries numbering");
+    });
+  });
+  test("numbered headings", function () {
+    var numbering = HEAD + '<w:numbering' + NS + '><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:pStyle w:val="Heading1"/><w:lvlText w:val="%1"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+    return imp({ styles: STYLES([STYLE("Heading1", "heading 1", { pPr: '<w:numPr><w:numId w:val="1"/></w:numPr><w:outlineLvl w:val="0"/>' })]),
+      numbering: numbering, body: P("Scope", S("Heading1")) + P("Text") }).then(function (r) {
+      eq(brief(r.project.blocks), ["h1:Scope", "p:Text"], "numbered headings: the heading is a heading, not a list item, and its number is not typed in");
+      ok(r.project.options.numberHeadings === true, "numbered headings: options.numberHeadings is switched on");
+    });
+  });
+
+  // ---- title, properties, front matter ------------------------------------------------------
+  var CORE = HEAD + '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Title from the properties</dc:title><dc:creator>Fixture Author</dc:creator></cp:coreProperties>';
+  test("title", function () {
+    var styles = STYLES([STYLE("Title", "Title"), STYLE("Subtitle", "Subtitle"), STYLE("Heading1", "heading 1"), STYLE("CoverTitle", "Client cover title", { based: "Title" })]);
+    return imp({ styles: styles, core: CORE, body: P("  ", S("Title")) + P("Site network review", S("CoverTitle")) + P("A subtitle", S("Subtitle")) +
+      P("Prepared for a client") + P("Second title", S("Title")) + P("Body text") }).then(function (r) {
+      var p = r.project;
+      ok(p.info.title === "Site network review", "title: the first Title paragraph with text fills info.title (found down the style chain)", p.info.title);
+      eq(brief(p.blocks), ["p:A subtitle", "p:Prepared for a client", "h1:Second title", "p:Body text"], "title: it is not a block; Subtitle is a paragraph; a later Title is a level 1 heading");
+      ok(p.info.author === "Fixture Author", "title: dc:creator fills info.author");
+      var fm = entry(r.report, "front-matter");
+      ok(fm && fm.count === 2 && JSON.stringify(fm.blockIds) === JSON.stringify([p.blocks[0].id, p.blocks[1].id]) && r.report.toCheck[0] === fm,
+        "front matter: the blocks before the first heading are listed under toCheck with their ids", JSON.stringify(fm));
+    }).then(function () {
+      return imp({ core: CORE, body: P("No title paragraph") + P("And no heading") });
+    }).then(function (r) {
+      ok(r.project.info.title === "Title from the properties", "title: dc:title is used when no Title paragraph gave one");
+      ok(!entry(r.report, "front-matter"), "front matter: not reported when the document has no heading at all (it would list every block)");
+    });
+  });
+
+  // ---- lists ------------------------------------------------------------------------------------
+  function LVL(i, fmt, txt, left, extra) { return '<w:lvl w:ilvl="' + i + '"><w:start w:val="' + ((extra && extra.start) || 1) + '"/><w:numFmt w:val="' + fmt + '"/><w:lvlText w:val="' + txt + '"/><w:pPr><w:ind w:left="' + left + '" w:hanging="360"/></w:pPr></w:lvl>'; }
+  var NUMBERING = HEAD + '<w:numbering' + NS + '>' +
+    '<w:abstractNum w:abstractNumId="0">' + LVL(0, "bullet", "", 720) + LVL(1, "bullet", "o", 1440) + LVL(2, "bullet", "", 2160) + LVL(3, "bullet", "", 2880) + '</w:abstractNum>' +
+    '<w:abstractNum w:abstractNumId="1">' + LVL(0, "decimal", "%1.", 720) + LVL(1, "lowerLetter", "%2.", 1440) + LVL(2, "lowerRoman", "%3.", 2160) + '</w:abstractNum>' +
+    '<w:abstractNum w:abstractNumId="2">' + LVL(0, "upperRoman", "Step %1", 720, { start: 5 }) + '</w:abstractNum>' +
+    '<w:abstractNum w:abstractNumId="3">' + LVL(0, "none", "", 720) + '</w:abstractNum>' +
+    '<w:abstractNum w:abstractNumId="4">' + LVL(0, "decimal", "%1)", 720) + LVL(1, "decimal", "%1.%2.", 1440) + '</w:abstractNum>' +
+    '<w:abstractNum w:abstractNumId="5"><w:numStyleLink w:val="ListStyle"/></w:abstractNum>' +
+    '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>' +
+    '<w:num w:numId="3"><w:abstractNumId w:val="1"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="1"/></w:lvlOverride></w:num>' +
+    '<w:num w:numId="4"><w:abstractNumId w:val="2"/></w:num><w:num w:numId="5"><w:abstractNumId w:val="3"/></w:num>' +
+    '<w:num w:numId="6"><w:abstractNumId w:val="1"/></w:num><w:num w:numId="7"><w:abstractNumId w:val="4"/></w:num>' +
+    '<w:num w:numId="8"><w:abstractNumId w:val="5"/></w:num><w:num w:numId="9"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+  var LIST_STYLES = STYLES([STYLE("ListNumber", "List Number", { pPr: '<w:numPr><w:numId w:val="2"/></w:numPr>' }),
+    STYLE("ListStyle", "My list", { type: "numbering", pPr: '<w:numPr><w:numId w:val="2"/></w:numPr>' })]);
+  test("lists", function () {
+    return imp({ styles: LIST_STYLES, numbering: NUMBERING, body:
+      P("Bullet one", NUM(1, 0)) + P("Bullet nested", NUM(1, 1)) + P("Bullet very deep", NUM(1, 3)) +
+      P("Gap one") +
+      P("One", NUM(2, 0)) + P("Two", NUM(2, 0)) + P("Two a", NUM(2, 1)) + P("Three", NUM(2, 0)) + P("New list", NUM(3, 0)) +
+      P("Gap two") +
+      P("Carries on", NUM(2, 0)) +
+      P("Gap three") +
+      // real Word: Increase Indent on a list item leaves ilvl at 0 and writes a larger indent
+      P("Flat", NUM(6, 0)) + P("Pushed in", NUM(6, 0) + '<w:ind w:left="1080"/>') + P("Flat again", NUM(6, 0)) +
+      P("Gap four") +
+      P("Whole list moved a", NUM(9, 0) + '<w:ind w:left="2000"/>') + P("Whole list moved b", NUM(9, 0) + '<w:ind w:left="2000"/>') +
+      P("Gap five") +
+      P("Roman step", NUM(4, 0)) + P("Format none", NUM(5, 0)) + P("By its style", S("ListNumber")) +
+      P("Switched off", S("ListNumber") + '<w:numPr><w:numId w:val="0"/></w:numPr>') + P("No such list", NUM(77, 0)) +
+      P("Gap six") +
+      P("Bracket", NUM(7, 0)) + P("Legal style", NUM(7, 1)) + P("Linked style", NUM(8, 0))
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(brief(b), ["•0:Bullet one", "•1:Bullet nested", "•2:Bullet very deep", "p:Gap one",
+        "#0:One", "#0:Two", "#1:Two a", "#0:Three", "#0r:New list", "p:Gap two", "#0:Carries on", "p:Gap three",
+        "#0:Flat", "#0:Pushed in", "#0:Flat again", "p:Gap four", "•0:Whole list moved a", "•0:Whole list moved b", "p:Gap five",
+        "#0:Roman step", "p:Format none", "#0:By its style", "p:Switched off", "p:No such list", "p:Gap six",
+        "#0:Bracket", "#1:Legal style", "#0r:Linked style"],
+        "lists: kind, level, restart on a new numId, no carrying on once another numbered list has come between, one item indented, a whole list indented, none, off, via a style");
+      var deep = entry(r.report, "lists-deeper");
+      ok(deep && deep.count === 1 && deep.blockIds[0] === b[2].id, "lists: a fourth level is capped at 2 and reported", JSON.stringify(deep));
+      var ln = entry(r.report, "list-numbering"), want = [byText(b, "Carries on").id, byText(b, "Roman step").id, byText(b, "By its style").id, byText(b, "Legal style").id];
+      eq(ln && ln.blockIds, want, "list numbering: reported for a list resumed after another list, a format out of the house order, literal text with a start of 5, and 1.1 numbering; not for 1. a. i. or 1)");
+      ok(b.every(function (x) { return !("__li" in x) && JSON.stringify(x).indexOf("__") < 0; }), "lists: no working fields are left on the blocks");
+    });
+  });
+  // real Word: ListIndent and ListOutdent through COM (and the ribbon's indent buttons on some lists)
+  // never change ilvl. Every item stays at level 0 and only w:ind moves: 720 is the level's own
+  // indent, 1080 and 1440 are pushed in, and 360 is an item pulled back past the start.
+  test("lists as Word really indents them", function () {
+    function IND(n) { return NUM(2, 0) + '<w:ind w:left="' + n + '"/>'; }
+    return imp({ styles: LIST_STYLES, numbering: NUMBERING, body:
+      P("First", NUM(2, 0)) + P("Second", NUM(2, 0)) + P("Second, a", IND(1080)) + P("Second, b", IND(1080)) + P("Second, b, i", IND(1440)) + P("Pulled back", IND(360)) + P("Last", NUM(2, 0)) }).then(function (r) {
+      eq(brief(r.project.blocks), ["#0:First", "#0:Second", "#0:Second, a", "#0:Second, b", "#0:Second, b, i", "#0:Pulled back", "#0:Last"],
+        "lists: a numbered item keeps its level whatever its indent, because Word numbers it 3, 4, 5 all the same");
+      ok(!entry(r.report, "list-numbering"), "lists: so no number changes and nothing is reported");
+    });
+  });
+  test("list functions", function () {
+    var styles = I.parseStyles(LIST_STYLES), numbering = I.parseNumbering(NUMBERING);
+    var doc = new DOMParser().parseFromString('<w:pPr' + NS + '>' + NUM(2, 1) + '<w:ind w:left="1500"/></w:pPr>', "application/xml");
+    var li = I.listInfo(doc.documentElement, styles, numbering);
+    ok(li && li.kind === "number" && li.numId === "2" && li.ilvl === 1 && li.numFmt === "lowerLetter" && li.left === 1500, "listInfo: kind, numId, level, format and the paragraph's own indent", JSON.stringify(li));
+    var plain = new DOMParser().parseFromString('<w:pPr' + NS + '>' + NUM(1, 2) + '</w:pPr>', "application/xml");
+    li = I.listInfo(plain.documentElement, styles, numbering);
+    ok(li && li.kind === "bullet" && li.left === 2160, "listInfo: the indent falls back to the list level's", JSON.stringify(li));
+    ok(I.listInfo(null, styles, numbering) === null, "listInfo: a paragraph with no numbering is not a list item");
+    var lv = numbering.level("3", 0);
+    ok(lv && lv.startOverride === true && lv.start === 1 && numbering.level("4", 0).start === 5, "parseNumbering: start and startOverride are read");
+    ok(numbering.level("8", 0, styles).numFmt === "decimal", "parseNumbering: a list style link is followed to the real list");
+    ok(I.CODES.changed.indexOf("list-numbering") >= 0 && I.CODES.toCheck[0] === "front-matter" && I.CODES.notCarried.indexOf("unreadable-part") >= 0, "CODES lists every report code by list");
+  });
+
+  // ---- runs ---------------------------------------------------------------------------------------
+  test("runs", function () {
+    var styles = STYLES([STYLE("Strong", "Strong paragraph", { rPr: '<w:b/>' }), STYLE("Emph", "Emphasis", { type: "character", rPr: '<w:i/>' }),
+      STYLE("PlaceholderText", "Placeholder", { rPr: '<w:b/><w:i/><w:color w:val="E00000"/>' }),
+      STYLE("Centred", "Centred", { pPr: '<w:jc w:val="center"/>' }), STYLE("CodeBlock", "Code", { rPr: '<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/>' })]);
+    return imp({ styles: styles, body:
+      PX(R("a", '<w:b/>') + R("b", '<w:b w:val="false"/>') + R("c", '<w:b w:val="off"/>') + R("c2", '<w:b w:val="0"/>') + R("d", '<w:b w:val="1"/>') +
+        R("e", '<w:i w:val="on"/><w:u w:val="single"/>') + R("f", '<w:u w:val="none"/>') + R("g", '<w:strike/>') + R("h", '<w:vertAlign w:val="superscript"/>') +
+        R("i", '<w:vertAlign w:val="subscript"/>') + R("code", '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>') + R("red", '<w:color w:val="e00000"/>') +
+        R("blue", '<w:color w:val="0000FF"/><w:sz w:val="40"/><w:highlight w:val="yellow"/>')) +
+      PX(R("x") + R("y", '<w:b w:val="0"/>') + R("z", '<w:rStyle w:val="Emph"/>'), S("Strong")) +
+      PX('<w:r><w:t>A</w:t><w:tab/><w:t>B</w:t><w:br/><w:t>C</w:t><w:noBreakHyphen/><w:t>D</w:t><w:softHyphen/><w:t>E</w:t><w:sym w:font="Wingdings" w:char="F022"/><w:sym w:font="Arial" w:char="00A9"/><w:cr/><w:t>F</w:t></w:r>') +
+      PX("") + P("   ") +
+      PX(R("one ") + R("two ") + '<w:proofErr w:type="spellStart"/>' + R("three")) +
+      PX('<w:r><w:br w:type="page"/></w:r>') +
+      P("Starts a page", '<w:pageBreakBefore/>') +
+      PX(R("Before the break") + '<w:r><w:br w:type="page"/></w:r>' + R("After the break")) +
+      P("Add the cost of each option.", S("PlaceholderText")) +
+      P("Centre", '<w:jc w:val="center"/>') + P("Right", '<w:jc w:val="right"/>') + P("Both", '<w:jc w:val="both"/>') + P("Left", '<w:jc w:val="left"/>') + P("Centred by style", S("Centred")) +
+      P("mono", S("CodeBlock")) +
+      PX('<w:r><mc:AlternateContent><mc:Choice Requires="w16se"><w16se:symEx xmlns:w16se="http://schemas.microsoft.com/office/word/2015/wordml/symex" w16se:font="Segoe UI Emoji" w16se:char="1F600"/></mc:Choice><mc:Fallback><w:t>😀</w:t></mc:Fallback></mc:AlternateContent></w:r>' + R(" smile")) +
+      '<w:customXml w:element="thing">' + P("Inside custom XML") + '</w:customXml>' +
+      '<x:unknown xmlns:x="urn:not-known"><x:deeper>' + P("Inside unknown markup") + '</x:deeper></x:unknown>' +
+      PX('<w:smartTag w:element="place">' + R("Inside a smart tag") + '</w:smartTag>' + '<w:sdt><w:sdtPr><w:text/></w:sdtPr><w:sdtContent>' + R(" and a content control") + '</w:sdtContent></w:sdt>') +
+      '<w:sdt><w:sdtPr><w:alias w:val="Block"/></w:sdtPr><w:sdtContent>' + P("Inside a block content control") + '</w:sdtContent></w:sdt>'
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(b[0].runs, [{ t: "a", b: true }, { t: "bcc2" }, { t: "d", b: true }, { t: "e", i: true, u: true }, { t: "f" }, { t: "g", s: true }, { t: "h", sup: true },
+        { t: "i", sub: true }, { t: "code", code: true }, { t: "red", red: true }, { t: "blue" }],
+        "runs: toggles (absent, 1, true, on are on; 0, false, off are off), underline none, strike, super and subscript, code font, red; other colours, sizes and highlights are not carried");
+      eq(b[1].runs, [{ t: "x", b: true }, { t: "y" }, { t: "z", b: true, i: true }], "runs: formatting from the paragraph style, switched off on a run, and from a character style");
+      eq(b[2].runs, [{ t: "A\tB\nC-DE□©\nF" }], "runs: tab, line break, non-breaking hyphen, soft hyphen dropped, a symbol-font character as a box, an ordinary symbol as itself");
+      ok(count(r.report, "symbols") === 1, "runs: the symbol that could not be carried is counted");
+      eq(brief(b).slice(3, 8), ["p:one two three", "pageBreak", "pageBreak", "p:Starts a page", "p:Before the break"], "runs: empty paragraphs are dropped, neighbours of one format are joined, page breaks become blocks");
+      eq(brief(b).slice(8, 11), ["pageBreak", "p:After the break", "prompt:Add the cost of each option."], "runs: a break inside a paragraph splits it; a PlaceholderText paragraph is a prompt block");
+      eq(b[3].runs, [{ t: "one two three" }], "runs: adjacent runs with the same formatting are one run");
+      eq([b[11].align, b[12].align, b[13].align, b[14].align, b[15].align], ["center", "right", "justify", null, "center"].map(function (x) { return x || undefined; }), "alignment: centre, right and both are carried, from the paragraph or its style; left is the default and is left out");
+      eq(b[16].runs, [{ t: "mono", code: true }], "runs: a fixed-width font from the paragraph style is code");
+      eq(brief(b).slice(17), ["p:😀 smile", "p:Inside custom XML", "p:Inside unknown markup", "p:Inside a smart tag and a content control", "p:Inside a block content control"],
+        "wrappers: newer markup with older text beside it, custom XML, unknown elements, smart tags and content controls lose the wrapper, not the words");
+    });
+  });
+
+  // ---- links and fields ---------------------------------------------------------------------------
+  function FIELD(code, result) {
+    return '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve">' + esc(code) + '</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>' + result + '<w:r><w:fldChar w:fldCharType="end"/></w:r>';
+  }
+  test("links and fields", function () {
+    var HL = '<w:rStyle w:val="Hyperlink"/>';
+    return imp({ styles: STYLES([STYLE("Hyperlink", "Hyperlink", { type: "character", rPr: '<w:color w:val="0563C1"/><w:u w:val="single"/>' })]),
+      rels: [["rIdL1", REL + "hyperlink", "https://example.com/a?x=1&y=2", true], ["rIdL2", REL + "hyperlink", "javascript:alert(1)", true],
+        ["rIdL3", REL + "hyperlink", "file:///C:/secret.txt", true], ["rIdL4", REL + "hyperlink", "mailto:someone@example.com", true]],
+      body:
+      PX(R("See ") + '<w:hyperlink r:id="rIdL1">' + R("the site", HL) + '</w:hyperlink>' + R(" and ") + '<w:hyperlink r:id="rIdL1" w:anchor="part2">' + R("part two", HL) + '</w:hyperlink>') +
+      PX('<w:hyperlink w:anchor="_Toc123">' + R("a bookmark", HL) + '</w:hyperlink>' + '<w:hyperlink r:id="rIdL2">' + R(" a script", HL) + '</w:hyperlink>' +
+        '<w:hyperlink r:id="rIdL3">' + R(" a file", HL) + '</w:hyperlink>' + '<w:hyperlink r:id="rIdL4">' + R(" a mailbox", HL) + '</w:hyperlink>') +
+      PX(FIELD(' HYPERLINK "https://example.org/field" ', R("field link", HL)) + R(" then ") + FIELD(' HYPERLINK \\l "bookmark1" ', R("inside link", HL))) +
+      PX(R("Page ") + FIELD(" PAGEREF _Ref1 \\h ", R("12")) + R(" on ") + '<w:fldSimple w:instr=" DATE \\@ &quot;d MMM&quot; ">' + R("1 Jan") + '</w:fldSimple>') +
+      PX('<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>' + R("No result"))
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(b[0].runs, [{ t: "See " }, { t: "the site", link: "https://example.com/a?x=1&y=2" }, { t: " and " }, { t: "part two", link: "https://example.com/a?x=1&y=2#part2" }],
+        "links: an external http link is carried, with its anchor; the Hyperlink style's underline is not doubled up");
+      eq(b[1].runs, [{ t: "a bookmark a script a file" }, { t: " a mailbox", link: "mailto:someone@example.com" }], "links: a bookmark, a javascript: and a file: target keep their words only; mailto is carried");
+      eq(b[2].runs, [{ t: "field link", link: "https://example.org/field" }, { t: " then inside link" }], "links: a HYPERLINK field is treated the same way");
+      eq([count(r.report, "internal-links"), count(r.report, "other-links")], [2, 2], "links: every link that kept its text only is counted, those to a place in the document apart from those to a file or another address");
+      eq(r.report.carried.links, 4, "links: carried.links counts the ones kept");
+      eq([text(b[3]), text(b[4])], ["Page 12 on 1 Jan", "No result"], "fields: a complex and a simple field keep their results as text; a field with no result leaves nothing, and its code never shows");
+      eq(count(r.report, "fields"), 2, "fields: each field turned to text is counted");
+    });
+  });
+
+  // ---- footnotes and endnotes ------------------------------------------------------------------------
+  test("notes", function () {
+    var foot = HEAD + '<w:footnotes' + NS + '><w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote><w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>' +
+      '<w:footnote w:id="2">' + PX('<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r>' + R(" Costs are budgetary.")) + PX(R("See ") + R("the quote", '<w:b/>') + R(".")) + '</w:footnote></w:footnotes>';
+    var end = HEAD + '<w:endnotes' + NS + '><w:endnote w:id="1">' + PX('<w:r><w:endnoteRef/></w:r>' + R(" An endnote.")) + '</w:endnote></w:endnotes>';
+    return imp({ footnotes: foot, endnotes: end, body:
+      PX(R("Three options") + '<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteReference w:id="2"/></w:r>' + R(" are set out") + '<w:r><w:endnoteReference w:id="1"/></w:r>' + R(".") +
+        '<w:r><w:footnoteReference w:id="99"/></w:r>') }).then(function (r) {
+      var p = r.project, runs = p.blocks[0].runs, keys = Object.keys(p.footnotes);
+      ok(runs.length === 5 && runs[1].t === "" && runs[1].fn === keys[0] && runs[3].fn === keys[1] && /^f\d+$/.test(keys[0]), "notes: a reference is a run with fn and no text", JSON.stringify(runs));
+      eq(p.footnotes[keys[0]].runs, [{ t: "Costs are budgetary.\nSee " }, { t: "the quote", b: true }, { t: "." }], "notes: a footnote's paragraphs are joined with newlines, its formatting kept, its own mark and the space after it left out");
+      eq(p.footnotes[keys[1]].runs, [{ t: "An endnote." }], "notes: an endnote becomes a footnote");
+      eq([count(r.report, "endnotes"), r.report.carried.footnotes, count(r.report, "notes-missing")], [1, 2, 1], "notes: endnotes are reported as changed, footnotes counted, and a reference to a note that is not there is reported");
+    });
+  });
+
+  // ---- tables --------------------------------------------------------------------------------------------
+  test("tables", function () {
+    var styles = STYLES([STYLE("Caption", "caption"), STYLE("Heading1", "heading 1", { pPr: '<w:outlineLvl w:val="0"/>' }),
+      STYLE("GridH", "Grid Table 4", { type: "table", extra: '<w:tblStylePr w:type="firstRow"><w:rPr><w:b/></w:rPr><w:tcPr><w:shd w:val="clear" w:fill="156082"/></w:tcPr></w:tblStylePr>' }),
+      STYLE("GridPlain", "Table Grid", { type: "table" })]);
+    var VR = '<w:vMerge w:val="restart"/>', VC = '<w:vMerge/>';
+    var merged = T([
+      TR([TC("Zone"), TC("Assets"), TC("Notes")], '<w:tblHeader/>'),
+      TR([TC("Control", VR), TC("Spans two", '<w:gridSpan w:val="2"/>')]),
+      TR([TC("", VC), TC("PLC"), TC("HMI")]),
+      TR([TC("", VC), TC("Old merge", '<w:hMerge w:val="restart"/>'), TC("", '<w:hMerge/>')])
+    ], [2000, 3000, 4000]);
+    var noGrid = T([
+      TR([TC("a", '<w:tcW w:w="1000" w:type="dxa"/>'), TC("b", '<w:tcW w:w="2000" w:type="dxa"/>'), TC("c", '<w:tcW w:w="3000" w:type="dxa"/>')]),
+      TR([TC("middle only")], '<w:gridBefore w:val="1"/><w:gridAfter w:val="1"/>')
+    ], null);
+    var shortGrid = T([TR([TC("a"), TC("b")]), TR([TC("only one")])], [5000]);
+    var wrapped = T([
+      '<w:sdt><w:sdtPr/><w:sdtContent>' + TR([TC("row in a control"), TC("x")]) + '</w:sdtContent></w:sdt>',
+      TR(['<w:sdt><w:sdtPr/><w:sdtContent>' + TC("cell in a control") + '</w:sdtContent></w:sdt>', TC("y")]),
+      TR([TC("deleted row"), TC("z")], '<w:del w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z"/>'),
+      TR([TC("inserted row"), TC("w")], '<w:ins w:id="2" w:author="A" w:date="2026-01-01T00:00:00Z"/>')
+    ], [3000, 3000]);
+    var SHD = '<w:shd w:val="clear" w:color="auto" w:fill="1F3864"/>';
+    var byShade = T([TR([TC("H1", SHD), TC("H2", SHD)]), TR([TC("1"), TC("2")])], [1, 1]);
+    var byBold = T([TR([TC(P("H1", "", "<w:b/>")), TC(P("H2", "", "<w:b/>"))]), TR([TC("1"), TC("2")])], [1, 1]);
+    var plain = T([TR([TC("1"), TC("2")]), TR([TC("3"), TC("4")])], [1, 1]);
+    // real Word: most header rows are only a header through the table style and tblLook
+    var byStyle = T([TR([TC("H1"), TC("H2")]), TR([TC("1"), TC("2")])], [1, 1], '<w:tblStyle w:val="GridH"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0"/>');
+    var styleOff = T([TR([TC("1"), TC("2")]), TR([TC("3"), TC("4")])], [1, 1], '<w:tblStyle w:val="GridH"/><w:tblLook w:val="0480" w:firstRow="0"/>');
+    var gridStyle = T([TR([TC("1"), TC("2")]), TR([TC("3"), TC("4")])], [1, 1], '<w:tblStyle w:val="GridPlain"/><w:tblLook w:val="04A0" w:firstRow="1"/>');
+    var nested = T([TR([TC(P("Outer text") + T([TR([TC("inner a"), TC("inner b")])], [1, 1]) + P("After inner")), TC(P("Heading in a cell", S("Heading1")) + P("Add a value", S("PlaceholderText")))])], [1, 1]);
+    return imp({ styles: styles, body:
+      merged + P("Table 1: Zones and assets", S("Caption")) + P("Between") + P("Table 2: Widths", S("Caption")) + noGrid + P("A stray caption", S("Caption")) + P("x") +
+      shortGrid + P("x") + wrapped + P("x") + byShade + P("x") + byBold + P("x") + plain + P("x") + byStyle + P("x") + styleOff + P("x") + gridStyle + P("x") + nested
+    }).then(function (r) {
+      var t = r.project.blocks.filter(function (b) { return b.type === "table"; });
+      eq(cells(t[0]), ["[p:Zone] [p:Assets] [p:Notes]", "r3[p:Control] s2[p:Spans two]", "[p:PLC] [p:HMI]", "s2[p:Old merge]"],
+        "tables: vMerge gives rowSpan on the first cell and leaves the continued cells out; gridSpan and hMerge give span");
+      eq([t[0].header, t[0].cols, t[0].caption], [1, [2000, 3000, 4000], "Table 1: Zones and assets"], "tables: tblHeader gives a header row, tblGrid the widths, and a Caption paragraph after it its caption");
+      eq([cells(t[1]), t[1].cols, t[1].caption], [["[p:a] [p:b] [p:c]", "[p] [p:middle only] [p]"], [1000, 2000, 3000], "Table 2: Widths"],
+        "tables: with no tblGrid the grid is rebuilt from the widest row; gridBefore and gridAfter are empty cells; a caption directly before a table is its caption");
+      eq([cells(t[2]), t[2].cols], [["[p:a] [p:b]", "[p:only one] [p]"], [1, 1]], "tables: a grid shorter than the widest row is rebuilt with equal widths, and a short row is filled out");
+      eq(cells(t[3]), ["[p:row in a control] [p:x]", "[p:cell in a control] [p:y]", "[p:inserted row] [p:w]"], "tables: rows and cells inside content controls are unwrapped; a deleted row is dropped; an inserted row stays");
+      eq(t.slice(4, 10).map(function (x) { return x.header; }), [1, 1, 0, 1, 0, 0], "tables: a header row by shading, by bold, none, by table style with tblLook, not when tblLook says off, not for a style with no first-row look");
+      eq(cells(t[10]), ["[p:Outer text|p:inner a|p:inner b|p:After inner] [p:Heading in a cell|p:Add a value]"], "tables: a table in a cell is unwrapped into the cell; a cell holds no headings or prompt blocks");
+      eq(t[10].rows[0].cells[1].blocks[1].runs, [{ t: "Add a value", red: true }], "tables: a prompt in a cell stays red text");
+      eq([count(r.report, "nested-tables"), r.report.carried.captions, r.report.carried.tables], [1, 2, 11], "tables: nested tables, captions and tables are counted");
+      ok(!!byText(r.project.blocks, "A stray caption"), "captions: one with no picture or table beside it stays a paragraph");
+      var tc = entry(r.report, "tracked-changes");
+      ok(tc && tc.deletions === 1 && tc.insertions === 1, "tables: the deleted and the inserted row are tracked changes", JSON.stringify(tc));
+      var ids = {};
+      (function walk(list) { list.forEach(function (b) { ids[b.id] = (ids[b.id] || 0) + 1; if (b.type === "table") b.rows.forEach(function (row) { row.cells.forEach(function (c) { walk(c.blocks); }); }); }); })(r.project.blocks);
+      ok(Object.keys(ids).every(function (k) { return ids[k] === 1 && /^b\d+$/.test(k); }), "tables: every block id is unique, cells included");
+    });
+  });
+  test("lists in cells", function () {
+    return imp({ numbering: NUMBERING, body: P("One", NUM(2, 0)) + T([TR([TC(P("In a cell", NUM(2, 0)) + P("Bullet", NUM(1, 1)))])], [1]) }).then(function (r) {
+      var cell = r.project.blocks[1].rows[0].cells[0];
+      eq(brief(cell.blocks), ["#0c:In a cell", "•1:Bullet"], "lists: items in a cell are list blocks, and one that carries on an earlier list says so");
+    });
+  });
+
+  // ---- what a reviewed document carries -------------------------------------------------------------------
+  test("tracked changes, comments, headers, contents, cover", function () {
+    var INS = ' w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z"';
+    var comments = HEAD + '<w:comments' + NS + '><w:comment w:id="0" w:author="A">' + P("Is this right?") + '</w:comment><w:comment w:id="1" w:author="B">' + P("Check the figure.") + '</w:comment></w:comments>';
+    var header = HEAD + '<w:hdr' + NS + '>' + P("Customer header text") + '</w:hdr>', footer = HEAD + '<w:ftr' + NS + '>' + P("Page 1 of 9, customer footer") + '</w:ftr>', blank = HEAD + '<w:hdr' + NS + '><w:p/></w:hdr>';
+    var tocEntry = function (t) { return PX('<w:hyperlink w:anchor="_Toc1">' + R(t) + '<w:r><w:tab/></w:r>' + FIELD(" PAGEREF _Toc1 \\h ", R("3")) + '</w:hyperlink>'); };
+    return imp({ comments: comments,
+      rels: [["rIdH1", REL + "header", "header1.xml"], ["rIdH2", REL + "header", "header2.xml"], ["rIdF1", REL + "footer", "footer1.xml"]],
+      files: { "word/header1.xml": header, "word/header2.xml": blank, "word/footer1.xml": footer },
+      styles: STYLES([STYLE("Heading1", "heading 1", { pPr: '<w:outlineLvl w:val="0"/>' }), STYLE("TOCHeading", "TOC Heading", { based: "Heading1", pPr: '<w:outlineLvl w:val="9"/>' })]),
+      body:
+      '<w:sdt><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Cover Pages"/><w:docPartUnique/></w:docPartObj></w:sdtPr><w:sdtContent>' + P("ACME Water") + P("Network review 2026") + '</w:sdtContent></w:sdt>' +
+      '<w:sdt><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Table of Contents"/></w:docPartObj></w:sdtPr><w:sdtContent>' + P("Contents", S("TOCHeading")) +
+        PX('<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> TOC \\o "1-3" </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>' + R("Introduction 3")) + PX('<w:r><w:fldChar w:fldCharType="end"/></w:r>') + '</w:sdtContent></w:sdt>' +
+      P("Introduction", S("Heading1")) +
+      PX(R("Kept ") + '<w:ins' + INS + '>' + R("inserted ") + '</w:ins>' + '<w:del' + INS + '><w:r><w:delText>deleted </w:delText></w:r></w:del>' +
+        '<w:moveFrom' + INS + '>' + R("moved away ") + '</w:moveFrom>' + '<w:moveTo' + INS + '>' + R("moved here ") + '</w:moveTo>' +
+        '<w:commentRangeStart w:id="0"/>' + R("commented", '<w:b/><w:rPrChange' + INS + '><w:rPr/></w:rPrChange>') + '<w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r>') +
+      // a contents list that is only a field, running over three paragraphs
+      PX('<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \\h \\z </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>' + '<w:hyperlink w:anchor="_Toc1">' + R("Introduction") + FIELD(" PAGEREF _Toc1 ", R("3")) + '</w:hyperlink>') +
+      tocEntry("Scope") + PX(R("Costs 9") + '<w:r><w:fldChar w:fldCharType="end"/></w:r>') +
+      P("After the contents")
+    }).then(function (r) {
+      var b = r.project.blocks, rep = r.report;
+      eq(brief(b), ["h1:Introduction", "p:Kept inserted moved here commented", "p:After the contents"], "tracked changes are accepted; the cover page, both contents lists and everything in them are left out");
+      var tc = entry(rep, "tracked-changes");
+      eq(tc && [tc.count, tc.insertions, tc.deletions], [4, 2, 2], "tracked changes: reported once with both counts");
+      var c = entry(rep, "comments");
+      eq(c && [c.count, c.examples], [2, ["Is this right?", "Check the figure."]], "comments: dropped, counted and quoted");
+      var h = entry(rep, "headers-footers");
+      eq(h && [h.count, h.examples], [2, ["Customer header text", "Page 1 of 9, customer footer"]], "headers and footers: not carried, quoted; an empty one is not counted");
+      eq([count(rep, "contents"), r.project.options.contents], [2, true], "contents: a contents control and a TOC field are each dropped whole and switch options.contents on");
+      eq([count(rep, "internal-links"), count(rep, "fields")], [0, 0], "contents: the links and page numbers inside a dropped contents list are not reported one by one");
+      var cover = entry(rep, "cover-page");
+      eq(cover && [cover.count, cover.examples], [1, ["ACME Water", "Network review 2026"]], "cover page: a cover building block is dropped and its text quoted");
+      ok(!entry(rep, "front-matter"), "front matter: nothing is left before the first heading here");
+    });
+  });
+
+  // ---- sections ------------------------------------------------------------------------------------------------
+  test("sections", function () {
+    var LAND = '<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/></w:sectPr>';
+    var COLS = '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:cols w:num="2" w:space="708"/></w:sectPr>';
+    var CONT = '<w:sectPr><w:type w:val="continuous"/><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>';
+    return imp({ sect: CONT, body:
+      P("p1") + P("p2", PORTRAIT) + P("l1") + T([TR([TC("wide")])], [1]) + P("l2", LAND) + P("p3") + P("p4", COLS) + P("p5", PORTRAIT) + P("p6")
+    }).then(function (r) {
+      eq(brief(r.project.blocks), ["p:p1", "p:p2", "pL:l1", "tableL", "pL:l2", "p:p3", "p:p4", "pageBreak", "p:p5", "p:p6"],
+        "sections: blocks of a landscape section are flagged; a new-page section without a turn is a page break; a turn and a continuous break add nothing");
+      var c = entry(r.report, "columns");
+      ok(c && c.count === 1 && c.blockIds[0] === byText(r.project.blocks, "p3").id, "sections: two columns become one and are reported", JSON.stringify(c));
+    }).then(function () {
+      return imp({ sect: '<w:sectPr><w:pgSz w:w="16838" w:h="11906"/></w:sectPr>', body: P("only") });
+    }).then(function (r) {
+      ok(r.project.blocks[0].land === true, "sections: a page wider than it is tall is landscape even without w:orient");
+    });
+  });
+
+  // ---- finding the document ----------------------------------------------------------------------------------------
+  test("a main part with another name", function () {
+    return imp({ main: "word/document2.xml", styles: STYLES([STYLE("Heading1", "heading 1")]), body: P("Found", S("Heading1")) + P("Text") }).then(function (r) {
+      eq(brief(r.project.blocks), ["h1:Found", "p:Text"], "the main part is found through the officeDocument relationship, and its styles through its own relationships");
+    }).then(function () {
+      return imp({ main: "content/main.xml", styles: STYLES([STYLE("Heading1", "heading 1")]), body: P("Elsewhere", S("Heading1")) });
+    }).then(function (r) {
+      eq(brief(r.project.blocks), ["h1:Elsewhere"], "nothing depends on the word/ folder");
+    });
+  });
+
+  // ---- the project and the report ---------------------------------------------------------------------------------------
+  test("project and report", function () {
+    var seen = [];
+    return imp({ styles: STYLES([STYLE("Heading1", "heading 1")]), body: P("One", S("Heading1")) + P("Two") }, { name: "My report.docx", onProgress: function (f, label) { seen.push([f, label]); } }).then(function (r) {
+      var p = r.project, rep = r.report;
+      ok(p.schema === "spt-document/1.0" && p.kind === "report" && /^doc-/.test(p.id) && !isNaN(Date.parse(p.createdAt)), "project: schema, kind report, an id and a creation time");
+      eq(Object.keys(p.info).sort(), ["author", "authorisedBy", "classification", "client", "date", "docType", "issuedDate", "issuedTo", "qaReviewBy", "reference", "revision", "site", "title"], "project: every info field is present");
+      eq([p.info.revision, p.info.classification, p.options], ["0.1", "Confidential", { numberHeadings: false, contents: false }], "project: defaults for revision, classification and options");
+      ok(typeof p.nextId === "number" && p.blocks.every(function (b) { return +b.id.slice(1) < p.nextId; }), "project: nextId is past every id handed out");
+      ok(p.footnotes && p.media && p.parts && !("theme" in p), "project: footnotes, media and parts are there; no theme without a kept object");
+      ok(p.importReport === rep, "project: the report is stored as importReport");
+      eq([rep.source.name, rep.source.size > 0, !isNaN(Date.parse(rep.source.importedAt))], ["My report.docx", true, true], "report: the source's name, size and time");
+      eq(rep.carried, { headings: 1, paragraphs: 1, listItems: 0, tables: 0, pictures: 0, keptObjects: 0, captions: 0, footnotes: 0, links: 0 }, "report: carried counts");
+      eq(rep.changed, [{ code: "formatting", count: 1 }], "report: formatting is always reported, and nothing else for a plain document");
+      eq([rep.toCheck, rep.notCarried], [[], []], "report: empty lists are empty");
+      var fr = seen.map(function (s) { return s[0]; });
+      ok(fr.length >= 3 && fr[fr.length - 1] === 1 && fr.every(function (f, i) { return i === 0 || f >= fr[i - 1]; }) && seen.every(function (s) { return typeof s[1] === "string" && s[1]; }),
+        "progress: fractions rise to 1, each with a label", JSON.stringify(seen));
+    }).then(function () {
+      var body = ""; for (var i = 0; i < 1500; i++) body += P("Paragraph " + i);
+      return imp({ body: body });
+    }).then(function (r) {
+      ok(r.project.blocks.length === 1500 && text(r.project.blocks[1499]) === "Paragraph 1499", "a long document is read in steps and arrives whole");
+    });
+  });
+
+  // ---- the exported parsers -----------------------------------------------------------------------------------------------
+  test("parseStyles and headingLevel", function () {
+    var s = I.parseStyles(STYLES([
+      STYLE("Heading1", "heading 1", { pPr: '<w:outlineLvl w:val="0"/><w:jc w:val="center"/>', rPr: '<w:b/><w:sz w:val="32"/><w:color w:val="0F4761"/>' }),
+      STYLE("Sub", "Client sub heading", { based: "Heading1", rPr: '<w:b w:val="0"/><w:i/>' }),
+      STYLE("A", "a", { based: "B" }), STYLE("B", "b", { based: "A" })
+    ], '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="278" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'));
+    var sub = s.byId.Sub;
+    eq([sub.name, sub.basedOn, sub.outlineLvl, sub.b, sub.i, sub.size, sub.color, sub.font, sub.jc, sub.spacing.after], ["Client sub heading", "Heading1", 0, false, true, 32, "0F4761", "Aptos", "center", "160"],
+      "parseStyles: a style resolved down its chain and over the document defaults");
+    ok(s.byId.A && s.byId.B && s.defaultParagraph === "Normal", "parseStyles: a loop in basedOn ends instead of hanging; the default paragraph style is found");
+    function pPr(inner) { return new DOMParser().parseFromString('<w:pPr' + NS + '>' + inner + '</w:pPr>', "application/xml").documentElement; }
+    eq([I.headingLevel(pPr(S("Sub")), s), I.headingLevel(pPr('<w:outlineLvl w:val="2"/>'), s), I.headingLevel(pPr(S("A")), s), I.headingLevel(null, s)], [1, 3, 0, 0], "headingLevel: from the chain, from the paragraph, none");
+    var empty = I.parseStyles("");
+    ok(empty.get("x") === null && I.headingLevel(pPr(S("Heading1")), empty) === 0, "parseStyles: no styles part gives an empty map, not an error");
+    var th = I.parseTheme('<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements><a:clrScheme name="x"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:accent1><a:srgbClr val="C00000"/></a:accent1></a:clrScheme><a:fontScheme name="x"><a:majorFont><a:latin typeface="Aptos Display"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Georgia"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme></a:themeElements></a:theme>');
+    eq([th.colors.accent1, th.colors.dk1, th.fonts.minor.latin, th.fonts.major.latin], ["C00000", "000000", "Georgia", "Aptos Display"], "parseTheme: colours and fonts");
+  });
+
+  run(0);
+})();
+</script>
+</body></html>

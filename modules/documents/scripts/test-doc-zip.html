@@ -1,0 +1,364 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the zip reader and writer</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.ZipIO (shared/zip-io.js, docs/document-tool-design.md 4.1): CRC-32 against
+  known values; write then read gives the same names and bytes; what is stored
+  and what is deflated; the header fields Word depends on; zips written the way
+  other tools write them (data descriptors, extra fields, a comment); the limits
+  and the refusals; a file packed by the vendored docx library and a file saved
+  by Word, each read, written again and read back.
+-->
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Inflating and deflating run off the main thread, and headless Edge's
+  // virtual clock runs out the moment the page has nothing queued, which dumps
+  // the page half way through. A message bounced to ourselves keeps a task
+  // queued, without moving the clock, until the tests finish.
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  var Zip = window.App.ZipIO;
+
+  // A document saved by Word itself (Microsoft 365, November 2026): a heading
+  // and two paragraphs, no author. These are Word's own entries, byte for byte.
+  // One entry was cut off the end, with its directory record: the sensitivity
+  // label part, which names the organisation that saved the file.
+  var WORD_ZIP = "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";
+
+  function b64(s) {
+    var bin = atob(s), u8 = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8;
+  }
+  function same(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+  function sameParts(a, b) {
+    if (a.length !== b.length) return "count " + a.length + " against " + b.length;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].name !== b[i].name) return "name " + a[i].name + " against " + b[i].name;
+      if (!same(a[i].bytes, b[i].bytes)) return "bytes of " + a[i].name;
+    }
+    return "";
+  }
+  function bytesOfBlob(blob) { return blob.arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+  function refused(promise, pattern, name) {
+    return promise.then(function () { ok(false, name, "it was accepted"); },
+      function (e) { ok(pattern.test(e && e.message), name, e && e.message); });
+  }
+  function deflateRaw(u8) {
+    return new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer()
+      .then(function (b) { return new Uint8Array(b); });
+  }
+  // A pseudo-random block: the same every run, and it does not compress.
+  function noise(n) {
+    var u8 = new Uint8Array(n), x = 123456789;
+    for (var i = 0; i < n; i++) { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; u8[i] = x & 0xFF; }
+    return u8;
+  }
+
+  // The directory of a zip, read independently of the code under test.
+  function directory(u8) {
+    var v = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), e = u8.length - 22;
+    while (e >= 0 && v.getUint32(e, true) !== 0x06054b50) e--;
+    var n = v.getUint16(e + 10, true), p = v.getUint32(e + 16, true), out = [];
+    for (var i = 0; i < n; i++) {
+      var nl = v.getUint16(p + 28, true), xl = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), local = v.getUint32(p + 42, true);
+      out.push({
+        name: new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nl)),
+        made: v.getUint16(p + 4, true), need: v.getUint16(p + 6, true), flags: v.getUint16(p + 8, true), method: v.getUint16(p + 10, true),
+        time: v.getUint16(p + 12, true), date: v.getUint16(p + 14, true), crc: v.getUint32(p + 16, true),
+        csize: v.getUint32(p + 20, true), usize: v.getUint32(p + 24, true), extra: xl, local: local,
+        localSig: v.getUint32(local, true), localFlags: v.getUint16(local + 6, true), localMethod: v.getUint16(local + 8, true),
+        localCrc: v.getUint32(local + 14, true), localCsize: v.getUint32(local + 18, true), localUsize: v.getUint32(local + 22, true),
+        localExtra: v.getUint16(local + 28, true)
+      });
+      p += 46 + nl + xl + cl;
+    }
+    out.comment = v.getUint16(e + 20, true);
+    return out;
+  }
+
+  // A zip built by hand, so the reader meets things our writer never writes.
+  // Each entry: { name, data (as stored in the file), method, usize, crc,
+  // flags, descriptor, localExtra, declare: { usize, csize } }.
+  function rawZip(entries, opts) {
+    opts = opts || {};
+    var chunks = [], central = [], offset = 0, enc = new TextEncoder();
+    entries.forEach(function (e) {
+      var name = enc.encode(e.name), flags = e.flags == null ? 0x0800 : e.flags, extra = e.localExtra || new Uint8Array(0);
+      var usize = e.declare && e.declare.usize != null ? e.declare.usize : e.usize;
+      var csize = e.declare && e.declare.csize != null ? e.declare.csize : e.data.length;
+      var lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, flags, true); lh.setUint16(8, e.method, true);
+      // With a data descriptor the local header carries zeros and the real figures follow the data.
+      lh.setUint32(14, e.descriptor ? 0 : e.crc, true); lh.setUint32(18, e.descriptor ? 0 : csize, true); lh.setUint32(22, e.descriptor ? 0 : usize, true);
+      lh.setUint16(26, name.length, true); lh.setUint16(28, extra.length, true);
+      chunks.push(new Uint8Array(lh.buffer), name, extra, e.data);
+      var size = 30 + name.length + extra.length + e.data.length;
+      if (e.descriptor) {
+        var dd = new DataView(new ArrayBuffer(16));
+        dd.setUint32(0, 0x08074b50, true); dd.setUint32(4, e.crc, true); dd.setUint32(8, csize, true); dd.setUint32(12, usize, true);
+        chunks.push(new Uint8Array(dd.buffer)); size += 16;
+      }
+      var ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, flags, true); ch.setUint16(10, e.method, true);
+      ch.setUint32(16, e.crc, true); ch.setUint32(20, csize, true); ch.setUint32(24, usize, true); ch.setUint16(28, name.length, true);
+      ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), name);
+      offset += size;
+    });
+    var csz = 0; central.forEach(function (c) { csz += c.length; });
+    var comment = enc.encode(opts.comment || "");
+    var end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, opts.count == null ? entries.length : opts.count, true); end.setUint16(10, opts.count == null ? entries.length : opts.count, true);
+    end.setUint32(12, csz, true); end.setUint32(16, opts.cdAt == null ? offset : opts.cdAt, true); end.setUint16(20, comment.length, true);
+    return new Blob(chunks.concat(central, [new Uint8Array(end.buffer), comment]));
+  }
+  function storedEntry(name, bytes, extra) {
+    var e = { name: name, data: bytes, method: 0, usize: bytes.length, crc: Zip.crc32(bytes) };
+    if (extra) Object.keys(extra).forEach(function (k) { e[k] = extra[k]; });
+    return e;
+  }
+
+  var enc = new TextEncoder();
+  var xml = enc.encode('<?xml version="1.0"?><Types>' + new Array(400).join('<Default Extension="x" ContentType="y"/>') + "</Types>");
+  var PARTS = [
+    { name: "[Content_Types].xml", bytes: xml },
+    { name: "word/document.xml", bytes: enc.encode("<w:document>" + new Array(2000).join("<w:p/>") + "</w:document>") },
+    { name: "word/media/image1.png", bytes: enc.encode(new Array(500).join("compressible but named png ")) },
+    { name: "word/media/\u56FE \u00E9&.emf", bytes: noise(4000) },
+    { name: "word/empty.bin", bytes: new Uint8Array(0) },
+    { name: "word/embeddings/Book1.XLSX", bytes: enc.encode(new Array(300).join("sheet ")) },
+    { name: "word/tiny.xml", bytes: enc.encode("<a/>") }
+  ];
+
+  Promise.resolve().then(function () {
+    // ---- CRC-32 and text ---------------------------------------------------
+    ok(Zip.crc32(new Uint8Array(0)) === 0, "CRC-32 of nothing is 0");
+    ok(Zip.crc32(enc.encode("123456789")) === 0xCBF43926, "CRC-32 of 123456789 is CBF43926", Zip.crc32(enc.encode("123456789")).toString(16));
+    ok(Zip.crc32(enc.encode("The quick brown fox jumps over the lazy dog")) === 0x414FA339, "CRC-32 of the quick brown fox is 414FA339");
+    ok(Zip.crc32(enc.encode("a")) === 0xE8B7BE43, "CRC-32 of a is E8B7BE43");
+    var all = new Uint8Array(256); for (var i = 0; i < 256; i++) all[i] = i;
+    ok(Zip.crc32(all) === 0x29058C73, "CRC-32 of every byte value is 29058C73", Zip.crc32(all).toString(16));
+    ok(Zip.crc32(all) >= 0, "CRC-32 is never negative");
+    var words = "caf\u00E9 \u00A3 \u56FE \uD83D\uDE00";
+    ok(Zip.text(Zip.bytesOf(words)) === words, "bytesOf then text gives the same words");
+    ok(Zip.bytesOf("\u00A3").length === 2 && Zip.bytesOf("\u00A3")[0] === 0xC2, "bytesOf writes UTF-8");
+    ok(Zip.text({ name: "x", bytes: Zip.bytesOf("abc") }) === "abc", "text reads a part");
+    ok(Zip.text(null) === "" && Zip.text(undefined) === "", "text of nothing is empty");
+    ok(Zip.text(new Uint8Array([0xEF, 0xBB, 0xBF, 0x61])) === "a", "text drops a byte order mark");
+
+    // ---- write, then read --------------------------------------------------
+    return Zip.write(PARTS, { mimeType: "application/x-test" });
+  }).then(function (blob) {
+    ok(blob instanceof Blob && blob.type === "application/x-test", "write gives a Blob of the type asked for");
+    return bytesOfBlob(blob).then(function (u8) {
+      var dir = directory(u8), by = {};
+      dir.forEach(function (d) { by[d.name] = d; });
+      ok(dir.length === PARTS.length && dir.map(function (d) { return d.name; }).join("|") === PARTS.map(function (p) { return p.name; }).join("|"),
+        "entries are written in the order given, with their names");
+      ok(dir[0].name === "[Content_Types].xml" && dir[0].local === 0, "the first part given is the first entry in the file");
+      ok(by["[Content_Types].xml"].method === 8 && by["word/document.xml"].method === 8, "XML is deflated");
+      ok(by["[Content_Types].xml"].csize < by["[Content_Types].xml"].usize, "a deflated entry is smaller than its content");
+      ok(by["word/media/image1.png"].method === 0 && by["word/media/image1.png"].csize === by["word/media/image1.png"].usize,
+        "a .png is stored, even when it would compress");
+      ok(by["word/embeddings/Book1.XLSX"].method === 0, "an .xlsx is stored, whatever the case of its extension");
+      ok(by["word/media/\u56FE \u00E9&.emf"].method === 0, "content that does not get smaller is stored");
+      ok(by["word/tiny.xml"].method === 0, "a tiny part that deflate would lengthen is stored");
+      ok(by["word/empty.bin"].method === 0 && by["word/empty.bin"].usize === 0 && by["word/empty.bin"].crc === 0, "an empty part is stored with CRC 0");
+      ok(dir.every(function (d) { return d.flags === 0x0800 && d.localFlags === 0x0800; }), "every entry is flagged UTF-8 and nothing else (no data descriptor)");
+      ok(dir.every(function (d) { return d.localSig === 0x04034b50 && d.localCrc === d.crc && d.localCsize === d.csize && d.localUsize === d.usize && d.localMethod === d.method; }),
+        "each local header carries the same CRC, sizes and method as the directory");
+      ok(dir.every(function (d, n) { return d.crc === Zip.crc32(PARTS[n].bytes) && d.usize === PARTS[n].bytes.length; }), "the CRC and size written are those of the content");
+      ok(dir.every(function (d) { return d.need === 20 && d.extra === 0 && d.localExtra === 0; }), "version 2.0, no extra fields (so no ZIP64)");
+      ok(dir.every(function (d) { return d.date === (((2026 - 1980) << 9) | (1 << 5) | 1) && d.time === 0; }), "every entry is dated 1 January 2026");
+      ok(dir.comment === 0, "no comment");
+      return Zip.read(blob);
+    });
+  }).then(function (back) {
+    ok(sameParts(back, PARTS) === "", "write then read gives the same names and bytes", sameParts(back, PARTS));
+    ok(back[3].name === "word/media/\u56FE \u00E9&.emf", "a name with non-ASCII characters, a space and an ampersand comes back as written");
+    return Promise.all([Zip.write(PARTS), Zip.write(PARTS)]).then(function (two) { return Promise.all(two.map(bytesOfBlob)); });
+  }).then(function (two) {
+    ok(same(two[0], two[1]), "the same parts give the same bytes every time");
+    return Zip.write(PARTS).then(function (blob) {
+      ok(blob.type === "application/zip", "the Blob type defaults to application/zip");
+      return blob.arrayBuffer();
+    });
+  }).then(function (buffer) {
+    return Zip.read(buffer).then(function (a) {
+      ok(sameParts(a, PARTS) === "", "read takes an ArrayBuffer");
+      return Zip.read(new Uint8Array(buffer));
+    }).then(function (a) {
+      ok(sameParts(a, PARTS) === "", "read takes a Uint8Array");
+      // A view into the middle of a larger buffer, as a caller slicing a file would hand over.
+      var padded = new Uint8Array(buffer.byteLength + 64);
+      padded.set(new Uint8Array(buffer), 40);
+      return Zip.read(padded.subarray(40, 40 + buffer.byteLength));
+    }).then(function (a) {
+      ok(sameParts(a, PARTS) === "", "read takes a view that does not start at the buffer's first byte");
+    });
+  }).then(function () {
+    // ---- directory entries -------------------------------------------------
+    var withDirs = [{ name: "word/", bytes: new Uint8Array(0) }, PARTS[1], { name: "word/media/", bytes: new Uint8Array(0) }, PARTS[6]];
+    return Zip.write(withDirs).then(Zip.read);
+  }).then(function (back) {
+    ok(back.length === 2 && back[0].name === "word/document.xml" && back[1].name === "word/tiny.xml", "directory entries are not written");
+    return Zip.write([]).then(Zip.read);
+  }).then(function (back) {
+    ok(back.length === 0, "an empty list writes a valid empty zip");
+
+    // ---- refusals when writing ---------------------------------------------
+    var many = [];
+    for (var i = 0; i < 65536; i++) many.push({ name: "p" + i, bytes: new Uint8Array(0) });
+    return refused(Zip.write(many), /too many parts/, "write refuses more than 65,535 entries");
+  }).then(function () {
+    return refused(Zip.write([PARTS[1], PARTS[6], PARTS[1]]), /same name/, "write refuses two parts with one name");
+  }).then(function () {
+
+    // ---- zips written by other tools ---------------------------------------
+    var a = enc.encode(new Array(300).join("data descriptor entry ")), b = enc.encode("stored with a descriptor"), c = enc.encode("extra field here");
+    return deflateRaw(a).then(function (da) {
+      var blob = rawZip([
+        { name: "deflated-dd.xml", data: da, method: 8, usize: a.length, crc: Zip.crc32(a), flags: 0x0808, descriptor: true },
+        storedEntry("stored-dd.bin", b, { flags: 0x0808, descriptor: true }),
+        // An extra field in the local header that the directory does not have: the data starts later than the directory suggests.
+        storedEntry("extra.bin", c, { localExtra: new Uint8Array([0x55, 0x54, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]) }),
+        storedEntry("folder/", new Uint8Array(0)),
+        storedEntry("caf\u00E9/\u56FE.txt", enc.encode("utf-8 name"))
+      ], { comment: "a comment after the directory" });
+      return Zip.read(blob).then(function (back) {
+        ok(back.length === 5, "a zip with data descriptors, an extra field, a folder and a comment is read");
+        ok(same(back[0].bytes, a), "a deflated entry with a data descriptor (zeros in its local header) reads correctly");
+        ok(same(back[1].bytes, b), "a stored entry with a data descriptor reads correctly");
+        ok(same(back[2].bytes, c), "an entry whose local header has an extra field reads correctly");
+        ok(back[3].name === "folder/" && back[3].bytes.length === 0, "a directory entry comes back as it is, with no bytes");
+        ok(back[4].name === "caf\u00E9/\u56FE.txt" && Zip.text(back[4]) === "utf-8 name", "a UTF-8 name is read");
+      });
+    });
+  }).then(function () {
+
+    // ---- limits and refusals when reading ----------------------------------
+    var small = enc.encode("small");
+    var huge = rawZip([storedEntry("a.bin", small), storedEntry("b.bin", small, { method: 8, declare: { usize: 400 * 1024 * 1024 } }),
+      storedEntry("c.bin", small, { method: 8, declare: { usize: 200 * 1024 * 1024 } })]);
+    return refused(Zip.read(huge), /unpacks to more than 500 MB/, "a zip that declares more than 500 MB is refused before anything is inflated");
+  }).then(function () {
+    var two = rawZip([storedEntry("a.bin", noise(600)), storedEntry("b.bin", noise(600))]);
+    return refused(Zip.read(two, { maxTotalBytes: 1000 }), /unpacks to more than/, "maxTotalBytes is counted across entries")
+      .then(function () { return Zip.read(two, { maxTotalBytes: 1200 }); })
+      .then(function (back) { ok(back.length === 2, "a zip exactly at maxTotalBytes is read"); })
+      .then(function () { return refused(Zip.read(two, { maxEntries: 1 }), /too many entries/, "maxEntries refuses a zip with more"); });
+  }).then(function () {
+    var list = [];
+    for (var i = 0; i < 5001; i++) list.push(storedEntry("e" + i, new Uint8Array(0)));
+    return refused(Zip.read(rawZip(list)), /too many entries \(5001\)/, "more than 5,000 entries are refused by default");
+  }).then(function () {
+    // The bomb: 2 MB of zeros that the directory says is 100 bytes.
+    var zeros = new Uint8Array(2 * 1024 * 1024);
+    return deflateRaw(zeros).then(function (d) {
+      var bomb = rawZip([{ name: "bomb.xml", data: d, method: 8, usize: 100, crc: 0 }]);
+      return refused(Zip.read(bomb), /larger than it declares/, "an entry that inflates past its declared size is stopped")
+        .then(function () {
+          var short = rawZip([{ name: "short.xml", data: d, method: 8, usize: zeros.length + 10, crc: 0 }]);
+          return refused(Zip.read(short), /smaller than it declares/, "an entry that inflates to less than it declares is refused");
+        });
+    });
+  }).then(function () {
+    return refused(Zip.read(rawZip([{ name: "junk.xml", data: noise(300), method: 8, usize: 900, crc: 0 }])), /damaged|declares/, "a deflated entry that is not deflate data is refused");
+  }).then(function () {
+    return refused(Zip.read(new Blob([enc.encode("\u00D0\u00CF\u0011\u00E0 this is an old .doc, not a zip at all, padded out past twenty-two bytes")])), /not a zip file/, "a file that is not a zip is refused");
+  }).then(function () {
+    return refused(Zip.read(new Blob([new Uint8Array(5)])), /not a zip file/, "a file too short to be a zip is refused");
+  }).then(function () {
+    return refused(Zip.read(null), /nothing was given/, "nothing to read is refused");
+  }).then(function () {
+    return refused(Zip.read(rawZip([storedEntry("secret.xml", enc.encode("x"), { flags: 0x0801 })])), /encrypted/, "an encrypted entry is refused");
+  }).then(function () {
+    return refused(Zip.read(rawZip([storedEntry("a", enc.encode("x"))], { count: 0xFFFF })), /ZIP64/, "an entry count of 65,535 (the ZIP64 marker) is refused");
+  }).then(function () {
+    return refused(Zip.read(rawZip([storedEntry("a", enc.encode("x"))], { cdAt: 0xFFFFFFFF })), /ZIP64/, "a directory offset of FFFFFFFF (the ZIP64 marker) is refused");
+  }).then(function () {
+    return refused(Zip.read(rawZip([storedEntry("big", enc.encode("x"), { declare: { usize: 0xFFFFFFFF, csize: 0xFFFFFFFF } })])), /ZIP64/, "an entry sized FFFFFFFF (the ZIP64 marker) is refused");
+  }).then(function () {
+    return refused(Zip.read(rawZip([{ name: "lzma.bin", data: enc.encode("x"), method: 14, usize: 1, crc: 0 }])), /not supported/, "a compression method other than stored or deflate is refused");
+  }).then(function () {
+    return refused(Zip.read(rawZip([storedEntry("cut.bin", noise(50), { declare: { usize: 5000, csize: 5000 } })])), /cut short|damaged/, "an entry that runs past the end of the file is refused");
+  }).then(function () {
+    return refused(Zip.read(rawZip([storedEntry("a", enc.encode("x"))], { cdAt: 7 })), /damaged/, "a directory that is not where the end record says is refused");
+  }).then(function () {
+
+    // ---- a file packed by the vendored docx library ------------------------
+    var D = window.docx;
+    var doc = new D.Document({
+      creator: "Test", title: "Zip test",
+      sections: [{ children: [
+        new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: [new D.TextRun({ text: "Heading" })] }),
+        new D.Paragraph({ children: [new D.TextRun({ text: "caf\u00E9 \u00A3 \u56FE, and a footnote" }), new D.FootnoteReferenceRun(1)] })
+      ] }],
+      footnotes: { 1: { children: [new D.Paragraph({ children: [new D.TextRun({ text: "note" })] })] } }
+    });
+    return D.Packer.toBlob(doc);
+  }).then(function (packed) {
+    return Zip.read(packed).then(function (first) {
+      var dirs = first.filter(function (p) { return /\/$/.test(p.name); }), files = first.filter(function (p) { return !/\/$/.test(p.name); });
+      ok(files.some(function (p) { return p.name === "word/document.xml"; }) && files.some(function (p) { return p.name === "[Content_Types].xml"; }),
+        "a file packed by the docx library is read (" + files.length + " parts)");
+      ok(dirs.length > 0, "the library's zip has directory entries (" + dirs.length + ")");
+      ok(Zip.text(files.filter(function (p) { return p.name === "word/document.xml"; })[0]).indexOf("caf\u00E9 \u00A3 \u56FE, and a footnote") !== -1, "its document text is read as UTF-8");
+      var types = files.filter(function (p) { return p.name === "[Content_Types].xml"; })[0];
+      var ordered = [types].concat(first.filter(function (p) { return p !== types; }));
+      return Zip.write(ordered).then(function (blob) {
+        return bytesOfBlob(blob).then(function (u8) {
+          var dir = directory(u8);
+          ok(dir.length === files.length && !dir.some(function (d) { return /\/$/.test(d.name); }), "re-zipped, it has the same parts and no directory entries");
+          ok(dir[0].name === "[Content_Types].xml", "re-zipped, [Content_Types].xml is first");
+          return Zip.read(blob);
+        });
+      }).then(function (second) {
+        var expect = [types].concat(files.filter(function (p) { return p !== types; }));
+        ok(sameParts(second, expect) === "", "re-zipped, every part has identical bytes", sameParts(second, expect));
+      });
+    });
+  }).then(function () {
+
+    // ---- a file saved by Word ----------------------------------------------
+    var word = b64(WORD_ZIP), dir = directory(word);
+    ok(dir.length === 11 && dir.every(function (d) { return d.method === 8 && d.flags === 6; }), "the Word file is Word's own zip (11 deflated entries, Word's flags)");
+    return Zip.read(new Blob([word])).then(function (first) {
+      ok(first.length === 11 && first[0].name === "[Content_Types].xml", "a file saved by Word is read (11 parts)");
+      ok(first.every(function (p, n) { return p.bytes.length === dir[n].usize && Zip.crc32(p.bytes) === dir[n].crc; }), "every part of it has the size and CRC-32 Word recorded");
+      var docXml = Zip.text(first.filter(function (p) { return p.name === "word/document.xml"; })[0]);
+      ok(docXml.indexOf("Text before the objects.") !== -1 && docXml.indexOf("<w:document ") !== -1, "its document part is the XML Word wrote");
+      return Zip.write(first, { mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }).then(function (blob) {
+        return bytesOfBlob(blob).then(function (u8) {
+          var again = directory(u8);
+          ok(again.every(function (d, n) { return d.crc === dir[n].crc && d.usize === dir[n].usize && d.name === dir[n].name; }), "re-zipped, each entry has the CRC-32 Word recorded for it");
+          return Zip.read(blob);
+        });
+      }).then(function (second) {
+        ok(sameParts(second, first) === "", "re-zipped and read again, every part is identical", sameParts(second, first));
+      });
+    });
+  }).catch(function (e) {
+    ok(false, "the page ran to the end", (e && e.stack) || String(e));
+  }).then(finish);
+})();
+</script>
+</body></html>

@@ -1,0 +1,13 @@
+{
+  "pages": 2,
+  "inlineShapes": 0,
+  "shapes": 11,
+  "shapeTypes": {
+    "autoShape": 6,
+    "textBox": 1,
+    "line": 4
+  },
+  "textBoxFont": "Aptos",
+  "textBoxSize": 12,
+  "protection": "none"
+}

@@ -2,11 +2,11 @@
 
 Copyright (c) 2026 SolutionsPT. All rights reserved.
 
-Desktop-app versions of each tool in the suite: the OT Cyber Report Review Tool (module `report-review`), the OT Cyber Assessment Tool (module `assessments`) and the OT Cyber Risk Assessment Tool (module `risk-assessment`). Each is built on its own, as its own exe, so a contractor can be given just the tool they need. Each runs its module's single-file build from `../single-html` unchanged, inside Electron's own copy of Chromium. Nothing in `../../modules` is touched.
+Desktop-app versions of each tool in the suite: the OT Cyber Report Review Tool (module `report-review`), the OT Cyber Assessment Tool (module `assessments`), the OT Cyber Risk Assessment Tool (module `risk-assessment`) and the OT Cyber Document Tool (module `documents`). Each is built on its own, as its own exe, so a contractor can be given just the tool they need. Each runs its module's single-file build from `../single-html` unchanged, inside Electron's own copy of Chromium. Nothing in `../../modules` is touched.
 
 The SolutionsPT OT Cyber Suite (`-Module suite`) builds the same way: its page is the suite's single-file build, which carries each tool in a frame, and its manifest is `platform/suite.json` (copied in as `module.json`). Its exe is `%LOCALAPPDATA%\OTCAT-electron\suite\dist\SolutionsPT OT Cyber Suite v<version>.exe`.
 
-What differs between them comes from the module's manifest, `modules/<module>/module.json`: the product name (window titles, the exe's name and file properties, the loading window), the `appId` and package name (so each exe keeps its own local storage and autosave, and the two can run side by side), and which self-test runs. The version is the suite's, from `shared/version.js` (read by `../module-info.ps1`), and the same for every module.
+What differs between them comes from the module's manifest, `modules/<module>/module.json`: the product name (window titles, the exe's name and file properties, the loading window), the `appId` and package name (so each exe keeps its own local storage and autosave, and they can run side by side), and which self-test runs. The version is the suite's, from `shared/version.js` (read by `../module-info.ps1`), and the same for every module.
 
 The simplest way to build is the repository's one entry point:
 
@@ -30,7 +30,7 @@ Nothing is installed: the exe unpacks itself to a temp folder each time it start
 
 It uses `electron-builder` (pinned to 26.15.3) and needs a portable Node. That Node is unzipped, not installed, into `%LOCALAPPDATA%\OTCAT-electron\tools`; see the script header. Electron itself is reused from the folder build, which has already been checksum-verified, so it isn't downloaded twice.
 
-Everything heavy stays in `%LOCALAPPDATA%\OTCAT-electron`, outside OneDrive. The Electron download (`cache`), the portable Node (`tools`) and the electron-builder staging project (`builder`, with its `node_modules`) are shared by every module. Each module's output goes in its own subfolder (`assessments\`, `risk-assessment\`), so building one never overwrites the other.
+Everything heavy stays in `%LOCALAPPDATA%\OTCAT-electron`, outside OneDrive. The Electron download (`cache`), the portable Node (`tools`) and the electron-builder staging project (`builder`, with its `node_modules`) are shared by every module. Each module's output goes in its own subfolder (`assessments\`, `risk-assessment\`, `report-review\`, `documents\`, `suite\`), so building one never overwrites another.
 
 The icon comes from `build/icon.ico`; re-run `build-icon.ps1` if the source logo changes. A larger or vector source would sharpen the 256 px size, since the current one is 200 px.
 
@@ -56,12 +56,14 @@ The icon comes from `build/icon.ico`; re-run `build-icon.ps1` if the source logo
 - writes a real Word and a real Excel download to disk
 - lets the window close when there is unsaved work
 
+`selftest-documents.js` checks that the document tool starts from inside the package with its version badge, loads its demo document, exports a Word file that is a zip with a cover, and lets the window close when there is unsaved work.
+
 `selftest-suite.js` checks that the suite:
 
 - starts from inside the package on its home page, with the loading window behaving as below
-- shows its title, logo and version (agreeing with the exe's), a card per tool with its tour, What's new, Recent files, Getting started and the licence pop-up
-- opens each tool in its frame with the tool's title and the exe's version, and the file pickers and localStorage work inside the frame
-- writes a real Word and a real Excel download to disk from inside each tool's frame
+- shows its title, logo and version (agreeing with the exe's), a card for each of the four tools with its tour and when to use it, What's new, Recent files and the licence pop-up
+- opens each tool in its frame with the tool's title and the exe's version (the document tool included; what it does there is its own self-test's), and the file pickers and localStorage work inside the frame
+- writes a real Word and a real Excel download to disk from inside the assessment and risk tools' frames
 - keeps each tool's work when switching between tools and the home page
 - raises the unsaved-work warning from a tool's own frame (on reload) and from the suite (on close), and still lets the window close
 
@@ -84,7 +86,7 @@ The output goes to `%LOCALAPPDATA%\OTCAT-electron\<module>\<product>\`, about 37
 - **Closing with unsaved work.** Edge asks "Leave site?". Electron asks nothing and silently refuses to close, which would trap the window. The wrapper asks its own question and closes if told to. A negative control proved the window gets stuck without it.
 - **Exports** get a Save As dialog that opens in Documents.
 - **Web links** open in the normal browser, never inside the app.
-- **One copy of each tool at a time**, because two copies would share one autosave store. The two tools are separate apps and can run together.
+- **One copy of each tool at a time**, because two copies would share one autosave store. The tools are separate apps and can run together.
 - **No menu bar**, and nothing from Node is exposed to the page (sandboxed, context isolation on).
 
 ## Not done, or worth knowing before going further

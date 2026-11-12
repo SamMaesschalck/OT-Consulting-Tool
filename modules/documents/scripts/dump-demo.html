@@ -1,0 +1,87 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the demo document</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'" />
+</head>
+<body>
+<p id="status">running</p>
+<!--
+  Not a test page. scripts\build-demo.ps1 runs this in headless Edge to make
+  data/demo-document.js, the document the tour opens. The demo is the Word
+  fixture demo-source.docx brought in through the real importer, so it shows
+  what an import gives: every block type, a diagram kept from Word, and one
+  line left in red for the Issue check to find. The page prints the project
+  file as base64 in <pre id="demo">.
+
+  Nothing here depends on the day or the machine: the id, the dates and the
+  author are fixed, so the same fixture gives the same file.
+-->
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script src="fixtures/demo-source.js"></script>
+<script>
+(function () {
+  var A = window.App, M = A.DocModel;
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  function say(t) { var p = document.createElement("p"); p.textContent = t; document.body.appendChild(p); }
+  function end() { alive = false; document.getElementById("status").textContent = "DEMO_DONE"; }
+  function bytes(b64) { var s = atob(b64), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+  var WHEN = "2026-11-11T09:00:00.000Z";
+
+  var b64 = (window.Fixtures || {})["demo-source"];
+  if (!b64) { say("FAIL the fixture demo-source did not load"); end(); return; }
+  A.DocxImport.read(new File([bytes(b64)], "Network segmentation proposal.docx"), { name: "Network segmentation proposal.docx" }).then(function (res) {
+    var doc = M.normalise(res.project);
+    doc.id = "doc-demo";
+    doc.createdAt = WHEN;
+    doc.info.docType = "Proposal";
+    doc.info.reference = "OPP-10442";
+    doc.info.client = "Northfield Water";
+    doc.info.site = "Ashby treatment works";
+    doc.info.author = "A. Consultant";
+    doc.info.revision = "0.1";
+    doc.info.date = "2026-11-11";
+    doc.options.contents = true;
+    if (doc.importReport && doc.importReport.source) doc.importReport.source.importedAt = WHEN;
+    // The source's one red paragraph arrives as red text. In the demo it is a
+    // prompt block, so the tour shows that block type too.
+    doc.blocks.forEach(function (b) {
+      if (b.type !== "paragraph" || !b.runs.length || !b.runs.every(function (r) { return r.red && !r.fn && !r.link; })) return;
+      b.text = M.text(b); b.type = "prompt"; delete b.runs; delete b.align;
+    });
+
+    // The demo must show every block type, a kept diagram and one thing
+    // still to write; say so here, where the fixture can be put right.
+    var types = {}, kept = {};
+    M.each(doc, function (b) { types[b.type] = true; if (b.type === "kept") kept[b.kind] = true; });
+    var want = ["heading", "paragraph", "list", "table", "picture", "kept", "pageBreak", "prompt"];
+    var lacking = want.filter(function (t) { return !types[t]; });
+    if (lacking.length) say("FAIL the demo has no " + lacking.join(", ") + " block");
+    if (!kept.smartart) say("FAIL the demo has no SmartArt diagram kept from Word");
+    if (!String(doc.info.title || "").trim()) say("FAIL the demo has no title");
+    if (M.missing(doc).length) say("FAIL the demo has pictures or drawings without bytes");
+
+    return M.toFile(doc).then(function (blob) { return blob.text(); }).then(function (text) {
+      // toFile stamps the day and the version; the demo carries neither.
+      var file = JSON.parse(text);
+      file.savedAt = WHEN;
+      file.createdWithVersion = "";
+      file.savedBy = { product: A.Product.name, version: "" };
+      var json = JSON.stringify(file), u = new TextEncoder().encode(json), s = "";
+      for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+      var pre = document.createElement("pre");
+      pre.id = "demo";
+      pre.textContent = btoa(s);
+      document.body.appendChild(pre);
+      say("DEMO " + doc.blocks.length + " blocks, " + Object.keys(file.media || {}).length + " pictures, " + Object.keys(file.parts || {}).length + " carried parts, " + json.length + " characters");
+    });
+  }).then(end, function (e) { say("FAIL the demo was not built: " + (e && (e.stack || e.message))); end(); });
+})();
+</script>
+</body></html>

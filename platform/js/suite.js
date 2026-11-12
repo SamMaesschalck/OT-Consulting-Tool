@@ -3,12 +3,13 @@
  *
  * A rail down the left (Home, each tool, any tour that is open, the theme and
  * the licence) and beside it the home page or a tool in its frame. Each tool runs
- * exactly as it does on its own, in its own frame: the two tools define the
+ * exactly as it does on its own, in its own frame: the tools define the
  * same global names, so they could not share one page, and the frame keeps
  * every tool's behaviour identical inside and outside the suite. A tool that
  * is left stays open and hidden, so switching never loses work. Each tool
  * still saves and loads its own files: a project file in the assessment and
- * risk tools, a review pack and review file in the Report Review Tool.
+ * risk tools, a review pack and review file in the Report Review Tool, a
+ * document file (and Word files) in the Document Tool.
  *
  * Where the tools come from:
  *   - the folder (developer) build frames each tool's own page,
@@ -329,10 +330,13 @@
 
   // What sort of file a recent entry is, for the list: what the tool said; a
   // project file for the assessment and risk tools, which write nothing else;
-  // or, for the Report Review Tool, read from the names it gives its files.
+  // a document for the Document Tool, whose Word exports are downloads and
+  // never recent files; or, for the Report Review Tool, read from the names
+  // it gives its files.
   function recentKind(e) {
     if (e.kind) return e.kind;
     if (e.module === "assessments" || e.module === "risk-assessment") return "Project file";
+    if (e.module === "documents") return "Document";
     if (e.module !== "report-review") return "";
     if (/-review-pack-round-\d+/i.test(e.name)) return "Review pack";
     if (/-review-round-\d+-/i.test(e.name)) return "Review file";
@@ -360,6 +364,10 @@
     if (/^spt-risk-project\//.test(s)) return { module: "risk-assessment", what: "project file" };
     if (/^spt-risk-context\//.test(s)) return { module: null, what: "risk context file",
       hint: "Open or start an IEC 62443-3-3 assessment in the OT Cyber Assessment Tool and use Import risk context on the Target SL card of its Engagement details page." };
+    // Before the line below: a file with no schema string and a schemaVersion
+    // is taken for an assessment project, so the document file always says
+    // what it is.
+    if (/^spt-document\//.test(s)) return { module: "documents", what: "document file" };
     if (!s && typeof d.schemaVersion === "string") return { module: "assessments", what: "project file" };
     return null;
   }
@@ -388,15 +396,24 @@
 
   // Files dropped on the suite, or on a tool that does not take them itself
   // (from: that tool's frame). Each goes to the tool that reads it; a tool
-  // other than the Report Review Tool takes one project file at a time. A
-  // review file dropped on the author's own tool (not its tour) is the author
-  // bringing it in: it goes to that tool, whose review card imports it.
+  // other than the Report Review Tool takes one file at a time. A Word file
+  // cannot be passed on (a file reaches a tool as text): the message says
+  // where to open it instead. A review file dropped on the author's own tool
+  // (not its tour) is the author bringing it in: it goes to that tool, whose
+  // review card imports it.
   function openDropped(files, from) {
     var author = from && !from.tour && AUTHOR_TOOLS[from.module.id] ? from.module : null;
     files = (files || []).filter(function (x) { return x && typeof x.name === "string"; });
     if (!files.length) return Promise.resolve([]);
     return Promise.all(files.map(function (file) {
-      if (typeof file.size === "number" && file.size > FILE_MAX) return Promise.resolve({ name: file.name, text: null });
+      // Too large to pass on, so it is not read. Its first bytes alone say
+      // whether it is a document file (which writes its schema first), so the
+      // message can name the tool that opens it.
+      if (typeof file.size === "number" && file.size > FILE_MAX) {
+        return Promise.resolve().then(function () { return file.slice(0, 512).text(); })
+          .then(function (head) { return { name: file.name, text: null, tooBig: true, isDocument: /^﻿?\s*\{\s*"schema"\s*:\s*"spt-document\//.test(String(head)) }; },
+                function () { return { name: file.name, text: null, tooBig: true, isDocument: false }; });
+      }
       return Promise.resolve().then(function () { return file.text(); })
         .then(function (text) { return { name: file.name, text: text, handle: file.__sptHandle || null }; }, function () { return { name: file.name, text: null }; });
     })).then(function (got) {
@@ -407,13 +424,20 @@
         var m = toAuthor ? author : k && k.module ? modulesById[k.module] : null;
         if (k && !k.module) { notes.push(g.name + " is a " + k.what + ". " + k.hint); return; }
         if (!m || !moduleAvailable(m)) {
-          notes.push(g.name + (/^PK/.test(g.text || "") ? " is a Word or Excel file, which the suite does not open."
+          var docs = modulesById.documents && moduleAvailable(modulesById.documents) ? modulesById.documents : null;
+          if (g.tooBig) {
+            notes.push(g.name + " is too large to pass on from here (over " + Math.round(FILE_MAX / 1048576) + " MB). Open it with Load in " +
+              (g.isDocument && docs ? "the " + docs.name : "its own tool") + ".");
+            return;
+          }
+          notes.push(g.name + (/^PK/.test(g.text || "") ? " is a Word or Excel file, which the suite does not open." +
+              (docs ? " To put a Word file into the SolutionsPT template, open it with Load in the " + docs.name + "." : "")
             : " is not a file the suite opens. Open it with Load in its own tool."));
           return;
         }
         if (!byTool[m.id]) { byTool[m.id] = []; order.push(m.id); }
         if (m.id !== "report-review" && !toAuthor) {
-          if (projects[m.id]) { notes.push(g.name + " was left out: open one project file at a time."); return; }
+          if (projects[m.id]) { notes.push(g.name + " was left out: open one " + k.what + " at a time."); return; }
           projects[m.id] = true;
         }
         byTool[m.id].push(g);
@@ -643,6 +667,8 @@
                   "M9 3h6v3H9z", "m8.5 13.5 2.5 2.5 4.5-5"],
     "risk-assessment": ["M3 3.5h7v7H3z", "M14 3.5h7v7h-7z", "M8.5 15h7v6h-7z", "M10 7h4", "M6.5 10.5V13H12v2", "M17.5 10.5V13H12"],
     "report-review": ["M4 4.5h16v11.5H10l-6 4.5z", "M8 8.5h8", "M8 12h5"],
+    // A page with a folded corner, and a pencil over its lower right.
+    documents: ["M5.5 3h8l5 5v4.5", "M13.5 3v5h5", "M5.5 3v18h6", "M8.5 12h5", "M8.5 15.5h3", "m14 20.5.6-2.9 5-5 2.3 2.3-5 5z"],
     moon: ["M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"],
     sun: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M12 2.5V5", "M12 19v2.5", "M2.5 12H5", "M19 12h2.5",
           "m5.3 5.3 1.8 1.8", "m16.9 16.9 1.8 1.8", "m5.3 18.7 1.8-1.8", "m16.9 7.1 1.8-1.8"],
@@ -804,7 +830,7 @@
     });
     function pick() {
       if (!BUNDLE || typeof window.showOpenFilePicker !== "function") { input.click(); return; }
-      window.showOpenFilePicker({ multiple: true, types: [{ description: "Project file, review pack or review file", accept: { "application/json": [".json"] } }] })
+      window.showOpenFilePicker({ multiple: true, types: [{ description: "Project file, document file, review pack or review file", accept: { "application/json": [".json"] } }] })
         .then(function (handles) {
           return Promise.all(handles.map(function (hd) {
             return hd.getFile().then(function (file) { file.__sptHandle = hd; return file; });
@@ -815,7 +841,7 @@
     }
     return h("span", null, [
       input,
-      h("button", { type: "button", class: "btn small recent-pick", title: "Open a project file, review pack or review file in the tool that reads it",
+      h("button", { type: "button", class: "btn small recent-pick", title: "Open a project file, document file, review pack or review file in the tool that reads it",
         onClick: pick }, [icon("folder"), "Open a file"])
     ]);
   }
@@ -826,7 +852,7 @@
     if (!list.length) {
       body = h("div", { class: "recent-empty" }, [
         icon("drop"),
-        h("p", { text: "Project files, review packs and review files you open or save in a tool appear here." }),
+        h("p", { text: "Project files, document files, review packs and review files you open or save in a tool appear here." }),
         h("p", { text: "Drop one anywhere in the suite and it opens in the right tool." })
       ]);
     } else {
@@ -861,17 +887,18 @@
       ]),
       body,
       h("div", { class: "recent-foot", text: list.length
-        ? "The list holds each file's name, its customer or system and the time, not its contents. Picking one switches to its tool, which offers to reopen the file if the browser still has access to it, or shows where to load it from."
-        : "The list holds each file's name, its customer or system and the time, not its contents." })
+        ? "The list holds each file's name, its customer, system or document title and the time, not its contents. Picking one switches to its tool, which offers to reopen the file if the browser still has access to it, or shows where to load it from."
+        : "The list holds each file's name, its customer, system or document title and the time, not its contents." })
     ]);
   }
 
-  // Each tool, and the file that passes from one to the next.
+  // Each tool, and the file that passes from one to the next. The Document
+  // Tool comes last and apart, with no arrow: no file passes to or from it.
   function helpCard() {
     var by = function (id) { return modulesById[id] && moduleAvailable(modulesById[id]) ? modulesById[id] : null; };
-    var risk = by("risk-assessment"), assess = by("assessments"), review = by("report-review");
-    function step(m, what) {
-      return h("li", { class: "flow-step", "data-module": m.id }, [
+    var risk = by("risk-assessment"), assess = by("assessments"), review = by("report-review"), docs = by("documents");
+    function step(m, what, apart) {
+      return h("li", { class: "flow-step" + (apart ? " flow-apart" : ""), "data-module": m.id }, [
         toolIcon(m, true),
         h("span", { class: "flow-text" }, [h("span", { class: "flow-name", text: m.name }), h("span", { class: "flow-what", text: what })])
       ]);
@@ -893,10 +920,11 @@
       flow.push(step(review, "A colleague comments on the report and the engagement behind it, and gives a verdict."));
       flow.push(link("back", "Review file", "Goes back to the author, who brings the comments in with Import review files."));
     }
+    if (docs) flow.push(step(docs, "Proposals, method statements and other documents in the SolutionsPT template, written here or brought in from a Word file. It works on its own: no file passes between it and the other tools.", true));
     // Dropping files is said by the empty Recent files; once the list has
     // entries, this is the only place that says it.
     var tips = [];
-    if (readRecent().length) tips.push("Drop a project file, review pack or review file anywhere in the suite and it opens in the right tool.");
+    if (readRecent().length) tips.push("Drop a project file, document file, review pack or review file anywhere in the suite and it opens in the right tool.");
     tips.push("A tool you leave keeps your work until you close the suite. In the rail, a ring on a tool means it is open and a filled amber dot means it has unsaved changes. The suite asks before closing while any tool has them.");
     return h("section", { class: "card help-card", "aria-labelledby": "help-h" }, [
       h("div", { class: "card-h" }, [h("h2", { id: "help-h", text: "How the tools fit together" })]),

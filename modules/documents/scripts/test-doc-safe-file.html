@@ -1,0 +1,418 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: Word import, hostile and damaged files</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.DocxImport against files that are not what they claim, are damaged, or
+  were made to do harm (docs/document-tool-design.md 4.4, "Refusals"): every one
+  either imports with what could not be read listed in the report, or is refused
+  with one plain sentence. None hangs, none throws a raw error, nothing from a
+  file reaches the page as markup, and nothing outside the file is ever asked for.
+
+  The zips are written by this page (stored, or deflated with the browser's own
+  CompressionStream), with sizes the directory can be made to lie about.
+-->
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-import.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function eq(a, b, n) { var x = JSON.stringify(a), y = JSON.stringify(b); ok(x === y, n, "got " + x + " wanted " + y); }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // Unzipping is real work, not a timer: without a timer pending, virtual time
+  // would run out while it is still going.
+  var tick = setInterval(function () {}, 20);
+  var I = window.App.DocxImport;
+
+  // Anything the page asks the outside world for is recorded. Nothing should be.
+  var asked = [];
+  var realFetch = window.fetch;
+  window.fetch = function (u) { asked.push("fetch " + u); return Promise.reject(new Error("no")); };
+  var realOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (m, u) { asked.push("xhr " + u); return realOpen.apply(this, arguments); };
+  if (navigator.sendBeacon) navigator.sendBeacon = function (u) { asked.push("beacon " + u); return false; };
+  var elementsBefore = document.getElementsByTagName("*").length;
+
+  // ---- a zip writer of this page's own -----------------------------------------
+  var CRC = (function () { var t = [], n, c, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc(u) { var c = 0xFFFFFFFF; for (var i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function bytes(v) { return typeof v === "string" ? new TextEncoder().encode(v) : v; }
+  // A part may carry method (8 = its data is already deflated), usize (the size to declare) and sum (the CRC to declare).
+  function zip(parts) {
+    var chunks = [], central = [], offset = 0;
+    parts.forEach(function (p) {
+      var name = bytes(p.name), data = bytes(p.data), sum = p.sum != null ? p.sum : crc(data), usize = p.usize != null ? p.usize : data.length, method = p.method || 0;
+      var lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, method, true);
+      lh.setUint32(14, sum, true); lh.setUint32(18, data.length, true); lh.setUint32(22, usize, true); lh.setUint16(26, name.length, true);
+      chunks.push(new Uint8Array(lh.buffer), name, data);
+      var ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, method, true);
+      ch.setUint32(16, sum, true); ch.setUint32(20, data.length, true); ch.setUint32(24, usize, true); ch.setUint16(28, name.length, true);
+      ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), name);
+      offset += 30 + name.length + data.length;
+    });
+    var size = 0; central.forEach(function (c) { size += c.length; });
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, parts.length, true); e.setUint16(10, parts.length, true);
+    e.setUint32(12, size, true); e.setUint32(16, offset, true);
+    return new Blob(chunks.concat(central, [new Uint8Array(e.buffer)]));
+  }
+  function deflate(u) { return new Response(new Blob([u]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+  function png(w, h, extra) { var u = new Uint8Array(33 + (extra || 0)); u.set([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, w >>> 24, (w >> 16) & 255, (w >> 8) & 255, w & 255, h >>> 24, (h >> 16) & 255, (h >> 8) & 255, h & 255, 8, 6]); return u; }
+
+  // ---- a package, part by part, so that any of them can be spoiled ----------------------
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main", RNS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  var NS = ' xmlns:w="' + W + '" xmlns:r="' + RNS + '" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"' +
+    ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"' +
+    ' xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"';
+  var HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  var REL = RNS + "/", IMG = REL + "image";
+  var MAIN_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function R(text, rPr) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(text) + '</w:t></w:r>'; }
+  function PX(inner, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + inner + '</w:p>'; }
+  function P(text, pPr) { return PX(R(text), pPr); }
+  function DOC(body) { return HEAD + '<w:document' + NS + '><w:body>' + body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body></w:document>'; }
+  function RELS(rels) {
+    return HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      rels.map(function (r) { return '<Relationship Id="' + r[0] + '" Type="' + r[1] + '" Target="' + esc(r[2]) + '"' + (r[3] ? ' TargetMode="External"' : '') + '/>'; }).join("") + '</Relationships>';
+  }
+  function TYPES(mainType) {
+    return HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>' +
+      '<Override PartName="/word/document.xml" ContentType="' + (mainType || MAIN_TYPE) + '"/></Types>';
+  }
+  // The parts of a small sound document, by name. A test changes, adds or deletes entries, then packs them.
+  function sound(body, rels) {
+    return {
+      "[Content_Types].xml": TYPES(),
+      "_rels/.rels": RELS([["rId1", REL + "officeDocument", "word/document.xml"]]),
+      "word/document.xml": DOC(body || P("A sound paragraph")),
+      "word/_rels/document.xml.rels": RELS(rels || [])
+    };
+  }
+  function pack(map, extra) {
+    var parts = Object.keys(map).filter(function (n) { return map[n] != null; }).map(function (n) { return { name: n, data: map[n] }; });
+    return zip(parts.concat(extra || []));
+  }
+  function PIC(rid, cx, cy, name) {
+    return '<w:r><w:drawing><wp:inline><wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:docPr id="1" name="' + esc(name || "Picture 1") + '"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:blipFill><a:blip r:embed="' + rid + '"/></pic:blipFill><pic:spPr/></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  }
+
+  function text(b) { return b.runs ? b.runs.map(function (r) { return r.t; }).join("") : (b.text || ""); }
+  function brief(blocks) { return blocks.map(function (b) { return b.type + (text(b) ? ":" + text(b) : ""); }); }
+  function entry(report, code) {
+    var found = null;
+    ["toCheck", "changed", "notCarried"].forEach(function (l) { report[l].forEach(function (e) { if (e.code === code) found = e; }); });
+    return found;
+  }
+  // A refusal must be one plain sentence with a code: no stack, no "undefined", no type names.
+  function refused(blob, code, pattern, name, opts) {
+    return I.read(blob, opts || { name: "hostile.docx" }).then(function (r) {
+      ok(false, name, "it was imported: " + JSON.stringify(brief(r.project.blocks)).slice(0, 200));
+    }, function (e) {
+      var plain = e instanceof Error && e.plain === true && typeof e.message === "string" && /\.$/.test(e.message) &&
+        !/undefined|null|TypeError|RangeError|\bat \w+ \(|\[object/.test(e.message) && e.message.length < 300;
+      ok(plain && e.code === code && pattern.test(e.message), name, "code " + (e && e.code) + ": " + (e && e.message) + (e && e.cause ? " / cause " + e.cause : ""));
+    });
+  }
+  // Either outcome is acceptable, as long as it is one of the two.
+  function settles(blob, name) {
+    return I.read(blob, { name: "odd.docx" }).then(function (r) { ok(!!r.project && !!r.report, name + " (imported)"); return r; },
+      function (e) { ok(e instanceof Error && e.plain === true && !!e.code, name + " (refused: " + (e && e.message) + ")", String(e && e.stack)); return null; });
+  }
+
+  var tests = [];
+  function test(name, fn) { tests.push({ name: name, fn: fn }); }
+  function run(i) {
+    if (i >= tests.length) { clearInterval(tick); finish(); return; }
+    var t = tests[i];
+    Promise.resolve().then(t.fn).then(null, function (e) { ok(false, t.name + ": threw", (e && (e.cause ? e.cause.stack : e.stack)) || String(e)); })
+      .then(function () { run(i + 1); });
+  }
+
+  // ---- not a Word file at all -----------------------------------------------------------
+  test("not a Word file", function () {
+    var doc = new Uint8Array(600); doc.set([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+    return refused(new Blob(["Just some text, not a zip at all."]), "not-zip", /not a Word file/, "plain text is refused")
+      .then(function () { return refused(new Blob([doc]), "not-zip", /older Word file \(\.doc\) or one protected with a password/, "an old .doc or an encrypted file is refused, and the message says what to do"); })
+      .then(function () { return refused(new Blob([]), "not-zip", /not a Word file/, "an empty file is refused"); })
+      .then(function () { return refused(null, "not-word", /not a Word file/, "nothing at all is refused, not thrown"); })
+      .then(function () { return refused(new Blob([new Uint8Array([0x50, 0x4B, 3, 4, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22])]), "zip", /could not be opened/, "a file that starts like a zip and is not one is refused"); })
+      .then(function () {
+        var m = sound(); m["_rels/.rels"] = RELS([["rId1", REL + "extended-properties", "docProps/app.xml"]]);
+        return refused(pack(m), "not-word", /not a Word document/, "a zip with no officeDocument relationship is refused");
+      })
+      .then(function () {
+        var m = sound(); m["[Content_Types].xml"] = TYPES("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml");
+        return refused(pack(m), "not-word", /not a Word document/, "a spreadsheet is refused");
+      })
+      .then(function () {
+        var m = sound(); m["word/document.xml"] = null;
+        return refused(pack(m), "not-word", /not a Word document/, "a package whose main part is missing is refused");
+      })
+      .then(function () {
+        var m = sound(); m["word/document.xml"] = HEAD + '<html xmlns="http://www.w3.org/1999/xhtml"><body><p>hello</p></body></html>';
+        return refused(pack(m), "not-word", /not a Word document/, "a main part that is not WordprocessingML is refused");
+      });
+  });
+
+  test("Strict Open XML", function () {
+    var m = sound();
+    m["word/document.xml"] = HEAD + '<w:document xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main"><w:body><w:p><w:r><w:t>Strict</w:t></w:r></w:p></w:body></w:document>';
+    m["_rels/.rels"] = RELS([["rId1", "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument", "word/document.xml"]]);
+    return I.read(pack(m), {}).then(function () { ok(false, "a Strict file is refused"); }, function (e) {
+      eq([e.code, e.message], ["strict", "This file is saved as Strict Open XML. In Word, use Save as and choose Word Document (.docx), then load that."], "a Strict Open XML file is refused with the message that says how to convert it");
+    });
+  });
+
+  // ---- XML made to expand or to reach outside ---------------------------------------------
+  test("DOCTYPE and entities", function () {
+    var LOL = '<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;"><!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">]>';
+    var XXE = '<?xml version="1.0"?><!DOCTYPE d [<!ENTITY xxe SYSTEM "file:///C:/Windows/win.ini">]>';
+    var body = '<w:document' + NS + '><w:body><w:p><w:r><w:t>&lol3;</w:t></w:r></w:p></w:body></w:document>';
+    var why = /document type declaration/;
+    var a = sound(); a["word/document.xml"] = LOL + body;
+    var b = sound(); b["word/document.xml"] = XXE + body.replace("&lol3;", "&xxe;");
+    var c = sound(null, [["rIdS", REL + "styles", "styles.xml"]]); c["word/styles.xml"] = LOL + '<w:styles' + NS + '/>';
+    var d = sound(); d["word/_rels/document.xml.rels"] = '<?xml version="1.0"?><!DOCTYPE r SYSTEM "http://example.com/evil.dtd"><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>';
+    var e = sound(); e["customXml/item1.xml"] = LOL + "<data>&lol3;</data>";       // a part the reader never opens
+    var f = sound(); f["word/charts/chart1.xml"] = '<?xml version="1.0"?>\n<!-- padding -->\n' + new Array(3000).join(" ") + '<!DOCTYPE c []><c/>';
+    var g = sound(); g["word/vmlDrawing1.vml"] = '<!ENTITY % x SYSTEM "http://example.com/x">';
+    var h = sound();
+    var wide = '<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE s [<!ENTITY a "b">]><w:styles' + NS + '/>', u16 = new Uint8Array(2 + wide.length * 2);
+    u16[0] = 0xFF; u16[1] = 0xFE; for (var i = 0; i < wide.length; i++) { u16[2 + i * 2] = wide.charCodeAt(i) & 255; u16[3 + i * 2] = wide.charCodeAt(i) >> 8; }
+    h["word/styles.xml"] = u16;
+    return refused(pack(a), "doctype", why, "a DOCTYPE with nested entities in the main part is refused before it is parsed")
+      .then(function () { return refused(pack(b), "doctype", why, "an external entity (a local file) is refused"); })
+      .then(function () { return refused(pack(c), "doctype", why, "a DOCTYPE in the styles part is refused"); })
+      .then(function () { return refused(pack(d), "doctype", why, "a DOCTYPE in a relationships part is refused"); })
+      .then(function () { return refused(pack(e), "doctype", why, "a DOCTYPE in a part the reader never opens is refused too, because the part could be carried"); })
+      .then(function () { return refused(pack(f), "doctype", why, "a DOCTYPE hidden behind padding and a comment is found"); })
+      .then(function () { return refused(pack(g), "doctype", why, "an entity declaration on its own, in a VML part, is refused"); })
+      .then(function () { return refused(pack(h), "doctype", why, "a DOCTYPE in a UTF-16 part is found"); })
+      .then(function () {
+        var m = sound(P("The text <!DOCTYPE html> is only words here"));
+        return I.read(pack(m), {});
+      }).then(function (r) { eq(brief(r.project.blocks), ["paragraph:The text <!DOCTYPE html> is only words here"], "the words DOCTYPE in escaped text are not a declaration, and the file imports"); });
+  });
+
+  // ---- size -----------------------------------------------------------------------------------
+  test("zip bombs and size limits", function () {
+    var m = sound();
+    return deflate(new Uint8Array(1024 * 1024)).then(function (small) {
+      // The directory says 3 GB; the reader must believe it and stop before inflating anything.
+      var bomb = pack(m, [{ name: "word/media/huge.bin", data: small, method: 8, usize: 3000000000, sum: 0 }]);
+      ok(bomb.size < 5000, "the bomb itself is tiny (" + bomb.size + " bytes)");
+      return refused(bomb, "zip", /unpacks to more than \d+ MB/, "a zip that declares 3 GB is refused from its directory alone")
+        .then(function () {
+          // The directory says 10 bytes; the data inflates to a megabyte.
+          return refused(pack(m, [{ name: "word/media/liar.bin", data: small, method: 8, usize: 10, sum: 0 }]), "zip", /could not be opened/, "an entry that inflates past the size it declares is refused, not inflated to the end");
+        })
+        .then(function () {
+          var many = []; for (var i = 0; i < 5001; i++) many.push({ name: "x/" + i + ".txt", data: "" });
+          return refused(pack(m, many), "zip", /too many entries/, "a zip of thousands of entries is refused");
+        })
+        .then(function () {
+          return refused(pack(m, [{ name: "filler.bin", data: new Uint8Array(1300000) }]), "too-big", /^This file is 2 MB, which is more than this tool can load \(1 MB\)\.$/,
+            "a file larger than maxBytes is refused before it is unzipped", { maxBytes: 1048576 });
+        })
+        .then(function () {
+          // A small file whose one picture is large once unpacked: under the file limit, over it in memory.
+          var big = png(10, 10, 300000);
+          return deflate(big).then(function (packed) {
+            var d = sound(PX(PIC("rIdP", 952500, 952500)), [["rIdP", IMG, "media/image1.png"]]);
+            var blob = pack(d, [{ name: "word/media/image1.png", data: packed, method: 8, usize: big.length, sum: crc(big) }]);
+            return refused(blob, "too-big", /pictures and drawings in this file come to more than/, "pictures that unpack past maxBytes are refused, although the file is small (" + blob.size + " bytes)", { maxBytes: 100000 })
+              .then(function () { return I.read(blob, { maxBytes: 400000 }); })
+              .then(function (r) { ok(r.project.blocks[0].type === "picture" && r.project.media[r.project.blocks[0].media].blob.size === big.length, "the same file imports when the limit allows it"); });
+          });
+        });
+    });
+  });
+
+  // ---- names --------------------------------------------------------------------------------------
+  test("path traversal and odd names", function () {
+    var m = sound(
+      PX(PIC("rIdUp", 952500, 476250, "Up and out")) + PX(PIC("rIdAround", 952500, 476250, "Round the houses")) + PX(PIC("rIdBack", 952500, 476250, "Backslash")) + P("After", '<w:pStyle w:val="__proto__"/>'),
+      [["rIdUp", IMG, "../../../../../Windows/win.ini"], ["rIdAround", IMG, "../../../word/./media//image1.png"], ["rIdBack", IMG, "..\\..\\secret.png"],
+        ["rIdS", REL + "styles", "styles.xml"]]);
+    m["word/media/image1.png"] = png(20, 10);
+    m["word/styles.xml"] = HEAD + '<w:styles' + NS + '><w:style w:type="paragraph" w:styleId="__proto__"><w:name w:val="heading 1"/><w:basedOn w:val="constructor"/></w:style><w:style w:type="paragraph" w:styleId="constructor"><w:name w:val="toString"/></w:style></w:styles>';
+    var extra = [{ name: "../outside.png", data: png(1, 1) }, { name: "/absolute.png", data: png(1, 1) }, { name: "word\\media\\secret.png", data: png(1, 1) },
+      { name: "word/../../climb.png", data: png(1, 1) }, { name: "__proto__", data: "x" }, { name: "word/", data: "" }, { name: "", data: "x" },
+      { name: "word/media/image1.png", data: png(999, 999) }];
+    return I.read(pack(m, extra), {}).then(function (r) {
+      var p = r.project, pics = p.blocks.filter(function (b) { return b.type === "picture"; }), gone = entry(r.report, "objects-lost");
+      eq(brief(p.blocks), ["picture", "heading:After"], "a target that climbs out of the package finds nothing; one that wanders inside it still finds its part");
+      eq([pics.length, p.media[pics[0].media].name, p.media[pics[0].media].width], [1, "image1.png", 20], "entries named to leave the package are never parts, and the first of two entries with one name is the one used");
+      eq([gone && gone.count, gone && gone.examples], [2, ["Up and out", "Backslash"]], "the pictures that pointed outside are reported by name");
+      ok(({}).polluted === undefined && Object.prototype.hasOwnProperty.call(Object.prototype, "name") === false && typeof ({}).toString === "function", "a style and a part called __proto__ are names like any other");
+    }).then(function () {
+      var c = sound(P("Upper case names"));
+      var renamed = { "[CONTENT_TYPES].XML": c["[Content_Types].xml"], "_RELS/.RELS": c["_rels/.rels"], "WORD/DOCUMENT.XML": c["word/document.xml"] };
+      return I.read(pack(renamed), {});
+    }).then(function (r) { eq(brief(r.project.blocks), ["paragraph:Upper case names"], "part names are matched without regard to case, as the format says"); });
+  });
+
+  // ---- parts that are missing or broken -----------------------------------------------------------
+  test("missing and damaged parts", function () {
+    var bare = { "_rels/.rels": RELS([["rId1", REL + "officeDocument", "word/document.xml"]]), "word/document.xml": DOC(P("Nothing but the document")) };
+    return I.read(pack(bare), {}).then(function (r) {
+      eq(brief(r.project.blocks), ["paragraph:Nothing but the document"], "a package with no content types, no relationships part, no styles and no numbering still imports");
+    }).then(function () {
+      var m = sound(P("Styled", '<w:pStyle w:val="Heading1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="4"/></w:numPr>') + PX(R("Note") + '<w:r><w:footnoteReference w:id="2"/></w:r>'),
+        [["rIdS", REL + "styles", "styles.xml"], ["rIdN", REL + "numbering", "numbering.xml"], ["rIdF", REL + "footnotes", "footnotes.xml"], ["rIdT", REL + "theme", "theme/theme1.xml"], ["rIdH", REL + "header", "header1.xml"]]);
+      return I.read(pack(m), {});
+    }).then(function (r) {
+      eq(brief(r.project.blocks), ["paragraph:Styled", "paragraph:Note"], "relationships to styles, numbering, footnotes, a theme and a header that are not in the file leave plain paragraphs");
+      ok(entry(r.report, "notes-missing") && entry(r.report, "notes-missing").count === 1, "the footnote that could not be found is reported");
+    }).then(function () {
+      var m = sound(); m["word/document.xml"] = DOC(P("Cut off")).slice(0, -40);
+      return refused(pack(m), "damaged", /damaged and could not be read/, "a main part cut short is refused as damaged");
+    }).then(function () {
+      var m = sound(null, [["rIdS", REL + "styles", "styles.xml"]]); m["word/styles.xml"] = "<w:styles" + NS + "><w:style></w:styles>";
+      return refused(pack(m), "damaged", /damaged and could not be read/, "a styles part that does not parse is refused as damaged, not read as having no styles");
+    }).then(function () {
+      var m = sound(); m["word/document.xml"] = new Uint8Array([0xFF, 0xFE, 0x00, 0xD8, 0x00, 0xD8, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      return refused(pack(m), "damaged", /damaged/, "a main part of binary rubbish is refused as damaged");
+    }).then(function () {
+      var m = sound(); m["word/_rels/document.xml.rels"] = "not xml";
+      return refused(pack(m), "damaged", /damaged/, "a relationships part that is not XML is refused as damaged");
+    }).then(function () {
+      var m = sound(PX(PIC("rIdP", 952500, 476250)), [["rIdP", IMG, "media/empty.png"], ["rIdP", IMG, "media/twice.png"], ["", "", ""]]);
+      m["word/media/empty.png"] = new Uint8Array(0); m["word/numbering.xml"] = "";
+      return settles(pack(m), "a picture of no bytes, a repeated relationship id and an empty relationship");
+    }).then(function () {
+      var m = sound(); m["[Content_Types].xml"] = "<Types";
+      return refused(pack(m), "damaged", /damaged/, "a content types part that does not parse is refused as damaged");
+    });
+  });
+
+  // ---- numbers made to break something ---------------------------------------------------------------
+  test("huge dimensions and counts", function () {
+    var cells = ""; for (var i = 0; i < 200; i++) cells += '<w:tc><w:p><w:r><w:t>c' + i + '</w:t></w:r></w:p></w:tc>';
+    var grid = ""; for (var g = 0; g < 500; g++) grid += '<w:gridCol w:w="100"/>';
+    var body =
+      PX(PIC("rIdP", "99999999999999", "49999999999999", "Kilometres wide")) + PX(PIC("rIdP", "-5", "0", "No size")) + PX(PIC("rIdP", "abc", "1e9999", "Not numbers")) +
+      '<w:tbl><w:tblGrid>' + grid + '</w:tblGrid><w:tr><w:trPr><w:gridBefore w:val="999999999"/></w:trPr><w:tc><w:tcPr><w:gridSpan w:val="4000000000"/></w:tcPr><w:p><w:r><w:t>wide</w:t></w:r></w:p></w:tc></w:tr></w:tbl>' +
+      '<w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="-3"/><w:tcW w:w="-100" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>negative</w:t></w:r></w:p></w:tc></w:tr><w:tr>' + cells + '</w:tr></w:tbl>' +
+      P("Deep list", '<w:numPr><w:ilvl w:val="99999"/><w:numId w:val="1"/></w:numPr><w:ind w:left="99999999"/>') + P("Other item", '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>') +
+      P("Outline 999", '<w:outlineLvl w:val="999"/>') + P("Outline minus", '<w:outlineLvl w:val="-4"/>') +
+      PX('<w:r><w:sym w:font="X" w:char="FFFFFFFFFF"/><w:sym w:font="X" w:char="zz"/><w:sym w:font="X" w:char="0000"/><w:t>syms</w:t></w:r>') +
+      PX('<w:r><w:rPr><w:sz w:val="99999999999"/></w:rPr><w:pict><v:rect style="position:absolute;width:999999999pt;height:1e400in"><v:textbox><w:txbxContent><w:p><w:r><w:rPr><w:sz w:val="-7"/></w:rPr><w:t>big box</w:t></w:r></w:p></w:txbxContent></v:textbox></v:rect></w:pict></w:r>');
+    var m = sound(body, [["rIdP", IMG, "media/image1.png"], ["rIdN", REL + "numbering", "numbering.xml"]]);
+    m["word/media/image1.png"] = png(4000000000, 3);
+    m["word/numbering.xml"] = HEAD + '<w:numbering' + NS + '><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl><w:lvl w:ilvl="8"><w:start w:val="99999999999999999999"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%9."/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+    return I.read(pack(m), {}).then(function (r) {
+      var p = r.project, b = p.blocks, pic = b[0], t1 = b[3], t2 = b[4];
+      eq([pic.type, pic.width, pic.height], ["picture", 10000, 5000], "a picture claiming to be kilometres wide is brought down to 10,000 px, in proportion");
+      ok(b[1].type === "picture" && b[1].width > 0 && b[1].width <= 10000 && b[1].height > 0 && b[2].width > 0 && b[2].height > 0, "a size of nothing, a negative size and sizes that are not numbers fall back to something positive", JSON.stringify([b[1], b[2]]));
+      ok(p.media[pic.media].width <= 10000, "a picture's own claimed size is clamped the same way");
+      ok(t1.type === "table" && t1.cols.length <= 63 && t1.rows[0].cells.every(function (c) { return (c.span || 1) <= 63; }) && t1.rows[0].cells.length <= 63, "a table with 500 grid columns, a gridBefore of a billion and a span of four billion stays within 63 columns", JSON.stringify([t1.cols.length, t1.rows[0].cells.length]));
+      ok(t2.cols.length === 63 && t2.rows[1].cells.length === 63 && t2.cols.every(function (c) { return c > 0; }) && !t2.rows[0].cells[0].span, "a row of 200 cells is cut at 63, widths stay positive and a negative span is one column");
+      eq([b[5].type, b[5].level, b[6].level, b[7].type, b[8].type], ["list", 2, 0, "paragraph", "paragraph"], "a list level of 99,999 is capped, and an outline level out of range is no heading");
+      eq(text(b[9]), "□□□syms", "symbol codes that are not characters become boxes");
+      var box = b[10];
+      ok(box.type === "kept" && box.width <= 10000 && box.height <= 10000 && isFinite(box.width) && isFinite(box.height), "a kept object's size is clamped and finite", JSON.stringify([box.width, box.height]));
+      ok(/<w:sz w:val="20"\/>/.test(box.xml), "a size that is not a size falls back to Word's default in a stamped text box");
+    });
+  });
+
+  // ---- structures made to loop or to go on for ever ------------------------------------------------------
+  test("loops, open ends and depth", function () {
+    var m = sound(
+      P("First", '<w:pStyle w:val="A"/>') + P("Listed", '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>') +
+      PX('<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> PAGE </w:instrText></w:r>' + R("after a field that never closes")) +
+      P("and the paragraph after it") +
+      PX('<w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>' + R("stray field marks")),
+      [["rIdS", REL + "styles", "styles.xml"], ["rIdN", REL + "numbering", "numbering.xml"]]);
+    m["word/styles.xml"] = HEAD + '<w:styles' + NS + '><w:style w:type="paragraph" w:styleId="A"><w:name w:val="a"/><w:basedOn w:val="B"/></w:style><w:style w:type="paragraph" w:styleId="B"><w:name w:val="b"/><w:basedOn w:val="C"/></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="C"><w:name w:val="heading 2"/><w:basedOn w:val="A"/></w:style><w:style w:type="paragraph" w:styleId="Self"><w:name w:val="s"/><w:basedOn w:val="Self"/></w:style>' +
+      '<w:style w:type="numbering" w:styleId="Loop"><w:name w:val="l"/><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr></w:style></w:styles>';
+    m["word/numbering.xml"] = HEAD + '<w:numbering' + NS + '><w:abstractNum w:abstractNumId="0"><w:numStyleLink w:val="Loop"/></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+    return I.read(pack(m), {}).then(function (r) {
+      eq(brief(r.project.blocks), ["heading:First", "paragraph:Listed", "paragraph:after a field that never closes", "paragraph:and the paragraph after it", "paragraph:stray field marks"],
+        "styles based on each other in a ring, a list style that points at itself, a field never closed and stray field marks: nothing hangs and no text is lost");
+    }).then(function () {
+      var toc = sound(P("Before") + PX('<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> TOC \\o </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>' + R("Entry one")) + P("Swallowed paragraph"));
+      return I.read(pack(toc), {});
+    }).then(function (r) {
+      var c = entry(r.report, "contents");
+      eq([brief(r.project.blocks), c && c.count, c && c.examples], [["paragraph:Before"], 1, ["Entry one", "Swallowed paragraph"]], "a contents field that never closes takes what follows with it, and the report quotes what went");
+    }).then(function () {
+      var open = "", close = "";
+      for (var i = 0; i < 180; i++) { open += '<w:sdt><w:sdtContent>'; close += '</w:sdtContent></w:sdt>'; }
+      return settles(pack(sound(open + P("180 controls deep") + close)), "content controls nested 180 deep");
+    }).then(function (r) {
+      if (r) eq(brief(r.project.blocks), ["paragraph:180 controls deep"], "and the paragraph at the bottom of them is still found");
+      var open = "", close = "";
+      for (var i = 0; i < 6000; i++) { open += '<w:tbl><w:tr><w:tc>'; close += '</w:tc></w:tr></w:tbl>'; }
+      return settles(pack(sound(open + P("6,000 tables deep") + close)), "tables nested 6,000 deep");
+    }).then(function () {
+      var body = [];
+      for (var i = 0; i < 12000; i++) body.push(P("Line " + i));
+      return I.read(pack(sound(body.join(""))), {});
+    }).then(function (r) { ok(r.project.blocks.length === 12000, "12,000 paragraphs arrive, read in steps"); });
+  });
+
+  // ---- markup in the file's own words ------------------------------------------------------------------------
+  test("markup comes back as text, and nothing outside is asked for", function () {
+    var EVIL = '<img src=x onerror="window.__pwned=1"><script>window.__pwned=2</' + 'script>', NAME = '"><svg onload=alert(1)>.png';
+    var m = sound(
+      P(EVIL) + PX(PIC("rIdP", 952500, 476250, EVIL)) + PX(PIC("rIdLink", 952500, 476250).replace('r:embed', 'r:link')) +
+      PX('<w:r><w:pict><v:rect alt="' + esc(EVIL) + '" style="width:72pt;height:36pt"><v:textbox><w:txbxContent>' + P(EVIL + " ]]> &amp;") + '</w:txbxContent></v:textbox></v:rect></w:pict></w:r>') +
+      PX('<w:hyperlink r:id="rIdWeb">' + R("a link") + '</w:hyperlink>') + '<w:altChunk r:id="rIdChunk"/>',
+      [["rIdP", IMG, "media/" + encodeURIComponent(NAME)], ["rIdLink", IMG, "https://tracker.example.com/pixel.png?id=1&x=<y>", true], ["rIdWeb", REL + "hyperlink", "https://example.com/?a=1&b=<2>", true],
+        ["rIdChunk", REL + "aFChunk", "https://example.com/remote.html", true], ["rIdTpl", REL + "attachedTemplate", "file://server/share/template.dotm", true],
+        ["rIdC", REL + "comments", "comments.xml"], ["rIdH", REL + "header", "header1.xml"]]);
+    m["word/media/" + NAME] = png(20, 10);
+    m["word/comments.xml"] = HEAD + '<w:comments' + NS + '><w:comment w:id="0">' + P(EVIL) + '</w:comment></w:comments>';
+    m["word/header1.xml"] = HEAD + '<w:hdr' + NS + '>' + P(EVIL) + '</w:hdr>';
+    return I.read(pack(m), { name: EVIL + ".docx" }).then(function (r) {
+      var p = r.project, b = p.blocks, pic = b[1], box = b[2];
+      eq([text(b[0]), p.media[pic.media].name, r.report.source.name, box.label, box.text], [EVIL, NAME, EVIL + ".docx", EVIL, EVIL + " ]]> &amp;"],
+        "markup in a paragraph, a file name, the source's name and a drawing's label and words comes back as the same characters, as text");
+      eq([entry(r.report, "comments").examples[0], entry(r.report, "headers-footers").examples[0]].map(function (s) { return s.slice(0, 20); }), [EVIL.slice(0, 20), EVIL.slice(0, 20)], "markup quoted in the report is text too");
+      var again = new DOMParser().parseFromString(box.xml, "application/xml");
+      ok(!again.getElementsByTagName("parsererror").length && again.getElementsByTagName("img").length === 0 && again.getElementsByTagName("script").length === 0 && again.documentElement.textContent.indexOf(EVIL) >= 0,
+        "kept XML holding markup as text is still well formed, and the markup is still text inside it");
+      eq([b.length, entry(r.report, "linked-pictures").examples], [4, ["https://tracker.example.com/pixel.png?id=1&x=<y>"]], "a picture that is only an address is not kept, and its address is quoted in the report as it was written");
+      eq(b[3].runs, [{ t: "a link", link: "https://example.com/?a=1&b=<2>" }], "a link's address is stored as text");
+      eq(entry(r.report, "embedded-chunks").examples, ["remote.html"], "an external chunk is reported and not fetched");
+      eq([window.__pwned, document.getElementsByTagName("*").length - elementsBefore, document.getElementsByTagName("img").length], [undefined, 0, 0], "nothing from the file was added to the page, and no script from it ran");
+      var net = performance.getEntriesByType("resource").map(function (e) { return e.name; }).filter(function (n) { return !/^file:/.test(n); });
+      eq([asked, net], [[], []], "no address in the file was requested: no fetch, no request, no beacon, no resource load");
+    });
+  });
+
+  // ---- active content reached through a kept object --------------------------------------------------------------
+  test("active content behind a kept object", function () {
+    var OLE = '<w:r><w:object><v:shape id="_x0000_i1025" style="width:72pt;height:36pt"><v:imagedata r:id="rIdImg" o:title=""/></v:shape><o:OLEObject Type="Embed" ProgID="Word.DocumentMacroEnabled.12" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1" r:id="rIdBin"/></w:object></w:r>';
+    var CROPPED = PIC("rIdImg", 952500, 476250, "Cropped").replace('</pic:blipFill>', '<a:srcRect l="20000"/></pic:blipFill>');
+    var m = sound(PX(OLE) + PX(CROPPED), [["rIdImg", IMG, "media/image1.png"], ["rIdBin", REL + "oleObject", "vbaProject.bin"], ["rIdSelf", REL + "package", "document.xml"]]);
+    m["word/media/image1.png"] = png(20, 10);
+    m["word/vbaProject.bin"] = new Uint8Array(64);
+    m["word/media/_rels/image1.png.rels"] = RELS([["rId1", REL + "control", "../activeX/activeX1.bin"], ["rId2", REL + "package", "../document.xml"]]);
+    m["word/activeX/activeX1.bin"] = new Uint8Array(64);
+    return I.read(pack(m), {}).then(function (r) {
+      var p = r.project, names = Object.keys(p.parts).map(function (k) { return p.parts[k].name; });
+      eq([brief(p.blocks), p.blocks[0].kind, names], [["kept"], "picture", ["word/media/image1.png"]], "a macro project, an ActiveX part and the document itself are never carried, even when a kept object's relationships or a carried part's lead to them");
+      var gone = entry(r.report, "unreadable-part"), lost = entry(r.report, "objects-lost");
+      eq([lost && lost.count, lost && lost.examples, gone && gone.count, gone && gone.examples, gone && gone.blockIds], [1, ["Embedded object"], 1, ["Cropped"], [p.blocks[0].id]],
+        "an embedded object whose content was a macro project is left out whole and reported, because Word refuses a file with an object that points at nothing; the picture is kept and reported as having lost something");
+      ok(entry(r.report, "macros") && entry(r.report, "macros").count === 1, "the macros are reported");
+    });
+  });
+
+  run(0);
+})();
+</script>
+</body></html>

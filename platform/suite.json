@@ -28,6 +28,14 @@
       "summary": "Review a colleague's report and the engagement behind it, from the pack they send. Comment on any paragraph, table or item, suggest wording, go through the checklist and automatic checks, then give a verdict.",
       "useWhen": "Use it when a colleague sends you a review pack from the assessment or risk tool. Read the report as the client will and question the findings as well as the wording. Your comments go into a small review file for the author to import, and files from several reviewers merge without overwriting each other.",
       "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A demo pack made from a demo assessment, at its second review round. Its changes are never kept." }
+    },
+    {
+      "id": "documents",
+      "shortName": "Documents",
+      "navLabel": "Write",
+      "summary": "Write proposals, method statements, reports and other documents in the SolutionsPT template, or bring in a Word document and have it rebuilt in the template with its pictures and diagrams kept.",
+      "useWhen": "Use it for any document that is not an assessment or risk report but should look like one. Start a new document or load a Word file, fill in the document information, edit, then export a Word file as a draft or a final. Anything from an imported file that could not be carried over is listed for you.",
+      "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A short demo proposal with a table, a picture and a diagram kept from Word. Its changes are never kept." }
     }
   ],
   "singleHtml": {

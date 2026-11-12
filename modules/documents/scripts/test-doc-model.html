@@ -1,0 +1,479 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the model</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  App.DocModel on its own (no page, no editor): reading and repairing a project,
+  ids, run arithmetic, copies, structural edits, tables with spans, footnotes,
+  the two forms of a project (base64 in the file, Blobs in memory) and the
+  round trip between them, missing bytes and filling them from another copy.
+  Then App.DocPictures on real pictures made in the page, and, in a frame with
+  the whole tool, the size limits: an insert is refused at the limit and a Save
+  never is. Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1100px;height:700px;border:0"></iframe>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/pictures.js"></script>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  // Written out as it goes: a step that never comes back then shows as the
+  // last line reached, with no "ALL TESTS PASSED" after it.
+  function ok(c, n, d) {
+    lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++;
+    document.getElementById("out").textContent = lines.join("\n") + "\n\nincomplete";
+  }
+  // The run uses virtual time, which jumps to its end as soon as no timer is
+  // waiting. Reading a Blob or drawing a picture is real work that no timer
+  // stands for, so one is kept waiting until the page has finished.
+  var beat = setInterval(function () {}, 20);
+  function finish() {
+    clearInterval(beat);
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  // A mistake in the page itself must show as a failure, not as a page that never finishes.
+  window.addEventListener("error", function (e) { ok(false, "the page ran without a script error", e.message + " (line " + e.lineno + ")"); finish(); });
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  function throws(fn) { try { fn(); return null; } catch (e) { return e; } }
+  function J(v) { return JSON.stringify(v); }
+  function bytes(n, seed) { var b = new Uint8Array(n); for (var i = 0; i < n; i++) b[i] = (i * 31 + (seed || 7)) & 255; return b; }
+  function same(a, b) { if (a.length !== b.length) return false; for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+  function b64(s) { var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+
+  var M = window.App.DocModel, P = window.App.DocPictures, R = M.runs;
+  var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  var GIF = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+  // ---------- a new document, and reading one ----------
+  var d = M.create();
+  ok(d.schema === "spt-document/1.0" && d.kind === "report" && /^doc-/.test(d.id), "a new document is a report with the schema and an id of its own");
+  ok(d.blocks.length === 1 && d.blocks[0].type === "paragraph" && d.blocks[0].runs.length === 0, "it starts with one empty paragraph");
+  ok(d.info.revision === "0.1" && d.info.classification === "Confidential" && d.info.title === "" && /^\d{4}-\d\d-\d\d$/.test(d.info.date), "revision 0.1, Confidential, no title, and a date as a date field stores it");
+  ok(d.options.numberHeadings === false && d.options.contents === false && J(d.footnotes) === "{}" && J(d.media) === "{}" && J(d.parts) === "{}", "options off, and no footnotes, pictures or parts");
+  ok(M.create("short").kind === "short" && M.create("letter").kind === "report", "the kind is report or short, and anything else is a report");
+  ok(M.create().id !== M.create().id, "two new documents have different ids");
+
+  var e1 = throws(function () { M.normalise({ schema: "spt-document/2.0", blocks: [] }); });
+  ok(e1 && /spt-document\/2\.0/.test(e1.message) && /spt-document\/1\.0/.test(e1.message) && !e1.foreign, "a later schema is refused, naming it and the one this version reads", e1 && e1.message);
+  var e2 = throws(function () { M.normalise({ schema: "spt-review-pack/1.0" }); });
+  ok(e2 && e2.foreign && e2.foreign.schema === "spt-review-pack/1.0", "another tool's file is refused and what it says it is comes back with the refusal");
+  var e3 = throws(function () { M.normalise({ schemaVersion: "1.4", project: {} }); });
+  ok(e3 && e3.foreign && e3.foreign.schema === "" && e3.foreign.schemaVersion === "1.4", "a file with no schema is refused too, with its schemaVersion");
+  ok(!!throws(function () { M.fromText("not json at all"); }) && !!throws(function () { M.fromText("[1,2]"); }) && !!throws(function () { M.normalise(null); }), "text that is not JSON, an array and nothing are refused");
+
+  var min = M.normalise({ schema: "spt-document/1.0" });
+  ok(min.kind === "report" && min.blocks.length === 1 && min.info.revision === "0.1" && min.info.classification === "Confidential" && min.nextId >= 2 && !!min.id, "a file with only its schema opens with every default filled in");
+  ok(M.normalise({ schema: "spt-document/1.0", info: { revision: "", classification: "" } }).info.revision === "", "a field the file holds as empty stays empty");
+
+  var raw = {
+    schema: "spt-document/1.0", id: "doc-x", kind: "short", nextId: 3,
+    info: { title: "T", coverTitleLines: ["One", "", "Two", "Three", "Four"], extra: "x" },
+    options: { numberHeadings: true },
+    blocks: [
+      { id: "b1", type: "heading", level: 7, runs: [{ t: "H" }], colour: "red" },
+      { id: "b1", type: "paragraph", runs: [{ t: "a" }, { t: "b" }, { t: "" }, { t: "c", b: true, zz: 1 }], align: "middle" },
+      { type: "list", list: "number", level: 9, runs: [{ t: "x" }], restart: true, "continue": true },
+      { id: "b40", type: "sparkline", data: [1, 2, 3], runs: "not runs" },
+      { id: "b41", type: "picture", media: "m50", width: 0, height: "x", align: "center", caption: "Cap" },
+      { id: "b42", type: "table", header: 5, cols: [2], rows: [
+        { cells: [{ blocks: [{ id: "b43", type: "heading", level: 1, runs: [{ t: "In a cell" }] }, { id: "b44", type: "pageBreak" }], span: 2 }, { blocks: [] }] },
+        { cells: [{ blocks: [{ id: "b45", type: "prompt", text: "Fill in" }] }] }
+      ] },
+      "junk"
+    ],
+    footnotes: { f60: { runs: [{ t: "note" }] } },
+    media: { m50: { type: "IMAGE/PNG", name: "p.png", width: 1, height: 1, source: "import", data: PNG } },
+    parts: { p70: { name: "word/charts/chart1.xml", contentType: "application/xml", data: btoa("<c/>"), rels: [{ id: "rId1", type: "t", part: "p71" }] },
+             p71: { name: "word/embeddings/x.xlsx", contentType: "application/zip", data: "@@not base64@@", rels: [] } },
+    theme: "p99", surprise: true
+  };
+  var n = M.normalise(raw);
+  ok(n.kind === "short" && n.info.title === "T" && n.info.extra === undefined && n.surprise === undefined, "known fields are kept and unknown ones outside the blocks are dropped");
+  ok(J(n.info.coverTitleLines) === J(["One", "Two", "Three"]), "cover title lines: at most three, empty ones left out", J(n.info.coverTitleLines));
+  ok(n.options.numberHeadings === true && n.options.contents === false, "a missing option is off");
+  ok(n.blocks[0].level === 1 && n.blocks[0].colour === undefined, "a heading level that is not 1 to 3 becomes 1, and an unknown field on a known block is dropped");
+  ok(n.blocks[1].id !== "b1" && n.blocks[1].align === undefined && J(n.blocks[1].runs) === J([{ t: "ab" }, { t: "c", b: true }]), "a second block with the same id gets a new one; runs are merged and cleaned", J(n.blocks[1]));
+  ok(/^b\d+$/.test(n.blocks[2].id) && n.blocks[2].level === 2 && n.blocks[2].restart === true && n.blocks[2]["continue"] === true, "a block with no id gets one; a list level is 0 to 2; restart and continue are kept");
+  ok(n.blocks[3].type === "sparkline" && J(n.blocks[3].data) === "[1,2,3]" && n.blocks[3].runs === "not runs", "a block of a type this version does not know is kept exactly as it is");
+  ok(n.blocks[4].width === 1 && n.blocks[4].height === 1 && n.blocks[4].align === undefined && n.blocks[4].caption === "Cap", "a picture always has a size; centre is the default and is not stored");
+  var t0 = n.blocks[5];
+  ok(t0.header === 1 && t0.cols.length === 3 && J(t0.cols) === "[2,1,1]", "a table's column widths are made to match its grid", J(t0.cols));
+  ok(t0.rows[0].cells[0].blocks.length === 1 && t0.rows[0].cells[0].blocks[0].type === "paragraph" && M.text(t0.rows[0].cells[0].blocks[0]) === "In a cell", "a heading in a cell becomes a paragraph and a page break there is dropped");
+  ok(t0.rows[0].cells[1].blocks.length === 1 && t0.rows[0].cells[1].blocks[0].type === "paragraph", "an empty cell gets an empty paragraph");
+  ok(t0.rows[1].cells.length === 3 && t0.rows[1].cells[0].blocks[0].runs[0].red === true, "a short row is filled out to the grid, and a prompt in a cell becomes red text");
+  ok(n.blocks.length === 6, "something that is not a block is dropped");
+  var ids = []; M.each(n, function (b) { ids.push(b.id); });
+  ok(ids.length === new Set(ids).size, "every block id is unique, cells included (" + ids.length + ")");
+  var top = Math.max.apply(null, ids.map(function (i) { return +String(i).replace(/\D/g, "") || 0; }).concat([50, 60, 71]));
+  ok(n.nextId > top, "nextId is above every number already used, whatever the file said", n.nextId + " vs " + top);
+  ok(n.media.m50.blob instanceof Blob && n.media.m50.data === undefined && n.media.m50.blob.size === b64(PNG).length && n.media.m50.type === "image/png" && n.media.m50.source === "import", "in memory a picture is a Blob and has no data");
+  ok(raw.media.m50.data === undefined, "and the base64 it was made from is dropped from what was read, at once");
+  ok(n.parts.p70.blob instanceof Blob && n.parts.p70.rels[0].part === "p71", "a carried part is a Blob too, with its relationships");
+  ok(n.parts.p71.blob === null && n.parts.p71.missing === true, "bytes that cannot be decoded are marked missing, not made empty");
+  ok(n.theme === undefined, "a theme that names no part is dropped");
+  ok(n.footnotes.f60.runs[0].t === "note", "footnotes are read");
+
+  var ex = M.normalise(JSON.parse(JSON.stringify(window.App.Data.contracts.document.example)));
+  ok(ex.blocks.length === 8 && ex.nextId >= 14 && ex.info.reference === "OPP-10442" && ex.options.numberHeadings === true, "the contract's own example reads");
+  ok(ex.media.m8.missing === true && ex.parts.p1.missing === true && J(M.missing(ex)) === J(["b7", "b13"]), "its shortened picture and part are found missing, and their blocks are named", J(M.missing(ex)));
+
+  // ---------- ids ----------
+  var used = {}, doc = M.create(), clash = false;
+  function note(id) { if (used[id]) clash = true; used[id] = true; }
+  doc.blocks.forEach(function (b) { note(b.id); });
+  for (var i = 0; i < 20; i++) {
+    var p = M.make.paragraph(doc, "p" + i); note(p.id);
+    M.insertAfter(doc, doc.blocks[doc.blocks.length - 1].id, [p]);
+    if (i % 3 === 0) M.remove(doc, [p.id]);
+    note(M.newId(doc, "m")); note(M.newId(doc, "f")); note(M.newId(doc, "sptK"));
+  }
+  ok(!clash, "an id is never used twice, whatever is deleted in between");
+  var before = doc.nextId, again = M.normalise(JSON.parse(JSON.stringify(M.shell(doc))));
+  ok(again.nextId === before, "nextId survives a save, so ids are not reused after reopening either");
+
+  // ---------- runs ----------
+  var plain = [{ t: "Hello world" }];
+  ok(J(R.normalise([{ t: "a" }, { t: "b", b: false }, { t: "" }, { t: "c", i: true }, { t: "d", i: true }, null])) === J([{ t: "ab" }, { t: "cd", i: true }]), "normalise merges neighbours of the same look and drops empty runs");
+  ok(J(R.normalise([{ t: "x", sup: true, sub: true }, { t: "y", link: "javascript:alert(1)" }, { t: "z", link: "https://example.org/a" }])) === J([{ t: "x", sup: true }, { t: "y" }, { t: "z", link: "https://example.org/a" }]), "never both superscript and subscript; only http, https and mailto links");
+  ok(R.length([{ t: "ab" }, { t: "", fn: "f1" }, { t: "c" }]) === 4 && M.runsText([{ t: "ab" }, { t: "", fn: "f1" }, { t: "c" }]) === "abc", "a footnote reference is one position in an offset and no text");
+  ok(J(R.slice(plain, 6, 11)) === J([{ t: "world" }]) && J(R.slice(plain, 3)) === J([{ t: "lo world" }]), "slice by offsets");
+  var bold = R.toggle(plain, 0, 5, "b");
+  ok(J(bold) === J([{ t: "Hello", b: true }, { t: " world" }]), "toggle sets a format on a range", J(bold));
+  ok(J(R.toggle(bold, 0, 5, "b")) === J(plain), "toggling it again clears it and the runs merge back");
+  ok(J(R.toggle(bold, 3, 8, "b")) === J([{ t: "Hello wo", b: true }, { t: "rld" }]), "a range that is only partly bold becomes all bold");
+  ok(J(R.toggle(bold, 0, 11, "b", false)) === J(plain) && J(R.toggle(plain, 0, 11, "b", false)) === J(plain), "a format can be cleared outright, as a block selection needs");
+  ok(J(R.toggle(R.toggle(plain, 0, 5, "sup"), 0, 5, "sub")) === J([{ t: "Hello", sub: true }, { t: " world" }]), "subscript takes superscript off");
+  ok(J(R.toggle(plain, 0, 5, "colour")) === J(plain) && J(R.toggle(plain, 4, 4, "b")) === J(plain), "an unknown format or an empty range changes nothing");
+  ok(J(R.insert(bold, 5, "!")) === J([{ t: "Hello!", b: true }, { t: " world" }]), "typed text takes the look of the text before it");
+  ok(J(R.insert(bold, 0, ">")) === J([{ t: ">Hello", b: true }, { t: " world" }]), "and of the text after it at the very start");
+  var linked = R.setLink(plain, 6, 11, "https://example.org");
+  ok(J(linked) === J([{ t: "Hello " }, { t: "world", link: "https://example.org" }]), "setLink makes a link of a range");
+  ok(J(R.insert(linked, 11, "!")) === J([{ t: "Hello " }, { t: "world", link: "https://example.org" }, { t: "!" }]), "typing at the end of a link does not extend it");
+  ok(J(R.insert(linked, 8, "X")) === J([{ t: "Hello " }, { t: "woXrld", link: "https://example.org" }]), "typing inside a link does");
+  ok(J(R.setLink(linked, 0, 11, "ftp://example.org")) === J(linked) && J(R.setLink(linked, 0, 11, "")) === J(plain), "an address that is not allowed changes nothing; an empty one removes the link");
+  var red = R.toggle(plain, 6, 11, "red");
+  ok(J(R.insert(red, 11, "!")) === J([{ t: "Hello " }, { t: "world!", red: true }]), "typing at the end of red text extends it");
+  ok(J(R.insert(plain, 5, [{ t: ",", i: true }])) === J([{ t: "Hello" }, { t: ",", i: true }, { t: " world" }]), "runs can be inserted as they are");
+  ok(J(R.remove(plain, 5, 11)) === J([{ t: "Hello" }]) && J(R.remove(plain, 0, 99)) === "[]", "remove a range; past the end is the end");
+  var sp = R.split(bold, 3);
+  ok(J(sp) === J([[{ t: "Hel", b: true }], [{ t: "lo", b: true }, { t: " world" }]]) && J(R.join(sp[0], sp[1])) === J(bold), "split at an offset, and join puts it back");
+  var withFn = [{ t: "ab" }, { t: "", fn: "f1" }, { t: "cd" }];
+  ok(J(R.split(withFn, 2)) === J([[{ t: "ab" }], [{ t: "", fn: "f1" }, { t: "cd" }]]) && J(R.split(withFn, 3)) === J([[{ t: "ab" }, { t: "", fn: "f1" }], [{ t: "cd" }]]), "the caret can be before a footnote reference or after it");
+  ok(J(R.remove(withFn, 2, 3)) === J([{ t: "abcd" }]), "removing that one position removes the reference");
+  ok(J(R.insert(withFn, 3, "X")) === J([{ t: "ab" }, { t: "", fn: "f1" }, { t: "Xcd" }]) && J(R.toggle(withFn, 0, 5, "b")) === J([{ t: "ab", b: true }, { t: "", fn: "f1" }, { t: "cd", b: true }]), "typing beside a reference stays outside it, and formatting passes over it");
+  ok(J(plain) === J([{ t: "Hello world" }]), "no run function changes the runs it was given");
+
+  // ---------- copies ----------
+  doc = M.create();
+  var para = M.make.paragraph(doc, "With a note");
+  M.insertAfter(doc, doc.blocks[0].id, [para]);
+  var fnKey = M.footnote.add(doc, para.id, 4).key;
+  M.footnote.set(doc, fnKey, [{ t: "The note" }]);
+  var tbl = M.make.table(doc, 2, 2);
+  var kept = { id: M.newId(doc, "b"), type: "kept", kind: "chart", xml: "<w:r><w:drawing r:id=\"sptK5\"/></w:r>", rels: [{ id: "sptK5", type: "chart", part: "p1" }], width: 10, height: 10, floating: false, text: "", description: "Chart" };
+  M.insertAfter(doc, para.id, [tbl, kept]);
+  var copies = M.copyBlocks(doc, [para, tbl, kept]);
+  var oldIds = []; M.each(doc, function (b) { oldIds.push(b.id); });
+  var newIds = copies.map(function (b) { return b.id; });
+  copies[1].rows.forEach(function (r) { r.cells.forEach(function (c) { c.blocks.forEach(function (b) { newIds.push(b.id); }); }); });
+  ok(newIds.length === 7 && newIds.every(function (i) { return oldIds.indexOf(i) === -1; }) && new Set(newIds).size === 7, "a copy has new block ids throughout, the blocks in its cells included");
+  ok(copies[2].xml === kept.xml && J(copies[2].rels) === J(kept.rels) && copies[2].rels !== kept.rels, "a copied kept object keeps its xml, its relationship ids and its part keys");
+  var copiedFn = copies[0].runs.filter(function (r) { return r.fn; })[0].fn;
+  ok(copiedFn !== fnKey && J(doc.footnotes[copiedFn].runs) === J([{ t: "The note" }]) && para.runs.some(function (r) { return r.fn === fnKey; }), "a copied footnote reference gets a note of its own with the same text");
+  copies[0].runs[0].t = "changed";
+  ok(M.text(para) === "With a note", "changing the copy leaves the original alone");
+
+  // ---------- finding and structural edits ----------
+  var cellBlock = tbl.rows[1].cells[0].blocks[0], at = M.find(doc, cellBlock.id);
+  ok(at && at.block === cellBlock && at.table === tbl && at.cell === tbl.rows[1].cells[0] && at.index === 0 && at.list === tbl.rows[1].cells[0].blocks, "find gives where a block is, inside a table cell too");
+  ok(M.find(doc, "nope") === null && M.find(doc, para.id).table === undefined, "a block that is not there is null; a body block has no table");
+  var h1 = M.make.heading(doc, 1, "One"), pb = M.make.pageBreak(doc);
+  ok(J(M.insertAfter(doc, null, [h1])) === J([h1.id]) && doc.blocks[0] === h1, "insertAfter null puts blocks at the top");
+  ok(M.insertAfter(doc, cellBlock.id, [pb]).length === 0 && tbl.rows[1].cells[0].blocks.length === 1, "a page break is not put into a table cell");
+  var inCell = M.make.paragraph(doc, "second in cell");
+  ok(J(M.insertAfter(doc, cellBlock.id, [inCell])) === J([inCell.id]) && tbl.rows[1].cells[0].blocks[1] === inCell, "a paragraph is");
+  var order = function () { return doc.blocks.map(function (b) { return b.id; }); };
+  var o1 = order();
+  ok(J(M.move(doc, [kept.id], h1.id)) === J([kept.id]) && order()[0] === kept.id && order().length === o1.length, "move puts blocks before another");
+  ok(J(M.move(doc, [kept.id, h1.id], null)) === J([kept.id, h1.id]) && J(order().slice(-2)) === J([kept.id, h1.id]), "move to the end, in document order");
+  ok(M.move(doc, [h1.id], h1.id).length === 0 && M.move(doc, [tbl.id], cellBlock.id).length === 0, "a block is not moved before itself, nor a table into its own cell");
+  var two = [M.make.paragraph(doc, "r1"), M.make.paragraph(doc, "r2")], rep = M.replace(doc, h1.id, two);
+  ok(J(rep) === J([h1.id, two[0].id, two[1].id]) && !M.find(doc, h1.id) && doc.blocks[doc.blocks.length - 1] === two[1], "replace swaps one block for others and names all it touched");
+  ok(J(M.remove(doc, [two[0].id, inCell.id, "nope"])) === J([two[0].id, inCell.id]) && !M.find(doc, inCell.id), "remove takes blocks out of the body and out of cells");
+
+  // ---------- outline, sections, prompts ----------
+  doc = M.create();
+  doc.blocks = [];
+  function add(b) { doc.blocks.push(b); return b; }
+  var s1 = add(M.make.heading(doc, 1, "Summary")); add(M.make.paragraph(doc, "text"));
+  var s11 = add(M.make.heading(doc, 2, "Scope")); add(M.make.prompt(doc, "Add the scope"));
+  var s111 = add(M.make.heading(doc, 3, "Detail")); var redP = add(M.make.paragraph(doc, "x")); redP.runs = [{ t: "a", red: true }, { t: "b" }, { t: "c", red: true }];
+  var s2 = add(M.make.heading(doc, 1, "Costs")); var tt = add(M.make.table(doc, 1, 1)); tt.rows[0].cells[0].blocks[0].runs = [{ t: "tbc", red: true }];
+  var out = M.outline(doc);
+  ok(J(out.map(function (e) { return [e.id, e.level, e.text, e.number, e.count]; })) === J([[s1.id, 1, "Summary", "", 3], [s11.id, 2, "Scope", "", 3], [s111.id, 3, "Detail", "", 2], [s2.id, 1, "Costs", "", 1]]), "the outline lists headings with the prompts in each section, cells and subsections included", J(out));
+  doc.options.numberHeadings = true;
+  ok(J(M.outline(doc).map(function (e) { return e.number; })) === J(["1", "1.1", "1.1.1", "2"]), "with numbering on, each heading has its number");
+  ok(M.sectionRange(doc, s1.id).length === 6 && M.sectionRange(doc, s11.id).length === 4 && M.sectionRange(doc, s111.id).length === 2 && M.sectionRange(doc, s2.id).length === 2, "a section runs to the next heading of the same or a higher level");
+  ok(M.sectionRange(doc, redP.id).length === 0, "and only a heading has one");
+  ok(M.promptCount(doc) === 5, "promptCount: the missing title, a prompt block and each run of red text", String(M.promptCount(doc)));
+  doc.info.title = "Named";
+  ok(M.promptCount(doc) === 4, "less one once the title is filled in");
+  ok(M.text(tt) === "tbc" && M.text(s1) === "Summary" && M.text(doc.blocks[3]) === "Add the scope", "text of a table, a heading and a prompt");
+
+  // ---------- tables ----------
+  function sound(t) {
+    var G = M.table.grid(t), W = t.cols.length, bad = "";
+    if (G.length !== t.rows.length) bad = "rows";
+    G.forEach(function (row, r) {
+      if (row.length !== W) bad = "width of row " + r + " is " + row.length + " not " + W;
+      row.forEach(function (g, c) { if (!g) bad = "hole at " + r + "," + c; });
+    });
+    var seen = [];
+    t.rows.forEach(function (row) { row.cells.forEach(function (cell) { if (seen.indexOf(cell) !== -1) bad = "cell twice"; seen.push(cell); if (!cell.blocks.length) bad = "empty cell"; }); });
+    return bad;
+  }
+  function label(t) { return t.rows.map(function (row) { return row.cells.map(function (c) { return M.text(c.blocks[0]) + (c.span ? "s" + c.span : "") + (c.rowSpan ? "r" + c.rowSpan : ""); }).join("|"); }).join(" / "); }
+  function fresh() {
+    // 3 by 3:  A A B     A spans two columns, C two rows, E two rows.
+    //          C D E
+    //          C F E
+    var td = M.create(), t = M.make.table(td, 3, 3);
+    td.blocks.push(t);
+    function cell(text, span, rowSpan) { var c = { blocks: [M.make.paragraph(td, text)] }; if (span) c.span = span; if (rowSpan) c.rowSpan = rowSpan; return c; }
+    t.rows = [{ cells: [cell("A", 2), cell("B")] }, { cells: [cell("C", 0, 2), cell("D"), cell("E", 0, 2)] }, { cells: [cell("F")] }];
+    return { doc: td, t: t };
+  }
+  var f = fresh(), G = M.table.grid(f.t);
+  ok(sound(f.t) === "" && G[0][1].covered && G[0][1].c === 0 && G[2][0].covered && G[2][0].r === 1 && !G[2][1].covered && M.text(G[2][1].cell.blocks[0]) === "F" && G[2][2].r === 1, "the grid resolves spans: who covers each place and from where");
+  ok(J(M.table.addRow(f.doc, f.t.id, 2)) === J([f.t.id]) && sound(f.t) === "" && label(f.t) === "As2|B / Cr3|D|Er3 /  / F", "a row added inside a cell that spans rows makes that cell taller", label(f.t) + " " + sound(f.t));
+  f = fresh();
+  M.table.addRow(f.doc, f.t.id, 0); M.table.addRow(f.doc, f.t.id);
+  ok(sound(f.t) === "" && f.t.rows.length === 5 && f.t.rows[0].cells.length === 3 && f.t.rows[4].cells.length === 3, "a row added on top or at the bottom is a full row of new cells", sound(f.t));
+  f = fresh();
+  M.table.removeRow(f.doc, f.t.id, 1);
+  ok(sound(f.t) === "" && label(f.t) === "As2|B / C|F|E", "removing the row a tall cell starts in hands the cell to the next row, one row shorter", label(f.t) + " " + sound(f.t));
+  f = fresh();
+  M.table.removeRow(f.doc, f.t.id, 2);
+  ok(sound(f.t) === "" && label(f.t) === "As2|B / C|D|E", "removing a row a tall cell reaches into shortens it", label(f.t));
+  f = fresh();
+  M.table.addCol(f.doc, f.t.id, 1);
+  ok(sound(f.t) === "" && f.t.cols.length === 4 && label(f.t) === "As3|B / Cr2||D|Er2 / |F", "a column added inside a cell that spans columns makes that cell wider; other rows get a new cell", label(f.t) + " " + sound(f.t));
+  f = fresh();
+  M.table.addCol(f.doc, f.t.id, 0); M.table.addCol(f.doc, f.t.id);
+  ok(sound(f.t) === "" && f.t.cols.length === 5 && f.t.rows[0].cells.length === 4 && f.t.rows[2].cells.length === 3, "a column added at either edge adds a cell to every row a tall cell does not cover", label(f.t) + " " + sound(f.t));
+  f = fresh();
+  M.table.removeCol(f.doc, f.t.id, 0);
+  ok(sound(f.t) === "" && f.t.cols.length === 2 && label(f.t) === "A|B / D|Er2 / F", "removing a wide cell's first column narrows it and it keeps its content; a tall cell of that column alone goes whole", label(f.t) + " " + sound(f.t));
+  f = fresh();
+  M.table.removeCol(f.doc, f.t.id, 1);
+  ok(sound(f.t) === "" && label(f.t) === "A|B / Cr2|Er2 / ", "removing a column from the middle", label(f.t) + " " + sound(f.t));
+  f = fresh();
+  var one = M.make.table(f.doc, 1, 1); f.doc.blocks.push(one);
+  ok(M.table.removeRow(f.doc, one.id, 0).length === 0 && M.table.removeCol(f.doc, one.id, 0).length === 0 && one.rows.length === 1, "the last row and the last column cannot be removed");
+  ok(M.table.addRow(f.doc, "nope", 0).length === 0 && M.table.addRow(f.doc, f.t.rows[0].cells[0].blocks[0].id, 0).length === 0, "a table function given something that is not a table does nothing");
+  M.table.setHeader(f.doc, f.t.id, false);
+  ok(f.t.header === 0 && (M.table.setHeader(f.doc, f.t.id, true), f.t.header === 1), "the header row goes off and on");
+  f.t.cols = [1, 1, 2];
+  M.table.nudge(f.doc, f.t.id, 0, 0.05);
+  ok(J(f.t.cols) === J([30, 20, 50]), "wider moves 5 percent of the table from the next column", J(f.t.cols));
+  M.table.nudge(f.doc, f.t.id, 2, 0.05);
+  ok(J(f.t.cols) === J([30, 15, 55]), "for the last column it comes from the one before", J(f.t.cols));
+  for (var k = 0; k < 10; k++) M.table.nudge(f.doc, f.t.id, 0, -0.05);
+  ok(f.t.cols[0] === 5 && f.t.cols[1] === 40 && M.table.nudge(f.doc, f.t.id, 0, -0.05).length === 0, "no column goes below 5 percent", J(f.t.cols));
+  M.table.equalWidths(f.doc, f.t.id);
+  ok(J(f.t.cols) === "[1,1,1]", "equal widths");
+  var nt = M.make.table(f.doc, 2, 3);
+  ok(nt.header === 1 && nt.rows.length === 2 && nt.rows[0].cells.length === 3 && sound(nt) === "", "a new table has a header row and a paragraph in every cell");
+
+  // ---------- media, parts, footnotes and the two forms ----------
+  var done = Promise.resolve().then(function () {
+    doc = M.create(); doc.info.title = "Round trip";
+    var png = new Blob([b64(PNG)], { type: "image/png" }), big = bytes(200000, 3), emf = new Blob([big], { type: "image/x-emf" });
+    var kPng = M.addMedia(doc, png, { name: "dot.png", width: 1, height: 1 });
+    var kEmf = M.addMedia(doc, emf, { name: "drawing.emf", source: "import" });
+    var kSpare = M.addMedia(doc, new Blob([bytes(50)]), { type: "image/png", name: "unused.png" });
+    var pBook = M.addPart(doc, new Blob([bytes(999, 1)]), { name: "word/embeddings/book.xlsx", contentType: "application/vnd.ms-excel" });
+    var pChart = M.addPart(doc, new Blob(["<c:chart/>"]), { name: "word/charts/chart1.xml", contentType: "application/xml", rels: [{ id: "rId1", type: "package", part: pBook }] });
+    var pTheme = M.addPart(doc, new Blob(["<a:theme/>"]), { name: "word/theme/theme1.xml", contentType: "application/xml" });
+    var pSpare = M.addPart(doc, new Blob(["<x/>"]), { name: "word/x.xml", contentType: "application/xml" });
+    doc.theme = pTheme;
+    var pic = M.make.picture(doc, kPng, 100, 50), pic2 = M.make.picture(doc, kEmf, 300, 200);
+    var kp = { id: M.newId(doc, "b"), type: "kept", kind: "chart", xml: "<w:r/>", rels: [{ id: "sptK90", type: "chart", part: pChart }, { id: "sptK91", type: "image", external: "https://example.org/a.png" }], width: 400, height: 300, floating: false, text: "", description: "Chart" };
+    var note1 = M.make.paragraph(doc, "Has a note"), gone = M.make.paragraph(doc, "Loses its note");
+    doc.blocks.push(pic, pic2, kp, note1, gone);
+    var f1 = M.footnote.add(doc, note1.id, 3), f2 = M.footnote.add(doc, gone.id, 0);
+    M.footnote.set(doc, f1.key, [{ t: "kept note", i: true }, { t: "", fn: "f999" }]);
+    M.footnote.set(doc, f2.key, [{ t: "orphan" }]);
+    ok(doc.media[kPng].source === "insert" && doc.media[kEmf].source === "import" && doc.parts[pChart].rels[0].part === pBook && /^m\d+$/.test(kPng) && /^p\d+$/.test(pBook), "addMedia and addPart file the bytes under new keys");
+    ok(J(f1.ids) === J([note1.id]) && J(note1.runs) === J([{ t: "Has" }, { t: "", fn: f1.key }, { t: " a note" }]) && J(doc.footnotes[f1.key].runs) === J([{ t: "kept note", i: true }]), "a footnote is a reference in the text and one paragraph of its own, with no note inside it");
+    gone.runs = R.remove(gone.runs, 0, 1);
+    ok(J(gone.runs) === J([{ t: "Loses its note" }]) && !!doc.footnotes[f2.key], "deleting the reference leaves the footnote in memory, so undo finds it");
+    var uk = M.usedKeys(doc);
+    ok(J(uk.media.sort()) === J([kPng, kEmf].sort()) && J(uk.parts.sort()) === J([pBook, pChart, pTheme].sort()) && J(uk.footnotes) === J([f1.key]), "usedKeys: what the blocks reach, parts through their own relationships, and the theme", J(uk));
+    ok(M.sizeOf(doc) === png.size + 200000 + 999 + 10 + 10, "sizeOf counts the bytes in use", String(M.sizeOf(doc)));
+    var url = M.mediaUrl(doc, kPng);
+    ok(/^blob:/.test(url) && M.mediaUrl(doc, kPng) === url && M.mediaUrl(doc, kEmf) === "" && M.mediaUrl(doc, "m0") === "", "mediaUrl gives one object URL for a picture the browser can draw, and none for an EMF");
+    M.releaseUrls(doc);
+    var url2 = M.mediaUrl(doc, kPng);
+    ok(/^blob:/.test(url2) && url2 !== url, "after releaseUrls a picture gets a new URL when it is next shown");
+    M.releaseUrls(doc);
+    return M.toFile(doc).then(function (file) {
+      ok(file instanceof Blob && file.type === "application/json", "toFile gives a JSON Blob");
+      return file.text();
+    }).then(function (text) {
+      var obj = JSON.parse(text);
+      ok(obj.schema === "spt-document/1.0" && obj.id === doc.id && obj.info.title === "Round trip" && obj.nextId === doc.nextId && obj.blocks.length === doc.blocks.length, "the file holds the document");
+      ok(obj.media[kPng].data === PNG && obj.media[kPng].blob === undefined && typeof obj.media[kEmf].data === "string", "in the file a picture is base64 and there is no blob");
+      ok(obj.media[kSpare] === undefined && obj.parts[pSpare] === undefined && obj.footnotes[f2.key] === undefined && !!obj.footnotes[f1.key], "what nothing refers to is left out: a picture, a part and the footnote whose reference was deleted");
+      ok(!!doc.media[kSpare] && !!doc.parts[pSpare] && !!doc.footnotes[f2.key], "and all three are still in memory");
+      ok(obj.theme === pTheme && Object.keys(obj.parts).length === 3 && J(obj.parts[pChart].rels) === J(doc.parts[pChart].rels), "parts, their relationships and the theme are written");
+      var keys = Object.keys(obj);
+      ok(keys.indexOf("schema") === 0 && keys.indexOf("blocks") < keys.indexOf("media") && keys.indexOf("media") < keys.indexOf("parts"), "in the contract's order");
+      var back = M.fromText(text);
+      ok(back.media[kPng].blob instanceof Blob && back.media[kPng].data === undefined && J(M.shell(back)) === J(M.shell(M.normalise(JSON.parse(J(M.shell(doc)))))), "fromText gives the memory form back, the same document");
+      return Promise.all([back.media[kEmf].blob.arrayBuffer(), back.parts[pBook].blob.arrayBuffer(), back.media[kPng].blob.arrayBuffer()]).then(function (bufs) {
+        ok(same(new Uint8Array(bufs[0]), big) && same(new Uint8Array(bufs[1]), bytes(999, 1)) && same(new Uint8Array(bufs[2]), b64(PNG)), "every byte of a picture and of a part survives the round trip (200,000 bytes across several slices)");
+        ok(back.media[kEmf].type === "image/x-emf" && back.media[kEmf].blob.type === "image/x-emf" && back.media[kEmf].name === "drawing.emf" && back.media[kEmf].source === "import", "with its type, name and where it came from");
+
+        // ---------- missing bytes, and filling them ----------
+        var lost = M.fromText(text);
+        lost.media[kPng].blob = null; lost.media[kPng].missing = true;
+        lost.parts[pBook].blob = null; lost.parts[pBook].missing = true;
+        ok(J(M.missing(lost)) === J([pic.id, kp.id]), "missing names the picture block and the kept block whose part, two steps away, is gone", J(M.missing(lost)));
+        ok(M.promptCount(lost) === 2 && M.promptCount(back) === 0, "each counts as something still to complete");
+        ok(M.mediaUrl(lost, kPng) === "", "a missing picture has no URL");
+        return M.toFile(lost).then(function (b) { return b.text(); }).then(function (t2) {
+          var o2 = JSON.parse(t2), again = M.fromText(t2);
+          ok(o2.media[kPng] && o2.media[kPng].data === undefined && o2.media[kPng].missing === undefined, "a document with bytes missing still saves; the entry is written without data");
+          ok(again.media[kPng].missing === true && again.media[kPng].blob === null && J(M.missing(again)) === J([pic.id, kp.id]), "and reads back as missing, not as an empty picture");
+          var other = M.fromText(text);
+          ok(M.fill(lost, other) === 2 && M.missing(lost).length === 0 && lost.media[kPng].missing === undefined && lost.media[kPng].blob === other.media[kPng].blob, "fill copies the Blobs across by key from the saved file, and nothing is missing any more");
+          ok(M.fill(lost, other) === 0, "a second fill has nothing to do");
+          var cell = M.make.table(lost, 1, 1); cell.rows[0].cells[0].blocks.push(M.make.picture(lost, "m0", 5, 5)); lost.blocks.push(cell);
+          ok(J(M.missing(lost)) === J([cell.rows[0].cells[0].blocks[1].id]), "a picture in a table cell with no bytes is found too");
+        });
+      });
+    });
+  })
+
+  // ---------- pictures the user adds ----------
+  .then(function () {
+    ok(P.sniff(b64(PNG)) === "image/png" && P.sniff(b64(GIF)) === "image/gif" && P.sniff(new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0])) === "image/jpeg" && P.sniff(new Uint8Array([0x42, 0x4D, 0, 0])) === "image/bmp", "a picture is known by its first bytes");
+    ok(P.sniff(new TextEncoder().encode("<?xml version=\"1.0\"?>\n<" + "!-- c --" + ">\n<svg xmlns=\"http://www.w3.org/2000/svg\"/>")) === "image/svg+xml" && P.sniff(new TextEncoder().encode("<html><svg/></html>")) === "" && P.sniff(new TextEncoder().encode("MZ executable")) === "", "an SVG by how it starts; anything else is not a picture");
+    return P.fromFile(new File([b64(PNG)], "dot.txt", { type: "text/plain" }));
+  }).then(function (r) {
+    ok(r.type === "image/png" && r.width === 1 && r.height === 1 && r.name === "dot.png" && r.blob.type === "image/png", "a small PNG is taken whatever its name says, and named for what it is", J([r.type, r.width, r.height, r.name]));
+    return r.blob.arrayBuffer().then(function (buf) { ok(same(new Uint8Array(buf), b64(PNG)), "and kept byte for byte"); });
+  }).then(function () {
+    return P.fromFile(new File(["just some words"], "notes.png", { type: "image/png" })).then(function () { ok(false, "a text file named .png is refused"); }, function (e) {
+      ok(/notes\.png is not a picture/.test(e.message), "a text file named .png is refused, with a message", e.message);
+    });
+  }).then(function () {
+    return P.fromFile(new File([b64(GIF)], "pixel.gif", { type: "image/gif" }));
+  }).then(function (r) {
+    ok(r.type === "image/png" && r.name === "pixel.png" && r.width === 1 && r.height === 1, "a GIF becomes a PNG", J([r.type, r.name]));
+    return r.blob.slice(0, 8).arrayBuffer().then(function (buf) { ok(P.sniff(new Uint8Array(buf)) === "image/png", "which really is one"); });
+  }).then(function () {
+    var c = document.createElement("canvas"); c.width = 3000; c.height = 30;
+    var x = c.getContext("2d"); x.fillStyle = "#0A3D62"; x.fillRect(0, 0, 3000, 30);
+    return new Promise(function (res) { c.toBlob(res, "image/png"); }).then(function (b) { return P.fromFile(new File([b], "wide.png")); });
+  }).then(function (r) {
+    ok(r.width === 2400 && r.height === 24 && r.type === "image/png", "a PNG wider than 2400 px is scaled down to 2400, its shape kept", J([r.width, r.height, r.type]));
+    var c = document.createElement("canvas"); c.width = 400; c.height = 300;
+    c.getContext("2d").fillRect(0, 0, 400, 300);
+    return new Promise(function (res) { c.toBlob(res, "image/jpeg", 0.8); }).then(function (b) {
+      return P.fromFile(new File([b], "photo.jpeg")).then(function (r2) {
+        ok(r2.type === "image/jpeg" && r2.width === 400 && r2.height === 300 && r2.blob.size === b.size && r2.name === "photo.jpg", "a JPEG that fits is kept as it is, never scaled up");
+      });
+    });
+  }).then(function () {
+    // Noise does not compress, so this PNG is large and has nothing see-through.
+    var c = document.createElement("canvas"); c.width = 2600; c.height = 700;
+    var x = c.getContext("2d"), img = x.createImageData(2600, 700), s = 12345;
+    for (var i = 0; i < img.data.length; i += 4) { s = (s * 1103515245 + 12345) & 0x7fffffff; img.data[i] = s & 255; img.data[i + 1] = (s >> 8) & 255; img.data[i + 2] = (s >> 16) & 255; img.data[i + 3] = 255; }
+    x.putImageData(img, 0, 0);
+    return new Promise(function (res) { c.toBlob(res, "image/png"); }).then(function (b) {
+      return P.fromFile(new File([b], "noise.png")).then(function (r) {
+        ok(b.size > 1.5 * 1048576 && r.type === "image/jpeg" && r.width === 2400 && r.name === "noise.jpg" && r.blob.size <= P.MAX_BYTES, "a scaled PNG with nothing see-through that is still over 1.5 MB becomes a JPEG", J([b.size, r.type, r.width, r.blob.size]));
+      });
+    });
+  }).then(function () {
+    // The tags are written in halves so that this page's own parser does not meet them.
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><scr' + 'ipt>window.__svgRan = true</scr' + 'ipt><rect width="200" height="100" fill="#0F5FA6"/></svg>';
+    return P.fromFile(new File([svg], "logo.svg", { type: "image/svg+xml" }));
+  }).then(function (r) {
+    ok(r.type === "image/png" && r.width === 400 && r.height === 200 && r.printWidth === 200 && r.printHeight === 100 && r.name === "logo.png", "an SVG is drawn to a PNG at twice the size it prints at; the SVG itself is not stored", J([r.type, r.width, r.height, r.printWidth]));
+    ok(window.__svgRan === undefined, "and a script inside it never ran");
+    var wide = '<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="300"><rect width="3000" height="300"/></svg>';
+    return P.fromFile(new File([wide], "wide.svg"));
+  }).then(function (r) {
+    ok(r.printWidth === 601 && r.width === 1202 && r.height === 120, "an SVG wider than the page is drawn for the page's width", J([r.printWidth, r.width, r.height]));
+  })
+
+  // ---------- the size limits, in the tool ----------
+  .then(function () {
+    var frame = document.getElementById("f");
+    return new Promise(function (res) { frame.onload = res; frame.src = "../index.html"; }).then(function () {
+      return poll(function () { return frame.contentWindow.DocumentTool; });
+    }).then(function () { return frame.contentWindow; });
+  }).then(function (w) {
+    var A = w.App, D = A.DocApp, WM = A.DocModel, saved = [];
+    var mem = { docs: {}, blobs: {} };
+    A.DocStorage.bytesStore = {
+      putDoc: function (id, json) { mem.docs[id] = json; return Promise.resolve(); },
+      getDoc: function (id) { return Promise.resolve(mem.docs[id] || null); },
+      putBlob: function (id, key, blob) { (mem.blobs[id] = mem.blobs[id] || {})[key] = blob; return Promise.resolve(); },
+      getBlobs: function (id) { return Promise.resolve(mem.blobs[id] || {}); },
+      remove: function (id) { delete mem.docs[id]; delete mem.blobs[id]; return Promise.resolve(); },
+      ok: function () { return Promise.resolve(true); }
+    };
+    A.DocStorage.download = function (blob, name) { saved.push({ blob: blob, name: name }); };
+    // The dialogs cannot be shown headless: Save goes by download here.
+    w.showSaveFilePicker = undefined; w.showOpenFilePicker = undefined;
+    WM.LIMITS.warnBytes = 1000; WM.LIMITS.refuseBytes = 3000;
+    var toast = w.document.getElementById("toast");
+    ok(D.canAdd(10) === false, "with no document open nothing can be added");
+    return D.setDoc(WM.create(), { from: "new" }).then(function () {
+      var doc = D.state.doc;
+      doc.info.title = "Limits";
+      ok(D.canAdd(3000) === true && D.canAdd(3001) === false && /was not added/.test(toast.textContent) && /err/.test(toast.className), "canAdd: exactly the limit is allowed, one byte more is refused with a message", toast.textContent);
+      var k = WM.addMedia(doc, new w.Blob([bytes(2500)], { type: "image/png" }), { name: "a.png", width: 10, height: 10 });
+      doc.blocks.push(WM.make.picture(doc, k, 10, 10));
+      D.touched({ media: [k] });
+      ok(/over 0 MB/.test(toast.textContent) && /warn/.test(toast.className), "passing the warning size says so, once", toast.textContent);
+      ok(D.canAdd(500) === true && D.canAdd(501) === false, "what is already in the document counts");
+      var spare = WM.addMedia(doc, new w.Blob([bytes(2500)], { type: "image/png" }), { name: "spare.png" });
+      ok(D.canAdd(500) === true, "bytes nothing refers to do not");
+      // A document over the refusal size, as an older or imported one may be.
+      doc.blocks.push(WM.make.picture(doc, spare, 10, 10));
+      ok(WM.sizeOf(doc) === 5000 && D.canAdd(1) === false, "over the limit nothing more can be added");
+      return D.save({});
+    }).then(function (res) {
+      ok(res && res.how === "download" && saved.length === 1 && /^Limits 0\.1\.json$/.test(saved[0].name) && D.state.dirty === false, "and it still saves: a Save is never refused", res && res.name);
+      return saved[0].blob.text();
+    }).then(function (text) {
+      var back = WM.fromText(text);
+      ok(WM.sizeOf(back) === 5000 && WM.missing(back).length === 0, "with every byte in the file");
+      ok(/Saved/.test(w.document.getElementById("toast").textContent) && /over 0 MB/.test(w.document.getElementById("toast").textContent), "the save says the document is over the warning size", w.document.getElementById("toast").textContent);
+    });
+  });
+
+  done.then(finish, function (e) { ok(false, "the page ran to the end", (e && e.stack) || String(e)); finish(); });
+})();
+</script>
+</body></html>

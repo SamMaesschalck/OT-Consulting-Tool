@@ -2,8 +2,9 @@
 /* version.js
  *
  * THE version of the OT Cyber suite. Every module (the OT Cyber Assessment
- * Tool, the OT Cyber Risk Assessment Tool, the OT Cyber Report Review Tool)
- * and the SolutionsPT OT Cyber Suite carry this one number, and every
+ * Tool, the OT Cyber Risk Assessment Tool, the OT Cyber Report Review Tool,
+ * the OT Cyber Document Tool) and the SolutionsPT OT Cyber Suite carry this
+ * one number, and every
  * file in a release is named for it. The canonical copy is shared/version.js:
  * change it there and only there, then run tools/sync-shared.ps1, which copies
  * it to js/version.js in each module (each keeps its own copy so it still

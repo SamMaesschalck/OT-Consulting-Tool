@@ -1,0 +1,104 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* documents.css: the document tool's shell, on top of the shared design system
+   (spt-theme.css): header, sidebar and outline, the notices above the page,
+   dialogs, the busy panel. The paper is editor.css, tables are tables.css and
+   the pages drawn into #main are pages.css. */
+
+.stage-badge { font-size: 11px; margin-left: 4px; }
+.hidden { display: none !important; }
+.muted { color: var(--text-muted); }
+.small { font-size: 12px; }
+/* The live region is read, never seen. */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---- header ---- */
+/* The document's title and where it is saved give way to a narrow header
+   first; the autosave warning never does. */
+#save-state, #autosave-note { color: #C9D8E5; font-size: 13px; white-space: nowrap; }
+#save-state { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#autosave-note { flex: none; font-weight: 600; color: #FFD98A; }
+#autosave-note:empty, #save-state:empty { display: none; }
+#btn-theme, .header .brand .sub { white-space: nowrap; }
+.btn-unsaved { box-shadow: 0 0 0 2px #F5B841 inset; }
+
+/* ---- the main area: notices, then one of the two views ---- */
+#stage { grid-area: main; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface-2); }
+#stage > .main { flex: 1 1 auto; min-height: 0; }
+#notices { flex: none; padding: 0 32px; }
+#notices:empty { display: none; }
+#notices > .doc-banner:first-child { margin-top: 12px; }
+#notices > .doc-banner:last-child { margin-bottom: 0; }
+.doc-banner { max-width: 1280px; margin: 0 auto 8px; border: 1px solid var(--border-strong); border-left: 3px solid var(--brand-blue); border-radius: var(--radius); background: var(--surface); padding: 8px 12px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.doc-banner .t { flex: 1 1 260px; min-width: 0; }
+#doc-missing { border-left-color: var(--gap); }
+
+/* ---- sidebar ---- */
+/* keyboard focus, wherever a click works */
+.nav-item:focus-visible, .doc-outline-row:focus-visible, .doc-outline-more:focus-visible, .doc-menu-item:focus-visible, .doc-toast-act:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
+/* a page's heading takes the keyboard when a control has gone: no ring on a heading */
+.page-title:focus { outline: none; }
+.doc-outline { padding: 4px 0 8px; }
+.doc-outline-none { padding: 6px 18px; font-size: 12.5px; color: var(--text-muted); }
+.doc-outline-row { display: flex; gap: 6px; align-items: baseline; padding: 3px 6px 3px 18px; font-size: 12.5px; color: var(--text); cursor: pointer; }
+.doc-outline-row:hover { background: var(--surface-2); }
+.doc-outline-row.lvl2 { padding-left: 30px; color: var(--text-muted); }
+.doc-outline-row.lvl3 { padding-left: 42px; color: var(--text-muted); }
+.doc-outline-row .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* what is still to complete in the section */
+.doc-outline-row .n { flex: none; font-size: 11px; font-weight: 700; background: var(--gap-bg); color: var(--gap); border-radius: 999px; padding: 0 6px; }
+/* shown for the row in use, so sixty rows are not sixty buttons to look at */
+.doc-outline-more { flex: none; border: 0; background: none; color: var(--text-muted); font: inherit; line-height: 1; padding: 2px 6px; border-radius: var(--radius); cursor: pointer; visibility: hidden; }
+.doc-outline-row:hover .doc-outline-more, .doc-outline-row:focus .doc-outline-more, .doc-outline-row:focus-within .doc-outline-more, .doc-outline-row[tabindex="0"] .doc-outline-more { visibility: visible; }
+.doc-outline-more:hover { background: var(--surface-3); color: var(--text); }
+.doc-menu { margin: 2px 10px 6px 18px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); box-shadow: 0 4px 12px rgba(15,30,50,0.18); display: grid; padding: 4px 0; }
+.doc-menu-item { border: 0; background: none; color: var(--text); font: inherit; font-size: 12.5px; text-align: left; padding: 5px 12px; cursor: pointer; }
+.doc-menu-item:hover { background: var(--surface-2); }
+.sidebar-legal { font-size: 11px; color: var(--text-soft); padding: 12px 16px; line-height: 1.4; }
+
+/* ---- messages ---- */
+/* the toast's one action, such as Undo */
+.doc-toast-act { margin-left: 10px; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
+
+/* ---- dialogs ---- */
+.doc-modal-back { position: fixed; inset: 0; background: rgba(10,25,40,.5); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+.doc-modal { background: var(--surface); color: var(--text); border-radius: var(--radius-lg); padding: 18px 20px; width: 100%; max-width: 440px; box-sizing: border-box; font-size: 14px; }
+.doc-modal.wide { max-width: 640px; max-height: calc(100vh - 32px); overflow: auto; }
+.doc-modal h2 { margin: 0 0 8px; font-size: 16px; }
+.doc-modal p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.doc-modal .btn-row { justify-content: flex-end; }
+.doc-modal input[type=text], .doc-modal input[type=url] { font: inherit; width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); margin: 8px 0 12px; }
+
+/* ---- the busy panel: over everything while a file is read or built ---- */
+.doc-busy-back { position: fixed; inset: 0; background: rgba(10,25,40,.35); display: flex; align-items: center; justify-content: center; z-index: 2100; padding: 16px; }
+.doc-busy { background: var(--surface); color: var(--text); border-radius: var(--radius-lg); padding: 16px 20px; width: 100%; max-width: 360px; box-sizing: border-box; font-size: 14px; box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
+.doc-busy-label { margin-bottom: 10px; }
+.doc-busy progress { width: 100%; height: 8px; accent-color: var(--brand-blue); }
+
+/* ---- narrow screens ---- */
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; grid-template-areas: "header" "sidebar" "main"; height: 100dvh; }
+  .header { flex-wrap: wrap; padding: 6px 10px; gap: 6px 10px; height: auto; }
+  .header .brand .brand-logo img { height: 24px; }
+  .header .brand .sub { font-size: 12px; }
+  #save-state { display: none; }
+  .header-actions { margin-left: auto; }
+  .sidebar { display: flex; border-right: 0; border-bottom: 1px solid var(--border); padding: 0; overflow-x: auto; overflow-y: hidden; }
+  .sidebar .nav-section { display: flex; padding: 4px; white-space: nowrap; }
+  .sidebar .nav-item { padding: 6px 10px; flex: none; }
+  /* no outline here: the room goes to the page */
+  .sidebar .nav-section-title, .sidebar #outline, .sidebar .sidebar-legal { display: none; }
+  /* the active page's count would otherwise touch its label */
+  .sidebar .nav-item .badge { margin-left: 6px; }
+  .main { padding: 12px 16px; }
+  #notices { padding: 0 16px; }
+}
+
+/* ---- high contrast (forced colours) ---- */
+@media (forced-colors: active) {
+  .btn-unsaved { outline: 2px solid Highlight; }
+  .doc-modal, .doc-busy, .doc-menu { border: 1px solid CanvasText; }
+}
+
+@media print {
+  #notices, .doc-busy-back, .doc-modal-back, .toast { display: none !important; }
+}
