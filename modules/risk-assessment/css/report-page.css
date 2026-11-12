@@ -97,6 +97,10 @@
 .rp-tabs { display: inline-flex; gap: 4px; }
 .rp-status { font-size: 12.5px; color: var(--text-muted); }
 .rp-spacer { flex: 1; }
+/* The Word preview (js/word-preview.js); the sheets are css/doc-preview.css. */
+.wp-state { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 12px; }
+.wp-progress { width: 220px; max-width: 100%; height: 8px; accent-color: var(--brand-blue); }
+.wp-paper { min-width: 0; }
 .rp-doc { transition: opacity .15s; }
 .rp-doc.rp-busy { opacity: .6; }
 .rp-error { border: 1px solid var(--gap); background: var(--gap-bg); color: var(--text); border-radius: var(--radius); padding: 8px 10px; font-size: 13px; }

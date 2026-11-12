@@ -92,6 +92,16 @@
     // The deliverables, built as the app builds them.
     return w.docx.Packer.toBlob(RX.buildWordDoc(p, {})).then(function (b) {
       r.word = b.size;
+      // The Word preview reads that file back and draws it (js/word-preview.js).
+      r.preview = "";
+      if (!w.RiskWordPreview || !A.DocPreview || !A.DocxImport) return null;
+      return A.DocPreview.fromDocx(b, { name: "check.docx" }).then(function (read) {
+        var div = doc.createElement("div");
+        A.DocPreview.drawRead(div, read, {});
+        r.preview = (read.cover ? "cover " : "no cover ") + div.querySelectorAll(".dpv-sheet").length + " sheets " + read.counts.headings + " headings";
+        A.DocPreview.dispose(read);
+      }, function (e) { r.preview = "failed: " + e.message; });
+    }).then(function () {
       return w.docx.Packer.toBlob(RX.buildWordDoc(p, { highLevelOnly: true }));
     }).then(function (b) {
       r.wordHL = b.size;
@@ -141,6 +151,7 @@
         ok(b.name === a.name && b.len === a.len && b.len > 200, "page '" + a.name + "' renders identically (" + b.len + " chars)", a.len + " vs " + b.len);
       });
       ok(close(folder.word, single.word), "the Word report builds to the same size (" + single.word + " bytes)", folder.word + " vs " + single.word);
+      ok(/^cover \d+ sheets [1-9]/.test(single.preview) && single.preview === folder.preview, "the Word preview reads the report back and draws it (" + single.preview + ")", folder.preview + " vs " + single.preview);
       ok(close(folder.wordHL, single.wordHL), "the high-level Word report builds to the same size (" + single.wordHL + " bytes)", folder.wordHL + " vs " + single.wordHL);
       ok(single.sheets === folder.sheets && close(folder.excel, single.excel), "the Excel workbook has the same sheets and size (" + single.excel + " bytes)", folder.excel + " vs " + single.excel);
       ok(folder.errors.length === 0, "(the folder version ran with no script or console errors)", folder.errors.join(" | "));

@@ -42,13 +42,13 @@
   // Packing and reading a Blob are real work no timer stands for, and headless
   // Edge's virtual clock runs out the moment nothing is queued: a message
   // bounced to ourselves keeps a task queued until the tests finish (as
-  // test-doc-zip.html).
-  var beat = setInterval(function () {}, 20);
+  // test-doc-zip.html). One keep-alive only: a short interval beside it would
+  // hold the virtual clock to 20 ms steps and make every wait crawl.
   var alive = true, bounce = new MessageChannel();
   bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
   bounce.port2.postMessage(0);
   function finish() {
-    clearInterval(beat); alive = false;
+    alive = false;
     lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
     document.getElementById("out").textContent = lines.join("\n");
   }
@@ -430,23 +430,24 @@
     // ======================= shell ===========================================
     await step("shell", async function () {
     // ---- a message stays up long enough to read ----
+    // The delay the toast asks for is read off its setTimeout call, and the
+    // timer's callback is then run at once, rather than waiting the seconds out.
     function toastShown() { return !/\bhidden\b/.test(T.$("toast").className); }
-    T.D.toast("Saved.");
-    await later(4000);
-    var at4 = toastShown();
-    await later(400);
-    ok(at4 && !toastShown(), "toast: a short message still goes after about four seconds");
+    function toastTimed(msg, kind) {
+      var realST = T.W.setTimeout, asked = [];
+      T.W.setTimeout = function (fn, ms) { asked.push({ fn: fn, ms: ms }); return 0; };
+      try { T.D.toast(msg, kind); } finally { T.W.setTimeout = realST; }
+      var shown = toastShown(), t = asked[asked.length - 1];
+      if (t) t.fn();
+      return { shown: shown, ms: t ? t.ms : null, gone: !toastShown() };
+    }
+    var short = toastTimed("Saved.");
+    ok(short.shown && short.ms >= 4000 && short.ms <= 4400 && short.gone, "toast: a short message still goes after about four seconds", J(short));
     var longMsg = "3 pictures could not be pasted. Insert them from a file, or load the Word file to bring everything across. 1 comment was not pasted. Tracked changes were settled: inserted text was kept and deleted text was left out.";
-    T.D.toast(longMsg, "warn");
-    await later(6000);
-    var at6 = toastShown();
-    await later(longMsg.length * 65 - 6000 + 300);
-    ok(at6 && !toastShown(), "toast: a message of several sentences is still up after six seconds, and goes once there has been time to read it", String(at6));
-    T.D.toast(new Array(60).join("A very long message. "));
-    await later(19000);
-    var at19 = toastShown();
-    await later(1500);
-    ok(at19 && !toastShown(), "toast: and never stays longer than twenty seconds");
+    var lng = toastTimed(longMsg, "warn");
+    ok(lng.shown && lng.ms > 6000 && lng.ms >= longMsg.length * 65 && lng.ms <= longMsg.length * 65 + 300 && lng.gone, "toast: a message of several sentences is still up after six seconds, and goes once there has been time to read it", J(lng));
+    var huge = toastTimed(new Array(60).join("A very long message. "));
+    ok(huge.shown && huge.ms > 19000 && huge.ms <= 20000 && huge.gone, "toast: and never stays longer than twenty seconds", J(huge));
 
     // ---- 62: the Draft or Final choice follows a document saved into another file ----
     d = await open(T, project([para("Complete.")], { info: { issuedDate: "2026-11-11" } }));

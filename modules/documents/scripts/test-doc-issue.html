@@ -18,8 +18,7 @@
   it", Final refused and then allowed, the file names, and Worth a look.
 
   The shell (App.DocApp) is a stand-in that records what is asked of it. The
-  writer and the model are the real ones when they are built; a small stand-in
-  is used for whichever is still a stub, and the page says so in a NOTE line.
+  writer and the model are the real ones.
 -->
 <div id="main" style="width:1100px"></div>
 <script src="../js/version.js"></script>
@@ -36,6 +35,7 @@
 <script src="../js/model.js"></script>
 <script src="../js/storage.js"></script>
 <script src="../js/pictures.js"></script>
+<script src="../js/doc-preview.js"></script>
 <script src="../js/render.js"></script>
 <script src="../js/history.js"></script>
 <script src="../js/tables.js"></script>
@@ -52,9 +52,6 @@
     lines.push((c ? "PASS " : "FAIL ") + n + (!c && d != null ? " - " + d : "")); if (!c) fail++;
     show("FAIL the page did not finish: re-run it alone with a larger time budget");
   }
-  // Every package is built now, so a stand-in being used means a real object
-  // has gone missing: that is a failure, not a note.
-  function note(t) { ok(false, "no stand-in is used", t); }
   function finish() {
     alive = false;
     show("\n" + (fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"));
@@ -110,85 +107,6 @@
   // Export is a download; here it is caught.
   A.DocStorage.download = function (blob, name) { calls.down.push({ blob: blob, name: name }); };
 
-  // ---- stand-ins for whatever is still a stub -----------------------------
-  function eachBlock(d, fn) {
-    (d.blocks || []).forEach(function (b) {
-      fn(b);
-      if (b.type === "table") b.rows.forEach(function (r) { r.cells.forEach(function (c) { c.blocks.forEach(fn); }); });
-    });
-  }
-  if (M.create("report") === null) {
-    note("App.DocModel is still a stub: a stand-in model is used");
-    M.runsText = function (runs) { return (runs || []).map(function (r) { return r.t || ""; }).join(""); };
-    M.text = function (b) { return b.type === "prompt" ? b.text || "" : M.runsText(b.runs); };
-    M.find = function (d, id) { var hit = null; eachBlock(d, function (b) { if (b.id === id) hit = { block: b }; }); return hit; };
-    M.remove = function (d, ids) { d.blocks = d.blocks.filter(function (b) { return ids.indexOf(b.id) === -1; }); return ids; };
-    M.table.grid = function (t) {
-      return t.rows.map(function (row) {
-        var out = [], c = 0;
-        row.cells.forEach(function (cell) { for (var s = 0; s < (cell.span || 1); s++) out.push({ cell: cell, c: c++, covered: s > 0 }); });
-        return out;
-      });
-    };
-    M.missing = function (d) {
-      var ids = [];
-      eachBlock(d, function (b) { if (b.type === "picture" && (!d.media[b.media] || d.media[b.media].missing)) ids.push(b.id); });
-      return ids;
-    };
-    M.promptCount = function (d) {
-      var n = String(d.info.title || "").trim() ? 0 : 1;
-      eachBlock(d, function (b) {
-        if (b.type === "prompt") n++;
-        (b.runs || []).forEach(function (r) { if (r.red) n++; });
-      });
-      return n + M.missing(d).length;
-    };
-    M.normalise = function (o) { return o; };
-  }
-  // The stand-in writer prints the same things red that the design says the
-  // real one does, into a real .docx, so the page and the export are still
-  // tested end to end against a file.
-  function standInWriter() {
-    var dx = window.docx;
-    function build(project) {
-      var out = [];
-      function red(text, where) { out.push({ text: text, where: where }); return new dx.TextRun({ text: text, color: "E00000" }); }
-      function block(b) {
-        if (b.type === "prompt") {
-          out.push({ text: b.text, where: { kind: "block", blockId: b.id } });
-          return [new dx.Paragraph({ style: "PlaceholderText", children: [new dx.TextRun({ text: b.text, bold: true })] })];
-        }
-        if (b.type === "picture") {
-          var m = project.media[b.media];
-          return [new dx.Paragraph({ children: [!m || m.missing ? red("This picture could not be restored. Replace it or delete it.", { kind: "block", blockId: b.id }) : new dx.TextRun("[picture]")] })];
-        }
-        if (b.type === "table") {
-          return [new dx.Table({ rows: b.rows.map(function (r) {
-            return new dx.TableRow({ children: r.cells.map(function (c) { return new dx.TableCell({ children: [].concat.apply([], c.blocks.map(block)) }); }) });
-          }) })];
-        }
-        if (!b.runs) return [];
-        return [new dx.Paragraph({ children: b.runs.map(function (r) { return r.red ? red(r.t, { kind: "block", blockId: b.id }) : new dx.TextRun(r.t || ""); }) })];
-      }
-      var title = String(project.info.title || "").trim();
-      var kids = [new dx.Paragraph({ children: [title ? new dx.TextRun(title) : red("Add the document title", { kind: "info", field: "title" })] })];
-      project.blocks.forEach(function (b) { kids.push.apply(kids, block(b)); });
-      return { kids: kids, out: out };
-    }
-    H.buildDocument = function (project, opts) {
-      var b = build(project), fin = opts && opts.issueStatus === "final";
-      if (opts && opts.issueCheck) return Promise.resolve({ placeholders: b.out });
-      if (fin && b.out.length) return Promise.reject(new Error("This document still has " + b.out.length + " things to write, so it cannot be issued as final. Export it as a draft, or complete it first."));
-      b.kids.unshift(new dx.Paragraph("Status " + (fin ? "Final" : "Draft")));
-      var doc = new dx.Document({
-        creator: project.info.author || "SolutionsPT", title: project.info.title, description: project.info.docType || "Document",
-        styles: { paragraphStyles: [{ id: "PlaceholderText", name: "Placeholder", basedOn: "Normal", run: { color: "E00000" } }] },
-        sections: [{ children: b.kids }]
-      });
-      return dx.Packer.toBlob(doc).then(function (blob) { return { blob: blob, fitted: [] }; });
-    };
-    H.issueList = function (project) { return H.buildDocument(project, { issueCheck: true }).then(function (r) { return r.placeholders; }); };
-  }
 
   // ---- documents ---------------------------------------------------------
   var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -267,13 +185,9 @@
     });
   }
 
-  var REAL = true;
   var probe = docOf({ info: { title: "Probe" }, blocks: [para("b1", "x")] });
   var chain = H.buildDocument(probe, { issueStatus: "draft" }).then(function () {}, function (e) {
-    if (!/not built yet/.test(String(e && e.message))) { ok(false, "the writer builds a plain document", e && e.message); return; }
-    REAL = false;
-    note("App.HouseDocx is still a stub: a stand-in writer is used, which prints the same things red into a real .docx");
-    standInWriter();
+    ok(false, "the writer builds a plain document", e && e.message);
   });
   function step(name, fn) {
     chain = chain.then(fn).catch(function (e) { ok(false, name + " ran without throwing", e && (e.stack || e.message)); });
@@ -395,13 +309,9 @@
     }).then(function (parts) {
       ok(redInXml(parts["word/document.xml"]).length === 0, "nothing prints red in the final");
       ok(/Final/.test(parts["word/document.xml"]) && !/Status<\/w:t>[\s\S]{0,400}Draft/.test(parts["word/document.xml"]), "it says Final");
-      if (REAL) {
-        ok(/documentProtection/.test(parts["word/settings.xml"] || "") && /_MarkAsFinal/.test(parts["docProps/custom.xml"] || ""), "it opens read-only and is marked as final");
-        var headers = Object.keys(parts).filter(function (n) { return /^word\/header\d*\.xml$/.test(n); }).map(function (n) { return parts[n]; }).join("");
-        ok(!/DRAFT/.test(headers), "and carries no draft watermark");
-      } else {
-        note("read-only protection and the watermark are the real writer's (test-doc-house.html); not checked against the stand-in");
-      }
+      ok(/documentProtection/.test(parts["word/settings.xml"] || "") && /_MarkAsFinal/.test(parts["docProps/custom.xml"] || ""), "it opens read-only and is marked as final");
+      var headers = Object.keys(parts).filter(function (n) { return /^word\/header\d*\.xml$/.test(n); }).map(function (n) { return parts[n]; }).join("");
+      ok(!/DRAFT/.test(headers), "and carries no draft watermark");
     });
   });
 

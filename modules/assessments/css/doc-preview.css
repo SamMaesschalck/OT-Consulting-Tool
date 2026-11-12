@@ -1,0 +1,180 @@
+/* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
+/* doc-preview.css: a document drawn as pages (shared/doc-preview.js). The
+   canonical copy is shared/doc-preview.css; tools/sync-shared.ps1 copies it
+   into the document, assessment and risk tools.
+
+   Everything is under .dpv, the class draw() gives the element it draws
+   into, so nothing here reaches the rest of a tool's page. What sits on a
+   sheet (.dpv-sheet) is laid out by the sheet; the look of text, tables and
+   pictures is under .dpv alone, so the document tool's editor page, which
+   carries .dpv as well, draws a block exactly as the preview does.
+
+   The sheets are paper: white, with the Word template's own values
+   (shared/house-docx.js buildStyles: Segoe UI, body 11 pt, headings 16, 13
+   and 12 pt in navy 173267, captions 9 pt italic, table header 173267, rule
+   E2E7EE), in both themes. Sizes are px at 96 dpi: an A4 page is 794 px
+   wide with 96 px margins, which leaves the 601 px of text Word prints; a
+   landscape page leaves 1026 px. */
+
+/* ---- sheets ---- */
+.dpv { overflow-x: auto; padding-bottom: 24px; }
+.dpv .dpv-sheet {
+  position: relative; box-sizing: border-box; width: 794px; min-height: 1123px; margin: 0 auto 18px; padding: 96px;
+  background: #FFFFFF; color: #1A2533; border: 1px solid var(--border-strong, #C8D2DD); box-shadow: 0 1px 4px rgba(20,33,52,0.18);
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, Arial, sans-serif;
+  font-size: 14.67px; line-height: 1.36; text-align: left;
+}
+.dpv .dpv-sheet.land { width: 1123px; min-height: 794px; }
+.dpv .dpv-sheet[data-part="cover"] { padding: 0; height: 1123px; overflow: hidden; }
+/* The sheet has the page margins, so a block on it fills the text area. */
+.dpv .dpv-sheet > .blk { width: auto; padding: 0; background: transparent; content-visibility: visible; }
+.dpv .dpv-sheet > .blk:focus-visible { outline: 2px solid #0F5FA6; outline-offset: 4px; }
+/* A draft's watermark, as Word prints it behind the text, and the running
+   header and footer of a body page. */
+.dpv .dpv-mark {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-45deg);
+  font-size: 150px; font-weight: 700; letter-spacing: 4px; color: rgba(184, 194, 206, 0.35);
+  pointer-events: none; user-select: none; white-space: nowrap; z-index: 0;
+}
+.dpv .dpv-sheet > .blk, .dpv .dpv-sheet > .doc-control, .dpv .dpv-sheet > .doc-contents, .dpv .dpv-sheet > .dp-fn-list { position: relative; z-index: 1; }
+.dpv .dpv-head { position: absolute; top: 40px; right: 96px; height: 28px; width: auto; }
+.dpv .dpv-foot {
+  position: absolute; left: 96px; right: 96px; bottom: 40px; display: flex; gap: 12px; align-items: baseline;
+  font-size: 9.33px; color: #8595A5;
+}
+.dpv .dpv-foot > span { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dpv .dpv-foot > .dpv-foot-c { flex: 1.4 1 0; text-align: center; }
+.dpv .dpv-foot > span:last-child { flex: 0 0 auto; text-align: right; }
+
+/* ---- blocks ---- */
+.dpv .blk { box-sizing: border-box; position: relative; color: #1A2533; }
+.dpv .blk .txt { margin: 0; padding: 0 0 8px; min-height: 1.36em; white-space: pre-wrap; overflow-wrap: anywhere; outline: none; }
+.dpv .blk p.txt.al-center { text-align: center; }
+.dpv .blk p.txt.al-right { text-align: right; }
+.dpv .blk p.txt.al-justify { text-align: justify; }
+.dpv .blk h1.txt, .dpv .blk h2.txt, .dpv .blk h3.txt { color: #173267; font-weight: 400; line-height: 1.25; flex: 1; min-width: 0; margin: 0; }
+.dpv .blk h1.txt { font-size: 21.33px; padding: 21px 0 9px; }
+.dpv .blk h2.txt { font-size: 17.33px; padding: 16px 0 7px; }
+.dpv .blk h3.txt { font-size: 16px; padding: 13px 0 5px; }
+.dpv .blk h1.txt b, .dpv .blk h2.txt b, .dpv .blk h3.txt b { font-weight: inherit; }
+.dpv .blk h1.txt i, .dpv .blk h2.txt i, .dpv .blk h3.txt i { font-style: normal; }
+.dpv .blk[data-type="heading"] { display: flex; align-items: baseline; gap: 0.75em; }
+.dpv .blk .hnum { color: #0F5FA6; font-weight: 700; flex: none; line-height: 1.25; }
+.dpv .blk .hnum:empty { display: none; }
+.dpv .blk[data-type="heading"]:has(h1) .hnum { font-size: 21.33px; }
+.dpv .blk[data-type="heading"]:has(h2) .hnum { font-size: 17.33px; }
+.dpv .blk[data-type="heading"]:has(h3) .hnum { font-size: 16px; }
+.dpv .blk[data-type="list"] { display: flex; align-items: baseline; }
+.dpv .blk[data-type="list"] .marker { flex: none; width: 22px; margin-left: 12px; color: inherit; user-select: none; }
+.dpv .blk[data-type="list"].lvl-1 .marker { margin-left: 36px; }
+.dpv .blk[data-type="list"].lvl-2 .marker { margin-left: 60px; }
+.dpv .blk[data-type="list"] .txt { flex: 1; min-width: 0; padding-bottom: 4px; }
+.dpv .blk .txt.prompt, .dpv .blk .red, .dpv .red { color: #E00000; }
+.dpv .blk .txt.prompt { font-weight: 700; }
+.dpv .blk code { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 13.33px; background: #F4F7FA; padding: 0 2px; border-radius: 2px; }
+.dpv .blk a[data-link] { color: #0F5FA6; text-decoration: underline; }
+.dpv .blk sup.fn { color: #0F5FA6; font-weight: 600; padding: 0 1px; user-select: none; cursor: default; }
+/* A run's own colour and size (an imported chart's legend, a tile's figure):
+   set inline by doc-preview.js; the size takes its line with it. */
+.dpv .blk .rs { line-height: 1.2; }
+.dpv .blk .cap { margin: 4px 0 8px; font-size: 12px; font-style: italic; color: #5A6B7B; white-space: pre-wrap; min-height: 1.3em; }
+.dpv .blk figure { margin: 4px 0 8px; display: flex; flex-direction: column; }
+.dpv .blk figure.al-left { align-items: flex-start; }
+.dpv .blk figure.al-center { align-items: center; }
+.dpv .blk figure.al-right { align-items: flex-end; }
+.dpv .blk figure img { display: block; max-width: 100%; height: auto; }
+.dpv .blk figure figcaption { align-self: stretch; }
+.dpv .blk figure.al-center figcaption { text-align: center; }
+.dpv .blk figure.al-right figcaption { text-align: right; }
+.dpv .blk .ph {
+  box-sizing: border-box; max-width: 100%; min-height: 64px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding: 8px; text-align: center; font-size: 12px; color: #5A6B7B; border: 1px dashed #94A0AD; background: #F4F7FA;
+}
+.dpv .blk .ph.lost { border-color: #E00000; color: #B23A33; background: #FBEDEC; }
+.dpv .kept-card { max-width: 100%; display: flex; flex-direction: column; align-items: inherit; gap: 2px; }
+.dpv .kept-card p { margin: 0; font-size: 12px; color: #5A6B7B; }
+.dpv .kept-card .kept-line { margin-top: 6px; color: #1A2533; }
+.dpv .kept-card .kept-n { font-weight: 600; }
+.dpv .kept-card .kept-label, .dpv .kept-card .kept-text { overflow-wrap: anywhere; }
+.dpv .kept-card .kept-text::before { content: "Text inside: "; }
+.dpv .kept-card .kept-note.lost { color: #B23A33; font-weight: 600; }
+.dpv .kept-card img.kept-preview { display: block; max-width: 100%; height: auto; border: 1px solid #E2E7EE; }
+.dpv .kept-icon { width: 40px; height: 40px; fill: none; stroke: #5A6B7B; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.dpv .blk .unknown { margin: 0; padding: 6px 0; font-size: 12px; color: #5A6B7B; }
+
+/* ---- tables ---- */
+.dpv table.doc-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 6px 0 10px; font: inherit; color: #1A2533; }
+.dpv .doc-table th, .dpv .doc-table td {
+  border: 1px solid #E2E7EE; padding: 4px 8px; vertical-align: top; text-align: left; font-weight: 400; overflow-wrap: anywhere;
+}
+.dpv .doc-table th { background: #173267; color: #FFFFFF; font-weight: 600; vertical-align: middle; }
+.dpv .doc-table th.filled { color: inherit; }
+/* A header row the Word file left unshaded (it is only bold). */
+.dpv .doc-table th.plain { background: transparent; color: inherit; font-weight: 700; }
+.dpv .doc-table .blk { width: auto; padding: 0; margin: 0; background: transparent; color: inherit; content-visibility: visible; font-size: inherit; }
+.dpv .doc-table .blk + .blk { margin-top: 4px; }
+.dpv .doc-table .blk .txt { padding-bottom: 0; }
+.dpv .doc-table p { margin: 0; }
+.dpv .doc-table img { max-width: 100%; height: auto; }
+.dpv .doc-table caption { caption-side: bottom; padding-top: 4px; text-align: left; }
+.dpv .doc-table caption .cap { margin: 0; font-size: 12px; font-style: italic; color: #5A6B7B; }
+/* A table with a look of its own (an imported chart or row of tiles): no
+   rules, its paragraphs close together, and Word's own cell padding. */
+.dpv table.doc-table.bare { margin: 4px 0 8px; }
+.dpv .doc-table.bare > tbody > tr > th, .dpv .doc-table.bare > tbody > tr > td { border: 0; padding: 0 7.67px; }
+.dpv .doc-table.bare .blk + .blk { margin-top: 0; }
+.dpv .doc-table.bare .blk .txt { min-height: 0; }
+/* A table inside a cell fills the cell's text and adds no space round it. */
+.dpv table.doc-table.nested { margin: 0; }
+/* A bar of a chart: a row of an exact height whose cells hold nothing. The
+   empty line in the cell is not drawn, so the row is as tall as Word prints it. */
+.dpv .doc-table tr.exact > td.bar, .dpv .doc-table tr.exact > th.bar { padding-top: 0; padding-bottom: 0; line-height: 0; font-size: 0; }
+.dpv .doc-table td.bar .blk .txt, .dpv .doc-table th.bar .blk .txt { min-height: 0; padding: 0; font-size: 0; line-height: 0; }
+
+/* ---- footnotes, listed at the end of the sheet they are referred to on ---- */
+.dpv .dp-fn-list { margin-top: 28px; }
+.dpv .dp-fn-list::before { content: ""; display: block; width: 33%; border-top: 1px solid #1A2533; margin-bottom: 6px; }
+.dpv .dp-fn { display: flex; gap: 3px; align-items: baseline; margin: 0 0 4px; font-size: 12px; line-height: 1.33; color: #1A2533; }
+.dpv .dp-fn-n { flex: none; font-size: 9px; position: relative; top: -4px; }
+.dpv .dp-fn-t { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dpv .dp-fn-t a[data-link] { color: #0F5FA6; text-decoration: underline; }
+
+/* ---- the cover, at its printed size ---- */
+.dpv .cover-page, .cover-mini .cover-page {
+  position: relative; box-sizing: border-box; width: 794px; height: 1123px; overflow: hidden;
+  padding: 51px 53px 37px; background: #0F1C3F; color: #FFFFFF; text-align: left;
+  font-family: "Segoe UI", system-ui, Arial, sans-serif; line-height: 1.25;
+}
+.dpv .cover-page .cover-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.dpv .cover-page .cover-top, .dpv .cover-page .cover-foot { position: relative; }
+.dpv .cover-page .cover-logo { display: block; width: 250px; height: auto; }
+.dpv .cover-page .cover-kicker { margin-top: 55px; font-size: 14px; font-weight: 700; color: #7FC4E8; }
+.dpv .cover-page .cover-bar { width: 60px; height: 4px; margin-top: 6px; background: #3399CC; }
+.dpv .cover-page .cover-title { margin-top: 15px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.dpv .cover-page .cover-client { margin-top: 16px; font-size: 20px; color: #C7D8E8; }
+.dpv .cover-page .cover-site { font-size: 14px; color: #9DB8D6; }
+.dpv .cover-page .cover-sub { margin-top: 10px; font-size: 13.33px; font-weight: 700; color: #7FC4E8; }
+.dpv .cover-page .cover-foot { position: absolute; left: 53px; right: 53px; bottom: 37px; }
+.dpv .cover-page .cover-strip { display: flex; flex-wrap: wrap; gap: 4px 32px; align-items: baseline; margin-bottom: 8px; }
+.dpv .cover-page .cover-strip > .cover-pair { display: block; max-width: 100%; min-width: 0; font-size: 12.67px; overflow-wrap: anywhere; }
+.dpv .cover-page .cover-k { font-size: 10.67px; font-weight: 700; color: #7FC4E8; }
+.dpv .cover-page .cover-v { font-size: 12.67px; margin-left: 10px; margin-right: 0; }
+.dpv .cover-page .cover-addr { font-size: 10px; color: #DBE6F1; }
+
+/* ---- document control and contents ---- */
+.dpv .doc-control h1, .dpv .doc-contents h1 { font-size: 21.33px; font-weight: 400; color: #173267; margin: 21px 0 9px; }
+.dpv .control-table { width: 100%; border-collapse: collapse; font-size: 14.67px; }
+.dpv .control-table th, .dpv .control-table td { border: 1px solid #E2E7EE; padding: 5px 8px; text-align: left; vertical-align: top; font-weight: 400; color: #1A2533; }
+.dpv .control-table th { width: 32%; background: #F4F7FA; }
+.dpv .contents-line { margin: 0 0 6px; }
+.dpv .contents-line.lvl-1 { padding-left: 24px; }
+.dpv .contents-line a { color: #0F5FA6; text-decoration: none; cursor: pointer; }
+.dpv .contents-line a:focus-visible { outline: 2px solid #0F5FA6; outline-offset: 2px; }
+.dpv .doc-short-head .doc-title { margin: 0 0 13px; font-size: 29.33px; font-weight: 400; color: #173267; line-height: 1.2; overflow-wrap: anywhere; }
+.dpv .doc-short-head .cap { margin: 0 0 8px; font-size: 12px; font-style: italic; color: #5A6B7B; }
+
+@media print {
+  .dpv { overflow: visible; padding: 0; }
+  .dpv .dpv-sheet { box-shadow: none; border: 0; margin: 0; break-after: page; }
+}

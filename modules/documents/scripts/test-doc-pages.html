@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="../css/editor.css" />
 <link rel="stylesheet" href="../css/tables.css" />
 <link rel="stylesheet" href="../css/pages.css" />
+<link rel="stylesheet" href="../css/doc-preview.css" />
 </head>
 <body>
 <pre id="out">running...</pre>
@@ -17,8 +18,7 @@
   report words every code, offers Show and Remove for the front matter and
   lists the pictures and drawings; the preview lays out cover, control,
   contents and landscape sheets; the welcome page opens a new document and the
-  demo. The model and the renderer are the real ones when they are built; a
-  small stand-in is used for whichever is still a stub, and the page says so.
+  demo. The model and the renderer are the real ones.
 -->
 <button id="btn-load" type="button">Load</button>
 <div id="main" style="width:1100px"></div>
@@ -37,6 +37,7 @@
 <script src="../js/model.js"></script>
 <script src="../js/storage.js"></script>
 <script src="../js/pictures.js"></script>
+<script src="../js/doc-preview.js"></script>
 <script src="../js/render.js"></script>
 <script src="../js/history.js"></script>
 <script src="../js/tables.js"></script>
@@ -53,9 +54,6 @@
     lines.push((c ? "PASS " : "FAIL ") + n + (!c && d != null ? " - " + d : "")); if (!c) fail++;
     show("FAIL the page did not finish: re-run it alone with a larger time budget");
   }
-  // Every package is built now, so a stand-in being used means a real object
-  // has gone missing: that is a failure, not a note.
-  function note(t) { ok(false, "no stand-in is used", t); }
   function finish() {
     alive = false;
     show("\n" + (fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"));
@@ -102,57 +100,13 @@
     }
   };
 
-  // ---- stand-ins for whatever is still a stub -----------------------------
-  if (M.create("report") === null) {
-    note("App.DocModel is still a stub: a stand-in model is used");
-    M.runsText = function (runs) { return (runs || []).map(function (r) { return r.t || ""; }).join(""); };
-    M.text = function (b) { return b.type === "prompt" ? b.text || "" : M.runsText(b.runs); };
-    M.find = function (d, id) {
-      for (var i = 0; i < d.blocks.length; i++) {
-        var b = d.blocks[i];
-        if (b.id === id) return { block: b, list: d.blocks, index: i };
-        if (b.type !== "table") continue;
-        for (var r = 0; r < b.rows.length; r++) for (var c = 0; c < b.rows[r].cells.length; c++) {
-          var cell = b.rows[r].cells[c];
-          for (var k = 0; k < cell.blocks.length; k++) if (cell.blocks[k].id === id) return { block: cell.blocks[k], list: cell.blocks, index: k, table: b, cell: cell };
-        }
-      }
-      return null;
-    };
-    M.remove = function (d, ids) { d.blocks = d.blocks.filter(function (b) { return ids.indexOf(b.id) === -1; }); return ids; };
-    M.table.grid = function (t) {
-      return t.rows.map(function (row) {
-        var out = [], c = 0;
-        row.cells.forEach(function (cell) { for (var s = 0; s < (cell.span || 1); s++) out.push({ cell: cell, c: c++, covered: s > 0 }); });
-        return out;
-      });
-    };
-    M.sizeOf = function (d) { return Object.keys(d.media || {}).reduce(function (s, k) { return s + ((d.media[k].blob && d.media[k].blob.size) || 0); }, 0); };
-    M.missing = function () { return []; };
-    M.normalise = function (o) { return o; };
-    M.fromText = function (t) { return JSON.parse(t); };
-    M.create = function (kind) { return docOf({ kind: kind || "report", info: { title: "" }, blocks: [{ id: "b1", type: "paragraph", runs: [{ t: "" }] }] }); };
-  }
-  (function () {
-    var probe = R.coverEl(docOf({ info: { title: "Probe" } }));
-    if (probe && probe.childNodes.length) return;
-    note("App.DocRender is still a stub: a stand-in renderer is used");
-    function box(cls, text, w, hgt) {
-      var el = document.createElement("div");
-      el.className = cls; el.textContent = text;
-      if (w) { el.style.width = w + "px"; el.style.height = hgt + "px"; }
-      return el;
-    }
-    R.coverEl = function (d) { return box("cover", [(d.info.docType || "Document").toUpperCase(), d.info.title || "Untitled document", d.info.client || ""].join(" "), 794, 1123); };
-    R.controlEl = function (d, st) { return box("control", "Document control and confidentiality Status " + (st === "final" ? "Final" : "Draft")); };
-    R.contentsEl = function () { return box("contents", "Contents"); };
-    R.shortHeadEl = function (d) { return box("short-head", d.info.title || ""); };
-    R.blockEl = function (d, b) {
-      var el = box("blk", M.text(b) || b.type);
-      el.id = "blk-" + b.id; el.setAttribute("data-block-id", b.id); el.setAttribute("data-type", b.type);
-      return el;
-    };
-  })();
+  // ---- the real model and renderer ---------------------------------------
+  // (Stand-ins for them were kept here while they were stubs; every package
+  // is built now, so a missing one is a failure.)
+  var made = null; try { made = M.create("report"); } catch (e) { made = null; }
+  ok(!!made && Array.isArray(made.blocks), "the real document model is loaded");
+  var probe = null; try { probe = R.coverEl(docOf({ info: { title: "Probe" } })); } catch (e) { probe = null; }
+  ok(!!probe && probe.childNodes.length > 0, "the real renderer is loaded");
 
   // ---- documents ---------------------------------------------------------
   var PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -309,7 +263,7 @@
   // ======================= import: the words ==============================
   step("sentences", function () {
     var C = A.DocxImport.CODES, all = C.toCheck.concat(C.notCarried, C.changed), seen = {}, bad = [];
-    ok(all.length === 37, "the reader lists 37 report codes", all.length);
+    ok(all.length === 38, "the reader lists 38 report codes", all.length);
     all.forEach(function (code) {
       [1, 3].forEach(function (n) {
         var s = F.sentence({ code: code, count: n });

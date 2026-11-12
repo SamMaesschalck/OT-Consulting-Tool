@@ -77,6 +77,17 @@ rewrite and reorder report sections, add glossary terms and edit the proposed
 next steps; every change is saved in the project file and applies to both screen
 and Word.
 
+**Word preview.** Beside the report page, under Report in the sidebar, the Word
+report as Export Word makes it, page by page: the cover, document control, then
+the body, landscape pages and charts included. The file is built in memory with
+`export-docx.js` (no download), read back with the shared Word reader
+(`docx-import.js`) and drawn by the shared page renderer (`doc-preview.js`, the
+document tool's), so it cannot disagree with the export. It follows the export's
+choices (Draft or Final, which site, zone or product, the organisation-wide
+report) and builds again when the assessment changes. `scripts/test-word-preview.html`
+and `test-word-preview-2.html` (half the demos each, `word-preview-check.js`) draw every demo and check the pages, cover, headings, pictures and cell colours
+against the file.
+
 **Re-assessment.** An earlier assessment in the same file (or a separate loaded
 file) becomes a baseline, and the report gains a "Progress since previous
 assessment" section showing what moved.
@@ -111,6 +122,8 @@ tokens for smaller screens.
   export-docx.js             client Word document
   review.js                  Send for review, Import, Accept, the Review card
   docx-blocks.js, review-core.js, review-author.js   shared review code, synced from shared/
+  zip-io.js, docx-import.js, doc-preview.js          the Word preview's reader and renderer, synced
+                             from shared/ (with css/doc-preview.css)
   engine.js                  engagement engine; assessments, targets, responses
   ui.js                      view layer: sidebar, capture pages, wizards, modals
   hero-asset.js, logo.js     branding assets for the Word cover
@@ -327,6 +340,6 @@ The tool is **v0.6** (0.6.0). That is the suite version, one number for every to
 - **In the tool:** a badge beside the name in the header, the sidebar notice, and the licence pop-up.
 - **In project files:** each saved project records `createdWithVersion` and `savedWithVersion`, so a project sent back says which release made it. A project last saved by a newer release than the one opening it gets a warning. Files from before versions were recorded are left without a `createdWithVersion` rather than being given one they never had.
 - **In releases:** the single file is named `OT Cyber Assessment Tool v0.6.html`, and the desktop exe is `OT Cyber Assessment Tool v0.6.exe` with file version 0.6.0.
-- **Never in a report.** Word and Excel exports carry no version information, either in the text or in the file properties. `scripts/test-version.html` opens real exports and fails if the version appears anywhere in them.
+- **Never in a report.** Word and Excel exports carry no version information, either in the text or in the file properties. `scripts/test-review-leak.html` opens real exports of six demos and fails if the version appears anywhere in them; `scripts/test-version.html` checks the version in the tool and the project files.
 
 To release a new version, edit `shared/version.js`, run `tools/sync-shared.ps1`, update the pinned numbers in `scripts/test-version.html`, commit, then run `tools/release.ps1` (or build one module with `tools/build.ps1 -Module assessments -As both -SelfTest`). `module.json` is what the packaging scripts read: the product name, entry page, test pages, parity check page and the exe's app id and self-test.

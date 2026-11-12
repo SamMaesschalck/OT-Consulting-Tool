@@ -90,7 +90,7 @@ H.test(function (ok, done) {
       ok(!missMust.length, id + ": every section the consultant writes or edits lands somewhere", missMust.join(", "));
       ok(!missItem.length, id + ": every finding that opens with an item's code lands (" + itemTried + " tried)", missItem.join(", "));
       ok(!unnamed.length, id + ": what has nowhere to go says so, naming the section", unnamed.join(", "));
-      summary.push(id + " " + landed + "/" + tried + " (only in Word: " + nowhere.join(" | ") + ")");
+      summary.push({ id: id, tried: tried, landed: landed, text: id + " " + landed + "/" + tried + " (only in Word: " + nowhere.join(" | ") + ")" });
     }).catch(function (e) { ok(false, id + ": threw " + (e && e.message) + " " + (e && e.stack)); });
   });
   // ---- after the report has been edited: positions have moved ------------------------
@@ -173,7 +173,11 @@ H.test(function (ok, done) {
     E.clearReportSection(mv.hidden);
   }).catch(function (e) { ok(false, "positions: threw " + (e && e.message) + " " + (e && e.stack)); });
   chain.then(function () {
-    ok(true, "sections that land, per demo: " + summary.join("; "));
+    // Every demo was walked, and in each most sections land somewhere.
+    var thin = summary.filter(function (s) { return !(s.tried > 3 && s.landed * 2 > s.tried); });
+    ok(summary.length === ids.length && thin.length === 0, "every demo was walked, and most of each one's sections land (" + summary.length + " of " + ids.length + ")",
+       "walked " + summary.map(function (s) { return s.id; }).join(",") + "; thin: " + thin.map(function (s) { return s.text; }).join("; "));
+    ok.note("sections that land, per demo: " + summary.map(function (s) { return s.text; }).join("; "));
   }).then(done);
 });
 </script>

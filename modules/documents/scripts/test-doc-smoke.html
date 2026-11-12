@@ -50,7 +50,7 @@
   };
   var IDS = "app-header btn-new btn-load btn-save btn-theme file-input save-state autosave-note sidebar nav outline main toolbar paper live toast modal".split(" ");
   var SCRIPTS = "js/version.js js/product.js js/host-bridge.js js/logo.js js/hero-asset.js vendor/docx.umd.js js/zip-io.js js/docx-graft.js js/house-docx.js js/docx-import.js " +
-    "data/document.js data/licence.js js/model.js js/storage.js js/pictures.js js/render.js js/history.js js/tables.js js/paste.js js/editor.js js/export.js js/import-flow.js " +
+    "data/document.js data/licence.js js/model.js js/storage.js js/pictures.js js/doc-preview.js js/render.js js/history.js js/tables.js js/paste.js js/editor.js js/export.js js/import-flow.js " +
     "js/pages.js js/app.js";
 
   function reach(o, path) {
@@ -90,7 +90,7 @@
       ok(doc.getElementById("live").getAttribute("aria-live") === "polite", "the live region is polite");
       var sheets = doc.querySelectorAll('link[rel="stylesheet"]');
       var loaded = Array.prototype.filter.call(sheets, function (l) { try { return l.sheet && l.sheet.cssRules.length >= 0; } catch (e) { return false; } });
-      ok(sheets.length === 5 && loaded.length === 5, "the five stylesheets load", loaded.length + " of " + sheets.length);
+      ok(sheets.length === 6 && loaded.length === 6, "the six stylesheets load (the shared page renderer's, css/doc-preview.css, the sixth)", loaded.length + " of " + sheets.length);
       ok((doc.querySelector(".brand-logo img") || {}).naturalWidth > 0, "the header logo shows");
       var csp = (doc.querySelector('meta[http-equiv="Content-Security-Policy"]') || { content: "" }).content;
       ok(/img-src 'self' data: blob:;/.test(csp) && /default-src 'none'/.test(csp) && !/connect-src|unsafe-eval/.test(csp), "the policy allows blob: pictures, and no eval and no connections", csp);

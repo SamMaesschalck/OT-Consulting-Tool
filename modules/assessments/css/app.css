@@ -2860,3 +2860,18 @@ tr.plan-row:focus { outline: 2px solid var(--brand-blue); outline-offset: -2px; 
 .export-issue-note.blocked { color: var(--gap); }
 /* A field the check took the consultant to: the same pulse as a find-jump. */
 .check-flash { animation: jumpFlash 2.2s ease-out; }
+
+/* ---------- Word preview (the sheets are css/doc-preview.css) ---------- */
+.wp-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 4px 0 12px; }
+.wp-field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.wp-field select { font: inherit; font-weight: 400; min-width: 200px; max-width: 100%; padding: 5px 8px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); }
+.wp-seg { display: inline-flex; gap: 0; }
+.wp-seg .btn { border-radius: 0; }
+.wp-seg .btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.wp-seg .btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; margin-left: -1px; }
+.wp-bar .btn.small, .wp-seg .btn.small { padding: 5px 12px; font-size: 13px; }
+.wp-state { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 12px; }
+.wp-progress { width: 220px; max-width: 100%; height: 8px; accent-color: var(--brand-blue); }
+.wp-note { margin: 0 0 12px; font-size: 13px; }
+.wp-note:empty { display: none; }
+.wp-paper { min-width: 0; }

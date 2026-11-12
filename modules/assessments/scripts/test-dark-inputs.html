@@ -39,15 +39,15 @@ H.test(function (ok) {
       ok(contrast(bg, fg) > 90, "input text/background have readable contrast", "bg=" + bg + " fg=" + fg + " diff=" + contrast(bg, fg).toFixed(0));
     }
 
-    // and a .field textarea/select stays correct too
+    // and a .field textarea stays correct too (the 3-3 engagement page has
+    // none, so the evidence fields of the FR1 capture page)
     A.Engine.activateInstrument("iec-62443-3-3");
-    A.UI.go("engagement");
-    var ta = document.querySelector("#main .field textarea, #main textarea");
+    A.UI.go("fr", "FR1");
+    var ta = document.querySelector("#main .field textarea");
+    ok(!!ta, "found a .field textarea on the 3-3 FR1 capture page");
     if (ta) {
       var tcs = getComputedStyle(ta);
       ok(lum(tcs.backgroundColor) < 90 && lum(tcs.color) > 150, "themed .field textarea also dark with light text", "bg=" + tcs.backgroundColor + " fg=" + tcs.color);
-    } else {
-      ok(true, "(no textarea on this page to check - skipped)");
     }
   }
 });

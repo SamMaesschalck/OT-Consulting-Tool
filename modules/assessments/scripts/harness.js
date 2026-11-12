@@ -71,6 +71,8 @@
     CORE.forEach(write);
     if (opts.xlsx) write("js/export-xlsx.js");
     if (opts.docx) { write("js/hero-asset.js"); write("js/export-docx.js"); }
+    // The Word preview's reader and renderer, as index.html loads them.
+    ["js/zip-io.js", "js/docx-import.js", "js/doc-preview.js"].forEach(write);
     write("js/engine.js");
     write("js/ui.js");
     ["js/docx-blocks.js", "js/review-core.js", "js/review-author.js", "js/review.js"].forEach(write);

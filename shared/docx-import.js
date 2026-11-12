@@ -46,6 +46,13 @@
   var XMLNS = "http://www.w3.org/2000/xmlns/";
   var EMU_PER_PX = 9525;
   var RED = "E00000";
+  // Colours that are ordinary text, not a colour of its own: black and the template's text colour.
+  var PLAIN_COLOURS = { "000000": 1, "1A2533": 1 };
+  function lightColour(hex) {
+    var n = parseInt(hex, 16);
+    return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255 > 0.82;
+  }
+  var MAX_NEST = 3;         // tables inside table cells are kept to this depth, then read as their text
   var MAX_BYTES = 150 * 1024 * 1024;
   var MAX_PX = 10000;        // no real drawing is wider than this; a file may claim anything
   var MAX_COLS = 63;         // Word's own limit on table columns
@@ -53,7 +60,7 @@
 
   // The import report's codes, by list (4.4, "The import report").
   var CODES = {
-    toCheck: ["front-matter"],
+    toCheck: ["cover-like", "front-matter"],
     notCarried: ["comments", "headers-footers", "contents", "figures-list", "cover-page", "internal-links", "other-links", "picture-links",
       "links-in-drawings", "hidden-text", "controls", "macros", "fields-no-text", "objects-in-notes", "notes-missing", "embedded-chunks",
       "objects-lost", "unreadable-part", "theme-missing", "linked-pictures", "linked-objects"],
@@ -1904,8 +1911,18 @@
       // Red is a prompt: the template's own, or the prompt Word shows in a content control nobody filled in.
       if (st.redPara || plcDepth || isPlaceholderStyle(cs, own.rStyle) || String(eff.color || "").toUpperCase() === RED) f.red = true;
       if (link) f.link = link;
+      // A colour and a size set on the run itself (or by its character style), never one its
+      // paragraph's style gives: those are the look the template replaces. A colour is kept when
+      // it is not the ordinary text colour; a size is kept only in a table with a look of its own
+      // (table() decides, and finish() drops the rest), where it is part of a chart or a tile.
+      var direct = mergeRun(cs ? cs.run : {}, own);
+      if (!f.red && !link && !wasLink && (direct.color !== undefined || direct.themeColor !== undefined)) {
+        var hexc = colourHex(direct, theme);
+        if (hexc && !PLAIN_COLOURS[hexc]) f.color = hexc;
+      }
+      if (direct.size) f.sz = clamp(direct.size, 8, 144);
       f.key = (f.b ? "b" : "") + (f.i ? "i" : "") + (f.u ? "u" : "") + (f.s ? "s" : "") + (f.sup ? "^" : "") + (f.sub ? "_" : "") +
-        (f.code ? "c" : "") + (f.red ? "r" : "") + (link ? "|" + link : "");
+        (f.code ? "c" : "") + (f.red ? "r" : "") + (f.color ? "#" + f.color : "") + (f.sz ? "@" + f.sz : "") + (link ? "|" + link : "");
       if (!rPr && !link && !wasLink && !plcDepth) st.plain = f;
       return f;
     }
@@ -1922,7 +1939,7 @@
       var runs = st.seg.runs, last = runs[runs.length - 1];
       if (last && last.key === f.key && !last.fn) { last.t += text; return; }
       var run = { t: text, key: f.key };
-      ["b", "i", "u", "s", "sup", "sub", "code", "red", "link"].forEach(function (k) { if (f[k]) run[k] = f[k]; });
+      ["b", "i", "u", "s", "sup", "sub", "code", "red", "link", "color", "sz"].forEach(function (k) { if (f[k]) run[k] = f[k]; });
       runs.push(run);
     }
     function addObject(st, node, run) {
@@ -2242,6 +2259,9 @@
               numbered = true;
             }
             textBlock = { id: nid("b"), type: "heading", level: Math.min(lv, 3), runs: runs };
+            // The number as it was typed, for a reader that draws the file as Word shows it
+            // (shared/doc-preview.js). Not enumerable: a project never stores it.
+            if (typed) Object.defineProperty(textBlock, "__num", { value: typed[0].replace(/\s+$/, ""), enumerable: false, configurable: true });
             if (lv > 3) note("headings-deeper", 1, { blockId: textBlock.id });
             // Whether the original numbered it: the template numbers every heading or none.
             (numbered ? headsNumbered : headsPlain).push(textBlock.id);
@@ -2283,7 +2303,8 @@
       return runs.map(function (r) {
         var k = assign({}, r);
         delete k.b; delete k.i;
-        k.key = r.fn ? "fn" : ["u", "s", "sup", "sub", "code", "red"].filter(function (x) { return r[x]; }).join(",") + "|" + (r.link || "");
+        k.key = r.fn ? "fn" : ["u", "s", "sup", "sub", "code", "red"].filter(function (x) { return r[x]; }).join(",") + "|" + (r.link || "") +
+          (r.color ? "#" + r.color : "") + (r.sz ? "@" + r.sz : "");
         return k;
       });
     }
@@ -2310,11 +2331,21 @@
         case "p": paragraph(n, out, env); break;
         case "tbl":
           releaseSpacers();
-          if (env.cell) {
-            // A table inside a cell: its text is kept, cell by cell, as paragraphs of the outer cell.
+          if (env.cell && (env.depth || 1) >= MAX_NEST) {
+            // A table nested deeper than that: its text is kept, cell by cell, as paragraphs of the outer cell.
             note("nested-tables", 1);
             rowsOf(n).forEach(function (tr) { cellsOf(tr).forEach(function (tc) { kids(tc).forEach(function (k) { blockLevel(k, out, env); }); releaseSpacers(); }); });
-          } else { var t = table(n); if (t) out.push(t); }
+          } else {
+            var t = table(n, env.cell ? (env.depth || 1) : 0);
+            if (t && env.cell && !t.borders && !t.rows.some(function (r) { return r.cells.some(function (c) { return c.fill; }); })) {
+              // A table inside a cell that is not part of a chart (no look of its own): its text is
+              // kept, cell by cell, as paragraphs of the outer cell, where it can be edited.
+              note("nested-tables", 1);
+              t.rows.forEach(function (r) { r.cells.forEach(function (c) {
+                c.blocks.forEach(function (b) { if (!(b.type === "paragraph" && !(b.runs || []).length)) out.push(b); });
+              }); });
+            } else if (t) out.push(t);
+          }
           break;
         case "sdt": {
           var gallery = sdtGallery(n);
@@ -2374,8 +2405,54 @@
       return any && every;
     }
 
-    function table(tbl) {
+    // A fill as a hex colour, its theme colour worked out; null for none, auto or white.
+    function fillOf(shd) {
+      if (!shd) return null;
+      var v = String(wAttr(shd, "val") || "").toLowerCase(), fill = String(wAttr(shd, "fill") || "").toUpperCase();
+      var hexf = /^[0-9A-F]{6}$/.test(fill) ? fill : null;
+      // A solid pattern is drawn in the pattern colour (what the assessment exporter writes).
+      if (v === "solid") { var col = String(wAttr(shd, "color") || "").toUpperCase(); if (/^[0-9A-F]{6}$/.test(col)) hexf = col; }
+      var tf = wAttr(shd, "themeFill");
+      if (tf && theme) {
+        var base = theme.colors[THEME_COLOUR[tf] || tf];
+        if (base && !hexf) hexf = base;
+      }
+      return hexf && hexf !== "FFFFFF" ? hexf : null;
+    }
+    // True when every edge a border element names is none or nil (and it names one).
+    function bordersNone(el) {
+      if (!el) return false;
+      var any = false, none = true;
+      kids(el).forEach(function (b) { any = true; var v = String(wAttr(b, "val") || ""); if (v !== "none" && v !== "nil") none = false; });
+      return any && none;
+    }
+    function twips(el) { var v = el ? int(wAttr(el, "w"), 0) : 0; return el && (wAttr(el, "type") || "dxa") === "dxa" ? clamp(v, 0, 31680) : 0; }
+    // Every run in the blocks, nested tables included: fn(run).
+    function eachRun(blocks, fn) {
+      (blocks || []).forEach(function (b) {
+        (b.runs || []).forEach(fn);
+        if (b.type === "table") (b.rows || []).forEach(function (row) { row.cells.forEach(function (c) { eachRun(c.blocks, fn); }); });
+      });
+    }
+    // The exact line height of a cell that holds nothing but empty paragraphs (a bar in a chart
+    // drawn as a table), in twips, or 0.
+    function emptyLine(tc) {
+      var h = 0, ok = true;
+      kids(tc).forEach(function (k) {
+        if (!ok || k.nodeType !== 1) return;
+        if (is(k, W, "tcPr")) return;
+        if (!is(k, W, "p") || paragraphsText(k).join("").trim() !== "" || k.getElementsByTagNameNS(W, "drawing").length) { ok = false; return; }
+        var sp = child(child(k, W, "pPr"), W, "spacing");
+        if (sp && wAttr(sp, "lineRule") === "exact") h = Math.max(h, int(wAttr(sp, "line"), 0));
+        else ok = false;
+      });
+      return ok ? clamp(h, 0, 4000) : 0;
+    }
+
+    function table(tbl, depth) {
+      depth = depth || 0;
       var tblPr = child(tbl, W, "tblPr"), grid = child(tbl, W, "tblGrid");
+      var noBorders = bordersNone(child(tblPr, W, "tblBorders")), cellsNone = true, fills = [];
       var gridW = children(grid, W, "gridCol").slice(0, MAX_COLS).map(function (g) { return int(wAttr(g, "w"), 0); });
       var rows = [], used = [], open = [], widest = 0, widestWidths = null, headerRow = false, firstMeta = null;
       rowsOf(tbl).forEach(function (tr) {
@@ -2391,6 +2468,11 @@
           var tcPr = child(tc, W, "tcPr");
           var span = clamp(int(wVal(child(tcPr, W, "gridSpan")), 1), 1, MAX_COLS - col);
           var tcW = child(tcPr, W, "tcW"), w = tcW && (wAttr(tcW, "type") || "dxa") === "dxa" ? int(wAttr(tcW, "w"), 0) : 0;
+          // A width in percent (fiftieths of a percent, or "n%"), as a share of a portrait page's text.
+          if (tcW && wAttr(tcW, "type") === "pct") {
+            var pv = String(wAttr(tcW, "w") || ""), pct = /%$/.test(pv) ? parseFloat(pv) : int(pv, 0) / 50;
+            if (pct > 0 && pct <= 100) w = Math.round(9026 * pct / 100);
+          }
           var hm = child(tcPr, W, "hMerge"), vm = child(tcPr, W, "vMerge");
           for (k = 0; k < span; k++) widths.push(w > 0 ? w / span : null);
           if (hm && (wVal(hm) || "continue") !== "restart" && lastH) {
@@ -2406,7 +2488,7 @@
             // A continued merge with nothing above it to continue: an ordinary cell.
           }
           var cellBlocks = [];
-          kids(tc).forEach(function (c) { blockLevel(c, cellBlocks, { cell: true }); });
+          kids(tc).forEach(function (c) { blockLevel(c, cellBlocks, { cell: true, depth: depth + 1 }); });
           // What the cell's last paragraphs held back is settled inside the cell.
           releaseSpacers();
           meta.any = true;
@@ -2414,6 +2496,19 @@
           if (!allBold(cellBlocks)) meta.bold = false;
           var cell = { blocks: cellBlocks.length ? cellBlocks : emptyCell().blocks };
           if (span > 1) cell.span = span;
+          // The cell's own look, kept only if the table turns out to have a look of its own.
+          var fl = fillOf(child(tcPr, W, "shd"));
+          if (fl) { cell.fill = fl; fills.push({ cell: cell, row: rows.length }); }
+          var va = wVal(child(tcPr, W, "vAlign"));
+          if (va === "center" || va === "bottom") cell.vAlign = va;
+          var mar = child(tcPr, W, "tcMar");
+          if (mar) {
+            var pad = ["top", "right", "bottom", "left"].map(function (side) { return twips(child(mar, W, side) || child(mar, W, side === "left" ? "start" : side === "right" ? "end" : side)); });
+            if (pad.some(function (p) { return p > 0; })) Object.defineProperty(cell, "__pad", { value: pad, enumerable: false, configurable: true });
+          }
+          if (!bordersNone(child(tcPr, W, "tcBorders"))) cellsNone = false;
+          var line = emptyLine(tc);
+          if (line) Object.defineProperty(cell, "__line", { value: line, enumerable: false, configurable: true });
           cells.push(cell);
           for (k = 0; k < span; k++) open[col + k] = null;
           if (vm) open[col] = { cell: cell, span: span };
@@ -2423,13 +2518,27 @@
         for (k = 0; k < after && col < MAX_COLS; k++) { cells.push(emptyCell()); widths.push(null); open[col++] = null; }
         if (!rows.length) { headerRow = !!(trPr && toggle(child(trPr, W, "tblHeader"))); firstMeta = meta; }
         if (col > widest) { widest = col; widestWidths = widths; }
-        rows.push({ cells: cells });
+        var rowOut = { cells: cells };
+        var trH = child(trPr, W, "trHeight"), hv = trH ? clamp(int(wVal(trH), 0), 0, 31680) : 0;
+        if (hv) { rowOut.h = hv; if (wAttr(trH, "hRule") === "exact") rowOut.hRule = "exact"; }
+        else {
+          // A row of nothing but empty cells of an exact line height (a bar): that height, exactly.
+          var lines = cells.map(function (c) { return c.__line || 0; });
+          if (cells.length && lines.every(function (l) { return l > 0; })) { rowOut.h = Math.max.apply(null, lines); rowOut.hRule = "exact"; }
+        }
+        rows.push(rowOut);
         used.push(col);
       });
       if (!rows.length || !widest) return null;
 
       var cols;
-      if (gridW.length >= widest && gridW.every(function (w) { return w > 0; })) cols = gridW.slice(0, widest);
+      // A grid of equal columns that the cells' own widths contradict is a placeholder some
+      // writers leave (one column of 100 each): the cells' widths are the table's.
+      var gridEqual = gridW.length > 1 && gridW.every(function (w) { return w === gridW[0]; });
+      var cellsDiffer = widestWidths && widestWidths.length === widest && widestWidths.every(function (w) { return w > 0; }) &&
+        widestWidths.some(function (w) { return Math.abs(w - widestWidths[0]) > 1; });
+      if (gridEqual && cellsDiffer) cols = widestWidths.map(Math.round);
+      else if (gridW.length >= widest && gridW.every(function (w) { return w > 0; })) cols = gridW.slice(0, widest);
       else if (widestWidths && widestWidths.every(function (w) { return w > 0; })) cols = widestWidths.map(Math.round);
       else { cols = []; for (var i = 0; i < widest; i++) cols.push(1); }
       // A short row is filled out, so every row covers the whole grid.
@@ -2442,11 +2551,36 @@
           : (parseInt(wVal(look) || "0", 16) & 0x20) !== 0);
         if (firstMeta.shaded || firstMeta.bold || (firstRowOn && ts && ts.firstRow)) header = 1;
       }
+      // A table with a look of its own (a chart drawn as a table, a row of tiles): no borders, or
+      // fills below its header row. It keeps its fills, cell padding, row heights and run sizes.
+      // Any other table takes the template's look, a shaded header row included.
+      var anyCell = rows.some(function (r) { return r.cells.length; });
+      var bare = noBorders || (anyCell && cellsNone);
+      var own = bare || fills.some(function (f) { return f.row >= header; });
+      var out = { id: nid("b"), type: "table", header: header, cols: cols, rows: rows };
+      if (own) {
+        if (bare) out.borders = "none";
+        var tw = twips(child(tblPr, W, "tblW"));
+        if (tw > 0) out.width = tw;
+        rows.forEach(function (r) {
+          r.cells.forEach(function (c) { if (c.__pad) c.pad = c.__pad; });
+        });
+        eachRun(rows.reduce(function (a, r) { return a.concat(r.cells.reduce(function (b, c) { return b.concat(c.blocks); }, [])); }, []),
+          function (r) { if (r.sz) { r.size = r.sz; delete r.sz; } });
+      } else {
+        // Left to the template. A reader that shows the file as Word prints it
+        // (shared/doc-preview.js) still finds the look, kept off the project.
+        var stash = function (o, k) { if (o[k] != null) { Object.defineProperty(o, "__" + k, { value: o[k], enumerable: false, configurable: true }); delete o[k]; } };
+        fills.forEach(function (f) { stash(f.cell, "fill"); });
+        rows.forEach(function (r) { stash(r, "h"); stash(r, "hRule"); r.cells.forEach(function (c) { stash(c, "vAlign"); }); });
+      }
+      // A header row the file did not shade (it was bold): Word prints it so.
+      if (header && !fills.some(function (f) { return f.row === 0; })) Object.defineProperty(out, "__plainHead", { value: true, enumerable: false, configurable: true });
       // The template prints a header row in bold, so bold there says nothing more.
       if (header) rows[0].cells.forEach(function (cell) {
         cell.blocks.forEach(function (b) { (b.runs || []).forEach(function (r) { delete r.b; }); });
       });
-      return { id: nid("b"), type: "table", header: header, cols: cols, rows: rows };
+      return out;
     }
 
     // -- sections ----------------------------------------------------------------------------
@@ -2581,6 +2715,58 @@
       });
       eachList(blocks, finishCaptions);
       finishLists(blocks);
+      // A light colour (white text) reads only on a fill. Where nothing behind it is shaded (an
+      // original cover's text, whose dark picture does not come across as a background) the
+      // template's text colour prints instead.
+      (function prune(list, shaded) {
+        list.forEach(function (b) {
+          if (!shaded) (b.runs || []).forEach(function (r) { if (r.color && lightColour(r.color)) delete r.color; });
+          if (b.type === "table") b.rows.forEach(function (row) { row.cells.forEach(function (c) { prune(c.blocks, shaded || !!(c.fill || c.__fill)); }); });
+        });
+      })(blocks, false);
+      // A SolutionsPT cover and document control page (any report of the suite's tools, this
+      // tool's own export, older templates too) are taken out: the template prints its own, and
+      // what they said fills Document information. They are kept on the report, so the user can
+      // put them back. A Word preview (opts.keepFront) reads them where they are.
+      var house = opts.keepFront ? null : houseFront(blocks), coverLike = [];
+      if (house) {
+        house.blocks = blocks.splice(0, house.end);
+        var goneIds = mapOf();
+        eachList(house.blocks, function (list) { list.forEach(function (b) { goneIds[b.id] = true; }); });
+        // What the report said about those blocks goes with them.
+        Object.keys(tally).forEach(function (code) {
+          var t = tally[code], had = t.blockIds.length;
+          if (!had) return;
+          t.blockIds = t.blockIds.filter(function (id) { return !goneIds[id]; });
+          var gone = had - t.blockIds.length;
+          if (!gone) return;
+          if (!t.blockIds.length && t.count <= had) delete tally[code];
+          else t.count = Math.max(1, t.count - gone);
+        });
+        if (house.contents) project.options.contents = true;
+        while (blocks.length && blocks[0].type === "pageBreak") blocks.shift();
+      } else {
+        // Someone else's cover: page one, before the first page break, with large type or a
+        // large picture and few words. It stays, but the report offers to remove it.
+        var pb = -1;
+        blocks.some(function (b, i) { if (b.type === "pageBreak" && !b.land) { pb = i; return true; } return false; });
+        if (pb >= 1 && pb <= 12 && pb < blocks.length - 1) {
+          var words = 0, big = false;
+          eachList(blocks.slice(0, pb), function (list) {
+            list.forEach(function (b) {
+              (b.runs || []).forEach(function (r) {
+                words += String(r.t || "").split(/\s+/).filter(Boolean).length;
+                if ((r.sz || r.size || 0) >= 36) big = true;
+              });
+              if ((b.type === "picture" || b.type === "kept") && b.height >= 300) big = true;
+            });
+          });
+          if (big && words <= 60) coverLike = blocks.slice(0, pb + 1).map(function (b) { return b.id; });
+        }
+      }
+      // A size is kept only where table() kept it (as `size`); everywhere else the template's sizes print.
+      eachList(blocks, function (list) { list.forEach(function (b) { (b.runs || []).forEach(function (r) { delete r.sz; }); }); });
+      Object.keys(project.footnotes || {}).forEach(function (k) { ((project.footnotes[k] || {}).runs || []).forEach(function (r) { delete r.sz; }); });
       // Headings are numbered by the template, all of them or none, from 1. Where the original left
       // some unnumbered, or its text refers to a section or a page by number, the numbers in the
       // text may no longer be the numbers printed.
@@ -2604,15 +2790,31 @@
         if (!project.info.title && t) project.info.title = t.textContent.replace(/\s+/g, " ").trim();
         if (a) project.info.author = a.textContent.replace(/\s+/g, " ").trim();
       }
+      // What the house cover and document control said is what the document says.
+      // A file the template made names the company as its creator when no author was given: the
+      // cover is what says who wrote it.
+      if (house) {
+        if (!house.fields.some(function (p) { return p[0] === "author"; })) project.info.author = "";
+        house.fields.forEach(function (p) { project.info[p[0]] = p[1]; });
+      }
 
       if (insertions || deletions) { var tc = note("tracked-changes", insertions + deletions); tc.insertions = insertions; tc.deletions = deletions; }
       note("formatting", 1);
       // What sits before the first heading is often the original's own cover and control table.
       var firstHeading = -1;
       blocks.some(function (b, i) { if (b.type === "heading") { firstHeading = i; return true; } return false; });
-      if (firstHeading > 0) {
-        var fm = note("front-matter", firstHeading);
-        fm.blockIds = blocks.slice(0, firstHeading).map(function (b) { return b.id; });
+      if (coverLike.length) {
+        var cl = note("cover-like", coverLike.length);
+        cl.blockIds = coverLike.slice();
+        blocks.slice(0, coverLike.length).forEach(function (b) {
+          var w = plainText(b.runs || []).replace(/\s+/g, " ").trim();
+          if (w && cl.examples.length < 5) cl.examples.push(quote(w));
+        });
+      }
+      var fmFrom = Math.min(coverLike.length, firstHeading > 0 ? firstHeading : 0);
+      if (firstHeading > fmFrom) {
+        var fm = note("front-matter", firstHeading - fmFrom);
+        fm.blockIds = blocks.slice(fmFrom, firstHeading).map(function (b) { return b.id; });
       }
 
       var kept = false, carried = { headings: 0, paragraphs: 0, listItems: 0, tables: 0, pictures: 0, keptObjects: 0,
@@ -2662,6 +2864,11 @@
           report[listName].push(t);
         });
       });
+      // The original cover and document control, as imported, until the user chooses (the
+      // Import report's first card): fields went into Document information, unused had no place.
+      if (house) {
+        report.front = { blocks: house.blocks, fields: house.fields, unused: house.unused, contents: house.contents };
+      }
       project.importReport = report;
       return { project: project, report: report };
     }
@@ -2679,9 +2886,183 @@
     return step();
   }
 
+  // ---- the SolutionsPT front matter -------------------------------------------------------
+  // The cover and document control page that the assessment, risk and document
+  // tools print, read from the blocks an import made. One recogniser, used by
+  // read() (which takes them out and fills Document information) and by the
+  // Word preview (shared/doc-preview.js), which draws the cover.
+  function frontWords(s) { return String(s == null ? "" : s).replace(/‑/g, "-").replace(/[\s ]+/g, " ").trim(); }
+  function frontText(b, noRed) {
+    return frontWords(((b && b.runs) || []).map(function (r) { return r.fn || (noRed && r.red) ? "" : (r.t || ""); }).join(""));
+  }
+  function frontInk(b) { return ((b && b.runs) || []).filter(function (r) { return r.t && frontWords(r.t); }); }
+  function frontAllBold(b) { var t = frontInk(b); return t.length > 0 && t.every(function (r) { return r.b; }); }
+  function frontBoldCount(b) { return frontInk(b).filter(function (r) { return r.b; }).length; }
+  function frontSize(b) { var r = frontInk(b)[0]; return r && r.size ? r.size : 0; }
+  function cellText(cell, noRed) {
+    return frontWords(((cell && cell.blocks) || []).map(function (b) { return frontText(b, noRed); }).join(" "));
+  }
+
+  // The house cover: a table of one column (one row in the assessment and risk
+  // reports, two in the document tool's) whose first picture is the full-page
+  // background, then the logo card, the kicker, the title lines, the client,
+  // the site and the line under it, the strip of issue, author and
+  // classification, and the address. Null when the blocks do not open with it.
+  // The pictures are returned as blocks (bg, logo); the caller makes them
+  // something it can show.
+  function houseCover(blocks) {
+    var first = blocks && blocks[0];
+    if (!first || first.type !== "table" || !(first.rows || []).length) return null;
+    if (!first.rows.every(function (row) { return (row.cells || []).length === 1; })) return null;
+    var cell = [];
+    first.rows.forEach(function (row, r) {
+      // A first row that was bold throughout (a cover with no client or site) is read as a
+      // header row, whose bold the reader takes off: for reading the cover it is bold again.
+      var list = row.cells[0].blocks || [];
+      if (r === 0 && first.header) {
+        list = list.map(function (b) {
+          return b.type === "paragraph" ? Object.assign({}, b, { runs: (b.runs || []).map(function (x) { return Object.assign({}, x, { b: true }); }) }) : b;
+        });
+      }
+      cell = cell.concat(list);
+    });
+    var pics = cell.filter(function (b) { return b.type === "picture"; });
+    var bg = pics[0];
+    if (!bg || !(bg.width >= 700 && bg.height >= 1000)) return null;
+    var paras = cell.filter(function (b) { return b.type === "paragraph" && frontText(b); });
+    if (paras.length < 4) return null;
+    var c = { kicker: frontText(paras[0]), titleLines: [], strip: [], address: [], bg: bg, logo: pics[1] || null, block: first };
+    var i = 1;
+    while (i < paras.length && frontAllBold(paras[i]) && frontBoldCount(paras[i]) === 1 && paras[i].runs.length <= 2) { c.titleLines.push(frontText(paras[i])); i++; }
+    if (!c.titleLines.length || i >= paras.length) return null;
+    c.titleSize = frontSize(paras[1]) || 52;
+    var at = -1, k;
+    for (k = i; k < paras.length; k++) if (frontBoldCount(paras[k]) >= 2) { at = k; break; }
+    if (at < 0) return null;
+    // Between the title and the strip: the client (30 half-points), the site
+    // and the bold line under it. Where the file gives no sizes, the first
+    // plain line is the client and the second the site.
+    var addSub = function (t) { c.subLine = c.subLine ? c.subLine + " " + t : t; };
+    for (k = i; k < at; k++) {
+      var t = frontText(paras[k]), size = frontSize(paras[k]);
+      if (frontAllBold(paras[k])) addSub(t);
+      else if (size ? size >= 26 && c.client == null : c.client == null) c.client = t;
+      else if (c.site == null) c.site = t;
+      else addSub(t);
+    }
+    if (c.client == null) c.client = "";
+    var label = null;
+    (paras[at].runs || []).forEach(function (r) {
+      var w = frontWords(r.t);
+      if (!w) return;
+      if (r.b) { if (label != null) c.strip.push([label, ""]); label = w; }
+      else if (label != null) { c.strip.push([label, w]); label = null; }
+    });
+    if (label != null) c.strip.push([label, ""]);
+    for (k = at + 1; k < paras.length; k++) c.address.push(frontText(paras[k]));
+    return c;
+  }
+
+  // Document control labels, as the assessment, risk and document tools print
+  // them, to the Document information field each fills (null: read, not kept).
+  var CONTROL_FIELDS = {
+    "document revision": "revision", "revision": "revision", "status": null,
+    "qa review by": "qaReviewBy", "authorised by": "authorisedBy", "authorized by": "authorisedBy",
+    "issued to": "issuedTo", "issued date": "issuedDate", "confidentiality": "classification", "classification": "classification",
+    "document": "title", "title": "title", "document type": "docType", "reference": "reference",
+    "client": "client", "client / organisation": "client", "client / organization": "client",
+    "author": "author", "consultant": "author", "assessment date": "date", "date": "date",
+    "system under consideration": "site", "site": "site"
+  };
+  function controlKey(label) { return Object.prototype.hasOwnProperty.call(CONTROL_FIELDS, label) ? CONTROL_FIELDS[label] : undefined; }
+  // Words an exporter prints for a field left empty.
+  function frontEmpty(v) { return !v || /^\(?not set\)?$/i.test(v); }
+  // Short words the kicker keeps in capitals ("OT cyber security assessment").
+  var KEEP_CAPS = /^(OT|IT|ICS|IACS|IEC|ISA|ISO|EU|UK|NIS2?|CRA|CAF|NCSC|ONR|NIST|CIS|SCADA|IIOT|IOT|CSMS|PLC|DCS|SIS|HMI|QA|SL)$/;
+  function sentenceCase(s) {
+    s = frontWords(s);
+    if (!s || /[a-z]/.test(s)) return s;
+    return s.split(" ").map(function (w, i) {
+      if (KEEP_CAPS.test(w.replace(/[^A-Z0-9]/g, ""))) return w;
+      w = w.toLowerCase();
+      return i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+    }).join(" ");
+  }
+
+  // The whole house front matter: the cover, then (after page breaks and empty
+  // lines) a heading saying "Document control" over a table holding at least
+  // three of the known labels, then the old report's own contents list under
+  // its heading. Returns null, or { end, cover, control, fields, unused,
+  // contents }: blocks[0..end) are the front matter; fields is a list of
+  // [Document information key, value]; unused lists [label, value] pairs
+  // that have no field.
+  function houseFront(blocks) {
+    var cover = houseCover(blocks);
+    if (!cover) return null;
+    var i = 1;
+    var blank = function (b) { return b && ((b.type === "paragraph" && !frontText(b) && !(b.runs || []).some(function (r) { return r.fn; })) || b.type === "pageBreak"); };
+    var skip = function () { while (i < blocks.length && blank(blocks[i])) i++; };
+    skip();
+    var rows = [];
+    var h = blocks[i], t = blocks[i + 1];
+    if (h && h.type === "heading" && /document control/i.test(frontText(h)) && t && t.type === "table") {
+      var pairs = (t.rows || []).filter(function (r) { return (r.cells || []).length >= 2; })
+        .map(function (r) { return [cellText(r.cells[0]), cellText(r.cells[1], true)]; });
+      var known = pairs.filter(function (p) { return controlKey(p[0].toLowerCase()) !== undefined; }).length;
+      if (known >= 3) { rows = pairs; i += 2; skip(); }
+    }
+    // The old report's contents list (the document tool's is lines of links):
+    // its heading and its lines. A contents field was taken out already.
+    var contents = false;
+    if (rows.length && blocks[i] && blocks[i].type === "heading" && /^(table of )?contents$/i.test(frontText(blocks[i]))) {
+      contents = true; i++;
+      while (i < blocks.length && (blocks[i].type === "paragraph" || blocks[i].type === "list") && frontText(blocks[i])) i++;
+      skip();
+    }
+    var f = {}, unused = [];
+    var order = ["title", "docType", "client", "site", "reference", "revision", "date", "author", "classification",
+      "qaReviewBy", "authorisedBy", "issuedTo", "issuedDate"];
+    var put = function (k, v) { v = frontWords(v); if (k && !frontEmpty(v)) f[k] = v; };
+    put("title", cover.titleLines.join(" "));
+    if (!/^document$/i.test(cover.kicker)) put("docType", sentenceCase(cover.kicker));
+    if (cover.client !== "Client") put("client", cover.client);
+    put("site", cover.site);
+    cover.strip.forEach(function (p) {
+      var key = p[0].toLowerCase();
+      if (key === "issue") {
+        var bits = p[1].split(/\s*·\s*/);
+        put("revision", bits[0]); put("date", bits.slice(1).join(" "));
+      } else if (key === "author") put("author", p[1]);
+      else if (key === "classification") put("classification", p[1]);
+    });
+    var ref = null;
+    rows.forEach(function (p) {
+      var key = controlKey(p[0].toLowerCase());
+      if (key === undefined) { if (!frontEmpty(p[1])) unused.push([p[0], p[1]]); return; }
+      if (key === "reference") ref = p[1];
+      if (key === "client" && p[1] === "Client") return;
+      put(key, p[1]);
+    });
+    // The bold line under the site is the reference on the document tool's
+    // cover; the reports print a line about the standard there, which has no
+    // field of its own.
+    var ownTool = rows.some(function (p) { return /^document$/i.test(p[0]); });
+    if (cover.subLine) {
+      if (ref != null ? frontWords(ref) === cover.subLine : ownTool) put("reference", cover.subLine);
+      else unused.unshift(["Line under the site", cover.subLine]);
+    }
+    // The cover's issue line shows the issued date once there is one, in place
+    // of the date: that is the issued date again, not a date of its own.
+    if (f.date && f.issuedDate && f.date === f.issuedDate) delete f.date;
+    var fields = [];
+    order.forEach(function (k) { if (f[k]) fields.push([k, f[k]]); });
+    return { end: i, cover: cover, control: rows, fields: fields, unused: unused, contents: contents };
+  }
+
   window.App.DocxImport = {
     read: read, parseStyles: parseStyles, parseNumbering: parseNumbering, parseTheme: parseTheme,
     headingLevel: headingLevel, listInfo: listInfo, effectiveFormat: effectiveFormat,
-    classifyDrawing: classifyDrawing, CODES: CODES
+    classifyDrawing: classifyDrawing, CODES: CODES,
+    houseCover: houseCover, houseFront: houseFront, sentenceCase: sentenceCase
   };
 })();

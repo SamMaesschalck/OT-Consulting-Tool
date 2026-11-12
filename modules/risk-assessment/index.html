@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/spt-theme.css" />
   <link rel="stylesheet" href="css/review-author.css" />
   <link rel="stylesheet" href="css/report-page.css" />
+  <link rel="stylesheet" href="css/doc-preview.css" />
   <!-- Apply the saved (or system) colour theme before first paint to avoid a
        flash. The toggle in the header updates this and persists the choice.
        Shares the "ot-theme" key with the assessment tool so the two apps agree
@@ -869,6 +870,11 @@
         class: "nav-item" + (state.stage === "report" ? " active" : ""),
         onClick: function () { state.stage = "report"; render(); }
       }, [h("span", null, ["Report", h("span", { class: "muted", style: "display:block;font-size:11px", text: "both reports, section by section" })])]));
+      // The Word file itself, page by page (js/word-preview.js).
+      sec.appendChild(h("div", {
+        class: "nav-item" + (state.stage === "wordpreview" ? " active" : ""), id: "nav-word-preview",
+        onClick: function () { state.stage = "wordpreview"; render(); }
+      }, [h("span", null, ["Word preview", h("span", { class: "muted", style: "display:block;font-size:11px", text: "the Word file, page by page" })])]));
       sec.appendChild(h("div", {
         class: "nav-item" + (state.stage === "hlreport" ? " active" : ""),
         onClick: function () { state.stage = "hlreport"; render(); }
@@ -1976,7 +1982,9 @@
         // js/review.js (loaded after this script): the reports' peer review.
         peer: function (m) { if (window.RiskReview) window.RiskReview.render(m, h, card); },
         // js/report-page.js: both Word reports, to read and edit section by section.
-        report: function (m) { if (window.RiskReportPage) window.RiskReportPage.render(m, h); }
+        report: function (m) { if (window.RiskReportPage) window.RiskReportPage.render(m, h); },
+        // js/word-preview.js: the Word file itself, page by page.
+        wordpreview: function (m) { if (window.RiskWordPreview) window.RiskWordPreview.render(m, h); }
       }[state.stage];
       (fn || renderSuc)(main);
     }
@@ -2127,5 +2135,11 @@
   <script src="js/review-author.js"></script>
   <script src="js/report-page.js"></script>
   <script src="js/review.js"></script>
+  <!-- The Word preview: the Word file read back (docx-import.js, over zip-io.js)
+       and drawn as pages (doc-preview.js), all shared/ copies. -->
+  <script src="js/zip-io.js"></script>
+  <script src="js/docx-import.js"></script>
+  <script src="js/doc-preview.js"></script>
+  <script src="js/word-preview.js"></script>
 </body>
 </html>

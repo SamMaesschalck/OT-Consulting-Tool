@@ -77,8 +77,9 @@ window.docx = (function () {
     ok(all.length === 4,
        "the demo file holds four posture reviews: the 2024 archive, this year's organisation read, and one per plant",
        String(all.length));
-    ok(all[0].engagementMeta.dateOfVisit === TP.prior.dateOfVisit,
-       "the earliest is the 2024 review", all[0].engagementMeta.dateOfVisit);
+    // The prior read itself (its date and label, its own opportunity id, every
+    // delta landing and lower then, the baseline wired as a copy, the
+    // comparison's improvements and no regression) is test-tour-priors.html's.
     ok(E.state.activeAssessmentId === all[1].id,
        "the tour opens on this year's organisation-wide review, not a plant");
 
@@ -168,37 +169,6 @@ window.docx = (function () {
          return (a.engagementMeta || {}).dateOfVisit !== TP.prior.dateOfVisit;
        }), "the 2024 archive is excluded from the sites to roll up",
        sibs.map(function (a) { return (a.engagementMeta || {}).dateOfVisit; }).join(", "));
-    ok(all[0].label === TP.prior.label,
-       "the archive is labelled, so the picker reads as a history", all[0].label);
-    ok(all[0].engagementMeta.opportunityId !== all[1].engagementMeta.opportunityId,
-       "each review carries its own opportunity id");
-
-    // A delta naming a question that does not exist would silently do nothing
-    // and the demo would show no progress at all.
-    var rowIds = {};
-    TP.rows.forEach(function (r) { rowIds[r.id] = true; });
-    ok(TP.prior.deltas.every(function (d) { return rowIds[d.id]; }),
-       "every 2024 delta names a question the demo actually answers",
-       TP.prior.deltas.filter(function (d) { return !rowIds[d.id]; }).map(function (d) { return d.id; }).join(","));
-    ok(TP.prior.deltas.every(function (d) {
-         var now = TP.rows.filter(function (r) { return r.id === d.id; })[0];
-         return now && typeof now.band === "number" && d.band < now.band;
-       }), "and each scored LOWER in 2024 than it does now");
-
-    var bl = all[1].baseline;
-    ok(!!bl && (bl.responses || []).length > 0, "this year's review carries the 2024 baseline");
-    ok(bl && bl.responses !== all[0].responses,
-       "the baseline is a copy, so editing the archive cannot rewrite history");
-
-    var diff = A.Compare.compare({
-      instrument: E.state.instrument, taxonomy: E.state.taxonomy, profile: E.state.profile,
-      family: E.state.scoringFamily,
-      baselineResponses: bl.responses, currentResponses: E.state.engagement.responses
-    });
-    ok(diff.summary.improved >= TP.prior.deltas.length,
-       "the comparison reports an improvement for every authored delta",
-       diff.summary.improved + " improved of " + TP.prior.deltas.length);
-    ok(diff.summary.regressed === 0, "and nothing regressed", String(diff.summary.regressed));
 
     // ---- the assessment is finished, not half-captured ----
     var answered = (eng.responses || []).filter(function (r) { return r.band != null; }).length;

@@ -23,11 +23,13 @@ if (-not (Test-Path (Join-Path $here $AppPageName))) { throw "Build the single f
 
 $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 $outFile = Join-Path $repo "test-results\check-single-html-$Module.txt"
+# Edge's own messages, one file per module, so two checks never share one.
+$errFile = Join-Path $repo "test-results\check-single-html-$Module.stderr.txt"
 New-Item -ItemType Directory -Force (Split-Path $outFile) | Out-Null
-if (Test-Path $outFile) { Remove-Item $outFile -Force }
+foreach ($f in @($outFile, $errFile)) { if (Test-Path $f) { Remove-Item $f -Force } }
 $prof = Join-Path $env:TEMP ("edgeprof-" + [IO.Path]::GetRandomFileName())
 $url = "file:///" + $check.Replace('\','/').Replace(' ','%20')
-$p = Start-Process -FilePath $edge -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError (Join-Path $env:TEMP "check-single-err.txt") `
+$p = Start-Process -FilePath $edge -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile `
   -ArgumentList @("--headless=new","--disable-gpu","--no-first-run","--disable-sync","--allow-file-access-from-files","--user-data-dir=`"$prof`"","--virtual-time-budget=900000","--dump-dom","`"$url`"")
 if (-not $p.WaitForExit($TimeoutSec * 1000)) { try { $p.Kill() } catch {}; throw "$pageName timed out" }
 $text = ""

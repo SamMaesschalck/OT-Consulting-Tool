@@ -5,7 +5,7 @@
 <pre id="out">running…</pre>
 
 <script src="harness.js"></script>
-<script>H.app({ tours: ["41", "caf", "caf-aviation", "cra", "csms", "machinery", "ml", "nis2", "nis2-quick", "posture", "sl", "supplier"] }); H.dom();</script>
+<script>H.app({ tours: H.ALL_TOURS }); H.dom();</script>
 <script>
 (function () {
   var lines = [], fail = 0;
@@ -15,37 +15,28 @@
     E.loadCatalog();
     A.UI.init({ autosave: false });
 
-    // Replicate the combined tour.html exactly: seed EVERY assessment into one
-    // shared project (same SEED map + instrument-changed re-apply), so any
+    // Replicate the combined tour.html: seed EVERY demo into one shared
+    // project (H.demoSeeds is tour.html's SEED map), each once on its first
+    // activation, and on a later one only its metadata stamped again, so any
     // cross-instrument interference with the CRA dataset shows up here.
-    var SEED = {
-      "iec-62443-3-3":      A.TourSL,
-      "ncsc-caf":           A.TourCAF,
-      "general-ot-posture": A.TourPosture,
-      "iec-62443-2-1-2024": A.TourML,
-      "nis2-assessment":    A.TourNIS2,
-      "nis2-quick-gap":     A.TourNIS2Quick,
-      "iec-62443-4-1":      A.Tour41,
-      "iec-62443-2-1-2010": A.TourCSMS,
-      "ncsc-caf-aviation":  A.TourCAFAviation,
-      "eu-cra":             A.TourCRA,
-      "eu-machinery":       A.TourMachinery,
-      "supplier-screener":  A.TourSupplier
-    };
+    var SEED = H.demoSeeds(), seeded = {};
     var seedFailures = [];
     Object.keys(SEED).forEach(function (id) {
       ok(!!SEED[id] && typeof SEED[id].apply === "function", "tour dataset applier exposed for " + id);
     });
     E.on("instrument-changed", function (inst) {
       var mod = inst && SEED[inst.id];
-      if (mod && typeof mod.apply === "function") mod.apply(E);
+      if (!mod || typeof mod.apply !== "function") return;
+      if (!seeded[inst.id]) { seeded[inst.id] = true; mod.apply(E); return; }
+      if (mod.metadata && E.updateMetadata) E.updateMetadata(mod.metadata);
     });
     Object.keys(SEED).forEach(function (id) {
       try { E.activateInstrument(id); } catch (e) { seedFailures.push(id + ": " + e.message); }
     });
-    ok(seedFailures.length === 0, "all 12 assessments seed without throwing", seedFailures.join(" | "));
+    var nSeed = Object.keys(SEED).length;
+    ok(seedFailures.length === 0 && nSeed === 20, "all " + nSeed + " demo assessments seed without throwing", seedFailures.join(" | "));
 
-    // Now switch to the CRA (re-applies its dataset, as tour.html does).
+    // Now switch to the CRA (its metadata stamped again, as tour.html does).
     E.activateInstrument("eu-cra");
     ok(!!A.TourCRA && typeof A.TourCRA.apply === "function", "App.TourCRA applier exposed");
 

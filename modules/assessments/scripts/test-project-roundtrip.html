@@ -39,8 +39,15 @@ body{font:17px "Segoe UI",sans-serif;padding:22px;color:#1A2533}
   E.activateInstrument("iec-62443-3-3");
   E.updateMetadata({ clientName: "Acme Petrochemicals", siteName: "Plant A", consultant: "S. Maesschalck", dateOfVisit: "2026-05-21" });
   var tid = E.state.activeTargetId;
-  E.setResponse(tid, "SR1.1", { applicable: true, achievedSL: 1, evidence: "Shared local accounts found on RTUs." });
-  E.setResponse(tid, "SR1.2", { applicable: true, achievedSL: 0 });
+  // Answers in the capability-SL item model: each item (base, RE1, ...) of a
+  // requirement carries its own state, and the level picked is kept beside them.
+  E.setRequirementSL(tid, "SR1.1", 1);
+  E.setResponse(tid, "SR1.1", { applicable: true, evidence: "Shared local accounts found on RTUs." });
+  E.setRequirementSL(tid, "SR1.2", 0);
+  E.setResponse(tid, "SR1.2", { applicable: true });
+  var items11 = JSON.stringify(E.findResponse(tid, "SR1.1").components);
+  check("SR1.1 is answered at SL 1 in item states (setup)",
+    E.findResponse(tid, "SR1.1").slChoice === 1 && /"met"/.test(items11) && /"not-met"/.test(items11));
 
   var file1 = E.getProjectFile();
   check("getProjectFile returns schemaVersion 2.0",  file1.schemaVersion === "2.0");
@@ -58,7 +65,7 @@ body{font:17px "Segoe UI",sans-serif;padding:22px;color:#1A2533}
   check("after reload: active instrument is SL",     E.state.instrument.id === "iec-62443-3-3");
   check("after reload: 2 responses restored",        E.state.engagement.responses.length === 2);
   var r11 = E.findResponse(E.state.activeTargetId, "SR1.1");
-  check("SR1.1 achievedSL restored",                 r11 && r11.achievedSL === 1);
+  check("SR1.1 item states and SL choice restored",   r11 && r11.slChoice === 1 && JSON.stringify(r11.components) === items11);
   check("SR1.1 evidence restored",                   r11 && r11.evidence === "Shared local accounts found on RTUs.");
 
   // -------- 2. Two assessments in one project ---------------------------
@@ -67,7 +74,8 @@ body{font:17px "Segoe UI",sans-serif;padding:22px;color:#1A2533}
   E.activateInstrument("iec-62443-3-3");
   E.updateMetadata({ clientName: "Northbridge Manufacturing", consultant: "S. Maesschalck", dateOfVisit: "2026-05-21" });
   var tid1 = E.state.activeTargetId;
-  E.setResponse(tid1, "SR1.1", { applicable: true, achievedSL: 2 });
+  E.setRequirementSL(tid1, "SR1.1", 2);
+  var items11b = JSON.stringify(E.findResponse(tid1, "SR1.1").components);
 
   // Switch to posture; organisation metadata should still be there.
   E.activateInstrument("general-ot-posture");
@@ -115,7 +123,7 @@ body{font:17px "Segoe UI",sans-serif;padding:22px;color:#1A2533}
   E.activateInstrument("iec-62443-3-3");
   var sr11 = E.findResponse(E.state.activeTargetId, "SR1.1");
   check("SL SR1.1 still present after a cross-instrument round-trip",
-    sr11 && sr11.achievedSL === 2);
+    sr11 && sr11.slChoice === 2 && JSON.stringify(sr11.components) === items11b && items11b.indexOf('"met"') !== -1);
   check("the customer record is still shared after instrument switch + load",
     E.state.engagement.engagement.clientName === "Northbridge Manufacturing" &&
     E.state.project.clientName === "Northbridge Manufacturing");

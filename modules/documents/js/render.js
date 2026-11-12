@@ -29,125 +29,18 @@
   "use strict";
   window.App = window.App || {};
 
+  // The drawing itself is shared/doc-preview.js (App.DocPreview), the one
+  // renderer of a document's blocks, which the assessment and risk tools'
+  // Word previews use too. This file keeps what editing needs: reading an
+  // edited element back, and caret offsets.
+  var P = window.App.DocPreview;
   var ZW = "​";
-  var MARKS = ["b", "i", "u", "s", "sup", "sub", "code"];
+  var MARKS = P.MARKS;
   // What the browser, or a paste that got past us, may leave for the same thing.
   var ALIAS = { strong: "b", em: "i", strike: "s", del: "s" };
   var TEXT_TYPES = { heading: 1, paragraph: 1, list: 1, prompt: 1 };
-  // The printed text width at 96 dpi: 9026 and 15398 dxa (design 3.5).
-  var PAGE_W = 601, LAND_W = 1026;
-  var SHOWN = { "image/png": 1, "image/jpeg": 1, "image/gif": 1, "image/bmp": 1 };
-  var KIND_WORDS = {
-    shape: "Shape", group: "Grouped drawing", textbox: "Text box", canvas: "Drawing canvas",
-    smartart: "Diagram (SmartArt)", chart: "Chart", ole: "Embedded object", picture: "Picture",
-    equation: "Equation", other: "Drawing"
-  };
-  var KEPT_NOTE = "Kept from the original Word file. It prints in the Word export as it was.";
-  var KEPT_CHECK = " Any text inside it is made smaller too, so check it in a draft in Word.";
-  var KEPT_WIDE = "It is wider than the page and will be made smaller to fit." + KEPT_CHECK;
-  var KEPT_TALL = "It is taller than a page and will be made smaller to fit." + KEPT_CHECK;
-  var LOST = "This picture could not be restored. Replace it or delete it.";
-  var LOST_KEPT = "This drawing could not be restored. Replace it with a picture or delete it.";
-
-  function h(tag, attrs, kids) {
-    var el = document.createElement(tag);
-    Object.keys(attrs || {}).forEach(function (k) {
-      var v = attrs[k];
-      if (v == null || v === false) return;
-      if (k === "text") el.textContent = v;
-      else if (k === "class") el.className = v;
-      else if (k === "value") el.value = v;
-      else if (k.slice(0, 2) === "on" && typeof v === "function") el.addEventListener(k.slice(2).toLowerCase(), v);
-      else el.setAttribute(k, v === true ? "" : v);
-    });
-    (kids || []).forEach(function (c) {
-      if (c == null || c === false) return;
-      el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
-    });
-    return el;
-  }
-  function model() { return window.App.DocModel; }
+  var h = P.h, runsInto = P.runsInto, fnNumbers = P.fnNumbers, headingNumbers = P.headingNumbers, blockText = P.blockText;
   function house() { return window.App.HouseDocx || {}; }
-
-  // ---- numbers that come from the whole document ---------------------------
-
-  // Reading-order numbers of the footnote references and of the kept objects,
-  // and the heading numbers. Each is a scan of the whole document, so one scan
-  // serves every block drawn in the same turn; the editor calls fresh() as soon
-  // as it has changed the blocks.
-  var scan = { doc: null, fn: null, kept: null, keptCount: 0, heads: null };
-  function fresh() { scan.doc = null; scan.fn = scan.kept = scan.heads = null; }
-  function scanned(doc) {
-    if (scan.doc === doc && scan.fn) return scan;
-    var fn = {}, kept = {}, nFn = 0, nKept = 0;
-    (function walk(blocks) {
-      (blocks || []).forEach(function (b) {
-        if (!b) return;
-        if (b.type === "kept") kept[b.id] = ++nKept;
-        (b.runs || []).forEach(function (r) { if (r && r.fn && !fn[r.fn]) fn[r.fn] = ++nFn; });
-        if (b.type === "table") (b.rows || []).forEach(function (row) {
-          ((row && row.cells) || []).forEach(function (c) { walk(c && c.blocks); });
-        });
-      });
-    })(doc && doc.blocks);
-    scan.doc = doc; scan.fn = fn; scan.kept = kept; scan.keptCount = nKept; scan.heads = null;
-    // A scan is good for the turn it was made in: any later change may renumber.
-    Promise.resolve().then(fresh);
-    return scan;
-  }
-  function fnNumbers(doc) { return scanned(doc).fn; }
-  function keptNumbers(doc) { var s = scanned(doc); return { n: s.kept, of: s.keptCount }; }
-  function headingNumbers(doc) {
-    var s = scanned(doc);
-    if (s.heads) return s.heads;
-    var out = {};
-    if (doc && doc.options && doc.options.numberHeadings) {
-      // The writer's own numbers when the template is loaded, so the screen
-      // shows what will print; the outline's otherwise.
-      if (house().headingNumbers) out = house().headingNumbers(doc.blocks) || {};
-      else if (model() && model().outline) (model().outline(doc) || []).forEach(function (o) { if (o && o.number) out[o.id] = String(o.number); });
-    }
-    s.heads = out;
-    return out;
-  }
-
-  // ---- runs ---------------------------------------------------------------
-
-  function fnMark(key, doc) {
-    var n = doc ? fnNumbers(doc)[key] : "";
-    return h("sup", { class: "fn", contenteditable: "false", "data-fn": key, text: n ? String(n) : "*" });
-  }
-  function runsInto(el, runs, doc) {
-    while (el.firstChild) el.removeChild(el.firstChild);
-    var any = false, endsInBreak = false, afterFn = false;
-    (runs || []).forEach(function (r) {
-      if (!r) return;
-      if (r.fn) {
-        if (!afterFn) el.appendChild(document.createTextNode(ZW));
-        el.appendChild(fnMark(r.fn, doc));
-        el.appendChild(document.createTextNode(ZW));
-        any = true; endsInBreak = false; afterFn = true;
-        return;
-      }
-      var t = r.t == null ? "" : String(r.t);
-      if (!t) return;
-      var into = el;
-      function wrap(node) { into.appendChild(node); into = node; }
-      if (r.link) wrap(h("a", { "data-link": r.link }));
-      if (r.red) wrap(h("span", { class: "red" }));
-      MARKS.forEach(function (m) {
-        // Superscript wins over subscript: the model never holds both.
-        if (r[m] && !(m === "sub" && r.sup)) wrap(document.createElement(m));
-      });
-      t.split("\n").forEach(function (line, i) {
-        if (i) into.appendChild(document.createElement("br"));
-        if (line) into.appendChild(document.createTextNode(line));
-      });
-      any = true; afterFn = false;
-      endsInBreak = t.charAt(t.length - 1) === "\n";
-    });
-    if (!any || endsInBreak) el.appendChild(document.createElement("br"));
-  }
 
   function isFn(node) { return node.nodeType === 1 && node.tagName === "SUP" && node.classList.contains("fn"); }
   function inert(node) { return node.nodeType === 1 && node.getAttribute("contenteditable") === "false"; }
@@ -169,7 +62,7 @@
   function sameFormat(a, b) {
     if (a.fn || b.fn) return false;
     for (var i = 0; i < MARKS.length; i++) if (!a[MARKS[i]] !== !b[MARKS[i]]) return false;
-    return !a.red === !b.red && (a.link || "") === (b.link || "");
+    return !a.red === !b.red && (a.link || "") === (b.link || "") && (a.color || "") === (b.color || "") && (a.size || 0) === (b.size || 0);
   }
   function runsFrom(el) {
     var out = [], pad = padBr(el);
@@ -180,6 +73,8 @@
       MARKS.forEach(function (m) { if (f[m]) r[m] = true; });
       if (f.red) r.red = true;
       if (f.link) r.link = f.link;
+      if (f.color && !f.red) r.color = f.color;
+      if (f.size) r.size = f.size;
       out.push(r);
     }
     (function walk(node, f) {
@@ -201,6 +96,8 @@
           if (mark === "sup") g.sub = false;
           if (mark === "sub") g.sup = false;
         } else if (tag === "span" && c.classList.contains("red")) { g = Object.assign({}, f); g.red = true; }
+        else if (tag === "span" && c.classList.contains("rc") && c.hasAttribute("data-color")) { g = Object.assign({}, f); g.color = c.getAttribute("data-color"); }
+        else if (tag === "span" && c.classList.contains("rs") && c.hasAttribute("data-size")) { g = Object.assign({}, f); g.size = Number(c.getAttribute("data-size")) || 0; }
         else if (tag === "a" && c.hasAttribute("data-link")) { g = Object.assign({}, f); g.link = c.getAttribute("data-link"); }
         // Anything else (font, a span with no class, a div the browser made) is
         // transparent: its text takes the formatting of the nearest known parent.
@@ -339,241 +236,10 @@
     return r;
   }
 
-  // ---- blocks ----------------------------------------------------------------
-
-  function blockRuns(block) {
-    if (block.type === "prompt") return block.text ? [{ t: String(block.text) }] : [];
-    return block.runs || [];
-  }
-  function blockText(block) {
-    return blockRuns(block).map(function (r) { return r.t || ""; }).join("");
-  }
-  // A height to lay an unseen block out at until it is first shown (see .blk in
-  // editor.css), so the scroll bar is about right from the start.
-  function roughHeight(block) {
-    if (!block) return 0;
-    var wide = block.land ? LAND_W : PAGE_W;
-    if (block.type === "heading") return block.level === 1 ? 56 : block.level === 2 ? 46 : 40;
-    if (block.type === "table") return (block.rows || []).length * 30 + 20 + (block.caption ? 26 : 0);
-    if (block.type === "picture" || block.type === "kept") {
-      var w = Number(block.width) || 0, ht = Number(block.height) || 0;
-      var shown = ht > 0 && w > 0 ? (w > wide ? ht * wide / w : ht) : 200;
-      return Math.round(shown) + (block.type === "kept" ? 90 : 16) + (block.caption ? 26 : 0);
-    }
-    if (block.type === "pageBreak") return 44;
-    var perLine = block.land ? 160 : 92;
-    return Math.max(1, Math.ceil(blockText(block).length / perLine)) * 22 + 10;
-  }
-
-  // A picture's or a kept object's caption. In the editor it is there as soon
-  // as the block has the field, empty or not, so there is something to type in.
-  function captionEl(block, editable) {
-    if (typeof block.caption !== "string") return null;
-    if (!editable && !block.caption) return null;
-    var cap = h("p", { class: "cap", "data-edit": "plain", "data-cap": block.id, "aria-label": "Caption" });
-    runsInto(cap, block.caption ? [{ t: block.caption }] : [], null);
-    return cap;
-  }
-  function sizeWords(w, ht) {
-    function cm(px) { return (Math.round(px / 96 * 25.4) / 10).toFixed(1); }
-    return w > 0 && ht > 0 ? cm(w) + " x " + cm(ht) + " cm" : "";
-  }
-  function placeholderBox(w, ht, lines, cls) {
-    var box = h("div", { class: "ph " + (cls || "") }, lines.map(function (l) { return l ? h("span", { class: "ph-line", text: l }) : null; }));
-    if (w > 0 && ht > 0) {
-      box.style.width = Math.round(w) + "px";
-      box.style.aspectRatio = Math.round(w) + " / " + Math.round(ht);
-    }
-    return box;
-  }
-  // The size a picture is drawn at: its printed size, clamped to the page as
-  // the writer clamps it. In a table cell the cell's own width does that.
-  function fitted(block, inCell) {
-    var w = Number(block.width) || 0, ht = Number(block.height) || 0, max = block.land ? LAND_W : PAGE_W;
-    if (!inCell && w > max && w > 0) { ht = ht * max / w; w = max; }
-    return { w: Math.round(w), h: Math.round(ht) };
-  }
-  function pictureEl(doc, block, opts) {
-    var m = (doc && doc.media && doc.media[block.media]) || null, size = fitted(block, opts.inCell);
-    var fig = h("figure", { class: "pic al-" + (block.align || "center") });
-    if (!m || m.missing || !m.blob) {
-      fig.appendChild(placeholderBox(size.w || 240, size.h || 120, [LOST], "lost"));
-    } else if (!SHOWN[m.type]) {
-      fig.appendChild(placeholderBox(size.w || 240, size.h || 160,
-        [(m.name || "Picture") + " (" + String(m.type || "").replace(/^image\/(x-)?/, "").toUpperCase() + ")",
-          "Shown as a placeholder here. It prints in the Word file."]));
-    } else {
-      var img = h("img", { alt: block.alt || "", loading: "lazy", decoding: "async", draggable: "false" });
-      if (size.w) img.width = size.w;
-      if (size.h) img.height = size.h;
-      // The printed proportions, whatever the file's own are, also when the
-      // picture is narrowed to fit a cell.
-      if (size.w && size.h) img.style.aspectRatio = size.w + " / " + size.h;
-      var url = model() && model().mediaUrl ? model().mediaUrl(doc, block.media) : "";
-      if (url) img.src = url;
-      fig.appendChild(img);
-    }
-    var cap = captionEl(block, opts.editable);
-    if (cap) fig.appendChild(h("figcaption", {}, [cap]));
-    return fig;
-  }
-
-  var NS = "http://www.w3.org/2000/svg";
-  var ICONS = {
-    shape: ["M4 13h9v7H4z", "M15.5 4a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z"],
-    group: ["M3 3h8v8H3z", "M13 13h8v8h-8z", "M11 11l2 2"],
-    textbox: ["M3 5h18v14H3z", "M7 9h10", "M7 12h10", "M7 15h6"],
-    canvas: ["M3 4h18v16H3z", "M7 15l3-4 3 3 2-2 3 3"],
-    smartart: ["M3 9h5v6H3z", "M9.5 9h5v6h-5z", "M16 9h5v6h-5z", "M8 12h1.5", "M14.5 12H16"],
-    chart: ["M4 20V4", "M4 20h16", "M8 20v-7", "M12 20V8", "M16 20v-10"],
-    ole: ["M4 4h16v16H4z", "M4 9h16", "M9 9v11", "M4 14h16"],
-    picture: ["M3 5h18v14H3z", "M3 16l5-5 4 4 3-3 6 6", "M15.5 9.5h.01"],
-    equation: ["M5 6h7l-4 6 4 6H5", "M15 10l5 5", "M20 10l-5 5"],
-    other: ["M4 4h16v16H4z", "M9 9h6v6H9z"]
-  };
-  function icon(kind) {
-    var svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("class", "kept-icon");
-    svg.setAttribute("aria-hidden", "true");
-    (ICONS[kind] || ICONS.other).forEach(function (d) {
-      var p = document.createElementNS(NS, "path");
-      p.setAttribute("d", d);
-      svg.appendChild(p);
-    });
-    return svg;
-  }
-  // Whether any part the object needs did not come back from an autosave copy.
-  function keptLost(doc, block) {
-    var parts = (doc && doc.parts) || {}, seen = {}, todo = (block.rels || []).slice();
-    while (todo.length) {
-      var r = todo.pop();
-      if (!r || !r.part || seen[r.part]) continue;
-      seen[r.part] = true;
-      var p = parts[r.part];
-      if (!p || p.missing || !p.blob) return true;
-      (p.rels || []).forEach(function (x) { todo.push(x); });
-    }
-    return false;
-  }
-  function keptDescription(block) {
-    if (block.description) return String(block.description);
-    var size = sizeWords(Number(block.width) || 0, Number(block.height) || 0);
-    return (KIND_WORDS[block.kind] || KIND_WORDS.other) + (size ? ", " + size : "");
-  }
-  // A kept object cannot be drawn here, so its card has to say which one it is:
-  // its place among the kept objects, what it was, its own name, the words in it.
-  function keptCard(doc, block, n, of) {
-    if (n == null || of == null) {
-      var nums = keptNumbers(doc);
-      n = nums.n[block.id] || 0; of = nums.of;
-    }
-    var title = "Drawing " + n + " of " + of + ". " + keptDescription(block);
-    var card = h("div", { class: "kept-card", role: "group", "aria-label": title });
-    var w = Number(block.width) || 0, ht = Number(block.height) || 0, max = block.land ? LAND_W : PAGE_W;
-    var lost = keptLost(doc, block);
-    var prev = block.preview && doc && doc.media && doc.media[block.preview];
-    if (prev && prev.blob && !prev.missing && SHOWN[prev.type] && !lost) {
-      var img = h("img", { class: "kept-preview", alt: "", loading: "lazy", decoding: "async", draggable: "false" });
-      var size = fitted(block, false);
-      if (size.w) img.width = size.w;
-      if (size.h) img.height = size.h;
-      if (size.w && size.h) img.style.aspectRatio = size.w + " / " + size.h;
-      var url = model() && model().mediaUrl ? model().mediaUrl(doc, block.preview) : "";
-      if (url) img.src = url;
-      card.appendChild(img);
-    } else {
-      // A frame of the object's own proportions, never taller than is useful.
-      var pw = Math.min(w || 320, max), ph = w > 0 && ht > 0 ? ht * pw / w : 140;
-      if (ph > 260) { pw = pw * 260 / ph; ph = 260; }
-      var box = placeholderBox(pw, ph, [], "kept-ph");
-      box.appendChild(icon(block.kind));
-      card.appendChild(box);
-    }
-    card.appendChild(h("p", { class: "kept-line" }, [
-      h("span", { class: "kept-n", text: "Drawing " + n + " of " + of + "." }), " " + keptDescription(block)
-    ]));
-    if (block.label) card.appendChild(h("p", { class: "kept-label", text: String(block.label) }));
-    var words = String(block.text || "").replace(/\s+/g, " ").trim();
-    if (words) card.appendChild(h("p", { class: "kept-text", text: words.length > 240 ? words.slice(0, 240) + "…" : words }));
-    if (lost) card.appendChild(h("p", { class: "kept-note lost", text: LOST_KEPT }));
-    else {
-      card.appendChild(h("p", { class: "kept-note", text: KEPT_NOTE }));
-      // Wider than the page's text, or taller than a page can show (the writer's own limits).
-      var PG = house().PAGE || {}, maxH = block.land ? PG.landscapeMaxHPx : PG.portraitMaxHPx;
-      if (!block.floating && w > max) card.appendChild(h("p", { class: "kept-note", text: KEPT_WIDE }));
-      else if (!block.floating && maxH > 0 && ht > maxH) card.appendChild(h("p", { class: "kept-note", text: KEPT_TALL }));
-    }
-    return card;
-  }
-
-  function listMarker(doc, block, numbers) {
-    var hit = numbers && numbers[block.id];
-    if (!hit && doc && house().listNumbers) {
-      var all = house().listNumbers(doc.blocks);
-      hit = all && all[block.id];
-    }
-    if (hit && hit.marker) return String(hit.marker);
-    return block.list === "number" ? "" : "•";
-  }
-
-  // A block's element. The wrapper has no role, so the heading, paragraph or
-  // table inside is what a screen reader meets. The element that holds the
-  // block's text carries data-edit ("runs", or "plain" for a prompt or a
-  // caption), and that is all the editor looks for: it is made contenteditable
-  // only when it is used. opts: editable, numbers (App.HouseDocx.listNumbers
-  // of the list the block is in), headingNumbers, keptN and keptOf, inCell.
-  function blockEl(doc, block, opts) {
-    opts = opts || {};
-    var type = block.type;
-    var wrap = h("div", { class: "blk", id: "blk-" + block.id, "data-block-id": block.id, "data-type": String(type), tabindex: "-1" });
-    if (block.land) wrap.classList.add("land");
-    if (type === "heading") {
-      var level = Math.min(3, Math.max(1, Number(block.level) || 1));
-      var nums = opts.headingNumbers || headingNumbers(doc);
-      wrap.appendChild(h("span", { class: "hnum", text: nums[block.id] || "" }));
-      var hd = h("h" + level, { class: "txt", "data-edit": "runs" });
-      runsInto(hd, block.runs, doc);
-      wrap.appendChild(hd);
-    } else if (type === "paragraph" || type === "list") {
-      if (type === "list") {
-        wrap.classList.add("lvl-" + Math.min(2, Math.max(0, Number(block.level) || 0)));
-        // Real text and not a CSS counter: a screen reader reads "2. Add a
-        // zone", and the number on screen is the one Word will show.
-        wrap.appendChild(h("span", { class: "marker", contenteditable: "false", text: listMarker(doc, block, opts.numbers) }));
-      }
-      var p = h("p", { class: "txt" + (block.align && type === "paragraph" ? " al-" + block.align : ""), "data-edit": "runs" });
-      runsInto(p, block.runs, doc);
-      wrap.appendChild(p);
-    } else if (type === "prompt") {
-      var pr = h("p", { class: "txt prompt", "data-edit": "plain" });
-      runsInto(pr, blockRuns(block), null);
-      wrap.appendChild(pr);
-    } else if (type === "pageBreak") {
-      wrap.appendChild(h("div", { class: "pb", role: "separator", "aria-label": "Page break" }, [h("span", { text: "Page break" })]));
-    } else if (type === "picture") {
-      wrap.appendChild(pictureEl(doc, block, opts));
-    } else if (type === "kept") {
-      var fig = h("figure", { class: "kept al-" + (block.align || "center") }, [keptCard(doc, block, opts.keptN, opts.keptOf)]);
-      var kc = captionEl(block, opts.editable);
-      if (kc) fig.appendChild(h("figcaption", {}, [kc]));
-      wrap.appendChild(fig);
-    } else if (type === "table") {
-      // The table draws its own caption (App.DocTables).
-      var T = window.App.DocTables;
-      wrap.appendChild(T && T.tableEl ? T.tableEl(doc, block, { editable: !!opts.editable }) : document.createElement("table"));
-    } else {
-      // A block from a later version of the tool: kept as it is, printed as nothing.
-      wrap.appendChild(h("p", { class: "unknown", text: "This part was made by a newer version of the tool. It is kept as it is and does not print." }));
-    }
-    wrap.style.setProperty("contain-intrinsic-block-size", "auto " + Math.round(roughHeight(block)) + "px");
-    return wrap;
-  }
-
   // ---- the preview's front matter ----------------------------------------------
-  // Drawn in HTML from the same inputs the Word template takes (App.HouseDocx),
-  // so the wording cannot drift. Each falls back to the rule in the design
-  // (section 2) when the template is not loaded.
+  // Drawn by App.DocPreview from the same inputs the Word template takes
+  // (App.HouseDocx), so the wording cannot drift. Each falls back to the rule
+  // in the design (section 2) when the template is not loaded.
 
   function info(doc) { return (doc && doc.info) || {}; }
   function coverInput(doc) {
@@ -597,41 +263,17 @@
   // information. The capitals on it are the Word cover's own.
   function coverEl(doc) {
     var c = coverInput(doc), A = window.App.Assets || {}, co = house().COMPANY || {};
-    var page = h("div", { class: "cover-page", "aria-hidden": "true" });
-    var bg = dataUrl(A.coverBg);
-    if (bg) page.appendChild(h("img", { class: "cover-bg", src: bg, alt: "" }));
-    var top = h("div", { class: "cover-top" });
-    var logo = dataUrl(A.logoCard);
-    if (logo) top.appendChild(h("img", { class: "cover-logo", src: logo, alt: "" }));
-    top.appendChild(h("div", { class: "cover-kicker", text: c.kicker || "DOCUMENT" }));
-    top.appendChild(h("div", { class: "cover-bar" }));
-    var title = h("div", { class: "cover-title" }, (c.titleLines || []).map(function (l) { return h("div", { text: String(l) }); }));
-    // Half-points to px at 96 dpi.
-    title.style.fontSize = Math.round((Number(c.titleSize) || 52) / 2 * 96 / 72) + "px";
-    top.appendChild(title);
-    if (c.client) top.appendChild(h("div", { class: "cover-client", text: c.client }));
-    if (c.site) top.appendChild(h("div", { class: "cover-site", text: c.site }));
-    if (c.subLine) top.appendChild(h("div", { class: "cover-sub", text: c.subLine }));
-    page.appendChild(top);
-    // Each label and its value are one unit (.cover-pair, pages.css), as in
-    // the Word strip (stripLayout): a pair that does not fit what is left of
-    // a line moves to the next whole, and one too long for a line has a line
-    // of its own and wraps inside its value. No space between the label and
-    // the value, so they never part.
-    function pair(label, value) { return [h("span", { class: "cover-pair" }, [h("span", { class: "cover-k", text: String(label).trim() }), h("span", { class: "cover-v", text: value || "" })])]; }
     // The strip's pairs are the template's own (stripParts): the date and its
     // dot only when there is a date, the author and its label only when there
     // is an author. The same rule here when the template is not loaded.
     var parts = house().stripParts ? house().stripParts(c) : [["ISSUE", (c.revision || "0.1") + (c.date ? "  ·  " + c.date : "")]]
       .concat(c.author ? [["AUTHOR", c.author]] : []).concat([["CLASSIFICATION", c.classification || "Confidential"]]);
-    var strip = [];
-    parts.forEach(function (p) { strip = strip.concat(pair(p[0], p[1])); });
-    page.appendChild(h("div", { class: "cover-foot" }, [
-      h("div", { class: "cover-strip" }, strip),
-      h("div", { class: "cover-addr", text: co.addressLine || "SolutionsPT Ltd   ·   Unit 1, Oakfield Road, Cheadle Royal Business Park, Cheadle, Cheshire SK8 3GX" }),
-      h("div", { class: "cover-addr", text: co.contactLine || "Telephone +44 (0) 161 495 4600   ·   sales@solutionspt.com   ·   www.solutionspt.com" })
-    ]));
-    return page;
+    return P.coverEl({
+      kicker: c.kicker, titleLines: c.titleLines, titleSize: c.titleSize, client: c.client, site: c.site, subLine: c.subLine,
+      strip: parts, bg: dataUrl(A.coverBg), logo: dataUrl(A.logoCard),
+      address: [co.addressLine || "SolutionsPT Ltd   ·   Unit 1, Oakfield Road, Cheadle Royal Business Park, Cheadle, Cheshire SK8 3GX",
+        co.contactLine || "Telephone +44 (0) 161 495 4600   ·   sales@solutionspt.com   ·   www.solutionspt.com"]
+    });
   }
 
   function controlPairs(doc, status) {
@@ -658,15 +300,7 @@
     });
     return rows;
   }
-  function controlEl(doc, status) {
-    var body = h("tbody", {}, controlPairs(doc, status).map(function (p) {
-      return h("tr", {}, [h("th", { scope: "row", text: p[0] }), h("td", { class: p[2] ? "red" : null, text: p[1] })]);
-    }));
-    return h("div", { class: "doc-control" }, [
-      h("h1", { text: "Document control and confidentiality" }),
-      h("table", { class: "control-table" }, [body])
-    ]);
-  }
+  function controlEl(doc, status) { return P.controlEl(controlPairs(doc, status)); }
   // The Contents list: level 1 and 2 headings, no page numbers (design, section 2).
   // An empty element when the document prints none, so a caller can always append it.
   function contentsEl(doc) {
@@ -702,12 +336,12 @@
   }
 
   window.App.DocRender = {
-    blockEl: blockEl, runsInto: runsInto, runsFrom: runsFrom, matches: matches, offsetsOf: offsetsOf, rangeAt: rangeAt,
-    roughHeight: roughHeight, keptCard: keptCard, coverEl: coverEl, controlEl: controlEl, contentsEl: contentsEl,
+    blockEl: P.blockEl, runsInto: runsInto, runsFrom: runsFrom, matches: matches, offsetsOf: offsetsOf, rangeAt: rangeAt,
+    roughHeight: P.roughHeight, keptCard: P.keptCard, coverEl: coverEl, controlEl: controlEl, contentsEl: contentsEl,
     shortHeadEl: shortHeadEl,
     // Beyond the design's table, for the editor and the pages that draw blocks.
-    PAGE_W: PAGE_W, LAND_W: LAND_W, TEXT_TYPES: TEXT_TYPES, h: h, fresh: fresh, fnNumbers: fnNumbers,
-    keptNumbers: keptNumbers, headingNumbers: headingNumbers, textLength: textLength, blockRuns: blockRuns,
-    keptDescription: keptDescription
+    PAGE_W: P.PAGE_W, LAND_W: P.LAND_W, TEXT_TYPES: TEXT_TYPES, h: h, fresh: P.fresh, fnNumbers: fnNumbers,
+    keptNumbers: P.keptNumbers, headingNumbers: headingNumbers, textLength: textLength, blockRuns: P.blockRuns,
+    keptDescription: P.keptDescription
   };
 })();

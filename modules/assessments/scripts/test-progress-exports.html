@@ -20,6 +20,13 @@
       out.appendChild(d);
     }
     var App = window.App;
+    // A 3-3 answer in the capability-SL item model, as Engine.setRequirementSL
+    // writes it: every item up to SL 4 met or not met against the level given.
+    function slAnswer(req, sl) {
+      var comps = {};
+      App.Scoring.requirementItems(req).forEach(function (it) { comps[it.componentId] = { state: it.firstSL <= sl ? "met" : "not-met" }; });
+      return { components: comps, slChoice: sl };
+    }
 
     var progress = {
       sourceLine: "Acme Petrochemicals, visit 2025-06-01, rev 1.0 - prev.json",
@@ -44,7 +51,7 @@
       var tax  = App.Data.shared.taxonomies["fr-7"];
       var prof = App.Data.shared.scoringProfiles["sl-target-closeness"];
       var eng = App.Storage.makeEmptyEngagement(inst);
-      eng.responses.push({ targetId: eng.targets[0].id, requirementId: inst.requirements[0].id, applicable: true, achievedSL: 1 });
+      eng.responses.push(Object.assign({ targetId: eng.targets[0].id, requirementId: inst.requirements[0].id, applicable: true }, slAnswer(inst.requirements[0], 1)));
       eng.basisOfAssessment.interviews.push({ name: "J. Smith", role: "OT Lead", date: "2026-01-10" });
       eng.basisOfAssessment.documents.push({ title: "OT Security Policy", reference: "POL-014 v3.2", date: "2025-11-01" });
       eng.basisOfAssessment.observations.push({ name: "SCADA HMI", method: "walkthrough" });
@@ -118,8 +125,11 @@
       var engS = App.Storage.makeEmptyEngagement(instS);
       var tidS = engS.targets[0].id;
       instS.requirements.filter(function (r) { return r.frId === "FR1"; }).forEach(function (r, i) {
-        engS.responses.push({ targetId: tidS, requirementId: r.id, applicable: true, achievedSL: (i === 0 ? 0 : 2) });
+        engS.responses.push(Object.assign({ targetId: tidS, requirementId: r.id, applicable: true }, slAnswer(r, i === 0 ? 0 : 2)));
       });
+      // The fixture is answered: SR 1.1 is short of its target, the rest of FR1 is met at SL 2.
+      var answered = engS.responses.length > 5 && engS.responses.every(function (r) { return r.components && Object.keys(r.components).length > 0; });
+      line(answered ? "ok" : "bad", (answered ? "PASS" : "FAIL") + " setup: the SL Word fixture answers FR1 in item states");
       engS.basisOfAssessment.interviews.push({ name: "J. Smith", role: "OT Lead", date: "2026-01-10" });
       engS.basisOfAssessment.documents.push({ title: "OT Security Policy", reference: "POL-014 v3.2", date: "2025-11-01" });
       engS.basisOfAssessment.observations.push({ name: "SCADA HMI", method: "walkthrough" });

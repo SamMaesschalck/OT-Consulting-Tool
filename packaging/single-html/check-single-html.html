@@ -94,6 +94,7 @@
           return new Promise(function (resolve) {
             A.ExportDOCX.buildAsync(eng, inst, tax, prof, narr, opts, function (err, blob) {
               o.docx = err ? ("ERROR " + err.message) : (blob ? blob.size : 0);
+              if (!err && blob && !r.previewBlob) r.previewBlob = blob;
               resolve();
             });
           });
@@ -103,6 +104,19 @@
       }
     });
     // Word builds one at a time, so the two copies are compared like for like.
+    // The Word preview reads the first of those files back and draws it, as
+    // its page does (ui.js renderWordPreviewPage).
+    jobs.push(function () {
+      r.preview = "";
+      if (!r.previewBlob || !A.DocPreview || !A.DocxImport) return null;
+      return A.DocPreview.fromDocx(r.previewBlob, { name: "check.docx" }).then(function (read) {
+        var div = doc.createElement("div");
+        A.DocPreview.drawRead(div, read, { watermark: "DRAFT" });
+        r.preview = (read.cover ? "cover " : "no cover ") + div.querySelectorAll(".dpv-sheet").length + " sheets " + read.counts.headings + " headings";
+        A.DocPreview.dispose(read);
+        delete r.previewBlob;
+      }, function (e) { r.preview = "failed: " + e.message; delete r.previewBlob; });
+    });
     return jobs.reduce(function (p, j) { return p.then(j); }, Promise.resolve()).then(function () { return r; });
   }
 
@@ -140,6 +154,8 @@
                     Math.abs(b.docx - a.docx) <= Math.max(200, a.docx * 0.01);
         ok(close, id + ": Word builds to the same size (" + b.docx + " bytes)", a.docx + " vs " + b.docx);
       });
+      ok(/^cover \d+ sheets [1-9]/.test(single.preview) && single.preview === folder.preview,
+         "the Word preview reads a report back and draws it (" + single.preview + ")", folder.preview + " vs " + single.preview);
       finish();
     })
     .catch(function (e) { ok(false, "check threw: " + e.message); finish(); });

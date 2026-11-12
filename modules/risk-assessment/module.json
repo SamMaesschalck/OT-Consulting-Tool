@@ -6,7 +6,9 @@
   "tests": {
     "pages": "scripts/test-*.html",
     "virtualTimeMs": 300000,
-    "timeoutSec": 300
+    "timeoutSec": 300,
+    "_alone": "Pages tools/run-tests.ps1 -Parallel runs on their own: test-risk-sections measures a text box grown to its text.",
+    "alone": ["test-risk-sections.html"]
   },
   "singleHtml": {
     "parityCheck": "check-single-html-risk.html",

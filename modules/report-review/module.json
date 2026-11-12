@@ -6,7 +6,9 @@
   "tests": {
     "pages": "scripts/test-*.html",
     "virtualTimeMs": 300000,
-    "timeoutSec": 300
+    "timeoutSec": 300,
+    "_alone": "Pages tools/run-tests.ps1 -Parallel runs on their own: scroll and layout checks (the scroll position after each action in speed, the 420 px and A4 widths in app and pages, the 768 px view in ux, the outline scroll in fixes).",
+    "alone": ["test-review-app.html", "test-review-fixes.html", "test-review-pages.html", "test-review-speed.html", "test-review-ux.html"]
   },
   "singleHtml": {
     "parityCheck": "check-single-html-review.html",

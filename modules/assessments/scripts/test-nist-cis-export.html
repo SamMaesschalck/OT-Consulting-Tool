@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>NIST 800-53, NIST 800-82 and CIS Controls export</title></head>
+<body>
+<!--
+  Word and Excel built from an answered assessment of each catalogue
+  instrument on the caf-achieved engine (once three pages: test-nist-export,
+  test-nist82-export and test-cis-export). test-sanity-all.html builds every
+  instrument empty; these build with states set. The CIS case also answers a
+  safeguard above the IG1 baseline, which exercises the "Above baseline"
+  column and the "N / -" meeting cell in the Word and Excel results tables.
+-->
+<pre id="out">running…</pre>
+
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: true }); H.dom();</script>
+<script>
+(function () {
+  var lines = [], fail = 0, captured = {};
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() { lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  var A = window.App;
+
+  A.Engine.loadCatalog();
+  A.UI.init({ autosave: false });
+  ok(!!window.docx && !!window.ExcelJS, "vendor libs (docx + ExcelJS) loaded");
+  // Capture blobs instead of triggering a browser download (key by extension).
+  A.Storage.downloadBlob = function (blob, name) { captured[String(name).replace(/^.*\./, "")] = blob; return blob; };
+
+  var CASES = [
+    { id: "nist-800-53", label: "NIST", answers: [["AC-1", "achieved"], ["AC-3", "partially"], ["SI-2", "not"]] },
+    { id: "nist-800-82", label: "NIST", answers: [["AC-1", "achieved"], ["AC-3", "partially"], ["SI-2", "not"]] },
+    // Control 13 (Network Monitoring & Defense) has no IG1 safeguards, so an
+    // implemented 13.1 is entirely above baseline.
+    { id: "cis-controls-v8", label: "CIS", profile: "cis-ig1", aboveBaseline: true,
+      answers: [["1.1", "achieved"], ["1.2", "partially"], ["4.1", "not"], ["16.1", "not"], ["13.1", "achieved"]] }
+  ];
+
+  function one(c) {
+    var p = c.id + ": ";
+    captured = {};
+    A.Engine.activateInstrument(c.id);
+    if (c.profile) A.Engine.setCAFProfile(c.profile);
+    // a few answers so the report has content
+    var tid = A.Engine.state.activeTargetId;
+    c.answers.forEach(function (a) { A.Engine.setResponse(tid, a[0], { applicable: true, state: a[1] }); });
+    if (c.aboveBaseline) {
+      var scoredAB = A.Engine.scoreActiveTarget();
+      ok(!!scoredAB && (scoredAB.aboveBaseline || []).length > 0, p + "above-baseline controls detected under IG1", "count " + ((scoredAB && scoredAB.aboveBaseline) || []).length);
+    }
+    var narrative = A.Engine.getActiveNarrative();
+    ok(!!narrative && !!narrative.boilerplate && !!narrative.templates, p + c.label + " narrative pack loaded (boilerplate + templates)");
+
+    var inst = A.Engine.state.instrument, tax = A.Engine.state.taxonomy, prof = A.Engine.state.profile;
+    var engagement = A.Engine.state.engagement;
+    var opts = {
+      cafProfileRegistry: A.Engine.getCAFProfileRegistry(),
+      cafProfileId: A.Engine.getActiveCAFProfileId(),
+      cafProfile: A.Engine.getActiveCAFProfile ? A.Engine.getActiveCAFProfile() : null,
+      cafOverlay: A.Engine.getActiveCAFOverlay(),
+      targetId: tid
+    };
+
+    // ---- Excel (returns a promise) ----
+    var xp;
+    try { xp = A.ExportXLSX.download(engagement, inst, tax, prof, opts); }
+    catch (e) { ok(false, p + "xlsx build threw: " + e.message); }
+
+    // ---- Word (async via opts.onDone) ----
+    var docxDone = new Promise(function (resolve) {
+      var o2 = {}; for (var k in opts) o2[k] = opts[k];
+      o2.onDone = function (err) { ok(!err, p + "Word export completes without error", err && err.message); resolve(); };
+      try { A.ExportDOCX.download(engagement, inst, tax, prof, narrative, o2); }
+      catch (e) { ok(false, p + "docx build threw: " + e.message + "\n" + (e.stack || "")); resolve(); }
+    });
+
+    return Promise.all([
+      (xp && xp.then ? xp : Promise.reject(new Error("no promise returned"))).then(function () { ok(true, p + "xlsx download promise resolved"); }, function (e) { ok(false, p + "xlsx download promise resolved", e && e.message); }),
+      docxDone
+    ]).then(function () {
+      ok(captured["docx"] && captured["docx"].size > 3000, p + "Word .docx blob produced", captured["docx"] && ("size " + captured["docx"].size));
+      ok(captured["xlsx"] && captured["xlsx"].size > 3000, p + "Excel .xlsx blob produced", captured["xlsx"] && ("size " + captured["xlsx"].size));
+    });
+  }
+
+  CASES.reduce(function (chain, c) { return chain.then(function () { return one(c); }); }, Promise.resolve())
+    .then(finish, function (e) { ok(false, "threw: " + (e && e.message)); finish(); });
+})();
+</script>
+</body></html>

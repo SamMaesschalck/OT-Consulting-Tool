@@ -206,7 +206,7 @@
     // --- UI smoke ---
     RT.loadProjectText(saved);
     var doc = w.document, navItems = doc.querySelectorAll(".nav-item");
-    ok(navItems.length === 11, "nav shows 5 stages + Basis + Report + 2 reports + Peer review + About", "got " + navItems.length);
+    ok(navItems.length === 12, "nav shows 5 stages + Basis + Report + Word preview + 2 reports + Peer review + About", "got " + navItems.length);
     function clickNav(label) { var n = doc.querySelectorAll(".nav-item"); for (var i = 0; i < n.length; i++) if (n[i].textContent.indexOf(label) >= 0) { n[i].click(); return true; } return false; }
 
     clickNav("2. High-level");
@@ -255,14 +255,17 @@
     clickNav("High-level report");
     ok(doc.body.textContent.indexOf("High-level risk assessment report") >= 0, "standalone high-level report renders");
     ok(doc.body.textContent.indexOf("Relative risk ranking") >= 0, "high-level report shows the relative risk ranking");
-    ok(doc.body.textContent.indexOf("Basis of assessment") >= 0, "high-level report includes the basis of assessment");
+    // The report area, not the page: the sidebar names "Basis of assessment" and
+    // "Full report" on every page.
+    function mainText() { return doc.querySelector("#main").textContent; }
+    ok(mainText().indexOf("Basis of assessment") >= 0, "high-level report includes the basis of assessment");
     ok(doc.body.textContent.indexOf("Print high-level report") >= 0, "high-level report offers a print action");
     ok(doc.querySelector("#main").querySelectorAll(".fr-slt-table").length === 0, "high-level report needs no SL-T table (standalone deliverable)");
     ok(doc.body.textContent.indexOf("Approval / sign-off") >= 0, "high-level report carries the asset-owner sign-off card");
 
     clickNav("Full report");
-    ok(doc.body.textContent.indexOf("Review & export") >= 0 || doc.body.textContent.indexOf("Full report") >= 0, "full report page renders");
-    ok(doc.body.textContent.indexOf("Basis of assessment") >= 0, "full report reproduces the basis of assessment");
+    ok(mainText().indexOf("Review & export") >= 0 || mainText().indexOf("Full report") >= 0, "full report page renders");
+    ok(mainText().indexOf("Basis of assessment") >= 0, "full report reproduces the basis of assessment");
     ok(doc.body.textContent.indexOf("High-level risk ranking") >= 0, "full report reproduces the high-level risk ranking");
     ok(doc.body.textContent.indexOf("Approval / sign-off") >= 0, "full report carries the asset-owner sign-off card");
     // --- dark mode toggle ---

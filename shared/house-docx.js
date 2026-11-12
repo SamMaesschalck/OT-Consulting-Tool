@@ -445,6 +445,10 @@
   function spanInto(o, opts) {
     if (opts.columnSpan > 1) o.columnSpan = opts.columnSpan;
     if (opts.rowSpan > 1) o.rowSpan = opts.rowSpan;
+    // The document tool's too: an imported cell's own padding, in twips (top, right, bottom, left).
+    if (Array.isArray(opts.pad) && opts.pad.length === 4) {
+      o.margins = { top: opts.pad[0] | 0, right: opts.pad[1] | 0, bottom: opts.pad[2] | 0, left: opts.pad[3] | 0 };
+    }
     return o;
   }
   function cellDxa(content, widthDxa, opts) {
@@ -1142,6 +1146,9 @@
       }
       var link = r.link && safeLink(xmlSafe(r.link, "")) ? xmlSafe(r.link, "") : null;
       if (link) { o.underline = { type: "single" }; if (!ctx.onDark) o.color = COLOR.blue; }
+      // A colour and a size of the run's own (an imported chart's legend, a tile's figure).
+      if (r.color && /^[0-9A-F]{6}$/i.test(String(r.color))) o.color = String(r.color).toUpperCase();
+      if (r.size >= 8 && r.size <= 144) o.size = Math.round(r.size);
       if (r.red) o.color = COLOR.note;
 
       var tagText = null;
@@ -1242,7 +1249,10 @@
   function writeParagraph(b, env) {
     var kids = inline(b.runs, { w: env.w, blockId: b.id, onDark: env.header }, env.base);
     if (env.w.lead && env.w.lead.length) kids = env.w.lead.splice(0).concat(kids);     // floating drawings anchored here (writeKept)
-    var p = kids.length ? body(kids, { alignment: alignOf(b.align) }) : body("", { alignment: alignOf(b.align) });
+    // In a table with a look of its own the paragraphs sit close, as in a tile or a chart.
+    var po = { alignment: alignOf(b.align) };
+    if (env.tight) po.spacing = { before: 0, after: 0 };
+    var p = kids.length ? body(kids, po) : body("", po);
     return [tagBlock(p, b)];
   }
 
@@ -1397,32 +1407,57 @@
   // Word's default cell margins, left and right, and a hair.
   var CELL_PAD_DXA = 230;
 
+  // A table with a look of its own (an imported chart or row of tiles, see
+  // contracts/document.json): no borders, or fills of its own.
+  function ownLook(b) {
+    if (b.borders === "none") return true;
+    return (b.rows || []).some(function (r, i) {
+      return i >= (b.header ? 1 : 0) && ((r && r.cells) || []).some(function (c) { return c && c.fill; });
+    });
+  }
+  function hexOk(v) { return /^[0-9A-F]{6}$/i.test(String(v || "")) ? String(v).toUpperCase() : null; }
+
   function writeTable(b, env) {
     var TableRow = window.docx.TableRow;
+    var HR = window.docx.HeightRule || { ATLEAST: "atLeast", EXACT: "exact" };
     var lay = tableLayout(b);
     if (!lay.ncols || !lay.placed.length) return [];
-    var widths = scaleCols(b.cols, lay.ncols, env.maxDxa);
+    var own = ownLook(b);
+    // Its own width when it has one narrower than the space it is in.
+    var room = b.width > 0 ? Math.min(Math.round(b.width), env.maxDxa) : env.maxDxa;
+    var widths = scaleCols(b.cols, lay.ncols, room);
     var headerRows = b.header ? 1 : 0;
     var rows = lay.placed.map(function (line, r) {
-      var isHead = r < headerRows;
+      var isHead = r < headerRows, src = (b.rows || [])[r] || {};
       var cells = line.map(function (at) {
         var wd = 0;
         for (var c = at.col; c < at.col + at.span; c++) wd += widths[c];
+        var fill = hexOk(at.cell.fill);
         var inner = { w: env.w, maxDxa: wd, maxPx: Math.max(16, Math.floor((wd - CELL_PAD_DXA) / 15)),
           maxHPx: env.maxHPx ? Math.max(16, env.maxHPx - CELL_H_LESS_PX) : undefined, inCell: true,
-          header: isHead, base: isHead ? { bold: true, color: "FFFFFF" } : null };
+          depth: (env.depth || 0) + 1, tight: own,
+          header: isHead && !fill && !own, base: isHead ? (fill || own ? { bold: true } : { bold: true, color: "FFFFFF" }) : null };
         var kids = writeBlocks(at.cell.blocks, inner);
         if (!kids.length) kids = [body("")];
         var o = { columnSpan: at.span, rowSpan: at.rowSpan };
-        return isHead ? headerCellDxa(kids, wd, o) : cellDxa(kids, wd, o);
+        if (fill) o.fill = fill;
+        if (own && Array.isArray(at.cell.pad)) o.pad = at.cell.pad;
+        if (at.cell.vAlign === "center" || at.cell.vAlign === "bottom") o.valign = at.cell.vAlign;
+        // A table with a look of its own keeps an unshaded header row unshaded (bold only).
+        var made = isHead && !fill && !own ? headerCellDxa(kids, wd, o) : cellDxa(kids, wd, o);
+        return made;
       });
-      return isHead ? new TableRow({ children: cells, tableHeader: true }) : new TableRow({ children: cells });
+      var ro = { children: cells };
+      if (isHead) ro.tableHeader = true;
+      if (src.h > 0) ro.height = { value: Math.round(src.h), rule: src.hRule === "exact" ? HR.EXACT : HR.ATLEAST };
+      return new TableRow(ro);
     });
-    var t = tagBlock(fixedTable(rows, widths), b);
+    // Cell padding of a cell's own is set as the cell is made (cellDxa).
+    var t = tagBlock(fixedTable(rows, widths, { noBorders: b.borders === "none" }), b);
     // Word joins two tables with nothing between them, and a table that ends
     // a cell or a section needs a paragraph after it: the caption, or a
-    // spacer as under the document control table.
-    return [t, txt(b.caption) ? captionPara(txt(b.caption)) : body("", { spacing: { after: 120 } })];
+    // spacer as under the document control table (in a cell, one that adds no space).
+    return [t, txt(b.caption) ? captionPara(txt(b.caption)) : body("", { spacing: env.inCell ? { before: 0, after: 0 } : { after: 120 } })];
   }
 
   function writeBlocks(blocks, env) {
@@ -1435,6 +1470,8 @@
       else if (b.type === "picture") made = writePicture(b, env);
       else if (b.type === "kept") made = writeKept(b, env, i + 1 < blocks.length ? blocks[i + 1] : env.next);
       else if (b.type === "prompt") made = [tagBlock(placeholderPara(b.text, { kind: "block", blockId: b.id }), b)];
+      // A table inside a cell (an imported chart), down to the depth the model keeps.
+      else if (env.inCell && b.type === "table" && (env.depth || 1) < 3) made = writeTable(b, env);
       else if (env.inCell) made = [];                 // a cell holds nothing else
       else if (b.type === "heading") made = writeHeading(b, env);
       else if (b.type === "table") made = writeTable(b, env);

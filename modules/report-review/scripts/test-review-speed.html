@@ -86,6 +86,15 @@
 
   load("").then(function (w) {
     var d = w.document, R = w.ReviewTool, main = d.getElementById("main");
+    // Blocks and item cards off the screen are not laid out (content-visibility)
+    // until a frame is drawn, and headless Edge draws frames when it likes: a
+    // block laid out late, in place of its estimated height, makes the browser
+    // move the scroll a few pixels to keep the text on screen still, and that
+    // read as an action scrolling the page (149055 to 149051 once). Every
+    // block is laid out here, so the scroll checks see only what an action does.
+    var still = d.createElement("style");
+    still.textContent = ".rr-block, .rr-item { content-visibility: visible !important; }";
+    d.head.appendChild(still);
     var pack = bigPack(1600, 300), blocks = pack.documents[0].blocks;
     R.loadTexts([{ name: "speed.json", text: JSON.stringify(pack) }]);
     ok(R.state.pack && d.querySelectorAll("#rr-paper .rr-block").length === 1600, "a pack of 1,600 blocks opens, all of it drawn", String(d.querySelectorAll("#rr-paper .rr-block").length));

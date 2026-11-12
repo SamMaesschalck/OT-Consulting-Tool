@@ -21,6 +21,10 @@
   // ignores it.
   var SENTENCES = {
     // toCheck
+    "cover-like": function (e) {
+      return "The original's first page, before its first page break, has large type or a large picture and few words, so it may be a cover. " +
+        "The template prints its own cover. Remove " + (e.count === 1 ? "it" : "these blocks") + " if you do not need " + (e.count === 1 ? "it" : "them") + ".";
+    },
     "front-matter": function (e) {
       return "The original starts with " + plural(e.count, "block", "blocks") + " before its first heading. " +
         "This is often its own cover, document control table or contents list, which the template now provides. " +

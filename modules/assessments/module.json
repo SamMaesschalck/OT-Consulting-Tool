@@ -6,7 +6,9 @@
   "tests": {
     "pages": "scripts/test-*.html",
     "virtualTimeMs": 900000,
-    "timeoutSec": 600
+    "timeoutSec": 600,
+    "_alone": "Pages tools/run-tests.ps1 -Parallel runs on their own: focus and caret checks (home-engagement-strip, issue-links, licence, load-guard-and-rollback) and rv-paint, which times a redraw with performance.now.",
+    "alone": ["test-home-engagement-strip.html", "test-issue-links.html", "test-licence.html", "test-load-guard-and-rollback.html", "test-rv-paint.html"]
   },
   "singleHtml": {
     "parityCheck": "check-single-html.html",

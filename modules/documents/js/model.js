@@ -42,6 +42,9 @@
   var SHOWN = { "image/png": 1, "image/jpeg": 1, "image/gif": 1, "image/bmp": 1 };
   // Word's widest table, and the widest the import and a paste make.
   var MAX_COLS = 63;
+  // How deep tables inside table cells are kept (an imported chart drawn as a
+  // table is two deep). The editor draws a table inside a cell but does not edit it.
+  var NEST_MAX = 3;
 
   function isObj(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
   function str(v) { return typeof v === "string" ? v : v == null ? "" : String(v); }
@@ -128,12 +131,19 @@
     if (out.sup && out.sub) delete out.sub;
     var link = r.link ? safeLink(r.link) : "";
     if (link) out.link = link;
+    // A colour of its own (hex, never on a prompt: red wins) and a size in
+    // half-points, both from an imported file's charts and tiles.
+    var col = hexColour(r.color);
+    if (col && !out.red) out.color = col;
+    var size = Math.round(Number(r.size));
+    if (size >= 8 && size <= 144) out.size = size;
     return out;
   }
+  function hexColour(v) { v = str(v).replace(/^#/, "").toUpperCase(); return /^[0-9A-F]{6}$/.test(v) ? v : ""; }
   function sameFormat(a, b) {
     if (a.fn || b.fn) return false;
     for (var i = 0; i < FORMATS.length; i++) if (!!a[FORMATS[i]] !== !!b[FORMATS[i]]) return false;
-    return (a.link || "") === (b.link || "");
+    return (a.link || "") === (b.link || "") && (a.color || "") === (b.color || "") && (a.size || 0) === (b.size || 0);
   }
   // The one canonical form: no empty runs, neighbours of the same formatting
   // merged, only the known fields. Every run function returns it, so two run
@@ -231,19 +241,28 @@
   // ---------- walking ----------
   // fn(block, list, index, table, cell) for every block, those in table cells
   // included, in reading order. Return false from fn to stop.
+  // A table inside a cell (an imported chart) is walked too, its blocks given
+  // with the innermost table and cell.
   function each(doc, fn) {
-    var blocks = doc.blocks || [];
-    for (var i = 0; i < blocks.length; i++) {
-      var b = blocks[i];
-      if (fn(b, blocks, i, null, null) === false) return false;
-      if (b.type !== "table" || !Array.isArray(b.rows)) continue;
+    function rowsOf(b, depth) {
+      if (b.type !== "table" || !Array.isArray(b.rows) || depth > NEST_MAX) return true;
       for (var r = 0; r < b.rows.length; r++) {
         var cells = b.rows[r].cells || [];
         for (var c = 0; c < cells.length; c++) {
           var inner = cells[c].blocks || [];
-          for (var k = 0; k < inner.length; k++) if (fn(inner[k], inner, k, b, cells[c]) === false) return false;
+          for (var k = 0; k < inner.length; k++) {
+            if (fn(inner[k], inner, k, b, cells[c]) === false) return false;
+            if (rowsOf(inner[k], depth + 1) === false) return false;
+          }
         }
       }
+      return true;
+    }
+    var blocks = doc.blocks || [];
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      if (fn(b, blocks, i, null, null) === false) return false;
+      if (rowsOf(b, 1) === false) return false;
     }
     return true;
   }
@@ -480,6 +499,11 @@
     G.forEach(function (row) { for (var c = 0; c < width; c++) if (!row[c]) row[c] = null; });
     return G;
   }
+  function copyLook(from, to) {
+    if (from.fill) to.fill = from.fill;
+    if (from.vAlign) to.vAlign = from.vAlign;
+    if (from.pad) to.pad = from.pad.slice();
+  }
   function setSpan(cell, key, n) { if (n > 1) cell[key] = n; else delete cell[key]; }
   function tableOf(doc, id) { var at = find(doc, id); return at && at.block.type === "table" ? at.block : null; }
   function isOrigin(g, r, c) { return !!g && g.r === r && g.c === c; }
@@ -491,11 +515,18 @@
       var t = tableOf(doc, id); if (!t) return [];
       var G = grid(t), R = t.rows.length, W = t.cols.length, row = { cells: [] };
       at = Math.max(0, Math.min(at == null ? R : at | 0, R));
+      // The new row takes its look (fills, alignment, height) from the row
+      // above it, or the one below when it goes on top; never the header's.
+      var from = at > 0 ? at - 1 : 0;
+      if (from < (t.header || 0) && from + 1 < R) from = from + 1;
       for (var c = 0; c < W; c++) {
         var g = at > 0 && at < R ? G[at][c] : null;
         if (g && g.r < at) { if (g.c === c) setSpan(g.cell, "rowSpan", (g.cell.rowSpan | 0 || 1) + 1); continue; }
-        row.cells.push(emptyCell(doc));
+        var nc = emptyCell(doc), near = G[from] && G[from][c];
+        if (near && near.cell && from >= (t.header || 0)) copyLook(near.cell, nc);
+        row.cells.push(nc);
       }
+      if (R && t.rows[from] && t.rows[from].h && from >= (t.header || 0)) { row.h = t.rows[from].h; if (t.rows[from].hRule) row.hRule = t.rows[from].hRule; }
       t.rows.splice(at, 0, row);
       return [id];
     },
@@ -529,7 +560,12 @@
         function add() {
           var a = at > 0 && at < W ? G[r][at - 1] : null, b = a ? G[r][at] : null;
           if (a && b && a.cell === b.cell) { if (a.r === r) setSpan(a.cell, "span", (a.cell.span | 0 || 1) + 1); }
-          else cells.push(emptyCell(doc));
+          else {
+            // The new cell takes the look of the cell to its left, or to its right at the start.
+            var nc = emptyCell(doc), near = G[r][at > 0 ? at - 1 : 0];
+            if (near && near.cell) copyLook(near.cell, nc);
+            cells.push(nc);
+          }
         }
         for (var c = 0; c < W; c++) {
           if (c === at) add();
@@ -647,11 +683,16 @@
   }
   function usedKeys(doc) {
     var media = {}, parts = {}, notes = {};
-    each(doc, function (b) {
+    function visit(b) {
       if (b.type === "picture" && b.media) media[b.media] = true;
       if (b.type === "kept") { if (b.preview) media[b.preview] = true; partClosure(doc, b.rels, parts); }
       if (Array.isArray(b.runs)) b.runs.forEach(function (r) { if (isObj(r) && r.fn) notes[r.fn] = true; });
-    });
+    }
+    each(doc, visit);
+    // The original cover and document control an import took out are kept
+    // until the user chooses (Import report), pictures and all.
+    var front = frontBlocks(doc);
+    if (front.length) each({ blocks: front }, visit);
     if (doc.theme) partClosure(doc, [{ part: doc.theme }], parts);
     function known(map, of) { return Object.keys(map).filter(function (k) { return of && own(of, k); }); }
     return { media: known(media, doc.media), parts: known(parts, doc.parts), footnotes: known(notes, doc.footnotes) };
@@ -787,17 +828,27 @@
   }
   // A cell can hold paragraphs, list items, pictures and kept objects. What
   // else is found there is turned into those, so its words are not lost.
-  function cellBlocks(doc, list, seen) {
+  // A table inside a cell (from an imported file's charts) is kept down to
+  // NEST_MAX tables deep; one deeper gives its words to the cell it is in.
+  function cellBlocks(doc, list, seen, depth) {
     var out = [];
+    depth = depth || 1;
     (Array.isArray(list) ? list : []).forEach(function (b) {
       if (!isObj(b)) return;
       if (b.type === "heading") b = { id: b.id, type: "paragraph", runs: b.runs };
       else if (b.type === "prompt") b = { id: b.id, type: "paragraph", runs: [{ t: str(b.text), red: true }] };
       else if (b.type === "pageBreak") return;
+      else if (b.type === "table" && depth < NEST_MAX) {
+        var nt = { id: typeof b.id === "string" && b.id && !inherited(b.id) && !own(seen, b.id) ? b.id : newId(doc, "b"), type: "table" };
+        seen[nt.id] = true;
+        cleanTable(doc, b, nt, seen, depth + 1);
+        out.push(nt);
+        return;
+      }
       else if (b.type === "table") {
         (Array.isArray(b.rows) ? b.rows : []).forEach(function (row) {
           (isObj(row) && Array.isArray(row.cells) ? row.cells : []).forEach(function (cell) {
-            out = out.concat(cellBlocks(doc, isObj(cell) ? cell.blocks : [], seen));
+            out = out.concat(cellBlocks(doc, isObj(cell) ? cell.blocks : [], seen, depth));
           });
         });
         return;
@@ -806,6 +857,17 @@
       if (c) out.push(c);
     });
     return out;
+  }
+  // A cell's own look: a fill (hex), its vertical alignment, and its padding
+  // in twips (top, right, bottom, left). Anything else is dropped.
+  function cleanCellLook(from, c) {
+    var f = hexColour(from.fill);
+    if (f) c.fill = f;
+    if (from.vAlign === "center" || from.vAlign === "bottom") c.vAlign = from.vAlign;
+    if (Array.isArray(from.pad) && from.pad.length === 4) {
+      var pad = from.pad.map(function (n) { n = Math.round(Number(n)); return n >= 0 && n <= 2000 ? n : 0; });
+      if (pad.some(function (n) { return n > 0; })) c.pad = pad;
+    }
   }
   // Keeps a table from a file inside Word's widest table before anything
   // lays it out, so a span of a million in a file made by hand cannot make a
@@ -837,18 +899,28 @@
       row.cells = kept;
     });
   }
-  function cleanTable(doc, b, out, seen) {
+  function cleanTable(doc, b, out, seen, depth) {
     out.header = b.header ? 1 : 0;
     out.cols = [];
     out.rows = (Array.isArray(b.rows) ? b.rows : []).filter(isObj).map(function (row) {
-      return { cells: (Array.isArray(row.cells) ? row.cells : []).filter(isObj).map(function (cell) {
-        var c = { blocks: cellBlocks(doc, cell.blocks, seen) };
+      var r = { cells: (Array.isArray(row.cells) ? row.cells : []).filter(isObj).map(function (cell) {
+        var c = { blocks: cellBlocks(doc, cell.blocks, seen, depth || 1) };
         if (!c.blocks.length) c.blocks.push(make.paragraph(doc, ""));
         setSpan(c, "span", Math.max(1, cell.span | 0));
         setSpan(c, "rowSpan", Math.max(1, cell.rowSpan | 0));
+        cleanCellLook(cell, c);
         return c;
       }) };
+      // A row's own height in twips (a bar in a chart), at least or exactly.
+      var rh = Math.round(Number(row.h));
+      if (rh > 0 && rh <= 31680) { r.h = rh; if (row.hRule === "exact") r.hRule = "exact"; }
+      return r;
     });
+    // A table with a look of its own (an imported chart or row of tiles):
+    // no borders, and a width of its own in twips when narrower than the page.
+    if (b.borders === "none") out.borders = "none";
+    var tw = Math.round(Number(b.width));
+    if (tw >= 100 && tw <= 31680) out.width = tw;
     if (!out.rows.length) out.rows.push({ cells: [] });
     boundTable(out.rows);
     // Every row is made to reach the full width, and no cell reaches below
@@ -878,6 +950,7 @@
       });
     }
     walk(obj.blocks);
+    if (isObj(obj.importReport) && isObj(obj.importReport.front)) walk(obj.importReport.front.blocks);
     ["media", "parts", "footnotes"].forEach(function (k) { if (isObj(obj[k])) Object.keys(obj[k]).forEach(see); });
     return max;
   }
@@ -991,7 +1064,27 @@
     if (typeof obj.theme === "string" && own(doc.parts, obj.theme)) doc.theme = obj.theme;
     var report = cleanReport(obj.importReport);
     if (report) doc.importReport = report;
+    // The original cover and document control (shared/docx-import.js
+    // houseFront): their blocks are cleaned as the body's are, with ids of
+    // their own (they may be the body's too, while the user keeps them).
+    var fr = report && isObj(obj.importReport.front) ? obj.importReport.front : null;
+    if (fr) {
+      var fseen = {}, fblocks = [];
+      (Array.isArray(fr.blocks) ? fr.blocks : []).forEach(function (b) { var c = cleanBlock(doc, b, false, fseen); if (c) fblocks.push(c); });
+      var pairs = function (list) {
+        return (Array.isArray(list) ? list : []).filter(function (p) { return Array.isArray(p) && typeof p[0] === "string" && typeof p[1] === "string"; })
+          .slice(0, 40).map(function (p) { return [safeText(p[0]), safeText(p[1])]; });
+      };
+      if (fblocks.length) {
+        report.front = { blocks: fblocks, fields: pairs(fr.fields).filter(function (p) { return INFO_FIELDS.indexOf(p[0]) !== -1; }),
+          unused: pairs(fr.unused), contents: fr.contents === true };
+      }
+    }
     return doc;
+  }
+  function frontBlocks(doc) {
+    var fr = doc && doc.importReport && doc.importReport.front;
+    return fr && Array.isArray(fr.blocks) ? fr.blocks : [];
   }
   // The import report in the shape the contract gives it, whatever the file
   // holds: the Import report page reads it without testing each field. The

@@ -1,8 +1,15 @@
 <!doctype html>
 <!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
-<html lang="en"><head><meta charset="utf-8"/><title>Document tool: fixes to the template and the writer</title></head>
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: fixes to the template and the writer</title>
+<!-- For step 10's screen cover (once test-doc-fix-r2-cover.html). -->
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/pages.css" />
+<link rel="stylesheet" href="../css/doc-preview.css" />
+</head>
 <body>
 <pre id="out">running...</pre>
+<div id="stage" style="position:absolute; left:0; top:0;"></div>
 <!--
   Regression tests for the review of the Word template (shared/house-docx.js)
   and the export (js/export.js). Each step is one finding, built into a real
@@ -21,7 +28,17 @@
     7. characters XML cannot hold are left out wherever text is written;
     8. a picture taller than the page is made to fit it, and is listed;
     9. a numbered list that opens below its top level is written so that
-       Word prints the numbers the screen shows.
+       Word prints the numbers the screen shows;
+   10. (second review round, once test-doc-fix-r2-cover.html) the cover strip
+       keeps each label with its value. With a long author the strip wrapped
+       between CLASSIFICATION and its value (seen in Word). Now a pair that
+       fits on a line is one unit (no-break spaces and hyphens), a pair too
+       long for a line has a line of its own and wraps inside its value with
+       the label held to it, and the normal strip prints as before. The
+       screen's cover wraps its pairs the same way, and the cover still fits
+       its page;
+   11. a short document's Word file prints the issued date when one is given,
+       otherwise the date (the screen's line is test-doc-fix-pages.html's).
 
   What only Word can show (the cover on one page, a tall picture on its page,
   the list numbers Word prints) was read back from Word when these fixes were
@@ -41,6 +58,7 @@ window.addEventListener("error", function (e) { document.getElementById("out").t
 <script src="../js/house-docx.js"></script>
 <script src="../data/document.js"></script>
 <script src="../js/model.js"></script>
+<script src="../js/doc-preview.js"></script>
 <script src="../js/render.js"></script>
 <script src="../js/export.js"></script>
 <script>
@@ -81,7 +99,7 @@ window.addEventListener("error", function (e) { document.getElementById("out").t
   }
   function coverXml(doc) { return doc.slice(doc.indexOf("<w:body>"), doc.indexOf("</w:sectPr>") + 11); }
   // The cover strip holds each label to its value with no-break spaces and
-  // hyphens (test-doc-fix-r2-cover.html pins those); here they read as plain.
+  // hyphens (step 10 pins those); here they read as plain.
   function texts(xml) { return (xml.match(/<w:t [^>]*>[^<]*<\/w:t>|<w:t>[^<]*<\/w:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/\u00a0/g, " ").replace(/\u2011/g, "-"); }); }
   function paras(xml) { return xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p\/>/g) || []; }
   function paraWith(xml, needle) { return paras(xml).filter(function (p) { return p.indexOf(">" + needle + "<") !== -1; })[0] || ""; }
@@ -448,6 +466,101 @@ window.addEventListener("error", function (e) { document.getElementById("out").t
       var lvl1 = function (abs) { return ((nx.match(new RegExp('<w:abstractNum w:abstractNumId="' + abs + '"[^>]*>[\\s\\S]*?</w:abstractNum>')) || [""])[0].match(/<w:lvl w:ilvl="1"[^>]*>[\s\S]*?<\/w:lvl>/) || [""])[0]; };
       ok(lvl1(own[0]) !== "" && lvl1(own[0]).replace(/w:tplc="[^"]*"/, "") === lvl1(shared).replace(/w:tplc="[^"]*"/, ""), "an opened list's definition has the house levels: the same format, text and indent", lvl1(own[0]));
       ok(/<w:ilvl w:val="1"\/>/.test(paraWith(r.doc, "A0")) && /<w:ilvl w:val="0"\/>/.test(paraWith(r.doc, "A2")) && /<w:ilvl w:val="2"\/>/.test(paraWith(r.doc, "D0")), "and every item keeps its level");
+    });
+  });
+
+  // ---- 10. the cover strip holds each label to its value ----
+  var NBSP = " ", NBHY = "‑", R2 = A.DocRender;
+  function unesc(s) { return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&"); }
+  // The strip's paragraph, as its runs: [{ text, br, size }].
+  function stripRuns(doc) {
+    var cov = coverXml(doc);
+    var p = (cov.match(/<w:p>(?:(?!<\/w:p>)[\s\S])*<\/w:p>/g) || []).filter(function (x) { return /ISSUE/.test(x); })[0] || "";
+    return (p.match(/<w:r>[\s\S]*?<\/w:r>/g) || []).map(function (r) {
+      var t = (r.match(/<w:t[^>]*>([^<]*)<\/w:t>/) || [])[1] || "";
+      return { text: unesc(t), br: /<w:br\/>/.test(r), size: (r.match(/<w:sz w:val="(\d+)"\/>/) || [])[1] };
+    });
+  }
+  function spaced(s) { return String(s).replace(/ /g, " ").replace(/‑/g, "-"); }
+  // A date and no issued date, as the strip was first checked with.
+  function stripProject(over, kind) {
+    return { schema: "spt-document/1.0", kind: kind || "report", info: Object.assign({}, INFO, { issuedDate: "", date: "2026-11-11" }, over || {}), options: {}, footnotes: {}, media: {}, parts: {}, blocks: [para("Body text.")] };
+  }
+  var LONG_CLASS = "Official sensitive, commercial in confidence, not for onward distribution beyond the named recipients of this document";
+  // Word: the normal strip prints as before, its pairs held together
+  step(function () {
+    return build(stripProject()).then(function (r) {
+      var rs = stripRuns(r.doc);
+      ok(rs.length === 6 && spaced(rs.map(function (x) { return x.text; }).join("|")) === "ISSUE   |1.2  ·  2026-11-11|        AUTHOR   |A. Consultant|        CLASSIFICATION   |Confidential",
+         "10 normal: the strip is the assessment's six runs, word for word once its no-break spaces are read as spaces", rs.map(function (x) { return JSON.stringify(x.text); }).join("|"));
+      ok(rs.every(function (x) { return !x.br; }) && rs.map(function (x) { return x.size; }).join() === "16,19,16,19,16,19", "10 normal: on one line with no breaks, labels at 8 pt and values at 9.5 pt as before", rs.map(function (x) { return x.size + (x.br ? "br" : ""); }).join());
+      ok([0, 2, 4].every(function (i) { return /\S {3}$/.test(rs[i].text); }), "10 normal: each label is joined to its value by no-break spaces, so the two cannot part", rs.map(function (x) { return JSON.stringify(x.text); }).join("|"));
+      ok(rs[2].text.indexOf("        ") === 0 && rs[4].text.indexOf("        ") === 0, "10 normal: the spaces between pairs are ordinary spaces, so the strip wraps there");
+      ok(rs[1].text === "1.2" + NBSP + NBSP + "·" + NBSP + NBSP + "2026" + NBHY + "11" + NBHY + "11" && rs[3].text === "A." + NBSP + "Consultant",
+         "10 normal: a pair that fits a line has no break inside it, not even at a hyphen", JSON.stringify(rs[1].text) + " " + JSON.stringify(rs[3].text));
+    });
+  });
+  // Word: the long case that split CLASSIFICATION from its value
+  step(function () {
+    var p = stripProject({ client: "Northfield and District Water and Wastewater Services Joint Operating Company Limited", author: LONG_AUTHOR,
+      classification: "Official sensitive, commercial in confidence, not for onward distribution" });
+    return build(p).then(function (r) {
+      var rs = stripRuns(r.doc), cls = rs.filter(function (x) { return /CLASSIFICATION/.test(x.text); })[0] || { text: "" };
+      ok(/CLASSIFICATION {3}$/.test(cls.text), "10 long: CLASSIFICATION is held to its value, so it cannot end a line with the value on the next", JSON.stringify(cls.text));
+      var auth = rs[rs.indexOf(rs.filter(function (x) { return /AUTHOR/.test(x.text); })[0]) + 1] || { text: "" };
+      ok(auth.text === LONG_AUTHOR.replace(/ /g, NBSP), "10 long: the author, which fits a line, is one unit", JSON.stringify(auth.text));
+      ok(HD.coverFits(p), "10 long: the cover still fits its page");
+    });
+  });
+  // Word: a pair too long for one line
+  step(function () {
+    var p = stripProject({ author: LONG_AUTHOR, classification: LONG_CLASS });
+    return build(p).then(function (r) {
+      var rs = stripRuns(r.doc), at = -1;
+      rs.forEach(function (x, i) { if (/CLASSIFICATION/.test(x.text)) at = i; });
+      var lab = rs[at] || {}, val = rs[at + 1] || {};
+      ok(lab.br === true && lab.text === "CLASSIFICATION" + NBSP + NBSP + NBSP, "10 too long: it starts a line of its own, with no spaces before its label", JSON.stringify(lab));
+      ok(val.text === LONG_CLASS, "10 too long: its value keeps ordinary spaces, so it wraps inside itself", JSON.stringify(val.text));
+      ok(HD.coverFits(p), "10 too long: the cover still fits its page");
+      var some = stripProject({ author: LONG_AUTHOR, classification: new Array(15).join("not for onward distribution ") });
+      var lots = stripProject({ author: LONG_AUTHOR, classification: new Array(50).join("not for onward distribution ") });
+      ok(HD.coverRoom(HD.coverInput(some)).foot === true && HD.coverRoom(HD.coverInput(lots)).foot === false,
+         "10 too long: the estimate of the strip's height still says when a pair of many lines no longer fits", JSON.stringify(HD.coverRoom(HD.coverInput(lots))));
+    });
+  });
+  // the screen: pairs are units, laid out as Word lays them
+  step(function () {
+    var stage = document.getElementById("stage");
+    function draw(over) { stage.textContent = ""; var el = R2.coverEl(stripProject(over)); stage.appendChild(el); return el; }
+    var el = draw({});
+    var pairs = el.querySelectorAll(".cover-strip > .cover-pair");
+    ok(pairs.length === 3 && Array.prototype.every.call(pairs, function (q) { return q.children.length === 2 && q.children[0].className === "cover-k" && q.children[1].className === "cover-v"; }),
+       "10 screen: the strip is three label and value pairs, each one unit", el.querySelector(".cover-strip").innerHTML.slice(0, 200));
+    var tops = Array.prototype.map.call(el.querySelectorAll(".cover-strip .cover-k, .cover-strip .cover-v"), function (n) { return Math.round(n.getBoundingClientRect().bottom); });
+    ok(tops.length === 6 && Math.max.apply(null, tops) - Math.min.apply(null, tops) <= 4, "10 screen: the normal strip is on one line", tops.join());
+    var stripH = el.querySelector(".cover-strip").getBoundingClientRect().height;
+    ok(stripH > 10 && stripH < 20, "10 screen: and one line high, as before", String(stripH));
+    [["long", { client: "Northfield and District Water and Wastewater Services Joint Operating Company Limited", author: LONG_AUTHOR, classification: "Official sensitive, commercial in confidence, not for onward distribution" }],
+     ["too long", { author: LONG_AUTHOR, classification: LONG_CLASS }]].forEach(function (c) {
+      var e = draw(c[1]);
+      var parted = Array.prototype.filter.call(e.querySelectorAll(".cover-strip .cover-k"), function (k) {
+        var v = k.nextElementSibling, rc = v && v.getClientRects()[0];
+        return !rc || Math.abs(rc.bottom - k.getBoundingClientRect().bottom) > 4;
+      }).map(function (k) { return k.textContent; });
+      ok(parted.length === 0, "10 screen, " + c[0] + ": every label is on the line where its value starts", parted.join());
+    });
+    stage.textContent = "";
+  });
+
+  // ---- 11. a short document's date in the Word file ----
+  step(function () {
+    var both = stripProject({ issuedDate: "12 November 2026" }, "short"), dateOnly = stripProject({ issuedDate: "" }, "short"), blank = stripProject({ issuedDate: "   " }, "short");
+    ok(HD.shortHeadLine(dateOnly) === "Northfield Water · 1.2 · 2026-11-11" && HD.shortHeadLine(blank) === HD.shortHeadLine(dateOnly), "11 short: with no issued date, or only spaces, the line gives the date", HD.shortHeadLine(blank));
+    return build(both).then(function (r) {
+      ok(r.doc.indexOf(">Northfield Water · 1.2 · 12 November 2026<") !== -1 && r.doc.indexOf("· 2026-11-11<") === -1, "11 short: the Word file prints the issued date and not the date");
+      return build(dateOnly);
+    }).then(function (r) {
+      ok(r.doc.indexOf(">Northfield Water · 1.2 · 2026-11-11<") !== -1, "11 short: and the date when there is no issued date");
     });
   });
 

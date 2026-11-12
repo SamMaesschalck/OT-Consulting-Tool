@@ -92,7 +92,7 @@ window.docx = (function () {
     var inst = E.state.instrument;
     var tidA = E.state.activeTargetId;
     E.renameTarget(tidA, "PalletPro AGV-350");
-    E.setEngagementField ? E.setEngagementField("clientName", "Fabrik GmbH") : (E.state.engagement.engagement.clientName = "Fabrik GmbH");
+    E.updateMetadata({ clientName: "Fabrik GmbH" });
 
     // ---- activation & shape ----
     check("instrument activates as a layered (isCRA) csms-conformance instrument", CRA.isCRA(inst) && E.state.scoringFamily === "csms-conformance");

@@ -8,10 +8,7 @@
 <div id="summary" class="sum"></div>
 
 <script src="harness.js"></script>
-<script>H.app({ docx: "mock", tours: ["cra", "nis2", "posture"] }); H.dom();</script>
-<script>
-window.docx = { Document:function(){}, Paragraph:function(){}, TextRun:function(){}, TableCell:function(){}, TableRow:function(){}, Table:function(){}, ImageRun:function(){}, PageBreak:function(){}, Header:function(){}, Footer:function(){}, HeadingLevel:{}, AlignmentType:{}, WidthType:{}, ShadingType:{}, TableLayoutType:{}, PageOrientation:{}, HeightRule:{}, PageNumber:{}, Packer:{ toBlob:function(){ return Promise.resolve(new Blob()); } } };
-</script>
+<script>H.app({ tours: ["cra", "nis2", "posture"] }); H.dom();</script>
 <script>
 (function () {
   window.confirm = function () { return true; };

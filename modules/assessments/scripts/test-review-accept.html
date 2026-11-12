@@ -7,7 +7,7 @@
   tool, and only counts once it is in the Word document. Each editable kind is
   accepted through App.Review.accept, then the Word file is built separately and
   opened: a paragraph of a section's opening (that paragraph alone, the rest of
-  the run still generated: test-review-para.html goes through it), a renamed
+  the run still generated: test-rv-para.html goes through it), a renamed
   section, a section title, each narrative field, the proposed next steps, and a
   plan and an evidence field. Then what must not be accepted: generated text
   falls back to Copy, and so do a stale comment and wording shared by several
@@ -374,22 +374,9 @@ H.test(function (ok, done) {
     ok(!plan.can && /on 2 items/.test(plan.why), "wording recorded on two items falls back to Copy, as it could only change one", JSON.stringify(plan));
   });
 
-  // ---- a section that opens differently per zone ----------------------------------
-  // Only the commented paragraph is replaced, so the other zones' openings
-  // are not at risk and Accept is offered (test-review-para.html accepts it).
-  step(function () { E.activateInstrument("iec-62443-3-3"); return docs(); });
-  step(function (d) {
-    var byKey = {};
-    d.forEach(function (doc) { (doc.probe || []).forEach(function (s) { if (s.key && s.texts.length) (byKey[s.key] = byKey[s.key] || []).push(JSON.stringify(s.texts)); }); });
-    var key = Object.keys(byKey).filter(function (k) { return byKey[k].length > 1 && byKey[k].some(function (x) { return x !== byKey[k][0]; }); })[0];
-    ok(!!key, "there is a section printed per zone with different openings (" + key + ")");
-    var doc = d[0], sec = (doc.probe || []).filter(function (s) { return s.key === key; })[0];
-    var b = doc.blocks.filter(function (x) { return x.sectionKey === key && RC.norm(x.text) === RC.norm(sec.texts[0]); })[0];
-    var t = thread(blockAnchor(b), "Words for one zone only.");
-    var plan = RV.acceptPlan(t);
-    ok(plan.can && plan.kind === "paragraph", "a paragraph there can be accepted: it replaces that paragraph, not every zone's opening", JSON.stringify(plan));
-    var s = RV.store(); s.threads = s.threads.filter(function (x) { return x !== t; });
-  });
+  // (A section that opens differently per zone: test-rv-para.html offers,
+  // accepts and undoes a paragraph there, and checks the other zones' openings
+  // are untouched.)
 
   // ---- a change that does not reach the document is undone -----------------------
   step(function () { E.activateInstrument("ncsc-caf"); return docs(); });
@@ -415,7 +402,7 @@ H.test(function (ok, done) {
   step(function () {
     var pack = RV.packItems();
     var tgt = E.state.engagement.targets[0];
-    ok(pack.items.length && pack.items.every(function (i) { return i.targetId && E.state.engagement.targets.some(function (t) { return t.id === i.targetId; }); }), "each pack item carries its target's id");
+    // (That every pack item carries its target's id is test-rv-pack.html's.)
     var it = pack.items.filter(function (i) { return i.evidence && i.targetId === tgt.id && RC.norm(i.evidence).length > 12; })[0];
     rn = { it: it, tid: tgt.id, oldName: tgt.name };
     rn.withId = thread({ documentIndex: 0, kind: "item", targetName: tgt.name, targetId: tgt.id, itemId: it.itemId, field: "evidence", quote: it.evidence, code: it.code, itemTitle: it.title }, it.evidence + " Checked after the rename.");

@@ -1,0 +1,163 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool Word preview</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  The Word preview (js/word-preview.js over the shared js/doc-preview.js) on
+  the tour's demo project: both reports are built as Download Word report
+  builds them, read back and drawn, and what is drawn is checked against the
+  file itself, read here from word/document.xml: the house cover recognised,
+  one sheet per page the file starts and landscape where it turns landscape,
+  every heading, every picture and every coloured cell. Then the page: the
+  sidebar entry, both reports drawn, nothing downloaded, and the Word file
+  built from the same project byte for byte what the export makes.
+-->
+<iframe id="app" src="../index.html?tour=1" style="width:1300px;height:900px;visibility:hidden"></iframe>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " - " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  function attr(el, name) { return el.getAttributeNS(W, name) || el.getAttribute("w:" + name); }
+
+  function documentXml(w, blob) {
+    return w.App.ZipIO.read(blob).then(function (list) {
+      var e = list.filter(function (x) { return x.name === "word/document.xml"; })[0];
+      return new DOMParser().parseFromString(w.App.ZipIO.text(e), "application/xml");
+    });
+  }
+  // As the assessment tool's test-word-preview.html reads it: the cover (the
+  // first section) left out.
+  function fromXml(d) {
+    var body = d.getElementsByTagNameNS(W, "body")[0];
+    var kids = Array.prototype.slice.call(body.children), out = { sheets: 0, land: 0, headings: 0, pictures: 0, fills: 0 };
+    var start = 0, i;
+    for (i = 0; i < kids.length; i++) { if (kids[i].localName === "p" && kids[i].getElementsByTagNameNS(W, "sectPr")[0]) { start = i + 1; break; } }
+    var starts = 0;
+    function close(sect) {
+      var pg = sect.getElementsByTagNameNS(W, "pgSz")[0], land = !!pg && attr(pg, "orient") === "landscape";
+      out.sheets += 1 + starts; if (land) out.land += 1 + starts; starts = 0;
+    }
+    for (i = start; i < kids.length; i++) {
+      var el = kids[i];
+      if (el.localName === "sectPr") { close(el); continue; }
+      Array.prototype.forEach.call(el.getElementsByTagNameNS(W, "br"), function (br) { if (attr(br, "type") === "page") starts++; });
+      if (el.localName === "p") {
+        var st = el.getElementsByTagNameNS(W, "pStyle")[0];
+        if (st && /^Heading[123]$/.test(attr(st, "val"))) out.headings++;
+        var sect = el.getElementsByTagNameNS(W, "sectPr")[0];
+        if (sect) close(sect);
+      }
+      out.pictures += el.getElementsByTagNameNS("http://schemas.openxmlformats.org/drawingml/2006/main", "blip").length;
+      Array.prototype.forEach.call(el.getElementsByTagNameNS(W, "tcPr"), function (tcPr) {
+        var shd = tcPr.getElementsByTagNameNS(W, "shd")[0];
+        if (!shd) return;
+        var f = String(attr(shd, "val") === "solid" ? attr(shd, "color") : attr(shd, "fill") || "").toUpperCase();
+        if (/^[0-9A-F]{6}$/.test(f) && f !== "FFFFFF") out.fills++;
+      });
+    }
+    return out;
+  }
+
+  function run(w) {
+    var DP = w.App.DocPreview, RX = w.RiskExports, RT = w.RiskTool, downloads = 0;
+    ok(!!DP && !!w.App.DocxImport && !!w.RiskWordPreview, "the preview's reader, renderer and page are loaded");
+    var chain = Promise.resolve();
+    [{ id: "detailed", opts: {} }, { id: "highLevel", opts: { highLevelOnly: true } }].forEach(function (d) {
+      chain = chain.then(function () {
+        return w.docx.Packer.toBlob(RX.buildWordDoc(RT.state.project, d.opts)).then(function (blob) {
+          return Promise.all([documentXml(w, blob), DP.fromDocx(blob, { name: d.id + ".docx" })]);
+        }).then(function (got) {
+          var want = fromXml(got[0]), read = got[1];
+          ok(!!read.cover && /RISK ASSESSMENT/.test(read.cover.kicker) && read.cover.titleLines.length > 0 && read.cover.strip.length >= 2,
+            d.id + ": the house cover is recognised", JSON.stringify(read.cover && { k: read.cover.kicker, t: read.cover.titleLines }));
+          var paper = w.document.createElement("div");
+          w.document.body.appendChild(paper);
+          DP.drawRead(paper, read, {});
+          var body = paper.querySelectorAll(".dpv-sheet[data-part=body]");
+          ok(paper.querySelectorAll(".dpv-sheet[data-part=cover] .cover-page").length === 1, d.id + ": the cover is drawn on a sheet of its own");
+          ok(body.length === want.sheets, d.id + ": one sheet per page the file starts (" + want.sheets + ")", "drew " + body.length);
+          ok(paper.querySelectorAll(".dpv-sheet.land").length === want.land, d.id + ": landscape where the file turns landscape (" + want.land + ")", "drew " + paper.querySelectorAll(".dpv-sheet.land").length);
+          var heads = paper.querySelectorAll(".dpv-sheet[data-part=body] > .blk[data-type=heading]").length;
+          ok(heads === want.headings, d.id + ": every heading (" + want.headings + ")", "drew " + heads);
+          var pics = paper.querySelectorAll(".dpv-sheet[data-part=body] figure.pic img").length;
+          ok(pics === want.pictures, d.id + ": every picture in the body (" + want.pictures + ")", "drew " + pics);
+          var filled = paper.querySelectorAll(".dpv-sheet[data-part=body] .filled").length;
+          var navyHeads = paper.querySelectorAll(".dpv-sheet[data-part=body] th:not(.filled):not(.plain)").length;
+          ok(filled + navyHeads === want.fills, d.id + ": every coloured cell is drawn coloured (" + want.fills + ")", "drew " + filled + " + " + navyHeads);
+          paper.parentNode.removeChild(paper);
+          DP.dispose(read);
+        });
+      });
+    });
+    // The export is unchanged: the same project builds the same file, bar
+    // the parts the library writes afresh each time (its dates and ids).
+    chain = chain.then(function () {
+      var saved = w.URL.createObjectURL, got = [];
+      w.URL.createObjectURL = function (b) { if (b && /wordprocessingml|octet|^$/.test(b.type || "")) got.push(b); return saved.call(w.URL, b); };
+      var origClick = w.HTMLAnchorElement.prototype.click;
+      w.HTMLAnchorElement.prototype.click = function () { if (this.download) { downloads++; return; } return origClick.apply(this, arguments); };
+      return new Promise(function (res) { RX.downloadWord({}, function () { res(); }); }).then(function () {
+        w.URL.createObjectURL = saved;
+        w.HTMLAnchorElement.prototype.click = origClick;
+        ok(downloads === 1 && got.length >= 1, "the export still makes its file");
+        return Promise.all([documentXml(w, got[got.length - 1]), w.docx.Packer.toBlob(RX.buildWordDoc(RT.state.project, {})).then(function (b) { return documentXml(w, b); })]);
+      }).then(function (two) {
+        var s = new XMLSerializer();
+        function clean(x) { return s.serializeToString(x).replace(/ (w:rsid\w*|wp14:\w+|w14:\w+|r:id|r:embed|id|name)="[^"]*"/g, ""); }
+        ok(clean(two[0]) === clean(two[1]), "the file the preview reads is the file the export makes");
+      });
+    });
+    // The page itself.
+    chain = chain.then(function () {
+      downloads = 0;
+      var origClick = w.HTMLAnchorElement.prototype.click;
+      w.HTMLAnchorElement.prototype.click = function () { if (this.download) { downloads++; return; } return origClick.apply(this, arguments); };
+      var nav = w.document.getElementById("nav-word-preview");
+      ok(!!nav && /Word preview/.test(nav.textContent), "the sidebar has a Word preview entry under Reports");
+      if (!nav) return;
+      nav.click();
+      function wait(test, ms) {
+        return new Promise(function (res) { var t0 = Date.now(); (function poll() { if (test() || Date.now() - t0 > ms) res(test()); else setTimeout(poll, 100); })(); });
+      }
+      return wait(function () { return w.document.querySelectorAll("#wp-paper .dpv-sheet").length > 2; }, 60000).then(function (drawn) {
+        ok(drawn, "the page draws the detailed report's sheets");
+        ok(!!w.document.querySelector("#wp-paper .dpv-sheet[data-part=cover] .cover-page"), "the page starts with the cover");
+        var n1 = w.document.querySelectorAll("#wp-paper .dpv-sheet").length;
+        var hl = w.document.querySelector('#wp-docs [data-doc="highLevel"]');
+        ok(!!hl, "the high-level report can be chosen");
+        if (!hl) return;
+        hl.click();
+        return wait(function () { var c = w.document.querySelector("#wp-paper .cover-title"); return !!c && /High-Level/i.test(c.textContent) && n1 > 1; }, 60000).then(function (d2) {
+          ok(d2, "the page draws the high-level report");
+          ok(downloads === 0, "a preview downloads nothing");
+          ok(!/[–—]/.test(w.document.querySelector(".page-sub").textContent), "no en or em dashes in the page's own words");
+          w.HTMLAnchorElement.prototype.click = origClick;
+        });
+      });
+    });
+    return chain;
+  }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.docx || !w.App || !w.App.DocPreview ||
+        (w.RiskTool.state.project.suc.name || "").indexOf("Acme") !== 0) {
+      if (++tries > 300) { clearInterval(t); lines.push("FAIL app did not load seeded"); failures++; done(); }
+      return;
+    }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async: " + (e && e.message) + " " + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+})();
+</script>
+</body>
+</html>

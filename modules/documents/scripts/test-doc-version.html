@@ -43,9 +43,6 @@
     lines.push((c ? "PASS " : "FAIL ") + n + (!c && d != null ? " - " + d : "")); if (!c) fail++;
     show("FAIL the page did not finish: re-run it alone with a larger time budget");
   }
-  // Every package is built now, so a stand-in being used means a real object
-  // has gone missing: that is a failure, not a note.
-  function note(t) { ok(false, "no stand-in is used", t); }
   function finish() {
     alive = false;
     show("\n" + (fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED"));
@@ -166,12 +163,6 @@
         ok(res.project.blocks.length >= 2 && !!res.project.importReport, "a Word file was imported", res.project.blocks.length + " blocks");
         res.project.info.title = res.project.info.title || "Marker imported";
         return stamp(res.project, "imported");
-      }, function (e) {
-        if (!/not built yet/.test(String(e && e.message))) throw e;
-        note("App.DocxImport is still a stub: a hand-made imported document stands in for the fixture");
-        var d = plain("report", "imported");
-        d.importReport = { source: { name: "Customer file.docx", size: blob.size, importedAt: "2026-11-11T09:00:00.000Z" }, carried: { paragraphs: 1 }, toCheck: [], notCarried: [], changed: [{ code: "formatting", count: 1 }] };
-        return d;
       });
     });
   }

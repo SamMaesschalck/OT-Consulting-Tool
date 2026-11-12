@@ -37,6 +37,19 @@ table.doc-table {
 .doc-table th p { margin: 0; }
 .doc-table img { max-width: 100%; height: auto; }
 
+/* A table with a look of its own, from an imported file (its fills are set
+   on the cells): drawn on the paper as the preview draws it
+   (shared/doc-preview.css). */
+.doc-table th.filled { color: inherit; }
+.doc-table th.plain { background: transparent; color: inherit; font-weight: 700; }
+.doc-table.bare > tbody > tr > th, .doc-table.bare > tbody > tr > td { border: 0; padding: 0 7.67px; }
+.doc-table.bare .blk + .blk { margin-top: 0; }
+.doc-table.bare .blk .txt { min-height: 0; }
+table.doc-table.nested { margin: 0; }
+.doc-table tr.exact > td.bar, .doc-table tr.exact > th.bar { padding-top: 0; padding-bottom: 0; line-height: 0; font-size: 0; }
+.doc-table td.bar .blk .txt, .doc-table th.bar .blk .txt { min-height: 0; padding: 0; font-size: 0; line-height: 0; }
+.blk .rs { line-height: 1.2; }
+
 /* The cell holding the caret. */
 .doc-table td:focus-within,
 .doc-table th:focus-within {

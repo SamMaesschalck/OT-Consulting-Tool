@@ -1,0 +1,256 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: the house cover recognised</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  A Word file that carries a SolutionsPT cover and document control page (an
+  assessment or risk report, or this tool's own export, older templates too)
+  imports with them taken out: Document information is filled from what they
+  said and the export prints the current template's pages. The originals are
+  kept on the import report, and its first card puts them back, and takes
+  them out again, each as one step Undo reverses. Someone else's cover is not
+  taken: its first page is offered for removal instead.
+
+    1. The reader, on files the real writer makes: this tool's export (two-row
+       cover, its control rows, a contents list), a report-style one-row cover
+       with the assessment's control rows, a risk-style control table, someone
+       else's cover, and an ordinary first page.
+    2. The Import report in the tool: the card, Keep, Undo, Redo, Use, a typed
+       field never overwritten, Save and Load keeping the originals and their
+       pictures, and the other cover's Remove these blocks.
+-->
+<iframe id="f" style="width:1300px;height:900px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  var debug = /debug/.test(location.hash);
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; if (debug) document.getElementById("out").textContent = lines.join("\n"); }
+  function eq(a, b, n) { var x = JSON.stringify(a), y = JSON.stringify(b); ok(x === y, n, "got " + x + " wanted " + y); }
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  document.getElementById("out").textContent = "FAIL the page did not finish: re-run it alone with a larger time budget";
+  var alive = !debug, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  function pause(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  var f = document.getElementById("f");
+  f.onload = function () {
+    var w = f.contentWindow, d = w.document, A = w.App, T = w.DocumentTool, M = A.DocModel, H = A.HouseDocx, I = A.DocxImport, X = w.docx, errors = [];
+    w.addEventListener("error", function (e) { errors.push("error: " + e.message + " " + e.filename + ":" + e.lineno); });
+    w.addEventListener("unhandledrejection", function (e) { errors.push("rejection: " + (e.reason && (e.reason.message || e.reason))); });
+    w.confirm = function () { return true; };
+    var kept = {};
+    A.DocStorage.bytesStore = {
+      putDoc: function (id, json) { (kept[id] = kept[id] || { blobs: {} }).doc = json; return Promise.resolve(); },
+      getDoc: function (id) { return Promise.resolve(kept[id] ? kept[id].doc : null); },
+      putBlob: function (id, key, blob) { (kept[id] = kept[id] || { blobs: {} }).blobs[key] = blob; return Promise.resolve(); },
+      getBlobs: function (id) { return Promise.resolve(kept[id] ? kept[id].blobs : {}); },
+      remove: function (id) { delete kept[id]; return Promise.resolve(); },
+      ok: function () { return Promise.resolve(true); }
+    };
+    A.DocStorage.download = function () {};
+    w.showSaveFilePicker = undefined; w.showOpenFilePicker = undefined;
+    function $(id) { return d.getElementById(id); }
+    // The fields that hold something, in name order, so two can be compared.
+    function info(doc) { var o = {}; Object.keys(doc.info).sort().forEach(function (k) { if (doc.info[k] && k !== "coverTitleLines") o[k] = doc.info[k]; }); return o; }
+    function sorted(obj) { var o = {}; Object.keys(obj).sort().forEach(function (k) { o[k] = obj[k]; }); return o; }
+    function codes(rep, list) { return (rep[list] || []).map(function (e) { return e.code; }); }
+    function firstText(doc) { var b = doc.blocks[0]; return b ? b.type + ":" + M.text(b).replace(/\s+/g, " ") : ""; }
+
+    // ---- files, made by the real writer ------------------------------------
+    // This tool's own export: a report with every field, a contents list.
+    function ownDoc() {
+      return M.normalise({
+        schema: "spt-document/1.0", id: "doc-cover-own", kind: "report",
+        info: { title: "Network segmentation proposal", docType: "Method statement", reference: "OPP-10442", client: "Northfield Water", site: "Ashby treatment works",
+          author: "A. Consultant", revision: "1.2", date: "2026-11-11", qaReviewBy: "B. Reviewer", authorisedBy: "C. Director", issuedTo: "D. Client",
+          issuedDate: "2026-11-12", classification: "Commercial in confidence" },
+        options: { numberHeadings: false, contents: true }, nextId: 100,
+        blocks: [
+          { id: "b1", type: "heading", level: 1, runs: [{ t: "Summary" }] },
+          { id: "b2", type: "paragraph", runs: [{ t: "The body starts here." }] },
+          { id: "b3", type: "heading", level: 2, runs: [{ t: "Scope" }] },
+          { id: "b4", type: "paragraph", runs: [{ t: "And goes on." }] }
+        ]
+      });
+    }
+    function exportOf(doc) { return H.buildDocument(doc, { issueStatus: "draft" }).then(function (r) { return r.blob; }); }
+    function read(blob, name) { return I.read(new w.File([blob], name), { name: name }); }
+    var run = H.run, FONT = H.FONT;
+    function P(t, o) { o = Object.assign({ font: FONT }, o || {}); return new X.Paragraph({ children: [run(t, o)] }); }
+    // A report's cover as the assessment and risk exporters print it: one row, one cell.
+    function reportCover(kicker, client, site, sub, strip) {
+      var kids = [];
+      var bg = A.Assets.coverBg, lc = A.Assets.logoCard;
+      kids.push(new X.Paragraph({ children: [new X.ImageRun({ data: bg.bytes(), transformation: { width: 824, height: 1240 },
+        floating: { horizontalPosition: { relative: "page", offset: -91440 }, verticalPosition: { relative: "page", offset: -457200 }, behindDocument: true, allowOverlap: true } })] }));
+      kids.push(new X.Paragraph({ children: [new X.ImageRun({ data: lc.bytes(), transformation: { width: 250, height: 80 } })] }));
+      kids.push(P(kicker, { bold: true, size: 21, color: "6EC1E4" }));
+      kids.push(P("NCSC Cyber Assessment", { bold: true, size: 52, color: "FFFFFF" }));
+      kids.push(P("Framework 4.0", { bold: true, size: 52, color: "FFFFFF" }));
+      kids.push(P(client, { size: 30, color: "C7D8E8" }));
+      if (site) kids.push(P(site, { size: 21, color: "9DB8D6" }));
+      if (sub) kids.push(P(sub, { size: 20, bold: true, color: "6EC1E4" }));
+      kids.push(new X.Paragraph({ children: strip.map(function (s, i) { return run(s, { font: FONT, bold: i % 2 === 0, size: i % 2 === 0 ? 16 : 19, color: "FFFFFF" }); }) }));
+      kids.push(P("SolutionsPT Ltd   ·   Unit 1, Oakfield Road", { size: 15, color: "DBE6F1" }));
+      kids.push(P("Telephone +44 (0) 161 495 4600", { size: 15, color: "DBE6F1" }));
+      var NB = { top: { style: "none", size: 0, color: "auto" }, bottom: { style: "none", size: 0, color: "auto" }, left: { style: "none", size: 0, color: "auto" }, right: { style: "none", size: 0, color: "auto" }, insideHorizontal: { style: "none", size: 0, color: "auto" }, insideVertical: { style: "none", size: 0, color: "auto" } };
+      return [new X.Table({ width: H.dxaW(11906), columnWidths: [11906], borders: NB, rows: [new X.TableRow({ children: [new X.TableCell({ children: kids })] })] }), P("")];
+    }
+    function reportFile(cover, controlTitle, pairs) {
+      var front = [H.h1(controlTitle), H.table(pairs.map(function (p) {
+        return new X.TableRow({ children: [H.cell(H.body(p[0]), { width: 32, fill: "F2F4F7" }), H.cell(H.body(p[1] || ""), { width: 68 })] });
+      })), H.body(""), H.pageBreakPara(), H.h1("1  Executive summary"), H.body("The report's first real section.")];
+      var doc = H.assemble({ kind: "report", cover: cover, segments: [{ land: false, children: front }], footerCentre: "x", props: {} }, { issueStatus: "draft" });
+      return new Promise(function (res, rej) { H.pack(doc, { issueStatus: "draft" }, function (e, out) { if (e) rej(e); else res(out); }); });
+    }
+    function plainFile(children) {
+      var doc = new X.Document({ sections: [{ children: children }] });
+      return X.Packer.toBlob(doc);
+    }
+
+    var ownFirst, ownBlob, chain = Promise.resolve();
+    // ---- 1a. this tool's own export ------------------------------------------
+    chain = chain.then(function () {
+      ownFirst = ownDoc();
+      return exportOf(ownFirst);
+    }).then(function (blob) {
+      ownBlob = blob;
+      return read(blob, "own.docx");
+    }).then(function (r) {
+      var p = r.project, rep = r.report;
+      eq(firstText(p), "heading:Summary", "own export: the body starts at its first heading, with no cover or control blocks before it");
+      eq(p.blocks.length, 4, "own export: the body holds only the four blocks written");
+      // The cover prints the issued date in place of the date, so the date is
+      // not read back as a date of its own.
+      var want = info(ownFirst);
+      delete want.date;
+      eq(info(p), want, "own export: Document information is filled from the cover and document control, every field (the issued date is not a second date)");
+      ok(p.options.contents === true, "own export: its contents list is taken out and the option is on");
+      eq(codes(rep, "toCheck"), [], "own export: nothing under Check first");
+      ok(codes(rep, "notCarried").indexOf("internal-links") === -1, "own export: the contents list's links are not reported as left out", JSON.stringify(rep.notCarried));
+      ok(rep.front && rep.front.blocks.length >= 4 && rep.front.blocks[0].type === "table", "own export: the original pages are kept on the report", rep.front && rep.front.blocks.map(function (b) { return b.type; }).join(","));
+      ok(rep.front && rep.front.contents === true, "own export: the report says a contents list went with them");
+      eq((rep.front && rep.front.unused) || [], [], "own export: everything it said has a field");
+      eq(I.houseCover(rep.front.blocks).titleLines.join(" "), "Network segmentation proposal", "the one recogniser reads the two-row cover's title");
+    });
+    // A bare one: no type, client, site or author, so the cover's first row is bold throughout
+    // (read as a header row), and the file names the company as its creator.
+    chain = chain.then(function () {
+      var bare = M.create("report");
+      bare.info.title = "A bare document"; bare.info.date = "";
+      bare.blocks = [{ id: M.newId(bare, "b"), type: "heading", level: 1, runs: [{ t: "Only heading" }] }];
+      return exportOf(bare).then(function (blob) { return read(blob, "bare.docx"); });
+    }).then(function (r) {
+      ok(!!r.report.front && firstText(r.project) === "heading:Only heading" && !(r.report.toCheck || []).length, "a bare cover with no client or site is recognised too", firstText(r.project));
+      eq(info(r.project), { classification: "Confidential", revision: "0.1", title: "A bare document" }, "and nothing it did not say is filled, not even the file's creator as the author");
+    });
+    // ---- 1b. a report's one-row cover and the assessment's control rows ------
+    chain = chain.then(function () {
+      return reportFile(reportCover("OT CYBER SECURITY ASSESSMENT", "Northfield Water", "Ashby works", "NCSC CAF 4.0  ·  Profile: Baseline",
+        ["ISSUE   ", "0.3  ·  2026-10-01", "        AUTHOR   ", "A. Consultant", "        CLASSIFICATION   ", "Confidential"]),
+        "Document control and confidentiality",
+        [["Document revision", "0.3"], ["Status", "Draft"], ["QA review by", "B. Reviewer"], ["Authorised by", ""], ["Issued to", "D. Client"],
+          ["Issued date", "2026-10-02"], ["Confidentiality", "Confidential"], ["Instrument", "NCSC Cyber Assessment Framework 4.0"], ["Edition", "4.0"]]);
+    }).then(function (blob) { return read(blob, "assessment.docx"); }).then(function (r) {
+      var p = r.project, rep = r.report;
+      eq(firstText(p), "heading:1 Executive summary", "report cover: the body starts at the report's first real section");
+      eq(info(p), sorted({ title: "NCSC Cyber Assessment Framework 4.0", docType: "OT cyber security assessment", client: "Northfield Water", site: "Ashby works",
+        author: "A. Consultant", revision: "0.3", date: "2026-10-01", qaReviewBy: "B. Reviewer", issuedTo: "D. Client", issuedDate: "2026-10-02", classification: "Confidential" }),
+        "report cover: the kicker is the type in sentence case, and every printed field is filled");
+      eq(rep.front.unused, [["Line under the site", "NCSC CAF 4.0 · Profile: Baseline"], ["Instrument", "NCSC Cyber Assessment Framework 4.0"], ["Edition", "4.0"]],
+        "report cover: the line under the site and the instrument rows have no field and are listed");
+      eq(codes(rep, "toCheck"), [], "report cover: nothing under Check first");
+      ok(codes(rep, "changed").indexOf("floating-pictures") === -1, "report cover: the cover's background is not reported as a floating picture brought in line");
+    });
+    // ---- 1c. the risk report's control table ---------------------------------
+    chain = chain.then(function () {
+      return reportFile(reportCover("OT CYBER RISK ASSESSMENT", "Client", "Water treatment SCADA", "IEC 62443-3-2 Clause 4: zones",
+        ["ISSUE   ", "0.1  ·  2026-09-09", "        AUTHOR   ", "", "        CLASSIFICATION   ", "Confidential"]),
+        "Document control",
+        [["Client / organisation", "(not set)"], ["System under consideration", "Water treatment SCADA"], ["Consultant", "E. Analyst"], ["Assessment date", "2026-09-09"],
+          ["Document revision", "0.1"], ["QA review by", "(not set)"], ["Confidentiality", "Confidential"], ["Method", "IEC 62443-3-2 Clause 4 workflow"]]);
+    }).then(function (blob) { return read(blob, "risk.docx"); }).then(function (r) {
+      var p = r.project;
+      eq(firstText(p), "heading:1 Executive summary", "risk cover: the body starts at the report's first real section");
+      eq(info(p), sorted({ title: "NCSC Cyber Assessment Framework 4.0", docType: "OT cyber risk assessment", site: "Water treatment SCADA", author: "E. Analyst", revision: "0.1",
+        date: "2026-09-09", classification: "Confidential" }),"risk cover: (not set) and the placeholder client fill nothing; the consultant is the author");
+      eq(I.sentenceCase("OT CYBER SECURITY ASSESSMENT"), "OT cyber security assessment", "the kicker's capitals become words, OT kept");
+    });
+    // ---- 1d. someone else's cover, and an ordinary first page -------------------
+    var foreignBlob;
+    chain = chain.then(function () {
+      return plainFile([P("Acme Engineering", { size: 64, bold: true }), P("Prepared for Northfield Water"), new X.Paragraph({ children: [new X.PageBreak()] }),
+        new X.Paragraph({ heading: X.HeadingLevel.HEADING_1, children: [new X.TextRun("Introduction")] }), P("Body text.")]);
+    }).then(function (blob) { foreignBlob = blob; return read(blob, "foreign.docx"); }).then(function (r) {
+      var p = r.project, rep = r.report, cl = (rep.toCheck || []).filter(function (e) { return e.code === "cover-like"; })[0];
+      ok(!rep.front, "someone else's cover is not taken out");
+      eq(firstText(p), "paragraph:Acme Engineering", "someone else's cover stays in the body");
+      ok(cl && cl.blockIds.length === 3 && cl.blockIds[2] === p.blocks[2].id && p.blocks[2].type === "pageBreak", "its first page and the page break are offered as a cover", JSON.stringify(cl));
+      ok(codes(rep, "toCheck").indexOf("front-matter") === -1, "the same blocks are not listed again under Check first");
+      return plainFile([P("A memo with an ordinary first line."), P("Some more."), new X.Paragraph({ children: [new X.PageBreak()] }), P("Page two.")]);
+    }).then(function (blob) { return read(blob, "plain.docx"); }).then(function (r) {
+      ok(codes(r.report, "toCheck").indexOf("cover-like") === -1 && !r.report.front, "an ordinary first page is neither a house cover nor offered as a cover");
+    });
+
+    // ---- 2. the Import report in the tool ---------------------------------------
+    function card() { return $("dp-card-front"); }
+    chain = chain.then(function () {
+      return T.load(new w.File([ownBlob], "own.docx"));
+    }).then(function () { return pause(200); }).then(function () {
+      var doc = T.state.doc, c = card(), cards = d.querySelectorAll("#main .card");
+      ok(!!c && cards[0] === c, "the Import report opens on the card for the recognised cover");
+      ok(c && /SolutionsPT cover and document control recognised/.test(c.textContent) && /Title: Network segmentation proposal/.test(c.textContent) && /Document type: Method statement/.test(c.textContent),
+        "the card says they were replaced and lists the fields filled", c && c.textContent);
+      ok(!$("dp-card-check"), "there is no Check first card");
+      ok(!/[–—]/.test(c ? c.textContent : ""), "no en or em dashes on the card");
+      var before = doc.blocks.length;
+      $("dp-front-keep").click();
+      ok(doc.blocks[0].type === "table" && doc.blocks.length === before + doc.importReport.front.blocks.length, "Keep the original pages instead puts them back at the top", firstText(doc));
+      ok(!!$("dp-front-use") && !$("dp-front-keep"), "the card then offers the current template's pages");
+      A.DocHistory.undo();
+      ok(doc.blocks.length === before && doc.blocks[0].type === "heading", "one Undo takes them out again");
+      T.go("report");
+      ok(!!$("dp-front-keep"), "and the card follows the body");
+      A.DocHistory.redo();
+      ok(doc.blocks[0].type === "table", "Redo puts them back");
+      T.go("report");
+      // Something typed since is never overwritten; an emptied field is filled again.
+      doc.info.client = "Typed by hand"; doc.info.title = "";
+      $("dp-front-use").click();
+      ok(doc.blocks.length === before && doc.blocks[0].type === "heading", "Use the current template's pages takes them out again");
+      ok(doc.info.client === "Typed by hand" && doc.info.title === "Network segmentation proposal", "a typed field is kept, an empty one is filled from the original", JSON.stringify([doc.info.client, doc.info.title]));
+      A.DocHistory.undo();
+      ok(doc.blocks[0].type === "table", "and Undo brings them back");
+      A.DocHistory.redo();
+      return M.toFile(doc).then(function (b) { return b.text(); }).then(function (text) {
+        var again = M.fromText(text), fr = again.importReport.front;
+        ok(fr && fr.blocks.length === doc.importReport.front.blocks.length && fr.fields.length === doc.importReport.front.fields.length, "Save and Load keep the original pages and the fields");
+        var pic = fr.blocks[0].rows[0].cells[0].blocks.filter(function (b) { return b.type === "picture"; })[0];
+        ok(pic && again.media[pic.media] && again.media[pic.media].blob && again.media[pic.media].blob.size > 1000, "and the cover's pictures with them");
+        ok(M.missing(again).length === 0, "nothing is missing after Load");
+      });
+    }).then(function () {
+      // Saved: the next Load has nothing to ask about.
+      A.DocApp.markClean();
+      return T.load(new w.File([foreignBlob], "foreign.docx"));
+    }).then(function () { return pause(200); }).then(function () {
+      var doc = T.state.doc, c = $("dp-card-cover");
+      ok(!!c && /The first page looks like a cover/.test(c.textContent) && !card(), "someone else's cover gets its own card, not the house one");
+      $("dp-cover-remove").click();
+      ok(doc.blocks[0].type === "heading", "Remove these blocks takes the first page out");
+      A.DocHistory.undo();
+      ok(M.text(doc.blocks[0]) === "Acme Engineering", "and Undo brings it back");
+      ok(errors.length === 0, "no script errors", errors.join("; "));
+    });
+    chain.then(finish, function (e) { ok(false, "the page ran to the end", e && (e.stack || e.message)); finish(); });
+  };
+  f.src = "../index.html";
+})();
+</script>
+</body></html>

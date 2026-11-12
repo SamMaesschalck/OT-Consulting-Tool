@@ -146,7 +146,7 @@
 
   // ---------- welcome ----------
   function welcome(main) {
-    head(main, "Documents", "Write a document in the SolutionsPT template, or bring in a Word document and have it rebuilt in the template with its pictures and diagrams kept.");
+    head(main, "Documents", "Write a document in the SolutionsPT template, or bring in a Word file and have it rebuilt in the template with its pictures and drawings kept.");
     main.appendChild(h("div", { class: "dp-start", id: "dp-start" }, [
       h("p", { text: "Start a document, open one you saved, or load a Word file. You can also drop a file anywhere on this page." }),
       btn("New document", "primary", function () {
@@ -403,77 +403,24 @@
     var paper = h("div", { class: "dp-preview", id: "dp-preview" });
     main.appendChild(paper);
 
-    function sheet(land, part) {
-      // "paper" is the editor's own class for its sheet, so what is typed and
-      // what is previewed take their look from the same rules (editor.css).
-      var s = h("div", { class: "dp-sheet paper" + (land ? " land" : ""), "data-part": part });
-      paper.appendChild(s);
-      return s;
-    }
-    var R = A.DocRender;
+    // The shared renderer lays the document out on sheets (App.DocPreview.draw,
+    // the same one the assessment and risk tools' Word previews use): the
+    // front matter as whole sheets, then the body, a page break or a change
+    // of orientation starting a new sheet, each sheet's footnotes at its end,
+    // and a contents entry going to its heading. "dp-sheet paper" keep the
+    // sheets' old names for this tool's own rules and tests.
+    var R = A.DocRender, front = [];
     if (d.kind === "report") {
-      sheet(false, "cover").appendChild(R.coverEl(d));
-      sheet(false, "control").appendChild(R.controlEl(d, status(d)));
-      if (d.options && d.options.contents) sheet(false, "contents").appendChild(R.contentsEl(d));
+      front.push({ part: "cover", el: R.coverEl(d) });
+      front.push({ part: "control", el: R.controlEl(d, status(d)) });
+      if (d.options && d.options.contents) front.push({ part: "contents", el: R.contentsEl(d) });
     }
-    // One list numbering rule, the writer's own (3.2).
-    var numbers = A.HouseDocx.listNumbers(d.blocks || []);
-    // Read in the same turn as the blocks are drawn: the scan lasts one turn.
-    var fnNumbers = R.fnNumbers(d) || {};
-    // The footnotes referred to on a sheet, listed at its end: Word prints
-    // each at the foot of the page its reference falls on. One line for each
-    // footnote, in the order of the references, table cells included.
-    function close(s) {
-      if (!s) return;
-      var seen = {}, rows = [];
-      Array.prototype.forEach.call(s.querySelectorAll("sup.fn[data-fn]"), function (mark) {
-        var key = mark.getAttribute("data-fn"), note = (d.footnotes || {})[key];
-        if (seen[key] || !note) return;
-        seen[key] = true;
-        var words = h("span", { class: "dp-fn-t" });
-        // A footnote holds no reference of its own; the writer leaves one out too.
-        R.runsInto(words, (note.runs || []).filter(function (r) { return r && !r.fn; }), null);
-        rows.push(h("p", { class: "dp-fn", "data-fn": key }, [
-          h("span", { class: "dp-fn-n", text: String(fnNumbers[key] || mark.textContent || "") }), words
-        ]));
-      });
-      if (rows.length) s.appendChild(h("div", { class: "dp-fn-list", role: "group", "aria-label": "Footnotes" }, rows));
-    }
-    var cur = null;
-    function open(land) { close(cur); cur = sheet(land, "body"); cur.__land = land; return cur; }
-    if (d.kind === "short") open(false).appendChild(R.shortHeadEl(d));
-    (d.blocks || []).forEach(function (b) {
-      var land = !!b.land;
-      // A page break starts a sheet, and so does a change of orientation.
-      if (b.type === "pageBreak") { close(cur); cur = null; return; }
-      if (!cur || cur.__land !== land) open(land);
-      var el = R.blockEl(d, b, { editable: false, numbers: numbers });
-      // The editor's sheet stays in the page, hidden, with the same blocks
-      // under the same ids: the preview's copies give theirs up.
-      el.removeAttribute("id");
-      Array.prototype.forEach.call(el.querySelectorAll('[id^="blk-"]'), function (n) { n.removeAttribute("id"); });
-      cur.appendChild(el);
+    A.DocPreview.draw(paper, d, {
+      front: front, sheetClass: "dp-sheet paper",
+      lead: d.kind === "short" ? R.shortHeadEl(d) : null,
+      // One list numbering rule, the writer's own (3.2).
+      numbers: A.HouseDocx.listNumbers(d.blocks || [])
     });
-    close(cur);
-    if (!cur && !(d.blocks || []).length) open(false);
-
-    // A contents entry goes to its heading, as it does in the Word file: the
-    // sheet is scrolled to it and the heading takes the keyboard.
-    function follow(e) {
-      var a = e.target && e.target.closest ? e.target.closest("a[data-goto]") : null;
-      if (!a || !paper.contains(a)) return;
-      if (e.type === "keydown" && e.key !== "Enter") return;
-      e.preventDefault();
-      var id = a.getAttribute("data-goto"), target = null;
-      Array.prototype.forEach.call(paper.querySelectorAll(".dp-sheet > .blk[data-block-id]"), function (n) {
-        if (!target && n.getAttribute("data-block-id") === id) target = n;
-      });
-      if (!target) return;
-      target.scrollIntoView({ block: "start" });
-      try { target.focus({ preventScroll: true }); } catch (err) {}
-    }
-    on(paper, "click", follow);
-    on(paper, "keydown", follow);
   }
 
   // ---------- Issue and export ----------
@@ -635,6 +582,80 @@
     return before.length;
   }
 
+  // The original's SolutionsPT cover and document control (importReport.front):
+  // taken out at import, kept on the report until the user chooses. Whether
+  // they are in the body is read from the body, so Undo and Redo on the Edit
+  // page keep the card right.
+  function frontKept(d, fr) { return (fr.blocks || []).some(function (b) { return exists(d, b.id); }); }
+  // Puts them back at the top of the body as they were, as one step Undo takes away.
+  function keepFront(d, fr) {
+    var after = [];
+    (fr.blocks || []).forEach(function (b) {
+      if (exists(d, b.id)) return;
+      var copy = JSON.parse(JSON.stringify(b)), at = after.length;
+      d.blocks.splice(at, 0, copy);
+      after.push({ id: copy.id, index: at, parent: null, json: JSON.stringify(copy) });
+    });
+    if (!after.length) return 0;
+    A.DocHistory.record({ label: "Keep the original cover and document control", before: [], after: after, selBefore: null, selAfter: null });
+    D().touched({ structure: true });
+    if (A.DocEditor && A.DocEditor.redraw) { try { A.DocEditor.redraw(after.map(function (a) { return a.id; })); } catch (e) {} }
+    return after.length;
+  }
+  // Takes them out again (as they now are, in case they were edited) and
+  // fills any Document information field that is still empty.
+  function useTemplateFront(d, fr) {
+    fr.blocks = (fr.blocks || []).map(function (b) {
+      var f = M().find(d, b.id);
+      return f && f.list === d.blocks ? JSON.parse(JSON.stringify(f.block)) : b;
+    });
+    var n = removeBlocks(d, fr.blocks.map(function (b) { return b.id; }).filter(function (id) { return exists(d, id); }), "Use the current template's cover and document control");
+    var filled = 0;
+    (fr.fields || []).forEach(function (p) {
+      if (String(d.info[p[0]] || "").trim()) return;
+      d.info[p[0]] = p[1]; filled++;
+    });
+    if (filled) D().touched({ info: true });
+    return n;
+  }
+  function frontCard(d, main, fr) {
+    var kept = frontKept(d, fr), kids = [];
+    if (!kept) {
+      kids.push(h("p", { class: "dp-entry-t", text: "The original's cover and document control page were taken out. The current template prints its own in their place, filled in from what they said, so a later change to the template reaches this document too." }));
+      if ((fr.fields || []).length) {
+        kids.push(h("p", { class: "muted dp-entry-said", text: "Filled in under Document information:" }));
+        kids.push(h("ul", { class: "dp-quotes", id: "dp-front-fields" }, fr.fields.map(function (p) {
+          return h("li", { "data-field": p[0], text: (LABELS[p[0]] || p[0]) + ": " + p[1] });
+        })));
+      }
+      if ((fr.unused || []).length) {
+        kids.push(h("p", { class: "muted dp-entry-said", text: "Not used, because Document information has no place for them:" }));
+        kids.push(h("ul", { class: "dp-quotes", id: "dp-front-unused" }, fr.unused.map(function (p) { return h("li", { text: p[0] + ": " + p[1] }); })));
+      }
+      if (fr.contents) kids.push(h("p", { text: "Its contents list was taken out too. A contents list is switched on in its place." }));
+      kids.push(h("div", { class: "btn-row" }, [
+        btn("Keep the original pages instead", "small", function () {
+          var n = keepFront(d, fr);
+          if (n) D().toast("The original pages are back at the start of the document. Undo on the Edit page takes them out again.");
+          redraw(main, report);
+        }, "dp-front-keep"),
+        btn("Go to Document information", "small", function () { D().go("info"); }, "dp-front-info")
+      ]));
+    } else {
+      kids.push(h("p", { class: "dp-entry-t", text: "The original's cover and document control page are back at the start of the document, as they were brought in. The template still prints its own cover and document control page before them." }));
+      var ids = fr.blocks.map(function (b) { return b.id; }).filter(function (id) { return exists(d, id); });
+      kids.push(h("div", { class: "btn-row" }, [
+        rowBtn("Show", "the original cover and document control", function () { D().go("edit", ids.length === 1 ? { blockId: ids[0] } : { blockIds: ids }); }),
+        btn("Use the current template's pages", "small", function () {
+          var n = useTemplateFront(d, fr);
+          if (n) D().toast("The original pages were taken out again. Undo on the Edit page brings them back.");
+          redraw(main, report);
+        }, "dp-front-use")
+      ]));
+    }
+    return card("SolutionsPT cover and document control recognised", null, kids, "dp-card-front");
+  }
+
   function entryRow(d, entry, extra) {
     var ids = (entry.blockIds || []).filter(function (id) { return exists(d, id); });
     var words = A.DocImportFlow.sentence(entry);
@@ -691,7 +712,26 @@
       h("span", { class: "muted", text: "This page stays in the sidebar, under Import report." })
     ]));
 
-    var check = rep.toCheck || [];
+    if (rep.front && (rep.front.blocks || []).length) main.appendChild(frontCard(d, main, rep.front));
+
+    // Someone else's cover: offered for removal, never taken out unasked.
+    (rep.toCheck || []).filter(function (e) { return e.code === "cover-like"; }).forEach(function (entry) {
+      var listed = (entry.blockIds || []).length;
+      var left = (entry.blockIds || []).filter(function (id) { return exists(d, id); });
+      var body = listed && !left.length
+        ? h("p", { class: "dp-entry-t", text: "The blocks of the original's first page have been removed. Undo on the Edit page brings them back." })
+        : h("ul", { class: "dp-entries" }, [entryRow(d, entry, function (ids) {
+          if (!ids.length) return [];
+          return [btn("Remove these blocks", "small danger", function () {
+            var n = removeBlocks(d, ids, "Remove the original's first page");
+            D().toast(plural(n, "block", "blocks") + " removed. Undo on the Edit page brings " + (n === 1 ? "it" : "them") + " back.");
+            redraw(main, report);
+          }, "dp-cover-remove")];
+        })]);
+      main.appendChild(card("The first page looks like a cover", null, [body], "dp-card-cover"));
+    });
+
+    var check = (rep.toCheck || []).filter(function (e) { return e.code !== "cover-like"; });
     if (check.length) {
       main.appendChild(card("Check first", null, [h("ul", { class: "dp-entries" }, check.map(function (entry) {
         var listed = (entry.blockIds || []).length;
@@ -761,7 +801,7 @@
     head(main, "About");
     main.appendChild(card((V.product || (A.Product && A.Product.name) || "") + " " + (V.label || ""), V.number ? "version " + V.number : null, [
       h("p", { text: "Works offline, with no server. Your document file holds the document, its pictures and anything kept from an imported Word file, so handle it as you would the document itself." }),
-      h("p", { text: "It reads and writes " + M().SCHEMA + ", reads Word documents (.docx) and writes Word documents in the SolutionsPT template." })
+      h("p", { text: "It reads and writes " + M().SCHEMA + ", reads Word files (.docx) and writes Word files in the SolutionsPT template." })
     ], "dp-card-about"));
     var keys = [];
     KEYS.forEach(function (k) { keys.push(h("dt", { text: k[0] }), h("dd", { text: k[1] })); });

@@ -1635,6 +1635,12 @@ window.App.UI = (function () {
       class: "nav-item" + (view === "report" ? " active" : ""),
       onClick: function () { go("report"); }
     }, [h("span", null, ["Preview"])]));
+    // The Word report itself, page by page, beside the report page where the
+    // report is written and edited.
+    if (window.App.DocPreview && window.App.DocxImport) s.appendChild(h("div", {
+      class: "nav-item" + (view === "word-preview" ? " active" : ""), id: "nav-word-preview",
+      onClick: function () { go("word-preview"); }
+    }, [h("span", null, ["Word preview"])]));
 
     finishSidebar(s);
   }
@@ -2116,6 +2122,7 @@ window.App.UI = (function () {
     else if (view === "ra-wizard") renderRiskAppetiteWizardPage();
     else if (view === "ra-verdict") renderRiskAppetiteVerdictPage();
     else if (view === "report") renderReportPage();
+    else if (view === "word-preview") renderWordPreviewPage();
     else renderEngagementSummaryPage();
     refs.main.classList.toggle("hide-answered", hideAnswered && HIDEABLE_VIEWS.indexOf(view) !== -1);
     flushPendingJump();
@@ -8852,6 +8859,157 @@ window.App.UI = (function () {
   }
 
   // ---- report preview ---------------------------------------------------
+
+  // ---- Word preview ------------------------------------------------------
+  // The Word report as the Export button makes it, drawn page by page. The
+  // same documents docxJobs describes are built with the exporter, in memory,
+  // read back with the shared Word reader (App.DocxImport) and drawn by the
+  // shared renderer (App.DocPreview), so what is shown is the file itself and
+  // cannot disagree with it. Built when the page is opened, kept until the
+  // assessment, the choices here or the report's wording change.
+  var wordPreview = { key: null, read: null, error: null, seq: 0, docIndex: 0, status: null, shape: "per", busy: false };
+
+  function wordPreviewJobs(shape) {
+    return docxJobs(issueAllIds(), shape === "org" ? "org" : "per");
+  }
+  function wordPreviewCanOrg() {
+    return E.state.scoringFamily !== "capability-sl" && !isCRA() &&
+      !!(window.App.Compare && window.App.Compare.rollUpSites) && siteRollUpEntries().length >= 2;
+  }
+  // What the built file depends on: the assessment, the export's options and
+  // the choices on this page. A change to any of them builds it again.
+  function wordPreviewKey(job, status) {
+    var o = {};
+    Object.keys(job.opts || {}).forEach(function (k) { if (typeof job.opts[k] !== "function") o[k] = job.opts[k]; });
+    try {
+      return JSON.stringify([E.state.instrument && E.state.instrument.id, status, o, job.engagement,
+        E.getActiveNarrative ? E.getActiveNarrative() : null]);
+    } catch (e) { return String(Date.now()); }
+  }
+
+  function renderWordPreviewPage() {
+    var DP = window.App.DocPreview, X = window.App.ExportDOCX;
+    refs.main.innerHTML = "";
+    refs.main.appendChild(h("h1", { class: "page-title", text: "Word preview" }));
+    refs.main.appendChild(h("p", { class: "page-sub", text: "The Word report as Export Word makes it, page by page. Word decides where the pages break. To change the report, edit it on the Preview page." }));
+    if (!DP || !X || !window.App.DocxImport) {
+      refs.main.appendChild(h("p", { class: "muted", text: "The Word preview is not available in this copy of the tool." }));
+      return;
+    }
+    var noNarrativeFamilies = ["program-maturity-ml", "nis2-conformance", "csms-conformance", "risk-appetite-coherence"];
+    if (!E.getActiveNarrative() && noNarrativeFamilies.indexOf(E.state.scoringFamily) === -1) {
+      refs.main.appendChild(h("p", { class: "muted", text: "No narrative pack is loaded for this instrument, so there is no Word report to show." }));
+      return;
+    }
+    var canOrg = wordPreviewCanOrg();
+    if (wordPreview.shape === "org" && !canOrg) wordPreview.shape = "per";
+    var jobs = wordPreviewJobs(wordPreview.shape);
+    if (!jobs.length) { refs.main.appendChild(h("p", { class: "muted", text: "There is nothing to report on yet." })); return; }
+    if (wordPreview.docIndex >= jobs.length) wordPreview.docIndex = 0;
+    // Draft or Final as last chosen at export, unless chosen here.
+    if (!wordPreview.status) wordPreview.status = E.getReportNarrative().issueAs === "final" ? "final" : "draft";
+
+    // The choices that change the file: which document, and draft or final.
+    var bar = h("div", { class: "wp-bar", id: "wp-bar" });
+    var docOptions = jobs.map(function (j, i) {
+      return { value: "per:" + i, text: j.name || "The report" };
+    });
+    if (wordPreview.shape === "org") docOptions = [{ value: "org:0", text: "Organisation-wide report" }];
+    if (canOrg && wordPreview.shape === "per") docOptions.push({ value: "org:0", text: "Organisation-wide report" });
+    if (canOrg && wordPreview.shape === "org") {
+      docOptions = wordPreviewJobs("per").map(function (j, i) { return { value: "per:" + i, text: j.name || "The report" }; }).concat(docOptions);
+    }
+    if (docOptions.length > 1) {
+      var sel = h("select", { id: "wp-doc", "aria-label": "Which Word document" });
+      docOptions.forEach(function (o) {
+        var opt = h("option", { value: o.value, text: o.text });
+        if (o.value === wordPreview.shape + ":" + wordPreview.docIndex) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener("change", function () {
+        var v = sel.value.split(":");
+        wordPreview.shape = v[0]; wordPreview.docIndex = Number(v[1]) || 0;
+        renderWordPreviewPage();
+      });
+      bar.appendChild(h("label", { class: "wp-field", for: "wp-doc" }, ["Document", sel]));
+    }
+    var seg = h("div", { class: "wp-seg", role: "radiogroup", "aria-label": "Draft or final" });
+    [["draft", "Draft"], ["final", "Final"]].forEach(function (o) {
+      var b = h("button", { type: "button", class: "btn small" + (wordPreview.status === o[0] ? " primary" : ""), role: "radio",
+        "aria-checked": wordPreview.status === o[0] ? "true" : "false", "data-status": o[0], text: o[1] });
+      b.addEventListener("click", function () {
+        if (wordPreview.status === o[0]) return;
+        wordPreview.status = o[0];
+        renderWordPreviewPage();
+      });
+      seg.appendChild(b);
+    });
+    bar.appendChild(seg);
+    var refresh = h("button", { type: "button", class: "btn small", id: "wp-refresh", text: "Build again" });
+    refresh.addEventListener("click", function () { wordPreview.key = null; renderWordPreviewPage(); });
+    bar.appendChild(refresh);
+    refs.main.appendChild(bar);
+
+    var job = jobs[wordPreview.docIndex];
+    var opts = Object.assign({}, job.opts, { issueStatus: wordPreview.status });
+    delete opts.onDone;
+    var state = h("div", { class: "wp-state", id: "wp-state", role: "status", "aria-live": "polite" });
+    var meter = h("progress", { class: "wp-progress", id: "wp-progress", max: "100", value: "0" });
+    var stateText = h("span", { class: "muted", id: "wp-state-text" });
+    state.appendChild(stateText); state.appendChild(meter);
+    refs.main.appendChild(state);
+    var note = h("p", { class: "muted wp-note", id: "wp-note" });
+    refs.main.appendChild(note);
+    var paper = h("div", { class: "wp-paper", id: "wp-paper" });
+    refs.main.appendChild(paper);
+
+    function say(text, fraction) {
+      stateText.textContent = text;
+      if (fraction == null) meter.classList.add("hidden");
+      else { meter.classList.remove("hidden"); meter.value = Math.round(Math.max(0, Math.min(1, fraction)) * 100); }
+    }
+    function show(read) {
+      say("", null);
+      state.classList.add("hidden");
+      var name = X.docxFilename(job.engagement, opts);
+      note.textContent = "This is " + name + (read.cover ? "" : ", drawn without its cover") + ". It is read from the file itself, so a change on the Preview page shows here the next time this page is opened.";
+      DP.drawRead(paper, read, { watermark: wordPreview.status === "final" ? "" : "DRAFT", fit: true });
+    }
+    var key = wordPreviewKey(job, wordPreview.status);
+    if (wordPreview.key === key && wordPreview.read) { show(wordPreview.read); return; }
+    if (wordPreview.key === key && wordPreview.error) { say(wordPreview.error, null); return; }
+
+    var seq = ++wordPreview.seq;
+    say("Building the Word report…", 0.05);
+    // A moment for the page to show the message before the build takes the thread.
+    window.setTimeout(function () {
+      if (seq !== wordPreview.seq) return;
+      X.buildAsync(job.engagement, E.state.instrument, E.state.taxonomy, E.state.profile, E.getActiveNarrative(), opts, function (err, blob) {
+        if (seq !== wordPreview.seq) return;
+        if (err) {
+          var why = wordPreview.status === "final"
+            ? "Final is not available. " + (err.message || "The report could not be built.") + " Choose Draft to see the report."
+            : "The Word report could not be built: " + (err.message || "something went wrong.");
+          wordPreview.key = key; wordPreview.error = why; wordPreview.read = null;
+          if (stateText.isConnected) say(why, null);
+          return;
+        }
+        if (stateText.isConnected) say("Reading the pages…", 0.3);
+        DP.fromDocx(blob, { name: X.docxFilename(job.engagement, opts), onProgress: function (f) {
+          if (seq === wordPreview.seq && stateText.isConnected) say("Reading the pages…", 0.3 + 0.65 * (f || 0));
+        } }).then(function (read) {
+          if (seq !== wordPreview.seq) { DP.dispose(read); return; }
+          if (wordPreview.read && wordPreview.read !== read) DP.dispose(wordPreview.read);
+          wordPreview.key = key; wordPreview.read = read; wordPreview.error = null;
+          if (stateText.isConnected) { say("Drawing the pages…", 0.97); window.setTimeout(function () { if (seq === wordPreview.seq && paper.isConnected) show(read); }, 0); }
+        }, function (e) {
+          if (seq !== wordPreview.seq) return;
+          wordPreview.key = key; wordPreview.error = "The Word report could not be read back: " + ((e && e.message) || "something went wrong."); wordPreview.read = null;
+          if (stateText.isConnected) say(wordPreview.error, null);
+        });
+      });
+    }, 30);
+  }
 
   function renderReportPage() {
     refs.main.innerHTML = "";

@@ -83,7 +83,7 @@ window.addEventListener("error", function (e) { document.getElementById("out").t
   function sects(doc) { return doc.match(/<w:sectPr>[\s\S]*?<\/w:sectPr>/g) || []; }
   function coverXml(doc) { return doc.slice(doc.indexOf("<w:body>"), doc.indexOf("</w:sectPr>") + 11); }
   // The cover strip holds each label to its value with no-break spaces and
-  // hyphens (test-doc-fix-r2-cover.html pins those); here they read as plain.
+  // hyphens (test-doc-fix-template.html step 10 pins those); here they read as plain.
   function texts(xml) { return (xml.match(/<w:t [^>]*>[^<]*<\/w:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/\u00a0/g, " ").replace(/\u2011/g, "-"); }); }
   function controlTable(doc) {
     var at = doc.indexOf(">Document control and confidentiality<"), from = doc.indexOf("<w:tbl>", at);

@@ -6,7 +6,9 @@
   "tests": {
     "pages": "scripts/test-doc-*.html",
     "virtualTimeMs": 900000,
-    "timeoutSec": 600
+    "timeoutSec": 600,
+    "_alone": "Pages tools/run-tests.ps1 -Parallel runs on their own: hit-testing, scrolling and layout checks in the editor and the pages (fix-editor, editor, keys, tables, table-colours, fix-pages, speed), and test-doc-app, whose deliberate CPU-burning interval slows any page beside it.",
+    "alone": ["test-doc-app.html", "test-doc-editor.html", "test-doc-fix-editor.html", "test-doc-fix-pages.html", "test-doc-keys.html", "test-doc-speed.html", "test-doc-table-colours.html", "test-doc-tables.html"]
   },
   "singleHtml": {
     "parityCheck": "check-single-html-documents.html",

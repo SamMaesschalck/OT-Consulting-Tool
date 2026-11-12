@@ -214,8 +214,14 @@ window.docx = (function () {
       mentions <= 4);
     check("and no longer carries a standalone weakest-domain sentence",
       !/The weakest domain is [^.]*, graded/.test(execOnly));
+    // The wording that prints only when the cap bit: the pack's "has been held
+    // down" (capClause, headline_cap_note, headline_cap_note_multi) and "is
+    // held at" (the top-grade rule), and the exporter's "The grade is held down
+    // by" and "The top grade is held back". The method text says "held down" of
+    // the rule in general, so the plain phrase is not enough. Here the mean
+    // already sits at the ceiling, so none may print.
     check("exec summary does not claim a cap that did not bite",
-      !/held there rather than averaged up/.test(allText));
+      !/has been held down|headline is held at|The grade is held down by|The top grade is held back/.test(allText));
     check("exec summary states overall coverage",
       /based on \d+% of applicable questions being answered/.test(allText));
     // low_confidence_flag should NOT appear here (overall coverage is not below threshold given this seed)

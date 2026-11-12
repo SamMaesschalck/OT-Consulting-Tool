@@ -71,49 +71,14 @@
 
   // ---- drawing ---------------------------------------------------------
 
+  // The drawing is the shared renderer's (App.DocPreview.tableEl, which draws
+  // a cell's blocks as any block is, so the editor edits a paragraph in a cell
+  // exactly as it edits one on the page, and an imported table's own look:
+  // fills, widths, no borders, a table inside a cell). The editor adds only
+  // where the caret was.
   function tableEl(doc, block, opts) {
     opts = opts || {};
-    var cols = block.cols || [];
-    var total = cols.reduce(function (a, n) { return a + (Number(n) > 0 ? Number(n) : 0); }, 0) || 1;
-    var table = el("table", { class: "doc-table", "data-table-id": block.id });
-    var group = el("colgroup");
-    cols.forEach(function (n) {
-      var col = el("col");
-      col.style.width = (100 * (Number(n) > 0 ? Number(n) : 0) / total).toFixed(3) + "%";
-      group.appendChild(col);
-    });
-    table.appendChild(group);
-    // One body, with header cells in the header row: a merged cell that runs
-    // from the header row into the rows below could not cross from a thead.
-    var body = el("tbody");
-    var grid = M().table.grid(block);
-    (block.rows || []).forEach(function (row, r) {
-      var tr = el("tr");
-      (grid[r] || []).forEach(function (g, c) {
-        if (!g || !g.cell || g.covered) return;
-        var head = r < (block.header || 0);
-        var td = el(head ? "th" : "td", { "data-r": String(r), "data-c": String(c), scope: head ? "col" : null });
-        if (spanOf(g.cell) > 1) td.colSpan = spanOf(g.cell);
-        if (rowSpanOf(g.cell) > 1) td.rowSpan = rowSpanOf(g.cell);
-        var numbers = listNumbers(g.cell.blocks);
-        // A cell's blocks are drawn as any block is, so the editor edits a
-        // paragraph in a cell exactly as it edits one on the page.
-        (g.cell.blocks || []).forEach(function (b) {
-          td.appendChild(R().blockEl(doc, b, { editable: !!opts.editable, numbers: numbers, inCell: true }));
-        });
-        tr.appendChild(td);
-      });
-      body.appendChild(tr);
-    });
-    table.appendChild(body);
-    // The caption is marked as a picture's caption is (data-edit, data-cap),
-    // so the editor edits it in place the same way; and, as there, it is on
-    // the paper once the block has the field, even while it is still empty.
-    if (typeof block.caption === "string" && (block.caption || opts.editable)) {
-      var cap = el("p", { class: "cap", "data-edit": "plain", "data-cap": block.id, "aria-label": "Caption", text: block.caption });
-      if (!block.caption) cap.appendChild(el("br"));
-      table.appendChild(el("caption", {}, [cap]));
-    }
+    var table = window.App.DocPreview.tableEl(doc, block, opts);
     if (opts.editable) {
       var note = function (event) {
         var td = event.target && event.target.closest ? event.target.closest("td,th") : null;
@@ -123,12 +88,6 @@
       table.addEventListener("focusin", note);
     }
     return table;
-  }
-  // List numbers have one owner (design 3.2); a cell's list starts its own count.
-  function listNumbers(blocks) {
-    var HD = window.App.HouseDocx;
-    var has = (blocks || []).some(function (b) { return b.type === "list"; });
-    return (has && HD && HD.listNumbers && HD.listNumbers(blocks)) || {};
   }
 
   // ---- edits -----------------------------------------------------------

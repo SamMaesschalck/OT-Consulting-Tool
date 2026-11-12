@@ -1,6 +1,6 @@
 # OT Cyber Document Tool
 
-The document tool writes documents that are not assessment or risk reports but should look like one: proposals, method statements, reports, procedures and short notes. They print in the same SolutionsPT template as the assessment reports, with the same cover, document control page, header and footer. A document can be written in the tool, or an existing Word document can be loaded and rebuilt in the template with its pictures and diagrams kept.
+The document tool writes documents that are not assessment or risk reports but should look like one: proposals, method statements, reports, procedures and short notes. They print in the same SolutionsPT template as the assessment reports, with the same cover, document control page, header and footer. A document can be written in the tool, or an existing Word file can be loaded and rebuilt in the template with its pictures and diagrams kept.
 
 It works on its own. No file passes between it and the other tools, and it is not yet connected to the Report Review Tool. The design, with the experiments behind it, is in [document-tool-design.md](document-tool-design.md); how to work on the code is in [modules/documents/README.md](../modules/documents/README.md).
 
@@ -52,7 +52,7 @@ The keyboard: the page is one stop for Tab. Tab inside a paragraph does nothing,
 
 **Preview** shows the whole document, cover first. It is drawn from what you wrote, not from the Word file, and Word decides where pages break. Footnotes are listed at the end of the sheet their numbers are on. An entry in the contents list goes to its heading, as it does in the Word file.
 
-## Bringing in a Word document
+## Bringing in a Word file
 
 Load a `.docx`, or drop it on the tool. It is read and rebuilt as blocks in the template; the Word file itself is never changed, and Save can never write over it (the first Save of an imported document asks where to keep its document file). Only `.docx` files are read. For an old `.doc` file or a Strict Open XML file, use Save as in Word and choose Word Document (.docx) first.
 
@@ -82,6 +82,8 @@ Headings are numbered again from 1 when numbering is on. If the original left so
 
 Every import ends on the **Import report**, which stays in the sidebar. Nothing is dropped without a line here.
 
+- **SolutionsPT cover and document control recognised**: shown first when the original carries the house cover and document control page (see below), with the fields it filled and **Keep the original pages instead**.
+- **The first page looks like a cover**: when the original's first page, before its first page break, has large type or a large picture and few words. **Remove these blocks** deletes that page; Undo brings it back.
 - **Brought across**: how many paragraphs, headings, tables, pictures, drawings, captions and footnotes arrived.
 - **Check first**: when the original starts with blocks before its first heading. That is usually its own cover, document control table or contents list, which the template now provides. Show selects them; Remove them deletes them, and Undo brings them back.
 - **Not carried over**: each thing left out, with what it said (the text of the headers and footers, the first comments, hidden text, the address of a link that was taken off), so anything needed can be typed back in. A chart, diagram, picture or object that could not be brought across is listed here as left out, never as kept. So are a field that draws its own content and has no text to keep (a list number field, an equation field), a link on a picture that could not travel with it, and a footnote the file refers to but does not hold.
@@ -90,7 +92,15 @@ Every import ends on the **Import report**, which stays in the sidebar. Nothing 
 
 If a drawing has lost one of its parts in the original file, it is left out and named in the report, because Word refuses a whole file that holds one. A file that cannot be read at all gives one message saying why, and the document you had open is left as it was.
 
-A document exported by this tool can be loaded again. It arrives with its own cover and document control page as ordinary blocks at the start, listed under Check first; remove them and the rest is as you wrote it.
+### A SolutionsPT cover and document control page
+
+A Word report from the assessment or risk tool, or a document exported by this tool (older template versions included), starts with the SolutionsPT cover and document control page. These are recognised and taken out of the body, so the export prints the current template's cover and document control instead of the old ones' words, and a later change to the template reaches the document too. What they said fills Document information: the title (the title lines joined), the document type (the line above the title, in ordinary capitals, for example "OT cyber security assessment"), the client, the site or subject, the reference, the revision and date from the issue line (the date is left empty when it is only the issued date again), the author and classification, and from document control the revision, QA review by, authorised by, issued to, issued date and confidentiality (into Classification). The risk report's client, system under consideration, consultant and assessment date fill the client, site, author and date. Status is not kept: Draft or Final is chosen when you export. Anything with no field (the line under the site on a report's cover, such as "2013 edition · 3 zones and conduits assessed", and rows such as Instrument, Edition or Method) is listed on the card as not used. The report's own contents list goes too, and the contents option is switched on when it had one.
+
+Recognition goes by shape, not by exact words: the cover is a table of one column on the first page whose first picture is the full-page background; document control is a table holding at least three of the known labels under a heading that says "Document control". Another company's cover is never taken out.
+
+The original pages are kept with the document (in its file, pictures and all) until you choose. **Keep the original pages instead** puts them back at the start exactly as they were brought in, as one step that Undo reverses; nothing you have typed is cleared. **Use the current template's pages** takes them out again and fills any Document information field that is still empty, never one you have typed in.
+
+A document exported by this tool and loaded again comes back as you wrote it: its cover and document control are recognised, and nothing is listed under Check first.
 
 ## Draft and Final
 
@@ -129,7 +139,6 @@ In the suite, a document file opens from Open a file, Recent files or a drop any
 - Pictures in a paste from Word (they are in the clipboard in a form the tool does not read yet). Load the Word file to bring everything across, or insert the pictures from files.
 - Editing a kept drawing, resizing it by hand, or putting a floating one in line with the text.
 - A picture or equation inside a sentence: it becomes a block of its own.
-- Recognising the tool's own cover and document control page when one of its exports is loaded again.
 - Friendlier dates (11 November 2026), which would be a change to every tool at once.
 - One theme per document: a kept drawing pasted from a document with a different theme takes this document's theme colours.
 

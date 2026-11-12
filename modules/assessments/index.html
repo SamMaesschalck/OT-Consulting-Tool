@@ -8,6 +8,7 @@
   <meta name="referrer" content="no-referrer" />
   <link rel="stylesheet" href="css/app.css" />
   <link rel="stylesheet" href="css/review-author.css" />
+  <link rel="stylesheet" href="css/doc-preview.css" />
   <!-- Apply the saved (or system) colour theme before first paint to avoid a
        flash. The toggle in the header updates this and persists the choice. -->
   <script>
@@ -84,6 +85,11 @@
   <script src="js/export-xlsx.js"></script>
   <script src="js/hero-asset.js"></script>
   <script src="js/export-docx.js"></script>
+  <!-- The Word preview: the exported file read back (docx-import.js, over
+       zip-io.js) and drawn as pages (doc-preview.js), all shared/ copies. -->
+  <script src="js/zip-io.js"></script>
+  <script src="js/docx-import.js"></script>
+  <script src="js/doc-preview.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/docx-blocks.js"></script>

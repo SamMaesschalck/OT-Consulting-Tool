@@ -66,7 +66,7 @@ window.Suite.Data = {
                         "name":  "OT Cyber Document Tool",
                         "shortName":  "Documents",
                         "navLabel":  "Write",
-                        "summary":  "Write proposals, method statements, reports and other documents in the SolutionsPT template, or bring in a Word document and have it rebuilt in the template with its pictures and diagrams kept.",
+                        "summary":  "Write proposals, method statements, reports and other documents in the SolutionsPT template, or bring in a Word file and have it rebuilt in the template with its pictures and drawings kept.",
                         "useWhen":  "Use it for any document that is not an assessment or risk report but should look like one. Start a new document or load a Word file, fill in the document information, edit, then export a Word file as a draft or a final. Anything from an imported file that could not be carried over is listed for you.",
                         "entry":  "../modules/documents/index.html",
                         "payload":  "documents",

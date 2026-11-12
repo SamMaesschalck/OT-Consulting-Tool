@@ -129,7 +129,13 @@ window.addEventListener("DOMContentLoaded", function () {
     ok(E.assessmentsFor("ncsc-caf").length === 3,
        "three sites means three assessments in the one customer file",
        String(E.assessmentsFor("ncsc-caf").length));
-    ok(E.state.project.clientName === undefined || true, "");   // customer stays on the file
+    // The customer stays on the file; each site's name and visit live on its
+    // own assessment, never on the shared record.
+    var siteOf = {};
+    E.assessmentsFor("ncsc-caf").forEach(function (a) { siteOf[a.id] = (a.engagementMeta || {}).siteName; });
+    ok(E.state.project.siteName === undefined && SITES.every(function (nm) { return siteOf[assIds[nm]] === nm; }),
+       "each site's name is on its own assessment, and none on the shared customer record",
+       JSON.stringify(siteOf) + " project.siteName=" + E.state.project.siteName);
 
     // The engine hands back the sibling site assessments to roll up.
     var sibs = E.siblingSiteAssessments();

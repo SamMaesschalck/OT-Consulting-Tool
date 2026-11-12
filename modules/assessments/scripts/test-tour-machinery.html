@@ -8,7 +8,7 @@
 <div id="summary" class="sum"></div>
 
 <script src="harness.js"></script>
-<script>H.app({ docx: "mock", tours: ["41", "caf", "caf-aviation", "cra", "csms", "machinery", "ml", "nis2", "nis2-quick", "posture", "sl"] }); H.dom();</script>
+<script>H.app({ docx: "mock", tours: H.ALL_TOURS }); H.dom();</script>
 <script>
 window.docx = (function () {
   function TextRun(opts) {
@@ -74,23 +74,23 @@ window.docx = (function () {
     E.loadCatalog();
     A.UI.init({ autosave: false });
 
-    // Replicate the combined tour: seed every assessment into one shared
-    // project, then land on the machinery instrument (re-applied on switch).
-    var SEED = {
-      "iec-62443-3-3": A.TourSL, "ncsc-caf": A.TourCAF, "general-ot-posture": A.TourPosture,
-      "iec-62443-2-1-2024": A.TourML, "nis2-assessment": A.TourNIS2, "nis2-quick-gap": A.TourNIS2Quick,
-      "iec-62443-4-1": A.Tour41, "iec-62443-2-1-2010": A.TourCSMS, "ncsc-caf-aviation": A.TourCAFAviation,
-      "eu-cra": A.TourCRA, "eu-machinery": A.TourMachinery
-    };
+    // Replicate the combined tour.html: seed every demo into one shared
+    // project (H.demoSeeds is tour.html's SEED map), each once on its first
+    // activation and on a later one only its metadata stamped again, then
+    // land on the machinery instrument.
+    var SEED = H.demoSeeds(), seeded = {};
     E.on("instrument-changed", function (inst) {
       var mod = inst && SEED[inst.id];
-      if (mod && typeof mod.apply === "function") mod.apply(E);
+      if (!mod || typeof mod.apply !== "function") return;
+      if (!seeded[inst.id]) { seeded[inst.id] = true; mod.apply(E); return; }
+      if (mod.metadata && E.updateMetadata) E.updateMetadata(mod.metadata);
     });
     var seedFailures = [];
     Object.keys(SEED).forEach(function (id) {
       try { E.activateInstrument(id); } catch (e) { seedFailures.push(id + ": " + e.message); }
     });
-    check("all 11 assessments seed without throwing", seedFailures.length === 0, seedFailures.join(" | "));
+    var nSeed = Object.keys(SEED).length;
+    check("all " + nSeed + " demo assessments seed without throwing", seedFailures.length === 0 && nSeed === 20, seedFailures.join(" | "));
 
     E.activateInstrument("eu-machinery");
     check("App.TourMachinery applier exposed", !!A.TourMachinery && typeof A.TourMachinery.apply === "function");

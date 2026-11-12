@@ -1066,6 +1066,9 @@
       state.composer = c;
       redraw([was && was.anchor, c.anchor], [was && was.relatesTo, c.relatesTo]);
       focusOn(document.querySelector(".rr-composer textarea"));
+      // A line on the cover has its box under the cover: bring it into view.
+      var cz = document.querySelector(".rr-cover-notes > .rr-composer");
+      if (cz && cz.scrollIntoView) cz.scrollIntoView({ block: "nearest" });
     });
   }
   // The place a comment is on, for the keyboard: its block or its cell, its
@@ -1597,8 +1600,10 @@
   function imageNode(b, media) {
     var src = media && Object.prototype.hasOwnProperty.call(media, b.media) ? media[b.media] : null;
     if (typeof src !== "string" || !IMAGE_SRC.test(src)) return h("p", { class: "muted small", text: "[image: " + b.media + "]" });
+    // At the size Word gives it (px at 96 dpi), never wider than the page's
+    // text (review.css).
     var w = Number(b.width);
-    return h("img", { src: src, alt: "Chart or picture from the report", style: w > 0 ? "width:" + Math.min(w, 800) + "px" : null });
+    return h("img", { src: src, alt: "Chart or picture from the report", style: w > 0 ? "width:" + Math.round(w) + "px" : null });
   }
   // top: the block's own table, whose cells can be commented on (a table
   // inside a cell cannot). Those cells carry data-cell and can take the
@@ -1660,11 +1665,12 @@
   // The block a comment panel (or anything in one) sits under.
   function entryOfSide(node) {
     var s = node && node.closest ? node.closest(".rr-side") : null;
-    while (s && !(s.classList && s.classList.contains("rr-block"))) s = s.previousSibling;
+    // A line on the cover has its comments under the cover, after its slot.
+    while (s && !(s.classList && (s.classList.contains("rr-block") || s.classList.contains("rr-cover-slot")))) s = s.previousSibling;
     return (s && s.rrEntry) || null;
   }
   function sidesOf(en) {
-    var out = [], n = en.el.nextSibling;
+    var out = [], n = (en.slot || en.el).nextSibling;
     while (n && n.classList && n.classList.contains("rr-side")) { out.push(n); n = n.nextSibling; }
     return out;
   }
@@ -1680,7 +1686,8 @@
   // .rr-block in review.css), so the scroll bar is about right from the start.
   function roughHeight(b) {
     if (b.type === "table") return (b.rows || []).length * 26 + 10;
-    if (b.type === "image") { var w = Number(b.width), ht = Number(b.height); return (ht > 0 ? (w > 800 ? ht * 800 / w : ht) : 240) + 10; }
+    // The page's text is 602px wide (A4 less its margins).
+    if (b.type === "image") { var w = Number(b.width), ht = Number(b.height); return (ht > 0 ? (w > 602 ? ht * 602 / w : ht) : 240) + 10; }
     if (b.type === "heading") return 44;
     return Math.ceil(String(b.text || "").length / 110) * 20 + 8;
   }
@@ -1754,12 +1761,15 @@
   }
   // The comments beside one block, drawn again; the block itself is not touched.
   function refreshBlock(en) {
-    var el = en.el, par = el.parentNode, next;
+    // A line on the cover: its slot under the cover, shown only with comments.
+    var el = en.slot || en.el, par = el.parentNode, next, ss;
     while ((next = el.nextSibling) && next.classList && next.classList.contains("rr-side")) par.removeChild(next);
-    sideNodes(en).forEach(function (n) {
+    ss = sideNodes(en);
+    ss.forEach(function (n) {
       if (rep.cur !== en) setTabbable(n, false);
       par.insertBefore(n, next);
     });
+    if (en.slot) en.slot.hidden = !ss.length;
     dressBlock(en);
   }
   // The block that holds the report's place in the Tab order. Its comments'
@@ -1961,6 +1971,7 @@
     var rq = requestPanel();
     if (rq) main.appendChild(rq);
     main.appendChild(h("div", { class: "rr-toolbar" }, tb));
+    main.appendChild(h("p", { class: "rr-pages-note", id: "rr-pages-note", text: "Shown as A4 pages with the house cover. Word decides where pages break." }));
     main.appendChild(h("span", { class: "rr-sr", id: "rr-block-hint", text: "Press Enter to comment on it." }));
     var hintBox = h("div", { class: "rr-sr", id: "rr-hints" }, [
       h("span", { id: "rr-head-hint", text: "Heading. Press Enter to comment on it." }),
@@ -1973,16 +1984,55 @@
     // report keeps its place in the Tab order.
     var keep = rep && rep.pack === pack && rep.d === d && rep.cur ? rep.cur.n : 0;
     rep = { pack: pack, d: d, doc: doc, paper: paper, at: mapOf(), list: [], cur: null, secs: secs, hints: mapOf(), hintN: 0, hintBox: hintBox };
-    var cover = null, prevMap = prevAt(d);
+    // The report as Word prints it: the house cover, drawn from the pack, then
+    // the pages. Each line on the cover that the Word file holds (its front
+    // matter) is that block's own element, so it takes a comment, the
+    // keyboard and a check's Go to as any block does. Its comments cannot sit
+    // beside it on the picture: they go under the cover, in cover order, each
+    // after a slot naming the line ("On the cover: title"), which stands in
+    // for the block in sidesOf and refreshBlock. Front matter the cover does
+    // not draw goes under it too, as Other cover text. Each top-level heading
+    // starts a sheet; Word decides where its pages break. A body block and
+    // its comments always share a sheet.
+    var cv = coverSheet(doc, e), onCover = mapOf();
+    cv.items.forEach(function (x) { onCover[x.b.id] = x; });
+    paper.appendChild(cv.page);
+    var notes = null, other = null, sheet = null, filled = false, prevMap = prevAt(d);
     (doc.blocks || []).forEach(function (b, n) {
-      var en = { b: b, el: blockEl(doc, b, prevMap[b.id]), n: n, cell: null };
+      var cx = b.front ? onCover[b.id] : null;
+      var en = { b: b, el: cx ? cx.el : blockEl(doc, b, prevMap[b.id]), n: n, cell: null };
       en.el.rrEntry = en;
       rep.list.push(en);
       if (!rep.at[b.id]) rep.at[b.id] = en;
-      var into = paper;
+      var into;
+      if (b.front && !notes) {
+        notes = h("div", { class: "rr-cover-notes", "data-part": "cover-notes" });
+        paper.appendChild(notes);
+      }
+      if (cx) {
+        en.slot = h("div", { class: "rr-cover-slot", text: "On the cover: " + cx.label });
+        en.slot.rrEntry = en;
+        notes.appendChild(en.slot);
+        var ss = sideNodes(en);
+        en.slot.hidden = !ss.length;
+        ss.forEach(function (s) { setTabbable(s, false); notes.appendChild(s); });
+        dressBlock(en);
+        return;
+      }
       if (b.front) {
-        if (!cover) { cover = h("div", { class: "rr-cover" }); paper.appendChild(cover); }
-        into = cover;
+        if (!other) {
+          other = h("div", { class: "rr-cover-other", "data-part": "front" }, [h("p", { class: "rr-sheet-note", text: "Other cover text" })]);
+          notes.appendChild(other);
+        }
+        into = other;
+      } else {
+        if (!sheet || (filled && b.type === "heading" && (b.level || 1) === 1)) {
+          sheet = h("div", { class: "rr-sheet", "data-part": "page" });
+          paper.appendChild(sheet);
+          filled = false;
+        }
+        filled = true;
+        into = sheet;
       }
       into.appendChild(en.el);
       sideNodes(en).forEach(function (s) { setTabbable(s, false); into.appendChild(s); });
@@ -1994,6 +2044,104 @@
     paper.addEventListener("focusin", paperFocus);
     main.appendChild(paper);
     applyFind(paper, false);
+  }
+
+  // ---------- the cover ----------
+  // The house cover (the Design B cover the assessment and risk tools print),
+  // drawn from the pack: the engagement's client, site, author and document
+  // control, and the document's title. Where the Word file's own cover words
+  // are in the pack (its front matter) they are taken as printed: the
+  // document type above the title, the title's lines, the line under the
+  // site, the issue strip, the logo and the address. Each of those is drawn
+  // as its block (coverSheet's items), so it can be commented on; the rest is
+  // drawn from the engagement. The picture behind is decorative. The
+  // capitals on it are the Word cover's own.
+  var COVER_TYPE = /^[A-Z][A-Z0-9 &\/.,'()-]*$/;
+  function splitTitle(t) {
+    t = RC.norm(t);
+    if (t.length <= 26) return [t];
+    var mid = t.length / 2, best = -1;
+    for (var i = 0; i < t.length; i++) if (t[i] === " " && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+    return best < 0 ? [t] : [t.slice(0, best), t.slice(best + 1)];
+  }
+  var ADDRESS = /^(SolutionsPT Ltd|Telephone)\b/;
+  // Each part of the cover, as { t: text, b: the front-matter block it is,
+  // or null when it comes from the engagement }.
+  function coverInfo(doc, e) {
+    var dc = e.documentControl || {};
+    var front = (doc.blocks || []).filter(function (b) { return b.front; });
+    var lines = front.filter(function (b) { return b.type === "paragraph" && RC.norm(b.text); })
+      .map(function (b) { return { t: RC.norm(b.text), b: b }; });
+    var strip = -1, kind = -1;
+    lines.forEach(function (x, i) { if (strip < 0 && /^ISSUE\s/.test(x.t)) strip = i; });
+    var head = strip < 0 ? lines.filter(function (x) { return !ADDRESS.test(x.t); }) : lines.slice(0, strip);
+    var addr = (strip < 0 ? lines : lines.slice(strip + 1)).filter(function (x) { return ADDRESS.test(x.t); });
+    head.forEach(function (x, i) { if (kind < 0 && COVER_TYPE.test(x.t) && /[A-Z]{3}/.test(x.t)) kind = i; });
+    var client = RC.norm(e.client), site = RC.norm(e.site), at = -1;
+    if (client) head.forEach(function (x, i) { if (at < 0 && i > kind && x.t === client) at = i; });
+    var title = kind >= 0 && at > kind + 1 ? head.slice(kind + 1, at)
+      : splitTitle(doc.title || e.instrumentTitle || "Report").map(function (t) { return { t: t, b: null }; });
+    var after = at >= 0 ? head.slice(at + 1) : [];
+    var siteLine = site ? { t: site, b: null } : null;
+    if (after.length && (after[0].t === site || (!site && after.length > 1))) siteLine = after.shift();
+    var m = strip >= 0 ? /^ISSUE\s+(.*?)\s+(?:AUTHOR\s+(.*?)\s+)?CLASSIFICATION\s+(.*)$/.exec(lines[strip].t) : null;
+    var longest = title.reduce(function (x, l) { return Math.max(x, l.t.length); }, 0);
+    return {
+      logo: front.filter(function (b) { return b.type === "image"; })[0] || null,
+      type: kind >= 0 ? head[kind] : { t: e.scoringFamily === "risk-assessment" ? "OT CYBER RISK ASSESSMENT" : "OT CYBER SECURITY ASSESSMENT", b: null },
+      title: title, titlePx: longest <= 30 ? 35 : longest <= 38 ? 29 : 24,
+      client: at >= 0 ? head[at] : (client ? { t: client, b: null } : null), site: siteLine, sub: after[0] || null,
+      // The strip as the Word file printed it, where it has one.
+      strip: strip >= 0 ? lines[strip].b : null, stripText: strip >= 0 ? lines[strip].t : "",
+      issue: m ? m[1] : RC.norm(dc.documentRevision || "0.1") + (RC.norm(dc.issuedDate) ? "  ·  " + RC.norm(dc.issuedDate) : ""),
+      author: m ? m[2] || "" : RC.norm(e.consultant),
+      classification: m ? m[3] : RC.norm(dc.confidentiality) || "Confidential",
+      parsed: !!m || strip < 0,
+      addr: addr
+    };
+  }
+  function assetSrc(x) { return x && typeof x.base64 === "string" ? "data:" + (x.mime || "image/png") + ";base64," + x.base64 : ""; }
+  // The cover sheet, and the lines on it that are blocks: { page, items:
+  // [{ b, el, label }] }, which renderReport makes entries of.
+  function coverSheet(doc, e) {
+    var c = coverInfo(doc, e), as = A.Assets || {}, items = [];
+    function part(cls, x, label, kids) {
+      var el = h("div", { class: cls, text: kids ? null : x && x.t }, kids || null);
+      if (x && x.b) {
+        el.classList.add("rr-block", "rr-cv-line");
+        el.setAttribute("data-block-id", x.b.id);
+        el.setAttribute("data-section-key", x.b.sectionKey || "");
+        el.setAttribute("tabindex", "-1");
+        items.push({ b: x.b, el: el, label: label });
+      }
+      return el;
+    }
+    var page = h("div", { class: "rr-sheet rr-cover-page", "data-part": "cover" });
+    var bg = assetSrc(as.coverBg);
+    if (bg) page.appendChild(h("img", { class: "rr-cv-bg", src: bg, alt: "" }));
+    var top = h("div", { class: "rr-cv-top" });
+    var logo = assetSrc(as.logoCard);
+    if (logo) top.appendChild(part("rr-cv-logowrap", c.logo ? { b: c.logo } : null, "logo", [h("img", { class: "rr-cv-logo", src: logo, alt: c.logo ? "The logo on the cover" : "" })]));
+    top.appendChild(part("rr-cv-type", c.type, "document type"));
+    top.appendChild(h("div", { class: "rr-cv-bar" }));
+    var title = h("div", { class: "rr-cv-title", style: "font-size:calc(" + c.titlePx + " * var(--u))" });
+    c.title.forEach(function (l, i) { title.appendChild(part("rr-cv-tline", l, c.title.length > 1 ? "title, line " + (i + 1) : "title")); });
+    top.appendChild(title);
+    if (c.client) top.appendChild(part("rr-cv-client", c.client, "client"));
+    if (c.site) top.appendChild(part("rr-cv-site", c.site, "site"));
+    if (c.sub) top.appendChild(part("rr-cv-sub", c.sub, "line under the site"));
+    function pair(k, v) { return h("span", { class: "rr-cv-pair" }, [h("span", { class: "rr-cv-k", text: k }), h("span", { class: "rr-cv-v", text: v })]); }
+    var strip = [pair("ISSUE", c.issue)];
+    if (c.author) strip.push(pair("AUTHOR", c.author));
+    strip.push(pair("CLASSIFICATION", c.classification));
+    // A strip that does not read as one is shown as the Word file has it.
+    var stripEl = c.parsed ? part("rr-cv-strip", c.strip ? { b: c.strip } : null, "issue, author and classification", strip)
+      : part("rr-cv-strip", { t: c.stripText, b: c.strip }, "issue, author and classification");
+    var addr = c.addr.length ? c.addr.map(function (x, i) { return part("rr-cv-addr", x, "address, line " + (i + 1)); })
+      : [h("div", { class: "rr-cv-addr", text: "SolutionsPT Ltd   ·   Unit 1, Oakfield Road, Cheadle Royal Business Park, Cheadle, Cheshire SK8 3GX" }),
+        h("div", { class: "rr-cv-addr", text: "Telephone +44 (0) 161 495 4600   ·   sales@solutionspt.com   ·   www.solutionspt.com" })];
+    page.appendChild(h("div", { class: "rr-cv-in" }, [top, h("div", { class: "rr-cv-foot" }, [stripEl].concat(addr))]));
+    return { page: page, items: items };
   }
 
   // A section's heading brought to the top of the report, below the toolbar
@@ -2130,7 +2278,8 @@
     var walker = document.createTreeWalker(paper, NodeFilter.SHOW_TEXT, null), nodes = [], n;
     while ((n = walker.nextNode())) {
       // Report text only: not the comments, the composer or the buttons.
-      if (n.parentNode.closest && n.parentNode.closest(".rr-side, .rr-composer, button, textarea, input, select")) continue;
+      // Nor the labels the page adds: the cover strip's, a cover line's slot.
+      if (n.parentNode.closest && n.parentNode.closest(".rr-side, .rr-composer, button, textarea, input, select, .rr-cv-k, .rr-cover-slot, .rr-sheet-note")) continue;
       if (n.nodeValue.toLowerCase().indexOf(q) !== -1) nodes.push(n);
     }
     nodes.forEach(function (t) {

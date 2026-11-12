@@ -73,7 +73,7 @@ async function run(ok) {
   await poll(function () { return document.getElementById("rv-back-page"); }, 5000).catch(function () {});
   ok(!main.querySelector(".review-card [data-comment-id]"), "Go to on an item comment leaves the report page");
   var bar = document.getElementById("rv-back-page");
-  if (!bar) ok.note("view: " + (A.UI.__view ? A.UI.__view() : "?") + "; card holder connected: " + !!document.querySelector(".rv-panel") + "; back in card: " + !!document.querySelector(".rv-back"));
+  if (!bar) ok.note("page: " + ((main.querySelector("h1, h2") || {}).textContent || "?") + "; card holder connected: " + !!document.querySelector(".rv-panel") + "; back in card: " + !!document.querySelector(".rv-back"));
   ok(!!bar && !!bar.querySelector(".rv-back-go") && bar.classList.contains("rv-back") && bar.parentNode === document.body, "and a Back to the comment bar is on the page it went to (the card's own bar, fixed in place)");
   bar.querySelector(".rv-back-go").click();
   await poll(function () { return main.querySelector('[data-comment-id="c-item"]'); });

@@ -84,7 +84,8 @@
     var paper = d.getElementById("rr-paper");
     ok(!!paper && paper.querySelectorAll("[data-block-id]").length === pack.documents[0].blocks.length, "every block is on the page (" + pack.documents[0].blocks.length + ")");
     ok(paper.querySelectorAll("table").length > 5 && paper.querySelectorAll("img").length > 0, "tables and charts draw");
-    ok(/SolutionsPT Ltd/.test(paper.querySelector(".rr-cover").textContent) && !paper.querySelector(".rr-cover img[width='824']"), "the cover reads as text");
+    // (The cover, drawn from the pack's data as text on the house picture, is
+    // test-review-pages.html's.)
     var redFlag = paper.querySelector(".rr-prompt-flag");
     ok(!!redFlag && !!paper.querySelector(".rr-red"), "a red prompt is flagged where it stands");
     ok(d.querySelectorAll(".rr-outline-item").length > 5, "the outline lists the sections");
@@ -367,7 +368,7 @@
       d.getElementById("btn-theme").click();
       ok(html.getAttribute("data-theme") !== darkBefore && w.localStorage.getItem("ot-theme") === html.getAttribute("data-theme"), "the theme toggles, under the shared key");
       html.setAttribute("data-theme", "dark");
-      ok(w.getComputedStyle(d.getElementById("rr-paper")).backgroundColor === "rgb(255, 255, 255)", "the document stays white paper in dark mode");
+      ok(w.getComputedStyle(d.querySelector('#rr-paper .rr-sheet[data-part="page"]')).backgroundColor === "rgb(255, 255, 255)", "the document stays white paper in dark mode");
       ok(w.getComputedStyle(d.querySelector(".card, .rr-banner")).backgroundColor !== "rgb(255, 255, 255)", "while the rest goes dark");
       html.setAttribute("data-theme", "light");
       frame.style.width = "420px";

@@ -1,0 +1,1255 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Document tool: what an import must not change unseen</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Reading a Word file: the import fixes of both review rounds, once three
+  pages (test-doc-fix-import-a, -import-b and -r2-import), which loaded the
+  same scripts. Each part keeps its own fixtures in a scope of its own; the
+  parts run one after another and share the summary.
+
+  Part a (review findings 5 to 15, 23, 27 and 51). Nothing from the file is
+  dropped or altered without a line in the import report:
+
+    - headings numbered again from 1 while the text still names the old numbers;
+    - hidden text, which Word neither shows nor prints;
+    - letters typed in a symbol font (an ohm sign stored as "W");
+    - a table column that Word numbers by itself;
+    - Word's built-in "List Number 2" and "List Bullet 3" styles;
+    - a numbered list that resumes after a different numbered list;
+    - the heading typed above a contents list, and the page breaks round it;
+    - a legacy form check box and drop-down;
+    - the prompt of a content control nobody filled in;
+    - a link to a file, which is not a link to a place inside the document.
+
+  Part b (review findings 24 to 26, 28 to 34, 39, 53 and 57). Nothing from the
+  file is dropped or altered without a true line in the import report:
+
+    - fields that have no result (LISTNUM, AUTONUM, EQ, SYMBOL, MACROBUTTON);
+    - a drawing, picture or footnote that is left out is not reported as kept;
+    - a link inside a kept drawing or text box follows the rule for links in the
+      text, and what a kept object still fetches from outside is said;
+    - a numbered item with extra indent keeps its number;
+    - a list of figures is not the contents list;
+    - a link on a picture, and what is counted as a link brought across;
+    - a caption with a footnote or a link, and which block a caption belongs to;
+    - a link to a file, with the paragraph it was in;
+    - a table inside a footnote.
+
+  Part r2 (second review round): two fixes to the Word import, and the
+  defences behind the second.
+
+    - A diagram drawn as loose floating shapes inside a table cell travels as
+      one block of whole paragraphs, the anchors and the blank lines between and
+      after them, as it does in the body: the shapes keep their places against
+      each other and the cell keeps its height. A numbered paragraph with no
+      words in a cell still keeps its number.
+    - A picture linked to a file or a web address outside the document (an
+      image relationship with TargetMode="External", including what an
+      INCLUDEPICTURE field in a text box leaves behind) never reaches the
+      exported file: Word fetches it on open, and an address on a share hands
+      over the reader's Windows sign-in. It is listed as not carried over, with
+      its address. A picture that also holds its own copy keeps the copy; a
+      chart linked to a workbook keeps its figures and loses the link.
+    - A link taken off inside a text box no longer leaves its words in the
+      Hyperlink style.
+    - DocModel.normalise, the writer and the graft each refuse a kept block
+      that still names something outside the file other than a link to click.
+
+  Every file is built here, shaped the way Word writes it, and read by the real
+  reader; the export is the real writer's and the real graft's. The exported
+  zip is unpacked and every relationship part is read.
+-->
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/import-flow.js"></script>
+<script>
+// The shared summary. Each part registers a function that builds its chain of
+// steps and returns it; the parts run one after another.
+window.FixImport = (function () {
+  var lines = [], fail = 0, parts = [];
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function eq(a, b, n) { var x = JSON.stringify(a), y = JSON.stringify(b); ok(x === y, n, "got " + x + " wanted " + y); }
+  // Unzipping runs off the main thread, and headless Edge's virtual clock runs
+  // out the moment the page has nothing queued. A message bounced to ourselves
+  // keeps a task queued, without moving the clock, until the tests finish.
+  var alive = true, bounce = new MessageChannel();
+  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
+  bounce.port2.postMessage(0);
+  function finish() {
+    alive = false;
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function run() {
+    var chain = Promise.resolve();
+    parts.forEach(function (p) {
+      chain = chain.then(function () { return p.fn(ok, eq); }).then(null, function (e) { ok(false, "part " + p.name + ": the run", e && (e.stack || e.message)); });
+    });
+    chain.then(finish);
+  }
+  return { part: function (name, fn) { parts.push({ name: name, fn: fn }); }, run: run };
+})();
+</script>
+<script>
+// ======================= part a =======================
+FixImport.part("a", function (ok, eq) {
+
+  var A = window.App, I = A.DocxImport, H = A.HouseDocx, Zip = A.ZipIO, M = A.DocModel, F = A.DocImportFlow;
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+  var WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+  var REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+  var NS = ' xmlns:w="' + W + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="' + MC + '"' +
+    ' xmlns:wp="' + WP + '" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"' +
+    ' xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"';
+  var HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+
+  // ---- WordprocessingML, briefly ----
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function R(text, rPr) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(text) + '</w:t></w:r>'; }
+  function PX(inner, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + inner + '</w:p>'; }
+  function P(text, pPr, rPr) { return PX(R(text, rPr), pPr); }
+  function S(id) { return '<w:pStyle w:val="' + id + '"/>'; }
+  function NUM(id, lvl) { return '<w:numPr><w:ilvl w:val="' + (lvl || 0) + '"/><w:numId w:val="' + id + '"/></w:numPr>'; }
+  function FONT(name) { return '<w:rFonts w:ascii="' + name + '" w:hAnsi="' + name + '"/>'; }
+  function STYLE(id, name, o) {
+    o = o || {};
+    return '<w:style w:type="' + (o.type || "paragraph") + '"' + (o.dflt ? ' w:default="1"' : '') + ' w:styleId="' + id + '"><w:name w:val="' + name + '"/>' +
+      (o.based ? '<w:basedOn w:val="' + o.based + '"/>' : '') + (o.pPr ? '<w:pPr>' + o.pPr + '</w:pPr>' : '') + (o.rPr ? '<w:rPr>' + o.rPr + '</w:rPr>' : '') + '</w:style>';
+  }
+  function STYLES(list) { return HEAD + '<w:styles' + NS + '>' + STYLE("Normal", "Normal", { dflt: true }) + STYLE("Heading1", "heading 1", { pPr: '<w:outlineLvl w:val="0"/>' }) + (list || []).join("") + '</w:styles>'; }
+  function TC(inner) { return '<w:tc>' + (inner.charAt(0) === "<" ? inner : P(inner)) + '</w:tc>'; }
+  function TR(cells) { return '<w:tr>' + cells.join("") + '</w:tr>'; }
+  function T(rows, grid) { return '<w:tbl><w:tblPr/><w:tblGrid>' + grid.map(function (w) { return '<w:gridCol w:w="' + w + '"/>'; }).join("") + '</w:tblGrid>' + rows.join("") + '</w:tbl>'; }
+  function FLD(type, rPr, ff) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:fldChar w:fldCharType="' + type + '"' + (ff ? '>' + ff + '</w:fldChar>' : '/>') + '</w:r>'; }
+  function INSTR(code, rPr) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:instrText xml:space="preserve">' + esc(code) + '</w:instrText></w:r>'; }
+  function FIELD(code, result, ff) { return FLD("begin", "", ff) + INSTR(code) + FLD("separate") + (result || "") + FLD("end"); }
+  var BREAK = PX('<w:r><w:br w:type="page"/></w:r>');
+  function LVL(i, fmt, txt, left, pStyle) {
+    return '<w:lvl w:ilvl="' + i + '"><w:start w:val="1"/><w:numFmt w:val="' + fmt + '"/>' + (pStyle ? '<w:pStyle w:val="' + pStyle + '"/>' : '') +
+      '<w:lvlText w:val="' + txt + '"/><w:pPr><w:ind w:left="' + left + '" w:hanging="360"/></w:pPr></w:lvl>';
+  }
+  function NUMBERING(abstracts, nums) {
+    return HEAD + '<w:numbering' + NS + '>' + abstracts.map(function (a, i) { return '<w:abstractNum w:abstractNumId="' + i + '">' + a + '</w:abstractNum>'; }).join("") +
+      nums.map(function (abs, i) { return '<w:num w:numId="' + (i + 1) + '"><w:abstractNumId w:val="' + abs + '"/></w:num>'; }).join("") + '</w:numbering>';
+  }
+  // A package. o: { body, styles, numbering, rels: [[id, kind, target, external]] }
+  function make(o) {
+    var CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.";
+    var rels = '<Relationship Id="rIdS" Type="' + REL + 'styles" Target="styles.xml"/>', types = '<Override PartName="/word/styles.xml" ContentType="' + CT + 'styles+xml"/>';
+    var files = [{ name: "word/styles.xml", bytes: Zip.bytesOf(o.styles || STYLES()) }];
+    if (o.numbering) {
+      rels += '<Relationship Id="rIdN" Type="' + REL + 'numbering" Target="numbering.xml"/>';
+      types += '<Override PartName="/word/numbering.xml" ContentType="' + CT + 'numbering+xml"/>';
+      files.push({ name: "word/numbering.xml", bytes: Zip.bytesOf(o.numbering) });
+    }
+    (o.rels || []).forEach(function (r) { rels += '<Relationship Id="' + r[0] + '" Type="' + REL + r[1] + '" Target="' + esc(r[2]) + '"' + (r[3] ? ' TargetMode="External"' : '') + '/>'; });
+    return Zip.write([
+      { name: "[Content_Types].xml", bytes: Zip.bytesOf(HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+        '<Override PartName="/word/document.xml" ContentType="' + CT + 'document.main+xml"/>' + types + '</Types>') },
+      { name: "_rels/.rels", bytes: Zip.bytesOf(HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + REL + 'officeDocument" Target="word/document.xml"/></Relationships>') },
+      { name: "word/document.xml", bytes: Zip.bytesOf(HEAD + '<w:document' + NS + '><w:body>' + o.body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body></w:document>') },
+      { name: "word/_rels/document.xml.rels", bytes: Zip.bytesOf(HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>') }
+    ].concat(files));
+  }
+  function imp(o) { return make(o).then(function (blob) { return I.read(blob, { name: "made.docx" }); }); }
+
+  // ---- reading the result ----
+  function text(b) { return b.runs ? b.runs.map(function (r) { return r.t; }).join("") : (b.text || ""); }
+  function brief(blocks) {
+    return blocks.map(function (b) {
+      var tag = b.type === "heading" ? "h" + b.level : b.type === "list" ? (b.list === "bullet" ? "*" : "#") + b.level + (b.restart ? "r" : "") + (b["continue"] ? "c" : "")
+        : b.type === "paragraph" ? "p" : b.type;
+      return tag + (text(b) ? ":" + text(b) : "");
+    });
+  }
+  function entry(report, code) {
+    var found = null;
+    ["toCheck", "changed", "notCarried"].forEach(function (l) { report[l].forEach(function (e) { if (e.code === code) found = e; }); });
+    return found;
+  }
+  function count(report, code) { var e = entry(report, code); return e ? e.count : 0; }
+  function byText(blocks, t) { for (var i = 0; i < blocks.length; i++) if (text(blocks[i]) === t) return blocks[i]; return null; }
+  function markers(blocks) {
+    var n = H.listNumbers(blocks), out = [];
+    (function walk(list) {
+      list.forEach(function (b) {
+        if (b.type === "table") b.rows.forEach(function (row) { row.cells.forEach(function (c) { walk(c.blocks); }); });
+        if (b.type === "list") out.push(n[b.id].marker);
+      });
+    })(blocks);
+    return out.join(" ");
+  }
+  function documentXml(blob) {
+    return Zip.read(blob).then(function (files) { return Zip.text(files.filter(function (x) { return x.name === "word/document.xml"; })[0]); });
+  }
+  function exported(project) {
+    return H.buildDocument(project, { issueStatus: "draft" }).then(function (res) { return documentXml(res.blob); });
+  }
+  function plainWords(s) { return !/[\u2013\u2014]/.test(s) && !/\b[A-Z]{4,}\b/.test(s) && !/the tool/i.test(s); }
+
+  var chain = Promise.resolve();
+  function test(name, fn) {
+    chain = chain.then(fn).then(null, function (e) { ok(false, name + ": it ran", (e && (e.cause ? e.cause.stack || e.cause.message : e.stack || e.message)) || String(e)); });
+  }
+
+  // ---- 5. heading numbers ----
+  var HEAD_NUM = NUMBERING([LVL(0, "decimal", "%1", 432, "Heading1") + LVL(1, "decimal", "%1.%2", 576, "Heading2")], [0]);
+  var HEAD_STYLES = HEAD + '<w:styles' + NS + '>' + STYLE("Normal", "Normal", { dflt: true }) +
+    STYLE("Heading1", "heading 1", { pPr: '<w:numPr><w:numId w:val="1"/></w:numPr><w:outlineLvl w:val="0"/>' }) +
+    STYLE("Heading2", "heading 2", { pPr: '<w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr><w:outlineLvl w:val="1"/>' }) + '</w:styles>';
+  var OFF = '<w:numPr><w:numId w:val="0"/></w:numPr>';
+  test("heading numbers", function () {
+    return imp({ styles: HEAD_STYLES, numbering: HEAD_NUM, body:
+      P("Executive summary", S("Heading1") + OFF) + P("Summary text.") + P("Introduction", S("Heading1")) + P("Findings", S("Heading1")) + P("Network findings", S("Heading2")) +
+      PX(R("The gaps are described in section ") + FIELD(" REF _Ref1 \\n \\h ", R("2.1")) + R(" on page ") + FIELD(" PAGEREF _Ref1 \\h ", R("7")) + R(".")) +
+      PX(R("Dated ") + FIELD(' DATE \\@ "d MMM" ', R("1 Jan"))) + P("Glossary", S("Heading1") + OFF)
+    }).then(function (r) {
+      var b = r.project.blocks, e = entry(r.report, "heading-numbers");
+      eq([r.project.options.numberHeadings, brief(b).slice(0, 5)], [true, ["h1:Executive summary", "p:Summary text.", "h1:Introduction", "h1:Findings", "h2:Network findings"]],
+        "5 the headings come across as headings and numbering is switched on");
+      eq(H.headingNumbers(b)[b[0].id], "1", "5 the heading the original left unnumbered takes number 1 in the template (which is why it must be said)");
+      ok(!!e && r.report.changed.indexOf(e) >= 0 && I.CODES.changed.indexOf("heading-numbers") >= 0, "5 the report has a heading-numbers line in the changed list", JSON.stringify(r.report.changed.map(function (x) { return x.code; })));
+      eq(e && [e.headings, e.references, e.count], [2, 2, 4], "5 it counts the headings that had no number and the references kept as text (a date field is not one)");
+      eq(e && e.blockIds, [b[0].id, byText(b, "Glossary").id, byText(b, "The gaps are described in section 2.1 on page 7.").id],
+        "5 it points at the unnumbered headings and at the paragraph that holds the references");
+      var s = F.sentence(e);
+      ok(/numbered again from 1/.test(s) && /2 headings that had no number in the original now have one/.test(s) && /2 cross-references to a section or a page were kept as the text they showed/.test(s) &&
+        /Check every reference to a section or page number/.test(s) && plainWords(s), "5 the sentence says what happened and what to check", s);
+      ok(/1 heading that had no number in the original now has one, so the numbers after it have moved/.test(F.sentence({ code: "heading-numbers", count: 1, headings: 1, references: 0 })) &&
+        !/cross-reference/.test(F.sentence({ code: "heading-numbers", count: 1, headings: 1, references: 0 })), "5 the sentence reads properly for one heading and no reference");
+      return imp({ styles: HEAD_STYLES, numbering: HEAD_NUM, body: P("Introduction", S("Heading1")) + P("Scope", S("Heading2")) + P("Text") });
+    }).then(function (r) {
+      ok(r.project.options.numberHeadings === true && !entry(r.report, "heading-numbers"), "5 no line when every heading was numbered and nothing refers to one");
+      return imp({ body: P("Introduction", S("Heading1")) + PX(R("See ") + FIELD(" REF _Ref1 \\h ", R("Scope"))) });
+    }).then(function (r) {
+      ok(r.project.options.numberHeadings === false && !entry(r.report, "heading-numbers") && count(r.report, "fields") === 1, "5 no line when the headings are not numbered at all");
+    });
+  });
+
+  // ---- 6, 23, 51. hidden text ----
+  function textBox(inner) {
+    var words = '<w:txbxContent>' + inner + '</w:txbxContent>';
+    return '<w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="1143000" cy="508000"/><wp:docPr id="1" name="Note box"/><wp:cNvGraphicFramePr/>' +
+      '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr txBox="1"/>' +
+      '<wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1143000" cy="508000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx>' + words + '</wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic>' +
+      '</wp:inline></w:drawing></mc:Choice><mc:Fallback><w:pict><v:rect id="box1" style="width:90pt;height:40pt"><v:textbox>' + words + '</v:textbox></v:rect></w:pict></mc:Fallback></mc:AlternateContent></w:r>';
+  }
+  test("hidden text", function () {
+    var V = '<w:vanish/>';
+    var styles = STYLES([STYLE("Hid", "Hidden note", { type: "character", rPr: V }), STYLE("HidPara", "Hidden paragraph", { rPr: V })]);
+    return imp({ styles: styles, body:
+      P("Notes", S("Heading1")) +
+      PX(R("Alpha visible. ") + R("SECRETNOTE margin is forty percent. ", V) + R("Omega visible.")) +
+      P("WHOLEHIDDEN drafting paragraph.", '<w:rPr><w:vanish/></w:rPr>', V) +
+      PX(R("Before ") + R("STYLEHIDDEN words ", '<w:rStyle w:val="Hid"/>') + R("kept anyway", '<w:rStyle w:val="Hid"/><w:vanish w:val="0"/>')) +
+      T([TR([TC(PX(R("CELLHIDDEN ", V) + R("cell text"))), TC("other cell")])], [3000, 3000]) +
+      P("PARASTYLEHIDDEN line.", S("HidPara")) + PX(R("Shown in a hidden style", '<w:vanish w:val="0"/>'), S("HidPara")) +
+      PX(FLD("begin", V) + INSTR(' XE "INDEXMARK" ', V) + FLD("end", V) + R("After the index mark")) +
+      PX(R("Page ") + R("12", '<w:webHidden/>')) +
+      PX(R("Box follows.") + textBox(PX(R("Box words ") + R("BOXHIDDEN", '<w:rStyle w:val="Hid"/>') + R(" shown", '<w:rStyle w:val="Hid"/><w:vanish w:val="0"/>'))))
+    }).then(function (r) {
+      var p = r.project, b = p.blocks, e = entry(r.report, "hidden-text");
+      var kept = b.filter(function (x) { return x.type === "kept"; })[0], rest = JSON.stringify(b.filter(function (x) { return x.type !== "kept"; }));
+      var words = ["SECRETNOTE", "WHOLEHIDDEN", "STYLEHIDDEN", "CELLHIDDEN", "PARASTYLEHIDDEN", "INDEXMARK"];
+      eq(words.filter(function (w) { return rest.indexOf(w) >= 0 || JSON.stringify(p.footnotes).indexOf(w) >= 0; }), [], "6 no hidden words in any block or footnote");
+      eq(brief(b).filter(function (x) { return x.charAt(0) === "p"; }), ["p:Alpha visible. Omega visible.", "p:Before kept anyway", "p:Shown in a hidden style", "p:After the index mark", "p:Page 12", "p:Box follows."],
+        "6 the visible text on each side is kept and joined; a paragraph hidden throughout leaves no block; hidden switched off on a run is kept; web-hidden text is kept");
+      eq(brief(b.filter(function (x) { return x.type === "table"; })[0].rows[0].cells[0].blocks), ["p:cell text"], "6 the same in a table cell");
+      ok(!!e && r.report.notCarried.indexOf(e) >= 0 && I.CODES.notCarried.indexOf("hidden-text") >= 0, "6 the report has a hidden-text line in the not carried list");
+      eq(e && [e.count, e.examples], [5, ["SECRETNOTE margin is forty percent.", "WHOLEHIDDEN drafting paragraph.", "STYLEHIDDEN words", "CELLHIDDEN", "PARASTYLEHIDDEN line."]],
+        "6 each hidden run is counted once and quoted, so it can be read and typed in if wanted (an index mark showed nothing and is not counted)");
+      ok(e && e.blockIds && e.blockIds.indexOf(byText(b, "Alpha visible. Omega visible.").id) >= 0, "6 it points at the paragraph the hidden text was in", JSON.stringify(e && e.blockIds));
+      var s = F.sentence(e);
+      ok(/^5 pieces of hidden text were left out\./.test(s) && plainWords(s) && /^1 piece of hidden text was left out\./.test(F.sentence({ code: "hidden-text", count: 1 })), "6 the sentence reads properly for one and for many", s);
+      // A kept text box loses its styles, so what a style hid must be hidden on the run itself.
+      var box = new DOMParser().parseFromString(kept.xml, "application/xml"), runs = box.getElementsByTagNameNS(W, "r"), seen = {};
+      for (var i = 0; i < runs.length; i++) {
+        var t = runs[i].getElementsByTagNameNS(W, "t")[0], rPr = runs[i].getElementsByTagNameNS(W, "rPr")[0];
+        if (t && rPr) seen[t.textContent.trim()] = rPr.getElementsByTagNameNS(W, "vanish").length;
+      }
+      eq([seen["BOXHIDDEN"], seen["shown"], seen["Box words"]], [1, 0, 0], "51 in a kept text box, text hidden through a style is still hidden once the style is gone, and nothing else is");
+      return exported(p).then(function (xml) {
+        var outside = xml.replace(/<w:txbxContent>[\s\S]*?<\/w:txbxContent>/g, "");
+        eq(words.filter(function (w) { return outside.indexOf(w) >= 0; }), [], "6 the exported Word file does not print the hidden words");
+        ok(/Alpha visible\. Omega visible\./.test(xml), "6 and it does print the visible ones");
+      });
+    });
+  });
+
+  // ---- 7, 27. symbol fonts ----
+  test("symbol fonts", function () {
+    var SY = FONT("Symbol"), WD = FONT("Wingdings"), W2 = FONT("Wingdings 2");
+    var styles = STYLES([STYLE("Greek", "Greek line", { rPr: SY })]);
+    function SYM(font, ch) { return '<w:r><w:sym w:font="' + font + '" w:char="' + ch + '"/></w:r>'; }
+    return imp({ styles: styles, body:
+      PX(R("Resistance is 10 ") + R("W", SY) + R(" and length 5 ") + R("m", SY) + R("m. Done ") + R("\u00FC", WD) + R(" ok.")) +
+      PX(R("Patched: ") + R("P", W2) + R(" Tested: ") + R("O", W2) + R(" Private: ") + R("\uF0FC", WD) + R(" Loose: ") + R("\uF057") + R(" Odd: ") + R("b", FONT("Webdings")) + R(" Web: ") + R("a", FONT("Webdings"))) +
+      PX(R("Power 10 W, 5 mm, gr\u00FC\u00DF", FONT("Calibri"))) +
+      PX(R("Sym: ") + SYM("Symbol", "F06D") + SYM("Wingdings", "00FC") + SYM("Symbol", "006D") + SYM("Wingdings", "F022") + SYM("Client Icons", "F0E0") + SYM("Arial", "00A9")) +
+      P("abg 2 W", S("Greek")) +
+      PX(R("Mixed: ") + R("a = 5 \u03A9", SY))
+    }).then(function (r) {
+      var b = r.project.blocks, e = entry(r.report, "symbols");
+      eq(text(b[0]), "Resistance is 10 \u03A9 and length 5 \u03BCm. Done \u2713 ok.", "7 a letter typed in Symbol is the Greek letter it showed, and a Wingdings tick is a tick");
+      ok(text(b[0]).indexOf("10 W") < 0 && text(b[0]).indexOf("5 mm") < 0 && text(b[0]).indexOf("\u00FC") < 0, "7 the stored letters W, m and u-umlaut are not passed through");
+      eq(text(b[1]), "Patched: \u2713 Tested: \u2717 Private: \u2713 Loose: \u25A1 Odd: \u25A1 Web: \u2714",
+        "27 Wingdings 2 P and O are a tick and a cross; a private-range character follows its font; one with no symbol font, or with no match, is a box");
+      eq(text(b[2]), "Power 10 W, 5 mm, gr\u00FC\u00DF", "7 the same letters in an ordinary font are untouched");
+      eq(text(b[3]), "Sym: \u03BC\u2713\u03BC\u25A1\u25A1\u00A9", "27 w:sym goes by its font: Symbol F06D and 006D are both mu, Wingdings 00FC is the tick, an unmatched or unknown symbol is a box, an ordinary one is itself");
+      eq(text(b[4]), "\u03B1\u03B2\u03B3 2 \u03A9", "7 a symbol font set by the paragraph style counts too; digits and spaces stay");
+      eq(text(b[5]), "Mixed: \u03B1 = 5 \u03A9", "7 a real Greek letter typed in the Symbol font stays as it is");
+      eq(e && [e.count, e.blockIds], [4, [b[1].id, b[3].id]], "7 every box is counted under symbols, with the paragraphs to look at");
+      eq(b.map(function (x) { return x.runs.length; }), [1, 1, 1, 1, 1, 1], "7 no working keys are left to split the runs");
+      ok(JSON.stringify(b).indexOf("sym") < 0, "7 nothing about the font is left on the runs");
+    });
+  });
+
+  // ---- 8. a column that Word numbers by itself ----
+  var LISTS = NUMBERING([LVL(0, "decimal", "%1.", 720) + LVL(1, "lowerLetter", "%2.", 1440), LVL(0, "bullet", "", 720)], [0, 1, 0, 0]);
+  test("numbered cells", function () {
+    function NO(id) { return TC(PX("", NUM(id || 1, 0))); }
+    return imp({ numbering: LISTS, body:
+      T([TR([TC("No."), TC("Requirement")]), TR([NO(), TC("Fit the lock")]), TR([NO(), TC("Label the port")]), TR([NO(), TC("Record it")]), TR([NO(2), TC(PX("", ""))])], [1000, 5000]) +
+      PX("", NUM(1, 0)) + P("After")
+    }).then(function (r) {
+      var p = r.project, t = p.blocks[0], col = t.rows.slice(1, 4).map(function (row) { return row.cells[0].blocks; });
+      eq(col.map(function (c) { return c.map(function (x) { return [x.type, x.list, x.level, x.runs]; }); }), [[["list", "number", 0, []]], [["list", "number", 0, []]], [["list", "number", 0, []]]],
+        "8 an empty numbered paragraph in a cell is kept as a list item with no words");
+      eq(col.map(function (c) { return !!c[0]["continue"]; }), [false, true, true], "8 the second and third carry on the first");
+      eq(markers(p.blocks), "1. 2. 3. \u2022", "8 so the column counts 1, 2, 3 (and an empty bulleted cell shows its bullet)");
+      eq(brief(t.rows[4].cells[1].blocks), ["p"], "8 an empty cell with no numbering is an empty cell");
+      eq(brief(p.blocks.slice(1)), ["p:After"], "8 an empty numbered paragraph in the body still makes no block");
+      eq(r.report.carried.listItems, 0, "8 they are not counted as list items of the body");
+      var n = M.normalise(JSON.parse(JSON.stringify({ schema: p.schema, id: p.id, kind: p.kind, info: p.info, options: p.options, nextId: p.nextId, blocks: p.blocks, footnotes: {}, media: {}, parts: {} })));
+      eq(n.blocks[0].rows[2].cells[0].blocks.map(function (x) { return [x.type, x.list, !!x["continue"]]; }), [["list", "number", true]], "8 the saved document keeps the item when it is loaded again");
+      return exported(p).then(function (xml) {
+        var dom = new DOMParser().parseFromString(xml, "application/xml"), tbls = dom.getElementsByTagNameNS(W, "tbl"), tbl = null;
+        for (var i = 0; i < tbls.length; i++) if (tbls[i].textContent.indexOf("Fit the lock") >= 0) tbl = tbls[i];
+        var rows = tbl.getElementsByTagNameNS(W, "tr"), ids = [];
+        for (var k = 1; k < 4; k++) {
+          var id = rows[k].getElementsByTagNameNS(W, "tc")[0].getElementsByTagNameNS(W, "numId")[0];
+          ids.push(id ? id.getAttributeNS(W, "val") : null);
+        }
+        ok(ids[0] != null && ids[0] === ids[1] && ids[1] === ids[2], "8 in the exported Word file each of the three cells is numbered, on one list", JSON.stringify(ids));
+      });
+    });
+  });
+
+  // ---- 9. Word's built-in styles for the deeper levels of a list ----
+  // As Word writes them: each style is a list of its own at level 0, with its own indent.
+  var FAMILY_NUM = NUMBERING([LVL(0, "bullet", "", 360, "ListBullet"), LVL(0, "bullet", "", 643, "ListBullet2"), LVL(0, "bullet", "", 926, "ListBullet3"),
+    LVL(0, "decimal", "%1.", 360, "ListNumber"), LVL(0, "decimal", "%1.", 643, "ListNumber2"), LVL(0, "bullet", "", 1492, "ListBullet5")], [0, 1, 2, 3, 4, 5]);
+  function LS(id, name, num) { return STYLE(id, name, { pPr: '<w:numPr><w:numId w:val="' + num + '"/></w:numPr>' }); }
+  var FAMILY_STYLES = STYLES([LS("ListBullet", "List Bullet", 1), LS("ListBullet2", "List Bullet 2", 2), LS("ListBullet3", "List Bullet 3", 3), LS("ListNumber", "List Number", 4),
+    LS("ListNumber2", "List Number 2", 5), LS("ListBullet5", "List Bullet 5", 6), STYLE("ListContinue", "List Continue", { pPr: '<w:ind w:left="283"/>' }),
+    LS("Aufzhlung2", "List Bullet 2", 2)]);
+  test("built-in list styles", function () {
+    return imp({ styles: FAMILY_STYLES, numbering: FAMILY_NUM, body:
+      P("Bullet one", S("ListBullet")) + P("Bullet two", S("ListBullet")) + P("Bullet sub", S("ListBullet2")) + P("Bullet sub sub", S("ListBullet3")) + P("Bullet five", S("ListBullet5")) + P("Localised sub", S("Aufzhlung2")) +
+      P("Gap") +
+      P("Number one", S("ListNumber")) + P("Number two", S("ListNumber")) + P("Sub one", S("ListNumber2")) + P("Sub two", S("ListNumber2")) + P("Number three", S("ListNumber")) + P("Number four", S("ListNumber"))
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(brief(b), ["*0:Bullet one", "*0:Bullet two", "*1:Bullet sub", "*2:Bullet sub sub", "*2:Bullet five", "*1:Localised sub", "p:Gap",
+        "#0:Number one", "#0:Number two", "#1:Sub one", "#1:Sub two", "#0:Number three", "#0:Number four"],
+        "9 List Bullet 2 and 3 and List Number 2 are one and two levels down, by style id or by name, and the list that resumes is not started again");
+      eq(markers(b.slice(7)), "1. 2. a. b. 3. 4.", "9 the numbers run 1, 2, then the sub items, then 3, 4 as in Word");
+      var deep = entry(r.report, "lists-deeper"), ln = entry(r.report, "list-numbering");
+      eq(deep && deep.blockIds, [byText(b, "Bullet five").id], "9 a level past the third is brought up and reported");
+      eq(ln && ln.blockIds, [byText(b, "Sub one").id, byText(b, "Sub two").id], "9 the sub items, which Word numbered 1, 2 and the template letters, are reported");
+      return imp({ styles: FAMILY_STYLES, numbering: FAMILY_NUM, body:
+        P("Number one", S("ListNumber")) + P("Number two", S("ListNumber")) + P("Sub one", S("ListNumber2")) + P("More about the sub item", S("ListContinue")) + P("Number three", S("ListNumber")) +
+        P("Gap") + P("Direct on the same list", NUM(4, 0)) });
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(brief(b), ["#0:Number one", "#0:Number two", "#1:Sub one", "p:More about the sub item", "#0c:Number three", "p:Gap", "#0c:Direct on the same list"],
+        "9 after a List Continue paragraph the parent list carries on, and so does an item numbered directly on the list the plain style uses");
+      eq(markers(b), "1. 2. a. 3. 4.", "9 so it is 3, not 2 after the sub list's 1");
+    });
+  });
+
+  // ---- 10. a list that resumes after a different numbered list ----
+  test("resumed lists", function () {
+    return imp({ numbering: LISTS, body:
+      P("Open the panel", NUM(1, 0)) + P("Check the switch", NUM(1, 0)) + P("A note.") +
+      P("B one", NUM(3, 0)) + P("B two", NUM(3, 0)) + P("B three", NUM(3, 0)) + P("B four", NUM(3, 0)) + P("Another note.") +
+      P("Sign the log", NUM(1, 0)) + P("Close the panel", NUM(1, 0))
+    }).then(function (r) {
+      var b = r.project.blocks, sign = byText(b, "Sign the log"), n = H.listNumbers(b), ln = entry(r.report, "list-numbering");
+      ok(n[sign.id].marker !== "5." && !sign["continue"], "10 a list that resumes after a different list does not take that list's count", n[sign.id].marker);
+      eq([n[sign.id].marker, ln && ln.blockIds], ["1.", [sign.id]], "10 it starts at 1 and is reported with its block, the one item whose number changed");
+      ok(/may not show the number the original showed/.test(F.sentence(ln)), "10 the line says the number may differ");
+      return imp({ numbering: LISTS, body:
+        P("Open the panel", NUM(1, 0)) + P("Check the switch", NUM(1, 0)) + T([TR([TC(P("In a cell", NUM(3, 0))), TC("x")])], [3000, 3000]) + P("Sign the log", NUM(1, 0)) });
+    }).then(function (r) {
+      var b = r.project.blocks, sign = byText(b, "Sign the log"), ln = entry(r.report, "list-numbering");
+      eq([H.listNumbers(b)[sign.id].marker, !!sign["continue"], ln && ln.blockIds], ["1.", false, [sign.id]], "10 the same when the other list sat in a table cell");
+      return imp({ numbering: LISTS, body: P("One", NUM(1, 0)) + P("Two", NUM(1, 0)) + P("A note.") + P("Three", NUM(1, 0)) + P("A note.") + P("B one", NUM(3, 0)) + P("B two", NUM(3, 0)) });
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq([brief(b)[3], markers(b), !!entry(r.report, "list-numbering")], ["#0c:Three", "1. 2. 3. 1. 2.", false], "10 a list that resumes with only text between still carries on, and nothing is reported");
+      return imp({ numbering: LISTS, body: P("A one", NUM(1, 0)) + P("A two", NUM(1, 0)) + P("B one", NUM(3, 0)) + P("A three", NUM(1, 0)) });
+    }).then(function (r) {
+      var b = r.project.blocks, ln = entry(r.report, "list-numbering");
+      eq([brief(b), ln && ln.blockIds], [["#0:A one", "#0:A two", "#0r:B one", "#0r:A three"], [byText(b, "A three").id]],
+        "10 with no text between, the list that comes back starts again too, and is reported; the new list that broke in is not");
+    });
+  });
+
+  // ---- 11. the heading typed above a contents list ----
+  var TOC_STYLES = STYLES([STYLE("TOCHeading", "TOC Heading", { based: "Heading1", pPr: '<w:outlineLvl w:val="9"/>' }), STYLE("TOC1", "toc 1"),
+    STYLE("Unnumbered", "Heading no number", { based: "Heading1", pPr: '<w:outlineLvl w:val="9"/>' })]);
+  function TOC(lines) {
+    return PX(FLD("begin") + INSTR(' TOC \\o "1-3" \\h ') + FLD("separate") + R(lines[0]), S("TOC1")) +
+      lines.slice(1).map(function (l) { return P(l, S("TOC1")); }).join("") + PX(FLD("end"));
+  }
+  test("contents heading", function () {
+    return imp({ styles: TOC_STYLES, body:
+      P("Prepared for ACME Water") + BREAK + P("Contents", S("TOCHeading")) + TOC(["Executive summary 3", "Findings 4"]) + BREAK +
+      P("Executive summary", S("Heading1")) + P("Text.") + BREAK + P("Findings", S("Heading1")) + P("Left unnumbered", S("Unnumbered"))
+    }).then(function (r) {
+      var b = r.project.blocks, c = entry(r.report, "contents");
+      eq(brief(b), ["p:Prepared for ACME Water", "pageBreak", "h1:Executive summary", "p:Text.", "pageBreak", "h1:Findings", "h1:Left unnumbered"],
+        "11 the heading in Word's TOC Heading style goes with the contents list; the first heading is the first real one; no two page breaks are left side by side; a real page break stays; another style at outline level 9 is still a heading");
+      eq([c && c.count, c && c.examples, r.project.options.contents], [1, ["Contents", "Executive summary 3", "Findings 4"], true], "11 the heading's word is quoted with the contents lines, and the template's own contents list is switched on");
+      eq(entry(r.report, "front-matter").blockIds, [b[0].id, b[1].id], "11 the front matter line lists what is really before the first heading");
+      return exported(r.project).then(function (xml) {
+        ok(!/>Contents<\/w:t>[\s\S]*>Contents<\/w:t>/.test(xml.replace(/<w:hdr[\s\S]*$/, "")) || xml.split(">Contents</w:t>").length === 2, "11 the exported Word file has one Contents heading, the template's own", String(xml.split(">Contents</w:t>").length - 1));
+      });
+    }).then(function () {
+      // An older template: the heading is a plain Heading 1 that only says "Contents".
+      return imp({ styles: TOC_STYLES, body: P("Cover words") + P("Table of Contents", S("Heading1")) + TOC(["Scope 2"]) + P("Scope", S("Heading1")) + P("Contents of the pack", S("Heading1")) + P("Text.") + P("Contents", S("Heading1")) + P("A section really called Contents.") });
+    }).then(function (r) {
+      var b = r.project.blocks, c = entry(r.report, "contents");
+      eq(brief(b), ["p:Cover words", "h1:Scope", "h1:Contents of the pack", "p:Text.", "h1:Contents", "p:A section really called Contents."],
+        "11 a Heading 1 that only says Contents, directly above the list, goes too; a heading that says more, or has no list under it, stays");
+      ok(c && c.examples.indexOf("Table of Contents") >= 0, "11 and it is quoted in the report", JSON.stringify(c));
+    });
+  });
+
+  // ---- 12. the page break after the original's cover and contents ----
+  test("leading page break", function () {
+    var COVER = '<w:sdt><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Cover Pages"/><w:docPartUnique/></w:docPartObj></w:sdtPr><w:sdtContent>' + P("ACME Water") + P("Network review") + '</w:sdtContent></w:sdt>';
+    var CONTENTS = '<w:sdt><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Table of Contents"/><w:docPartUnique/></w:docPartObj></w:sdtPr><w:sdtContent>' + P("Contents", S("TOCHeading")) + TOC(["Executive summary 3"]) + '</w:sdtContent></w:sdt>';
+    return imp({ styles: TOC_STYLES, body: COVER + CONTENTS + BREAK + P("Executive summary", S("Heading1")) + P("Text.") + BREAK + P("More text.") }).then(function (r) {
+      var b = r.project.blocks;
+      eq(brief(b), ["h1:Executive summary", "p:Text.", "pageBreak", "p:More text."], "12 the page break that followed the original's cover and contents is not carried; the document starts at its first heading; a later break stays");
+      eq([r.project.options.contents, !!entry(r.report, "front-matter"), count(r.report, "cover-page"), count(r.report, "contents")], [true, false, 1, 1],
+        "12 nothing is listed as front matter, and the cover and contents are still reported");
+      return imp({ styles: TOC_STYLES, body: BREAK + BREAK + P("Straight in") + P("A heading", S("Heading1")) });
+    }).then(function (r) {
+      eq(brief(r.project.blocks), ["p:Straight in", "h1:A heading"], "12 page breaks that open a document are never carried: the template's front pages end on a new page themselves");
+      return imp({ styles: TOC_STYLES, body: P("Kept cover line") + BREAK + CONTENTS + BREAK + P("First", S("Heading1")) });
+    }).then(function (r) {
+      eq(brief(r.project.blocks), ["p:Kept cover line", "pageBreak", "h1:First"], "12 a break on each side of a contents list that was left out becomes one break");
+      return imp({ styles: TOC_STYLES, body: P("One") + BREAK + BREAK + P("Two") });
+    }).then(function (r) {
+      eq(brief(r.project.blocks), ["p:One", "pageBreak", "pageBreak", "p:Two"], "12 two breaks the author really put side by side are left alone");
+    });
+  });
+
+  // ---- 13. legacy form fields ----
+  test("form fields", function () {
+    function BOX(inner) { return '<w:ffData><w:name w:val="Check1"/><w:enabled/><w:checkBox><w:sizeAuto/>' + inner + '</w:checkBox></w:ffData>'; }
+    function DROP(inner) { return '<w:ffData><w:name w:val="Drop1"/><w:enabled/><w:ddList>' + inner + '</w:ddList></w:ffData>'; }
+    var ENTRIES = '<w:listEntry w:val="Low"/><w:listEntry w:val="Medium"/><w:listEntry w:val="High"/>';
+    return imp({ styles: TOC_STYLES, body:
+      PX(R("Tick: ") + FIELD(" FORMCHECKBOX ", "", BOX('<w:default w:val="0"/><w:checked/>'))) +
+      PX(R("Empty: ") + FIELD(" FORMCHECKBOX ", "", BOX('<w:default w:val="0"/>'))) +
+      PX(R("By default: ") + FIELD(" FORMCHECKBOX ", "", BOX('<w:default w:val="1"/>')) + R(" and unticked: ") + FIELD(" FORMCHECKBOX ", "", BOX('<w:default w:val="1"/><w:checked w:val="0"/>'))) +
+      PX(R("Risk: ") + FIELD(" FORMDROPDOWN ", "", DROP('<w:result w:val="1"/>' + ENTRIES)) + R(" first: ") + FIELD(" FORMDROPDOWN ", "", DROP(ENTRIES))) +
+      PX(R("Nothing to choose: ") + FIELD(" FORMDROPDOWN ", "", DROP("")) + R(".")) +
+      PX(R("Typed: ") + FIELD(" FORMTEXT ", R("typed in a form field"), '<w:ffData><w:name w:val="Text1"/><w:enabled/><w:textInput/></w:ffData>')) +
+      PX(R("No result part: ") + FLD("begin", "", BOX('<w:checked/>')) + INSTR(" FORMCHECKBOX ") + FLD("end")) +
+      PX(FLD("begin") + INSTR(' TOC \\o "1-3" ') + FLD("separate") + R("Scope 2 ") + FIELD(" FORMCHECKBOX ", "", BOX('<w:checked/>')) + FLD("end")) +
+      P("After")
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(b.map(text), ["Tick: \u2612", "Empty: \u2610", "By default: \u2612 and unticked: \u2610", "Risk: Medium first: Low", "Nothing to choose: .", "Typed: typed in a form field", "No result part: \u2612", "After"],
+        "13 a legacy check box is the ballot box it showed, ticked or not; a drop-down is the entry chosen; a text field keeps its text; nothing comes out of a contents list that is left out");
+      ok(b.slice(0, 4).every(function (x) { return !/:\s*$/.test(text(x)); }), "13 no paragraph ends at its colon");
+      eq([count(r.report, "controls"), count(r.report, "fields")], [1, 7], "13 a drop-down with nothing to show is listed as a control not carried, not as a field kept as its text");
+    });
+  });
+
+  // ---- 14. the prompt of a content control nobody filled in ----
+  test("placeholder prompts", function () {
+    var styles = STYLES([STYLE("PlaceholderText", "Placeholder Text", { type: "character", rPr: '<w:color w:val="666666"/>' }), STYLE("Hint", "Client hint", { type: "character", based: "PlaceholderText" }),
+      STYLE("Plain", "Plain character", { type: "character", rPr: '<w:color w:val="666666"/>' })]);
+    function SDT(prompt, inner) { return '<w:sdt><w:sdtPr>' + (prompt ? '<w:showingPlcHdr/>' : '') + '<w:text/></w:sdtPr><w:sdtContent>' + inner + '</w:sdtContent></w:sdt>'; }
+    var PH = '<w:rStyle w:val="PlaceholderText"/>';
+    return imp({ styles: styles, body:
+      P("Form", S("Heading1")) +
+      PX(R("Empty control: ") + SDT(true, R("Click or tap here to enter text.", PH)) + R(" (end)")) +
+      PX(R("Filled control: ") + SDT(false, R("Site A"))) +
+      PX(R("Renamed style: ") + SDT(true, R("Choose an item.", '<w:rStyle w:val="Plain"/>'))) +
+      PX(R("Style alone: ") + R("Enter a date.", '<w:rStyle w:val="Hint"/>')) +
+      SDT(true, P("Click or tap here to enter the scope.")) +
+      P("Ordinary grey", "", '<w:rStyle w:val="Plain"/>')
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(b[1].runs, [{ t: "Empty control: " }, { t: "Click or tap here to enter text.", red: true }, { t: " (end)" }], "14 the prompt of an unfilled content control is red text; the words round it are not");
+      eq(b[2].runs, [{ t: "Filled control: Site A" }], "14 a filled control is ordinary text");
+      eq([b[3].runs[1], b[4].runs[1]], [{ t: "Choose an item.", red: true }, { t: "Enter a date.", red: true }], "14 the control's own flag is enough when the style has another name, and the style (or one based on it) is enough without the control");
+      // The grey is a colour of the run's own (its character style's), which an
+      // import now keeps (contracts/document.json, runs.color); it is not red.
+      eq([b[5].type, b[5].runs, b[6].runs], ["paragraph", [{ t: "Click or tap here to enter the scope.", red: true }], [{ t: "Ordinary grey", color: "666666" }]], "14 a whole paragraph in an unfilled control is red too; grey text that is not a prompt is not");
+      var doc = M.normalise(JSON.parse(JSON.stringify({ schema: r.project.schema, id: r.project.id, kind: "report", info: Object.assign({}, r.project.info, { title: "T" }), options: r.project.options, nextId: r.project.nextId, blocks: b, footnotes: {}, media: {}, parts: {} })));
+      eq(M.promptCount(doc), 4, "14 the Issue check counts each of them, so a Final is refused while one remains");
+    });
+  });
+
+  // ---- 15. a link to a file is not a link to a place inside the document ----
+  test("links to files", function () {
+    return imp({ rels: [["rIdU", "hyperlink", "\\\\server\\share\\Design.docx", true], ["rIdF", "hyperlink", "file:///C:/docs/plan.docx", true], ["rIdJ", "hyperlink", "javascript:alert(1)", true],
+      ["rIdW", "hyperlink", "https://example.com/", true]], body:
+      PX(R("See ") + '<w:hyperlink r:id="rIdU">' + R("the design document") + '</w:hyperlink>' + R(", ") + '<w:hyperlink r:id="rIdF">' + R("the plan") + '</w:hyperlink>' + R(", ") +
+        '<w:hyperlink r:id="rIdJ">' + R("a script") + '</w:hyperlink>' + R(", ") + '<w:hyperlink w:anchor="_Toc1">' + R("section 2") + '</w:hyperlink>' + R(" and ") + '<w:hyperlink r:id="rIdW">' + R("the site") + '</w:hyperlink>') +
+      PX(FIELD(' HYPERLINK "C:\\\\docs\\\\register.xlsx" ', R("the register")) + R(" then ") + FIELD(' HYPERLINK \\l "bookmark1" ', R("the annex")))
+    }).then(function (r) {
+      var b = r.project.blocks, other = entry(r.report, "other-links"), inside = entry(r.report, "internal-links");
+      eq(b[0].runs, [{ t: "See the design document, the plan, a script, section 2 and " }, { t: "the site", link: "https://example.com/" }], "15 the words of every link are kept; only a web or email link is carried as a link");
+      eq([count(r.report, "internal-links"), count(r.report, "other-links"), r.report.carried.links], [2, 4, 1], "15 links to a bookmark are counted apart from links to a file, a share or another address");
+      ok(other && r.report.notCarried.indexOf(other) >= 0 && I.CODES.notCarried.indexOf("other-links") >= 0 && other.examples.indexOf("\\\\server\\share\\Design.docx") >= 0, "15 the report quotes where the file links pointed", JSON.stringify(other));
+      var s = F.sentence(other);
+      ok(/^4 links to a file or to another address that is not a web or email address were not carried over\. The text of each was kept\.$/.test(s) && s.indexOf("inside the document") < 0 && plainWords(s), "15 the sentence for a file link does not call it a place inside the document", s);
+      ok(/^2 links to a place inside the document were not carried over/.test(F.sentence(inside)) && /^1 link to a file .* was not carried over/.test(F.sentence({ code: "other-links", count: 1 })), "15 the bookmark sentence is unchanged, and the new one reads properly for one");
+    });
+  });
+
+  return chain;
+});
+</script>
+<script>
+// ======================= part b =======================
+FixImport.part("b", function (ok, eq) {
+
+  var App = window.App, I = App.DocxImport, H = App.HouseDocx, Zip = App.ZipIO, F = App.DocImportFlow;
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+  var WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+  var DML = "http://schemas.openxmlformats.org/drawingml/2006/main";
+  var RNS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  var REL = RNS + "/";
+  var NS = ' xmlns:w="' + W + '" xmlns:r="' + RNS + '" xmlns:mc="' + MC + '"' +
+    ' xmlns:wp="' + WP + '" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"' +
+    ' xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"';
+  var HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+
+  // ---- WordprocessingML, briefly ----
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function R(text, rPr) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(text) + '</w:t></w:r>'; }
+  function PX(inner, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + inner + '</w:p>'; }
+  function P(text, pPr, rPr) { return PX(R(text, rPr), pPr); }
+  function S(id) { return '<w:pStyle w:val="' + id + '"/>'; }
+  function NUM(id, lvl) { return '<w:numPr><w:ilvl w:val="' + (lvl || 0) + '"/><w:numId w:val="' + id + '"/></w:numPr>'; }
+  function STYLE(id, name, o) {
+    o = o || {};
+    return '<w:style w:type="' + (o.type || "paragraph") + '"' + (o.dflt ? ' w:default="1"' : '') + ' w:styleId="' + id + '"><w:name w:val="' + name + '"/>' +
+      (o.based ? '<w:basedOn w:val="' + o.based + '"/>' : '') + (o.pPr ? '<w:pPr>' + o.pPr + '</w:pPr>' : '') + (o.rPr ? '<w:rPr>' + o.rPr + '</w:rPr>' : '') + '</w:style>';
+  }
+  function STYLES(list) {
+    return HEAD + '<w:styles' + NS + '>' + STYLE("Normal", "Normal", { dflt: true }) + STYLE("Heading1", "heading 1", { pPr: '<w:outlineLvl w:val="0"/>' }) +
+      STYLE("Caption", "caption") + STYLE("TOF", "table of figures") + STYLE("TOC1", "toc 1") + (list || []).join("") + '</w:styles>';
+  }
+  function TC(inner) { return '<w:tc>' + (inner.charAt(0) === "<" ? inner : P(inner)) + '</w:tc>'; }
+  function TR(cells) { return '<w:tr>' + cells.join("") + '</w:tr>'; }
+  function T(rows, grid) { return '<w:tbl><w:tblPr/><w:tblGrid>' + grid.map(function (w) { return '<w:gridCol w:w="' + w + '"/>'; }).join("") + '</w:tblGrid>' + rows.join("") + '</w:tbl>'; }
+  var TABLE = T([TR([TC("Zone"), TC("Ports")]), TR([TC("A"), TC("3")])], [3000, 3000]);
+  function FLD(type) { return '<w:r><w:fldChar w:fldCharType="' + type + '"/></w:r>'; }
+  function INSTR(code) { return '<w:r><w:instrText xml:space="preserve">' + esc(code) + '</w:instrText></w:r>'; }
+  function FIELD(code, result) { return FLD("begin") + INSTR(code) + FLD("separate") + (result || "") + FLD("end"); }
+  // A field with no result part: Word writes begin, the code, end.
+  function CODE(code) { return FLD("begin") + INSTR(code) + FLD("end"); }
+  function LINK(rid, inner) { return '<w:hyperlink r:id="' + rid + '">' + inner + '</w:hyperlink>'; }
+  function FNREF(id) { return '<w:r><w:footnoteReference w:id="' + id + '"/></w:r>'; }
+  function LVL(i, fmt, txt, left) {
+    return '<w:lvl w:ilvl="' + i + '"><w:start w:val="1"/><w:numFmt w:val="' + fmt + '"/><w:lvlText w:val="' + txt + '"/><w:pPr><w:ind w:left="' + left + '" w:hanging="360"/></w:pPr></w:lvl>';
+  }
+  function NUMBERING(abstracts, nums) {
+    return HEAD + '<w:numbering' + NS + '>' + abstracts.map(function (a, i) { return '<w:abstractNum w:abstractNumId="' + i + '">' + a + '</w:abstractNum>'; }).join("") +
+      nums.map(function (abs, i) { return '<w:num w:numId="' + (i + 1) + '"><w:abstractNumId w:val="' + abs + '"/></w:num>'; }).join("") + '</w:numbering>';
+  }
+  function FOOTNOTES(notes) {
+    return HEAD + '<w:footnotes' + NS + '>' + notes.map(function (n) { return '<w:footnote w:id="' + n[0] + '">' + n[1] + '</w:footnote>'; }).join("") + '</w:footnotes>';
+  }
+  var FNMARK = '<w:r><w:footnoteRef/></w:r>';
+
+  // ---- pictures and drawings ----
+  // A real picture, one pixel square, so the writer can print it.
+  var PNG = (function () {
+    var s = atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="), u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u;
+  })();
+  var docPr = 0;
+  function FRAME(data, o) {
+    o = o || {};
+    var click = o.click ? '<a:hlinkClick xmlns:a="' + DML + '" r:id="' + o.click + '"/>' : '';
+    return '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="952500" cy="476250"/><wp:docPr id="' + (++docPr) + '" name="' + esc(o.name || "Object " + docPr) + '">' + click + '</wp:docPr>' +
+      '<wp:cNvGraphicFramePr/><a:graphic xmlns:a="' + DML + '">' + data + '</a:graphic></wp:inline></w:drawing>';
+  }
+  // A picture as Word writes one. o: { name, click (a link on the picture: a relationship id), crop }
+  function PIC(rid, o) {
+    o = o || {};
+    return '<w:r>' + FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      '<pic:nvPicPr><pic:cNvPr id="0" name="Picture">' + (o.click ? '<a:hlinkClick r:id="' + o.click + '"/>' : '') + '</pic:cNvPr><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="' + rid + '"/>' +
+      (o.crop ? '<a:srcRect l="12000"/>' : '') + '<a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm>' +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData>', o) + '</w:r>';
+  }
+  function CHART(rid, name) {
+    return '<w:r>' + FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="' + rid + '"/></a:graphicData>', { name: name }) + '</w:r>';
+  }
+  // A text box as Word writes one: DrawingML with a VML copy of the same words beside it.
+  // o: { name, click (a link on the box), href (an address on the VML shape), vml (words of the VML copy only) }
+  function BOX(inner, o) {
+    o = o || {};
+    return '<w:r><mc:AlternateContent><mc:Choice Requires="wps">' + FRAME('<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr txBox="1"/>' +
+      '<wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent>' + inner + '</w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData>', o) +
+      '</mc:Choice><mc:Fallback><w:pict><v:rect id="box' + docPr + '"' + (o.href ? ' href="' + esc(o.href) + '"' : '') + ' style="width:75pt;height:37pt"><v:textbox><w:txbxContent>' + inner + (o.vml || "") + '</w:txbxContent></v:textbox></v:rect></w:pict></mc:Fallback></mc:AlternateContent></w:r>';
+  }
+
+  // A package. o: { body, styles, numbering, footnotes, rels: [[id, kind, target, external]], files: { name: text or bytes } }
+  function make(o) {
+    var CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.";
+    var rels = '<Relationship Id="rIdS" Type="' + REL + 'styles" Target="styles.xml"/>', types = '<Override PartName="/word/styles.xml" ContentType="' + CT + 'styles+xml"/>';
+    var files = [{ name: "word/styles.xml", bytes: Zip.bytesOf(o.styles || STYLES()) }];
+    if (o.numbering) {
+      rels += '<Relationship Id="rIdN" Type="' + REL + 'numbering" Target="numbering.xml"/>';
+      types += '<Override PartName="/word/numbering.xml" ContentType="' + CT + 'numbering+xml"/>';
+      files.push({ name: "word/numbering.xml", bytes: Zip.bytesOf(o.numbering) });
+    }
+    if (o.footnotes) {
+      rels += '<Relationship Id="rIdFn" Type="' + REL + 'footnotes" Target="footnotes.xml"/>';
+      types += '<Override PartName="/word/footnotes.xml" ContentType="' + CT + 'footnotes+xml"/>';
+      files.push({ name: "word/footnotes.xml", bytes: Zip.bytesOf(o.footnotes) });
+    }
+    for (var n in (o.files || {})) files.push({ name: n, bytes: typeof o.files[n] === "string" ? Zip.bytesOf(o.files[n]) : o.files[n] });
+    (o.rels || []).forEach(function (r) { rels += '<Relationship Id="' + r[0] + '" Type="' + REL + r[1] + '" Target="' + esc(r[2]) + '"' + (r[3] ? ' TargetMode="External"' : '') + '/>'; });
+    return Zip.write([
+      { name: "[Content_Types].xml", bytes: Zip.bytesOf(HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+        '<Default Extension="png" ContentType="image/png"/><Default Extension="xlsx" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>' +
+        '<Override PartName="/word/document.xml" ContentType="' + CT + 'document.main+xml"/>' + types + '</Types>') },
+      { name: "_rels/.rels", bytes: Zip.bytesOf(HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + REL + 'officeDocument" Target="word/document.xml"/></Relationships>') },
+      { name: "word/document.xml", bytes: Zip.bytesOf(HEAD + '<w:document' + NS + '><w:body>' + o.body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body></w:document>') },
+      { name: "word/_rels/document.xml.rels", bytes: Zip.bytesOf(HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>') }
+    ].concat(files));
+  }
+  function RELS(rels) {
+    return HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      rels.map(function (r) { return '<Relationship Id="' + r[0] + '" Type="' + REL + r[1] + '" Target="' + esc(r[2]) + '"' + (r[3] ? ' TargetMode="External"' : '') + '/>'; }).join("") + '</Relationships>';
+  }
+  function imp(o) { return make(o).then(function (blob) { return I.read(blob, { name: "made.docx" }); }); }
+
+  // ---- reading the result ----
+  function text(b) { return b.runs ? b.runs.map(function (r) { return r.t; }).join("") : (b.text || ""); }
+  function brief(blocks) {
+    return blocks.map(function (b) {
+      var tag = b.type === "heading" ? "h" + b.level : b.type === "list" ? (b.list === "bullet" ? "*" : "#") + b.level + (b.restart ? "r" : "") + (b["continue"] ? "c" : "")
+        : b.type === "paragraph" ? "p" : b.type === "kept" ? "kept " + b.kind : b.type;
+      return tag + (b.type !== "kept" && text(b) ? ":" + text(b) : "") + (b.caption ? " [" + b.caption + "]" : "");
+    });
+  }
+  function entry(report, code) {
+    var found = null;
+    ["toCheck", "changed", "notCarried"].forEach(function (l) { report[l].forEach(function (e) { if (e.code === code) found = e; }); });
+    return found;
+  }
+  function count(report, code) { var e = entry(report, code); return e ? e.count : 0; }
+  function codes(report) { return report.notCarried.concat(report.changed).map(function (e) { return e.code; }).filter(function (c) { return c !== "formatting"; }); }
+  function byText(blocks, t) { for (var i = 0; i < blocks.length; i++) if (text(blocks[i]) === t) return blocks[i]; return null; }
+  function ofType(blocks, type) { return blocks.filter(function (b) { return b.type === type; }); }
+  function markers(blocks) {
+    var n = H.listNumbers(blocks);
+    return ofType(blocks, "list").map(function (b) { return n[b.id].marker; }).join(" ");
+  }
+  // The exported Word file: { doc, rels (every relationships part, joined), notes }.
+  function exported(project) {
+    return H.buildDocument(project, { issueStatus: "draft" }).then(function (res) { return Zip.read(res.blob); }).then(function (files) {
+      var out = { doc: "", rels: "", notes: "" };
+      files.forEach(function (f) {
+        if (f.name === "word/document.xml") out.doc = Zip.text(f);
+        else if (f.name === "word/footnotes.xml") out.notes = Zip.text(f);
+        else if (/\.rels$/.test(f.name)) out.rels += Zip.text(f);
+      });
+      return out;
+    });
+  }
+  function external(rels) { return (rels.match(/<Relationship [^>]*TargetMode="External"[^>]*>/g) || []).map(function (r) { return /Target="([^"]*)"/.exec(r)[1].replace(/&amp;/g, "&"); }).sort(); }
+  function plainWords(s) { return !/[\u2013\u2014]/.test(s) && !/\b[A-Z]{4,}\b/.test(s) && !/the tool/i.test(s) && /\.$/.test(s); }
+
+  var chain = Promise.resolve();
+  function test(name, fn) {
+    chain = chain.then(fn).then(null, function (e) { ok(false, name + ": it ran", (e && (e.cause ? e.cause.stack || e.cause.message : e.stack || e.message)) || String(e)); });
+  }
+
+  // ---- 24. fields with no result part ----
+  test("fields with no result", function () {
+    return imp({ body:
+      PX(R("The supplier shall, under clause ") + CODE(" LISTNUM ") + R(", comply.")) +
+      PX(CODE(" AUTONUM ") + R(" First clause")) +
+      PX(R("Ratio ") + CODE(" EQ \\f(1,2) ") + R(" of the load")) +
+      PX(R("Temp 20") + CODE(" SYMBOL 176 \\a ") + R("C, mark ") + CODE(" SYMBOL 153 ") + R(", at most ") + CODE(' SYMBOL 0x2264 \\u ') + R(" 5, varies ") + CODE(' SYMBOL 181 \\f "Symbol" \\s 11 ') +
+        R(", odd ") + CODE(' SYMBOL 61 \\f "Wingdings 3" ') + R(".")) +
+      PX(R("Site: ") + CODE(" MACROBUTTON NoMacro [Click and type the site name] ") + R(" (end)")) +
+      PX(R("Indexed") + CODE(' XE "Index entry" ') + R(" word, simple ") + '<w:fldSimple w:instr=" LISTNUM  LegalDefault "/>' + R(" field")) +
+      PX(R("Dated ") + FIELD(' DATE \\@ "d MMM" ', R("1 Jan"))) +
+      PX(FLD("begin") + INSTR(' TOC \\o "1-3" ') + FLD("separate") + R("Scope 2 ") + CODE(" LISTNUM ") + CODE(" SYMBOL 176 ") + FLD("end")) +
+      P("After")
+    }).then(function (r) {
+      var b = r.project.blocks, e = entry(r.report, "fields-no-text");
+      eq(b.map(text), ["The supplier shall, under clause , comply.", " First clause", "Ratio  of the load", "Temp 20\u00B0C, mark \u2122, at most \u2264 5, varies \u221D, odd \u25A1.",
+        "Site: [Click and type the site name] (end)", "Indexed word, simple  field", "Dated 1 Jan", "After"],
+        "24 a SYMBOL field is the character it names (Windows places, Unicode, a symbol font; an unmatched one is a box) and a MACROBUTTON field the prompt it displays");
+      ok(!!e && r.report.notCarried.indexOf(e) >= 0 && I.CODES.notCarried.indexOf("fields-no-text") >= 0, "24 a field with nothing to keep has a line of its own in the not carried list", JSON.stringify(codes(r.report)));
+      eq(e && [e.count, e.examples], [4, ["LISTNUM", "AUTONUM", "EQ \\f(1,2)", "LISTNUM LegalDefault"]],
+        "24 an automatic number and an old equation are each counted and quoted by their code; an index mark showed nothing, and nothing is counted inside a contents list that is left out");
+      eq(e && e.blockIds, [b[0].id, b[1].id, b[2].id, b[5].id], "24 the line points at the paragraphs the fields were in");
+      eq([count(r.report, "fields"), count(r.report, "symbols")], [7, 1], "24 the fields that became text are counted as fields kept as text (five symbols, a prompt, a date), not the ones that left nothing; the box is counted");
+      var s = F.sentence(e);
+      ok(/^4 fields that Word works out as it prints .* had no text to keep\. Type in what they showed\.$/.test(s) && plainWords(s) && /^1 field that .* Type in what it showed\.$/.test(F.sentence({ code: "fields-no-text", count: 1 })),
+        "24 the sentence reads properly for one and for many", s);
+    });
+  });
+
+  // ---- 25. what is left out is not reported as kept ----
+  test("left out is not kept", function () {
+    var THEME = '<a:theme xmlns:a="' + DML + '" name="T"><a:themeElements/></a:theme>';
+    return imp({
+      rels: [["rIdChart", "chart", "charts/chart1.xml"], ["rIdGone", "image", "media/gone.png"], ["rIdT", "theme", "theme/theme1.xml"]],
+      files: { "word/charts/chart1.xml": '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>',
+        "word/charts/_rels/chart1.xml.rels": RELS([["rId1", "package", "../embeddings/Gone.xlsx"]]),
+        "word/theme/theme1.xml": THEME, "word/theme/_rels/theme1.xml.rels": RELS([["rId1", "image", "../media/themegone.png"]]) },
+      body: P("Before") + PX(CHART("rIdChart", "Chart 1")) + PX(PIC("rIdGone", { name: "Pic A" })) + PX(R("A note") + FNREF(7)) + PX(PIC("rIdGone", { name: "Pic B", crop: true })) + P("After")
+    }).then(function (r) {
+      var p = r.project, b = p.blocks, lost = entry(r.report, "objects-lost"), stays = entry(r.report, "unreadable-part"), fn = entry(r.report, "notes-missing"), th = entry(r.report, "theme-missing");
+      eq(brief(b), ["p:Before", "p:A note", "kept picture", "p:After"], "25 a chart that has lost its workbook and a picture that has lost its image leave no block; a kept picture stays");
+      eq(lost && [lost.count, lost.examples, lost.blockIds], [2, ["Chart 1", "Pic A"], undefined], "25 the two that were left out are listed as lost, by name, and point at no block");
+      ok(lost && r.report.notCarried.indexOf(lost) >= 0 && !/kept/.test(F.sentence(lost)) && /^2 pictures or drawings could not be brought across because part of them is missing from the Word file\.$/.test(F.sentence(lost)) && plainWords(F.sentence(lost)),
+        "25 their sentence does not say they were kept", lost && F.sentence(lost));
+      eq(stays && [stays.count, stays.examples, stays.blockIds], [1, ["Pic B"], [b[2].id]], "25 only the drawing that stayed is reported as kept but to be checked, with its block");
+      eq(fn && [fn.count, fn.blockIds], [1, [b[1].id]], "25 a reference to a note that is not there is a line of its own, with its paragraph");
+      ok(fn && !/drawing|kept/.test(F.sentence(fn)) && /^1 footnote or endnote reference pointed at a note that is not in the Word file and was removed\.$/.test(F.sentence(fn)), "25 and it is not called a drawing that was kept", fn && F.sentence(fn));
+      ok(th && !("theme" in p) && !/drawing refers|was kept/.test(F.sentence(th)) && plainWords(F.sentence(th)), "25 a theme that could not be read has its own line", JSON.stringify(codes(r.report)));
+      // Whatever the report says was kept must be there to look at.
+      var ids = {}, wrong = [];
+      b.forEach(function (x) { ids[x.id] = true; });
+      r.report.notCarried.forEach(function (e) {
+        if (/kept, but may not look right/.test(F.sentence(e)) && !((e.blockIds || []).length === e.count && e.blockIds.every(function (id) { return ids[id]; }))) wrong.push(e.code);
+      });
+      eq(wrong, [], "25 every line that says a drawing was kept points at a block that exists");
+      ok(F.sentence({ code: "objects-lost", count: 1 }) === "1 picture or drawing could not be brought across because part of it is missing from the Word file.", "25 the sentence reads properly for one");
+    });
+  });
+
+  // ---- 26, 53. links and linked content inside a kept object ----
+  test("links inside kept objects", function () {
+    var HTA = "file://///fileserver.example/share/drawing.hta";
+    var words = PX(R("Open ") + LINK("rIdFile", R("the drawing")) + R(" or ") + LINK("rIdWeb", R("the site")) + R(", see ") + FIELD(' HYPERLINK "C:\\\\tools\\\\run.exe" ', R("the runner")) +
+      R(" and ") + FIELD(' HYPERLINK "https://example.org/field" ', R("the page")) + R(" on page ") + FIELD(" PAGE ", R("3")));
+    var fetched = PX(R("Logo: ") + FLD("begin") + INSTR(' INCLUDEPICTURE "http://tracker.example/pixel.png" \\d ') + FLD("separate") +
+      '<w:r><w:pict><v:shape id="inc1" style="width:10pt;height:10pt"><v:imagedata r:id="rIdRemote"/></v:shape></w:pict></w:r>' + FLD("end") + R(" then ") + '<w:fldSimple w:instr=" INCLUDETEXT &quot;\\\\\\\\host\\\\share\\\\a.docx&quot; ">' + R("included words") + '</w:fldSimple>');
+    return imp({
+      rels: [["rIdFile", "hyperlink", HTA, true], ["rIdWeb", "hyperlink", "https://example.org/", true], ["rIdJs", "hyperlink", "javascript:alert(1)", true],
+        ["rIdRemote", "image", "http://tracker.example/pixel.png", true], ["rIdChart", "chart", "charts/chart1.xml"]],
+      files: { "word/charts/chart1.xml": '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>',
+        "word/charts/_rels/chart1.xml.rels": RELS([["rId1", "hyperlink", "file:///C:/Windows/System32/calc.exe", true], ["rId2", "hyperlink", "https://example.org/chart", true],
+          ["rId3", "oleObject", "file:///\\\\host\\share\\Book1.xlsx", true]]) },
+      body: P("Body ") + PX(R("See ") + LINK("rIdFile", R("the body link"))) +
+        PX(BOX(words, { name: "Link box", click: "rIdJs", href: "javascript:alert(2)" })) + PX(BOX(fetched, { name: "Fetch box" })) + PX(CHART("rIdChart", "Chart 9")) +
+        PX(BOX(P("Plain words"), { name: "Quiet box" }))
+    }).then(function (r) {
+      var p = r.project, k = ofType(p.blocks, "kept"), box = k[0], inc = k[1], chart = k[2];
+      function outside(blk) { return blk.rels.filter(function (x) { return x.external; }).map(function (x) { return x.external; }).sort(); }
+      eq(brief(p.blocks), ["p:Body ", "p:See the body link", "kept textbox", "kept textbox", "kept chart", "kept textbox"], "26 the drawings are all kept");
+      eq(outside(box), ["https://example.org/"], "26 of the links in a kept text box only the one to a web address keeps its relationship");
+      ok(!/hlinkClick/.test(box.xml) && !/ href=/.test(box.xml) && (box.xml.match(/<w:hyperlink /g) || []).length === 2 && /the drawing/.test(box.xml) && /the runner/.test(box.xml) && /the site/.test(box.xml),
+        "26 a click action to a script and a file link are taken off, in both versions of the box; the words of each stay, and the web link is still a link", box.xml.slice(0, 900));
+      ok(!/run\.exe/.test(box.xml) && /example\.org\/field/.test(box.xml) && / PAGE /.test(box.xml) && /the page/.test(box.xml),
+        "53 a HYPERLINK field to a program is turned into its words; one to a web address and a page number field are left as they are");
+      var lk = entry(r.report, "links-in-drawings");
+      eq(lk && [lk.count, lk.blockIds, lk.examples], [4, [box.id, chart.id], ["Link box", "Chart 9"]],
+        "26 each link taken off is counted once (not once for each version of the box), with the drawing it was in: a file link, a click action (an address on the shape in the VML version), a field, and one in the chart's own part");
+      ok(lk && r.report.notCarried.indexOf(lk) >= 0 && /^4 links inside a drawing or a text box pointed somewhere other than a web or email address and were removed\. The words and shapes were kept\.$/.test(F.sentence(lk)) && plainWords(F.sentence(lk)),
+        "26 the sentence says what happened", lk && F.sentence(lk));
+      eq([count(r.report, "other-links"), r.report.carried.links], [1, 0], "26 the link in the body is still reported as before, and no link in a drawing is counted as a link brought across in the text");
+      ok(!/INCLUDEPICTURE|INCLUDETEXT/.test(inc.xml) && !/fldSimple/.test(inc.xml) && /included words/.test(inc.xml) && !/imagedata/.test(inc.xml),
+        "53 fields that fetch when the file is opened are turned into what they showed; the picture INCLUDEPICTURE fetched is not kept (Word would fetch it)", inc.xml.slice(0, 600));
+      var pics = entry(r.report, "linked-pictures"), fields = entry(r.report, "fields");
+      eq(pics && [pics.count, pics.examples, pics.blockIds], [1, ["http://tracker.example/pixel.png"], [inc.id]], "53 the picture that was fetched from outside is reported as a linked picture left out, with its address and its block");
+      ok(pics && r.report.notCarried.indexOf(pics) >= 0, "53 under not carried over");
+      eq(fields && [fields.count, fields.blockIds], [2, [inc.id]], "53 the two fields are counted as fields kept as what they showed");
+      eq(p.parts[chart.rels[0].part].rels.map(function (x) { return x.external; }), ["about:blank", "https://example.org/chart"],
+        "26 in a carried part a link that is not to a web address keeps its id and points at an empty page; a web link is kept; the workbook a chart is linked to is not carried");
+      var lo = entry(r.report, "linked-objects");
+      eq(lo && [lo.count, lo.examples, lo.blockIds], [1, ["file:///\\\\host\\share\\Book1.xlsx"], [chart.id]], "53 what a kept object was linked to outside the file is said, with the address");
+      ok(lo && r.report.notCarried.indexOf(lo) >= 0 && plainWords(F.sentence(lo)) && /^A link from a chart or an object to a file outside the document was left out\b/.test(F.sentence(lo)), "53 in a sentence", lo && F.sentence(lo));
+      eq(k[3].rels, [], "26 a text box with no links is untouched");
+      return exported(p).then(function (x) {
+        eq(external(x.rels).filter(function (t) { return !/^https:\/\/(www\.)?solutionspt\./.test(t); }),
+          ["about:blank", "https://example.org/", "https://example.org/chart"],
+          "26 the exported Word file's relationships hold the web links, and nothing else from the source");
+        ok(!/javascript:|\.hta|calc\.exe|run\.exe/.test(x.rels + x.doc) && !/INCLUDEPICTURE|INCLUDETEXT/.test(x.doc) && /the drawing/.test(x.doc) && /included words/.test(x.doc),
+          "26 no script, file or program address and no fetching field reaches the Word file; the words do");
+      });
+    });
+  });
+
+  // ---- 28. numbered items with extra indent ----
+  var LISTS = NUMBERING([LVL(0, "decimal", "%1.", 720) + LVL(1, "lowerLetter", "%2.", 1440), LVL(0, "bullet", "", 720) + LVL(1, "bullet", "", 1440)], [0, 1]);
+  test("indented numbered items", function () {
+    function IND(id, n) { return NUM(id, 0) + '<w:ind w:left="' + n + '"/>'; }
+    return imp({ numbering: LISTS, body:
+      P("N one", NUM(1, 0)) + P("N one sub a", IND(1, 1080)) + P("N one sub b", IND(1, 1080)) + P("N two", NUM(1, 0)) + P("N real sub", NUM(1, 1)) + P("N three", NUM(1, 0)) +
+      P("Gap") + P("B one", NUM(2, 0)) + P("B pushed in", IND(2, 1080)) + P("B two", NUM(2, 0))
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq(brief(b), ["#0:N one", "#0:N one sub a", "#0:N one sub b", "#0:N two", "#1:N real sub", "#0:N three", "p:Gap", "*0:B one", "*1:B pushed in", "*0:B two"],
+        "28 a numbered item keeps the level the file gives it whatever its indent; a real sub-level is still one; a bullet pushed in is still a sub-item");
+      eq(markers(b.slice(0, 6)), "1. 2. 3. 4. a. 5.", "28 so the numbers are the ones Word printed, and a reference to step 4 still finds step 4");
+      ok(!entry(r.report, "list-numbering"), "28 and nothing is reported as renumbered", JSON.stringify(entry(r.report, "list-numbering")));
+    });
+  });
+
+  // ---- 29. a list of figures is not the contents list ----
+  function LISTOF(code, lines, style) {
+    return PX(FLD("begin") + INSTR(code) + FLD("separate") + R(lines[0]), S(style)) + lines.slice(1).map(function (l) { return P(l, S(style)); }).join("") + PX(FLD("end"));
+  }
+  test("list of figures", function () {
+    return imp({ body: P("Overview", S("Heading1")) + P("TOF-BEFORE") + P("Table of Figures", S("Heading1")) + LISTOF(' TOC \\h \\z \\c "Figure" ', ["Figure 1: Network overview 4", "Figure 2: Zones 6"], "TOF") + P("TOF-AFTER") })
+      .then(function (r) {
+        var b = r.project.blocks, e = entry(r.report, "figures-list");
+        eq([brief(b), r.project.options.contents], [["h1:Overview", "p:TOF-BEFORE", "p:TOF-AFTER"], false],
+          "29 a list of figures is left out with the heading typed above it, the text round it stays, and the template's contents list is not switched on for it");
+        eq([e && e.count, e && e.examples, !!entry(r.report, "contents")], [1, ["Figure 1: Network overview 4", "Table of Figures", "Figure 2: Zones 6"], false],
+          "29 it is reported as a list of figures, with its lines quoted, and not as the table of contents");
+        var s = F.sentence(e);
+        ok(r.report.notCarried.indexOf(e) >= 0 && /^A list of figures or tables was not carried over\. The template has none to put in its place\. The captions themselves were kept\.$/.test(s) && !/contents/i.test(s) && plainWords(s) &&
+          /^2 lists of figures or tables were not carried over\. The template has none to put in their place\./.test(F.sentence({ code: "figures-list", count: 2 })), "29 the sentence does not promise a contents list in its place", s);
+        return imp({ body: P("Contents", S("Heading1")) + LISTOF(' TOC \\o "1-3" \\h \\z \\u ', ["Scope 2", "Findings 5"], "TOC1") + LISTOF(' TOC \\h \\z \\c "Table" ', ["Table 1: Ports 3"], "TOF") + P("Scope", S("Heading1")) + P("Text.") });
+      }).then(function (r) {
+        var c = entry(r.report, "contents"), f = entry(r.report, "figures-list");
+        eq([brief(r.project.blocks), r.project.options.contents], [["h1:Scope", "p:Text."], true], "29 with both, the contents list is switched on for the table of contents");
+        eq([c && c.count, c && c.examples, f && f.count, f && f.examples], [1, ["Scope 2", "Contents", "Findings 5"], 1, ["Table 1: Ports 3"]], "29 and each list is reported under its own name with its own lines");
+        return imp({ body: P("Scope", S("Heading1")) + LISTOF(' TOC \\o "1-2" \\c "Figure" ', ["Scope 2"], "TOC1") + P("Text.") });
+      }).then(function (r) {
+        eq([r.project.options.contents, count(r.report, "contents"), count(r.report, "figures-list")], [true, 1, 0], "29 a contents list that also names a caption label is still the contents list");
+      });
+  });
+
+  // ---- 30, 39. a link on a picture ----
+  var PIC_RELS = [["rIdP", "image", "media/image1.png"], ["rIdWeb", "hyperlink", "https://www.example.com/network-diagram?rev=3", true], ["rIdFile", "hyperlink", "file:///C:/plans/site.vsdx", true]];
+  test("links on pictures", function () {
+    return imp({ rels: PIC_RELS, files: { "word/media/image1.png": PNG }, body:
+      PX(PIC("rIdP", { name: "Linked web", click: "rIdWeb" })) + PX(PIC("rIdP", { name: "Linked file", click: "rIdFile" })) + PX(PIC("rIdP", { name: "No link" })) + PX(LINK("rIdWeb", R("a text link")))
+    }).then(function (r) {
+      var p = r.project, b = p.blocks, e = entry(r.report, "picture-links");
+      eq(brief(b), ["kept picture", "picture", "picture", "p:a text link"], "39 a picture that links to a web address travels as it is; one with a link that cannot be carried, or with none, is an ordinary picture");
+      eq(b[0].rels.filter(function (x) { return x.external; }).map(function (x) { return [x.type.split("/").pop(), x.external]; }), [["hyperlink", "https://www.example.com/network-diagram?rev=3"]],
+        "39 and the kept picture has its link, the exact address");
+      eq(e && [e.count, e.blockIds, e.examples], [1, [b[1].id], ["file:///C:/plans/site.vsdx"]], "30 the link that was left off is reported, with its picture and where it pointed");
+      ok(e && r.report.notCarried.indexOf(e) >= 0 && F.sentence(e) === "1 picture or drawing had a link on it. It was kept, but without the link." && /^3 pictures or drawings had a link on them\. They were kept, but without the link\.$/.test(F.sentence({ code: "picture-links", count: 3 })),
+        "30 in a sentence that reads properly for one and for many", e && F.sentence(e));
+      eq([r.report.carried.links, r.report.carried.pictures, r.report.carried.keptObjects], [1, 2, 1], "30 only the text link is counted as a link brought across");
+      return exported(p).then(function (x) {
+        ok(/<a:hlinkClick /.test(x.doc) && external(x.rels).indexOf("https://www.example.com/network-diagram?rev=3") >= 0 && !/site\.vsdx/.test(x.rels + x.doc),
+          "39 the exported Word file still has the picture's link to the web address, and not the file link");
+      });
+    }).then(function () {
+      return imp({ rels: PIC_RELS, files: { "word/media/image1.png": PNG }, body: PX(LINK("rIdWeb", PIC("rIdP", { name: "Wrapped" }))) + PX(FIELD(' HYPERLINK "https://example.org/f" ', PIC("rIdP", { name: "In a field" }))) });
+    }).then(function (r) {
+      var b = r.project.blocks, e = entry(r.report, "picture-links");
+      eq([brief(b), r.report.carried.links], [["picture", "picture"], 0], "30 a link written round a picture alone (as a hyperlink or as a field) is not counted as a link brought across");
+      eq(e && [e.count, e.blockIds, e.examples], [2, [b[0].id, b[1].id], ["https://www.example.com/network-diagram?rev=3", "https://example.org/f"]], "39 it is reported, with the picture and the address");
+      ok(!/link/.test(F.summary(r.report)) && /2 pictures/.test(F.summary(r.report)), "30 and the summary does not say a link was brought across", F.summary(r.report));
+      return imp({ rels: PIC_RELS, files: { "word/media/image1.png": PNG }, body: PX(LINK("rIdWeb", R("Open the diagram ") + PIC("rIdP", { name: "With words" }))) });
+    }).then(function (r) {
+      var b = r.project.blocks;
+      eq([b[0].runs, r.report.carried.links, count(r.report, "picture-links")], [[{ t: "Open the diagram ", link: "https://www.example.com/network-diagram?rev=3" }], 1, 1],
+        "30 with words and a picture in one link, the words keep the link and it is counted once; the picture's loss of it is still said");
+    });
+  });
+
+  // ---- 31. a caption that holds a footnote or a link ----
+  test("captions with notes", function () {
+    var notes = FOOTNOTES([[3, PX(FNMARK + R(" Source: site survey 2026"))]]);
+    return imp({ footnotes: notes, rels: [["rIdP", "image", "media/image1.png"], ["rIdWeb", "hyperlink", "https://example.com/x", true]], files: { "word/media/image1.png": PNG }, body:
+      PX(PIC("rIdP", { name: "Net" })) + PX(R("Figure 1: Net") + FNREF(3) + LINK("rIdWeb", R(" source")), S("Caption")) +
+      PX(PIC("rIdP", { name: "Zones" })) + P("Figure 2: Zones", S("Caption"))
+    }).then(function (r) {
+      var p = r.project, b = p.blocks, keys = Object.keys(p.footnotes);
+      eq(brief(b), ["picture", "p:Figure 1: Net source", "picture [Figure 2: Zones]"], "31 a caption that holds a footnote or a link stays a paragraph under its picture; a plain caption still becomes the picture's caption");
+      eq(b[1].runs, [{ t: "Figure 1: Net" }, { t: "", fn: keys[0] }, { t: " source", link: "https://example.com/x" }], "31 so the footnote reference and the link are both still there");
+      eq(p.footnotes[keys[0]].runs, [{ t: "Source: site survey 2026" }], "31 with the note's text");
+      eq([r.report.carried.captions, r.report.carried.footnotes, r.report.carried.links, r.report.carried.paragraphs], [1, 1, 1, 1], "31 and the counts say what was brought across");
+      return exported(p).then(function (x) { ok(/Source: site survey 2026/.test(x.notes), "31 the exported Word file prints the footnote", x.notes.slice(-300)); });
+    }).then(function () {
+      // A footnote nothing refers to any more is not counted as brought across.
+      return imp({ footnotes: FOOTNOTES([[3, PX(FNMARK + R(" In the title"))], [4, PX(FNMARK + R(" In the text"))]]),
+        styles: STYLES([STYLE("Title", "Title")]), body: PX(R("The report") + FNREF(3), S("Title")) + PX(R("Words") + FNREF(4)) });
+    }).then(function (r) {
+      eq([r.project.info.title, r.report.carried.footnotes], ["The report", 1], "31 footnotes are counted from the text that refers to them");
+    });
+  });
+
+  // ---- 32. which block a caption belongs to ----
+  test("caption targets", function () {
+    var base = { rels: [["rIdP", "image", "media/image1.png"]], files: { "word/media/image1.png": PNG } };
+    function run(body) { return imp(Object.assign({}, base, { body: body })); }
+    var PICTURE = PX(PIC("rIdP", { name: "Shot" }));
+    return run(PICTURE + P("Table 1: Open ports by zone", S("Caption")) + TABLE).then(function (r) {
+      eq([brief(r.project.blocks), r.report.carried.captions], [["picture", "table [Table 1: Open ports by zone]"], 1], "32 a table's caption written above it goes to the table, not to an uncaptioned picture before it");
+      return run(TABLE + P("Table 2: Second", S("Caption")) + TABLE);
+    }).then(function (r) {
+      eq(brief(r.project.blocks), ["table [Table 2: Second]", "table"], "32 between two tables the label does not decide, and the table before takes it as it always did");
+      return run(TABLE + P("Figure 1: Overview", S("Caption")) + PICTURE);
+    }).then(function (r) {
+      eq(brief(r.project.blocks), ["table", "picture [Figure 1: Overview]"], "32 a figure's caption written above its picture goes to the picture, not to the table before it");
+      return run(PICTURE + P("Figure 2: Layout", S("Caption")) + TABLE + P("Gap") + PICTURE + P("Network as surveyed", S("Caption")) + TABLE + P("Gap") + PICTURE + P("Table 9: nothing to hold it", S("Caption")) + P("Gap") + PICTURE + P("Fig. 3 Detail", S("Caption")) + TABLE);
+    }).then(function (r) {
+      eq([brief(r.project.blocks), r.report.carried.captions], [["picture [Figure 2: Layout]", "table", "p:Gap", "picture [Network as surveyed]", "table", "p:Gap", "picture [Table 9: nothing to hold it]", "p:Gap", "picture [Fig. 3 Detail]", "table"], 4],
+        "32 a figure caption under its picture stays there; with no label the block before takes it; a label with nothing of its kind beside it falls back to the block before");
+    });
+  });
+
+  // ---- 33, 57. a link to a file, and where it was ----
+  test("file links point at their paragraph", function () {
+    return imp({ rels: [["rIdDoc", "hyperlink", "Other%20report.docx", true], ["rIdFtp", "hyperlink", "ftp://ftp.example.com/a", true]], body:
+      P("Intro") + PX(R("See ") + LINK("rIdDoc", R("the other report")) + R(" and ") + LINK("rIdFtp", R("the archive"))) + PX(R("Also ") + '<w:hyperlink w:anchor="_Ref1">' + R("section 2") + '</w:hyperlink>') +
+      PX(FIELD(' HYPERLINK "Appendix A.xlsx" ', R("the appendix")))
+    }).then(function (r) {
+      var b = r.project.blocks, other = entry(r.report, "other-links"), inside = entry(r.report, "internal-links");
+      eq(other && [other.count, other.examples, other.blockIds], [3, ["Other%20report.docx", "ftp://ftp.example.com/a", "Appendix A.xlsx"], [b[1].id, b[3].id]], "33 links to another file or address are counted apart, quoted, and point at the paragraphs they were in");
+      eq(inside && [inside.count, inside.blockIds], [1, [b[2].id]], "33 a link to a place inside the document points at its paragraph too");
+      ok(F.sentence(other).indexOf("inside the document") < 0 && /^1 link to a place inside the document was not carried over/.test(F.sentence(inside)), "57 only the bookmark link is called a link to a place inside the document", F.sentence(other));
+      eq(b.map(text), ["Intro", "See the other report and the archive", "Also section 2", "the appendix"], "33 the words of each are kept");
+    });
+  });
+
+  // ---- 34. a table inside a footnote ----
+  test("table in a footnote", function () {
+    var notes = FOOTNOTES([[2, PX(FNMARK + R(" See figures:")) + T([TR([TC("CELLTEXT 42 percent"), TC(PX(R("second ") + R("cell", '<w:b/>')))]), TR([TC("row two"), TC(PX(""))])], [2000, 2000]) + P("After the table.")]]);
+    return imp({ footnotes: notes, body: PX(R("Claim") + FNREF(2)) }).then(function (r) {
+      var p = r.project, fn = p.footnotes[Object.keys(p.footnotes)[0]], e = entry(r.report, "objects-in-notes");
+      eq(fn.runs, [{ t: "See figures:\nCELLTEXT 42 percent\nsecond " }, { t: "cell", b: true }, { t: "\nrow two\nAfter the table." }], "34 the words of a table inside a footnote are kept, cell by cell, as lines of the note, in order");
+      eq(e && [e.count, e.tables, e.examples], [1, 1, ["See figures: CELLTEXT 42 percent second cell row two After the table."]], "34 the table is still reported as not carried, and the quote holds the words that were in it");
+      var s = F.sentence(e);
+      ok(/^1 picture, drawing or table inside a footnote or endnote was not carried over\. The note's text was kept\. The words in the table are now lines of the note\.$/.test(s) && plainWords(s), "34 the sentence says where the table's words went", s);
+      ok(F.sentence({ code: "objects-in-notes", count: 2 }) === "2 pictures, drawings or tables inside a footnote or endnote were not carried over. The note's text was kept.", "34 a report with no table count reads as it did");
+      return exported(p).then(function (x) { ok(/CELLTEXT 42 percent/.test(x.notes), "34 the exported Word file prints them in the footnote"); });
+    });
+  });
+
+  // ---- every code has its words ----
+  test("sentences", function () {
+    var all = I.CODES.toCheck.concat(I.CODES.notCarried, I.CODES.changed), bad = [];
+    ["fields-no-text", "objects-lost", "notes-missing", "theme-missing", "links-in-drawings", "linked-objects", "figures-list", "picture-links", "other-links"].forEach(function (c) { if (all.indexOf(c) < 0) bad.push(c + " is not listed"); });
+    all.forEach(function (code) {
+      [1, 3].forEach(function (n) { var s = F.sentence({ code: code, count: n }); if (/Something else/.test(s) || !plainWords(s)) bad.push(code + ": " + s); });
+    });
+    eq(bad, [], "every report code the reader can give has a plain sentence, for one and for many");
+  });
+
+  return chain;
+});
+</script>
+<script>
+// ======================= part r2 ======================
+FixImport.part("r2", function (ok, eq) {
+
+  var App = window.App, I = App.DocxImport, H = App.HouseDocx, G = App.DocxGraft, Zip = App.ZipIO, M = App.DocModel, F = App.DocImportFlow;
+  var W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  var MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+  var WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+  var DML = "http://schemas.openxmlformats.org/drawingml/2006/main";
+  var PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+  var WPG = "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup";
+  var WPS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape";
+  var RNS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  var REL = RNS + "/";
+  var NS = ' xmlns:w="' + W + '" xmlns:r="' + RNS + '" xmlns:mc="' + MC + '"' + ' xmlns:a="' + DML + '" xmlns:pic="' + PIC + '"' +
+    ' xmlns:wp="' + WP + '" xmlns:wps="' + WPS + '" xmlns:wpg="' + WPG + '"' +
+    ' xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"';
+  var HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  var UNC = "file://///fileserver.example/share/pixel.png";
+
+  // ---- WordprocessingML, briefly ----
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function R(text, rPr) { return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(text) + '</w:t></w:r>'; }
+  function PX(inner, pPr) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + inner + '</w:p>'; }
+  function P(text, pPr) { return PX(R(text), pPr); }
+  var EMPTY = '<w:p/>';
+  function STYLES() {
+    return HEAD + '<w:styles' + NS + '>' +
+      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
+      '<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>' +
+      '</w:styles>';
+  }
+  var NUMBERING = HEAD + '<w:numbering' + NS + '><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>' +
+    '<w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+  function FLD(type) { return '<w:r><w:fldChar w:fldCharType="' + type + '"/></w:r>'; }
+  function INSTR(code) { return '<w:r><w:instrText xml:space="preserve">' + esc(code) + '</w:instrText></w:r>'; }
+  function LINK(rid, text) { return '<w:hyperlink r:id="' + rid + '"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t>' + esc(text) + '</w:t></w:r></w:hyperlink>'; }
+
+  var docPr = 0;
+  // A shape with words, floating loose (no wrap), measured from the column and the paragraph, as Word draws one.
+  function SHAPE(name, x, y) {
+    var id = ++docPr;
+    return '<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="' + (251659264 + id) + '" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">' +
+      '<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column"><wp:posOffset>' + x + '</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>' + y + '</wp:posOffset></wp:positionV>' +
+      '<wp:extent cx="1371600" cy="457200"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="' + id + '" name="' + esc(name) + '"/><wp:cNvGraphicFramePr/>' +
+      '<a:graphic><a:graphicData uri="' + WPS + '"><wps:wsp><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1371600" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>' +
+      '<a:solidFill><a:srgbClr val="156082"/></a:solidFill></wps:spPr><wps:txbx><w:txbxContent>' + P(name) + '</w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>';
+  }
+  function FRAME(data, name) {
+    return '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="952500" cy="476250"/><wp:docPr id="' + (++docPr) + '" name="' + esc(name) + '"/>' +
+      '<wp:cNvGraphicFramePr/><a:graphic>' + data + '</a:graphic></wp:inline></w:drawing>';
+  }
+  // A picture. blip: the a:blip's attributes, as Word writes them (r:embed, r:link or both).
+  function PICDATA(blip, name, crop) {
+    return '<a:graphicData uri="' + PIC + '"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="' + esc(name) + '"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip ' + blip + '/>' +
+      (crop ? '<a:srcRect l="12000"/>' : '') + '<a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm>' +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData>';
+  }
+  function PICRUN(blip, name, crop) { return '<w:r>' + FRAME(PICDATA(blip, name, crop), name) + '</w:r>'; }
+  // A group of a shape and a picture, as Word writes one.
+  function GROUP(blip, name) {
+    return '<w:r>' + FRAME('<a:graphicData uri="' + WPG + '"><wpg:wgp><wpg:cNvGrpSpPr/><wpg:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/><a:chOff x="0" y="0"/><a:chExt cx="952500" cy="476250"/></a:xfrm></wpg:grpSpPr>' +
+      '<wps:wsp><wps:cNvPr id="1" name="Box"/><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="476250" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:bodyPr/></wps:wsp>' +
+      '<pic:pic><pic:nvPicPr><pic:cNvPr id="2" name="Logo"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip ' + blip + '/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+      '<pic:spPr><a:xfrm><a:off x="476250" y="0"/><a:ext cx="476250" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></wpg:wgp></a:graphicData>', name) + '</w:r>';
+  }
+  function CHART(rid, name) {
+    return '<w:r>' + FRAME('<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="' + rid + '"/></a:graphicData>', name) + '</w:r>';
+  }
+  // A text box as Word writes one, DrawingML with a VML copy beside it.
+  function BOX(inner, vmlInner, name) {
+    return '<w:r><mc:AlternateContent><mc:Choice Requires="wps">' + FRAME('<a:graphicData uri="' + WPS + '"><wps:wsp><wps:cNvSpPr txBox="1"/>' +
+      '<wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent>' + inner + '</w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData>', name) +
+      '</mc:Choice><mc:Fallback><w:pict><v:rect id="box' + docPr + '" style="width:75pt;height:37pt"><v:textbox><w:txbxContent>' + vmlInner + '</w:txbxContent></v:textbox></v:rect></w:pict></mc:Fallback></mc:AlternateContent></w:r>';
+  }
+  // What Word writes for a picture fetched by INCLUDEPICTURE: the field, and as its result a VML picture whose image is the address.
+  function INCLUDED(rid) {
+    return FLD("begin") + INSTR(' INCLUDEPICTURE "' + UNC + '" \\d ') + FLD("separate") +
+      '<w:r><w:pict><v:shapetype id="_x0000_t75" coordsize="21600,21600" o:spt="75" path="m@4@5l@4@11@9@11@9@5xe"/><v:shape id="_x0000_i1025" type="#_x0000_t75" style="width:82.5pt;height:82.5pt">' +
+      '<v:imagedata r:id="' + rid + '" o:href="' + UNC + '"/></v:shape></w:pict></w:r>' + FLD("end");
+  }
+  var PNG = (function () {
+    var s = atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="), u = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u;
+  })();
+
+  // A package. o: { body, numbering, rels: [[id, kind, target, external]], files: { name: text or bytes } }
+  function RELS(rels) {
+    return HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      rels.map(function (r) { return '<Relationship Id="' + r[0] + '" Type="' + REL + r[1] + '" Target="' + esc(r[2]) + '"' + (r[3] ? ' TargetMode="External"' : '') + '/>'; }).join("") + '</Relationships>';
+  }
+  function make(o) {
+    var CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.";
+    var rels = [["rIdS", "styles", "styles.xml"]].concat(o.numbering ? [["rIdN", "numbering", "numbering.xml"]] : []).concat(o.rels || []);
+    var types = '<Override PartName="/word/styles.xml" ContentType="' + CT + 'styles+xml"/>' + (o.numbering ? '<Override PartName="/word/numbering.xml" ContentType="' + CT + 'numbering+xml"/>' : '') +
+      '<Override PartName="/word/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>';
+    var files = [{ name: "word/styles.xml", bytes: Zip.bytesOf(STYLES()) }];
+    if (o.numbering) files.push({ name: "word/numbering.xml", bytes: Zip.bytesOf(o.numbering) });
+    for (var n in (o.files || {})) files.push({ name: n, bytes: typeof o.files[n] === "string" ? Zip.bytesOf(o.files[n]) : o.files[n] });
+    return Zip.write([
+      { name: "[Content_Types].xml", bytes: Zip.bytesOf(HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+        '<Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="' + CT + 'document.main+xml"/>' + types + '</Types>') },
+      { name: "_rels/.rels", bytes: Zip.bytesOf(RELS([["rId1", "officeDocument", "word/document.xml"]])) },
+      { name: "word/document.xml", bytes: Zip.bytesOf(HEAD + '<w:document' + NS + '><w:body>' + o.body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body></w:document>') },
+      { name: "word/_rels/document.xml.rels", bytes: Zip.bytesOf(RELS(rels)) }
+    ].concat(files));
+  }
+  function imp(o) { return make(o).then(function (blob) { return I.read(blob, { name: "made.docx" }); }); }
+
+  // ---- reading the result ----
+  function text(b) { return b.runs ? b.runs.map(function (r) { return r.t; }).join("") : (b.text || ""); }
+  function brief(blocks) {
+    return blocks.map(function (b) {
+      if (b.type === "kept") return "kept " + b.kind + (b.floating ? " floating" : "");
+      if (b.type === "table") return "table";
+      if (b.type === "list") return "list " + b.list + ":" + text(b);
+      return b.type.charAt(0) + ":" + text(b);
+    });
+  }
+  function entry(report, code) {
+    var found = null;
+    ["toCheck", "changed", "notCarried"].forEach(function (l) { report[l].forEach(function (e) { if (e.code === code) found = e; }); });
+    return found;
+  }
+  function count(xml, re) { return (xml.match(re) || []).length; }
+  function plainWords(s) { return !/[\u2013\u2014]/.test(s) && !/\b[A-Z]{4,}\b/.test(s) && !/the tool/i.test(s) && /\.$/.test(s); }
+  // The exported Word file: { doc, rels (every relationships part, joined), names }.
+  function unpack(blob) {
+    return Zip.read(blob).then(function (files) {
+      var out = { doc: "", rels: "", names: files.map(function (f) { return f.name; }), files: files };
+      files.forEach(function (f) {
+        if (f.name === "word/document.xml") out.doc = Zip.text(f);
+        else if (/\.rels$/.test(f.name)) out.rels += Zip.text(f);
+      });
+      return out;
+    });
+  }
+  function exported(project) {
+    return H.buildDocument(project, { issueStatus: "draft" }).then(function (res) { return unpack(res.blob); });
+  }
+  // Every relationship to something outside the file that is not a web or email link to click.
+  function outsideRels(rels) {
+    return (rels.match(/<Relationship\b[^>]*>/g) || []).filter(function (r) {
+      if (!/TargetMode="External"/.test(r)) return false;
+      var type = /Type="([^"]*)"/.exec(r)[1], target = /Target="([^"]*)"/.exec(r)[1].replace(/&amp;/g, "&");
+      return !(/\/hyperlink$/.test(type) && /^(https?:\/\/|mailto:)/i.test(target));
+    });
+  }
+  function parse(xml) { return new DOMParser().parseFromString(xml, "application/xml"); }
+
+  var chain = Promise.resolve();
+  function test(name, fn) {
+    chain = chain.then(fn).then(null, function (e) { ok(false, name + ": it ran", (e && (e.stack || e.message)) || String(e)); });
+  }
+
+  // ---- 1. a diagram of loose shapes in a table cell ----
+  var CELL_SHAPES = [["Internet", 1600000, 60000], ["Firewall", 1600000, 0], ["Switch", 1600000, 0], ["PLC", 200000, 0], ["HMI", 3000000, 0]];
+  function cellDiagram() {
+    // As Word lays a diagram over blank lines: each shape in a paragraph of its own, blank lines between and after.
+    var paras = [PX(SHAPE.apply(null, CELL_SHAPES[0])), EMPTY, PX(SHAPE.apply(null, CELL_SHAPES[1])), EMPTY, PX(SHAPE.apply(null, CELL_SHAPES[2])), EMPTY,
+      PX(SHAPE.apply(null, CELL_SHAPES[3]) + SHAPE.apply(null, CELL_SHAPES[4])), EMPTY, EMPTY, EMPTY];
+    return paras;
+  }
+  test("diagram in a cell", function () {
+    var paras = cellDiagram();
+    var body = P("Before the table.") +
+      '<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w="9000"/></w:tblGrid><w:tr><w:tc>' + paras.join("") + '</w:tc></w:tr>' +
+      '<w:tr><w:tc>' + P("Words in a cell") + EMPTY + EMPTY + '</w:tc></w:tr>' +
+      '<w:tr><w:tc>' + PX("", '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>') + '</w:tc></w:tr></w:tbl>' + P("After the table.");
+    return imp({ body: body, numbering: NUMBERING }).then(function (r) {
+      var p = r.project, t = p.blocks.filter(function (b) { return b.type === "table"; })[0];
+      var cell = t.rows[0].cells[0].blocks, k = cell[0];
+      eq(brief(cell), ["kept group floating"], "1 the shapes and blank lines of a diagram drawn in a cell are one kept block, not one block for each shape");
+      eq([count(k.xml, /<wp:anchor\b/g), count(k.xml, /<w:p\b[^>]*>(?![^<]*<\/w:t>)/g) >= paras.length, /^\s*<w:p[\s>]/.test(k.xml)], [5, true, true],
+        "1 the block holds every anchor and is whole paragraphs");
+      var outer = parse('<x xmlns:w="' + W + '">' + k.xml + '</x>').documentElement, top = [];
+      for (var c = outer.firstChild; c; c = c.nextSibling) if (c.nodeType === 1 && c.localName === "p") top.push(c.getElementsByTagNameNS(WP, "anchor").length);
+      eq(top, [1, 0, 1, 0, 1, 0, 2, 0, 0, 0], "1 every paragraph of the cell is there in order, blank lines and the ones after the last shape included, so the cell keeps its height");
+      eq(brief(t.rows[1].cells[0].blocks), ["p:Words in a cell"], "1 blank lines in a cell with no drawing go, as before");
+      eq(brief(t.rows[2].cells[0].blocks), ["list number:"], "1 a numbered paragraph with no words in a cell still keeps its number");
+      eq(brief(p.blocks), ["p:Before the table.", "table", "p:After the table."], "1 nothing of the cell leaks out of the table");
+      return exported(M.normalise(p)).then(function (x) {
+        var dom = parse(x.doc), tcs = dom.getElementsByTagNameNS(W, "tc"), tc = null;
+        for (var i = 0; i < tcs.length; i++) if (tcs[i].getElementsByTagNameNS(WP, "anchor").length) tc = tcs[i];
+        ok(!!tc, "1 the export has the diagram in a cell");
+        if (!tc) return;
+        var ps = [], offs = [];
+        for (var c2 = tc.firstChild; c2; c2 = c2.nextSibling) if (c2.nodeType === 1 && c2.localName === "p") ps.push(c2.getElementsByTagNameNS(WP, "anchor").length);
+        var anchors = tc.getElementsByTagNameNS(WP, "anchor");
+        for (var j = 0; j < anchors.length; j++) {
+          var h = anchors[j].getElementsByTagNameNS(WP, "positionH")[0], v = anchors[j].getElementsByTagNameNS(WP, "positionV")[0];
+          offs.push([h.getAttribute("relativeFrom"), +h.textContent, v.getAttribute("relativeFrom"), +v.textContent]);
+        }
+        eq(ps, [1, 0, 1, 0, 1, 0, 2, 0, 0, 0], "1 in the exported cell the paragraphs are the source's: one per anchor and every blank line");
+        eq(offs, CELL_SHAPES.map(function (s) { return ["column", s[1], "paragraph", s[2]]; }), "1 every shape keeps the place its anchor gave it");
+      });
+    });
+  });
+
+  // ---- 2. linked pictures, and a link's look in a text box ----
+  test("linked pictures", function () {
+    var boxWords = PX(LINK("rIdFile", "See the full drawing here") + INCLUDED("rIdRemote1"));
+    var boxVml = PX(LINK("rIdFile2", "See the full drawing here") + INCLUDED("rIdRemote2"));
+    return imp({
+      rels: [["rIdFile", "hyperlink", "file://///fileserver.example/share/drawing.hta", true], ["rIdFile2", "hyperlink", "file://///fileserver.example/share/drawing.hta", true],
+        ["rIdRemote1", "image", UNC, true], ["rIdRemote2", "image", UNC, true], ["rIdOnly", "image", "\\\\fileserver.example\\share\\only.png", true],
+        ["rIdBoth", "image", "http://tracker.example/both.png", true], ["rIdPng", "image", "media/image1.png"], ["rIdGrp", "image", "https://tracker.example/group.png", true],
+        ["rIdEmb", "image", "https://tracker.example/plain.png", true], ["rIdChart", "chart", "charts/chart1.xml"], ["rIdWeb", "hyperlink", "https://example.org/", true]],
+      files: { "word/media/image1.png": PNG,
+        "word/charts/chart1.xml": '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="' + RNS + '"><c:chart/><c:externalData r:id="rId3"><c:autoUpdate val="1"/></c:externalData></c:chartSpace>',
+        "word/charts/_rels/chart1.xml.rels": RELS([["rId3", "oleObject", "file:///\\\\host\\share\\Book1.xlsx", true]]) },
+      body: P("Start") + PX(BOX(boxWords, boxVml, "Call-out")) +
+        PX(PICRUN('r:link="rIdOnly"', "Linked only", true)) +
+        PX(PICRUN('r:embed="rIdPng" r:link="rIdBoth"', "Linked and saved", true)) +
+        PX(GROUP('r:link="rIdGrp"', "Logo group")) +
+        PX(PICRUN('r:embed="rIdEmb"', "Plain from outside")) +
+        PX(CHART("rIdChart", "Chart 1")) + PX(R("A ") + '<w:hyperlink r:id="rIdWeb"><w:r><w:t>web link</w:t></w:r></w:hyperlink>') + P("End")
+    }).then(function (r) {
+      var p = r.project, b = p.blocks;
+      eq(brief(b), ["p:Start", "kept textbox", "kept picture", "kept group", "kept chart", "p:A web link", "p:End"],
+        "2 a picture that was only a link is left out, at the top level and as the only thing in a frame; the rest is kept");
+      var box = b[1], both = b[2], group = b[3], chart = b[4];
+      ok(!/imagedata|v:shape\b|INCLUDEPICTURE/.test(box.xml) && /See the full drawing here/.test(box.xml), "2 the picture INCLUDEPICTURE left in the text box is gone, in both versions of the box; the words stay", box.xml.slice(0, 400));
+      ok(!/0563C1/i.test(box.xml) && !/<w:u\b/.test(box.xml) && !/w:val="Hyperlink"/.test(box.xml), "2 the words of the file link taken off the text box are no longer blue and underlined", box.xml.slice(0, 600));
+      ok(!/:link=/.test(both.xml) && /r:embed="/.test(both.xml), "2 a picture saved in the file and linked keeps its own copy and loses the link");
+      ok(!/<pic:pic\b/.test(group.xml) && /<wps:wsp\b/.test(group.xml), "2 in a group the linked picture goes and the shape stays");
+      var all = b.filter(function (x) { return x.type === "kept"; }).reduce(function (list, x) { return list.concat(x.rels); }, []);
+      Object.keys(p.parts).forEach(function (k) { all = all.concat(p.parts[k].rels || []); });
+      eq(all.filter(function (x) { return x.external != null; }).map(function (x) { return x.external; }), [], "2 no kept block or carried part holds an address outside the file");
+      return p.parts[chart.rels[0].part].blob.text().then(function (chartXml) {
+        ok(!/externalData/.test(chartXml) && /<c:chart\b/.test(chartXml), "2 a chart linked to a workbook keeps its figures and loses the link", chartXml);
+        var pics = entry(r.report, "linked-pictures"), objs = entry(r.report, "linked-objects");
+        ok(pics && r.report.notCarried.indexOf(pics) >= 0 && pics.count === 5, "2 every linked picture is listed as not carried over (count of addresses)", JSON.stringify(pics));
+        eq(pics && pics.examples, [UNC, "\\\\fileserver.example\\share\\only.png", "http://tracker.example/both.png", "https://tracker.example/group.png", "https://tracker.example/plain.png"],
+          "2 with each address");
+        ok(objs && r.report.notCarried.indexOf(objs) >= 0 && objs.count === 1 && objs.examples[0] === "file:///\\\\host\\share\\Book1.xlsx", "2 the chart's workbook link is listed as not carried over, with its address", JSON.stringify(objs));
+        eq(F.sentence({ code: "linked-pictures", count: 1 }), "A picture linked to a file or web address outside the document was left out, because Word would fetch it when the file is opened. Insert the picture itself if it is needed.",
+          "2 the sentence for one");
+        var many = F.sentence(pics), lo = F.sentence(objs);
+        ok(/^5 pictures linked to a file or web address outside the document were left out, because Word would fetch them when the file is opened\. Insert the pictures themselves if they are needed\.$/.test(many) &&
+          plainWords(many) && plainWords(lo) && /left out/.test(lo), "2 the sentences read properly for many and say what was left out", many + " | " + lo);
+        return exported(M.normalise(p));
+      }).then(function (x) {
+        eq(outsideRels(x.rels), [], "2 the exported file has no relationship outside the file but a web or email link");
+        ok(!/fileserver|tracker\.example|Book1\.xlsx|INCLUDEPICTURE/.test(x.rels + x.doc) && /https:\/\/example\.org\//.test(x.rels), "2 no linked address reaches the file; the web link does");
+      });
+    });
+  });
+
+  // ---- 3. the model, the writer and the graft refuse what slipped through ----
+  test("defences", function () {
+    var doc = M.normalise(M.create ? M.create() : { blocks: [] });
+    var blip = '<w:r xmlns:w="' + W + '" xmlns:r="' + RNS + '"><w:drawing><a:blip xmlns:a="' + DML + '" r:embed="sptK1" r:link="sptK2"/></w:drawing></w:r>';
+    var only = '<w:r xmlns:w="' + W + '" xmlns:r="' + RNS + '"><w:pict><v:imagedata xmlns:v="urn:schemas-microsoft-com:vml" r:id="sptK3"/></w:pict></w:r>';
+    var key = M.addPart(doc, new Blob([PNG], { type: "image/png" }), { name: "word/media/image1.png", contentType: "image/png" });
+    var both = { id: "bk1", type: "kept", kind: "picture", xml: blip, rels: [{ id: "sptK1", type: REL + "image", part: key }, { id: "sptK2", type: REL + "image", external: UNC }], width: 50, height: 50, text: "", description: "Picture" };
+    var bare = { id: "bk2", type: "kept", kind: "picture", xml: only, rels: [{ id: "sptK3", type: REL + "image", external: "\\\\server\\share\\a.png" }], width: 50, height: 50, text: "", description: "Picture" };
+    var chartKey = M.addPart(doc, new Blob(["<c/>"]), { name: "word/charts/chart1.xml", contentType: "application/xml", rels: [{ id: "rId1", type: REL + "oleObject", external: "file:///C:/x.xlsx" }, { id: "rId2", type: REL + "hyperlink", external: "javascript:alert(1)" }] });
+    var chart = { id: "bk3", type: "kept", kind: "chart", xml: '<w:r xmlns:w="' + W + '"/>', rels: [{ id: "sptK4", type: REL + "chart", part: chartKey }], width: 50, height: 50, text: "", description: "Chart" };
+    doc.blocks = [M.make.paragraph ? M.make.paragraph(doc, "Text") : { id: "bp", type: "paragraph", runs: [{ t: "Text" }] }, both, bare, chart];
+    var raw = JSON.parse(JSON.stringify({ blocks: doc.blocks }));
+    var n = M.normalise(doc), nb = {};
+    n.blocks.forEach(function (x) { nb[x.id] = x; });
+    eq([/:link=/.test(nb.bk1.xml), nb.bk1.rels.map(function (x) { return x.id; })], [false, ["sptK1"]], "3 normalise: a picture saved and linked keeps its copy; the link and its relationship go");
+    ok(nb.bk2.rels.every(function (x) { return x.external == null; }) && M.missing(n).indexOf("bk2") >= 0, "3 normalise: a picture that is only an address counts as missing, so it prints a prompt", JSON.stringify(nb.bk2.rels));
+    eq(n.parts[chartKey].rels.map(function (x) { return x.external || x.part; }), ["?outside", "about:blank"], "3 normalise: a carried part's link to a workbook is refused the same way; a bad link to click points nowhere");
+    ok(M.missing(n).indexOf("bk3") >= 0, "3 normalise: a chart that depends on such a part counts as missing");
+    // The writer, given blocks that never went through normalise.
+    var rawDoc = { blocks: [raw.blocks[0], raw.blocks[2], raw.blocks[3]], parts: doc.parts, media: {}, info: n.info, options: n.options, footnotes: {} };
+    rawDoc.parts[chartKey].rels = [{ id: "rId1", type: REL + "oleObject", external: "file:///C:/x.xlsx" }];
+    return H.buildDocument(M.normalise ? Object.assign({}, n, { blocks: rawDoc.blocks, parts: rawDoc.parts }) : rawDoc, { issueStatus: "draft" }).then(function (res) {
+      return unpack(res.blob).then(function (x) {
+        eq(outsideRels(x.rels), [], "3 writer: a block that names something outside the file is never written as it was");
+        eq([count(x.doc, /KEPT:/g), count(x.doc, /This picture could not be restored/g)], [0, 2], "3 writer: a prompt prints in the place of each");
+      });
+    }).then(function () {
+      var plan = { kept: [{ token: G.token("bk9"), blockId: "bk9", kind: "picture", xml: only, rels: [{ id: "sptK3", type: REL + "image", external: UNC }] }], parts: {} };
+      return G.apply(new Blob(["x"]), plan).then(function () { ok(false, "3 graft: a plan with a linked picture is refused"); },
+        function (e) { ok(e && e.blockId === "bk9" && /outside the document/.test(e.message), "3 graft: a plan with a linked picture is refused, naming the block", e && e.message); });
+    });
+  });
+
+  return chain;
+});
+FixImport.run();
+</script>
+</body></html>

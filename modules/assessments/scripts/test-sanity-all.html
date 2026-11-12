@@ -1,6 +1,18 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"/><title>Sanity check: every instrument</title></head>
 <body>
+<!--
+  Every non-placeholder instrument: activates, scores, renders its report, and
+  builds its Word and Excel files.
+
+  Word house style (once test-word-style.html): the Word reports carry text
+  from two places, the narrative packs (guarded by test-narrative-style.html)
+  and fixed wording written into export-docx.js itself (cover banners,
+  methodology bullets, captions, red prompts). Each Word document built here
+  is opened and every body paragraph checked against the house style: no em or
+  en dash (an ordinary spaced hyphen is fine). Table cells are left out,
+  because a lone dash is the house placeholder for an empty cell.
+-->
 <pre id="out">running…</pre>
 
 <script src="harness.js"></script>
@@ -15,6 +27,25 @@
 
   E.loadCatalog();
   A.UI.init({ autosave: false });
+
+  // Word house style: no em or en dash in a body paragraph.
+  function problems(s) {
+    var f = [];
+    if (/—/.test(s)) f.push("em dash");
+    if (/–/.test(s)) f.push("en dash");
+    return f;
+  }
+  // Body paragraphs of word/document.xml, with every table removed first.
+  function bodyParagraphs(xml) {
+    var noTables = xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, "");
+    return (noTables.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).map(function (p) {
+      return (p.match(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ""); }).join("")
+        .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;/g, "'");
+    }).filter(function (s) { return s.trim(); });
+  }
+  ok(problems("Capability assessment — not a certification").length === 1 && problems("Capability assessment - not a certification").length === 0,
+     "style: the check catches an em dash and lets a normal spaced hyphen through");
+  var styleChecked = 0;
 
   // Every non-placeholder instrument in the catalog.
   var list = E.state.instruments.filter(function (i) { return i.status !== "placeholder"; });
@@ -65,6 +96,8 @@
     var id = i0.id;
     try {
       E.activateInstrument(id);
+      // A client name, so the Word file is read as a consultant would send it.
+      E.updateMetadata({ clientName: "Style Check Ltd" });
       var inst = E.state.instrument, fam = E.state.scoringFamily;
       ok(inst && inst.id === id, id + ": activates and matches id");
       ok(!!inst.title && !!fam, id + ": has title + scoringFamily (" + fam + ")");
@@ -113,7 +146,15 @@
     return new Promise(function (resolve) {
       A.ExportDOCX.buildAsync(s.eng, s.inst, s.tax, s.prof, s.narr, s.opts, function (err, blob) {
         ok(!err && blob && blob.size > 2000, s.id + ": Word (.docx) builds", err ? err.message : (blob && ("size " + blob.size)));
-        resolve();
+        if (err || !blob) { ok(false, s.id + ": style: the Word document builds"); resolve(); return; }
+        H.unzipText(blob).then(function (parts) {
+          var doc = parts.filter(function (p) { return p.name === "word/document.xml"; })[0];
+          var paras = doc ? bodyParagraphs(doc.text) : [];
+          styleChecked++;
+          var bad = paras.map(function (x) { return { s: x, p: problems(x) }; }).filter(function (x) { return x.p.length; });
+          ok(paras.length > 10 && bad.length === 0, s.id + ": style: " + paras.length + " body paragraphs, no dashes",
+             bad.slice(0, 3).map(function (x) { return x.p.join(", ") + " in: " + x.s.slice(0, 110); }).join(" | "));
+        }, function (e) { ok(false, s.id + ": style: the Word document opens", e && e.message); }).then(resolve);
       });
     });
   });
@@ -136,7 +177,10 @@
     }).then(function () { return runXlsx(i + 1); });
   }
 
-  Promise.all(docxJobs).then(function () { return runXlsx(0); }).then(function () {
+  Promise.all(docxJobs).then(function () {
+    ok(styleChecked >= 18, "style: every instrument's Word document was opened and checked (" + styleChecked + ")");
+    return runXlsx(0);
+  }).then(function () {
     lines.push(""); lines.push(fail === 0 ? "ALL TESTS PASSED (" + snaps.length + " instruments)" : fail + " FAILED");
     document.getElementById("out").textContent = lines.join("\n");
   });

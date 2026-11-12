@@ -35,15 +35,15 @@
     document.getElementById("out").textContent = lines.join("\n") + "\n\nincomplete";
   }
   // Reading a Blob is real work no timer stands for, and headless Edge's
-  // virtual clock runs out the moment nothing is queued: a timer is kept
-  // waiting, and a message bounced to ourselves keeps a task queued, until
-  // the tests finish (as in test-doc-zip.html).
+  // virtual clock runs out the moment nothing is queued: a timer kept waiting
+  // holds the page open until the tests finish (as test-doc-app.html does).
+  // One keep-alive only. With a message bounced to ourselves as well, the
+  // main thread was never idle, so every wait crossed in 20 ms steps and the
+  // page took a minute or more; with the bounce alone the virtual clock could
+  // not jump over the waits either (about 50 s); the timer alone takes seconds.
   var beat = setInterval(function () {}, 20);
-  var alive = true, bounce = new MessageChannel();
-  bounce.port1.onmessage = function () { if (alive) bounce.port2.postMessage(0); };
-  bounce.port2.postMessage(0);
   function finish() {
-    clearInterval(beat); alive = false;
+    clearInterval(beat);
     lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
     document.getElementById("out").textContent = lines.join("\n");
   }

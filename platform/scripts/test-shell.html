@@ -114,7 +114,7 @@
       "the home page has four tool cards, the Document Tool last");
     var dc = d.querySelector(".tool-card[data-module='documents']");
     ok(dc && dc.querySelector("h2").textContent === "OT Cyber Document Tool" && /SolutionsPT template/.test(dc.querySelector(".tool-summary").textContent) &&
-       /pictures and diagrams kept/.test(dc.querySelector(".tool-summary").textContent), "its card names it and says what it does", dc && dc.textContent);
+       /pictures and drawings kept/.test(dc.querySelector(".tool-summary").textContent), "its card names it and says what it does", dc && dc.textContent);
     ok(dc && /not an assessment or risk report/.test(dc.querySelector(".help-tool p").textContent) && /draft or a final/.test(dc.querySelector(".help-tool p").textContent) &&
        dc.querySelector(".tool-tour") && /demo proposal/.test(dc.querySelector(".tool-tour").title), "with when to use it and its tour");
     var cols = S.getComputedStyle(d.querySelector(".tool-grid")).gridTemplateColumns.split(" ");

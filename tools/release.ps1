@@ -9,7 +9,7 @@
 # one file, for internal use.
 #
 #   .\tools\release.ps1              # full run: tests, single HTML, exe, tag
-#   .\tools\release.ps1 -SkipTests   # skip the test suites (assessments alone is ~40 minutes)
+#   .\tools\release.ps1 -SkipTests   # skip the test suites (all of them take about 10 minutes)
 #   .\tools\release.ps1 -NoTag       # build and check, but do not tag (works even if the tag exists)
 #
 # The version comes from shared\version.js (bump it, run tools\sync-shared.ps1,
@@ -23,7 +23,8 @@
 #   1. the working tree is clean, the tag for this version does not exist,
 #      docs\releases\v<x.y.z>.md exists, every module's shared files match
 #      their canonical copies, and the suite's home page data is current
-#   2. every module's test pages pass (unless -SkipTests)
+#   2. every module's test pages, then the suite shell's (platform\scripts),
+#      pass (unless -SkipTests)
 #   3. every module's single HTML, then the suite's, is built and its check
 #      page passes
 #   4. every module's portable exe, then the suite's, is built and its
@@ -72,6 +73,11 @@ if (-not $SkipTests) {
     & (Join-Path $PSScriptRoot "run-tests.ps1") -Module $m -VirtualTimeMs $vt -TimeoutSec $to
     if ($LASTEXITCODE -ne 0) { throw "The $m test pages did not pass. See test-results\$m\." }
   }
+  # The suite shell's own pages (platform\scripts\test-*.html): no module.json,
+  # so the runner's defaults apply.
+  Write-Output "Running the suite shell's test pages..."
+  & (Join-Path $PSScriptRoot "run-tests.ps1") -Root (Join-Path $repo "platform")
+  if ($LASTEXITCODE -ne 0) { throw "The platform test pages did not pass. See test-results\platform\." }
 }
 
 # Each file is staged as soon as it has passed its check, so a later build

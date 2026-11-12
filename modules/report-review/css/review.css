@@ -60,8 +60,42 @@
 .rr-toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 12px; font-size: 13px;
   position: sticky; top: -24px; z-index: 5; background: var(--surface-2); padding: 6px 0; }
 .rr-toolbar select, .rr-toolbar input[type=search] { font: inherit; padding: 4px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); min-width: 0; max-width: 100%; }
-.rr-paper { background: #FFF; color: #1A2533; border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 36px 44px; box-shadow: 0 1px 3px rgba(10,30,50,.08); max-width: 920px; margin-left: auto; margin-right: auto; font-size: 13.5px; line-height: 1.5; }
-.rr-cover { border-bottom: 1px solid #C8D2DD; padding-bottom: 18px; margin-bottom: 18px; }
+/* The report as pages, as the document tool's Preview shows a document: white
+   A4 sheets with the template's 1 inch margins, the house cover first. The
+   sheets are paper and stay white in the dark theme, as printed. The page
+   breaks are not Word's (it decides those): a sheet per top-level section. A
+   sheet narrows with the window, so nothing scrolls sideways. */
+.rr-paper { padding-bottom: 24px; }
+.rr-pages-note { margin: -4px 0 12px; font-size: 12px; color: var(--text-muted); text-align: center; }
+.rr-sheet { box-sizing: border-box; width: 794px; max-width: 100%; min-height: 1123px; margin: 0 auto 18px; padding: 96px min(96px, 12%);
+  background: #FFF; color: #1A2533; border: 1px solid var(--border-strong); box-shadow: 0 1px 4px rgba(20,33,52,0.18);
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, Arial, sans-serif; font-size: 14.67px; line-height: 1.36; }
+.rr-sheet-note { margin: 0 0 6px; font-size: 12px; color: #5A6B7B; }
+/* Under the cover: the comments on its lines, in cover order, each after a
+   slot naming the line, and any front matter the cover does not draw. */
+.rr-cover-notes { width: 794px; max-width: 100%; margin: -8px auto 18px; }
+.rr-cover-slot { margin: 10px 0 -2px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.rr-cover-other { margin-top: 10px; padding: 10px min(96px, 12%); background: #FFF; color: #1A2533; border: 1px solid var(--border-strong); font-size: 13px; }
+/* The cover at its printed size (A4 at 96 dpi), scaled to the width it has:
+   every size inside is in --u, a 794th of the sheet's width. */
+.rr-cover-page { position: relative; padding: 0; min-height: 0; aspect-ratio: 794 / 1123; overflow: hidden; container-type: inline-size;
+  background: #0F1C3F; color: #FFF; line-height: 1.25; --u: calc(100cqw / 794); }
+.rr-cv-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rr-cv-in { position: absolute; inset: 0; padding: calc(51 * var(--u)) calc(53 * var(--u)) calc(37 * var(--u)); }
+.rr-cv-top { position: relative; }
+.rr-cv-logo { display: block; width: calc(250 * var(--u)); height: auto; }
+.rr-cv-type { margin-top: calc(55 * var(--u)); font-size: calc(14 * var(--u)); font-weight: 700; color: #7FC4E8; }
+.rr-cv-bar { width: calc(60 * var(--u)); height: calc(4 * var(--u)); margin-top: calc(6 * var(--u)); background: #3399CC; }
+.rr-cv-title { margin-top: calc(15 * var(--u)); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.rr-cv-client { margin-top: calc(16 * var(--u)); font-size: calc(20 * var(--u)); color: #C7D8E8; }
+.rr-cv-site { font-size: calc(14 * var(--u)); color: #9DB8D6; }
+.rr-cv-sub { margin-top: calc(10 * var(--u)); font-size: calc(13.33 * var(--u)); font-weight: 700; color: #7FC4E8; }
+.rr-cv-foot { position: absolute; left: calc(53 * var(--u)); right: calc(53 * var(--u)); bottom: calc(37 * var(--u)); }
+.rr-cv-strip { display: flex; flex-wrap: wrap; gap: calc(4 * var(--u)) calc(32 * var(--u)); align-items: baseline; margin-bottom: calc(8 * var(--u)); }
+.rr-cv-pair { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.rr-cv-k { font-size: calc(10.67 * var(--u)); font-weight: 700; color: #7FC4E8; }
+.rr-cv-v { margin-left: calc(10 * var(--u)); font-size: calc(12.67 * var(--u)); }
+.rr-cv-addr { font-size: calc(10 * var(--u)); color: #DBE6F1; white-space: pre-wrap; }
 /* A block out of view is not laid out or painted until it is scrolled to
    (content-visibility), which is what keeps a report of thousands of blocks
    quick to open and to scroll. Until then it stands at a rough height, set
@@ -79,10 +113,32 @@
 .rr-block.open { background: #E6EEF6; }
 .rr-block.flash { animation: rr-flash 1.8s ease-out; }
 @keyframes rr-flash { 0%, 40% { background: #FCE9B8; } 100% { background: transparent; } }
-.rr-block h1, .rr-block h2, .rr-block h3, .rr-block h4 { margin: 10px 0 4px; color: #0A3D62; line-height: 1.25; }
-.rr-block h1 { font-size: 20px; }
-.rr-block h2 { font-size: 16px; }
-.rr-block h3, .rr-block h4 { font-size: 14px; }
+/* A line on the cover is a block too. It keeps the cover's own spacing (the
+   bar and padding take what the negative margin gives back, so the text does
+   not move), and its marks are drawn to read on the dark picture. */
+.rr-cover-page .rr-cv-line { content-visibility: visible; margin-left: -6px; margin-right: -6px; margin-bottom: 0; padding: 0 3px; }
+.rr-cover-page .rr-cv-type.rr-cv-line { margin-top: calc(55 * var(--u)); }
+.rr-cover-page .rr-cv-client.rr-cv-line { margin-top: calc(16 * var(--u)); }
+.rr-cover-page .rr-cv-sub.rr-cv-line { margin-top: calc(10 * var(--u)); }
+.rr-cover-page .rr-cv-strip.rr-cv-line { margin-bottom: calc(8 * var(--u)); }
+.rr-cover-page .rr-cv-logowrap { width: fit-content; }
+.rr-cover-page .rr-cv-line:hover, .rr-cover-page .rr-cv-line:focus-visible { background: rgba(255,255,255,.14); }
+.rr-cover-page .rr-cv-line:focus-visible { outline: 3px solid #7FC4E8; outline-offset: 1px; }
+.rr-cover-page .rr-cv-line.has-comment { border-left-color: #7FC4E8; }
+.rr-cover-page .rr-cv-line.has-must { border-left-color: #FF8A80; }
+.rr-cover-page .rr-cv-line.open { background: rgba(127,196,232,.3); }
+.rr-cover-page .rr-cv-line.flash { animation: rr-cv-flash 1.8s ease-out; }
+@keyframes rr-cv-flash { 0%, 40% { background: rgba(252,233,184,.45); } 100% { background: transparent; } }
+.rr-cover-page mark.rr-find { color: #1A2533; }
+/* the house headings: regular weight in the heading blue, with only the
+   section number bold, in the brand blue (its own run in the Word file) */
+.rr-block h1, .rr-block h2, .rr-block h3, .rr-block h4 { margin: 0; color: #173267; font-weight: 400; line-height: 1.25; overflow-wrap: anywhere; }
+.rr-block h1 { font-size: 21.33px; padding: 14px 0 3px; }
+.rr-block h2 { font-size: 17.33px; padding: 10px 0 2px; }
+.rr-block h3, .rr-block h4 { font-size: 16px; padding: 8px 0 1px; }
+.rr-block h1 strong, .rr-block h2 strong, .rr-block h3 strong, .rr-block h4 strong { color: #0F5FA6; }
+.rr-block h1 em, .rr-block h2 em, .rr-block h3 em, .rr-block h4 em { font-style: normal; }
+.rr-sheet > .rr-block:first-of-type h1, .rr-sheet > .rr-block:first-of-type h2 { padding-top: 0; }
 .rr-block p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rr-bullet { display: flex; gap: 8px; }
 .rr-bullet .m { flex: none; }
@@ -105,9 +161,13 @@ mark.rr-find { background: #FCE9B8; color: inherit; border-radius: 2px; padding:
 mark.rr-find.cur { background: #F2B035; outline: 1px solid #B07A10; }
 .rr-prompt-flag { display: inline-block; font-size: 10px; font-weight: 700; color: #FFF; background: #E00000; border-radius: 3px; padding: 0 5px; margin-right: 6px; vertical-align: 1px; }
 .rr-img img { max-width: 100%; height: auto; display: block; }
-.rr-tablewrap { overflow-x: auto; }
-.rr-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-.rr-table td { border: 1px solid #C8D2DD; padding: 3px 6px; vertical-align: top; overflow-wrap: anywhere; }
+.rr-table img { max-width: 100%; height: auto; }
+.rr-tablewrap { overflow-x: auto; margin: 4px 0 6px; }
+/* the template's table rules (E2E7EE); the shading is the Word file's own */
+.rr-table { border-collapse: collapse; width: 100%; font-size: 13.33px; line-height: 1.3; }
+/* break-word, not anywhere: a column is never narrower than its longest
+   word, and a table too wide for the page scrolls in its own frame */
+.rr-table td { border: 1px solid #E2E7EE; padding: 4px 8px; vertical-align: top; overflow-wrap: break-word; }
 .rr-table td:hover { outline: 1px solid #0F5FA6; outline-offset: -1px; }
 .rr-table td.picked { outline: 2px solid #0F5FA6; outline-offset: -2px; }
 .rr-table td.prev { outline: 2px dashed #B7791F; outline-offset: -2px; }
@@ -116,7 +176,7 @@ mark.rr-find.cur { background: #F2B035; outline: 1px solid #B07A10; }
    on a shaded header cell as well as on a white one */
 .rr-table td:focus { outline: none; }
 .rr-table td[data-cell]:focus-visible { outline: 3px solid #0F5FA6; outline-offset: -3px; box-shadow: inset 0 0 0 5px #FFF; }
-.rr-table td p { margin: 0 0 3px; white-space: pre-wrap; }
+.rr-table td p { margin: 0 0 3px; white-space: pre-wrap; overflow-wrap: break-word; }
 .rr-table td p:last-child { margin-bottom: 0; }
 
 /* comments beside a block: the app's own colours, so they sit on the paper */
@@ -247,7 +307,8 @@ button.rr-stat-go:hover { border-color: var(--brand-blue); }
   .sidebar .nav-item { padding: 6px 10px; flex: none; }
   .sidebar .nav-section-title, .sidebar .rr-outline, .sidebar .sidebar-legal { display: none; }
   .main { padding: 12px 16px; }
-  .rr-paper { padding: 16px 14px; }
+  .rr-sheet { padding-top: 48px; padding-bottom: 48px; }
+  .rr-cover-page { padding: 0; }
   .rr-kv { grid-template-columns: 1fr; }
   .rr-q { grid-template-columns: 1fr; }
   .rr-keys { grid-template-columns: 1fr; gap: 0 0; }

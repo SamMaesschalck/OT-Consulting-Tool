@@ -1,0 +1,196 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Table colours survive</title>
+<link rel="stylesheet" href="../css/spt-theme.css" />
+<link rel="stylesheet" href="../css/editor.css" />
+<link rel="stylesheet" href="../css/tables.css" />
+<link rel="stylesheet" href="../css/doc-preview.css" />
+</head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The charts an assessment report draws as tables (a row of tiles, a stacked
+  bar per objective made of shaded cells of set widths inside a cell, the
+  legend's coloured squares) keep their look through the document tool:
+
+    import (shared/docx-import.js) -> the model and a save and load
+    (js/model.js) -> export (shared/house-docx.js) -> import again
+
+  and they are drawn in the editor and the preview (shared/doc-preview.js).
+  An ordinary table with a shaded header row still takes the template's look.
+  The source is made here with the docx library in the shapes the assessment
+  exporter writes (modules/assessments/js/export-docx.js sbTilesRow,
+  the outcome profile bars and sbLegend).
+-->
+<div id="stage" style="width:1200px"></div>
+<script src="../js/version.js"></script>
+<script src="../js/product.js"></script>
+<script src="../js/logo.js"></script>
+<script src="../js/hero-asset.js"></script>
+<script src="../vendor/docx.umd.js"></script>
+<script src="../js/zip-io.js"></script>
+<script src="../js/docx-graft.js"></script>
+<script src="../js/house-docx.js"></script>
+<script src="../js/docx-import.js"></script>
+<script src="../data/document.js"></script>
+<script src="../data/licence.js"></script>
+<script src="../js/model.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/pictures.js"></script>
+<script src="../js/doc-preview.js"></script>
+<script src="../js/render.js"></script>
+<script src="../js/history.js"></script>
+<script src="../js/tables.js"></script>
+<script>
+(function () {
+  var lines = [], failed = 0;
+  function ok(c, name, detail) { lines.push((c ? "PASS " : "FAIL ") + name + (!c && detail ? " - " + detail : "")); if (!c) failed++; }
+  function finish() { lines.push("", failed ? failed + " FAILED" : "ALL TESTS PASSED"); document.getElementById("out").textContent = lines.join("\n"); }
+  var D = window.docx, A = window.App, M = A.DocModel;
+  var NONE = { style: "none", size: 0, color: "auto" };
+  var NB = { top: NONE, bottom: NONE, left: NONE, right: NONE, insideHorizontal: NONE, insideVertical: NONE };
+  function dxa(n) { return { size: n, type: D.WidthType.DXA }; }
+  function P(t, o) { o = o || {}; return new D.Paragraph({ alignment: o.align, spacing: o.spacing || { before: 0, after: 0 }, children: [new D.TextRun({ text: t, bold: !!o.bold, color: o.color, size: o.size, font: "Segoe UI" })] }); }
+  function emptyBar() { return new D.Paragraph({ spacing: { before: 0, after: 0, line: 170, lineRule: "exact" }, children: [new D.TextRun({ text: "", size: 2 })] }); }
+
+  // The source: tiles, bars, a legend and an ordinary table.
+  function source() {
+    var tiles = new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, borders: NB, rows: [new D.TableRow({ children: [
+      new D.TableCell({ borders: NB, width: { size: 32, type: D.WidthType.PERCENTAGE }, shading: { type: D.ShadingType.SOLID, color: "E5F1EA", fill: "E5F1EA" }, margins: { top: 160, bottom: 150, left: 50, right: 50 }, verticalAlign: "center",
+        children: [P("12", { align: D.AlignmentType.CENTER, bold: true, color: "2E7D52", size: 44 }), P("Achieved", { align: D.AlignmentType.CENTER, color: "5A6B7B", size: 14 })] }),
+      new D.TableCell({ borders: NB, width: { size: 4, type: D.WidthType.PERCENTAGE }, children: [P("", { size: 2 })] }),
+      new D.TableCell({ borders: NB, width: { size: 32, type: D.WidthType.PERCENTAGE }, shading: { type: D.ShadingType.SOLID, color: "F3DEDC", fill: "F3DEDC" }, verticalAlign: "center",
+        children: [P("5", { align: D.AlignmentType.CENTER, bold: true, color: "B23A33", size: 44 }), P("Not achieved", { align: D.AlignmentType.CENTER, color: "5A6B7B", size: 14 })] })
+    ] })] });
+    function bar(segs) {
+      return new D.Table({ width: dxa(6026), layout: D.TableLayoutType.FIXED, columnWidths: segs.map(function (s) { return s[0]; }), borders: NB,
+        rows: [new D.TableRow({ children: segs.map(function (s) { return new D.TableCell({ borders: NB, width: dxa(s[0]), shading: { type: D.ShadingType.SOLID, color: s[1], fill: s[1] }, children: [emptyBar()] }); }) })] });
+    }
+    var bars = new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, layout: D.TableLayoutType.FIXED, columnWidths: [3000, 6026], borders: NB, rows: [
+      new D.TableRow({ children: [new D.TableCell({ borders: NB, width: dxa(3000), verticalAlign: "center", children: [P("A Managing security risk", { size: 16 })] }),
+        new D.TableCell({ borders: NB, width: dxa(6026), verticalAlign: "center", children: [bar([[3013, "2E7D52"], [2009, "C28A1E"], [1004, "B23A33"]])] })] }),
+      new D.TableRow({ children: [new D.TableCell({ borders: NB, width: dxa(3000), verticalAlign: "center", children: [P("B Protecting against attack", { size: 16 })] }),
+        new D.TableCell({ borders: NB, width: dxa(6026), verticalAlign: "center", children: [bar([[1506, "2E7D52"], [4520, "B23A33"]])] })] })
+    ] });
+    var legend = new D.Paragraph({ spacing: { before: 120, after: 0 }, children: [
+      new D.TextRun({ text: "■ ", color: "2E7D52", size: 18 }), new D.TextRun({ text: "Achieved      ", color: "5A6B7B", size: 14 }),
+      new D.TextRun({ text: "■ ", color: "B23A33", size: 18 }), new D.TextRun({ text: "Not achieved", color: "5A6B7B", size: 14 })] });
+    var plain = new D.Table({ width: dxa(9026), columnWidths: [4513, 4513], rows: [
+      new D.TableRow({ tableHeader: true, children: [
+        new D.TableCell({ shading: { type: D.ShadingType.SOLID, color: "173267", fill: "173267" }, children: [P("Zone", { bold: true, color: "FFFFFF" })] }),
+        new D.TableCell({ shading: { type: D.ShadingType.SOLID, color: "173267", fill: "173267" }, children: [P("Assets", { bold: true, color: "FFFFFF" })] })] }),
+      new D.TableRow({ children: [new D.TableCell({ children: [P("Control")] }), new D.TableCell({ children: [P("PLCs")] })] })
+    ] });
+    var doc = new D.Document({ sections: [{ children: [
+      new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: [new D.TextRun("Alignment at a glance")] }),
+      tiles, new D.Paragraph({ children: [] }), bars, legend, new D.Paragraph({ children: [] }), plain, new D.Paragraph({ children: [] })
+    ] }] });
+    return D.Packer.toBlob(doc);
+  }
+
+  // What the look of a read document is, in a few lines.
+  function look(blocks) {
+    // From the heading on: an export puts document control before it.
+    var at = 0;
+    blocks.forEach(function (b, i) { if (!at && b.type === "heading" && /at a glance/.test(M.runsText(b.runs))) at = i; });
+    blocks = blocks.slice(at);
+    var t = blocks.filter(function (b) { return b.type === "table"; });
+    var legend = blocks.filter(function (b) { return b.type === "paragraph" && /■/.test(M.runsText(b.runs)); })[0];
+    var tiles = t[0], bars = t[1], plain = t[2];
+    var nested = bars && bars.rows[0].cells[1].blocks.filter(function (b) { return b.type === "table"; })[0];
+    return { tiles: tiles, bars: bars, plain: plain, nested: nested, legend: legend };
+  }
+  function checkLook(L, stage) {
+    ok(!!L.tiles && L.tiles.borders === "none", stage + ": the tiles keep no borders");
+    ok(L.tiles && L.tiles.rows[0].cells[0].fill === "E5F1EA" && L.tiles.rows[0].cells[2].fill === "F3DEDC", stage + ": the tiles keep their fills", JSON.stringify(L.tiles && L.tiles.rows[0].cells.map(function (c) { return c.fill; })));
+    var big = L.tiles && L.tiles.rows[0].cells[0].blocks[0].runs[0];
+    ok(big && big.size === 44 && big.color === "2E7D52", stage + ": a tile's figure keeps its size and colour", JSON.stringify(big));
+    ok(L.tiles && L.tiles.rows[0].cells[0].vAlign === "center", stage + ": a tile keeps its centring");
+    ok(L.tiles && L.tiles.rows[0].cells[0].blocks[0].align === "center", stage + ": a tile's text stays centred");
+    ok(!!L.nested, stage + ": a bar is a table inside its cell");
+    ok(L.nested && L.nested.rows[0].cells.map(function (c) { return c.fill; }).join() === "2E7D52,C28A1E,B23A33", stage + ": a bar keeps its segments' colours", JSON.stringify(L.nested && L.nested.rows[0].cells.map(function (c) { return c.fill; })));
+    var cols = L.nested && L.nested.cols, tot = cols && cols.reduce(function (a, b) { return a + b; }, 0);
+    ok(cols && cols.length === 3 && Math.abs(cols[0] / tot - 0.5) < 0.01 && Math.abs(cols[2] / tot - 1 / 6) < 0.01, stage + ": a bar keeps its segments' widths", JSON.stringify(cols));
+    ok(L.nested && L.nested.rows[0].h > 0 && L.nested.rows[0].h <= 200 && L.nested.rows[0].hRule === "exact", stage + ": a bar keeps its height", JSON.stringify(L.nested && L.nested.rows[0]));
+    ok(L.nested && L.nested.width > 5000 && L.nested.width <= 6100, stage + ": a bar keeps its own width", L.nested && L.nested.width);
+    var sq = L.legend && L.legend.runs.filter(function (r) { return /■/.test(r.t); });
+    ok(sq && sq.length === 2 && sq[0].color === "2E7D52" && sq[1].color === "B23A33", stage + ": the legend's squares keep their colours", JSON.stringify(L.legend && L.legend.runs));
+    ok(!!L.plain && L.plain.header === 1 && !L.plain.borders && !L.plain.rows[0].cells[0].fill, stage + ": an ordinary table with a shaded header row takes the template's look", JSON.stringify(L.plain && { h: L.plain.header, b: L.plain.borders, f: L.plain.rows[0].cells[0].fill }));
+  }
+
+  function drawn(stage, d) {
+    var stageEl = document.getElementById("stage");
+    stageEl.textContent = "";
+    var paper = document.createElement("div");
+    stageEl.appendChild(paper);
+    A.DocPreview.draw(paper, d, {});
+    var cells = paper.querySelectorAll("td.filled");
+    ok(cells.length >= 7, stage + ": the preview draws the fills", cells.length);
+    // The first bar: the first table inside a cell that starts green (an
+    // export's cover has a small table inside a cell of its own).
+    var bar = Array.prototype.filter.call(paper.querySelectorAll("table.nested"), function (t) {
+      var c = t.querySelector("td"); return c && getComputedStyle(c).backgroundColor === "rgb(46, 125, 82)";
+    })[0];
+    ok(!!bar, stage + ": the preview draws a bar's first segment green");
+    var segs = bar ? bar.querySelectorAll("tr:first-child > td") : [];
+    var ws = Array.prototype.map.call(segs, function (s) { return Math.round(s.getBoundingClientRect().width); });
+    ok(segs.length === 3 && ws[0] > 2.5 * ws[2], stage + ": the preview draws the segments at their widths", JSON.stringify(ws));
+    ok(segs.length && segs[0].getBoundingClientRect().height < 16, stage + ": the preview draws a bar as thin as Word does", segs.length && segs[0].getBoundingClientRect().height);
+    var sq = paper.querySelector("span.rc[data-color='B23A33']");
+    ok(!!sq && getComputedStyle(sq).color === "rgb(178, 58, 51)", stage + ": the preview draws the legend's square red");
+    ok(paper.querySelector("table.bare") && getComputedStyle(paper.querySelector("table.bare td")).borderTopStyle === "none", stage + ": the preview draws a chart table without rules");
+    var fig = paper.querySelector("span.rs[data-size='44']");
+    ok(!!fig && Math.abs(parseFloat(getComputedStyle(fig).fontSize) - 29.33) < 0.5, stage + ": the preview draws a tile's figure at 22 pt");
+    var th = paper.querySelector("table:not(.bare) th");
+    ok(!!th && getComputedStyle(th).backgroundColor === "rgb(23, 50, 103)", stage + ": an ordinary table's header is the template's navy");
+  }
+
+  var srcBlob;
+  source().then(function (blob) {
+    srcBlob = blob;
+    return A.DocxImport.read(blob, { name: "colours.docx" });
+  }).then(function (got) {
+    checkLook(look(got.project.blocks), "import");
+    var notes = (got.report.changed || []).concat(got.report.notCarried || []).map(function (e) { return e.code; });
+    ok(notes.indexOf("nested-tables") === -1, "import: a chart's table inside a cell is not reported as lost");
+    var d = M.normalise(got.project);
+    checkLook(look(d.blocks), "model");
+    return M.toFile(d).then(function (file) { return file.text(); }).then(function (text) {
+      var again = M.fromText(text);
+      checkLook(look(again.blocks), "save and load");
+      // The editor's own table tools keep a chart's look as rows and columns are added.
+      var tiles = look(again.blocks).tiles;
+      M.table.addCol(again, tiles.id, 3);
+      ok(tiles.rows[0].cells[3].fill === "F3DEDC", "editor: a column added after a tile takes its fill", JSON.stringify(tiles.rows[0].cells.map(function (c) { return c.fill; })));
+      var plain = look(again.blocks).plain;
+      M.table.addRow(again, plain.id, 1);
+      ok(!plain.rows[1].cells[0].fill, "editor: a row added under a header row does not take the header's look");
+      M.table.addRow(again, tiles.id, 1);
+      ok(tiles.rows[1].cells[0].fill === "E5F1EA", "editor: a row added under the tiles takes their fills");
+      // The editor draws what the model holds.
+      var ed = A.DocRender.blockEl(again, look(again.blocks).bars, { editable: true });
+      var nestedEd = ed.querySelector("table.nested");
+      ok(!!nestedEd && nestedEd.closest("[contenteditable=false]") && !nestedEd.querySelector("[contenteditable=true]"), "editor: a bar is drawn in the editor and not edited there");
+      ok(ed.querySelectorAll("td.filled").length === 5, "editor: the bars' fills are drawn in the editor", ed.querySelectorAll("td.filled").length);
+      drawn("model", M.fromText(text));
+      return A.HouseDocx.buildDocument(M.fromText(text), { issueStatus: "draft" }).then(function (r) { return { blob: r.blob }; });
+    });
+  }).then(function (r) {
+    ok(!!r.blob, "export: the Word file is written");
+    return A.ZipIO.read(r.blob).then(function (list) {
+      var x = A.ZipIO.text(list.filter(function (e) { return e.name === "word/document.xml"; })[0]);
+      ok(/<w:tc>(?:(?!<\/w:tc>)[\s\S])*<w:tbl>/.test(x), "export: a bar is written as a table inside a cell");
+      ok(/w:fill="2E7D52"/.test(x) && /w:fill="C28A1E"/.test(x) && /w:fill="E5F1EA"/.test(x), "export: the fills are written");
+      ok(/<w:color w:val="B23A33"\/>/.test(x), "export: the legend's colours are written");
+      ok(/<w:sz w:val="44"\/>/.test(x), "export: a tile's size is written");
+      ok(/w:hRule="exact"/.test(x), "export: a bar's height is written exactly");
+      ok(/<w:tblBorders>(?:(?!<\/w:tblBorders>)[\s\S])*w:val="none"/.test(x), "export: a chart's table is written without borders");
+      return A.DocxImport.read(r.blob, { name: "export.docx" });
+    });
+  }).then(function (got) {
+    checkLook(look(got.project.blocks.filter(function (b, i, all) { return true; })), "re-import");
+    drawn("re-import", M.normalise(got.project));
+  }).catch(function (e) { ok(false, "threw " + (e && e.message), e && e.stack); }).then(finish);
+})();
+</script>
+</body></html>

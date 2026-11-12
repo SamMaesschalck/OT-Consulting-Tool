@@ -20,9 +20,12 @@
   The page carries the tool's own Content-Security-Policy and expects no
   violation during an import, a picture insert and an export.
 
+  The house front matter of the export (cover, document control, contents
+  list) is recognised by the importer and taken out of the body: the body
+  must read back with nothing before it, nothing under Check first, and
+  Document information as the first document had it.
+
   What is set aside before comparing, and why:
-    - the house front matter of the export (cover, document control, contents
-      list), which the importer reads as ordinary blocks, as the design says;
     - relationship ids (sptK<n>), which are given afresh at each import;
     - the width of a kept object the writer made smaller to fit the page.
 -->
@@ -134,24 +137,22 @@
     M.each(doc, function (b) { if (b.type === "kept") out += b.xml; });
     return out;
   }
-  // The export's own front matter, read back as blocks: the cover (a table)
-  // and a page break, the document control heading and table and a page
-  // break, then the contents list when there is one. A short document opens
-  // with one line under its title instead.
-  var CONTROL = "Document control and confidentiality";
+  // A report's cover, document control and contents list are recognised and
+  // taken out of the body by the importer, so its body is the blocks as read.
+  // A short document opens with one line under its title instead.
   function bodyOf(doc, first) {
-    var bl = doc.blocks.slice(), i = 0;
+    var bl = doc.blocks.slice();
     if (first.kind === "short") return bl.slice(1);
-    while (i < bl.length && !(bl[i].type === "heading" && M.text(bl[i]) === CONTROL)) i++;
-    i++;
-    if (bl[i] && bl[i].type === "table") i++;
-    if (bl[i] && bl[i].type === "pageBreak") i++;
-    if (first.options.contents && bl[i] && bl[i].type === "heading" && M.text(bl[i]) === "Contents") {
-      i++;
-      while (i < bl.length && bl[i].type === "paragraph") i++;
-      if (bl[i] && bl[i].type === "pageBreak") i++;
-    }
-    return bl.slice(i);
+    return bl;
+  }
+  // Document information as the cover and document control print it.
+  function printedInfo(info) {
+    var o = {};
+    ["title", "docType", "reference", "client", "site", "author", "qaReviewBy", "authorisedBy", "issuedTo", "issuedDate"].forEach(function (k) { o[k] = String(info[k] || "").trim(); });
+    o.revision = String(info.revision || "").trim() || "0.1";
+    o.classification = String(info.classification || "").trim() || "Confidential";
+    o.date = String(info.issuedDate || "").trim() || String(info.date || "").trim();
+    return o;
   }
   function diff(a, b) {
     var out = [], n = Math.max(a.length, b.length);
@@ -183,6 +184,18 @@
           var a = first.blocks.map(function (b) { return brief(b, o1); });
           var b = body2.map(function (x, i) { return brief(x, { media: m2, fitted: fittedAt[i] ? [x.id] : [], sizes: opts.sizes }); });
           ok(JSON.stringify(a) === JSON.stringify(b), label + ": the export reads back as the same " + a.length + " blocks", diff(a, b));
+          if (first.kind !== "short") {
+            var rep2 = second.importReport || {};
+            // Check first lists only the document's own blocks before its first heading, if it has any.
+            var lead = 0;
+            while (lead < first.blocks.length && first.blocks[lead].type !== "heading") lead++;
+            var wantCheck = lead > 0 && lead < first.blocks.length ? ["front-matter:" + lead] : [];
+            var gotCheck = (rep2.toCheck || []).map(function (e) { return e.code + ":" + e.count; });
+            ok(!!rep2.front && JSON.stringify(gotCheck) === JSON.stringify(wantCheck), label + ": its own cover and document control are recognised, and nothing of theirs is under Check first",
+              JSON.stringify(gotCheck) + " against " + JSON.stringify(wantCheck));
+            ok(JSON.stringify(printedInfo(first.info)) === JSON.stringify(printedInfo(second.info)), label + ": Document information reads back as it was",
+              JSON.stringify(printedInfo(second.info)) + " against " + JSON.stringify(printedInfo(first.info)));
+          }
           ok(JSON.stringify(footnoteTexts(first)) === JSON.stringify(footnoteTexts(second)), label + ": the same footnotes, in order", JSON.stringify(footnoteTexts(second)));
           var k1 = keptKinds(first), k2 = keptKinds(second);
           ok(JSON.stringify(k1) === JSON.stringify(k2), label + ": the same " + k1.length + " kept objects, of the same kinds", k1.join(",") + " -> " + k2.join(","));

@@ -13,6 +13,7 @@ It is a module like the others: it runs alone, and it depends on no other module
 | `index.html`, `js/app.js` | The app: Report, Engagement, Checklist, Automatic checks, Previous round, Summary and verdict, About. |
 | `js/checks.js` | The automatic checks, pure functions of a pack. |
 | `js/review-core.js` | The rules of a review, synced from `shared/`. |
+| `js/hero-asset.js` | The house cover's picture and logo card, for the cover drawn on the Report page, synced from `shared/brand/`. |
 | `css/spt-theme.css`, `css/review.css` | The shared design system (synced from `shared/`), and this tool's own styles. |
 | `data/checklists.json` | The review checklist: common items, per scoring family and per instrument. Draft wording for the team to agree. After editing, run `scripts/build-data.ps1`. |
 | `data/review-pack.json`, `data/review-file.json` | Copies of the contracts, synced from `contracts/`. |

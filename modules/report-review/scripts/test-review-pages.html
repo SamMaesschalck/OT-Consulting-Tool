@@ -1,0 +1,299 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Review tool: the report as A4 pages with the house cover</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The Report page shows the report as the document tool's Preview shows a
+  document: the house cover, drawn from the pack, then white A4 sheets. This
+  page checks the cover is drawn from the pack's data (and from the Word
+  file's own cover words where the pack has them), that every block sits on a
+  sheet (the front matter on a sheet of its own, a sheet per top-level
+  section), that comments, their anchors (cell, row and column, picture) and
+  the keyboard work on the paged view as before, that find leaves the drawn
+  cover alone, that the paper stays white in the dark theme, and that a 900
+  px window does not scroll sideways.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1400px;height:900px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  var frame = document.getElementById("f");
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 20);
+      })();
+    });
+  }
+  var errors = [];
+  function load(q) {
+    return new Promise(function (res) {
+      frame.onload = function () {
+        var w = frame.contentWindow;
+        w.confirm = function () { return true; }; w.alert = function () {};
+        w.addEventListener("error", function (e) { errors.push(e.message); });
+        poll(function () { return w.ReviewTool; }).then(function () { res(w); });
+      };
+      frame.src = "../index.html" + (q || "");
+    });
+  }
+  function clean() { try { Object.keys(localStorage).forEach(function (k) { if (/^spt-review:/.test(k)) localStorage.removeItem(k); }); } catch (e) {} }
+  clean();
+  try { localStorage.setItem("spt-review:reviewer:v1", "P. Ages"); localStorage.setItem("ot-theme", "light"); } catch (e) {}
+
+  var W, D, R;
+  function q(s) { return D.querySelector(s); }
+  function all(s) { return Array.prototype.slice.call(D.querySelectorAll(s)); }
+  function block(id) { return q('#rr-paper [data-block-id="' + id + '"]'); }
+  function sheetOf(el) { return el && el.closest(".rr-sheet"); }
+  function key(el, k) { var e = new W.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e; }
+  function type(el, v) { el.value = v; el.dispatchEvent(new W.Event("input", { bubbles: true })); }
+  function norm(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
+  function last() { var c = R.state.review.comments; return c[c.length - 1]; }
+  function add(text) { type(q(".rr-c-text"), text); q(".rr-c-add").click(); return last(); }
+
+  var PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  // A pack with no front matter at all: the cover can only come from the
+  // engagement and the document's title.
+  function plainPack() {
+    function para(id, t, sec) { return { id: id, type: "paragraph", text: t, runs: [{ t: t }], red: false, front: false, sectionKey: sec, sectionTitle: sec }; }
+    function head(id, t, sec) { return { id: id, type: "heading", level: 1, text: t, runs: [{ t: t }], red: false, front: false, sectionKey: sec, sectionTitle: t }; }
+    return { schema: "spt-review-pack/1.0", packId: "rp-pages", reviewId: "rv-pages", round: 1, createdAt: "2026-11-12T10:00:00Z", sourceTool: { product: "OT Cyber Risk Assessment Tool", version: "0.7.0" },
+      engagement: { client: "Northfield Water", site: "Ashby treatment works", consultant: "R. Author", instrumentId: "risk-assessment", instrumentTitle: "IEC 62443-3-2 risk assessment", scoringFamily: "risk-assessment", targetLabel: "Zone or conduit",
+        documentControl: { documentRevision: "0.3", issuedDate: "2026-11-20", confidentiality: "Commercial in confidence", qaReviewBy: "" } },
+      documents: [{ title: "Detailed risk assessment for the Ashby works", targetName: "", contentHash: "h1:x", media: { "p1.png": PNG },
+        blocks: [head("d0-b1", "Executive summary", "executive-summary"), para("d0-b2", "The works has two zones.", "executive-summary"),
+          { id: "d0-b3", type: "image", media: "p1.png", width: 420, height: 200, front: false, sectionKey: "executive-summary", sectionTitle: "Executive summary" },
+          head("d0-b4", "Zones and conduits", "zones"), para("d0-b5", "Zone 1 is the control network.", "zones")] }],
+      items: [], basisOfAssessment: { interviews: [], documents: [], observations: [] }, facts: { perTarget: [] }, previousRound: { comments: [], verdicts: [] } };
+  }
+
+  load("?tour=1").then(function (w) {
+    W = w; D = w.document; R = w.ReviewTool;
+    return poll(function () { return R.state.pack && q("#rr-paper .rr-sheet"); });
+  }).then(function () {
+    var pack = R.state.pack, e = pack.engagement, dc = e.documentControl || {}, doc = pack.documents[0], blocks = doc.blocks;
+    var paper = q("#rr-paper");
+
+    // ---- the cover, drawn from the pack ----
+    var cover = q("#rr-paper .rr-cover-page");
+    ok(cover && paper.firstElementChild === cover && cover.getAttribute("data-part") === "cover", "the report opens on a cover sheet");
+    var ct = norm(cover && cover.innerText);
+    ok(ct.indexOf(e.client) !== -1 && ct.indexOf(e.site) !== -1 && ct.indexOf(e.consultant) !== -1 && ct.indexOf(dc.confidentiality) !== -1,
+      "it names the customer, the site, the author and the classification from the pack's engagement", ct.slice(0, 200));
+    ok(/OT CYBER SECURITY ASSESSMENT/.test(ct) && ct.indexOf(norm(e.instrumentTitle)) !== -1, "with the document type and the title, as the Word cover prints them");
+    var front = blocks.filter(function (b) { return b.front; });
+    var strip = front.filter(function (b) { return /^ISSUE\s/.test(norm(b.text)); })[0];
+    ok(strip && ct.indexOf(norm(strip.text).replace(/^ISSUE\s+/, "").replace(/\s+AUTHOR.*$/, "")) !== -1 && ct.indexOf(dc.documentRevision) !== -1, "and the issue, as the Word file's strip has it");
+    var imgs = all("#rr-paper .rr-cover-page img");
+    ok(imgs.length === 2 && imgs.every(function (i) { return /^data:image\/(jpeg|png);base64,/.test(i.getAttribute("src")); }) && q(".rr-cover-page .rr-cv-logo"),
+      "on the house cover picture, with the logo card, both from the tool's own assets");
+    ok(!cover.hasAttribute("aria-hidden") && q(".rr-cv-bg").getAttribute("alt") === "" && !cover.querySelector("button"), "its words reach a screen reader; the picture behind is decorative");
+    var cr = cover.getBoundingClientRect();
+    ok(Math.abs(cr.width - 794) < 2 && Math.abs(cr.height / cr.width - 1123 / 794) < 0.01, "an A4 page at its printed size", Math.round(cr.width) + " x " + Math.round(cr.height));
+
+    // ---- the front matter, and the pages ----
+    var fs = cover, notes = q("#rr-paper .rr-cover-notes");
+    ok(!q('#rr-paper .rr-sheet[data-part="front"]') && !q(".rr-cover-other"), "there is no separate sheet for the cover's words, and nothing left over");
+    ok(front.length > 3 && front.every(function (b) { var el = block(b.id); return el && cover.contains(el) && el.classList.contains("rr-cv-line"); }), "every front-matter block is a line on the drawn cover (" + front.length + ")");
+    var titleBs = front.filter(function (b) { return b.type === "paragraph" && norm(e.instrumentTitle).indexOf(norm(b.text)) !== -1 && norm(b.text).length > 5; });
+    ok(titleBs.length === 2 && titleBs.every(function (b) { var el = block(b.id); return el.parentNode.classList.contains("rr-cv-title") && norm(el.textContent) === norm(b.text); }), "the title's lines are the title's blocks, as printed");
+    var typeB = front.filter(function (b) { return norm(b.text) === "OT CYBER SECURITY ASSESSMENT"; })[0];
+    ok(typeB && block(typeB.id).classList.contains("rr-cv-type") && block(strip.id).classList.contains("rr-cv-strip") && block(front.filter(function (b) { return b.type === "image"; })[0].id).querySelector("img.rr-cv-logo"),
+      "and so are the document type, the issue strip and the logo");
+    ok(notes && cover.nextElementSibling === notes && all(".rr-cover-slot").length === front.length && all(".rr-cover-slot").every(function (s) { return s.hidden; }), "under the cover, a hidden place for each line's comments");
+    var body = blocks.filter(function (b) { return !b.front; });
+    var pages = all('#rr-paper .rr-sheet[data-part="page"]');
+    ok(body.every(function (b) { var s = sheetOf(block(b.id)); return s && s.getAttribute("data-part") === "page"; }), "every other block sits on a page sheet (" + body.length + ")");
+    var tops = body.filter(function (b) { return b.type === "heading" && (b.level || 1) === 1; });
+    ok(pages.length === tops.length && pages.every(function (p, i) { return p.querySelector(".rr-block") === block(tops[i].id); }), "a sheet per top-level heading, each starting with it (" + pages.length + " sheets)");
+    ok(all("#rr-paper .rr-block").length === blocks.length && all("#rr-paper > *").every(function (n) { return n.classList.contains("rr-sheet") || n === notes; }), "nothing is left off a sheet");
+    var pr = pages[0].getBoundingClientRect(), pcs = W.getComputedStyle(pages[0]);
+    ok(Math.abs(pr.width - 794) < 2 && parseFloat(pcs.minHeight) === 1123 && pcs.paddingLeft === "96px" && pcs.paddingTop === "96px", "a page is A4 wide with the template's 1 inch margins", pr.width + " " + pcs.paddingLeft);
+    ok(pcs.backgroundColor === "rgb(255, 255, 255)" && pcs.fontSize === "14.67px", "white, in the house body size");
+    var h1 = block(tops[1].id).querySelector("h1"), hcs = W.getComputedStyle(h1);
+    ok(hcs.color === "rgb(23, 50, 103)" && hcs.fontWeight === "400" && hcs.fontSize === "21.33px", "headings in the house style", hcs.color + " " + hcs.fontWeight + " " + hcs.fontSize);
+    ok(/Word decides where pages break/.test(q("#rr-pages-note").textContent), "and the page says Word decides where pages break");
+    var picB = body.filter(function (b) { return b.type === "image" && Number(b.width) > 0; })[0], pic = picB && block(picB.id).querySelector("img");
+    ok(pic && pic.style.width === Math.round(picB.width) + "px" && pic.getBoundingClientRect().width <= pr.width - 190, "a picture is shown at its size in the Word file, within the page", picB && (picB.width + " " + pic.style.width));
+    var prevs = all("#rr-paper [data-prev-id]");
+    ok(prevs.length >= 1 && prevs.every(function (p) { var s = sheetOf(p); return s && s.getAttribute("data-part") !== "cover"; }), "earlier comments sit beside their text, on its sheet");
+
+    // ---- comments and their anchors on the pages ----
+    var para = body.filter(function (b) { return b.type === "paragraph" && b.text.length > 60 && !b.red; })[3];
+    var pEl = block(para.id), pSheet = sheetOf(pEl);
+    pEl.click();
+    ok(q(".rr-composer") && pEl.nextElementSibling === q(".rr-composer") && sheetOf(q(".rr-composer")) === pSheet, "clicking a paragraph opens the box under it, on the same page");
+    var c1 = add("On a paragraph on a page.");
+    ok(c1.anchor.blockId === para.id && c1.anchor.quote === para.text && c1.anchor.sectionKey === para.sectionKey && block(para.id) === pEl && sheetOf(pEl) === pSheet && pSheet.isConnected,
+      "the comment is anchored to its block, and the page was not drawn again");
+    ok(q('[data-comment-id="' + c1.id + '"]') && sheetOf(q('[data-comment-id="' + c1.id + '"]')) === pSheet && pEl.classList.contains("has-comment"), "and shows beside it");
+    var tb = body.filter(function (b) { return b.type === "table" && b.rows.length > 2 && b.rows[1].cells.length > 1; })[0];
+    var td = block(tb.id).querySelector('td[data-cell="1.1"]');
+    td.click();
+    var c2 = add("On a cell.");
+    ok(c2.anchor.cell && c2.anchor.cell.row === 1 && c2.anchor.cell.col === 1 && c2.anchor.rowKey === norm(tb.rows[1].cells[0].text).slice(0, 200) && c2.anchor.colHead === norm(tb.rows[0].cells[1].text).slice(0, 200),
+      "a cell's comment keeps its row and column (rowKey, colHead)", JSON.stringify([c2.anchor.rowKey, c2.anchor.colHead]));
+    var imgB = blocks.filter(function (b) { return b.type === "image"; })[1] || picB;
+    block(imgB.id).click();
+    var c3 = add("On a picture.");
+    ok(c3.anchor.media === imgB.media && c3.anchor.blockId === imgB.id, "a picture's comment names its media");
+    var fp = front.filter(function (b) { return b.type === "paragraph" && norm(b.text) === norm(e.client); })[0];
+    var coverKeep = cover, tl = block(titleBs[0].id);
+    tl.click();
+    var cz = q(".rr-composer"), slot = cz && cz.previousElementSibling;
+    ok(cz && cz.parentNode === notes && slot && slot.classList.contains("rr-cover-slot") && !slot.hidden && slot.textContent === "On the cover: title, line 1" && tl.classList.contains("open"),
+      "clicking the cover's title opens the box under the cover, saying which line it is on", slot && slot.textContent);
+    var c4t = add("The title runs too long.");
+    ok(c4t.anchor.blockId === titleBs[0].id && c4t.anchor.quote === titleBs[0].text && c4t.anchor.kind === "block" && tl.classList.contains("has-comment") && block(titleBs[0].id) === tl && q(".rr-cover-page") === coverKeep,
+      "the comment is on the title's block, as a click on the block was, and the cover is not drawn again");
+    ok(q('[data-comment-id="' + c4t.id + '"]').closest(".rr-side").previousElementSibling === slot && !slot.hidden, "it is listed under the cover, after its line's name");
+    // Words selected on the cover say which words the comment is about.
+    var cl = block(fp.id), rg = D.createRange();
+    rg.setStart(cl.firstChild, 0); rg.setEnd(cl.firstChild, 4);
+    W.getSelection().removeAllRanges(); W.getSelection().addRange(rg);
+    cl.click();
+    ok(R.state.composer && R.state.composer.anchor.blockId === fp.id && R.state.composer.anchor.selection === norm(e.client).slice(0, 4), "selecting words on the cover and clicking comments on those words", R.state.composer && R.state.composer.anchor.selection);
+    var c4 = add("The client's name on the cover.");
+    W.getSelection().removeAllRanges();
+    var slots = all(".rr-cover-slot").filter(function (s) { return !s.hidden; });
+    ok(c4.anchor.blockId === fp.id && slots.length === 2 && slots[0].textContent === "On the cover: title, line 1" && slots[1].textContent === "On the cover: client" &&
+      slots[0].compareDocumentPosition(slots[1]) & 4, "comments on the cover are listed in cover order");
+    q('[data-comment-id="' + c4t.id + '"] .rr-del').click();
+    ok(slots[0].hidden && !tl.classList.contains("has-comment"), "deleting the title's comment hides its place again");
+    q("#toast .rr-toast-act").click();
+    ok(!slots[0].hidden && q('[data-comment-id="' + c4t.id + '"]'), "and Undo brings it back");
+    ok(R.state.review.comments.length === 5 && q('.nav-item[data-page="report"] .badge').textContent === "5", "and the sidebar counts all five");
+    R.jumpToBlock(0, fp.id);
+    ok(D.activeElement === cl && cl.classList.contains("flash"), "Go to (as a check or an earlier comment uses it) lands on the cover's line");
+    ok(W.getComputedStyle(cl).color === "rgb(199, 216, 232)", "and the line keeps its colour on the cover while marked");
+
+    // ---- the keyboard on the pages ----
+    var els = all("#rr-paper .rr-block");
+    ok(all('#rr-paper .rr-block[tabindex="0"]').length === 1, "the report is still one stop for Tab");
+    var lastFront = block(front[front.length - 1].id), firstBody = block(body[0].id);
+    block(front[0].id).focus();
+    var walked = [D.activeElement];
+    for (var i = 1; i < front.length; i++) { key(D.activeElement, "ArrowDown"); walked.push(D.activeElement); }
+    ok(walked.every(function (el, i) { return el === block(front[i].id); }), "Down walks the cover's lines in order, logo to address");
+    var k1 = key(lastFront, "ArrowDown");
+    ok(D.activeElement === firstBody && k1.defaultPrevented && firstBody.tabIndex === 0 && lastFront.tabIndex === -1, "and from the cover's last line to the document control page");
+    tl.focus(); key(tl, "Enter");
+    ok(R.state.composer && R.state.composer.anchor.blockId === titleBs[0].id, "Enter on a cover line comments on it");
+    q(".rr-c-cancel").click();
+    var endOfPage = pages[0].querySelectorAll(".rr-block"), lastOnPage = endOfPage[endOfPage.length - 1];
+    lastOnPage.focus();
+    key(lastOnPage, "ArrowDown");
+    ok(D.activeElement === block(tops[1].id) && sheetOf(D.activeElement) === pages[1], "and from the end of one page to the start of the next");
+    key(D.activeElement, "ArrowUp");
+    ok(D.activeElement === lastOnPage, "Up goes back across the page edge");
+    var secs = blocks.filter(function (b) { return b.type === "heading" && !b.sub; });
+    block(secs[2].id).focus();
+    key(block(secs[2].id), "PageDown");
+    ok(D.activeElement === block(secs[3].id), "Page Down still goes to the next section's heading");
+    var tEl = block(tb.id);
+    tEl.focus(); key(tEl, "Enter");
+    ok(D.activeElement && D.activeElement.nodeName === "TD" && tEl.contains(D.activeElement), "Enter goes into a table's cells");
+    key(D.activeElement, "Escape");
+    ok(D.activeElement === tEl, "and Escape comes back out");
+    ok(els[0] === block(blocks[0].id) && cover.contains(els[0]), "the first block is the cover's first line");
+
+    // ---- find ----
+    var input = q("#rr-report-find");
+    input.value = e.client;
+    input.dispatchEvent(new W.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    var marks = all("mark.rr-find");
+    ok(marks.length > 1 && marks.some(function (m) { return cl.contains(m); }) && marks.some(function (m) { return sheetOf(m) && sheetOf(m).getAttribute("data-part") === "page"; }) && !marks.some(function (m) { return m.closest(".rr-cover-slot, .rr-side"); }),
+      "find marks the client's name on the cover and on the pages (" + marks.length + ")");
+    ok(W.getComputedStyle(marks.filter(function (m) { return cl.contains(m); })[0]).color === "rgb(26, 37, 51)", "a match on the cover is dark on its yellow, so it reads");
+    input.dispatchEvent(new W.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    ok(all("mark.rr-find").length === 0, "Escape clears them");
+
+    // ---- dark theme ----
+    var keepPage = pages[2];
+    q("#btn-theme").click();
+    var html = D.documentElement;
+    if (html.getAttribute("data-theme") !== "dark") q("#btn-theme").click();
+    ok(html.getAttribute("data-theme") === "dark", "the dark theme is on");
+    var dcs = W.getComputedStyle(pages[2]);
+    ok(dcs.backgroundColor === "rgb(255, 255, 255)" && dcs.color === "rgb(26, 37, 51)", "the pages stay white paper, as printed", dcs.backgroundColor + " " + dcs.color);
+    ok(W.getComputedStyle(block(tops[1].id).querySelector("h1")).color === "rgb(23, 50, 103)" && W.getComputedStyle(D.body).backgroundColor !== "rgb(255, 255, 255)", "with the house heading colour, on the dark page around them");
+    ok(q("#rr-paper .rr-cover-page img.rr-cv-bg") && W.getComputedStyle(q(".rr-cv-type")).color === "rgb(127, 196, 232)", "and the cover as it prints");
+    ok(pages[2] === keepPage && keepPage.isConnected, "changing the theme does not draw the report again");
+    q("#btn-theme").click();
+
+    // ---- a narrow window ----
+    frame.style.width = "900px";
+    return wait(150);
+  }).then(function () {
+    var main = q("#main");
+    var page = q('#rr-paper .rr-sheet[data-part="page"]'), cover = q(".rr-cover-page");
+    ok(main.scrollWidth <= main.clientWidth + 1, "at 900 px nothing scrolls sideways", main.scrollWidth + " > " + main.clientWidth);
+    ok(page.getBoundingClientRect().right <= main.getBoundingClientRect().right && Math.abs(cover.getBoundingClientRect().height / cover.getBoundingClientRect().width - 1123 / 794) < 0.01, "the pages and the cover fit");
+    var c = R.state.review.comments[0];
+    ok(q('[data-comment-id="' + c.id + '"]') && q('[data-comment-id="' + c.id + '"]').getBoundingClientRect().right <= main.getBoundingClientRect().right, "and a comment beside its text still shows in full");
+    frame.style.width = "700px";
+    return wait(150);
+  }).then(function () {
+    var main = q("#main"), cover = q(".rr-cover-page"), page = q('#rr-paper .rr-sheet[data-part="page"]');
+    ok(main.scrollWidth <= main.clientWidth + 1 && cover.getBoundingClientRect().width < 700 && page.getBoundingClientRect().width < 700, "narrower still, the pages and the cover shrink with the window", Math.round(cover.getBoundingClientRect().width) + " " + main.scrollWidth + "/" + main.clientWidth);
+    frame.style.width = "1400px";
+    R.state.dirty = false;
+    // ---- an earlier comment on the cover, and cover text the cover does not draw ----
+    var p2 = JSON.parse(JSON.stringify(W.SPT_REVIEW_DEMO_PACK)), bl = p2.documents[0].blocks;
+    p2.packId = "rp-pages-2";
+    var tB = bl.filter(function (b) { return b.front && b.type === "paragraph" && /System$/.test(norm(b.text)); })[0];
+    var at = bl.map(function (b) { return /^ISSUE\s/.test(norm(b.text)); }).indexOf(true);
+    bl.splice(at + 1, 0, { id: "d0-bx", type: "paragraph", text: "Prepared for the board", runs: [{ t: "Prepared for the board" }], red: false, front: true, sectionKey: "", sectionTitle: "" });
+    p2.previousRound.comments.push({ comment: { id: "pcov", reviewer: "P. Earlier", createdAt: "2026-11-01T10:00:00Z", updatedAt: "2026-11-01T10:00:00Z", severity: "should-fix",
+      anchor: { documentIndex: 0, documentTitle: p2.documents[0].title, kind: "block", sectionKey: "", sectionTitle: "", blockId: tB.id, blockType: "paragraph", quote: tB.text, cell: null },
+      text: "The title is too long for the cover.", suggestion: null, relatesTo: null, check: null }, status: "wontchange", reason: "It is the standard's own title.", round: 1, replies: [], confirmedBy: [] });
+    window.__tB = tB.id;
+    R.loadTexts([{ name: "p2.json", text: JSON.stringify(p2) }]);
+    return poll(function () { return R.state.pack && R.state.pack.packId === "rp-pages-2" && q("#rr-paper .rr-cover-page"); });
+  }).then(function () {
+    var pv = q('#rr-paper [data-prev-id="pcov"]'), tl = block(window.__tB);
+    var slot = pv && pv.closest(".rr-side").previousElementSibling;
+    ok(pv && pv.closest(".rr-cover-notes") && slot && slot.classList.contains("rr-cover-slot") && !slot.hidden && slot.textContent === "On the cover: title, line 1",
+      "an earlier comment on the cover's title shows under the cover, after the title's name", slot && slot.textContent);
+    ok(/earlier comment/.test((D.getElementById((tl.getAttribute("aria-describedby") || "").split(" ")[0]) || {}).textContent || ""), "and the title says it has one, for a screen reader");
+    var ot = block("d0-bx"), other = q(".rr-cover-other");
+    ok(ot && other && other.contains(ot) && other.parentNode === q(".rr-cover-notes") && /Other cover text/.test(other.textContent) && !q(".rr-cover-page").contains(ot), "cover text the cover does not draw is under it, as Other cover text");
+    ot.click();
+    ok(R.state.composer && R.state.composer.anchor.blockId === "d0-bx" && ot.nextElementSibling === q(".rr-composer"), "and takes a comment like any block");
+    q(".rr-c-cancel").click();
+    R.state.dirty = false;
+    // ---- a pack with no front matter: the cover from the engagement alone ----
+    R.loadTexts([{ name: "plain.json", text: JSON.stringify(plainPack()) }]);
+    return poll(function () { return R.state.pack && R.state.pack.packId === "rp-pages" && q("#rr-paper .rr-cover-page"); });
+  }).then(function () {
+    var ct = norm(q(".rr-cover-page").innerText), lines = all(".rr-cv-title > div").map(function (d) { return d.textContent; });
+    ok(/OT CYBER RISK ASSESSMENT/.test(ct), "a risk pack's cover says it is a risk assessment");
+    ok(lines.length === 2 && lines.join(" ") === "Detailed risk assessment for the Ashby works", "the title is the document's, set on two lines", JSON.stringify(lines));
+    ok(ct.indexOf("Northfield Water") !== -1 && ct.indexOf("Ashby treatment works") !== -1 && ct.indexOf("R. Author") !== -1 && ct.indexOf("Commercial in confidence") !== -1 && /ISSUE\s*0\.3 · 2026-11-20/.test(ct),
+      "the customer, site, author, classification and issue come from the engagement and document control", ct);
+    ok(!q(".rr-cover-notes") && !q(".rr-cover-page .rr-block") && all('#rr-paper .rr-sheet[data-part="page"]').length === 2, "with no front matter nothing on the cover is a block, and two sections make two pages");
+    var img = q('#rr-paper [data-block-id="d0-b3"] img');
+    ok(img && img.style.width === "420px" && Math.abs(img.getBoundingClientRect().width - 420) < 1, "a picture narrower than the page is shown at its own size");
+    R.state.dirty = false;
+    ok(errors.length === 0, "no script errors", errors.join(" | "));
+  }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
+    clean();
+    try { localStorage.removeItem("ot-theme"); } catch (e) {}
+    finish();
+  });
+})();
+</script>
+</body></html>

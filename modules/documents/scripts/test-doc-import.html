@@ -272,7 +272,7 @@
     var lv = numbering.level("3", 0);
     ok(lv && lv.startOverride === true && lv.start === 1 && numbering.level("4", 0).start === 5, "parseNumbering: start and startOverride are read");
     ok(numbering.level("8", 0, styles).numFmt === "decimal", "parseNumbering: a list style link is followed to the real list");
-    ok(I.CODES.changed.indexOf("list-numbering") >= 0 && I.CODES.toCheck[0] === "front-matter" && I.CODES.notCarried.indexOf("unreadable-part") >= 0, "CODES lists every report code by list");
+    ok(I.CODES.changed.indexOf("list-numbering") >= 0 && I.CODES.toCheck.indexOf("front-matter") >= 0 && I.CODES.toCheck.indexOf("cover-like") >= 0 && I.CODES.notCarried.indexOf("unreadable-part") >= 0, "CODES lists every report code by list");
   });
 
   // ---- runs ---------------------------------------------------------------------------------------
@@ -303,8 +303,8 @@
     }).then(function (r) {
       var b = r.project.blocks;
       eq(b[0].runs, [{ t: "a", b: true }, { t: "bcc2" }, { t: "d", b: true }, { t: "e", i: true, u: true }, { t: "f" }, { t: "g", s: true }, { t: "h", sup: true },
-        { t: "i", sub: true }, { t: "code", code: true }, { t: "red", red: true }, { t: "blue" }],
-        "runs: toggles (absent, 1, true, on are on; 0, false, off are off), underline none, strike, super and subscript, code font, red; other colours, sizes and highlights are not carried");
+        { t: "i", sub: true }, { t: "code", code: true }, { t: "red", red: true }, { t: "blue", color: "0000FF" }],
+        "runs: toggles (absent, 1, true, on are on; 0, false, off are off), underline none, strike, super and subscript, code font, red; a colour of the run's own is carried (contracts/document.json runs.color), sizes and highlights outside a chart's table are not");
       eq(b[1].runs, [{ t: "x", b: true }, { t: "y" }, { t: "z", b: true, i: true }], "runs: formatting from the paragraph style, switched off on a run, and from a character style");
       eq(b[2].runs, [{ t: "A\tB\nC-DE□©\nF" }], "runs: tab, line break, non-breaking hyphen, soft hyphen dropped, a symbol-font character as a box, an ordinary symbol as itself");
       ok(count(r.report, "symbols") === 1, "runs: the symbol that could not be carried is counted");

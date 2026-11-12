@@ -24,7 +24,7 @@
     var nav = document.querySelectorAll("#sidebar .nav-item").length;
     ok(nav > 0, "sidebar renders nav items after boot (" + nav + ")");
     ok(document.querySelector("#main").children.length > 0, "main pane renders content");
-    ok(document.body.textContent.indexOf("Import risk context") >= 0 || true, "boot completed without throwing");
+    ok(document.querySelector("#main").textContent.indexOf("Import risk context") >= 0, "the 3-3 engagement page renders its Target SL card, with Import risk context");
 
     // Preparation guidance: data present for every active instrument (or default),
     // rendered on the engagement page, and never auto-added to the basis register.

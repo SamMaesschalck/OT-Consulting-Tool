@@ -26,11 +26,10 @@
   check("contract accepts spt-risk-context/1.3", accepted.indexOf("spt-risk-context/1.3") >= 0);
   check("contract accepts spt-risk-context/1.4", accepted.indexOf("spt-risk-context/1.4") >= 0);
   check("contract copy itself is at 1.4", contract && contract.schema === "spt-risk-context/1.4");
-  // Replicate the importer's accept predicate (ui.js loadRiskContextFromFile) exactly.
-  function accepts(schema) { return accepted.indexOf(schema) >= 0; }
-  check("predicate: 1.1 accepted", accepts("spt-risk-context/1.1") === true);
-  check("predicate: 1.0 accepted", accepts("spt-risk-context/1.0") === true);
-  check("predicate: bogus rejected", accepts("spt-risk-context/9.9") === false);
+  // The importer (ui.js loadRiskContextFromFile) accepts exactly the schemas
+  // this contract lists, checked above. Its real accept and refuse paths are
+  // driven through the file input by test-risk-context-import-ui.html; a copy
+  // of the predicate tested here proved nothing about them.
 
   // A representative v1.1 export from the risk tool (scalar slTarget + per-FR vector).
   var ctx11 = {
@@ -123,7 +122,6 @@
   // ---- A v1.0 file (scalar-only) still imports ----
   var ctx10 = { schema: "spt-risk-context/1.0", generatedBy: "spt-risk-tool/0.1", generatedOn: "2026-07-02",
     suc: { name: "Legacy SuC" }, zones: [{ id:"Z1", name:"Zone one", safetyRelated:false, slSuggested:2, slTarget:2, justification:"x", assets:[] }], conduits: [] };
-  check("v1.0 schema is accepted by the predicate", accepts(ctx10.schema));
   E.newProject();
   E.activateInstrument("iec-62443-3-3");
   E.setRiskContext(ctx10, { scope: true, zoneIds: ["Z1"], fileName: "legacy.json" });
@@ -140,14 +138,12 @@
   ctx14.zones[0].countermeasures[0].existing = true;
   ctx14.zones[1].threats[0].disposition = "sl-t"; ctx14.zones[1].threats[0].residualRisk = null; ctx14.zones[1].threats[0].acceptance = "";
   ctx14.approval = { name: ".. Patel", role: "Plant Manager", date: "2026-07-01", statement: ".pproved.", approved: true };
-  check("v1.4 schema is accepted by the predicate", accepts(ctx14.schema));
   E.newProject();
   E.activateInstrument("iec-62443-3-3");
   E.setRiskContext(ctx14, { scope: true, zoneIds: ["Z1", "Z2"], fileName: "riverside-14.json" });
   var ass14 = A.Storage.findAssessment({ assessments: E.state.assessments }, "iec-62443-3-3");
   check("v1.4 riskContext stored with residual + existing-control zone provenance intact",
     ass14.riskContext && ass14.riskContext.zones[0].threats[0].residualRisk === "medium" && ass14.riskContext.zones[0].countermeasures[0].existing === true);
-  check("v1.4 file carries the asset-owner sign-off (provenance the 3-3 importer may ignore)", ctx14.approval.approved === true);
   var t14 = E.state.engagement.targets.filter(function (t) { return t.zoneId === "Z1"; })[0];
   check("v1.4 import scopes and targets exactly as 1.1 (new fields are context only)",
     t14 && A.Scoring.effectiveTargetSL(ass14.targetProfile, "FR1", t14.id) === 3);
