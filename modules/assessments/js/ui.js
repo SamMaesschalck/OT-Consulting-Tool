@@ -655,8 +655,14 @@ window.App.UI = (function () {
     var b = $("btn-save");
     if (!b) return;
     b.textContent = dirtySinceSave ? "Save*" : "Save";
-    if (dirtySinceSave) { b.classList.add("btn-unsaved"); b.title = "You have unsaved changes. Click to download the project file."; }
-    else { b.classList.remove("btn-unsaved"); b.title = "Download the project as a JSON file (all changes saved)."; }
+    // The tooltip follows what Save will do: overwrite the open file, ask where
+    // to save the first time, or (no file dialogs here) download a copy.
+    var what;
+    if (!STG.supportsFilePickers()) what = "Download the project as a new JSON file. This browser cannot save over the original.";
+    else if (STG.currentFileHandle()) what = "Save over the project file. Shift+click to save a copy as a new file.";
+    else what = "Save the project to a file. You choose where the first time.";
+    b.classList.toggle("btn-unsaved", dirtySinceSave);
+    b.title = (dirtySinceSave ? "You have unsaved changes. " : "All changes saved. ") + what;
   }
   function markDirty() { if (!dirtySinceSave) { dirtySinceSave = true; updateSaveButton(); } }
   function markClean() { dirtySinceSave = false; updateSaveButton(); }
@@ -860,7 +866,7 @@ window.App.UI = (function () {
             toast("Downloaded " + res.name + ". Saving back into the same file is not available here, so each save downloads a new copy.", "warn", 9000);
           } else if (!noInPlaceHintShown) {
             noInPlaceHintShown = true;
-            toast("Downloaded " + res.name + ". This browser can't overwrite the file from an offline page, so it adds \"(1)\", \"(2)\". For one-click overwrite of the same file, open this tool in Edge or Chrome. (In Firefox you can also turn on Settings → \"Always ask you where to save files\" and choose Replace.)", "warn", 12000);
+            toast("Downloaded " + res.name + ". This browser can't overwrite the file from an offline page, so it adds \"(1)\", \"(2)\" to the name. To overwrite the same file with one click, open this tool in Edge or Chrome. (In Firefox you can also turn on Settings → \"Always ask you where to save files\" and choose Replace.)", "warn", 12000);
           } else {
             toast("Downloaded " + res.name + " (a new copy; see the earlier note).", "warn");
           }
@@ -897,7 +903,7 @@ window.App.UI = (function () {
       var newer = newerFileWarning(res.data);
       if (newer) msgs.unshift(newer);
       if (msgs.length > 0) toast(msgs.join(" "), "warn", newer ? 12000 : undefined);
-      else if (res.migrated) toast("Loaded an older 1.0 file and migrated it to the project format. Save to keep the new shape.", "warn");
+      else if (res.migrated) toast("Loaded an older 1.0 file and migrated it to the project format. Save to keep it in the new format.", "warn");
       else toast("Project loaded" + (res.fileName ? " from " + res.fileName : "") + ".");
       return true;
     }
@@ -1881,7 +1887,7 @@ window.App.UI = (function () {
       onClick: function () { enterCAFWizard(view === "caf-wizard" ? cafWizardIdx : 0); }
     }, [
       h("span", null, ["Guided wizard"]),
-      h("span", { class: "badge", text: "1-by-1" })
+      h("span", { class: "badge", text: "1 / page" })
     ]));
 
     // Two-step profile picker: step 1 = sector/regulator, step 2 = level
@@ -2010,7 +2016,7 @@ window.App.UI = (function () {
       }, [
         h("strong", { text: "Profile selected: " + name }),
         h("div", { style: "margin-top:4px;", text:
-          "Expected states not yet populated. Outcomes will not be measured against an expected state until this profile is populated from the authoritative published source." })
+          "Expected states not loaded yet. Outcomes are not compared against an expected state until this profile is filled in from the published source." })
       ]);
     }
     return h("span", { class: "hidden" });
@@ -2290,7 +2296,7 @@ window.App.UI = (function () {
       // Layered CRA searches only the layers in scope - say so, or a consultant
       // hunting a P1 item with P1 toggled off gets an inexplicable blank.
       if (isCRA() && E.getCRASetup().layers.length < (E.state.instrument.layers || []).length) {
-        emptyMsg += " Note: some layers are out of scope for this engagement and their requirements are not searchable.";
+        emptyMsg += " Some layers are out of scope for this engagement, so their requirements are not searchable.";
       }
       findState.list.appendChild(h("div", { class: "find-empty muted", text: emptyMsg }));
       return;
@@ -2369,7 +2375,7 @@ window.App.UI = (function () {
     var card = h("div", { class: "coming-soon" }, [
       h("div", { class: "tag", text: "Coming soon" }),
       h("h2", { text: inst.title }),
-      h("p", { text: inst.comingSoon || "This instrument is registered as a placeholder. Its content and scoring will be implemented in a future phase." }),
+      h("p", { text: inst.comingSoon || "This instrument is a placeholder. Its content and scoring will come in a later release." }),
       h("div", { class: "muted" }, [
         h("div", null, ["Scoring family: " + (inst.scoringFamily || "-")]),
         h("div", null, ["Target dimension: " + (inst.targetDimensionLabel || "-")]),
@@ -2390,22 +2396,22 @@ window.App.UI = (function () {
     var title = inst.title;
     switch (E.state.scoringFamily) {
       case "capability-sl":
-        return "This assessment measures the security capability of the in-scope system against " + title + ", requirement by requirement, for the target security level set for the engagement. It establishes where current capability meets the target and where it falls short, then turns the shortfalls into a prioritised remediation roadmap. It is an advisory gap analysis to guide hardening and investment, not a certification.";
+        return "This assessment measures the security capability of the in-scope system against " + title + ", requirement by requirement, for the target security level set for the engagement. It shows where current capability meets the target and where it falls short, then turns the shortfalls into a prioritised remediation roadmap. It is an advisory gap analysis to guide hardening and investment, not a certification.";
       case "domain-letter":
-        return "This is a lightweight posture screener that profiles the organisation's security across a set of domains through a guided interview. It aims to give a fast, structured read on relative strengths and weak spots, and a shareable posture profile, rather than a detailed control-by-control audit.";
+        return "This is a lightweight posture screener that profiles the organisation's security across a set of domains through a guided interview. It gives a quick, structured read of relative strengths and weak spots, and a posture profile you can share. It is not a control-by-control audit.";
       case "program-maturity-ml":
-        return "This assessment rates the maturity of the security programme against " + title + ", element by element, on a four-level maturity scale. It aims to show how established and repeatable each part of the programme is, where it needs to mature, and what to prioritise next. It is an advisory maturity review, not a certification.";
+        return "This assessment rates the maturity of the security programme against " + title + ", element by element, on a four-level maturity scale. It shows how established and repeatable each part of the programme is, where it needs to mature, and what to prioritise next. It is an advisory maturity review, not a certification.";
       case "nis2-conformance":
-        return "This is a conformance and gap analysis against the obligations in " + title + ". It reviews each obligation to identify where the organisation already conforms and where work is needed, and produces a prioritised roadmap. It is advisory and does not constitute a determination of legal compliance.";
+        return "This is a conformance and gap analysis against the obligations in " + title + ". It reviews each obligation to find where the organisation already conforms and where work is needed, and produces a prioritised roadmap. It is advisory and is not a determination of legal compliance.";
       case "csms-conformance":
         if (isCRA()) {
-          return "This assessment evaluates the product against the essential cybersecurity requirements of " + title + ", layer by layer. It aims to show where the product already meets the requirements and where gaps remain ahead of any conformity work. It is an advisory gap analysis, not a conformity assessment or certification.";
+          return "This assessment evaluates the product against the essential cybersecurity requirements of " + title + ", layer by layer. It shows where the product already meets the requirements and where gaps remain ahead of any conformity work. It is an advisory gap analysis, not a conformity assessment or certification.";
         }
         return "This assessment reviews the organisation's cyber security management system against " + title + ", element by element, to establish how fully each part is in place and where to focus improvement. It is an advisory conformance review, not a certification.";
       case "caf-achieved":
-        return "This is an alignment and gap analysis against " + title + ". It weighs current practice against the expected standard for the selected profile, highlights the gaps that matter most, and produces a prioritised improvement roadmap alongside a client-ready report. It is advisory: a gap analysis to support improvement, not a formal audit or certification.";
+        return "This is an alignment and gap analysis against " + title + ". It weighs current practice against the expected standard for the selected profile, highlights the gaps that matter most, and produces a prioritised improvement roadmap and a client-ready report. It is an advisory gap analysis, not a formal audit or certification.";
       default:
-        return "This assessment reviews the organisation against " + title + " to establish where current practice meets the expected standard and where gaps remain, and to produce a prioritised improvement roadmap and a client-ready report. It is an advisory gap analysis, not a formal audit or certification.";
+        return "This assessment reviews the organisation against " + title + " to find where current practice meets the expected standard and where gaps remain, and to produce a prioritised improvement roadmap and a client-ready report. It is an advisory gap analysis, not a formal audit or certification.";
     }
   }
 
@@ -2542,7 +2548,7 @@ window.App.UI = (function () {
     var hasInstrument = !!E.state.instrument;
     refs.main.appendChild(h("h1", { class: "page-title", text: hasInstrument ? "Change assessment" : "Start an assessment" }));
     refs.main.appendChild(h("p", { class: "page-sub", text: hasInstrument
-      ? "Every assessment keeps its own answers, so switching never loses work. The customer and site are shared across the file; the opportunity, consultant and dates belong to each assessment. One instrument can hold more than one, for example a review this year and a re-assessment in two years' time."
+      ? "Every assessment keeps its own answers, so switching never loses work. The customer and site are shared across the file; the opportunity, consultant and dates belong to each assessment. You can hold more than one assessment of the same instrument, for example a review this year and a re-assessment in two years' time."
       : "Choose the framework for this engagement. You can add more assessments to the same file later, including another of the same framework, and they will all share the customer and site recorded below." }));
 
     refs.main.appendChild(homeEngagementStrip());
@@ -2665,7 +2671,7 @@ window.App.UI = (function () {
     return h("div", { class: "home-strip" }, [
       h("div", { class: "home-strip-title", text: "Who is this engagement for?" }),
       h("div", { class: "home-fields" }, cells),
-      h("p", { class: "muted home-strip-note", text: "Optional for now. These carry into every assessment in the project, and the rest of the report details live on the Engagement details page." })
+      h("p", { class: "muted home-strip-note", text: "Optional for now. These carry into every assessment in the project. The other report details are on the Engagement details page." })
     ]);
   }
 
@@ -2965,7 +2971,7 @@ window.App.UI = (function () {
         h("span", { class: "sub", text: "typical for this assessment, not a fixed list" })
       ]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin:0 0 8px; font-size:13px;", text: "A prompt for scoping and the site visit. Record what was actually reviewed and who was actually interviewed in the Basis of assessment above. Nothing here is added automatically." }),
+        h("p", { class: "muted", style: "margin:0 0 8px; font-size:13px;", text: "A prompt for scoping and the site visit. Record what was reviewed and who was interviewed in the Basis of assessment above; nothing here is added to it automatically." }),
         details
       ])
     ]);
@@ -3090,7 +3096,7 @@ window.App.UI = (function () {
           h("li", null, ["The unit of capture is the " + window.App.Report.mlNoun(inst, "requirementNoun") +
             ", grouped into " + (inst.elements || []).length + " " +
             window.App.Report.mlNoun(inst, "elementNounPlural") + "."]),
-          h("li", null, ["You set one maturity level per requirement: ML1-ML4, or Not met. Maturity levels apply independently per requirement. Documentation is implied from ML2 upward."]),
+          h("li", null, ["You set one maturity level per requirement, independently of the others: ML1-ML4, or Not met. Documentation is implied from ML2 upward."]),
           h("li", null, ["Unknown reduces coverage and lowers confidence; Not applicable drops the requirement from the score and coverage."]),
           h("li", null, ["An optional target ML per requirement should derive from risk (62443-3-2), not a flat default. Where set, the report shows met / below per requirement and per element."]),
           h("li", null, ["No single program grade is produced. The report is an achieved-ML profile by SPE and theme; mean ML is shown for context only. A Not met, or a requirement below its target, is surfaced as a floor finding, not averaged away."])
@@ -3775,7 +3781,7 @@ window.App.UI = (function () {
   function remediationFields(targetId, itemId, resp, isGap) {
     function save(patch) { E.setResponse(targetId, itemId, patch); }
     var bandSel = h("select", null, [
-      h("option", { value: "", text: "— not set —" }),
+      h("option", { value: "", text: "Not set" }),
       h("option", { value: "high", text: "High" }),
       h("option", { value: "medium", text: "Medium" }),
       h("option", { value: "low", text: "Low" })
@@ -4317,7 +4323,7 @@ window.App.UI = (function () {
           h("li", null, ["Each CSMS element is judged Not in place / Partially in place / Largely in place / In place against full conformance with ISA/IEC 62443-2-1:2010."]),
           h("li", null, ["Unknown reduces coverage and lowers confidence; Not applicable drops the element from the score and coverage."]),
           h("li", null, ["No single CSMS grade is produced. The report is a conformance profile by category and element group, plus a gap roadmap of every Not in place or Partially in place element."]),
-          h("li", null, ["This is a conformance gap analysis, not a certification. The 2024 edition restructures this CSMS into a maturity-based Security Program (a peer instrument)."])
+          h("li", null, ["This is a conformance gap analysis, not a certification. The 2024 edition restructures this CSMS into a maturity-based Security Program (a separate instrument in this tool)."])
         ]),
         h("table", { class: "tbl", style: "margin-top:10px;" }, [
           h("thead", null, [h("tr", null, [h("th", null, ["Category"]), h("th", { class: "center" }, ["Elements"])])]),
@@ -4492,7 +4498,7 @@ window.App.UI = (function () {
 
     refs.main.appendChild(h("h1", { class: "page-title", text: "Sector and scope" }));
     refs.main.appendChild(h("p", { class: "page-sub", text:
-      "Sets the starting point for the exposure conversation. Everything here is a scaffold you can override." }));
+      "Sets the starting point for the exposure conversation. Everything here is a starting point you can override." }));
 
     // --- sector ---
     var sectors = RA.sectors();
@@ -4518,8 +4524,8 @@ window.App.UI = (function () {
         // Said plainly, because a baseline that looks like a verdict is the
         // failure mode for this whole instrument.
         h("p", { class: "muted small", text:
-          "A starting point drawn from a house scaffold, not a determination. The sector baselines are tunable and "
-          + "the assessor sets the final band." })
+          "This is a house default, not a determination. The sector baselines can be tuned, and you set "
+          + "the final band." })
       ])
     ]));
 
@@ -4765,7 +4771,7 @@ window.App.UI = (function () {
         "The bands are a starting point. You have the final say on whether an appetite is appropriate to the "
         + "risks faced, because there are circumstances a four-by-four grid cannot see: a compensating group "
         + "control, an imminent divestment, a site mid-migration, a regulator-agreed trajectory, or a board that "
-        + "has genuinely decided to carry a risk with its eyes open." }),
+        + "has knowingly decided to carry a risk." }),
       sel
     ];
     if (setup.verdictOverride) {
@@ -4775,13 +4781,13 @@ window.App.UI = (function () {
       if (v.rationaleMissing) {
         body.push(h("p", { class: "placeholder-note", text:
           "Record your reasoning. It goes into the report as the basis for this verdict, and it is the part the "
-          + "client is actually paying for. Without it, the report states a conclusion with nothing behind it." }));
+          + "client is paying for. Without it, the report states a conclusion with nothing behind it." }));
       }
       body.push(h("p", { class: "muted small", style: "margin-bottom:0;", text:
         "This changes the verdict only. The exposure and appetite positions stand as you characterised them, and "
-        + "the plot still shows where the organisation actually sits. The computed read above, and the fact that "
-        + "you set the verdict yourself, stay on this page. The report presents your judgement and your "
-        + "reasoning, never a comparison against the tool." }));
+        + "the plot still shows where the organisation sits. The computed read above, and the fact that "
+        + "you set the verdict yourself, stay on this page. The report gives your judgement and your "
+        + "reasoning, with no comparison against the tool." }));
     }
     refs.main.appendChild(h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Your verdict" })]),
@@ -4934,7 +4940,7 @@ window.App.UI = (function () {
               ? "The suggestion is the highest band above: exposure follows the worst credible consequence, so a "
                 + "high regulatory reading does not dilute a severe consequence. "
               : "The suggestion is the mean of the bands above, rounded, since appetite is an overall posture. ")
-            + "It is a starting position, not a calculation to defer to. Set the band yourself where your read differs." }),
+            + "Treat it as a starting position and set the band yourself where your read differs." }),
           h("p", null, [
             h("strong", { text: secRes.bandLabel || "Not yet set" }),
             secRes.overridden ? h("span", { class: "muted small", text: "  (your override)" })
@@ -5123,7 +5129,7 @@ window.App.UI = (function () {
       captureBanner: d.captureBanner || "Indicative. Requirements are shown in the Regulation's own wording where a single provision maps to the question, and assessor-phrased where the question spans several; the Regulation text governs. This informs CRA conformity; it is not a conformity assessment or certification.",
       productsCardNote: d.productsCardNote || "Rename, add or remove products here; select one to set its classification below. Part I (product requirements) and most of the conformity layer are assessed per product; Part II (vulnerability handling) and the organisation-level conformity obligations (Art 14 reporting readiness, component due diligence) are organisation-wide and shared across all products. New products inherit the shared answers.",
       wizardOrgNote: d.wizardOrgNote || "Organisation-wide obligations (Annex I Part II vulnerability handling, plus Article 14 reporting readiness and component due diligence). These are answered once and apply to every product. Do this first, then switch to By product.",
-      wizardProductNote: d.wizardProductNote || "Per-product obligations (Annex I Part I product requirements and the product conformity work). Pick a product below, walk it, then pick the next product to redo the wizard for it."
+      wizardProductNote: d.wizardProductNote || "Per-product obligations (Annex I Part I product requirements and the product conformity work). Pick a product below and work through it, then pick the next product and do the same."
     };
   }
 
@@ -5740,9 +5746,9 @@ window.App.UI = (function () {
     // End-of-track guidance so the org-then-products flow is obvious.
     if (atEnd) {
       if (craWizMode === "org") {
-        wrap.appendChild(h("p", { class: "muted", style: "margin-top:10px;", text: "That completes the organisation-wide obligations. Choose “Assess " + d.noun + "s” (or the By " + d.noun + " button above) to walk each " + d.noun + "’s own requirements." }));
+        wrap.appendChild(h("p", { class: "muted", style: "margin-top:10px;", text: "That completes the organisation-wide obligations. Choose “Assess " + d.noun + "s” (or the By " + d.noun + " button above) to work through each " + d.noun + "’s own requirements." }));
       } else {
-        wrap.appendChild(h("p", { class: "muted", style: "margin-top:10px;", text: "That completes this " + d.noun + ". Use the " + d.noun + " bar above to select or add another " + d.noun + " and redo the walk for it, or jump to the report." }));
+        wrap.appendChild(h("p", { class: "muted", style: "margin-top:10px;", text: "That completes this " + d.noun + ". Use the " + d.noun + " bar above to select or add another " + d.noun + " and work through it, or jump to the report." }));
       }
     }
     refs.main.appendChild(wrap);
@@ -5767,7 +5773,7 @@ window.App.UI = (function () {
         bullets: gs.bullets || [
           "The unit of capture is the contributing outcome (41 of them across 4 objectives and 14 principles).",
           "You set one state per outcome: Achieved, Partially Achieved, or Not Achieved. Unknown reduces confidence; Not applicable drops the outcome.",
-          "The regulator profile above sets the expected state for each outcome. The report shows the gap of actual vs expected. The default General profile expects Achieved on every outcome.",
+          "The regulator profile above sets the expected state for each outcome. The report shows the gap between actual and expected. The default General profile expects Achieved on every outcome.",
           "No single CAF grade is produced. The report is a profile of Achieved / Partially / Not counts by objective and principle, plus the roadmap of outcomes below expected."
         ],
         profilesHeading: gs.profilesHeading || "Available profiles"
@@ -5815,9 +5821,9 @@ window.App.UI = (function () {
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "How this instrument scores" })]),
       h("div", { class: "card-b" }, [
-        h("p", { text: "Open a domain from the sidebar and work through the questions. The band for each scored question is set by you using the four-point scale; capture fields below it are evidence and notes." }),
+        h("p", { text: "Open a domain from the sidebar and work through the questions. You set the band for each scored question on the four-point scale; the fields below it are for evidence and notes." }),
         h("ul", null, [
-          h("li", null, ["The headline grade is the average across the graded domains, then held down twice: it can never sit more than two grades above the weakest domain, and the top grade is only awarded when every domain reaches it. A weak domain drags the headline sharply; it does not become the headline on its own."]),
+          h("li", null, ["The headline grade is the average across the graded domains, then held down twice: it can never sit more than two grades above the weakest domain, and the top grade is only awarded when every domain reaches it. A weak domain pulls the headline down sharply, but does not set it on its own."]),
           h("li", null, ["Unknown answers reduce coverage but are not counted as zero."]),
           h("li", null, ["Not applicable answers drop out of both the score and the coverage denominator."]),
           h("li", null, ["Coverage below " + thr + "% causes a grade to be reported as indicative rather than confident."])
@@ -5866,7 +5872,7 @@ window.App.UI = (function () {
 
     function slSelect(value, effective, allowInherit, onPick) {
       var sel = h("select", { class: "slt-cell" }, []);
-      if (allowInherit) sel.appendChild(h("option", { value: "", text: "– (" + effective + ")" }));
+      if (allowInherit) sel.appendChild(h("option", { value: "", text: "- (" + effective + ")" }));
       [1, 2, 3, 4].forEach(function (v) {
         var o = h("option", { value: String(v), text: "SL " + v });
         if (v === value) o.setAttribute("selected", "");
@@ -5926,7 +5932,7 @@ window.App.UI = (function () {
 
     bodyKids.push(h("p", { class: "hint", style: "margin:0 0 10px;", text:
       "ISA/IEC 62443-3-2 assigns each zone and conduit its own SL-T across the seven Foundational Requirements. Set the engagement default on the first row; each " +
-      labelSing.toLowerCase() + " below overrides only what it needs. “–” means inherit, and the number in brackets is what would apply." }));
+      labelSing.toLowerCase() + " below overrides only what it needs. “-” means inherit, and the number in brackets is what would apply." }));
     bodyKids.push(h("div", { style: "overflow-x:auto;" }, [h("table", { class: "tbl slt-matrix" }, [head, h("tbody", null, rows)])]));
 
     // Provenance of an imported risk context, with the zone SL-T rationale
@@ -6042,8 +6048,8 @@ window.App.UI = (function () {
     });
 
     var scopeNote = hasResponses
-      ? "Existing " + label.toLowerCase() + "s already hold responses, so the selected zones will be ADDED alongside them."
-      : "No responses are captured yet, so the selected zones will REPLACE the current " + label.toLowerCase() + " list.";
+      ? "Existing " + label.toLowerCase() + "s already hold responses, so the selected zones are added alongside them."
+      : "No responses are captured yet, so the selected zones replace the current " + label.toLowerCase() + " list.";
 
     var modal = h("div", { class: "modal-backdrop" }, [
       h("div", { class: "modal" }, [
@@ -6057,7 +6063,7 @@ window.App.UI = (function () {
             h("thead", null, [h("tr", null, [h("th", { text: "" }), h("th", { text: "Zone" }), h("th", { class: "center", text: "SL-T" })])]),
             h("tbody", null, zoneRows)
           ]),
-          h("p", { class: "muted", text: "One assessment " + label.toLowerCase() + " is created per selected zone, with its Target SL pre-set from the zone's SL-T (overridable as normal). " + scopeNote + " Untick every zone to store the context for provenance only, without creating " + label.toLowerCase() + "s." })
+          h("p", { class: "muted", text: "One assessment " + label.toLowerCase() + " is created per selected zone, with its Target SL pre-set from the zone's SL-T (you can still change it). " + scopeNote + " Untick every zone to store the context for provenance only, without creating " + label.toLowerCase() + "s." })
         ]),
         h("div", { class: "modal-f" }, [
           h("button", { class: "btn", onClick: closeModal, text: "Cancel" }),
@@ -6181,7 +6187,7 @@ window.App.UI = (function () {
             h("p", { style: "margin:0;", text:
               "This " + targetNoun() + " was added after " + plural(activeT.inheritedAtCreation, "requirement") +
               " had already been answered as shared answers, and it takes them automatically. " +
-              "Check they really do reach it, and answer here anything they do not." }),
+              "Check they do reach it, and answer here anything they do not." }),
             h("div", { style: "margin-top:8px;" }, [
               h("button", {
                 class: "btn btn-small",
@@ -7562,7 +7568,7 @@ window.App.UI = (function () {
       ]) });
     } else if (summaries.achieved || summaries.partially || summaries.notAchieved) {
       blocks.push({ toggleLabel: "What each state means", node: h("div", { class: "caf-summaries" }, [
-        h("div", { class: "caf-summary-label", text: "State summaries (paraphrased memory-jog, not verbatim CAF text)" }),
+        h("div", { class: "caf-summary-label", text: "State summaries (paraphrased as a reminder; not verbatim CAF text)" }),
         h("div", { class: "caf-summary-grid" }, [
           h("div", { class: "caf-summary caf-summary-achieved" }, [h("span", { class: "caf-summary-tag", text: "Achieved" }), document.createTextNode(summaries.achieved || "")]),
           h("div", { class: "caf-summary caf-summary-partially" }, [h("span", { class: "caf-summary-tag", text: "Partially" }), document.createTextNode(summaries.partially || "")]),
@@ -9024,7 +9030,7 @@ window.App.UI = (function () {
   function renderReportPage() {
     refs.main.innerHTML = "";
     refs.main.appendChild(h("h1", { class: "page-title", text: "Report preview" }));
-    refs.main.appendChild(h("p", { class: "page-sub", text: "On-screen rendering of the same numbers that will appear in the Excel and Word exports. Use the export buttons in the header to download." }));
+    refs.main.appendChild(h("p", { class: "page-sub", text: "The same figures as the Excel and Word exports. Download those with the export buttons in the header." }));
     refs.main.appendChild(buildSitesToolbar());
 
     // Scored up front: the next-steps scaffolding is built from the roadmap and
@@ -9659,7 +9665,7 @@ window.App.UI = (function () {
     var rn = E.getReportNarrative();
 
     var clsSel = h("select", null, [
-      h("option", { value: "", text: "— not set —" }),
+      h("option", { value: "", text: "Not set" }),
       h("option", { value: "essential", text: "Essential entity" }),
       h("option", { value: "important", text: "Important entity" }),
       h("option", { value: "not-determined", text: "Not yet determined" })
@@ -9674,7 +9680,7 @@ window.App.UI = (function () {
     expoTa.value = rn.regulatoryExposure || "";
     expoTa.addEventListener("change", function () { E.setReportNarrative({ regulatoryExposure: expoTa.value }); });
 
-    var priTa = h("textarea", { rows: "3", placeholder: "The top one or two priorities for this client. Leave blank to use the suggestion auto-seeded from the roadmap." });
+    var priTa = h("textarea", { rows: "3", placeholder: "The top one or two priorities for this client. Leave blank to use the suggestion drawn from the roadmap." });
     priTa.value = rn.topPriorities || "";
     priTa.addEventListener("change", function () { E.setReportNarrative({ topPriorities: priTa.value }); });
 
@@ -9977,7 +9983,7 @@ window.App.UI = (function () {
       var res = computeComparison();
       kids.push(h("p", { class: "muted", style: "margin-top:0;", text: "Baseline: " + C.sourceLine(baseline) }));
       if (res && res.versionMismatch) {
-        kids.push(h("p", { class: "muted", text: "Note: the baseline was scored against instrument content version " + baseline.instrumentContentVersion + "; the current version is " + (E.state.instrument.contentVersion || "unknown") + ". Renamed or removed items compare as not assessed." }));
+        kids.push(h("p", { class: "muted", text: "The baseline was scored against instrument content version " + baseline.instrumentContentVersion + "; the current version is " + (E.state.instrument.contentVersion || "unknown") + ". Renamed or removed items compare as not assessed." }));
       }
 
       // Baseline target pairing - only when the previous file held several.
@@ -10073,7 +10079,7 @@ window.App.UI = (function () {
         // selected profile, and which are newly added since the baseline.
         if (res.cmp.aboveBaseline && res.cmp.aboveBaseline.length) {
           kids.push(h("h3", { style: "margin:16px 0 4px;", text: "Implemented beyond the requirement" }));
-          kids.push(h("p", { class: "muted", style: "margin-top:0;", text: res.cmp.aboveBaseline.length + " control" + (res.cmp.aboveBaseline.length === 1 ? "" : "s") + " implemented beyond the selected profile" + (res.cmp.aboveBaselineNew ? ", " + res.cmp.aboveBaselineNew + " added since the previous assessment" : "") + ". These strengthen the estate beyond what the profile requires and do not affect the score." }));
+          kids.push(h("p", { class: "muted", style: "margin-top:0;", text: res.cmp.aboveBaseline.length + " control" + (res.cmp.aboveBaseline.length === 1 ? "" : "s") + " implemented beyond the selected profile" + (res.cmp.aboveBaselineNew ? ", " + res.cmp.aboveBaselineNew + " added since the previous assessment" : "") + ". They do not affect the score." }));
           var abHead = h("thead", null, [h("tr", null, [
             h("th", { text: "Ref" }), h("th", { text: "Control" }), h("th", { text: "Area" }),
             h("th", { text: "State" }), h("th", { text: "Since baseline" })
@@ -10171,7 +10177,7 @@ window.App.UI = (function () {
     }
 
     var bandSel = h("select", null, [
-      h("option", { value: "", text: "— not set —" }),
+      h("option", { value: "", text: "Not set" }),
       h("option", { value: "high", text: "High" }),
       h("option", { value: "medium", text: "Medium" }),
       h("option", { value: "low", text: "Low" })

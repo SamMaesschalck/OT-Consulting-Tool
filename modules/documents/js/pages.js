@@ -146,9 +146,9 @@
 
   // ---------- welcome ----------
   function welcome(main) {
-    head(main, "Documents", "Write a document in the SolutionsPT template, or bring in a Word file and have it rebuilt in the template with its pictures and drawings kept.");
+    head(main, "Documents", "Write a document in the SolutionsPT template, or load a Word file to have it rebuilt in the template with its pictures and drawings kept.");
     main.appendChild(h("div", { class: "dp-start", id: "dp-start" }, [
-      h("p", { text: "Start a document, open one you saved, or load a Word file. You can also drop a file anywhere on this page." }),
+      h("p", { text: "You can also drop a document file or a Word file anywhere on this page." }),
       btn("New document", "primary", function () {
         D().setDoc(M().create("report"), { from: "new" });
       }, "dp-new"),
@@ -163,7 +163,7 @@
     main.appendChild(card("How it works", null, [h("ol", { class: "dp-steps" }, [
       h("li", { text: "Fill in Document information: the title, the client and who it is issued to. The cover and the document control page are made from it." }),
       h("li", { text: "Write on the Edit page: headings, paragraphs, lists, tables, pictures and red prompts for anything still to complete." }),
-      h("li", { text: "Or load a Word file. Its text is rebuilt in the template, its pictures and drawings are kept, and anything that could not be carried over is listed for you." }),
+      h("li", { text: "Or load a Word file. Its text is rebuilt in the template, its pictures and drawings are kept, and anything that could not be carried over is listed." }),
       h("li", { text: "On Issue and export, check what is still to complete and export a Word file as a draft or a final." }),
       h("li", { text: "Save keeps your work in a document file. It holds client data: handle it as you would the document itself." })
     ])]));
@@ -222,8 +222,8 @@
     }
   };
   var LEADS = {
-    report: "What the cover, the document control page and the footer are made from. Changes are kept as you type.",
-    short: "What the title, the line under it and the footer are made from. Changes are kept as you type."
+    report: "The cover, the document control page and the footer are filled in from these fields. Changes are kept as you type.",
+    short: "The title, the line under it and the footer are filled in from these fields. Changes are kept as you type."
   };
   var KIND_TEXT = {
     report: ["Report", "A cover and a document control page, then the body. For proposals, method statements, reports and procedures."],
@@ -295,7 +295,7 @@
     on(lines, "input", commitLines); on(lines, "change", commitLines);
     var linesField = d.kind === "report" ? h("div", { class: "field dp-wide" }, [
       h("label", { for: "info-coverTitleLines", text: "Title lines on the cover" }), lines,
-      h("div", { class: "hint", text: "Leave empty and the title is split over two lines for you. To choose the breaks yourself, type up to three lines." })
+      h("div", { class: "hint", text: "Leave empty to split the title over two lines automatically, or type up to three lines to choose the breaks yourself." })
     ]) : null;
 
     main.appendChild(card("Document", null, [h("div", { class: "dp-info" }, [
@@ -319,7 +319,7 @@
     }
     var isShort = d.kind === "short";
     main.appendChild(card("Document control", null, [
-      isShort ? h("p", { class: "muted", id: "dp-control-note", text: "A short document prints no document control page. These are kept in case you change its kind. The issued date is the exception: when it is set, it is the date printed under the title." }) : null,
+      isShort ? h("p", { class: "muted", id: "dp-control-note", text: "A short document prints no document control page. These are kept in case you change its kind. The issued date is the exception: when set, it is printed under the title." }) : null,
       h("div", { class: "grid-2" }, [field("qaReviewBy"), field("authorisedBy"), field("issuedTo"), field("issuedDate"), field("classification")]),
       h("div", { class: "dp-options" }, [
         option("numberHeadings", "Number the headings.", "1, 1.1 and 1.1.1 are printed before the headings."),
@@ -385,7 +385,7 @@
     return card("File", null, [
       h("p", { id: "dp-file-name", text: name ? "Save writes to " + name + "." : "Save will ask where to keep the document file." }),
       h("p", { id: "dp-file-size", text: "Pictures and kept content: " + bytesText(size) + "." }),
-      size > L.warnBytes ? h("p", { class: "dp-warn", id: "dp-file-warn", text: "This is over " + mb(L.warnBytes) + ". The file still saves, but it will be slow to save and to open. Nothing more can be added once it reaches " + mb(L.refuseBytes) + "." }) : null
+      size > L.warnBytes ? h("p", { class: "dp-warn", id: "dp-file-warn", text: "This is over " + mb(L.warnBytes) + ". The file still saves, but saving and opening will be slow. Nothing more can be added past " + mb(L.refuseBytes) + "." }) : null
     ], "dp-card-file");
   }
 
@@ -399,7 +399,7 @@
     var d = doc();
     if (!d) { welcome(main); return; }
     head(main, "Preview");
-    main.appendChild(h("p", { class: "dp-note", id: "dp-preview-note", text: "A preview. Word decides where pages break. Drawings kept from an imported file are shown as placeholders here and print in the Word export as they were." }));
+    main.appendChild(h("p", { class: "dp-note", id: "dp-preview-note", text: "Word decides where the pages break. Drawings kept from an imported file show as placeholders here and print in the Word export as they were." }));
     var paper = h("div", { class: "dp-preview", id: "dp-preview" });
     main.appendChild(paper);
 
@@ -515,8 +515,8 @@
       nameLine.textContent = "The file will be called " + A.DocExport.filename(d, s) + ".";
     }
     var radios = h("fieldset", { class: "dp-kinds", id: "dp-status" }, [h("legend", { text: "Export as" })]);
-    [["draft", "Draft", "Carries a Draft watermark and Status Draft. Anything still to complete prints red."],
-     ["final", "Final", "Carries Status Final, opens read-only and is marked as final. Not available while anything is still to complete."]
+    [["draft", "Draft", "Has a Draft watermark and Status Draft. Anything still to complete prints red."],
+     ["final", "Final", "Has Status Final, opens read-only and is marked as final. Not available while anything is still to complete."]
     ].forEach(function (o) {
       var radio = h("input", { type: "radio", name: "dp-status", id: "dp-status-" + o[0], value: o[0] });
       radio.checked = st === o[0];
@@ -629,7 +629,7 @@
         })));
       }
       if ((fr.unused || []).length) {
-        kids.push(h("p", { class: "muted dp-entry-said", text: "Not used, because Document information has no place for them:" }));
+        kids.push(h("p", { class: "muted dp-entry-said", text: "Not used, because Document information has no field for them:" }));
         kids.push(h("ul", { class: "dp-quotes", id: "dp-front-unused" }, fr.unused.map(function (p) { return h("li", { text: p[0] + ": " + p[1] }); })));
       }
       if (fr.contents) kids.push(h("p", { text: "Its contents list was taken out too. A contents list is switched on in its place." }));
@@ -677,7 +677,7 @@
     if (b.type === "kept") {
       title = "Drawing " + it.kept + " of " + total;
       lines.push(b.description || [KEPT_NAMES[b.kind] || KEPT_NAMES.other, sizeText(b)].filter(Boolean).join(", "));
-      if (b.kind === "ole") lines.push("An embedded file. It is carried as it was, without being opened or checked.");
+      if (b.kind === "ole") lines.push("An embedded file, kept as it was without being opened or checked.");
       if (b.floating) lines.push("It floats beside the text, where the original put it.");
     } else {
       title = "Picture";
@@ -709,7 +709,7 @@
     main.appendChild(h("p", { class: "dp-summary", id: "dp-report-summary", text: A.DocImportFlow.summary(rep) }));
     main.appendChild(h("div", { class: "btn-row dp-report-go" }, [
       btn("Go to the document", "primary", function () { D().go("edit"); }, "dp-report-edit"),
-      h("span", { class: "muted", text: "This page stays in the sidebar, under Import report." })
+      h("span", { class: "muted", text: "You can come back to this report from the sidebar." })
     ]));
 
     if (rep.front && (rep.front.blocks || []).length) main.appendChild(frontCard(d, main, rep.front));
@@ -769,7 +769,7 @@
       h("p", { id: "dp-drawings-note", text: "Drawings kept from the Word file cannot be shown here. Export a draft and open it in Word to see them." }),
       h("div", { class: "btn-row" }, [btn("Export a draft to check in Word", "", function () { A.DocExport.word("draft"); }, "dp-report-draft")]),
       h("ul", { class: "dp-entries", id: "dp-drawings" }, list.map(function (it) { return drawingRow(d, it, list.keptTotal); }))
-    ] : [h("p", { class: "muted", id: "dp-drawings-none", text: "Every picture in the document can be shown on the Edit page, and it holds no drawings kept from the Word file." })], "dp-card-drawings"));
+    ] : [h("p", { class: "muted", id: "dp-drawings-none", text: "There are no drawings kept from the Word file, and every picture shows on the Edit page." })], "dp-card-drawings"));
   }
 
   // ---------- about ----------
@@ -778,29 +778,29 @@
   // The editor's keys, for the reader. Keep it in step with the keyboard map
   // in editor.js.
   var KEYS = [
-    ["Enter", "A new block. In a heading, the new block is a paragraph. In an empty list item, steps out of the list."],
-    ["Shift+Enter", "A line break inside the block."],
+    ["Enter", "Starts a new block. After a heading, the new block is a paragraph. In an empty list item, leaves the list."],
+    ["Shift+Enter", "Adds a line break inside the block."],
     ["Ctrl+B, Ctrl+I, Ctrl+U", "Bold, italic, underline."],
     ["Ctrl+Shift+X", "Strikethrough."],
     ["Ctrl+. and Ctrl+,", "Superscript and subscript."],
     ["Ctrl+Space", "Clears red from the selection."],
-    ["Ctrl+K", "A link (http, https or mailto)."],
+    ["Ctrl+K", "Adds a link (http, https or mailto)."],
     ["Ctrl+Alt+1, 2, 3 and Ctrl+Alt+0", "Heading 1, 2, 3 and paragraph."],
     ["Ctrl+Shift+8 and Ctrl+Shift+7", "Bulleted list and numbered list."],
     ["Tab and Shift+Tab", "In a list, indent and outdent. In a table, the next and the previous cell. Elsewhere in the text they do nothing: press Escape, then Tab, to leave the page."],
-    ["Ctrl+Enter", "A page break after the block."],
+    ["Ctrl+Enter", "Adds a page break after the block."],
     ["Alt+Shift+Up and Down", "Moves the block, or the selected blocks, up or down."],
     ["Ctrl+Z, Ctrl+Y", "Undo and redo."],
-    ["Ctrl+A", "All the text in the block. Again, every block."],
-    ["Escape", "From the text to the block. From a block to its section in the outline."],
+    ["Ctrl+A", "Selects the text in the block. Press again to select every block."],
+    ["Escape", "Moves from the text to the block, then from the block to its section in the outline."],
     ["F6", "Moves between the sidebar, the toolbar and the page."],
-    ["Ctrl+F", "The browser's own find. It searches the whole document."]
+    ["Ctrl+F", "Opens the browser's own find, which searches the whole document."]
   ];
   function about(main) {
     var V = A.Version || {};
     head(main, "About");
     main.appendChild(card((V.product || (A.Product && A.Product.name) || "") + " " + (V.label || ""), V.number ? "version " + V.number : null, [
-      h("p", { text: "Works offline, with no server. Your document file holds the document, its pictures and anything kept from an imported Word file, so handle it as you would the document itself." }),
+      h("p", { text: "It works offline and needs no server. Your document file holds the document, its pictures and anything kept from an imported Word file, so handle it as you would the document itself." }),
       h("p", { text: "It reads and writes " + M().SCHEMA + ", reads Word files (.docx) and writes Word files in the SolutionsPT template." })
     ], "dp-card-about"));
     var keys = [];

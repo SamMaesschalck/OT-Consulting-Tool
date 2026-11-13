@@ -29,7 +29,7 @@ window.RiskWordPreview = (function () {
   function render(main, h) {
     var DP = window.App && window.App.DocPreview;
     main.appendChild(h("h1", { class: "page-title", text: "Word preview" }));
-    main.appendChild(h("p", { class: "page-sub", text: "The Word report as Download Word report makes it, page by page. Word decides where the pages break. To change the report, edit it on the Report page." }));
+    main.appendChild(h("p", { class: "page-sub", text: "The downloaded Word report, page by page. Word itself decides where the pages break. To change the report, edit it on the Report page." }));
     if (!DP || !window.App.DocxImport || !RX() || !window.docx) {
       main.appendChild(h("p", { class: "muted", text: "The Word preview is not available in this copy of the tool." }));
       return;

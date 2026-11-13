@@ -2704,7 +2704,7 @@ window.App.Report = (function () {
           lbl,
           h("p", {
             style: "border-left:4px solid var(--near); background:var(--near-bg); padding:10px 14px; margin:10px 0 0; color:var(--text);",
-            text: "This regulator profile is a placeholder. Its expected states have not yet been populated, so meeting and below counts are not available. Results are reported as a profile of Achieved / Partially / Not Achieved."
+            text: "This regulator profile is a placeholder with no expected states yet, so there are no meeting or below counts. Results show how the outcomes split across Achieved, Partially Achieved and Not Achieved."
           })
         ])
       ]);
@@ -2862,7 +2862,7 @@ window.App.Report = (function () {
         // that objective, not how many there are. Without saying so, an
         // objective holding nineteen outcomes and one holding five draw
         // identically. The counts beside each bar carry the magnitude.
-        h("div", { class: "muted", style: "margin-top:6px; font-size:12px;", text: "Each bar shows the proportion of that objective's outcomes in each state; the figures beside it are the counts. Bar length is not the number of outcomes." }),
+        h("div", { class: "muted", style: "margin-top:6px; font-size:12px;", text: "Each bar splits that objective's outcomes by state, so every bar is the same length however many outcomes it holds. The figures beside it are the counts." }),
         h("div", { class: "spacer-12" }),
         h("table", { class: "tbl" }, [head, body, foot])
       ])
@@ -3391,14 +3391,14 @@ window.App.Report = (function () {
       ]);
       var actionCell = h("td", { style: "max-width:340px;" }, [
         it.action ? document.createTextNode(it.action)
-                  : (interactive ? h("span", { class: "muted small", text: "click row to add…" }) : h("span", { class: "muted", text: "-" }))
+                  : (interactive ? h("span", { class: "muted small", text: "click to add" }) : h("span", { class: "muted", text: "-" }))
       ]);
       var tr = h("tr", interactive ? { class: "rm-row" } : null, [priCell, mainCell, stateCell, ownerCell, actionCell]);
       if (interactive) wireRoadmapRow(tr, it.itemId, planning);
       return tr;
     });
     var leadText = interactive
-      ? "Drag rows to set the priority order; click a row to update the captured evidence and record the owner, recommended action, business impact and priority band. These flow straight into the Excel and Word exports."
+      ? "Drag rows to set the priority order. Click a row to edit the evidence and record the owner, recommended action, business impact and priority band. All of it goes into the Excel and Word exports."
       : opts.leadStatic;
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: opts.title })]),
@@ -3542,14 +3542,14 @@ window.App.Report = (function () {
       ]);
       var actionCell = h("td", { style: "max-width:340px;" }, [
         it.action ? document.createTextNode(it.action)
-                  : (interactive ? h("span", { class: "muted small", text: "click row to add…" }) : h("span", { class: "muted", text: "-" }))
+                  : (interactive ? h("span", { class: "muted small", text: "click to add" }) : h("span", { class: "muted", text: "-" }))
       ]);
       var tr = h("tr", interactive ? { class: "rm-row" } : null, [priCell, oblCell, stateCell, ownerCell, actionCell]);
       if (interactive) wireRoadmapRow(tr, it.itemId, planning);
       return tr;
     });
     var leadText = interactive
-      ? "Drag rows to set the priority order; click a row to update the captured evidence and record the owner, recommended action, business impact and priority band. These flow straight into the Excel and Word exports."
+      ? "Drag rows to set the priority order. Click a row to edit the evidence and record the owner, recommended action, business impact and priority band. All of it goes into the Excel and Word exports."
       : "Every applicable obligation that is Partially or Not Achieved, Not Achieved first. Priority, owner, business impact and recommended action are set by the consultant.";
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Gap roadmap" })]),

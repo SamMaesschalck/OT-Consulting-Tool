@@ -34,7 +34,7 @@
     "client-name": { title: "Client name missing or inconsistent", severity: "must-fix", about: "The client's name should be set, and printed the same way throughout." },
     "no-evidence": { title: "Findings with no evidence recorded", severity: "should-fix", about: "A finding with nothing behind it is hard to defend to the client." },
     "unanswered": { title: "Items not answered", severity: "should-fix", about: "Items in scope with no answer at all. Unknown and not applicable count as answers." },
-    "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Fields the document control table prints empty. They may be filled in at issue. QA review by is not counted, as an approval fills it in." },
+    "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Fields left empty in the document control table. They may be filled in at issue. QA review by is not counted, because an approval fills it in." },
     "numbering": { title: "Section numbering gaps", severity: "should-fix", about: "Numbered sections that skip a number, which usually means a section was hidden." },
     "figures": { title: "Figures that disagree", severity: "must-fix", about: "Counts the report prints that do not match the assessment behind it." },
     "risk-no-disposition": { title: "Risks above tolerable with no disposition", severity: "must-fix", about: "A threat above the tolerable risk with no countermeasure, no target level on its affected requirements and no recorded acceptance. The report prints it as needing a decision." },
@@ -190,7 +190,7 @@
         if (!m) return;
         if (recorded.some(function (v) { return w.re.test(v) && nt.indexOf(v) !== -1; })) return;
         var from = Math.max(0, m.index - 50);
-        out.push(result("internal-wording", keyFor(b, cell, w.label), "“" + m[0] + "” is internal wording that the client should not see.",
+        out.push(result("internal-wording", keyFor(b, cell, w.label), "“" + m[0] + "” is internal wording the client should not see.",
           (from ? "…" : "") + t.slice(from, m.index + 60) + (m.index + 60 < t.length ? "…" : ""), b, cell, d));
       });
     });

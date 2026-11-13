@@ -27,7 +27,7 @@
     },
     "front-matter": function (e) {
       return "The original starts with " + plural(e.count, "block", "blocks") + " before its first heading. " +
-        "This is often its own cover, document control table or contents list, which the template now provides. " +
+        "This is often its own cover, document control table or contents list, which the template already prints. " +
         "Check whether you still need " + (e.count === 1 ? "it" : "them") + ".";
     },
     // notCarried

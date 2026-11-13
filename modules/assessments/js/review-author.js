@@ -165,7 +165,7 @@
     // ---- where it stands ----------------------------------------------------
     var last = RC().lastRound(store);
     if (!last) {
-      container.appendChild(h("p", { class: "muted rv-empty", text: "Nothing has been sent yet. Send for review writes a pack: give it to each reviewer by shared folder or email, and treat it like the project file, as it holds client data." }));
+      container.appendChild(h("p", { class: "muted rv-empty", text: "Nothing has been sent yet. Send for review writes a pack: give it to each reviewer by shared folder or email, and keep it as carefully as the project file: it holds client data." }));
       return;
     }
     var fileRows = store.files.slice().sort(function (a, b) { return b.round - a.round || String(a.reviewer).localeCompare(b.reviewer); });
@@ -262,7 +262,7 @@
           var id = ui.lastGo; ui.lastGo = null;
           if (!reveal(id)) repaint();
         } }),
-        h("button", { type: "button", class: "btn rv-back-close", text: "Close", "aria-label": "Close the way back to the comment", onClick: function () {
+        h("button", { type: "button", class: "btn rv-back-close", text: "Close", "aria-label": "Close this bar", onClick: function () {
           ui.lastGo = null; repaint();
         } })
       ]));
@@ -317,7 +317,7 @@
         readyReveal(adapter.store(), ui, id);
         adapter.showCard();
       } }),
-      h("button", { type: "button", class: "btn rv-back-close", text: "Close", "aria-label": "Close the way back to the comment", onClick: function () {
+      h("button", { type: "button", class: "btn rv-back-close", text: "Close", "aria-label": "Close this bar", onClick: function () {
         ui.lastGo = null; dropPageBack();
       } })
     ]);
@@ -520,7 +520,7 @@
         // The change, marked, with a few words either side; the whole of both
         // texts one click away.
         body.push(h("div", { class: "rv-suggest" }, [
-          h("div", { class: "rv-s-label", text: "Suggested wording, the change marked" }),
+          h("div", { class: "rv-s-label", text: "Suggested wording, with the changes marked" }),
           diffNode(diff),
           h("details", { class: "rv-full" }, [
             h("summary", { text: "Show full wording" }),
@@ -675,7 +675,7 @@
       }
       r.file = id.data;
       results.push(r);
-      if (r.duplicate) lines.push(f.name + ": already imported, nothing changed.");
+      if (r.duplicate) lines.push(f.name + ": already imported. Nothing changed.");
       else if (r.older) lines.push(f.name + ": a later save from " + r.reviewer + " is already imported, so this one was left out.");
       else {
         changed = true;

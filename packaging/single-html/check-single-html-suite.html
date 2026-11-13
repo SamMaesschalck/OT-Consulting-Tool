@@ -131,7 +131,7 @@
     ok(d.querySelectorAll(".tool-card .tool-tour").length === 4, "every tool's tour is offered on its card");
     ok(d.querySelectorAll(".tool-card .help-tool").length === 4 && /62443-3-3/.test(d.querySelector(".help-card").textContent) && /review pack/i.test(d.querySelector(".help-card").textContent), "each card says when to use the tool, and How the tools fit together names the files between them");
     var apart = d.querySelector(".help-card .flow > li:last-child");
-    ok(apart && apart.getAttribute("data-module") === "documents" && apart.classList.contains("flow-apart") && /no file passes between it and the other tools/.test(apart.textContent),
+    ok(apart && apart.getAttribute("data-module") === "documents" && apart.classList.contains("flow-apart") && /No files pass between it and the other tools/.test(apart.textContent),
        "with the Document Tool after the flow, on its own", apart && apart.textContent);
     ok(w.getComputedStyle(d.querySelector(".tool-grid")).gridTemplateColumns.split(" ").length === 2, "the four cards sit as two rows of two");
     ok(d.querySelector("#suite-bar .bar-home[aria-current='page']") && d.querySelectorAll("#suite-bar .bar-tab").length === 4, "the rail shows Home, current, and a button for each tool");

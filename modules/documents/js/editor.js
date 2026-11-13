@@ -1058,7 +1058,7 @@
   }
   function insertFootnote() {
     var c = context(), t = textTarget(c);
-    if (!t || t.kind !== "block" || t.plain) { toast("Put the caret in a paragraph first."); return; }
+    if (!t || t.kind !== "block" || t.plain) { toast("Click in a paragraph first."); return; }
     var res = null;
     var entry = change("Footnote", [t.id], function () { res = M().footnote.add(st.doc, t.id, c.to); });
     if (!res || !entry) return;
@@ -1294,8 +1294,8 @@
     ["link", "Link", "Link (Ctrl+K)"], ["footnote", "Footnote", "Add a footnote"], null,
     ["bullet", "Bullets", "Bulleted list (Ctrl+Shift+8)"], ["number", "Numbers", "Numbered list (Ctrl+Shift+7)"],
     ["indent", "Indent", "Indent the list item (Tab)"], ["outdent", "Outdent", "Outdent the list item (Shift+Tab)"], null,
-    ["alignLeft", "Left", "Align left"], ["alignCenter", "Centre", "Centre"], ["alignRight", "Right", "Align right"],
-    ["alignJustify", "Justify", "Justify"], null,
+    ["alignLeft", "Left", "Align left"], ["alignCenter", "Centre", "Align centre"], ["alignRight", "Right", "Align right"],
+    ["alignJustify", "Justify", "Justify the text"], null,
     ["insertTable", "Table", "Insert a table"], ["insertPicture", "Picture", "Insert a picture from a file"],
     ["pageBreak", "Page break", "Page break after this block (Ctrl+Enter)"], ["landscape", "Landscape", "Print on a landscape page"], null,
     ["undo", "Undo", "Undo (Ctrl+Z)"], ["redo", "Redo", "Redo (Ctrl+Y)"]
@@ -1443,7 +1443,7 @@
   }
   function alignButtons(block, center) {
     var now = block.align || center;
-    return [["left", "Left", "Align left"], ["center", "Centre", "Centre"], ["right", "Right", "Align right"]].map(function (a) {
+    return [["left", "Left", "Align left"], ["center", "Centre", "Align centre"], ["right", "Right", "Align right"]].map(function (a) {
       return ctxButton(a[1], a[2], function () { setAlign(a[0]); }, { pressed: now === a[0] });
     });
   }
@@ -1452,7 +1452,7 @@
       ctxButton("Move up", "Move up (Alt+Shift+Up)", function () { move(-1); }),
       ctxButton("Move down", "Move down (Alt+Shift+Down)", function () { move(1); }),
       ctxButton("Duplicate", "Make a copy after it", duplicate),
-      ctxButton("Paragraph after", "Add a paragraph after it, to carry on writing there", function () { paragraphAfter(); }),
+      ctxButton("Paragraph after", "Add a paragraph after it", function () { paragraphAfter(); }),
       ctxButton("Delete", "Delete what is selected", deleteSelected, { danger: true })
     ];
   }
@@ -1550,7 +1550,7 @@
       }, [
         h("span", { class: "ol-text", text: label }),
         o.count ? h("span", { class: "ol-n", text: String(o.count), title: plural(o.count, "prompt") + " still to complete", "aria-label": plural(o.count, "prompt") + " still to complete" }) : null,
-        h("button", { type: "button", class: "ol-menu", tabindex: "-1", "aria-haspopup": "menu", "aria-label": "Section menu, " + label, title: "Section menu", text: "⋯" })
+        h("button", { type: "button", class: "ol-menu", tabindex: "-1", "aria-haspopup": "menu", "aria-label": "Actions for " + label, title: "Section actions", text: "⋯" })
       ]));
     });
     box.appendChild(tree);
@@ -1644,8 +1644,8 @@
     function entry(text, fn) {
       return h("button", { type: "button", role: "menuitem", class: "ol-pop-item", tabindex: "-1", text: text, onclick: function () { closeMenu(); fn(id); } });
     }
-    var pop = h("div", { class: "ol-pop", role: "menu", "aria-label": "Section" }, [
-      entry("Add a section after", addSectionAfter), entry("Delete the section", deleteSection)
+    var pop = h("div", { class: "ol-pop", role: "menu", "aria-label": "Section actions" }, [
+      entry("Add a section after", addSectionAfter), entry("Delete this section", deleteSection)
     ]);
     pop.addEventListener("keydown", function (e) {
       var all = Array.prototype.slice.call(pop.children), i = all.indexOf(e.target);

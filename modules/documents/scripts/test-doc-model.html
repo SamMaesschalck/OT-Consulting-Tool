@@ -451,7 +451,7 @@
     return D.setDoc(WM.create(), { from: "new" }).then(function () {
       var doc = D.state.doc;
       doc.info.title = "Limits";
-      ok(D.canAdd(3000) === true && D.canAdd(3001) === false && /was not added/.test(toast.textContent) && /err/.test(toast.className), "canAdd: exactly the limit is allowed, one byte more is refused with a message", toast.textContent);
+      ok(D.canAdd(3000) === true && D.canAdd(3001) === false && /^Not added/.test(toast.textContent) && /err/.test(toast.className), "canAdd: exactly the limit is allowed, one byte more is refused with a message", toast.textContent);
       var k = WM.addMedia(doc, new w.Blob([bytes(2500)], { type: "image/png" }), { name: "a.png", width: 10, height: 10 });
       doc.blocks.push(WM.make.picture(doc, k, 10, 10));
       D.touched({ media: [k] });

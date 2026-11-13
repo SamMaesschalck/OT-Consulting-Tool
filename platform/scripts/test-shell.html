@@ -130,7 +130,7 @@
     ok(d.querySelectorAll(".help-card .flow-step").length === 4 && last.getAttribute("data-module") === "documents" && last.classList.contains("flow-apart") &&
        !last.querySelector(".flow-arrow") && steps[steps.length - 2].classList.contains("flow-link") && /Review file/.test(steps[steps.length - 2].textContent),
       "How the tools fit together ends with the Document Tool, apart from the flow and with no arrow of its own");
-    ok(/Proposals, method statements and other documents in the SolutionsPT template/.test(last.textContent) && /no file passes between it and the other tools/.test(last.textContent),
+    ok(/Proposals, method statements and other documents in the SolutionsPT template/.test(last.textContent) && /No files pass between it and the other tools/.test(last.textContent),
       "and says it works on its own", last.textContent);
     ok(!/[–—]/.test(d.getElementById("home").textContent), "no en or em dashes anywhere on the home page");
     // ---- the rail ------------------------------------------------------------

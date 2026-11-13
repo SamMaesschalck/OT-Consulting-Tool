@@ -678,13 +678,13 @@ window.App.Storage = (function () {
       // refuses such a file before this is asked. Kept so the helper still
       // tells the truth to a caller that has not checked the file first.
       if (!inst) {
-        msgs.push("Assessment '" + instrumentId + "' targets an unknown instrument; its responses will not be displayed.");
+        msgs.push("Assessment '" + instrumentId + "' is for an instrument this tool does not have, so its answers are not shown.");
         return;
       }
       var saved = ass.instrumentContentVersion || "";
       var current = inst.contentVersion || "";
       if (saved && current && saved !== current) {
-        msgs.push("Assessment '" + id + "' was saved against content version " + saved + ", but the loaded instrument is version " + current + ". Renamed or removed items may not display correctly.");
+        msgs.push("Assessment '" + id + "' was saved against content version " + saved + ", but this tool has version " + current + ". Items renamed or removed since then may not show correctly.");
       }
     });
     return msgs;

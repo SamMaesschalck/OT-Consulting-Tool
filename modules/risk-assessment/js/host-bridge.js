@@ -229,7 +229,7 @@
             closeBanner();
             hooks.openFile(file, handle);
           });
-        }).catch(function () { pointAtLoad(name, "The file could not be read from where it was; it may have been moved or renamed."); });
+        }).catch(function () { pointAtLoad(name, "The file could not be read. It may have been moved or renamed."); });
       } },
       { text: "Not now", onClick: closeBanner }
     ]);

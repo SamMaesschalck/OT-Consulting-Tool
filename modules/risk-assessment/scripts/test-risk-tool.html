@@ -89,7 +89,7 @@
     proj.srs.adversaryClass = 4;
     s = RT.suggestZone(z, proj);
     ok(s.byFR.IAC.sl === 3, "adversary class 4 does not raise SL beyond risk-derived");
-    ok(s.byFR.IAC.trace.join(" ").indexOf("FLAG") >= 0, "adversary mismatch flagged in trace");
+    ok(s.byFR.IAC.trace.join(" ").indexOf("Mismatch:") >= 0, "adversary mismatch flagged in trace");
     proj.srs.adversaryClass = null;
 
     // --- conduit inherits higher endpoint per FR ---
@@ -231,7 +231,7 @@
     ok(doc.body.textContent.indexOf("Systems & evidence observed") >= 0, "Basis stage captures systems observed");
     ok(doc.body.textContent.indexOf("Preparation guidance") >= 0, "Basis stage shows preparation guidance");
     ok(doc.body.textContent.indexOf("Often forgotten") >= 0 && doc.body.textContent.indexOf("Key stakeholders to interview") >= 0, "guidance lists forgotten docs and key stakeholders");
-    ok(doc.body.textContent.indexOf("not a fixed list") >= 0, "guidance is framed as advisory, not a checklist");
+    ok(doc.body.textContent.indexOf("Advisory only") >= 0, "guidance is framed as advisory, not a checklist");
     ok(w.App.Data.engagementGuidance && w.App.Data.engagementGuidance.oftenForgotten.length >= 5, "guidance data mirror loaded");
     // guidance must never pre-populate the registers: only the one interview
     // this test added earlier should exist

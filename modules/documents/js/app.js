@@ -259,12 +259,12 @@
     if (size <= M.LIMITS.warnBytes) return;
     ui.warned = doc.id;
     toast("The pictures and kept content in this document are over " + mb(M.LIMITS.warnBytes) + " MB (" + mb(size) +
-      " MB). It still saves. Nothing more can be added past " + mb(M.LIMITS.refuseBytes) + " MB.", "warn");
+      " MB). It still saves, but nothing more can be added past " + mb(M.LIMITS.refuseBytes) + " MB.", "warn");
   }
   function canAdd(bytes) {
     if (!state.doc) return false;
     if (M.sizeOf(state.doc) + (Number(bytes) || 0) <= M.LIMITS.refuseBytes) return true;
-    toast("That was not added: it would take the pictures and kept content in this document past " + mb(M.LIMITS.refuseBytes) + " MB.", "err");
+    toast("Not added: the pictures and kept content in this document would go over " + mb(M.LIMITS.refuseBytes) + " MB.", "err");
     return false;
   }
 
@@ -509,7 +509,7 @@
         ui.offer = null;
         ui.passed = answer;
         return setDoc(doc, { from: "autosave" }).then(function (opened) {
-          if (opened) toast("Restored. It is not in a file until you save it.");
+          if (opened) toast("Restored. Save it to keep it in a file.");
           return opened;
         });
       }, function () {
@@ -613,7 +613,7 @@
       // even when it goes by the same id.
       var same = doc && doc.id === ui.offer.id, when = fmtWhen(ui.offer.time), named = (ui.offer.title || "Untitled document") + (when ? ", from " + when : "");
       list.push(banner("doc-offer",
-        same ? "This browser holds unsaved work on this document: " + named + ". Autosave is paused until you choose."
+        same ? "This browser holds unsaved work on this document: " + named + ". Autosave is paused until you restore or discard it."
           : "Unsaved work was found in this browser: " + named + ".", [
           h("button", { type: "button", class: "btn primary", id: "doc-offer-restore", text: "Restore it", onClick: restoreOffer }),
           h("button", { type: "button", class: "btn", id: "doc-offer-discard", text: "Discard it", onClick: declineOffer })
@@ -851,7 +851,7 @@
   function fallbackPage(main, page) {
     main.appendChild(h("h1", { class: "page-title", tabindex: "-1", text: page === "welcome" ? "OT Cyber Document Tool" : PAGE_NAMES[page] }));
     if (page !== "welcome") return;
-    main.appendChild(h("p", { text: "Write a document in the SolutionsPT template, or bring in a Word file and have it rebuilt in the template." }));
+    main.appendChild(h("p", { text: "Write a document in the SolutionsPT template, or load a Word file to have it rebuilt in the template." }));
     main.appendChild(h("div", { class: "btn-row" }, [
       h("button", { type: "button", class: "btn primary", text: "New document", onClick: function () { newDocument(); } }),
       h("button", { type: "button", class: "btn", text: "Load a document or a Word file", onClick: chooseFile }),
@@ -941,7 +941,7 @@
     var file = files.filter(function (f) { return /\.(json|docx|doc)$/i.test(f.name || ""); })[0] || files[0];
     if (!file) return;
     if (/^image\//.test(file.type || "")) { toast("To add a picture, drop it on the page in Edit, or use Insert picture there.", "warn"); return; }
-    if (files.length > 1) toast("One file is opened at a time: " + file.name + ".", "warn");
+    if (files.length > 1) toast("Only one file can be opened at a time. Opening " + file.name + ".", "warn");
     loadFile(file, null);
   });
 

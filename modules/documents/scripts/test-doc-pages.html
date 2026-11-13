@@ -273,7 +273,7 @@
       });
     });
     ok(bad.length === 0, "every code has its own sentence, for one and for many", bad.join(" | "));
-    ok(F.sentence({ code: "front-matter", count: 9 }) === "The original starts with 9 blocks before its first heading. This is often its own cover, document control table or contents list, which the template now provides. Check whether you still need them.",
+    ok(F.sentence({ code: "front-matter", count: 9 }) === "The original starts with 9 blocks before its first heading. This is often its own cover, document control table or contents list, which the template already prints. Check whether you still need them.",
        "front matter reads as designed", F.sentence({ code: "front-matter", count: 9 }));
     ok(/^1 comment was not/.test(F.sentence({ code: "comments", count: 1 })) && /^4 comments were not/.test(F.sentence({ code: "comments", count: 4 })), "one and many agree with their verb");
     ok(/^Headers and footers were not carried over\. The SolutionsPT header and footer replace them\.$/.test(F.sentence({ code: "headers-footers", count: 2 })), "headers and footers read as designed");
@@ -389,7 +389,7 @@
     reset();
     click($("dp-report-edit"));
     ok(JSON.stringify(calls.go[0]) === '["edit",null]' || (calls.go[0] && calls.go[0][0] === "edit" && calls.go[0][1] === undefined), "Go to the document opens the editor", JSON.stringify(calls.go));
-    ok(/stays in the sidebar/.test(main.querySelector(".dp-report-go").textContent), "and the page says it stays available");
+    ok(/come back to this report from the sidebar/.test(main.querySelector(".dp-report-go").textContent), "and the page says it stays available");
     ok(wordingProblems().length === 0, "report: no uppercase labels and no dashes", wordingProblems().join(" | "));
 
     // Remove them
@@ -468,7 +468,7 @@
       ]
     }));
     draw(P.preview);
-    ok($("dp-preview-note").textContent === "A preview. Word decides where pages break. Drawings kept from an imported file are shown as placeholders here and print in the Word export as they were.",
+    ok($("dp-preview-note").textContent === "Word decides where the pages break. Drawings kept from an imported file show as placeholders here and print in the Word export as they were.",
        "the preview says once what it is", $("dp-preview-note").textContent);
     var sheets = Array.prototype.slice.call(main.querySelectorAll(".dp-sheet"));
     var parts = sheets.map(function (s) { return s.getAttribute("data-part") + (s.classList.contains("land") ? "-land" : ""); });

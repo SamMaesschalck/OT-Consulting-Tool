@@ -319,7 +319,7 @@
     ok(lb.left >= sb.left + 95 && lb.right <= sb.right - 95, "inside the sheet's margins", lb.left + "-" + lb.right);
     ok(prev.querySelectorAll('[id^="blk-"]').length === 0 && prev.querySelectorAll("[contenteditable=true], [contenteditable='']").length === 0, "the preview still holds no block ids and nothing that can be edited");
     ok(getComputedStyle(sheets[0].querySelector("sup.fn")).cursor !== "pointer", "a reference does not look as if it opens something here", getComputedStyle(sheets[0].querySelector("sup.fn")).cursor);
-    ok($("dp-preview-note").textContent === "A preview. Word decides where pages break. Drawings kept from an imported file are shown as placeholders here and print in the Word export as they were.", "the preview's note is unchanged");
+    ok($("dp-preview-note").textContent === "Word decides where the pages break. Drawings kept from an imported file show as placeholders here and print in the Word export as they were.", "the preview's note is unchanged");
     // The same words reach the Word file.
     return HD.buildDocument(d, { issueStatus: "draft" }).then(function (r) { return A.ZipIO.read(r.blob); }).then(function (parts) {
       var p = parts.filter(function (x) { return x.name === "word/footnotes.xml"; })[0], xml = p ? new TextDecoder().decode(p.bytes) : "";

@@ -602,7 +602,7 @@
       function pick(v) { return function () { fileQuestion = null; m.close(); cb(v); }; }
       return [
         h("h2", { text: "Your review of the open pack is not saved" }),
-        h("p", { text: "Opening this pack leaves it behind. Save it first if you want to keep it in your review file." }),
+        h("p", { text: "Save it first if you want to keep it in your review file. Opening this pack without saving leaves it behind." }),
         h("div", { class: "rr-modal-choices" }, [
           h("button", { type: "button", class: "btn primary", id: "rr-leave-no", text: "Stay on the open pack", onClick: m.cancel }),
           h("button", { type: "button", class: "btn", id: "rr-leave-yes", text: "Open the pack without saving", onClick: pick(true) })
@@ -1960,7 +1960,7 @@
     }
     tb.push(findBox());
     tb.push(h("button", { type: "button", class: "btn sm", id: "rr-keys", text: "Keyboard", title: "The keys that work on this page", onClick: showKeys }));
-    tb.push(h("span", { class: "muted", text: "Click any paragraph, heading or table to comment. Click a table cell to comment on that cell. Select some words first and the comment is about those words." }));
+    tb.push(h("span", { class: "muted", text: "Click a paragraph, heading, table or table cell to comment on it. Select some words first to comment on just those words." }));
     main.appendChild(h("h1", { class: "page-title", text: (e.instrumentTitle || "Report") }));
     // Who and which round stay in view at any width (the header hides them
     // on a narrow window); with two reports, which one this is.
@@ -2630,7 +2630,7 @@
   }
   function renderChecklist(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Checklist" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Your answers go in your review file. A no is worth a comment saying why." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Your answers go in your review file. If you answer no, add a comment saying why." }));
     checklistItems().forEach(function (g) {
       main.appendChild(card(g.title, null, g.items.map(function (q) {
         var a = answerOf(q.id) || {};
@@ -2718,7 +2718,7 @@
   }
   function renderChecks(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Automatic checks" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Possible problems found automatically in this pack. Look at each one in place, then make it a comment or dismiss it." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Possible problems in this pack. Look at each one in place, then make it a comment or dismiss it." }));
     var all = currentChecks(), active = all.filter(function (r) { return !isDismissed(r); }), gone = all.length - active.length;
     // What was found first, in the checks' own order; the clean checks folded
     // into one card, each opening to say what it looked for.
@@ -3056,7 +3056,7 @@
   // ---------- welcome and about ----------
   function renderWelcome(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Report review" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Read a report as the client will, look behind it at the engagement, and give your comments here rather than by marking up a Word file." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Read a report as the client will, look at the engagement behind it, and comment here instead of marking up a Word file." }));
     var drop = h("div", { class: "rr-drop", id: "rr-drop" }, [
       h("p", { text: "Drop a review pack here, or" }),
       h("button", { type: "button", class: "btn primary", id: "rr-open", text: "Open a review pack", onClick: chooseFiles }),
@@ -3294,9 +3294,9 @@
     var when = fmtDate(snap.savedOn) + " " + (function () { var d = new Date(snap.savedOn); return isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); })();
     var other = !snap.overFile && snap.someoneElse;
     var text = snap.overFile
-      ? "Unsaved work on this review from " + when + " was found that is not in the review file you opened. Restore adds it to the file; nothing in the file is lost."
-      : other ? "Unsaved work by " + other + " on this pack, from " + when + ", was found in this browser."
-      : "Unsaved review work on this pack from " + when + " was found." + (hasWork(state.review) ? " Restore adds it to what you have done since." : "");
+      ? "Unsaved work on this review from " + when + " is not in the review file you opened. Restore adds it to the file, and keeps everything already in it."
+      : other ? "Unsaved work by " + other + " on this pack, from " + when + ", is kept in this browser."
+      : "This browser kept unsaved review work on this pack from " + when + "." + (hasWork(state.review) ? " Restore adds it to what you have done since." : "");
     function restore() {
       state.review = withOffered();
       state.restore = null;

@@ -379,7 +379,7 @@
       return A.D.loadText("Beta.json", sibling.text, fakeHandle(A, "Beta.json", sibling.text));
     }).then(function () {
       var text = A.q("#doc-offer .t").textContent;
-      ok(/^This browser holds unsaved work on this document: Proposal for Alpha, from \d/.test(text) && /Autosave is paused until you choose\.$/.test(text), "62: with the sibling open, the banner names the copy it holds by its own title and time", text);
+      ok(/^This browser holds unsaved work on this document: Proposal for Alpha, from \d/.test(text) && /Autosave is paused until you restore or discard it.$/.test(text), "62: with the sibling open, the banner names the copy it holds by its own title and time", text);
       return later(300).then(function () { return blobBytes(mem.blobs[Alpha.id][Alpha.key]); });
     }).then(function (b) {
       ok(same(b, picX), "62: opening the sibling does not write its picture over the one in the copy on offer");

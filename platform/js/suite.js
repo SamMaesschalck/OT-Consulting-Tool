@@ -978,8 +978,8 @@
       ]),
       body,
       h("div", { class: "recent-foot", text: list.length
-        ? "The list holds each file's name, its customer, system or document title and the time, not its contents. Picking one switches to its tool, which offers to reopen the file if the browser still has access to it, or shows where to load it from."
-        : "The list holds each file's name, its customer, system or document title and the time, not its contents." })
+        ? "The list keeps only each file's name, its customer, system or document title and the time. Picking one switches to its tool, which offers to reopen the file if the browser still has access to it, or shows where to load it from."
+        : "The list keeps only each file's name, its customer, system or document title and the time." })
     ]);
   }
 
@@ -1011,13 +1011,13 @@
       flow.push(step(review, "A colleague comments on the report and the engagement behind it, and gives a verdict."));
       flow.push(link("back", "Review file", "Goes back to the author, who brings the comments in with Import review files."));
     }
-    if (docs) flow.push(step(docs, "Proposals, method statements and other documents in the SolutionsPT template, written here or brought in from a Word file. It works on its own: no file passes between it and the other tools.", true));
+    if (docs) flow.push(step(docs, "Proposals, method statements and other documents in the SolutionsPT template, written here or brought in from a Word file. No files pass between it and the other tools.", true));
     // Dropping files is said by the empty Recent files; once the list has
     // entries, this is the only place that says it.
     var tips = [];
     if (readRecent().length) tips.push("Drop a project file, document file, review pack or review file anywhere in the suite and it opens in the right tool.");
     tips.push("A tool you leave keeps your work until you close it or the suite. In the rail, a ring on a tool means it is open and a filled amber dot means it has unsaved changes. The suite asks before closing while any tool has them.");
-    tips.push("To close a tool, use the cross beside it in the rail or Close on its card. It opens fresh the next time, as if it had never been opened.");
+    tips.push("To close a tool, use the cross beside it in the rail or Close on its card. It opens fresh the next time.");
     return h("section", { class: "card help-card", "aria-labelledby": "help-h" }, [
       h("div", { class: "card-h" }, [h("h2", { id: "help-h", text: "How the tools fit together" })]),
       h("div", { class: "card-b" }, [
