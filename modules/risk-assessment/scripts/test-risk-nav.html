@@ -1,0 +1,478 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool navigation and gates</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 3a of docs/risk-tool-redesign.md: the sidebar by page id with a status
+  per step from the one completeness list, Home (the kind of assessment, the
+  steps, Open the demo), Assign to zone, the risk comparison (step 4), the
+  linked readiness list on Check and issue, the in-page Generate anyway panel
+  in place of the browser's confirm, the old page ids (hlreport, wordpreview,
+  slt), lastStage through Save and Load, and a file that uses the new fields
+  read by the released v0.7 normaliser (scripts/fixtures/v0.7-normaliser.js).
+-->
+<iframe id="app" src="../index.html" style="width:1280px;height:800px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/v0.7-normaliser.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 30000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 140)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.RiskReportPage) { if (++tries > 200) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function run(w) {
+    var RT = w.RiskTool, MG = w.RiskApp.Migrate, d = w.document, RULES = w.App.Data.sltRules;
+    var confirms = 0;
+    w.confirm = function () { confirms++; return true; };
+    w.alert = function () {};
+    var KEY = RT.AUTOSAVE_KEY, keptSnap = null;
+    try { keptSnap = w.localStorage.getItem(KEY); w.localStorage.removeItem(KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function nav(stage) { return d.querySelector('#sidebar .nav-item[data-stage="' + stage + '"]'); }
+    function active() { var a = d.querySelector("#sidebar .nav-item.active"); return a ? a.getAttribute("data-stage") : null; }
+    function navStatus(stage) { var s = nav(stage) && nav(stage).querySelector(".nav-status"); return s ? s.textContent : null; }
+    function texts(doc) { return RT.readiness(doc).map(function (i) { return i.text; }); }
+    function has(list, re) { return list.some(function (t) { return re.test(t); }); }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    // Assign to zone: choose in the list, then press Assign (choosing alone records nothing).
+    function assign(sel, v) { change(sel, v); sel.parentNode.querySelector('[data-action="assign"]').click(); }
+    function key(el, k) { el.dispatchEvent(new w.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true })); }
+
+    // ---- boot: Home, and the sidebar by page id -------------------------------------
+    ok(RT.state.stage === "home" && active() === "home", "the tool opens on Home");
+    var ids = [].map.call(d.querySelectorAll("#sidebar .nav-item"), function (n) { return n.getAttribute("data-stage"); }).join(",");
+    // Phase 3b: steps 6 (spec) and 7 (approval) join the sidebar after step 5.
+    ok(ids === "home,basis,suc,srs,zones,compare,risk,spec,approval,report,review,peer,about", "every sidebar entry carries its page id, in the planned order", ids);
+    ok(/^6 Requirements specification/.test(nav("spec").textContent) && /^7 Approval/.test(nav("approval").textContent), "steps 6 and 7 are numbered and named in plain words");
+    ok(/^1 Scope and risk criteria/.test(nav("suc").textContent) && /^2 High-level risk/.test(nav("srs").textContent) && /^3 Zones and conduits/.test(nav("zones").textContent) && /^4 Risk comparison/.test(nav("compare").textContent) && /^5 Detailed risk/.test(nav("risk").textContent),
+      "the five steps are numbered and named in plain words");
+    ok(/^Engagement and evidence/.test(nav("basis").textContent) && /^Report/.test(nav("report").textContent) && /^Check and issue/.test(nav("review").textContent) && /^Peer review/.test(nav("peer").textContent) && /^About/.test(nav("about").textContent),
+      "with engagement and evidence first, three report entries, and About last");
+    ok(!d.querySelector("#sidebar .nav-section-title"), "and no small labels above the groups");
+    // The keyboard: each entry is a button in the tab order, the open page is marked, and Enter or Space opens it.
+    var items0 = [].slice.call(d.querySelectorAll("#sidebar .nav-item"));
+    ok(items0.length === 13 && items0.every(function (n) { return n.getAttribute("role") === "button" && n.getAttribute("tabindex") === "0"; }) && nav("home").getAttribute("aria-current") === "page" && nav("suc").getAttribute("aria-current") === "false",
+      "each sidebar entry is a keyboard button, and the open page is marked aria-current");
+    key(nav("zones"), "Enter");
+    ok(RT.state.stage === "zones" && nav("zones").getAttribute("aria-current") === "page" && d.activeElement === nav("zones"), "Enter on a sidebar entry opens its page, and the focus stays on that entry", d.activeElement && (d.activeElement.tagName + " " + d.activeElement.getAttribute("data-stage")));
+    key(nav("suc"), " ");
+    ok(RT.state.stage === "suc" && d.activeElement === nav("suc"), "and so does Space");
+    RT.navigate("home");
+    ok(d.activeElement === main().querySelector("h1.page-title") && main().querySelector("h1.page-title").getAttribute("tabindex") === "-1", "a page opened any other way puts the focus on its heading");
+    var st0 = RT.stepStatus();
+    ok(st0.suc.state === "empty" && navStatus("suc") === "Not started" && st0.srs.state === "empty" && st0.zones.state === "empty" && st0.compare.state === "empty" && st0.risk.state === "empty" && st0.basis.state === "empty",
+      "on an empty project every step reads Not started", JSON.stringify(st0));
+    ok(st0.review.state === "open" && st0.review.open === RT.completeness().length && navStatus("review") === st0.review.open + " open", "and Check and issue counts what is open", JSON.stringify(st0.review));
+    var m = main();
+    ok(!!m.querySelector('[data-assessment-type="high-level"]') && !!m.querySelector('[data-assessment-type="full"]') && !!d.getElementById("home-demo"), "Home offers a high-level assessment only or a full assessment, and Open the demo");
+    var homeIds = [].map.call(m.querySelectorAll(".home-steps li"), function (li) { return li.getAttribute("data-stage"); }).join(",");
+    ok(homeIds === "basis,suc,srs,zones,compare,risk,spec,approval,review" && m.querySelector('.home-steps li[data-stage="suc"] .nav-status').textContent === "Not started", "and lists the steps with their status", homeIds);
+    m.querySelector('.home-steps li[data-stage="srs"] button').click();
+    ok(RT.state.stage === "srs" && active() === "srs", "a step on Home opens it");
+    ok(d.activeElement === main().querySelector("h1.page-title"), "with the focus on the step's heading");
+
+    // ---- the kind of assessment: high-level only ---------------------------------------
+    RT.navigate("home");
+    main().querySelector('[data-assessment-type="high-level"]').focus();
+    main().querySelector('[data-assessment-type="high-level"]').click();
+    ok(P().assessmentType === "high-level" && RT.isDirty() && main().querySelector('[data-assessment-type="high-level"]').getAttribute("aria-pressed") === "true", "choosing high-level only is stored on the project (assessmentType)");
+    ok(d.activeElement === main().querySelector('[data-assessment-type="high-level"]'), "and the choice keeps the keyboard focus");
+    ok(navStatus("zones") === "Not needed" && navStatus("compare") === "Not needed" && navStatus("risk") === "Not needed", "and the zone steps read Not needed while they are empty");
+    P().suc.name = "Nav Works"; P().suc.scopeStatement = "Unit 1.";
+    P().counters.hla = 3;
+    P().srs.highLevelAssets.push({ id: "A1", name: "DCS", functionLocation: "Control room", consequence: "serious", likelihood: "high", note: "" });
+    P().srs.highLevelAssets.push({ id: "A2", name: "Lab link", functionLocation: "Lab", consequence: "minor", likelihood: "low", note: "" });
+    P().srs.highLevelAssets.push({ id: "A3", name: "CCTV", functionLocation: "Site", consequence: "", likelihood: "", note: "" });
+    RT.navigate("srs");
+    var row1 = main().querySelector('[data-hla-id="A1"]');
+    ok(!!row1 && !!row1.querySelector('[data-detailed="required"].suggested') && /Above tolerable/.test(row1.textContent), "high-level only: the ranking has the comparison as a column, the suggestion dashed");
+    ok(!main().querySelector('select[data-action="assign-zone"]') && !/Assign to zone|New zone/.test(main().textContent) && /decide where a detailed assessment is needed/.test(main().querySelector(".page-sub").textContent) && !/assign them to zones/.test(main().querySelector(".page-sub").textContent),
+      "high-level only: no zone column with no zones, and the sub-title does not ask for zones", main().querySelector(".page-sub").textContent);
+    var hl = texts("highLevel");
+    ok(has(hl, /^A1 \(DCS\): the decision on a detailed assessment is not confirmed\.$/) && has(hl, /^A2 \(Lab link\): the decision on a detailed assessment is not confirmed\.$/) && has(hl, /^A3 \(CCTV\): impact not rated\.$/) && !has(hl, /^A3 .*decision/), "the high-level report's readiness lists each undecided system and the unrated one (which has nothing to compare)", hl.join(" | "));
+    ok(RT.stepStatus().srs.state === "open" && navStatus("srs") === RT.stepStatus().srs.open + " open", "and step 2 shows them as open");
+    row1.querySelector('[data-detailed="not-required"]').focus();
+    row1.querySelector('[data-detailed="not-required"]').click();
+    row1 = main().querySelector('[data-hla-id="A1"]');
+    ok(P().srs.highLevelAssets[0].detailed.required === false && d.activeElement === row1.querySelector('[data-detailed="not-required"]'), "a choice is one click, and keeps the keyboard focus");
+    ok(!!row1.querySelector('input[data-reason="detailed"]') && has(texts("highLevel"), /^A1 \(DCS\): the decision differs from the comparison and has no reason\.$/), "a choice against the comparison asks for its reason");
+    type(row1.querySelector('input[data-reason="detailed"]'), "Retired next quarter.");
+    ok(!has(texts("highLevel"), /^A1 /) && P().srs.highLevelAssets[0].detailed.reason === "Retired next quarter.", "and the reason settles it");
+    // An impact with no likelihood gives no risk band: it is listed, not passed over.
+    var a3 = P().srs.highLevelAssets[2];
+    a3.consequence = "serious";
+    ok(RT.hlaComparison(a3).suggested === null && has(texts("highLevel"), /^A3 \(CCTV\): likelihood not rated, so there is nothing to compare with tolerable risk\.$/), "high-level only: a system rated for impact alone is listed as having nothing to compare", texts("highLevel").join(" | "));
+    a3.detailed = { required: false, reason: "" };
+    ok(has(texts("highLevel"), /^A3 \(CCTV\): the decision has no initial risk to rest on and no reason\.$/) && !has(texts("highLevel"), /^A3 \(CCTV\): likelihood not rated/), "a decision recorded with nothing to compare asks for its reason");
+    a3.detailed.reason = "Camera network only.";
+    ok(!has(texts("highLevel"), /^A3 /), "and the reason settles it");
+    a3.consequence = ""; delete a3.detailed;
+    // Check and issue, high-level only: the high-level report first, the detailed one set aside.
+    RT.navigate("review");
+    var cards = [].map.call(main().querySelectorAll("[data-readiness]"), function (c) { return c.getAttribute("data-readiness"); }).join(",");
+    ok(cards === "highLevel,detailed" && /Not part of a high-level-only assessment/.test(main().querySelector('[data-readiness="detailed"]').textContent) && !/Not part of/.test(main().querySelector('[data-readiness="highLevel"]').textContent),
+      "high-level only: Check and issue puts the high-level report first, and marks the detailed one as not part of it", cards);
+    RT.navigate("home");
+    main().querySelector('[data-assessment-type="full"]').click();
+    ok(P().assessmentType === "full" && navStatus("zones") === "Not started" && !RT.completeness().some(function (i) { return /decision on a detailed assessment/.test(i.text); }), "a full assessment asks for no decision on the ranking: it is made per zone and conduit");
+
+    // ---- Assign to zone --------------------------------------------------------------
+    RT.navigate("srs");
+    ok(!main().querySelector('[data-detailed]'), "a full assessment's ranking has no decision column");
+    var sel = main().querySelector('[data-hla-id="A1"] select[data-action="assign-zone"]');
+    ok(!!sel && !/Detail →/.test(main().textContent), "each ranked system offers Assign to zone, in place of Detail →");
+    // Browsing the list (an arrow key fires change on a closed select) records nothing and stays on the page.
+    var btnA = sel.parentNode.querySelector('[data-action="assign"]');
+    ok(!!btnA && btnA.disabled, "Assign waits for a zone to be chosen");
+    sel.focus(); change(sel, "new");
+    ok(P().zones.length === 0 && RT.state.stage === "srs" && !btnA.disabled && d.activeElement === sel, "choosing a zone alone assigns nothing, leaves the page as it is and keeps the focus");
+    btnA.click();
+    var z1 = P().zones[0];
+    ok(P().zones.length === 1 && z1.id === "Z1" && z1.name === "DCS" && same(z1.hlaIds, ["A1"]) && z1.fromHLA === "A1", "New zone creates a zone named after the system, holding it (hlaIds), with fromHLA its mirror", JSON.stringify(z1.hlaIds));
+    ok(z1.threats.length === 0, "and seeds no threat");
+    var card1 = main().querySelector('[data-owner-id="Z1"]');
+    ok(RT.state.stage === "zones" && active() === "zones" && card1 && card1.classList.contains("check-flash"), "it lands on step 3, on the zone");
+    ok(/Ranked systems: A1 DCS/.test(card1.textContent), "and the zone names the ranked systems it holds");
+    RT.navigate("srs");
+    assign(main().querySelector('[data-hla-id="A2"] select[data-action="assign-zone"]'), "Z1");
+    ok(same(z1.hlaIds, ["A1", "A2"]) && z1.fromHLA === "A1" && RT.state.stage === "zones" && P().zones.length === 1, "an existing zone takes a second system, after the first");
+    var ir = RT.initialRiskOf(z1);
+    ok(ir.band === "high" && ir.source === "systems" && ir.systems.length === 2, "the zone's initial risk is the worst of its systems (high, not low)", JSON.stringify(ir.band));
+    RT.navigate("srs");
+    ok(/Z1/.test(main().querySelector('[data-hla-id="A1"]').textContent) && !main().querySelector('[data-hla-id="A1"] select option[value="Z1"]'), "the ranking shows each system's zone, and does not offer it again");
+    P().assessmentType = "high-level"; RT.navigate("srs");
+    ok(main().querySelector('[data-hla-id="A1"] .assign-ro').textContent === "Z1" && !main().querySelector('select[data-action="assign-zone"]') && !main().querySelector('[data-action="unassign-Z1"]'), "high-level only, with zones: the zone column is shown read-only");
+    P().assessmentType = "full"; RT.navigate("srs");
+    main().querySelector('[data-hla-id="A1"] [data-action="unassign-Z1"]').click();
+    ok(same(z1.hlaIds, ["A2"]) && z1.fromHLA === "A2" && RT.initialRiskOf(z1).band === "low", "taking the first system out moves fromHLA to the next", JSON.stringify(z1.hlaIds));
+    assign(main().querySelector('[data-hla-id="A1"] select[data-action="assign-zone"]'), "Z1");
+    RT.navigate("srs");
+    main().querySelector('[data-hla-id="A2"] .btn.danger').click();
+    ok(same(z1.hlaIds, ["A1"]) && z1.fromHLA === "A1" && P().srs.highLevelAssets.length === 2, "a system taken out of the ranking leaves no zone pointing at it");
+    // A zone from an older file has only fromHLA: it reads as a list of one, and a second system keeps it first.
+    var zOld = RT.emptyZone(5); zOld.id = "Z5"; zOld.name = "Old"; zOld.fromHLA = "A3"; P().zones.push(zOld);
+    ok(same(RT.hlaIdsOf(zOld), ["A3"]) && !("hlaIds" in zOld), "a v0.7 zone's fromHLA reads as its one system, and no list is written until one is needed");
+    RT.navigate("srs");
+    assign(main().querySelector('[data-hla-id="A1"] select[data-action="assign-zone"]'), "Z5");
+    ok(same(zOld.hlaIds, ["A3", "A1"]) && zOld.fromHLA === "A3", "assigning to it writes the list with the old link first");
+    P().zones.pop();
+
+    // ---- the risk comparison (step 4) ----------------------------------------------------
+    var z2 = RT.emptyZone(2); z2.name = "Utilities"; P().zones.push(z2); P().counters.zone = 2;
+    var c1 = RT.emptyConduit(1); c1.fromZone = "Z1"; c1.toZone = "Z2"; c1.name = "Plant LAN"; P().conduits.push(c1);
+    var c2 = RT.emptyConduit(2); c2.fromZone = "Z2"; c2.toZone = "EXT"; c2.name = "Vendor"; P().conduits.push(c2); P().counters.conduit = 2;
+    RT.navigate("compare");
+    m = main();
+    ok(active() === "compare" && m.querySelector(".page-sub .zcr-ref").textContent === "ZCR 4", "step 4 is the risk comparison, with ZCR 4 as its reference");
+    ok(/method used here/.test(m.querySelector(".framing-note").textContent) && /house rule/.test(m.querySelector(".framing-note").textContent) && !/standard requires|the standard says/i.test(m.textContent), "comparing per zone and conduit is stated as the method used, and the conduit rule as a house rule");
+    var rowIds = [].map.call(m.querySelectorAll(".cmp-table tbody tr"), function (r) { return r.getAttribute("data-owner-id"); }).join(",");
+    ok(rowIds === "Z1,Z2,C1,C2", "one table: every zone, then every conduit", rowIds);
+    var cz1 = RT.comparison(z1);
+    ok(cz1.initial === "high" && cz1.suggested === true && cz1.state === "suggested" && m.querySelector('[data-owner-id="Z1"] [data-detailed="required"]').classList.contains("suggested") && /Above tolerable/.test(m.querySelector('[data-owner-id="Z1"]').textContent),
+      "a zone above tolerable risk is suggested for a detailed assessment, shown as a suggestion only");
+    ok(z1.detailed === undefined, "and nothing is recorded until the consultant chooses");
+    ok(RT.comparison(z2).suggested === null && has(texts("detailed"), /^Z2 \(Utilities\): no initial risk to compare with tolerable risk\.$/) && !!m.querySelector('[data-owner-id="Z2"] select[data-action="initial-risk"]'), "a zone with no ranked system has no initial risk until one is entered");
+    change(m.querySelector('[data-owner-id="Z2"] select[data-action="initial-risk"]'), "low");
+    ok(z2.initialRisk === "low" && RT.comparison(z2).source === "entered" && RT.comparison(z2).suggested === false, "entered directly, it is compared (low: not required is suggested)");
+    var cc1 = RT.comparison(c1), cc2 = RT.comparison(c2);
+    ok(cc1.initial === "high" && cc1.source === "zones" && cc2.initial === "low" && cc2.source === "zones", "a conduit takes the higher initial risk of the zones it joins (EXT adds nothing)", cc1.initial + " / " + cc2.initial);
+    change(main().querySelector('[data-owner-id="C2"] select[data-action="initial-risk"]'), "high");
+    cc2 = RT.comparison(c2);
+    ok(c2.initialRisk === "high" && cc2.initial === "high" && cc2.source === "entered" && cc2.ruleBand === "low", "or the one entered for it");
+    ok(RT.stepStatus().compare.state === "open" && RT.stepStatus().compare.open === 4 && navStatus("compare") === "4 open", "step 4 shows four undecided", JSON.stringify(RT.stepStatus().compare));
+    var conf = main().querySelector('[data-action="confirm-compare"]');
+    ok(!!conf && /Confirm suggested \(4\)/.test(conf.textContent), "Confirm suggested offers the four suggestions");
+    conf.focus();
+    conf.click();
+    ok(z1.detailed.required === true && z2.detailed.required === false && c1.detailed.required === true && c2.detailed.required === true && !RT.completeness().some(function (i) { return i.stage === "compare"; }), "and records each as suggested", JSON.stringify([z1.detailed, z2.detailed, c1.detailed, c2.detailed]));
+    ok(d.activeElement === main().querySelector("[data-detailed]"), "and, gone once pressed, hands the focus to the table's first decision", d.activeElement && d.activeElement.tagName);
+    ok(navStatus("compare") === "Done", "step 4 is then Done");
+    main().querySelector('[data-owner-id="Z1"] [data-detailed="not-required"]').click();
+    ok(z1.detailed.required === false && has(texts("detailed"), /^Z1 \(DCS\): the decision differs from the comparison and has no reason\.$/) && !!main().querySelector('[data-owner-id="Z1"] input[data-reason="detailed"]'), "overriding the comparison asks for a reason");
+    type(main().querySelector('[data-owner-id="Z1"] input[data-reason="detailed"]'), "Isolated by air gap.");
+    ok(!RT.completeness().some(function (i) { return i.stage === "compare"; }) && d.activeElement === main().querySelector('[data-owner-id="Z1"] input[data-reason="detailed"]'), "a reason settles it, and the field keeps the focus");
+    main().querySelector('[data-owner-id="Z1"] [data-detailed="not-required"]').click();
+    ok(z1.detailed.required === null && RT.comparison(z1).state === "suggested", "clicking the recorded choice again takes it back");
+    main().querySelector('[data-owner-id="Z1"] [data-detailed="required"]').click();
+    // Not required skips step 5: no threat is asked for, the SL-T and its basis are.
+    var pr = texts("detailed");
+    ok(has(pr, /^Z1 \(DCS\): no threats identified\.$/) && !has(pr, /^Z2 \(Utilities\): no threats/) && has(pr, /^Z2 \(Utilities\): no SL-T set for any FR\.$/), "a zone not needing a detailed assessment is asked for no threats, only its SL-T", pr.join(" | "));
+    z2.slTargetByFR.IAC = 2;
+    ok(has(texts("detailed"), /^Z2 \(Utilities\): SL-T set but no justification\.$/), "set by hand, the SL-T needs its basis in the justification");
+    z2.justification = "Utilities only; corporate SL2 floor.";
+    ok(!has(texts("detailed"), /^Z2 /), "and with it, nothing is open for that zone");
+    RT.navigate("risk");
+    var z2card = main().querySelector('[data-owner-id="Z2"]');
+    ok(active() === "risk" && /Not required/.test(z2card.querySelector(".card-h").textContent) && /No detailed assessment needed \(step 4\)/.test(z2card.textContent), "step 5 marks it, and says what it needs");
+    main().querySelector('.step-tabs [data-tab="slt"]').click();
+    ok(RT.state.stage === "slt" && active() === "risk" && main().querySelector('.step-tabs [data-tab="slt"]').classList.contains("active") && /No detailed assessment needed/.test(main().querySelector('[data-owner-id="Z2"]').textContent), "the SL-T is a tab of step 5 (slt), and says the same");
+    ok(d.activeElement === main().querySelector('.step-tabs [data-tab="slt"]'), "and the tab keeps the keyboard focus");
+
+    // A zone whose ranked system has an impact and no likelihood: the initial risk is entered instead.
+    var a3z = P().srs.highLevelAssets.filter(function (x) { return x.id === "A3"; })[0];
+    a3z.consequence = "serious";
+    var z9 = RT.emptyZone(9); z9.name = "Cameras"; P().zones.push(z9);
+    RT.navigate("srs");
+    assign(main().querySelector('[data-hla-id="A3"] select[data-action="assign-zone"]'), "Z9");
+    ok(same(z9.hlaIds, ["A3"]) && RT.comparison(z9).initial === null && RT.comparison(z9).source === "systems", "a zone whose only system has no likelihood gets no initial risk from it");
+    z9.detailed = { required: true, reason: "" };
+    ok(has(texts("detailed"), /^Z9 \(Cameras\): the decision has no initial risk to rest on and no reason\.$/), "a decision with nothing to compare asks for its reason");
+    delete z9.detailed;
+    RT.navigate("compare");
+    var r9 = main().querySelector('[data-owner-id="Z9"]');
+    ok(/A3 not rated/.test(r9.textContent) && !!r9.querySelector('select[data-action="initial-risk"]'), "step 4 says the system is not rated, and offers the initial risk to enter");
+    change(r9.querySelector('select[data-action="initial-risk"]'), "medium");
+    ok(z9.initialRisk === "medium" && RT.comparison(z9).source === "entered" && RT.comparison(z9).initial === "medium" && RT.comparison(z9).suggested === false, "entered, it is the zone's initial risk, and it is compared");
+    a3z.likelihood = "high";
+    ok(RT.comparison(z9).source === "systems" && RT.comparison(z9).initial === "high", "once the system is rated, its rating is the initial risk");
+    P().zones.pop(); a3z.consequence = ""; a3z.likelihood = "";
+
+    // ---- Check and issue: the readiness list, linked --------------------------------------
+    var th = RT.emptyThreat(7); th.statement = "Unrated."; P().counters.threat = 7; z1.threats.push(th);
+    RT.navigate("review");
+    m = main();
+    var det = m.querySelector('[data-readiness="detailed"]'), hlc = m.querySelector('[data-readiness="highLevel"]');
+    ok(!!det && !!hlc && det.querySelectorAll(".readiness li").length === RT.readiness("detailed").length && hlc.querySelectorAll(".readiness li").length === RT.readiness("highLevel").length, "Check and issue lists what is open in each report");
+    ok(/High-level report/.test(hlc.textContent) && /A3 \(CCTV\): impact not rated/.test(hlc.textContent) && !/Z1/.test(hlc.textContent), "the high-level report's list holds its own items, not the zones'");
+    // Phase 3b: the sign-off card moved from Check and issue to step 7 (Approval).
+    ok(!!m.querySelector('[data-download="word"]') && !!m.querySelector('[data-download="word-hl"]') && !!m.querySelector('[data-download="excel"]') && !!m.querySelector('[data-download="risk-context"]'), "with every download");
+    RT.navigate("approval");
+    ok(!!main().querySelector('[data-check-anchor="approval"]'), "and the asset owner's sign-off is on step 7");
+    RT.navigate("review"); m = main();
+    function goTo(re) {
+      var li = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return re.test(x.textContent); })[0];
+      if (!li) return null;
+      li.querySelector('[data-action="goto"]').click();
+      return li;
+    }
+    var gl = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return /Z1 \(DCS\) \/ T7: likelihood or impact not set/.test(x.textContent); })[0];
+    ok(gl && gl.querySelector('[data-action="goto"]').getAttribute("aria-label") === "Go to: Z1 (DCS) / T7: likelihood or impact not set.", "each Go to names its item for a screen reader");
+    ok(goTo(/Z1 \(DCS\) \/ T7: likelihood or impact not set/) && RT.state.stage === "risk" && main().querySelector('[data-owner-id="Z1"] [data-threat-id="T7"]').classList.contains("check-flash"), "Go to on a threat opens step 5 and flashes the threat");
+    ok(d.activeElement === main().querySelector('[data-owner-id="Z1"] [data-threat-id="T7"]'), "and the keyboard focus lands on the threat");
+    RT.navigate("review");
+    ok(goTo(/C1 \(Plant LAN\): no threats identified/) && RT.state.stage === "risk" && main().querySelector('[data-owner-id="C1"]').classList.contains("check-flash") && d.activeElement === main().querySelector('[data-owner-id="C1"]'), "on a conduit, step 5 and the conduit, with the focus");
+    var nm0 = P().suc.name; P().suc.name = "";
+    RT.navigate("review");
+    ok(/^What is still open in each report/.test(main().querySelector(".page-sub").textContent), "Check and issue's sub-title starts with a capital when the SUC has no name");
+    P().suc.name = nm0;
+    z1.detailed.required = null;
+    RT.navigate("review");
+    ok(goTo(/Z1 \(DCS\): the risk comparison's decision is not confirmed/) && RT.state.stage === "compare" && main().querySelector('[data-owner-id="Z1"]').classList.contains("check-flash"), "on a comparison, step 4 and the zone's row");
+    z1.detailed.required = true;
+    RT.navigate("review");
+    ok(goTo(/A3 \(CCTV\): impact not rated/) && RT.state.stage === "srs" && main().querySelector('[data-hla-id="A3"]').classList.contains("check-flash"), "on a ranked system, step 2 and its row");
+    RT.navigate("review");
+    ok(goTo(/No asset-owner sign-off/) && RT.state.stage === "approval" && main().querySelector('[data-check-anchor="approval"]').classList.contains("check-flash"), "and on the sign-off, its card (step 7)");
+    RT.navigate("review");
+    ok(goTo(/Z1 \(DCS\): no SL-T set/) && RT.state.stage === "slt" && main().querySelector('[data-owner-id="Z1"]').classList.contains("check-flash"), "on an SL-T, step 5's SL-T tab and the zone");
+    var items = RT.completeness();
+    ok(items.every(function (i) { return typeof i.stage === "string" && RT.STAGE_IDS.indexOf(i.stage) >= 0 && /^(detailed|highLevel|both)$/.test(i.doc) && typeof i.text === "string"; }), "every item of the one list names its page and its report");
+    ok(same(RT.exportProblems(), RT.readiness("detailed").map(function (i) { return i.text; })), "and the detailed report's part of it is the old completeness list");
+
+    // ---- Generate anyway: an in-page panel, never the browser's confirm --------------------
+    var downloads = [], origClick = w.HTMLAnchorElement.prototype.click, words = [];
+    w.HTMLAnchorElement.prototype.click = function () { if (this.download) { downloads.push(this.download); return; } return origClick.apply(this, arguments); };
+    var realWord = w.RiskExports.downloadWord;
+    w.RiskExports.downloadWord = function (opts, cb) { words.push(opts && opts.highLevelOnly ? "hl" : "detailed"); if (cb) cb(null); };
+    confirms = 0;
+    RT.navigate("review");
+    main().querySelector('[data-download="risk-context"]').focus();
+    main().querySelector('[data-download="risk-context"]').click();
+    var g = d.getElementById("issue-guard");
+    // Phase 3a review: the export's list is headed "Still open:" (was: "Still open in the detailed report:"), and its button says Export anyway.
+    ok(!!g && /Export the risk context anyway\?/.test(g.textContent) && /Still open:/.test(g.textContent) && /T7: likelihood or impact not set/.test(g.textContent) && downloads.length === 0 && confirms === 0, "an export with items open asks in the page, listing them, and not with confirm()");
+    ok(g.querySelector('[data-action="generate-anyway"]').textContent === "Export anyway" && !/detailed report|Generate/.test(g.textContent), "the export's question speaks of exporting, not of a report");
+    ok(g === main().firstChild && g.getAttribute("role") === "alertdialog" && d.activeElement === g.querySelector('[data-action="generate-anyway"]'), "at the top of the page, with the focus on Generate anyway");
+    RT.render();
+    ok(!!d.getElementById("issue-guard"), "the question stays through a redraw of the page");
+    d.getElementById("issue-guard").querySelector('[data-action="guard-cancel"]').click();
+    ok(!d.getElementById("issue-guard") && downloads.length === 0, "Cancel takes it away and downloads nothing");
+    ok(d.activeElement === main().querySelector('[data-download="risk-context"]'), "and the focus goes back to the button that asked");
+    main().querySelector('[data-download="risk-context"]').focus();
+    main().querySelector('[data-download="risk-context"]').click();
+    key(d.activeElement, "Escape");
+    ok(!d.getElementById("issue-guard") && downloads.length === 0 && d.activeElement === main().querySelector('[data-download="risk-context"]'), "Escape cancels it the same way");
+    main().querySelector('[data-download="risk-context"]').click();
+    d.getElementById("issue-guard").querySelector('[data-action="generate-anyway"]').click();
+    ok(downloads.length === 1 && /risk-context\.json$/.test(downloads[0]) && !d.getElementById("issue-guard"), "Generate anyway goes ahead", downloads.join(","));
+    main().querySelector('[data-download="word"]').click();
+    ok(/Generate the Word report anyway\?/.test(d.getElementById("issue-guard").textContent) && words.length === 0, "the Word download asks the same way");
+    // What is open is worked out again on each redraw: an edit on the page shows in the question.
+    th.likelihood = "low"; th.impact = "minor"; RT.render();
+    ok(!!d.getElementById("issue-guard") && !/T7: likelihood or impact not set/.test(d.getElementById("issue-guard").textContent), "the question's list follows the project, not a copy taken when it was asked");
+    th.likelihood = ""; th.impact = "";
+    RT.navigate("srs");
+    ok(!d.getElementById("issue-guard"), "and the question goes when the page changes");
+    RT.navigate("review");
+    ok(!d.getElementById("issue-guard") && words.length === 0, "without generating anything");
+    P().srs.highLevelAssets[1].consequence = "minor";
+    // Phase 3b: an unconfirmed tolerable risk is open in both reports, so it is confirmed first.
+    P().srs.tolerableConfirmed = P().srs.tolerableRisk;
+    // Phase 3b review: the high-level report asks for a sign-off too, so one is recorded.
+    ok(RT.readiness("highLevel").some(function (i) { return i.text === "No asset-owner sign-off recorded." && i.stage === "approval"; }), "the high-level report asks for the asset owner's sign-off as well");
+    P().approval = { name: "A. Owner", role: "Plant Manager", date: "2026-07-01", statement: "", approved: true };
+    main().querySelector('[data-download="word-hl"]').click();
+    ok(words.join() === "hl" && !d.getElementById("issue-guard") && confirms === 0, "with nothing open in the high-level report, its download asks nothing");
+    // Another project opened on the same page takes the question with it.
+    main().querySelector('[data-download="word"]').click();
+    ok(!!d.getElementById("issue-guard"), "(the question is asked again)");
+    var again = clone(P()); again.lastStage = "review";
+    RT.loadProjectText(JSON.stringify(again));
+    ok(RT.state.stage === "review" && !d.getElementById("issue-guard") && words.join() === "hl", "a project loaded onto the same page does not inherit the question, and nothing is generated");
+    w.RiskExports.downloadWord = realWord;
+    w.HTMLAnchorElement.prototype.click = origClick;
+
+    // ---- the old page ids --------------------------------------------------------------
+    RT.state.stage = "hlreport"; RT.render();
+    m = main();
+    ok(RT.state.stage === "report" && active() === "report" && m.querySelector('.rp-views [data-view="summary"]').classList.contains("active") && m.querySelector('.rp-viewbar .rp-tab[data-doc="highLevel"]').classList.contains("active") && /High-level risk assessment report/.test(m.textContent),
+      "hlreport opens the Report page on the high-level summary");
+    RT.state.stage = "wordpreview"; RT.render();
+    m = main();
+    ok(RT.state.stage === "report" && m.querySelector('.rp-views [data-view="word"]').classList.contains("active") && !!d.getElementById("wp-docs"), "wordpreview opens it on the Word pages");
+    ok([].map.call(m.querySelectorAll(".rp-views [data-view]"), function (b) { return b.textContent; }).join("|") === "Sections|Word pages|Summary", "the Report page has three views: Sections, Word pages, Summary");
+    m.querySelector('.rp-views [data-view="summary"]').focus();
+    m.querySelector('.rp-views [data-view="summary"]').click();
+    ok(d.activeElement === main().querySelector('.rp-views [data-view="summary"]') && main().querySelector('.rp-views [data-view="summary"]').classList.contains("active"), "a view button keeps the keyboard focus after the page is redrawn");
+    ok(!/[—–]/.test(main().textContent) && main().textContent.indexOf("spt-risk-tool/") < 0, "the summary prints no dash placeholders and no tool version");
+    w.RiskReportPage.goTo(1, "executive-summary", "");
+    ok(RT.state.stage === "report" && main().querySelector('.rp-views [data-view="sections"]').classList.contains("active") && w.RiskReportPage.state.doc === 1 && !!main().querySelector(".rp-holder"), "Go to from a review comment opens the sections, on that report");
+    RT.state.stage = "slt"; RT.render();
+    ok(active() === "risk" && main().querySelector('.step-tabs [data-tab="slt"]').classList.contains("active"), "slt still opens, as step 5's SL-T tab");
+    ["suc", "srs", "zones", "risk", "slt", "basis", "report", "review", "peer", "about", "home", "compare", "spec", "approval"].forEach(function (s) {
+      RT.state.stage = s; RT.render();
+      if (RT.state.stage !== s) ok(false, "page id " + s + " opens", RT.state.stage);
+    });
+    ok(true, "every page id of the plan still opens: suc, srs, zones, risk, slt, basis, report, review, peer, about, home, compare, spec, approval");
+
+    // ---- lastStage: Load reopens the last step used -----------------------------------------
+    var written = [], picks = 0;
+    w.showSaveFilePicker = function () { picks++; return Promise.resolve({ name: "nav.json", queryPermission: function () { return Promise.resolve("granted"); },
+      createWritable: function () { return Promise.resolve({ write: function (s) { written.push(s); return Promise.resolve(); }, close: function () { return Promise.resolve(); } }); } }); };
+    RT.forgetProjectFile();
+    RT.navigate("compare");
+    return new Promise(function (res) { RT.saveProject(null, res); }).then(function (r) {
+      var s = JSON.parse(written[written.length - 1]);
+      ok(r.ok && s.lastStage === "compare" && s.schema === "spt-risk-project/0.2" && s.assessmentType === "full", "Save records the step in use (lastStage), and the schema stays 0.2");
+      RT.navigate("home");
+      ok(RT.loadProjectText(written[written.length - 1]) === true && RT.state.stage === "compare" && active() === "compare", "Load reopens it");
+      // Phase 3b: "spec" is now a step, so a later step this build lacks is named instead.
+      var x = clone(s); x.lastStage = "workshop";
+      RT.loadProjectText(JSON.stringify(x));
+      ok(RT.state.stage === "home" && RT.state.project.lastStage === "workshop", "a step this build does not have opens Home, and the field is kept");
+      x.lastStage = "hlreport"; RT.loadProjectText(JSON.stringify(x));
+      ok(RT.state.stage === "report", "an old page id opens where it now lives");
+      x.lastStage = 7; RT.loadProjectText(JSON.stringify(x));
+      ok(RT.state.stage === "home" && !("lastStage" in RT.state.project), "and a broken one is dropped");
+
+      // ---- Open the demo, in this window ------------------------------------------------------
+      RT.loadProjectText(written[written.length - 1]);
+      RT.touched();
+      RT.navigate("home");
+      confirms = 0;
+      d.getElementById("home-demo").click();
+      return poll(function () { return /^Acme Petrochemicals/.test(RT.state.project.suc.name || ""); }, 20000);
+    }).then(function () {
+      var snap = null; try { snap = JSON.parse(w.localStorage.getItem(KEY)); } catch (e) {}
+      ok(confirms === 1 && RT.isTour() && RT.state.stage === "home", "Open the demo asks once over unsaved work, then opens the demo in tour mode");
+      ok(snap && snap.project && snap.project.suc.name === "Nav Works", "the unsaved work is in the autosave copy, and the demo did not replace it");
+      RT.touched(); RT.flushAutosave();
+      var snap2 = null; try { snap2 = JSON.parse(w.localStorage.getItem(KEY)); } catch (e) {}
+      ok(snap2 && snap2.project.suc.name === "Nav Works", "editing the demo writes no autosave");
+      ok(!d.getElementById("home-demo") && /The demo/.test(main().querySelector(".page-sub").textContent), "Home says it is the demo, with no Open the demo");
+      ok(RT.exportProblems().length === 0 && RT.stepStatus().review.state === "done" && ["basis", "suc", "srs", "zones", "compare", "risk", "spec", "approval"].every(function (s) { return RT.stepStatus()[s].state === "done"; }), "every step of the demo is Done", JSON.stringify(RT.stepStatus()));
+      var pk = picks;
+      return new Promise(function (res) { RT.saveProject(null, res); }).then(function () {
+        ok(picks === pk + 1, "Save in the demo always asks where, so it never writes over a real project's file");
+        d.getElementById("btn-new").click();
+        ok(!RT.isTour() && RT.state.stage === "home" && !!d.querySelector(".autosave-bar"), "New leaves the demo, and offers the real work back");
+        [].filter.call(d.querySelectorAll(".autosave-bar button"), function (b) { return /Restore/.test(b.textContent); })[0].click();
+        ok(RT.state.project.suc.name === "Nav Works" && RT.state.project.zones.length === 2, "which Restore brings back");      });
+    }).then(function () {
+      // ---- leaving the demo by Load keeps the real work in autosave, and offers it back --------
+      RT.touched(); RT.flushAutosave();
+      RT.navigate("home");
+      d.getElementById("home-demo").click();
+      return poll(function () { return RT.isTour() && /^Acme Petrochemicals/.test(RT.state.project.suc.name || ""); }, 20000).then(function () {
+        ok(/Autosave is off\./.test(main().querySelector(".page-sub").textContent) && !/not kept/.test(main().querySelector(".page-sub").textContent), "Home in the demo says autosave is off, not that changes are lost");
+        var other = JSON.parse(written[0]); other.suc.name = "Other Works"; other.lastStage = "home";
+        RT.loadProjectText(JSON.stringify(other));
+        var snap3 = null; try { snap3 = JSON.parse(w.localStorage.getItem(KEY)); } catch (e) {}
+        ok(!RT.isTour() && RT.state.project.suc.name === "Other Works" && snap3 && snap3.project.suc.name === "Nav Works", "Load leaves the demo without writing the loaded file over the real work kept in autosave", snap3 && snap3.project.suc.name);
+        var bar = d.querySelector(".autosave-bar");
+        ok(!!bar && d.querySelectorAll(".autosave-bar").length === 1 && /Nav Works/.test(bar.textContent), "and offers that work back, once");
+        [].filter.call(bar.querySelectorAll("button"), function (b) { return /Restore/.test(b.textContent); })[0].click();
+        ok(RT.state.project.suc.name === "Nav Works", "which Restore brings back");
+      });
+    }).then(function () {
+      // ---- a file using the new fields, through the released v0.7 normaliser -----------------
+      var V07 = window.RiskFixtures["v0.7-normaliser"](RT.FR_IDS, RULES.exposureModifiers, RULES.tolerableRisk["default"]);
+      var tour = clone(window.SPT_TOUR_PROJECT);
+      tour.lastStage = "compare";
+      tour.zones[2].hlaIds = ["A3", "A5"];
+      tour.conduits[2].initialRisk = "high";
+      tour.srs.highLevelAssets[4].detailed = { required: false, reason: "Monitored at high level only." };
+      var ours = MG.normaliseProject(clone(tour));
+      var saved = JSON.stringify(ours);
+      var fileNow = JSON.parse(saved);
+      ok(V07.accepts(fileNow.schema) && fileNow.schema === "spt-risk-project/0.2", "a file using the new fields is one v0.7 accepts: the schema is unchanged");
+      var old = V07.normaliseProject(JSON.parse(saved));
+      ok(same(old, fileNow), "v0.7's normaliser changes nothing in it: every new field is additive", JSON.stringify(old).length + " vs " + saved.length);
+      ok(old.assessmentType === "full" && old.lastStage === "compare" && same(old.zones[2].hlaIds, ["A3", "A5"]) && old.zones[2].fromHLA === "A3" && old.conduits[2].initialRisk === "high" && old.conduits[0].detailed.required === false && old.srs.highLevelAssets[4].detailed.required === false,
+        "and keeps them, with fromHLA the first assigned system for v0.7 and the risk context");
+      ok(same(MG.normaliseProject(clone(old)), fileNow), "a file v0.7 loaded and saved again reads back here as this build saved it");
+      ok(RT.buildRiskContext(fileNow).zones[2].fromHighLevelAsset === "A3" && RT.buildRiskContext(fileNow).schema === "spt-risk-context/1.4", "the risk context keeps fromHighLevelAsset (the first system) and stays 1.4");
+      // An older build edits the file: it takes a ranked system out without
+      // touching the zones. The prune clears the link and fromHLA follows.
+      var edited = clone(old);
+      edited.srs.highLevelAssets = edited.srs.highLevelAssets.filter(function (a) { return a.id !== "A3"; });
+      var back = MG.normaliseProject(edited);
+      ok(same(back.zones[2].hlaIds, ["A5"]) && back.zones[2].fromHLA === "A5", "an older build removing the first system: the link is cleared and fromHLA becomes the next", JSON.stringify([back.zones[2].hlaIds, back.zones[2].fromHLA]));
+      var edited2 = clone(old); edited2.zones[2].fromHLA = "A6";
+      var back2 = MG.normaliseProject(edited2);
+      ok(same(back2.zones[2].hlaIds, ["A6", "A3", "A5"]) && back2.zones[2].fromHLA === "A6", "an older build that rewrote fromHLA: that system goes first in the list");
+      var odd = clone(fileNow);
+      odd.assessmentType = "partial"; odd.zones[0].detailed = "yes"; odd.zones[1].detailed = { required: "no", reason: 4 }; odd.zones[1].initialRisk = "huge"; odd.zones[3].hlaIds = "A4";
+      var nOdd = MG.normaliseProject(odd);
+      ok(!("assessmentType" in nOdd) && !("detailed" in nOdd.zones[0]) && same(nOdd.zones[1].detailed, { required: null, reason: "" }) && !("initialRisk" in nOdd.zones[1]) && !("hlaIds" in nOdd.zones[3]) && nOdd.zones[3].fromHLA === "A4", "odd values of the new fields are tidied or dropped, never invented");
+      ok(same(MG.normaliseProject(clone(nOdd)), nOdd), "and a second pass changes nothing");
+    }).then(function () {
+      delete w.showSaveFilePicker;
+      try { if (keptSnap == null) w.localStorage.removeItem(KEY); else w.localStorage.setItem(KEY, keptSnap); } catch (e) {}
+      try { w.onbeforeunload = null; } catch (e) {}
+    });
+  }
+}());
+</script>
+</body>
+</html>

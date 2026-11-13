@@ -67,7 +67,7 @@ window.RiskReportPage = (function () {
 
   function signature() {
     var c = Object.assign({}, project());
-    delete c.review; delete c.savedOn;
+    delete c.review; delete c.savedOn; delete c.lastStage;
     return JSON.stringify(c);
   }
 
@@ -456,7 +456,7 @@ window.RiskReportPage = (function () {
         var into = top || root;
         if (!noted && topKey && ui.open === topKey) {
           noted = true;
-          into.appendChild(h("p", { class: "muted sect-note", text: "Rename the zones and conduits below on the Zones & conduits page." }));
+          into.appendChild(h("p", { class: "muted sect-note", text: "Rename the zones and conduits below on the Zones and conduits page." }));
         }
         into.appendChild(h("h3", { class: "rp-subhead", text: s.title }));
         blocksInto(into, s.blocks, model.media);
@@ -579,7 +579,7 @@ window.RiskReportPage = (function () {
   }
   function render(main, h) {
     ui.h = h;
-    main.appendChild(h("h1", { class: "page-title", text: "Report preview" }));
+    main.appendChild(h("h1", { class: "page-title", text: "Report" }));
     main.appendChild(h("p", { class: "page-sub", text: "The Word report, section by section; use Edit to rename, rewrite or hide one." }));
     ui.tabs = h("div", { class: "rp-tabs", role: "group", "aria-label": "Which report" }, DOCS.map(function (d, i) {
       return h("button", { class: "sl-btn rp-tab", text: d.label, onClick: function () { openDoc(i); } });
@@ -603,6 +603,9 @@ window.RiskReportPage = (function () {
     ui.doc = docIndex === 1 ? 1 : 0;
     ui.open = null;
     ui.reveal = { key: key || "", quote: quote || "" };
+    // The Report page shows the sections, on this report (js/ui-reports.js).
+    var RR = window.RiskApp && window.RiskApp.Reports;
+    if (RR && RR.reportView) RR.reportView("sections", ui.doc);
     RT().state.stage = "report";
     RT().render();
   }

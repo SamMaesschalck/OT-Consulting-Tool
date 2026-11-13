@@ -190,7 +190,7 @@
     ok(t.w.App.HostBridge.hosted && launch.module === "risk-assessment" && launch.tour === false, "it knows it is in the suite, not on its tour");
     ok(R.supportsFilePickers(), "the frame is the suite's own origin, so the file dialogs are available in it");
     ok(R.state.project.zones.length === 0 && !R.state.project.suc.name, "it starts on an empty project");
-    ok(!!(t.w.RiskWordPreview && t.w.App.DocPreview && t.w.App.DocxImport && t.d.getElementById("nav-word-preview")), "its Word preview is there, in the sidebar, with the reader and renderer it needs");
+    ok(!!(t.w.RiskWordPreview && t.w.App.DocPreview && t.w.App.DocxImport && t.d.querySelector('#sidebar .nav-item[data-stage="report"]')), "its Word preview is there, in the sidebar, with the reader and renderer it needs");
     var here = S.document.querySelector("#suite-bar [aria-current='page']");
     ok(S.document.getElementById("suite-bar").offsetWidth > 40 && here && here.getAttribute("data-key") === "risk-assessment" && /OT Cyber Risk Assessment Tool/.test(here.getAttribute("aria-label")) &&
        S.document.querySelector("#suite-bar .bar-tab[data-key='assessments']") && S.document.querySelector("#suite-bar .bar-home"),

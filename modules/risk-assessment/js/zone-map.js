@@ -144,7 +144,7 @@ window.RiskZoneMap = (function () {
     function box(id, name, sub, isExt, safety, worstBand) {
       var q = node[id];
       return {
-        x: q.x, y: q.y, cx: q.cx, w: BW, h: BH, ext: isExt,
+        id: id, x: q.x, y: q.y, cx: q.cx, w: BW, h: BH, ext: isExt,
         stroke: safety ? "#C28A1E" : (worstBand ? RISK_COL[worstBand] : "#0F5FA6"),
         strokeWidth: safety ? 2.5 : (worstBand === "very-high" || worstBand === "high" ? 2.5 : 1.5),
         title: clip(id + (name ? ": " + name : ""), 30), sub: sub
@@ -183,7 +183,8 @@ window.RiskZoneMap = (function () {
       svg.appendChild(svgEl("text", { x: c.lx, y: c.ly + 4, "text-anchor": "middle", "font-size": 10, "font-weight": 600, fill: TEXT, text: c.id }));
     });
     L.boxes.forEach(function (b) {
-      var g = svgEl("g", {});
+      // A zone's box carries its id, so the page can open the zone from it.
+      var g = svgEl("g", b.ext ? {} : { "data-zone-id": b.id });
       g.appendChild(svgEl("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 5, fill: b.ext ? "#ECF1F6" : "#FFFFFF", stroke: b.stroke, "stroke-width": b.strokeWidth, "stroke-dasharray": b.ext ? "5,4" : "none" }));
       g.appendChild(svgEl("text", { x: b.cx, y: b.y + 26, "text-anchor": "middle", "font-size": 12, "font-weight": 600, fill: TEXT, text: b.title }));
       if (b.sub) g.appendChild(svgEl("text", { x: b.cx, y: b.y + 44, "text-anchor": "middle", "font-size": 10, fill: MUTED, text: b.sub }));

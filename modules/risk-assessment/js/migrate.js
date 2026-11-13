@@ -13,10 +13,18 @@
  *     what the old build inferred, as an unconfirmed suggestion. Fields this
  *     build does not know are left alone, so a file from a later build keeps
  *     them through a load and a save.
+ *     The fields phase 3a added (assessmentType, lastStage, a zone's hlaIds
+ *     and initialRisk, a conduit's initialRisk, detailed on zones, conduits
+ *     and ranked systems) are tidied when present and never added, and so
+ *     are phase 3b's (the confirmed tolerable risk, organisational policies,
+ *     zone and conduit characteristics, separation answers, an asset's
+ *     connection, approvals). Where approvals[] is present, approval stays its
+ *     first entry's mirror; one an older build edited wins for that entry.
  *  3. The dangling-id prune: a reference to a record that is not in the file
- *     (a zone's ranked system, a conduit's end) is cleared, never invented.
+ *     (a zone's ranked systems, a conduit's end) is cleared, never invented.
  *     An older build edits a file without maintaining the links a newer one
- *     added, so a link can outlive what it pointed at.
+ *     added, so a link can outlive what it pointed at. A zone's fromHLA is
+ *     kept the first of its hlaIds; one an older build wrote goes first.
  *
  * Running it twice changes nothing the first run did not
  * (scripts/test-risk-migrate.html, on the frozen files in scripts/fixtures/).
@@ -104,6 +112,80 @@ window.RiskApp.Migrate = (function () {
     if (typeof m.existing !== "boolean") m.existing = false;
   }
 
+  // The fields phase 3a added (js/model.js), tidied when present and never
+  // added when absent, so a v0.7 file comes through as it was saved.
+  function isBand(v) { return typeof v === "string" && M.BAND_RANK[v] != null; }
+  function normDetailed(o) {
+    if (!("detailed" in o)) return;
+    var d = o.detailed;
+    if (!d || typeof d !== "object" || Array.isArray(d)) { delete o.detailed; return; }
+    if (d.required !== true && d.required !== false) d.required = null;
+    if (typeof d.reason !== "string") d.reason = "";
+  }
+  function normInitial(o) {
+    if ("initialRisk" in o && !isBand(o.initialRisk)) delete o.initialRisk;
+  }
+  function normNew(data) {
+    if ("assessmentType" in data && M.ASSESSMENT_TYPES.indexOf(data.assessmentType) < 0) delete data.assessmentType;
+    if ("lastStage" in data && (typeof data.lastStage !== "string" || !/^[a-z]+$/.test(data.lastStage))) delete data.lastStage;
+    data.srs.highLevelAssets.forEach(function (a) { if (a && typeof a === "object") normDetailed(a); });
+    (data.zones || []).forEach(function (z) {
+      if ("hlaIds" in z && !Array.isArray(z.hlaIds)) delete z.hlaIds;
+      if (Array.isArray(z.hlaIds)) z.hlaIds = z.hlaIds.filter(function (id) { return typeof id === "string" && id; });
+      normInitial(z); normDetailed(z);
+    });
+    (data.conduits || []).forEach(function (c) { normInitial(c); normDetailed(c); });
+    normNew3b(data);
+  }
+
+  // The fields phase 3b added (js/model.js), tidied when present and never
+  // added when absent.
+  function isStr(v) { return typeof v === "string"; }
+  function normText(o, k) { if (k in o && !isStr(o[k])) delete o[k]; }
+  function normLines(o, k) {
+    if (!(k in o)) return;
+    if (!Array.isArray(o[k])) { delete o[k]; return; }
+    o[k] = o[k].filter(function (x) { return isStr(x) && x; });
+  }
+  function normNew3b(data) {
+    var s = data.srs;
+    if ("tolerableConfirmed" in s && !isBand(s.tolerableConfirmed)) delete s.tolerableConfirmed;
+    if (data.suc && typeof data.suc === "object") normLines(data.suc, "policies");
+    (data.zones || []).forEach(function (z) {
+      M.ZONE_TEXT_FIELDS.forEach(function (k) { normText(z, k); });
+      M.ZONE_LIST_FIELDS.forEach(function (k) { normLines(z, k); });
+      if ("separation" in z) {
+        var sep = z.separation;
+        if (!isObj(sep)) delete z.separation;
+        else Object.keys(sep).forEach(function (k) {
+          var r = sep[k];
+          if (!isObj(r) || M.SEPARATION_ANSWERS.indexOf(r.answer) < 0 && r.answer != null) { delete sep[k]; return; }
+          if (r.answer == null) r.answer = null;
+          if (!isStr(r.reason)) r.reason = "";
+        });
+      }
+      (z.assets || []).forEach(function (a) { if (a && "link" in a && M.ASSET_LINKS.indexOf(a.link) < 0) delete a.link; });
+    });
+    (data.conduits || []).forEach(function (c) {
+      normLines(c, "boundaryDevices");
+      normText(c, "externalParty");
+      if ("direction" in c && M.CONDUIT_DIRECTIONS.indexOf(c.direction) < 0) delete c.direction;
+      M.CONDUIT_MARKERS.forEach(function (k) { if (k in c && c[k] !== true) delete c[k]; });
+    });
+    if ("approvals" in data) {
+      if (!Array.isArray(data.approvals)) delete data.approvals;
+      else {
+        data.approvals = data.approvals.filter(isObj).map(function (e) {
+          ["scope", "name", "role", "organisation", "date", "revision", "fingerprint"].forEach(function (k) { if (!isStr(e[k])) e[k] = ""; });
+          e.approved = !!e.approved;
+          return e;
+        });
+        // v0.7 edits approval alone: the later edit wins for the first entry.
+        M.setApprovals(data, M.approvalsOf(data));
+      }
+    }
+  }
+
   function fillShape(data) {
     var base = M.emptyProject();
     Object.keys(base).forEach(function (k) { if (data[k] == null) data[k] = base[k]; });
@@ -149,6 +231,7 @@ window.RiskApp.Migrate = (function () {
         });
       });
     }
+    normNew(data);
     return data;
   }
 
@@ -163,9 +246,16 @@ window.RiskApp.Migrate = (function () {
     function idsOf(list) { var m = {}; (list || []).forEach(function (x) { if (x && x.id) m[x.id] = true; }); return m; }
     function keepKnown(arr, known) { return arr.filter(function (id) { return known[id]; }); }
     data.zones.forEach(function (z) {
-      // The ranked system a zone was promoted from.
+      // The ranked systems assigned to a zone. fromHLA is the first of them,
+      // kept for v0.7 and the risk context; an older build that edits the file
+      // writes fromHLA only, so a fromHLA missing from the list goes first.
       if (z.fromHLA && !hla[z.fromHLA]) z.fromHLA = "";
-      if (Array.isArray(z.hlaIds)) z.hlaIds = keepKnown(z.hlaIds, hla);
+      if (Array.isArray(z.hlaIds)) {
+        var ids = keepKnown(z.hlaIds, hla), seen = {};
+        if (z.fromHLA && ids.indexOf(z.fromHLA) < 0) ids.unshift(z.fromHLA);
+        z.hlaIds = ids.filter(function (id) { if (seen[id]) return false; seen[id] = true; return true; });
+        z.fromHLA = z.hlaIds[0] || "";
+      }
     });
     data.conduits.forEach(function (c) {
       // A conduit's ends: a zone in the file, or EXT (outside the SUC).

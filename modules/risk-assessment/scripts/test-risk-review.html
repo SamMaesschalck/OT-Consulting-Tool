@@ -53,7 +53,7 @@
       var RT = w.RiskTool, RR = w.RiskReview, RC = w.App.ReviewCore, DB = w.App.DocxBlocks, main = d.getElementById("main");
       var p = RT.state.project;
       ok(!p.review, "a project has no review until one starts");
-      var nav = Array.prototype.filter.call(d.querySelectorAll("#sidebar .nav-item"), function (n) { return /Peer review/.test(n.textContent); })[0];
+      var nav = d.querySelector('#sidebar .nav-item[data-stage="peer"]');
       ok(!!nav, "the sidebar has a Peer review page");
       nav.click();
       ok(/Send for review/.test(main.textContent) && /Import review files/.test(main.textContent), "with Send for review and Import review files");

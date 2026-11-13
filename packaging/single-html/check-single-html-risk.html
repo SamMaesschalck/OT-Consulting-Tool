@@ -80,7 +80,7 @@
     var n = doc.querySelectorAll("#sidebar .nav-item").length;
     for (var i = 0; i < n; i++) {
       var item = doc.querySelectorAll("#sidebar .nav-item")[i];
-      var name = flat(item.textContent).slice(0, 40);
+      var name = item.getAttribute("data-stage");   // pages are found by page id, not label text
       item.click();
       r.pages.push({ name: name, len: flat(doc.getElementById("main").textContent).length });
     }

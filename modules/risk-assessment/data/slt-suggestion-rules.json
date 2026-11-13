@@ -2,11 +2,11 @@
   "schema": "spt-slt-suggestion/2.0",
   "_note": "SL-T suggestion heuristic for the risk tool, now driven by a two-axis risk model (likelihood x impact) as in the IEC 62443-3-2:2020 detailed cyber security risk assessment. HOUSE HEURISTIC: the standard prescribes no matrix; this mapping is a SolutionsPT house default. Every table below is a transparent SolutionsPT default, NOT reproduced from the standard. The tool always shows the rule trace; the consultant always sets the final SL-T (per foundational requirement) with a written justification. Where the client has their own corporate risk matrix, it takes precedence (hardRules).",
   "slDefinitions": {
-    "_note": "Paraphrased from the widely published 62443 SL attacker-class definitions.",
-    "1": "Protection against casual or coincidental violation.",
-    "2": "Protection against intentional violation using simple means, low resources, generic skills, low motivation.",
-    "3": "Protection against intentional violation using sophisticated means, moderate resources, IACS-specific skills, moderate motivation.",
-    "4": "Protection against intentional violation using sophisticated means, extended resources, IACS-specific skills, high motivation."
+    "_note": "HOUSE summary of the four security levels, in SolutionsPT's own words, as the assessment uses them. Not the standard's text.",
+    "1": "Mistakes and chance misuse, with no intent to cause harm.",
+    "2": "A deliberate attacker with general IT skills, simple tools and little time or money.",
+    "3": "A deliberate attacker who knows control systems, using purpose-built tools and a moderate budget.",
+    "4": "A deliberate attacker who knows control systems in depth and has the backing of a large organisation, such as a state."
   },
   "foundationalRequirements": [
     { "id": "IAC", "fr": "FR1", "name": "Identification & authentication control" },
@@ -26,9 +26,9 @@
   ],
   "severityScale": [
     { "id": "negligible", "name": "Negligible", "rank": 0, "note": "No meaningful safety, environmental, operational, financial or regulatory effect." },
-    { "id": "minor",      "name": "Minor",      "rank": 1, "note": "First-aid / short outage / small cost / minor reportable; recoverable within a shift." },
+    { "id": "minor",      "name": "Minor",      "rank": 1, "note": "First aid only, a short outage, a small cost or a minor reportable event, recoverable within a shift." },
     { "id": "serious",    "name": "Serious",    "rank": 2, "note": "Injury, reportable release, multi-shift outage, material cost, or regulatory action." },
-    { "id": "severe",     "name": "Severe",     "rank": 3, "note": "Loss of life, major release, loss of an essential function, or catastrophic cost/regulatory exposure." }
+    { "id": "severe",     "name": "Severe",     "rank": 3, "note": "Loss of life, a major release, loss of an essential function, or catastrophic cost or regulatory exposure." }
   ],
   "likelihoodScale": [
     { "id": "low",    "name": "Low",    "rank": 0, "note": "House default: no known history; would require an unlikely combination of access, capability and intent." },

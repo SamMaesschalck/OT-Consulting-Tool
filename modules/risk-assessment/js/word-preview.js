@@ -23,13 +23,16 @@ window.RiskWordPreview = (function () {
   var ui = { doc: 0, key: null, read: null, error: null, seq: 0 };
 
   function keyOf(docIndex) {
-    try { return JSON.stringify([docIndex, RT().state.project]); } catch (e) { return String(Date.now()); }
+    // The page a file was saved on is no part of the report.
+    try { return JSON.stringify([docIndex, RT().state.project], function (k, v) { return k === "lastStage" ? undefined : v; }); } catch (e) { return String(Date.now()); }
   }
 
+  // The Report page's Word pages view (js/ui-reports.js draws the view and
+  // report choice around it).
   function render(main, h) {
     var DP = window.App && window.App.DocPreview;
     main.appendChild(h("h1", { class: "page-title", text: "Word preview" }));
-    main.appendChild(h("p", { class: "page-sub", text: "The Word report, page by page. Edit it on the Report page." }));
+    main.appendChild(h("p", { class: "page-sub", text: "The Word report, page by page. Edit it in Sections." }));
     if (!DP || !window.App.DocxImport || !RX() || !window.docx) {
       main.appendChild(h("p", { class: "muted", text: "The Word preview is not available in this copy of the tool." }));
       return;

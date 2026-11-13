@@ -112,6 +112,91 @@
     }
     .val-warn { color: var(--gap); }
 
+    /* ---- The sidebar's steps and their status; Home; step 4; Check and issue ---- */
+    /* Save holds the header's primary place; with unsaved changes it turns amber. */
+    .header .btn.primary.btn-unsaved { background: var(--near); border-color: var(--near); color: #FFF; }
+    .nav-sep { height: 1px; background: var(--border); margin: 6px 18px; }
+    .nav-item:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
+    .nav-num { display: inline-block; min-width: 12px; font-weight: 700; color: var(--brand-blue); }
+    .nav-status { display: block; font-size: 11px; font-weight: 400; color: var(--text-muted); }
+    .nav-status[data-status="open"] { color: var(--near); }
+    .nav-status[data-status="done"] { color: var(--met); }
+    .step-tabs, .rp-viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 14px; }
+    .rp-views { display: inline-flex; gap: 4px; }
+    .step-tabs .sl-btn .badge, .rp-views .badge { margin-left: 6px; font-size: 11px; border-radius: 12px; padding: 0 7px; background: var(--surface-3); color: var(--text-muted); }
+    .step-tabs .sl-btn.active .badge { background: rgba(255, 255, 255, 0.85); color: var(--brand-blue-dark); }
+    .issue-guard { border: 2px solid var(--near); }
+    .issue-guard .guard-group { margin: 0 0 4px; font-weight: 600; }
+    .issue-guard ul { margin: 0 0 10px; }
+    .readiness { list-style: none; margin: 0; padding: 0; }
+    .readiness li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .readiness li:last-child { border-bottom: 0; }
+    .assign { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+    .assign select { flex: 1 1 130px; min-width: 130px; }
+    h1.page-title[tabindex="-1"]:focus { outline: none; }
+    .assign-x { border: 0; background: transparent; color: inherit; cursor: pointer; font-weight: 700; padding: 0 0 0 4px; font-family: inherit; }
+    .cmp-table td { vertical-align: top; }
+    .cmp-entry select { margin-top: 4px; min-width: 190px; }
+    .cmp-source, .cmp-words { font-size: 12px; margin-top: 2px; }
+    .detailed-choice .treat-opts { margin-bottom: 4px; }
+    .detailed-reason { margin-top: 4px; width: 100%; box-sizing: border-box; }
+    .home-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 720px) { .home-kinds { grid-template-columns: 1fr; } }
+    .home-kind {
+      display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer; font-family: inherit;
+      border: 1px solid var(--border-strong); background: var(--surface); color: var(--text);
+      border-radius: var(--radius); padding: 10px 12px; font-size: 13px;
+    }
+    .home-kind.on { border: 2px solid var(--brand-blue); background: var(--brand-blue-tint); }
+    .home-steps { list-style: none; margin: 0; padding: 0; }
+    .home-step {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%;
+      border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text);
+      padding: 8px 4px; cursor: pointer; font-family: inherit; font-size: 14px; text-align: left;
+    }
+    .home-step:hover { background: var(--surface-2); }
+    .home-step .nav-status { display: inline; font-size: 12px; }
+
+    /* ---- Step 1's criteria; step 3's layout; steps 6 and 7 ---- */
+    .check-line { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; text-transform: none; color: var(--text); cursor: pointer; }
+    .criteria-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+    @media (max-width: 980px) { .criteria-layout { grid-template-columns: 1fr; } }
+    .criteria-cap { font-size: 12px; margin-bottom: 6px; }
+    .tbl.matrix td, .tbl.matrix th { padding: 4px 6px; }
+    .tbl.matrix td.above-tol { outline: 2px dashed var(--gap); outline-offset: -3px; }
+    .scales { margin-top: 8px; font-size: 13px; }
+    .scales summary { cursor: pointer; color: var(--brand-blue); font-weight: 600; font-size: 12px; }
+    .scale-list { margin: 4px 0 8px; padding-left: 18px; }
+    .scale-name { font-weight: 600; }
+    .zones-layout { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(0, 3fr); gap: 16px; align-items: start; }
+    @media (max-width: 1100px) { .zones-layout { grid-template-columns: 1fr; } }
+    .zones-detail { position: sticky; top: 0; }
+    .tbl.compact td, .tbl.compact th { padding: 5px 8px; font-size: 13px; }
+    .pick-row { cursor: pointer; }
+    .pick-row.selected td { background: var(--brand-blue-tint); }
+    .link-btn { border: 0; background: transparent; color: var(--brand-blue); font-weight: 700; cursor: pointer; padding: 0; font-family: inherit; font-size: 13px; }
+    .zone-box-link { cursor: pointer; }
+    .zone-box-link:focus-visible rect, .zone-box-link:hover rect { stroke-width: 3; }
+    .zones-detail .asset-row { flex-wrap: wrap; }
+    .zones-detail .asset-row input[type=text] { flex: 2 1 180px; min-width: 140px; }
+    .zones-detail .asset-row select { flex: 1 1 140px; width: auto; min-width: 0; }
+    .paste-box { margin-top: 8px; }
+    .paste-box textarea { width: 100%; box-sizing: border-box; font-family: inherit; }
+    .sep-rows .sep-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 8px; background: var(--surface-2); }
+    .sep-head { font-size: 13px; margin-bottom: 6px; }
+    .sep-reason { margin-top: 6px; width: 100%; box-sizing: border-box; }
+    .chars { margin-top: 6px; }
+    .chars > summary { cursor: pointer; color: var(--brand-blue); font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+    .spec-status { font-size: 12px; font-weight: 600; color: var(--near); }
+    .spec-status[data-status="done"] { color: var(--met); }
+    .spec-kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 8px; font-size: 13px; }
+    .spec-kv dt { font-weight: 600; color: var(--text-muted); }
+    .spec-kv dd { margin: 0; }
+    .spec-list { margin: 4px 0 8px; padding-left: 18px; font-size: 13px; }
+    .approval-entry { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; background: var(--surface-2); }
+    .approval-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .approval-status { margin-top: 6px; font-size: 13px; }
+
     .print-only { display: none; }
     @media print {
       .app { display: block; height: auto; }
@@ -140,8 +225,8 @@
         <button id="btn-theme" class="btn ghost" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
         <button id="btn-new"  class="btn ghost" title="Start a new risk assessment">New</button>
         <button id="btn-load" class="btn ghost" title="Open a saved risk project">Load</button>
-        <button id="btn-save" class="btn ghost" title="Shift+click to save a copy">Save</button>
-        <button id="btn-export" class="btn primary" title="For the assessment tool's 62443-3-3 import">Export risk context</button>
+        <button id="btn-save" class="btn primary" title="Shift+click to save a copy">Save</button>
+        <button id="btn-export" class="btn ghost" title="For the assessment tool's 62443-3-3 import">Export risk context</button>
         <input id="file-input" type="file" accept="application/json,.json" class="hidden" />
       </div>
     </div>
@@ -174,6 +259,8 @@
   <script src="js/ui-kit.js"></script>
   <script src="js/app.js"></script>
   <script src="js/ui-stages.js"></script>
+  <script src="js/ui-zones.js"></script>
+  <script src="js/ui-spec.js"></script>
   <script src="js/ui-reports.js"></script>
   <script src="js/ui-about.js"></script>
   <script src="js/boot.js"></script>

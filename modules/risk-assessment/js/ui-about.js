@@ -25,7 +25,7 @@
       h("p", null, ["The risk matrix and SL mapping are SolutionsPT house defaults. A client's own matrix takes precedence."])
     ]));
 
-    main.appendChild(card("Security level definitions", "paraphrased from published 62443 material", [
+    main.appendChild(card("Security level definitions", "house summary", [
       h("table", { class: "tbl" }, [
         h("thead", null, [h("tr", null, [h("th", { text: "SL", style: "width:60px" }), h("th", { text: "Protects against" })])]),
         h("tbody", null, Object.keys(RULES.slDefinitions).filter(function (k) { return k !== "_note"; }).map(function (k) { return h("tr", null, [h("td", { text: "SL" + k }), h("td", { text: RULES.slDefinitions[k] })]); }))

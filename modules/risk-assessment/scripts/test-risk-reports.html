@@ -135,8 +135,11 @@
     var hlText = docText(hl);
     ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking") !== -1 && hlText.indexOf("the high-level cyber security risk assessment") !== -1, "high-level variant builds with the ranking");
     ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
-    ok(hlText.indexOf("candidates for detailed, per-system assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the High+ candidates and carries the tailor-me note");
-    ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("which justify a full, per-system assessment") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
+    // Phase 3a: the candidates are the systems above tolerable risk (was: ranked High or above), and the decision is per zone, not per system.
+    ok(hlText.indexOf("The systems above the tolerable risk of Medium (") !== -1 && hlText.indexOf("are the candidates for a detailed assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the candidates above tolerable risk and carries the tailor-me note");
+    ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("which justify a detailed assessment") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
+    ok(!/per-system|detailed tier|promoted|Promoted|ranked High or above/.test(hlText + "\n" + text), "neither report speaks of promotion, a detailed tier or per-system assessment", (( hlText + "\n" + text).match(/[^\n]*(per-system|detailed tier|promoted|Promoted|ranked High or above)[^\n]*/) || [""])[0]);
+    ok(text.indexOf("C1 and C3 were found not to need a detailed assessment") !== -1 && text.indexOf("Threats to the others were rated") !== -1, "the detailed method says which conduits the comparison found need no detailed assessment, and rates the others' threats");
     ok(hlText.indexOf("Target security levels") === -1 && hlText.indexOf("Zones, conduits and the detailed") === -1, "high-level variant omits the detailed tier");
     ok(hlText.indexOf("Sign-off") !== -1, "high-level variant still carries sign-off");
 
@@ -144,7 +147,8 @@
     ok(!/NO DISPOSITION|WORST CASE|Dispositioned|dispositioned/.test(text), "Word: no capitals for emphasis, no 'dispositioned'");
     ok(!/safety-plc|engineering-workstation|\(plc\)|\(hmi\)|remote-access|sis-present|internet-adjacent|many-conduits/.test(text), "Word: no flag or asset-type ids",
       (text.match(/safety-plc|engineering-workstation|\(plc\)|\(hmi\)|remote-access|sis-present|internet-adjacent|many-conduits/) || [""])[0]);
-    ok(text.indexOf("(Safety PLC)") !== -1 && text.indexOf("(PLC)") !== -1 && /Exposure: [a-z ,]*remote access/.test(text), "Word: asset types and exposure print as names");
+    // Phase 3b: exposure is a row of each zone's characteristics table (label cell, then value cell).
+    ok(text.indexOf("(Safety PLC)") !== -1 && text.indexOf("(PLC)") !== -1 && /\nExposure\n[a-z ,]*remote access/i.test(text), "Word: asset types and exposure print as names");
     ok(!/Very-high|very-high/.test(text), "Word: no band id");
     ok(text.indexOf("Reduced to within tolerable risk") !== -1 && text.indexOf("Reduce with countermeasures") !== -1 && text.indexOf("Risk accepted") !== -1 && text.indexOf("Within tolerable risk") !== -1,
       "Word: each confirmed decision prints in plain words");
@@ -239,6 +243,50 @@
     ok(/^Of the 1 threat above tolerable risk, 1 is reduced to within tolerable risk by countermeasures\./.test(vOne.tally), "Word: with one threat above tolerable risk the tally says 'threat'", vOne.tally);
     var vAcc = variant(function (q) { q.zones.concat(q.conduits).forEach(function (o) { o.threats.forEach(function (t) { if (t.id !== "T8") t.treatment = { decision: null, confirmed: false, reason: "" }; }); }); });
     ok(/^Of the 7 threats above tolerable risk, 1 is formally accepted by the asset owner\./.test(vAcc.tally), "Word: with acceptance the only decision the tally still has its verb", vAcc.tally);
+
+    // ---- a zone holding two ranked systems, and a system in two zones (phase 3a: zone.hlaIds) ----
+    // The screen, both Word reports, the Excel ranking and the risk context read the same assignment.
+    function multi(change) {
+      var q = JSON.parse(JSON.stringify(p));
+      q.zones[0].hlaIds = ["A1", "A5"]; q.zones[0].fromHLA = "A1";   // Z1 holds the BPCS and the lab link
+      q.zones[2].hlaIds = ["A3", "A1"]; q.zones[2].fromHLA = "A3";   // and the BPCS sits in Z3 too
+      if (change) change(q);
+      var keep = RT.state.project, keepStage = RT.state.stage, out = {};
+      out.hl = docText(RX.buildWordDoc(q, { highLevelOnly: true }));
+      out.det = docText(RX.buildWordDoc(q, {}));
+      out.rk = RX.buildWorkbook(q).getWorksheet("Ranking");
+      RT.state.project = q;
+      try {
+        out.ctx = RT.buildRiskContext();
+        RT.navigate("srs");
+        out.screen = function (id) { var r = w.document.querySelector('#main [data-hla-id="' + id + '"]'); return r ? [].map.call(r.querySelectorAll(".assign-zone"), function (x) { return x.firstChild.textContent; }).join(", ") : null; };
+        out.a1 = out.screen("A1"); out.a5 = out.screen("A5");
+      } finally { RT.state.project = keep; RT.state.stage = keepStage; RT.render(); }
+      out.rkZone = function (name) { var v = null; out.rk.eachRow(function (row, i) { if (i > 1 && row.getCell(1).value === name) v = String(row.getCell(6).value || ""); }); return v; };
+      return out;
+    }
+    var BPCS = "Unit 300 BPCS (DCS servers, HMIs, unit PLCs)", LAB = "Laboratory information system link";
+    var vM = multi();
+    ok(vM.a1 === "Z1, Z3" && vM.a5 === "Z1", "screen: step 2 shows the BPCS in Z1 and Z3, and the lab link in Z1", vM.a1 + " | " + vM.a5);
+    ok(vM.hl.indexOf(BPCS + "  → Z1, Z3") !== -1 && vM.hl.indexOf(LAB + "  → Z1") !== -1 && vM.det.indexOf(LAB + "  → Z1") !== -1, "Word: both reports' ranking list every zone of each system");
+    ok(vM.hl.indexOf("An arrow marks the zones a system is assigned to.") !== -1 && !/detailed tier|promoted/.test(vM.hl), "Word: the arrow is described as the assignment, not as a detailed tier");
+    ok(vM.rkZone(BPCS) === "Z1, Z3" && vM.rkZone(LAB) === "Z1", "Excel: the Ranking sheet's Zone column lists every zone", vM.rkZone(BPCS) + " | " + vM.rkZone(LAB));
+    ok(/\n5\nfor detailed assessment/.test(vM.hl) && vM.hl.indexOf("; 5 ranked systems are in zones taken to a detailed assessment.") !== -1, "Word: the tile and the summary count distinct ranked systems (5), not zones (4)", (vM.hl.match(/[^\n]*in zones taken[^\n]*/) || [""])[0]);
+    ok(vM.ctx.zones[0].fromHighLevelAsset === "A1" && vM.ctx.zones[2].fromHighLevelAsset === "A3" && vM.ctx.schema === "spt-risk-context/1.4", "the risk context keeps its one frozen field, the first system of each zone");
+    var vM2 = multi(function (q) { q.zones[0].detailed = { required: false, reason: "Isolated by a data diode." }; });
+    ok(vM2.hl.indexOf("; 4 ranked systems are in zones taken to a detailed assessment.") !== -1 && /\n4\nfor detailed assessment/.test(vM2.hl) && vM2.hl.indexOf(LAB + "  → Z1") !== -1,
+      "Word: a zone recorded as Not required takes its only system out of the count (the BPCS stays, through Z3), and the ranking still shows the assignment");
+    // A high-level-only assessment: the decision is per ranked system, and the summary follows it.
+    var vH = multi(function (q) {
+      q.assessmentType = "high-level";
+      q.srs.highLevelAssets[0].detailed = { required: false, reason: "Retired next quarter." };
+      q.srs.highLevelAssets[1].detailed = { required: true, reason: "" };
+      q.srs.highLevelAssets[4].detailed = { required: true, reason: "Feeds the batch release." };
+    });
+    var hlFound = (vH.hl.match(/[^\n]*systems were ranked[^\n]*/) || [""])[0];
+    ok(hlFound.indexOf("are the candidates for a detailed assessment") !== -1 && hlFound.split("are the candidates")[0].indexOf(BPCS) === -1 && hlFound.indexOf("A detailed assessment was judged not needed for " + BPCS + ": retired next quarter.") !== -1,
+      "Word, high-level only: a system recorded as Not required leaves the candidates, with its reason", hlFound);
+    ok(hlFound.indexOf("A detailed assessment was also judged needed for " + LAB + ": feeds the batch release.") !== -1 && /\n2\nfor detailed assessment/.test(vH.hl), "and one recorded as Required below tolerable risk is named, and the tile counts the two recorded as Required", hlFound);
     w.docx = realDocx;
 
     // ---- Word packs to a real .docx blob with the real (patched) lib ----
@@ -248,8 +296,10 @@
       return w.App.DocxBlocks.unzip(blob);
     }).then(function (parts) {
       var xml = new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
-      var zonesAt = xml.indexOf("Zones, conduits and the detailed risk assessment"), mapAt = xml.indexOf("name=\"zone-map\"");
-      var firstZone = xml.indexOf(p.zones[0].id + ": ", zonesAt);
+      // Phase 3b: the drawing is part of the requirements specification, under Zone and conduit
+      // drawings, ahead of the characteristics (was: at the top of the zones section).
+      var zonesAt = xml.indexOf(">Zone and conduit drawings<"), mapAt = xml.indexOf("name=\"zone-map\"");
+      var firstZone = xml.indexOf(">Zone and conduit characteristics<", zonesAt);
       ok(zonesAt > 0 && mapAt > zonesAt && mapAt < firstZone, "the zone and conduit drawing is in the report, at the top of the zones section", zonesAt + " / " + mapAt + " / " + firstZone);
       var pngs = parts.filter(function (x) { return /^word\/media\//.test(x.name) && x.bytes[0] === 0x89 && x.bytes[1] === 0x50; });
       ok(pngs.some(function (x) { return x.bytes.length > 8000; }), "and it is a real picture", pngs.map(function (x) { return x.name + " " + x.bytes.length; }).join(", "));

@@ -95,7 +95,7 @@
       RT.downloadWordReport({ highLevelOnly: true });
       return poll(function () { return downloads.length === 1; }, 5000);
     }).then(function () {
-      ok(confirms.length === 0 && downloads[0] === "word-hl", "with no review started, the high-level download asks nothing", confirms.join(" | "));
+      ok(confirms.length === 0 && !w.document.getElementById("issue-guard") && downloads[0] === "word-hl", "with no review started, the high-level download asks nothing", confirms.join(" | "));
 
       // ---- the pack -----------------------------------------------------------------
       return RR.buildPack(null, { note: "  First round: please look hard at section 4.  ", neededBy: "Thursday 12 November" });
@@ -231,11 +231,13 @@
       ok(seen, "and says so once the reports are rebuilt, without leaving the page");
       // The other report pages.
       RT.state.stage = "review"; RT.render();
-      ok(main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "Review & export shows the review's warnings");
+      ok(main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "Check and issue (review) shows the review's warnings");
+      // hlreport is an old page id: it opens the Report page on the high-level summary.
       RT.state.stage = "hlreport"; RT.render();
-      ok(main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "and the high-level report page");
+      ok(RT.state.stage === "report" && main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "and the high-level report page");
       RT.state.stage = "report"; RT.render();
-      ok(main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "and the Report page");
+      main.querySelector('.rp-views [data-view="sections"]').click();
+      ok(!!main.querySelector(".rp-holder") && main.querySelector(".rv-warn-card [data-review-warning=\"changed-since-approval\"]"), "and the Report page");
 
       // ---- changes requested: every download asks, none is stopped ---------------------------
       var r = RR.importTexts([reviewFile("B. Reviewer", "changes-requested", [
@@ -243,20 +245,40 @@
       ])]);
       ok(r.bad === 0 && RR.qaOffers().length === 0, "a changes-requested file imports, with no QA offer", r.lines.join(" | "));
       confirms = []; downloads = [];
+      // Phase 3a: the question is an in-page panel (#issue-guard), not the
+      // browser's confirm. Each one is read, then answered Generate anyway.
+      var asked = [];
+      function answer(n) {
+        return poll(function () { return w.document.getElementById("issue-guard"); }, 60000).then(function (g) {
+          asked.push(g.textContent);
+          g.querySelector('[data-action="generate-anyway"]').click();
+          return poll(function () { return downloads.length === n; }, 60000);
+        });
+      }
+      window.__asked = asked;
       RT.downloadWordReport({});
-      return poll(function () { return downloads.length === 1; }, 60000);
+      return answer(1);
     }).then(function () {
-      ok(confirms.length === 1 && /Changes requested by B\. Reviewer/.test(confirms[0]) && /must-fix/.test(confirms[0]), "the detailed Word download asks, naming the requested changes and the open must-fix", confirms[0]);
+      var asked = window.__asked;
+      ok(asked.length === 1 && /Changes requested by B\. Reviewer/.test(asked[0]) && /must-fix/.test(asked[0]) && confirms.length === 0, "the detailed Word download asks, naming the requested changes and the open must-fix", asked[0]);
       RT.downloadWordReport({ highLevelOnly: true });
-      return poll(function () { return downloads.length === 2; }, 60000);
+      return poll(function () { return w.document.getElementById("issue-guard"); }, 60000).then(function (g) {
+        asked.push(g.textContent); g.querySelector('[data-action="generate-anyway"]').click();
+        return poll(function () { return downloads.length === 2; }, 60000);
+      });
     }).then(function () {
-      ok(confirms.length === 2 && /Changes requested/.test(confirms[1]) && /must-fix/.test(confirms[1]), "so does the high-level Word download", confirms[1]);
-      ok(!/incomplete|No zones defined/.test(confirms[1]), "without the zone completeness list, which is not about that report");
+      var asked = window.__asked;
+      ok(asked.length === 2 && /Changes requested/.test(asked[1]) && /must-fix/.test(asked[1]), "so does the high-level Word download", asked[1]);
+      ok(!/incomplete|No zones defined/.test(asked[1]), "without the zone completeness list, which is not about that report");
       RT.downloadExcelReport();
-      return poll(function () { return downloads.length === 3; }, 60000);
+      return poll(function () { return w.document.getElementById("issue-guard"); }, 60000).then(function (g) {
+        asked.push(g.textContent); g.querySelector('[data-action="generate-anyway"]').click();
+        return poll(function () { return downloads.length === 3; }, 60000);
+      });
     }).then(function () {
-      ok(confirms.length === 3 && /Changes requested/.test(confirms[2]), "and the Excel download", confirms[2]);
-      ok(downloads.join(",") === "word,word-hl,excel", "and each went ahead: the review only warns", downloads.join(","));
+      var asked = window.__asked;
+      ok(asked.length === 3 && /Changes requested/.test(asked[2]), "and the Excel download", asked[2]);
+      ok(downloads.join(",") === "word,word-hl,excel" && confirms.length === 0 && !w.document.getElementById("issue-guard"), "and each went ahead: the review only warns", downloads.join(","));
 
       // ---- Go to lands on the threat or the zone ----------------------------------------
       RR.goTo({ comment: { anchor: { kind: "item", itemId: "Z1:T2", targetName: "Unit 300 BPCS", targetId: "Z1" } } });

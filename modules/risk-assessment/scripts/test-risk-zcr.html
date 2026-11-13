@@ -121,6 +121,7 @@
       var stages = Object.keys(Z.stages).filter(function (k) { return k.charAt(0) !== "_"; });
       ok(stages.length >= 5 && stages.every(function (s) { return !!RT.zcrOf(Z.stages[s]); }), "every page's ZCR is one the lookup holds", stages.join(","));
       ok(RT.stageZcr("suc").id === "ZCR 1" && RT.stageZcr("srs").id === "ZCR 2" && RT.stageZcr("zones").id === "ZCR 3" && RT.stageZcr("risk").id === "ZCR 5" && !RT.stageZcr("basis"), "the workflow pages map to ZCR 1, 2, 3 and 5");
+      ok(RT.stageZcr("compare").id === "ZCR 4" && !RT.stageZcr("home") && !RT.stageZcr("review"), "the risk comparison maps to ZCR 4, and Home and Check and issue to none");
 
       // ---- the check itself catches what it is for ----------------------------------------
       var caught = ["Tolerable risk (§4.3.6)", "Clause 4.1: define the system", "see clause 4.6/4.7", "not the standard's (def. 3.1.39)", "SuC name", "Mandatory security functions", "Security requirements specification", "Existing control (already in place)"]
@@ -131,11 +132,10 @@
       // ---- the pages --------------------------------------------------------------------
       var navs = [].slice.call(d.querySelectorAll("#sidebar .nav-item")), seen = [], bad = [], refs = {};
       var chain = Promise.resolve();
-      navs.forEach(function (_, i) {
+      function visit(open, key) {
         chain = chain.then(function () {
-          var item = d.querySelectorAll("#sidebar .nav-item")[i];
-          item.click();
-          var stage = RT.state.stage;
+          open();
+          var stage = key || RT.state.stage;
           var wait = stage === "report" ? poll(function () { return RP.idle(); })
             : stage === "wordpreview" ? poll(function () { return d.querySelectorAll("#wp-paper .dpv-sheet").length > 2; }, 60000)
             : Promise.resolve();
@@ -145,14 +145,22 @@
             banned(shown()).forEach(function (hit) { bad.push(stage + ": " + hit); });
           });
         });
-      });
+      }
+      navs.forEach(function (_, i) { visit(function () { d.querySelectorAll("#sidebar .nav-item")[i].click(); }); });
+      // Pages the sidebar reaches through another (phase 3a): step 5's SL-T tab,
+      // and the Report page's Word pages and summaries, opened by the old ids.
+      visit(function () { d.querySelector('#sidebar .nav-item[data-stage="risk"]').click(); d.querySelector('#main .step-tabs [data-tab="slt"]').click(); }, "slt");
+      visit(function () { RT.state.stage = "wordpreview"; RT.render(); }, "wordpreview");
+      visit(function () { RT.state.stage = "hlreport"; RT.render(); }, "hlreport");
+      visit(function () { d.querySelector('#main .rp-viewbar .rp-tab[data-doc="detailed"]').click(); }, "summary-detailed");
+      visit(function () { d.querySelector('#main .rp-views [data-view="sections"]').click(); }, "report");
       return chain.then(function () {
-        ok(seen.length === navs.length && seen.indexOf("about") >= 0 && seen.indexOf("hlreport") >= 0, "every page in the sidebar was opened (" + seen.length + ")", seen.join(","));
+        ok(seen.length === navs.length + 5 && seen.indexOf("about") >= 0 && seen.indexOf("hlreport") >= 0 && seen.indexOf("compare") >= 0 && seen.indexOf("home") >= 0, "every page in the sidebar was opened (" + seen.length + ")", seen.join(","));
         ok(bad.length === 0, "no draft citation or draft term on any page, in its text, tooltips or placeholders", bad.slice(0, 6).join(" | "));
-        ["suc", "srs", "zones", "risk", "slt", "hlreport"].forEach(function (s) {
+        ["suc", "srs", "zones", "compare", "risk", "slt", "hlreport", "spec", "approval"].forEach(function (s) {
           ok(refs[s] && refs[s].length === 1 && refs[s][0] === Z.stages[s], "the " + s + " page shows its ZCR once", JSON.stringify(refs[s]));
         });
-        ["basis", "review", "peer"].forEach(function (s) {
+        ["basis", "review", "peer", "home", "summary-detailed"].forEach(function (s) {
           ok(refs[s] && refs[s].length === 0, "the " + s + " page shows none", JSON.stringify(refs[s]));
         });
         // The reference is the lookup's id, with its title as the tooltip.
@@ -164,7 +172,8 @@
         // ---- About ------------------------------------------------------------------------
         RT.state.stage = "about"; RT.render();
         var about = main.querySelector(".card").textContent;
-        ok(/published IEC 62443-3-2:2020/.test(about) && !/ZCR 1 to ZCR 7/.test(about) && /covers ZCR 1, ZCR 2, ZCR 3 and ZCR 5\./.test(about) && /ZCR 4, ZCR 6 and ZCR 7 are not yet steps of their own\./.test(about),
+        // Phase 3b: steps 6 and 7 cover ZCR 6 and ZCR 7, so About claims all seven and names none as missing.
+        ok(/published IEC 62443-3-2:2020/.test(about) && !/ZCR 1 to ZCR 7/.test(about) && /covers ZCR 1, ZCR 2, ZCR 3, ZCR 4, ZCR 5, ZCR 6 and ZCR 7\./.test(about) && !/not yet steps? of (its|their) own/.test(about),
           "About claims only the ZCRs the tool has a page for, and names the rest as not yet steps", about.slice(0, 260));
         ok(/checked against its contents list/.test(about) && /not been checked line by line/.test(about), "that the step references were checked, and the requirement wording was not");
         ok(/risk matrix and SL mapping are SolutionsPT house defaults/.test(about), "and that the matrix and SL mapping are house defaults");
@@ -185,6 +194,8 @@
         // The other sentences: nothing signed, nothing decided, nothing above tolerable.
         window.__keep = JSON.stringify(P());
         P().approval.approved = false;
+        // (Phase 3b: several approvers; nothing signed means none of them.)
+        (P().approvals || []).forEach(function (e) { e.approved = false; e.fingerprint = ""; });
         P().zones.forEach(function (z) { z.threats.forEach(function (t) { t.treatment = { decision: null, confirmed: false, reason: "" }; }); });
         return wordXml({});
       }).then(function (xml) {

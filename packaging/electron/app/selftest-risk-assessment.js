@@ -113,7 +113,7 @@ module.exports = function selfTest(win) {
 
       // The licence notice, on the About page.
       const about = await run(`(function () {
-        var item = Array.prototype.filter.call(document.querySelectorAll("#sidebar .nav-item"), function (n) { return /About/.test(n.textContent); })[0];
+        var item = document.querySelector('#sidebar .nav-item[data-stage="about"]');
         if (!item) return { found: false };
         item.click();
         var t = document.getElementById("main").textContent;
@@ -136,7 +136,7 @@ module.exports = function selfTest(win) {
           document.querySelectorAll("#sidebar .nav-item")[i].click();
           pages.push(document.getElementById("main").textContent.length);
         }
-        var review = Array.prototype.filter.call(document.querySelectorAll("#sidebar .nav-item"), function (x) { return /Full report/.test(x.textContent); })[0];
+        var review = document.querySelector('#sidebar .nav-item[data-stage="review"]');   // Check and issue
         if (review) review.click();
         return { inline: true, loaded: loaded !== false, name: p.suc.name, zones: p.zones.length, conduits: p.conduits.length, threats: threats,
                  pages: pages, shows: document.getElementById("main").textContent.indexOf("Acme Petrochemicals") !== -1,
@@ -146,7 +146,7 @@ module.exports = function selfTest(win) {
       ok(demo.loaded && /^Acme Petrochemicals/.test(demo.name || "") && demo.zones === 4 && demo.conduits === 3 && demo.threats === 9,
          "it loads: 4 zones, 3 conduits, 9 threats", JSON.stringify(demo));
       ok(demo.pages && demo.pages.length >= 8 && demo.pages.every((n) => n > 150), "every page renders (" + (demo.pages || []).length + " pages)", JSON.stringify(demo.pages));
-      ok(demo.shows && demo.problems === 0, "the full report page shows it, complete enough to export", JSON.stringify(demo));
+      ok(demo.shows && demo.problems === 0, "the Check and issue page shows it, complete enough to export", JSON.stringify(demo));
 
       // Real downloads through the app's own export path, onto disk.
       await run(`(function () {

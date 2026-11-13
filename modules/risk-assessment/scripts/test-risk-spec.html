@@ -1,0 +1,614 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool zones, specification and approval</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 3b of docs/risk-tool-redesign.md: step 3's layout (the drawing on top,
+  compact tables, one zone or conduit in a detail panel, collapsed
+  characteristics), pasting assets several at a time, the separation rows
+  raised only by a mix in the data, step 1's read-only criteria and the
+  tolerable risk's confirmed marker, step 6's eight blocks with their status
+  and links, step 7's approvers with their fingerprint, the review hash
+  leaving the signature table out, the Word sections (requirements in order,
+  risk comparison, characteristics, signature table, criteria appendix) and
+  the Excel columns, and the new fields through the migration and the
+  released v0.7 normaliser.
+-->
+<iframe id="app" src="../index.html" style="width:1280px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/v0.7-normaliser.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS) { if (++tries > 200) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function run(w) {
+    var RT = w.RiskTool, MG = w.RiskApp.Migrate, d = w.document, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks, RULES = w.App.Data.sltRules;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var KEY = RT.AUTOSAVE_KEY, keptSnap = null;
+    try { keptSnap = w.localStorage.getItem(KEY); w.localStorage.removeItem(KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function texts() { return RT.completeness().map(function (i) { return i.text; }); }
+    function has(list, re) { return list.some(function (x) { return re.test(x); }); }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function tick(el, v) { el.checked = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function detail() { return main().querySelector("[data-detail]"); }
+    function fieldIn(scope, label) {
+      var f = [].filter.call(scope.querySelectorAll(".field"), function (x) { var l = x.querySelector("label"); return l && l.textContent === label; })[0];
+      return f ? f.querySelector("input, textarea, select") : null;
+    }
+
+    // ---- step 3: the layout ------------------------------------------------------------
+    RT.navigate("zones");
+    ok(/Nothing selected/.test(main().textContent) && !detail(), "with no zones the detail panel says nothing is selected");
+    main().querySelector('[data-action="add-zone"]').click();
+    main().querySelector('[data-action="add-zone"]').click();
+    ok(P().zones.length === 2 && detail().getAttribute("data-detail") === "zone" && detail().getAttribute("data-owner-id") === "Z2", "+ Add zone adds a zone and opens it in the detail panel");
+    var cards = [].slice.call(main().querySelectorAll(":scope > .card, :scope > .zones-layout"));
+    ok(cards[0] && cards[0].querySelector(".zone-map-wrap svg") && main().querySelector(".zones-layout"), "the drawing is on top, above the tables and the panel");
+    ok(main().querySelectorAll('[data-zone-row]').length === 2 && main().querySelectorAll('[data-detail]').length === 1, "a compact table lists both zones, and one is open in the panel");
+    var box1 = main().querySelector('.zone-map-wrap g[data-zone-id="Z1"]');
+    ok(!!box1 && box1.getAttribute("role") === "button" && box1.getAttribute("tabindex") === "0", "a zone's box in the drawing is a button");
+    box1.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+    ok(detail().getAttribute("data-owner-id") === "Z1", "and clicking it opens that zone");
+    main().querySelector('[data-zone-row="Z2"]').click();
+    ok(detail().getAttribute("data-owner-id") === "Z2" && main().querySelector('[data-zone-row="Z2"]').classList.contains("selected"), "a row of the table opens its zone, and is marked");
+    main().querySelector('[data-zone-row="Z1"] [data-action="pick-Z1"]').click();
+    var chars = detail().querySelector("details.chars");
+    ok(!!chars && !chars.open, "the characteristics start collapsed");
+    chars.open = true; chars.dispatchEvent(new w.Event("toggle"));
+    RT.render();
+    ok(detail().querySelector("details.chars").open, "and stay open through a redraw once opened");
+    ["Accountable organisation", "Physical boundary", "Logical access points and boundary devices", "Physical access points", "Data flows", "External dependencies", "Applicable security policies", "Assumptions"].forEach(function (l) {
+      ok(!!fieldIn(detail().querySelector("details.chars"), l), "the characteristics hold " + l.toLowerCase());
+    });
+    var z1 = P().zones[0];
+    ok(!("accountableOrg" in z1) && !("dataFlows" in z1), "and nothing is written until it is entered");
+    type(fieldIn(detail(), "Accountable organisation"), "Unit 1 operations");
+    type(fieldIn(detail(), "Data flows"), "Values to the historian\nAlarms to the pager");
+    ok(z1.accountableOrg === "Unit 1 operations" && same(z1.dataFlows, ["Values to the historian", "Alarms to the pager"]), "entered, they are stored on the zone");
+    type(fieldIn(detail(), "Accountable organisation"), "");
+    ok(!("accountableOrg" in z1), "and cleared, they go again");
+
+    // ---- pasting assets ----------------------------------------------------------------
+    ok(!!detail().querySelector('[data-action="paste-open"]'), "the zone offers Paste several");
+    detail().querySelector('[data-action="paste-open"]').click();
+    var ta = detail().querySelector('[data-action="paste-text"]');
+    ok(!!ta && d.activeElement === ta, "which opens a box, with the focus in it");
+    type(ta, "PLC-101\tPLC\nSIS-1\tSafety PLC\n\nMaintenance laptop\tEngineering workstation\tTemporary\nRadio gateway\tNetwork\twireless\nERP link\tbusiness system\nSpare\tgizmo");
+    detail().querySelector('[data-action="paste-add"]').click();
+    ok(z1.assets.length === 6 && !detail().querySelector('[data-action="paste-text"]'), "Add puts one asset per line, skipping blank lines, and closes the box", String(z1.assets.length));
+    ok(same(z1.assets.map(function (a) { return a.type; }), ["plc", "safety-plc", "engineering-workstation", "network", "business", "other"]), "a type column is read by id or name, an unknown one is Other", JSON.stringify(z1.assets));
+    ok(z1.assets[2].link === "temporary" && z1.assets[3].link === "wireless" && !("link" in z1.assets[0]), "a connection column marks a temporarily connected or wireless asset, and a fixed one has none");
+    ok(/6 assets added/.test(d.getElementById("toast").textContent), "and the toast says how many");
+    ok(same(RT.parseAssets("A\nB\tHMI"), [{ name: "A", type: "other" }, { name: "B", type: "hmi" }]), "a line with no type is Other");
+
+    // ---- separation rows: raised only by a mix -----------------------------------------
+    var rows = RT.separationRows(z1).map(function (r) { return r.id; }).join(",");
+    ok(rows === "business,safety,temporary,wireless", "a zone mixing business, safety, temporary and wireless assets raises those four rows, in order", rows);
+    var z2 = P().zones[1];
+    z2.assets = [{ name: "PLC-201", type: "plc" }, { name: "HMI-201", type: "hmi" }];
+    ok(RT.separationRows(z2).length === 0, "a zone of ordinary controllers raises none");
+    RT.navigate("zones");
+    main().querySelector('[data-zone-row="Z2"]').click();
+    ok(!detail().querySelector(".sep-rows") && !has(texts(), /^Z2 /), "and asks nothing: no separation field, nothing open");
+    z2.flags.wireless = true;
+    ok(RT.separationRows(z2).map(function (r) { return r.id; }).join() === "wireless", "a zone marked for wireless links raises the wireless row");
+    z2.flags.wireless = false;
+    var c1 = RT.emptyConduit(1); c1.fromZone = "Z2"; c1.toZone = "EXT"; P().conduits.push(c1); P().counters.conduit = 1;
+    ok(RT.separationRows(z2).map(function (r) { return r.id; }).join() === "external" && /C1/.test(RT.separationRows(z2)[0].why), "a conduit to EXT raises the external row on the zone it reaches, naming the conduit");
+    P().conduits[0].toZone = "Z1"; P().conduits[0].external = true;
+    ok(RT.separationRows(z2).map(function (r) { return r.id; }).join() === "external" && RT.separationRows(z1).some(function (r) { return r.id === "external"; }), "so does a conduit marked as an external network, on both its zones");
+    P().conduits[0].toZone = "EXT"; delete P().conduits[0].external;
+    var tx = texts();
+    ok(has(tx, /^Z1: record whether safety related assets are kept separate\.$/) && has(tx, /^Z2: record whether devices connected via external networks are kept separate\.$/), "each raised row unanswered is in the completeness list", tx.filter(function (x) { return /^Z\d:/.test(x); }).join(" | "));
+    ok(RT.completeness().filter(function (i) { return /kept separate/.test(i.text); }).every(function (i) { return i.stage === "zones" && i.doc === "detailed" && i.target.kind === "zone" && /^sep-/.test(i.target.part); }), "on step 3, for the detailed report, aimed at the row");
+    ok(RT.stepStatus().zones.state === "open", "and step 3 shows them as open");
+    // Go to a row: step 3 opens that zone, and the row flashes.
+    RT.navigate("review");
+    // Z2 is the open zone: Go to must switch the panel to Z1.
+    RT.navigate("zones"); main().querySelector('[data-zone-row="Z2"]').click(); RT.navigate("review");
+    var li = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return /Z1: record whether safety related/.test(x.textContent); })[0];
+    li.querySelector('[data-action="goto"]').click();
+    ok(RT.state.stage === "zones" && detail().getAttribute("data-owner-id") === "Z1" && detail().querySelector('[data-part="sep-safety"]').classList.contains("check-flash"), "Go to opens step 3 on the zone, at the separation row, which flashes");
+    // Answering.
+    var met = detail().querySelector('[data-separation="safety:met"]');
+    met.focus(); met.click();
+    ok(z1.separation && z1.separation.safety.answer === "met" && !has(texts(), /^Z1: record whether safety related/) && d.activeElement === detail().querySelector('[data-separation="safety:met"]'), "Met answers the row, and the choice keeps the focus");
+    detail().querySelector('[data-separation="temporary:not-separated"]').click();
+    ok(has(texts(), /^Z1: temporarily connected devices are not kept separate, with no reason\.$/) && /Give a reason/.test(detail().querySelector('[data-part="sep-temporary"]').textContent), "Not separated asks for a reason");
+    type(detail().querySelector('input[data-reason="sep-temporary"]'), "Laptops only during shutdowns, under permit.");
+    ok(!has(texts(), /^Z1: temporarily/) && z1.separation.temporary.reason === "Laptops only during shutdowns, under permit.", "and the reason settles it");
+    detail().querySelector('[data-separation="safety:met"]').click();
+    ok(!("safety" in z1.separation) && has(texts(), /^Z1: record whether safety related/), "clicking the answer again takes it back");
+    z1.assets = z1.assets.filter(function (a) { return a.type !== "business"; });
+    ok(!RT.separationRows(z1).some(function (r) { return r.id === "business"; }) && !has(texts(), /^Z1: record whether business/), "a row no longer raised stops asking");
+
+    // ---- the safety designation --------------------------------------------------------
+    RT.navigate("zones"); main().querySelector('[data-zone-row="Z2"]').click();
+    var saf = detail().querySelector('input[data-action="safety"]');
+    ok(!!saf && !saf.checked && !RT.suggestZone(z2, P()).safetyRelated, "the safety designation is a field of the zone");
+    tick(saf, true);
+    ok(z2.flags["sis-present"] === true && RT.suggestZone(z2, P()).safetyRelated && RT.suggestZone(z2, P()).byFR.UC.sl === 3 && RT.buildRiskContext().zones[1].safetyRelated === true, "ticked, it still drives safetyRelated, the SL3 floor and the risk context");
+    tick(detail().querySelector('input[data-action="safety"]'), false);
+    ok(!z2.flags["sis-present"] && ![].some.call(detail().querySelectorAll(".flag-grid label"), function (l) { return /safety instrumented|SIS/i.test(l.textContent); }), "and is not offered twice among the exposure flags");
+
+    // ---- a conduit ----------------------------------------------------------------------
+    main().querySelector('[data-conduit-row="C1"]').click();
+    ok(detail().getAttribute("data-detail") === "conduit" && detail().getAttribute("data-owner-id") === "C1", "a conduit opens in the same panel");
+    var ext = detail().querySelector('input[data-marker="external"]');
+    ok(ext.checked && ext.disabled && !("external" in P().conduits[0]), "an EXT end marks it external, without storing a marker");
+    detail().querySelector("details.chars").open = true;
+    type(fieldIn(detail(), "External party"), "Vendor support");
+    tick(detail().querySelector('input[data-marker="wireless"]'), true);
+    change(detail().querySelector('select[data-action="direction"]'), "from-to");
+    type(fieldIn(detail(), "Boundary devices"), "Firewall FW-1");
+    var cc = P().conduits[0];
+    ok(cc.externalParty === "Vendor support" && cc.wireless === true && cc.direction === "from-to" && same(cc.boundaryDevices, ["Firewall FW-1"]), "its characteristics: external party, markers, direction, boundary devices");
+    tick(detail().querySelector('input[data-marker="wireless"]'), false);
+    ok(!("wireless" in cc), "a marker taken off leaves no key behind");
+    ok(/Z2 ↔ EXT/.test(main().querySelector('[data-conduit-row="C1"]').textContent), "the conduits table shows its ends");
+
+    // ---- step 1: the criteria and the confirmed marker -----------------------------------
+    RT.navigate("suc");
+    var crit = main().querySelector('[data-check-anchor="criteria"]');
+    var cells = crit.querySelectorAll(".matrix td[data-band]"), above = crit.querySelectorAll(".matrix td.above-tol");
+    var want = 0; Object.keys(RULES.riskMatrix).filter(function (k) { return k !== "_note"; }).forEach(function (s) { Object.keys(RULES.riskMatrix[s]).forEach(function (l) { if (RT.exceedsTolerable(RULES.riskMatrix[s][l], P().srs.tolerableRisk)) want++; }); });
+    ok(cells.length === 12 && above.length === want && want > 0, "step 1 shows the matrix beside the form, the cells above tolerable risk outlined", above.length + " / " + want);
+    ok(!!crit.querySelector("details.scales") && /Low:/.test(crit.querySelector("details.scales").textContent) && !/House default/.test(crit.textContent), "with the scale definitions, read-only");
+    ok(has(texts(), /^Tolerable risk is not confirmed with the asset owner\.$/) && !RT.tolerableConfirmed(), "an unconfirmed tolerable risk is open (no silent default)");
+    var it = RT.completeness().filter(function (i) { return /Tolerable risk is not confirmed/.test(i.text); })[0];
+    ok(it.stage === "suc" && it.doc === "both" && it.target.kind === "criteria", "in step 1, for both reports");
+    tick(crit.querySelector('input[data-action="tolerable-confirmed"]'), true);
+    ok(P().srs.tolerableConfirmed === P().srs.tolerableRisk && !has(texts(), /Tolerable risk is not confirmed/), "ticking Confirmed with the asset owner records the band confirmed");
+    change(main().querySelector('[data-check-anchor="criteria"] select'), "high");
+    ok(!RT.tolerableConfirmed() && has(texts(), /Tolerable risk is not confirmed/) && /Confirmed for medium, before the change/.test(main().querySelector('[data-check-anchor="criteria"]').textContent), "changing the tolerable risk afterwards leaves it unconfirmed, and says so");
+    change(main().querySelector('[data-check-anchor="criteria"] select'), "medium");
+    ok(RT.tolerableConfirmed(), "and back at the band confirmed, it is confirmed again");
+
+    // ---- step 6: the specification ------------------------------------------------------
+    RT.navigate("spec");
+    var blocks = [].map.call(main().querySelectorAll("[data-spec]"), function (b) { return b.getAttribute("data-spec"); }).join(",");
+    var order = Object.keys(w.App.Data.zcrMap.specBlocks).filter(function (k) { return k.charAt(0) !== "_"; }).join(",");
+    ok(blocks === "suc,drawings,characteristics,assumptions,threats,policies,tolerable,regulatory" && blocks === order, "step 6 has eight blocks, in the order the ZCR lookup gives", blocks);
+    ok(main().querySelector(".page-sub .zcr-ref").textContent === "ZCR 6" && (main().textContent.match(/ZCR \d/g) || []).length === 1, "it shows ZCR 6 once, and no block carries a reference");
+    var tl = [].map.call(main().querySelectorAll("[data-spec] .card-h h2"), function (h) { return h.textContent; }).join("|");
+    ok(tl === "SUC description|Zone and conduit drawings|Zone and conduit characteristics|Operating environment assumptions|Threat environment|Organisational security policies|Tolerable risk|Regulatory requirements", "the blocks are named in plain words", tl);
+    ok(main().querySelector('[data-spec="drawings"] .zone-map-wrap svg') && main().querySelector('[data-spec="characteristics"] table'), "the drawing and the characteristics are assembled from step 3");
+    ok(main().querySelector('[data-spec="tolerable"] .spec-status').getAttribute("data-status") === "done" && main().querySelector('[data-spec="regulatory"] .spec-status').getAttribute("data-status") === "open", "each block has its status");
+    var sp = RT.completeness().filter(function (i) { return i.stage === "spec"; }).map(function (i) { return i.text; });
+    ok(sp.indexOf("Requirements specification: no regulatory requirements recorded.") >= 0 && sp.indexOf("Requirements specification: no organisational security policies recorded.") >= 0 && sp.indexOf("Requirements specification: no operating environment assumptions recorded.") >= 0, "blocks with no check elsewhere are open in the completeness list", sp.join(" | "));
+    ok(RT.completeness().filter(function (i) { return i.stage === "spec"; }).every(function (i) { return i.doc === "detailed" && i.target.kind === "spec"; }), "for the detailed report, aimed at their block");
+    // (Phase 3b review: the field is labelled Requirements, as its block is titled Regulatory requirements.)
+    type(fieldIn(main().querySelector('[data-spec="regulatory"]'), "Requirements"), "UK NIS Regulations 2018");
+    type(fieldIn(main().querySelector('[data-spec="policies"]'), "Policies"), "Group OT standard");
+    ok(same(P().srs.regulatory, ["UK NIS Regulations 2018"]) && same(P().suc.policies, ["Group OT standard"]) && !has(texts(), /no regulatory|no organisational/), "the two with no other home are entered on the page");
+    RT.navigate("spec");
+    var lnk = main().querySelector('[data-spec="assumptions"] [data-action="spec-goto-suc"]');
+    ok(!!lnk, "a block links back to where it was captured");
+    lnk.click();
+    ok(RT.state.stage === "suc" && main().querySelector('[data-check-anchor="suc"]').classList.contains("check-flash"), "and the link opens it there");
+    RT.navigate("review");
+    li = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return /no operating environment assumptions/.test(x.textContent); })[0];
+    li.querySelector('[data-action="goto"]').click();
+    ok(RT.state.stage === "spec" && main().querySelector('[data-spec="assumptions"]').classList.contains("check-flash"), "Go to on a block's item opens step 6 at the block");
+    var emptyHL = { schema: "spt-risk-project/0.2", assessmentType: "high-level", suc: { name: "", description: "", scopeStatement: "", assumptions: [] }, srs: { highLevelAssets: [] }, zones: [], conduits: [] };
+    MG.normaliseProject(emptyHL);
+    ok(RT.stepStatus(emptyHL).spec.state === "na", "a high-level-only job reads step 6 as Not needed while it is empty");
+
+    // ---- step 7: approval -----------------------------------------------------------------
+    RT.navigate("approval");
+    ok(main().querySelector(".page-sub .zcr-ref").textContent === "ZCR 7", "step 7 is the approval, with ZCR 7 as its reference");
+    ok(main().querySelector('[data-covers="tolerable"]') && main().querySelector('[data-covers="accepted"]') && /What is being approved/.test(main().textContent), "it says what is being approved: the tolerable risk, the SL-T and the accepted risks");
+    ok(!("approvals" in P()), "looking at it writes nothing");
+    main().querySelector('[data-action="add-approver"]').click();
+    ok(Array.isArray(P().approvals) && P().approvals.length === 1 && d.activeElement === main().querySelector('[data-approval="0"] [data-approval-field="name"]'), "+ Add approver adds one, with the focus on its name");
+    var a0 = main().querySelector('[data-approval="0"]');
+    type(a0.querySelector('[data-approval-field="name"]'), "A. Owner");
+    type(a0.querySelector('[data-approval-field="role"]'), "Plant Manager");
+    type(a0.querySelector('[data-approval-field="organisation"]'), "Works Ltd");
+    type(a0.querySelector('[data-approval-field="scope"]'), "Tolerable risk and SL-T");
+    ok(P().approval.name === "A. Owner" && P().approval.role === "Plant Manager" && P().approval.statement === "Tolerable risk and SL-T" && P().approval.approved === false, "the old single sign-off mirrors the first approver (scope as its statement)");
+    tick(main().querySelector('[data-approval="0"] [data-approval-field="approved"]'), true);
+    var fp = RT.approvalFingerprint();
+    ok(P().approvals[0].approved === true && P().approvals[0].fingerprint === fp && P().approval.approved === true, "Approved records the fingerprint of what was approved");
+    ok(/Unchanged since approval/.test(main().querySelector('[data-approval="0"]').textContent), "and says it is unchanged");
+    z1.slTargetByFR.IAC = 3; RT.navigate("approval");
+    ok(RT.approvalFingerprint() !== fp && /Changed since approval/.test(main().querySelector('[data-approval="0"]').textContent) && has(texts(), /^A\. Owner: approved before the SL-T changed\.$/), "a change to an SL-T afterwards reads changed since approval, and is open");
+    ok(RT.completeness().filter(function (i) { return /approved before/.test(i.text); })[0].stage === "approval", "on step 7");
+    var downloads = 0, origClick = w.HTMLAnchorElement.prototype.click;
+    w.HTMLAnchorElement.prototype.click = function () { if (this.download) { downloads++; return; } return origClick.apply(this, arguments); };
+    RT.navigate("review");
+    main().querySelector('[data-download="risk-context"]').click();
+    d.getElementById("issue-guard").querySelector('[data-action="generate-anyway"]').click();
+    w.HTMLAnchorElement.prototype.click = origClick;
+    ok(downloads === 1, "it never blocks: the export still goes ahead after the question");
+    RT.navigate("approval");
+    main().querySelector('[data-approval="0"] [data-action="approved-again"]').click();
+    ok(P().approvals[0].fingerprint === RT.approvalFingerprint() && !has(texts(), /approved before/), "Approved again takes the new fingerprint");
+    main().querySelector('[data-action="add-approver"]').click();
+    type(main().querySelector('[data-approval="1"] [data-approval-field="name"]'), "B. Second");
+    ok(P().approvals.length === 2 && P().approval.name === "A. Owner", "a second approver leaves the mirror on the first");
+    var states = RT.approvalStates();
+    ok(states.length === 2 && states[0].signed && !states[1].signed, "approvalStates lists both, signed or not");
+
+    // An older build edits only the single sign-off: that is the later edit, and the first entry takes it.
+    var file = clone(P()); file.approval.name = "A. Owner-Smith"; file.approval.date = "2026-11-01";
+    var back = MG.normaliseProject(file);
+    ok(back.approvals[0].name === "A. Owner-Smith" && back.approvals[0].date === "2026-11-01" && back.approvals[0].organisation === "Works Ltd" && back.approvals.length === 2, "a sign-off edited by an older build wins for the first approver, keeping the rest");
+    ok(same(MG.normaliseProject(clone(back)), back), "and a second pass changes nothing");
+    var oldOnly = clone(P()); delete oldOnly.approvals;
+    ok(!("approvals" in MG.normaliseProject(oldOnly)) && RT.approvalsOf(oldOnly).length === 1 && RT.approvalsOf(oldOnly)[0].name === "A. Owner", "a file with only the single sign-off loads unchanged, and reads as one approver");
+
+    // ---- the demo: Word, Excel and the review hash ----------------------------------------------
+    RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT));
+    ok(RT.exportProblems().length === 0 && RT.completeness().length === 0, "the demo has nothing open", RT.completeness().map(function (i) { return i.text; }).join(" | "));
+    ok(RT.approvalStates().length === 2 && RT.approvalStates().every(function (s) { return s.signed && !s.changed; }), "its two approvers are signed against what it holds now");
+    ok(RT.separationRows(P().zones[3]).some(function (r) { return r.id === "temporary" && r.answer === "not-separated" && r.reason; }) && RT.separationRows(P().zones[0]).some(function (r) { return r.id === "external" && r.answer === "met"; }), "and it shows a separation met and one not kept separate, with its reason");
+
+    function docXml(opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(P(), opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
+      });
+    }
+    function paragraphsOf(xml) {
+      var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+      while ((m = re.exec(xml))) {
+        var t2 = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+        if (t2.replace(/\s+/g, "")) out.push(t2.replace(/&amp;/g, "&").replace(/&apos;/g, "'").replace(/&quot;/g, "\""));
+      }
+      return out;
+    }
+    function blocksOf(opts) {
+      var probe = [];
+      return w.docx.Packer.toBlob(RX.buildWordDoc(P(), Object.assign({}, opts || {}, { sectionProbe: probe }))).then(function (b) {
+        return DB.fromBlob(b, { idPrefix: "s", headings: probe });
+      }).then(function (r) { return r.blocks.filter(function (x) { return !x.front; }); });
+    }
+    var det, hl;
+    return docXml({}).then(function (xml) {
+      det = paragraphsOf(xml);
+      return docXml({ highLevelOnly: true });
+    }).then(function (xml) {
+      hl = paragraphsOf(xml);
+      function at(list, s, from) { return list.indexOf(s, from || 0); }
+      var suc = at(det, "System under consideration and requirements");
+      // (Phase 3b review: the security functions that must be kept are part of the SUC description, so they come first, as on step 6.)
+      var seq = ["Security functions that must be kept", "Zone and conduit drawings", "Zone and conduit characteristics", "Operating environment assumptions", "Known or presumed threats", "Organisational security policies", "Tolerable risk", "Regulatory requirements"].map(function (s) { return at(det, s, suc); });
+      ok(suc > 0 && seq.every(function (x, i) { return x > suc && (i === 0 || x > seq[i - 1]); }) && seq[seq.length - 1] < at(det, "Basis of assessment"), "Word: the requirements specification is grouped in one section, in the order of its blocks", JSON.stringify(seq));
+      var ch = at(det, "Zone and conduit characteristics");
+      ok(at(det, "Accountable organisation", ch) > ch && at(det, "Acme Petrochemicals, Unit 300 operations", ch) > ch && at(det, "Data flows", ch) > ch && at(det, "C2: Vendor remote access", ch) > ch && at(det, "External network (DCS vendor support engineers)", ch) > ch, "Word: a characteristics table for each zone and conduit");
+      ok(det.indexOf("Temporarily connected devices are not kept separate. Vendor laptops join the engineering VLAN during turnarounds after the media kiosk check. A separate maintenance zone is planned for the Q2-2027 turnaround.") > ch && !det.some(function (x) { return /The DMZ is the zone built to meet external networks/.test(x); }), "Word: a separation not in place prints with its reason, and one met does not");
+      var rc = at(det, "Risk comparison");
+      ok(rc > at(det, "High-level risk ranking") && rc < at(det, "Zones, conduits and the detailed risk assessment") && at(det, "Against tolerable risk", rc) > rc && det.indexOf("Not required", rc) > rc && /method used in this assessment/.test(det[rc + 1]), "Word: a risk comparison table between the ranking and the detailed assessment, stated as the method used");
+      var ap = at(det, "Appendix: risk criteria");
+      ok(ap > at(det, "Method and limitations") && at(det, "Risk matrix", ap) > ap && at(det, "Impact scale", ap) > ap && at(det, "Likelihood scale", ap) > ap && at(det, "Security levels", ap) > ap && at(det, "Foundational requirements", ap) > ap && at(det, "FR1 Identification and authentication control", ap) > ap, "Word: the criteria appendix, last: matrix, scales, security levels and the FR key");
+      var mat = det.slice(ap).filter(function (x) { return / \(above\)$/.test(x); }).length;
+      ok(mat === 5 && det.some(function (x) { return /^Tolerable risk is Medium\. Cells marked above/.test(x); }), "Word: the matrix marks the cells above the tolerable line", String(mat));
+      var hap = at(hl, "Appendix: risk criteria");
+      ok(hap > 0 && at(hl, "Risk matrix", hap) > hap && at(hl, "Foundational requirements", hap) < 0 && at(hl, "Risk comparison") < 0 && at(hl, "Zone and conduit characteristics") < 0, "Word, high level: the criteria appendix too, with no FR key, comparison table or zones");
+      var so = at(det, "Sign-off");
+      ok(at(det, RX.SIGNATURE_HEAD[0], so) > so && at(det, "S. Adeyemi", so) > so && at(det, "Process Safety Engineer", so) > so && at(hl, RX.SIGNATURE_HEAD[0], at(hl, "Sign-off")) > 0, "Word: a signature table from the approvers, in both reports");
+      ok(!det.concat(hl).some(function (x) { return /[—–]/.test(x); }), "Word: no em or en dash anywhere in either report", (det.concat(hl).filter(function (x) { return /[—–]/.test(x); })[0] || ""));
+      ok(!det.concat(hl).some(function (x) { return /\bZCR\b|\b4\.[2-8]\b|clause/i.test(x); }), "Word: no ZCR id or clause number", (det.concat(hl).filter(function (x) { return /\bZCR\b|\b4\.[2-8]\b|clause/i.test(x); })[0] || ""));
+      return blocksOf({});
+    }).then(function (bl) {
+      var keys = {}; bl.forEach(function (b) { if (b.type === "heading") keys[b.text] = b.sectionKey; });
+      ok(keys["System under consideration and requirements"] === "system-under-consideration-and-requirements" && keys["Sign-off"] === "sign-off" && keys["Security functions that must be kept"] === "security-functions-that-must-be-kept" && keys["Regulatory requirements"] === "regulatory-requirements", "Word: existing headings keep their section keys");
+      ok(keys["Risk comparison"] === "risk-comparison" && keys["Appendix: risk criteria"] === "appendix-risk-criteria" && keys["Zone and conduit characteristics"] === "zone-and-conduit-characteristics" && keys["Organisational security policies"] === "organisational-security-policies", "Word: new headings get keys of their own", JSON.stringify([keys["Risk comparison"], keys["Appendix: risk criteria"]]));
+      // ---- the review hash leaves the approvers out ----
+      return RR.buildDocuments();
+    }).then(function (docs0) {
+      var h0 = docs0.map(function (x) { return x.contentHash; }).join();
+      var a = P().approvals;
+      a.push({ scope: "Conduit C2", name: "C. Third", role: "OT lead", organisation: "Acme", date: "2026-07-05", revision: "1.0", approved: true, fingerprint: RT.approvalFingerprint() });
+      a[1].organisation = "Acme Petrochemicals (process safety)";
+      RT.touched();
+      return RR.buildDocuments().then(function (docs1) {
+        ok(docs1.map(function (x) { return x.contentHash; }).join() === h0, "recording or editing an approver leaves both reports' content hash as it was");
+        // A real table moved out of the Sign-off section: as the signature table it is left out, as any other it counts.
+        var bl0 = docs1[0].blocks, other = bl0.filter(function (b) { return b.type === "paragraph" && b.sectionKey !== "sign-off"; })[3];
+        var tbl = clone(bl0.filter(function (b) { return b.type === "table" && b.sectionKey !== "sign-off" && b.rows.length > 1; })[0]);
+        tbl.sectionKey = "basis-of-assessment";
+        var sig = clone(tbl); sig.rows[0].cells[0].text = RX.SIGNATURE_HEAD[0];
+        ok(RR.__hashOf([other, sig]) === RR.__hashOf([other]) && RR.__hashOf([other, tbl]) !== RR.__hashOf([other]), "the signature table is left out wherever it sits, and only that table");
+        a.pop(); a[1].organisation = "Acme Petrochemicals Ltd";
+        P().zones[0].justification += " Edited.";
+        RT.touched();
+        return RR.buildDocuments();
+      }).then(function (docs2) {
+        ok(docs2.map(function (x) { return x.contentHash; }).join() !== h0, "while a change to what was reviewed still changes it");
+        P().zones[0].justification = P().zones[0].justification.replace(/ Edited\.$/, "");
+      });
+    }).then(function () {
+      // ---- Excel: the decision and the characteristics, in columns that fit ----
+      var wb = RX.buildWorkbook(P());
+      ok(wb.worksheets.map(function (s) { return s.name; }).join() === "Front,Ranking,Threat register,Zones,Conduits,Countermeasures,SL-T,Basis", "Excel: no new sheets");
+      var zs = wb.getWorksheet("Zones"), cs = wb.getWorksheet("Conduits");
+      function col(ws, name) { var n = 0; ws.getRow(1).eachCell(function (c, i) { if (c.value === name) n = i; }); return n; }
+      ok(col(zs, "Accountable organisation") && col(zs, "Detailed assessment") && zs.getCell(2, col(zs, "Detailed assessment")).value === "Required" && zs.getCell(2, col(zs, "Accountable organisation")).value === "Acme Petrochemicals, Unit 300 operations", "Excel: the Zones sheet carries the decision and the characteristics");
+      ok(/Temporarily connected devices: Vendor laptops/.test(String(zs.getCell(5, col(zs, "Separation not in place")).value)), "and the separation not in place, with its reason");
+      ok(cs.getCell(2, col(cs, "Detailed assessment")).value === "Not required" && /^One-way replication/.test(cs.getCell(2, col(cs, "Reason")).value) && cs.getCell(3, col(cs, "Connection")).value === "external network" && cs.getCell(3, col(cs, "Direction")).value === "One way, Z3 to Z1", "Excel: the Conduits sheet carries the decision, its reason, the connection and the direction");
+      var q = clone(P()); q.assessmentType = "high-level"; q.srs.highLevelAssets[0].detailed = { required: true, reason: "" };
+      var rk = RX.buildWorkbook(q).getWorksheet("Ranking");
+      ok(col(rk, "Detailed assessment") === 8 && !col(RX.buildWorkbook(P()).getWorksheet("Ranking"), "Detailed assessment"), "Excel: a high-level-only job's ranking has the decision column, a full one's does not");
+      return w.docx.Packer.toBlob(RX.buildWordDoc(q, { highLevelOnly: true })).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        var px = paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+        var rkAt = px.indexOf("High-level risk ranking");
+        ok(px.indexOf("Detailed assessment", rkAt) > rkAt && px.indexOf("Required", rkAt) > rkAt && px.indexOf("Not decided", rkAt) > rkAt, "Word, high-level only: the ranking carries the comparison column");
+      });
+    }).then(function () {
+      // ---- the new fields through the migration and the released v0.7 normaliser ----
+      var V07 = window.RiskFixtures["v0.7-normaliser"](RT.FR_IDS, RULES.exposureModifiers, RULES.tolerableRisk["default"]);
+      var tour = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+      var saved = JSON.stringify(tour), old = V07.normaliseProject(JSON.parse(saved));
+      ok(same(old, JSON.parse(saved)), "v0.7's normaliser changes nothing in a file using phase 3b's fields");
+      ok(old.srs.tolerableConfirmed === "medium" && old.approvals.length === 2 && old.zones[3].separation.temporary.answer === "not-separated" && old.zones[3].assets[2].link === "temporary" && old.conduits[1].external === true && old.suc.policies.length === 3 && old.zones[0].accountableOrg, "and keeps every one of them");
+      ok(same(MG.normaliseProject(clone(old)), JSON.parse(saved)), "so a file v0.7 loaded and saved again reads back as this build saved it");
+      var odd = clone(tour);
+      odd.srs.tolerableConfirmed = "maybe"; odd.suc.policies = "one"; odd.zones[0].dataFlows = ["ok", 5, ""]; odd.zones[0].accountableOrg = 7;
+      odd.zones[0].separation = { external: { answer: "yes" }, safety: { answer: "met", reason: 3 }, odd: "x" };
+      odd.zones[3].assets[0].link = "satellite"; odd.conduits[0].direction = "sideways"; odd.conduits[0].wireless = "yes"; odd.conduits[0].boundaryDevices = "FW";
+      odd.approvals = [{ name: "X", approved: "yes", fingerprint: 4 }, "junk"];
+      var n = MG.normaliseProject(odd);
+      ok(!("tolerableConfirmed" in n.srs) && !("policies" in n.suc) && same(n.zones[0].dataFlows, ["ok"]) && !("accountableOrg" in n.zones[0]), "odd values are tidied or dropped: confirmed marker, policies, a zone's lists and text");
+      ok(!("external" in n.zones[0].separation) && !("odd" in n.zones[0].separation) && n.zones[0].separation.safety.reason === "" && !("link" in n.zones[3].assets[0]), "a separation answer or an asset's connection it does not know is dropped");
+      ok(!("direction" in n.conduits[0]) && !("wireless" in n.conduits[0]) && !("boundaryDevices" in n.conduits[0]), "and a conduit's direction, markers and devices");
+      ok(n.approvals.length === 1 && n.approvals[0].approved === true && n.approvals[0].fingerprint === "" && n.approval.name === n.approvals[0].name, "an approver is kept with its fields made strings, and the mirror follows");
+      ok(same(MG.normaliseProject(clone(n)), n), "and a second pass changes nothing");
+    }).then(function () {
+      return review3b();
+    }).then(function () {
+      try { if (keptSnap == null) w.localStorage.removeItem(KEY); else w.localStorage.setItem(KEY, keptSnap); } catch (e) {}
+      try { w.onbeforeunload = null; } catch (e) {}
+    });
+
+    // ==== the phase 3b review's findings ==========================================================
+    function demo() { RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT)); return P(); }
+    function wait(ms) { return new Promise(function (res) { w.setTimeout(res, ms || 30); }); }
+    function sheetCol(ws, name) { var n = 0; ws.getRow(1).eachCell(function (c, i) { if (c.value === name) n = i; }); return n; }
+    function frontValue(wb, label) { var v = null; wb.getWorksheet("Front").eachRow(function (r) { if (r.getCell(1).value === label) v = r.getCell(2).value; }); return v; }
+    function after(px, head, label) { var i = px.indexOf(head); var j = px.indexOf(label, i); return i >= 0 && j > i ? px[j + 1] : null; }
+    function named(el) {
+      if (el.getAttribute("aria-label")) return true;
+      if (el.id && d.querySelector('label[for="' + el.id + '"]')) return true;
+      return !!el.closest("label");
+    }
+    function unnamed() { return [].filter.call(main().querySelectorAll("input, select, textarea"), function (el) { return !named(el); }); }
+    function review3b() {
+      var p = demo();
+      // ---- the demo: names, not ids, for its channels ----
+      ok(p.conduits.map(function (c) { return c.channels.join(", "); }).join(" | ") === "OPC UA | VPN, RDP through the jump host | HTTPS", "the demo's channels and protocols are named, not ids", p.conduits.map(function (c) { return c.channels.join(", "); }).join(" | "));
+      ok(sheetCol(RX.buildWorkbook(p).getWorksheet("Conduits"), "Channels and protocols") === 5, "and the Excel Conduits sheet calls the column what the page and Word call it");
+
+      // ---- every approver, not only the first, is read for the sign-off ----
+      p.approvals[0].approved = false; p.approvals[0].fingerprint = ""; p.approval.approved = false;
+      var so = RX.signOffTexts(p);
+      ok(so[0] === "This assessment was signed off by S. Adeyemi (Process Safety Engineer) on 2026-07-04, for “The SL-T of the Safety Instrumented System zone (Z2)”.", "the summary's sign-off names the approver who signed, with the scope of their approval", so[0]);
+      ok(frontValue(RX.buildWorkbook(p), "Sign-off") === "S. Adeyemi (Process Safety Engineer), 2026-07-04", "and the Excel Front sheet names them", String(frontValue(RX.buildWorkbook(p), "Sign-off")));
+      var px;
+      return docXml({}).then(function (xml) {
+        px = paragraphsOf(xml);
+        ok(px.indexOf(so[0]) > 0 && !px.some(function (x) { return /has not yet signed off/.test(x); }), "Word: the summary says who signed, and nowhere says nobody has");
+        ok(after(px, "Document control", "Asset-owner sign-off") === "S. Adeyemi (Process Safety Engineer), 2026-07-04", "Word: document control names them too", String(after(px, "Document control", "Asset-owner sign-off")));
+        ok(px.indexOf(RX.signOffTexts(p)[2], px.indexOf("Sign-off")) > 0 && px.indexOf("Not yet signed", px.indexOf("Sign-off")) > 0, "Word: Signed off as below once one has signed, the other row still Not yet signed");
+        // Nobody signed: the section names who it is for, and claims no signature.
+        p.approvals[1].approved = false; p.approvals[1].fingerprint = "";
+        return docXml({});
+      }).then(function (xml) {
+        px = paragraphsOf(xml);
+        var s0 = px.lastIndexOf("Sign-off"), next = px.indexOf("Method and limitations");
+        var sec = px.slice(s0, next);
+        ok(sec.indexOf("The asset owner has not yet signed off the tolerable risk or the results.") > 0 && sec.some(function (x) { return /^For approval by the people below\. /.test(x); }) && !sec.some(function (x) { return /^Signed off as below/.test(x); }), "Word: with approvers recorded and none signed, the section says For approval by, never Signed off as below", sec.slice(0, 4).join(" | "));
+        ok(sec.indexOf(RX.SIGNATURE_HEAD[0]) > 0 && RX.SIGNATURE_HEAD[0] === "Approver", "and the table's first column is Approver, not Signed off by");
+        ok(has(texts(), /^R\. Calder: approval not yet recorded\.$/) && has(texts(), /^S\. Adeyemi: approval not yet recorded\.$/) && RT.stepStatus().approval.state === "open" && RT.stepStatus().review.state === "open", "named approvers with none approved leave step 7 open, and Check and issue not ready");
+        var it = RT.completeness().filter(function (i) { return /approval not yet recorded/.test(i.text); })[0];
+        ok(it.stage === "approval" && it.doc === "both" && it.target.kind === "approval" && it.target.id === "0", "on step 7, for both reports, aimed at the approver");
+        RT.goToItem(it);
+        ok(RT.state.stage === "approval" && d.activeElement === main().querySelector('[data-approval="0"] [data-approval-field="approved"]'), "Go to lands on that approver's Approved tick");
+
+        // ---- the ranking is part of what an approval covers ----
+        p = demo();
+        var hlp = MG.normaliseProject({ schema: "spt-risk-project/0.2", assessmentType: "high-level", suc: { name: "Works", description: "A works.", scopeStatement: "", assumptions: [] },
+          srs: { tolerableRisk: "medium", tolerableConfirmed: "medium", highLevelAssets: [{ id: "A1", name: "DCS", functionLocation: "", consequence: "serious", likelihood: "medium", note: "", detailed: { required: true, reason: "" } }] }, zones: [], conduits: [] });
+        hlp.approvals = [{ scope: "Tolerable risk and ranking", name: "A. Owner", role: "Plant Manager", organisation: "", date: "2026-07-01", revision: "", approved: true, fingerprint: RT.approvalFingerprint(hlp) }];
+        hlp.approval = { name: "A. Owner", role: "Plant Manager", date: "2026-07-01", statement: "Tolerable risk and ranking", approved: true };
+        ok(!RT.approvalStates(hlp)[0].changed, "a high-level-only approval starts unchanged");
+        hlp.srs.highLevelAssets[0].consequence = "severe";
+        var st = RT.approvalStates(hlp)[0];
+        ok(st.changed && same(st.parts, ["ranking"]), "a change to the ranking after it reads as changed since approval", JSON.stringify(st.parts));
+        var ci = RT.completeness(hlp).filter(function (i) { return /approved before/.test(i.text); })[0];
+        ok(ci && ci.text === "A. Owner: approved before the ranking changed." && ci.doc === "highLevel", "and is open for the high-level report", ci && (ci.text + " " + ci.doc));
+        hlp.srs.highLevelAssets[0].consequence = "serious"; hlp.srs.highLevelAssets[0].detailed.required = false; hlp.srs.highLevelAssets[0].detailed.reason = "Retired.";
+        ok(RT.approvalStates(hlp)[0].changed, "so does a change to a system's decision on a detailed assessment");
+        RT.loadProjectText(JSON.stringify(hlp));
+        RT.navigate("approval");
+        ok(/A1 DCS/.test(main().querySelector('[data-covers="ranking"]').textContent) && /Changed since approval: the ranking\./.test(main().querySelector('[data-approval="0"]').textContent), "step 7 lists the ranking as approved, and says what changed");
+        return docXml({ highLevelOnly: true });
+      }).then(function (xml) {
+        px = paragraphsOf(xml);
+        ok(px.indexOf("Consultant note: the ranking changed after A. Owner approved. Confirm the approval before issue.") > 0, "Word, high level: the note says the ranking changed");
+        // An SL-T change concerns the detailed report alone.
+        p = demo();
+        p.zones[0].slTargetByFR.UC = 4;
+        var ci = RT.completeness().filter(function (i) { return /approved before/.test(i.text); });
+        ok(ci.length === 2 && ci.every(function (i) { return i.doc === "detailed" && /approved before the SL-T changed\.$/.test(i.text); }), "an SL-T change is open for the detailed report only", ci.map(function (i) { return i.doc + ": " + i.text; }).join(" | "));
+        RT.goToItem(ci[0]);
+        ok(d.activeElement === main().querySelector('[data-approval="0"] [data-action="approved-again"]'), "Go to lands on that approver's Approved again, not the whole card");
+        d.activeElement.click();
+        ok(d.activeElement === main().querySelector('[data-approval="0"] [data-approval-status]') && /Unchanged since approval/.test(d.activeElement.textContent), "Approved again leaves the keyboard on the approver's status");
+        return docXml({ highLevelOnly: true });
+      }).then(function (xml) {
+        ok(!paragraphsOf(xml).some(function (x) { return /^Consultant note: .* changed after/.test(x); }), "Word, high level: no note for an SL-T it does not print");
+        return docXml({});
+      }).then(function (xml) {
+        ok(paragraphsOf(xml).indexOf("Consultant note: the SL-T changed after S. Adeyemi approved. Confirm the approval before issue.") > 0, "Word, detailed: the note says the SL-T changed");
+        // A legacy fingerprint still works, and one ticked in an older build asks for a record.
+        p = demo();
+        p.approvals[0].fingerprint = "";
+        RT.navigate("approval");
+        var row = main().querySelector('[data-approval="0"]');
+        ok(RT.approvalStates()[0].unrecorded && row.querySelector('[data-approval-status="unrecorded"] [data-action="approved-again"]'), "an approval with no record of what it covered offers Approved again");
+        row.querySelector('[data-action="approved-again"]').click();
+        ok(P().approvals[0].fingerprint === RT.approvalFingerprint() && !RT.approvalStates()[0].unrecorded, "which records it");
+
+        // ---- an older build's edits to the single sign-off ----
+        var f1 = clone(P()); f1.approvals = []; f1.approval = { name: "", role: "Plant Manager", date: "", statement: "Tolerable risk only", approved: false };
+        var n1 = MG.normaliseProject(f1);
+        ok(n1.approvals.length === 1 && n1.approvals[0].role === "Plant Manager" && n1.approvals[0].scope === "Tolerable risk only" && n1.approval.role === "Plant Manager", "a role or statement typed by an older build into an empty sign-off is kept, as an approver");
+        var f2 = clone(P()); f2.approval.name = "B. Newman"; f2.approval.role = "Site Director";
+        var n2 = MG.normaliseProject(f2);
+        ok(n2.approvals[0].name === "B. Newman" && n2.approvals[0].revision === "" && n2.approvals[0].fingerprint === "" && n2.approvals.length === 2, "a new name from an older build drops the earlier person's revision and fingerprint");
+        ok(RT.approvalStates(n2)[0].unrecorded, "so the approval reads as having no record, not as unchanged");
+        var f3 = clone(P()); f3.approval.approved = false;
+        ok(MG.normaliseProject(f3).approvals[0].fingerprint === "", "an approval taken back by an older build drops its fingerprint");
+
+        // ---- a conduit with an end not set ----
+        p = demo();
+        p.conduits[0].fromZone = "";
+        var ends = RT.completeness().filter(function (i) { return /an end is not set/.test(i.text); });
+        ok(ends.length === 1 && /^C1 /.test(ends[0].text) && ends[0].stage === "zones" && ends[0].doc === "detailed" && ends[0].target.kind === "conduit" && ends[0].target.id === "C1", "a conduit with an end not set is open on step 3, aimed at the conduit", ends.map(function (i) { return i.text; }).join(" | "));
+        var sb = RT.specBlocks().filter(function (b) { return b.id === "drawings"; })[0];
+        ok(!sb.done && RT.stepStatus().zones.state === "open" && RT.stepStatus().review.state === "open", "so step 6's drawings block, step 3 and Check and issue agree");
+        return docXml({});
+      }).then(function (xml) {
+        px = paragraphsOf(xml);
+        var chAt = px.indexOf("Zone and conduit characteristics"), c1 = -1; px.forEach(function (x, i) { if (c1 < 0 && i > chAt && /^C1: /.test(x)) c1 = i; });
+        var endsCell = px[px.indexOf("Ends", c1) + 1];
+        ok(/^Not set and Z/.test(endsCell) && !/external/i.test(endsCell), "Word: the end not set prints as Not set, never as external", endsCell);
+
+        // ---- a safety zone's exposure row ----
+        p = demo();
+        var exposures = []; px.forEach(function (x, i) { if (x === "Exposure") exposures.push(px[i + 1]); });
+        ok(exposures.length > 0 && !exposures.some(function (x) { return /safety instrumented/i.test(x); }), "Word: the safety designation is not repeated in a zone's exposure row", exposures.join(" | "));
+
+        // ---- the criteria appendix and the requirements section ----
+        ok(!px.some(function (x) { return /Protection against|casual or coincidental/i.test(x); }), "Word: the security levels are the house summary, not the standard's wording");
+        ok(px.indexOf("The SolutionsPT house risk criteria used in this assessment.") > px.indexOf("Appendix: risk criteria"), "Word: the appendix says the criteria are the house's");
+        ok(px.filter(function (x) { return /^Tolerable risk: /.test(x); }).length === 1, "Word: the tolerable risk is stated once in the requirements");
+        var kt = px.indexOf("Known or presumed threats"), ad = px.indexOf("Assumed adversary: SL3-grade");
+        ok(ad > kt && kt > 0 && ad < px.indexOf("Organisational security policies", kt), "Word: the assumed adversary sits with the known threats");
+        ok(!px.some(function (x) { return /[\/]/.test(x) && /First.aid|catastrophic cost/.test(x); }), "Word: the impact scale reads as sentences, with no slashes");
+        p.srs.clientMatrix = true; p.srs.clientMatrixNote = "Ratings mapped from the Acme 5x5 corporate matrix";
+        return docXml({});
+      }).then(function (xml) {
+        px = paragraphsOf(xml);
+        var ap = px.indexOf("Appendix: risk criteria");
+        ok(px[ap + 1] === "The SolutionsPT house risk criteria, shown for reference." && /^Consultant note: the client's own risk criteria are in use \(Ratings mapped from the Acme 5x5 corporate matrix\)\. /.test(px[ap + 2]), "Word: with the client's criteria in use, the house tables are for reference and the consultant is asked to relate them", px.slice(ap + 1, ap + 3).join(" | "));
+
+        // ---- step 6 on a high-level-only job counts only what its report needs ----
+        var hl6 = MG.normaliseProject({ schema: "spt-risk-project/0.2", assessmentType: "high-level", suc: { name: "Works", description: "A works.", scopeStatement: "", assumptions: ["Badge controlled"] },
+          srs: { adversaryClass: 2, highLevelAssets: [] }, zones: [], conduits: [] });
+        ok(RT.stepStatus(hl6).spec.state !== "open" && RT.stepStatus(hl6).spec.open === 0, "a high-level-only job does not show step 6 open for the detailed report's items", JSON.stringify(RT.stepStatus(hl6).spec));
+
+        // ---- the asset paste skips a header row ----
+        var pa = RT.parseAssets("Name\tType\tConnection\nPLC-1\tPLC");
+        ok(same(pa, [{ name: "PLC-1", type: "plc" }]) && pa.headerSkipped === true, "a pasted header row is not added as an asset");
+        ok(RT.parseAssets("Asset\tType\nHMI-1\tHMI").length === 1 && !RT.parseAssets("PLC-1\tPLC").headerSkipped, "whichever words it uses, and a first line of data is kept");
+
+        // ---- unsaved changes: the choice of assessment, section edits and reviews count ----
+        function bare(x) { return Object.assign({ suc: {}, srs: {}, basisOfAssessment: {}, zones: [], conduits: [] }, x); }
+        ok(RT.projectHasContent(bare({ assessmentType: "high-level" })) && RT.projectHasContent(bare({ reportCustom: { detailed: { "sign-off": { title: "Approval" } } } })) && RT.projectHasContent(bare({ review: { rounds: [{ round: 1 }] } })), "the assessment type, a section edit and a review round count as content");
+        ok(!RT.projectHasContent(bare({ reportCustom: { detailed: {} }, review: { rounds: [] } })), "empty stores do not");
+
+        // ---- no dash placeholders on the pages ----
+        p = demo();
+        var dashed = [];
+        ["home", "basis", "suc", "srs", "zones", "compare", "risk", "slt", "spec", "approval"].forEach(function (s) { RT.navigate(s); if (/[—–]/.test(main().textContent)) dashed.push(s); });
+        ok(dashed.length === 0, "no em or en dash on any step's page", dashed.join(", "));
+        RT.navigate("srs");
+        ok([].every.call(main().querySelectorAll("table select:not([data-action])"), function (s) { return s.options[0].text === "Not rated"; }), "step 2's impact and likelihood selects say Not rated when empty");
+        RT.navigate("slt");
+        var na = main().querySelector(".sl-btn.na");
+        ok(!na || na.textContent === "Not set", "the SL button for no level says Not set");
+
+        // ---- step 6: field labels, links and status as typed ----
+        p.srs.regulatory = [];
+        RT.navigate("spec");
+        var pol = main().querySelector('[data-spec="policies"]');
+        ok(pol.querySelector(".card-h h2").textContent === "Organisational security policies" && !!fieldIn(pol, "Policies") && !fieldIn(pol, "Organisational security policies"), "the policies block does not repeat its title as the field's label");
+        var links = [].map.call(main().querySelectorAll('[data-action^="spec-goto-"]'), function (b) { return b.getAttribute("aria-label"); });
+        ok(links.length > 3 && links.every(Boolean) && links.filter(function (x, i) { return links.indexOf(x) === i; }).length === links.length, "each Go to step link has a name of its own", links.join(" | "));
+        function navStatus(s) { var e = d.querySelector('#sidebar .nav-item[data-stage="' + s + '"] .nav-status'); return e ? e.textContent : ""; }
+        ok(main().querySelector('[data-spec="regulatory"] .spec-status').getAttribute("data-status") === "open" && navStatus("spec") === "1 open", "with no regulatory requirements, the block and the sidebar are open", navStatus("spec"));
+        var reg = fieldIn(main().querySelector('[data-spec="regulatory"]'), "Requirements");
+        reg.focus(); reg.value = "NIS"; reg.dispatchEvent(new w.Event("input", { bubbles: true }));
+        ok(main().querySelector('[data-spec="regulatory"] .spec-status').getAttribute("data-status") === "done" && navStatus("spec") === "Done" && d.activeElement === reg, "typing the requirement settles the block and the sidebar as it goes in, the field keeping the focus", navStatus("spec"));
+        ok(unnamed().length === 0, "every field on step 6 has a name a screen reader reads", unnamed().map(function (e) { return e.outerHTML.slice(0, 80); }).join(" | "));
+
+        // ---- step 7: labels and focus ----
+        RT.navigate("approval");
+        ok(unnamed().length === 0 && main().querySelector('[data-approval="0"] [data-approval-field="name"]').id && d.querySelector('label[for="' + main().querySelector('[data-approval="0"] [data-approval-field="name"]').id + '"]').textContent === "Name", "every field on step 7 is named by its label", unnamed().map(function (e) { return e.outerHTML.slice(0, 80); }).join(" | "));
+        main().querySelector('[data-action="add-approver"]').click();
+        var rm = main().querySelector('[data-approval="2"] [data-action="remove-approver"]');
+        rm.focus(); rm.click();
+        ok(P().approvals.length === 2 && d.activeElement === main().querySelector('[data-approval="1"] [data-approval-field="name"]'), "Remove leaves the keyboard on the approver now last");
+
+        // ---- step 3: labels and focus ----
+        RT.navigate("zones");
+        main().querySelector('[data-zone-row="Z1"]').click();
+        var ch = detail().querySelector("details.chars"); ch.open = true; ch.dispatchEvent(new w.Event("toggle"));
+        ok(unnamed().length === 0, "every field of a zone is named", unnamed().map(function (e) { return e.outerHTML.slice(0, 80); }).join(" | "));
+        var fl = detail().querySelector('input[data-flag="removable-media"]');
+        var was = fl.checked; fl.focus(); fl.click();
+        ok(P().zones[0].flags["removable-media"] === !was && d.activeElement === detail().querySelector('input[data-flag="removable-media"]'), "an exposure flag keeps the focus when ticked");
+        detail().querySelector('input[data-flag="removable-media"]').click();
+        var nA = P().zones[0].assets.length;
+        var add = detail().querySelector('[data-action="add-asset"]'); add.focus(); add.click();
+        ok(P().zones[0].assets.length === nA + 1 && d.activeElement === detail().querySelector('[data-asset-name="' + nA + '"]'), "+ Add asset puts the keyboard in the new asset's name");
+        d.activeElement.closest(".asset-row").querySelector(".btn.danger").click();
+        ok(P().zones[0].assets.length === nA && d.activeElement === detail().querySelector('[data-asset-name="' + (nA - 1) + '"]'), "Remove puts it on the asset now last");
+        detail().querySelector('[data-action="paste-open"]').click();
+        detail().querySelector('[data-action="paste-cancel"]').click();
+        ok(d.activeElement === detail().querySelector('[data-action="paste-open"]'), "Cancel on the paste box goes back to Paste several");
+        detail().querySelector('[data-action="paste-open"]').click();
+        type(detail().querySelector('[data-action="paste-text"]'), "Name\tType\nPLC-9\tPLC");
+        detail().querySelector('[data-action="paste-add"]').click();
+        ok(P().zones[0].assets.length === nA + 1 && P().zones[0].assets[nA].name === "PLC-9" && d.activeElement === detail().querySelector('[data-asset-name="' + nA + '"]') && /1 asset added, header row skipped\./.test(d.getElementById("toast").textContent), "Add from the paste puts the keyboard on the first asset added, and says the header row was skipped");
+        main().querySelector('[data-conduit-row="C1"]').click();
+        var cch = detail().querySelector("details.chars"); cch.open = true; cch.dispatchEvent(new w.Event("toggle"));
+        ok(unnamed().length === 0 && d.querySelector('label[for="' + detail().querySelector('[data-end="fromZone"]').id + '"]').textContent === "From", "every field of a conduit is named, its ends by From and To", unnamed().map(function (e) { return e.outerHTML.slice(0, 80); }).join(" | "));
+
+        // ---- Tab out of a reason field keeps the keyboard where Tab took it ----
+        main().querySelector('[data-zone-row="Z4"]').click();
+        var rIn = detail().querySelector('input[data-reason="sep-temporary"]');
+        var all = [].slice.call(main().querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]"));
+        var nextAt = all.indexOf(rIn) + 1, nextEl = all[nextAt];
+        rIn.focus();
+        rIn.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+        rIn.value = rIn.value + " Reviewed."; rIn.dispatchEvent(new w.Event("input", { bubbles: true }));
+        rIn.dispatchEvent(new w.Event("change", { bubbles: true }));
+        nextEl.focus();   // where the browser's Tab goes
+        return wait(50);
+      }).then(function () {
+        var all2 = [].slice.call(main().querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]"));
+        ok(d.activeElement !== d.body && main().contains(d.activeElement) && all2.indexOf(d.activeElement) === all2.indexOf(detail().querySelector('input[data-reason="sep-temporary"]')) + 1 && /Reviewed\.$/.test(P().zones[3].separation.temporary.reason), "after Tab out of a reason, the redraw keeps the focus on the next control", d.activeElement && d.activeElement.outerHTML.slice(0, 80));
+        demo();
+      });
+    }
+  }
+}());
+</script>
+</body>
+</html>

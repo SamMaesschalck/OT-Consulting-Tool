@@ -117,10 +117,13 @@
       downloads = 0;
       var origClick = w.HTMLAnchorElement.prototype.click;
       w.HTMLAnchorElement.prototype.click = function () { if (this.download) { downloads++; return; } return origClick.apply(this, arguments); };
-      var nav = w.document.getElementById("nav-word-preview");
-      ok(!!nav && /Word preview/.test(nav.textContent), "the sidebar has a Word preview entry under Reports");
-      if (!nav) return;
-      nav.click();
+      // Phase 3a: the Word preview is the Report page's Word pages view.
+      var nav = w.document.querySelector('#sidebar .nav-item[data-stage="report"]');
+      if (nav) nav.click();
+      var view = w.document.querySelector('#main .rp-views [data-view="word"]');
+      ok(!!nav && !!view && /Word pages/.test(view.textContent), "the sidebar has a Word preview entry under Reports");
+      if (!view) return;
+      view.click();
       function wait(test, ms) {
         return new Promise(function (res) { var t0 = Date.now(); (function poll() { if (test() || Date.now() - t0 > ms) res(test()); else setTimeout(poll, 100); })(); });
       }

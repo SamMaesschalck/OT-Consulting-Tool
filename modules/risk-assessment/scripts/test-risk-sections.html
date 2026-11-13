@@ -105,10 +105,11 @@
         ok(at === -1, "and the high-level report's (" + now.length + " paragraphs)", at === -1 ? "" : "line " + at + ": " + String(now[at]).slice(0, 120) + " / " + String(was[at]).slice(0, 120));
 
         // ---- the page ---------------------------------------------------------------
-        var nav = [].slice.call(d.querySelectorAll("#sidebar .nav-item")).filter(function (n) { return /^Report/.test(n.textContent); })[0];
+        var nav = d.querySelector('#sidebar .nav-item[data-stage="report"]');
         ok(!!nav, "the sidebar has a Report page");
         nav.click();
-        ok(/Report preview/.test(main.textContent), "it opens as Report preview");
+        // Phase 3a review: the page is titled as its sidebar entry, Report (was: Report preview).
+        ok(main.querySelector("h1.page-title").textContent === "Report" && !!main.querySelector(".rp-holder"), "it opens as Report, the sections view");
         ok(/Refreshing the preview/.test(main.querySelector(".rp-status").textContent), "and says it is refreshing while it builds");
         return settled();
       }).then(function () {
@@ -267,7 +268,10 @@
         return wordBlocks({});
       }).then(function (bl) {
         var sec = bl.filter(function (b) { return b.sectionKey === "system-under-consideration-and-requirements"; });
-        ok(sec.some(function (b) { return b.text === "A new description."; }) && sec.some(function (b) { return /^Scope: /.test(b.text); }) && sec.some(function (b) { return /^Tolerable risk: /.test(b.text); }), "a rewrite replaces only the opening wording: scope and tolerable risk stay");
+        // (Phase 3b review: the tolerable risk prints once, under its own
+        // heading in the same part of the report, not in this opening.)
+        var tolSec = bl.filter(function (b) { return b.sectionKey === "tolerable-risk"; });
+        ok(sec.some(function (b) { return b.text === "A new description."; }) && sec.some(function (b) { return /^Scope: /.test(b.text); }) && tolSec.some(function (b) { return /^Tolerable risk: /.test(b.text); }), "a rewrite replaces only the opening wording: scope and tolerable risk stay");
         var rank = bl.filter(function (b) { return b.sectionKey === "high-level-risk-ranking"; });
         ok(rank.some(function (b) { return b.text === "A new opening for the ranking."; }) && rank.some(function (b) { return b.type === "table"; }), "and a table under it survives");
         var next = bl.filter(function (b) { return b.sectionKey === "what-happens-next" && b.type === "paragraph"; }).map(function (b) { return b.text; });
@@ -304,7 +308,8 @@
         return wordBlocks({});
       }).then(function (bl) {
         var sec = bl.filter(function (b) { return b.sectionKey === "sign-off"; });
-        ok(sec[0].text === "Asset owner approval" && /Signed off by|signed off/.test(sec.slice(1).map(function (b) { return b.text; }).join(" ")), "and what it records still prints under the new title");
+        // (Phase 3b review: the signature table's first column is Approver, as a row may not be signed yet.)
+        ok(sec[0].text === "Asset owner approval" && /Signed off|signed off/.test(sec.slice(1).map(function (b) { return b.text; }).join(" ")), "and what it records still prints under the new title");
         reset();
         return openReport(0);
       }).then(function () {
@@ -343,7 +348,7 @@
         ok(heads.length === P().zones.length + P().conduits.length, "each zone's register heading is in its parent section (" + heads.length + ")");
         ok(heads.every(function (h) { return h.querySelector("button") === null; }), "as a name, with no Edit of its own");
         edit("zones-conduits-and-the-detailed-risk-assessment");
-        ok(/Rename the zones and conduits below on the Zones & conduits page/.test(cardOwn("zones-conduits-and-the-detailed-risk-assessment", ".sect-note").map(function (x) { return x.textContent; }).join(" ")), "and the parent says where to rename them");
+        ok(/Rename the zones and conduits below on the Zones and conduits page/.test(cardOwn("zones-conduits-and-the-detailed-risk-assessment", ".sect-note").map(function (x) { return x.textContent; }).join(" ")), "and the parent says where to rename them");
         // Keys do not move when a zone is named like a fixed heading.
         ok(RS.sectionKey("Justification for Z1 Unit 300 BPCS", ["Z1 Unit 300 BPCS"]) === "justification-for", "the key strips the zone's name");
         var saved = P().zones[0].name;

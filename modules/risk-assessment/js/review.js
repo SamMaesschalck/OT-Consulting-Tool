@@ -82,11 +82,17 @@ window.RiskReview = (function () {
   // The content hash leaves out the asset owner's sign-off, as document control
   // leaves out QA review by: signing off after the review approved it is the
   // normal order, not a change to what was reviewed. Out: the Sign-off section,
-  // the document control row, and the sentence the executive summary prints.
+  // the document control row, the sentence the executive summary prints, and
+  // the approvers' signature table wherever it is (phase 3b), so recording an
+  // approver or an approval does not read as a change either.
   function hashBlocks(blocks) {
-    var skip = {};
+    var skip = {}, sigHead = norm((RX().SIGNATURE_HEAD || [])[0] || "").toLowerCase();
     RX().signOffTexts(project()).forEach(function (s) { skip[norm(s)] = 1; });
-    function para(b) { return b.type !== "table" && b.type !== "image" && skip[norm(b.text)]; }
+    function sigTable(b) {
+      var r0 = b.type === "table" && b.rows && b.rows[0];
+      return !!(sigHead && r0 && r0.cells && r0.cells[0] && norm(r0.cells[0].text).toLowerCase() === sigHead);
+    }
+    function para(b) { return (b.type !== "table" && b.type !== "image" && skip[norm(b.text)]) || sigTable(b); }
     function clean(b) {
       if (b.type !== "table") return b;
       return Object.assign({}, b, { rows: b.rows.filter(function (r) {
@@ -266,7 +272,7 @@ window.RiskReview = (function () {
   function signature() {
     return once("signature", function () {
       counts.signature++;
-      var c = Object.assign({}, project()); delete c.review; delete c.savedOn; return JSON.stringify(c);
+      var c = Object.assign({}, project()); delete c.review; delete c.savedOn; delete c.lastStage; return JSON.stringify(c);
     });
   }
   // The ids of the items a pack would hold now.
@@ -777,5 +783,7 @@ window.RiskReview = (function () {
     qaOffers: function () { return offersNow().slice(); }, FIELD_LABELS: FIELD_LABELS,
     // For the tests: the page's adapter, and how often a drawing really worked
     // out the signature, the items and a document's texts.
-    __adapter: adapter, __counts: counts };
+    __adapter: adapter, __counts: counts,
+    // For the tests: a document's content hash from its blocks.
+    __hashOf: hashOf };
 })();

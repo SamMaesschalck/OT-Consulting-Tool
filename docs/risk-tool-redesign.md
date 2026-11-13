@@ -170,6 +170,26 @@ About 675 `ok(` calls across 13 pages pin today's behaviour. Phase 4 is at least
 7. **Scenario library.** Ship about 30 house scenarios or none. Recommend shipping, with a named owner for the wording.
 8. **Second SL-T method** ("risk reduction to tolerable", with the adversary assumption as a visible floor). Add as opt-in rules data or leave out. Recommend leaving it out until a client asks.
 9. **Excel read-back.** Keep the workbook one-way, or add an import of owner, date and status. Recommend one-way.
+10. **Hand-built summary pages** (raised in the phase 3a review). The plan retires them, but phase 3a kept them as the Report page's Summary view because they are the only printable one-page summary (Print one-page summary, Print high-level report), and `hlreport` still opens the high-level one. Their wording now follows the house rules (no tool version, no dash placeholders). Either retire them and point `hlreport` at the high-level Sections view (several test assertions on the Summary view would then need the owner's OK to remove), or keep them as a print view. Undecided.
+
+11. **Phase 3b calls** (raised when it was built; each can be reversed cheaply):
+    - Conduit "protocols" reuse the existing `channels` field, labelled "Channels and protocols", rather than a second list.
+    - Regulatory requirements moved from step 2 to step 6. Security functions that must be kept stay on step 2 and show in step 6's SUC block.
+    - Organisational security policies are a new project field entered on step 6 (`suc.policies`); zone policies stay on the zone.
+    - Asset types gained "Business system"; temporarily connected and wireless are an asset's connection (`asset.link`), not types. A v0.7 build shows an unknown type as the first in its list but keeps it unless edited.
+    - Separation rows sit on zones only. The external row is raised on each zone at the end of a conduit to EXT or one marked external that holds control system assets.
+    - An approver entry has an `approved` flag beside the planned fields, so one can be recorded before signing; old files read as one approver.
+    - Four step 6 blocks with no other check (assumptions, threat environment, policies, regulatory) add completeness items for the detailed report; every existing project gains them and the tolerable-risk confirmation until filled in.
+    - The sign-off item ("No asset-owner sign-off recorded.") moved from Check and issue to step 7; its text is unchanged.
+    - Word: the drawing moved from the zones section to the requirements section; zone and conduit meta lines became characteristics tables; empty cells read "Not rated" or "Not set" instead of a dash (Word and Excel). The "Worst case" SL-T row stays until phase 4. No landscape pages: the risk module has no landscape helpers.
+
+12. **Phase 3b review calls** (each can be reversed cheaply):
+    - The ranking is part of what an approval covers (the high-level report's approval: tolerable risk and ranking; the detailed report's: tolerable risk, SL-T, accepted risks). The fingerprint holds one hash per part (`a2-`), so a change says what moved and which report it concerns; the first build's `a1-` prints are still read.
+    - The sign-off items concern the high-level report too, once there is a ranking, and named approvers with none approved are open on step 7.
+    - The signature table's first column is "Approver"; the section opens "For approval by the people below" until someone has signed.
+    - The risk context's `approval` stays the first approver's mirror (provenance); it does not yet say whether any other approver signed.
+    - When an older build renames the single sign-off's person, the first approver keeps its organisation (often the same asset owner) but drops its revision and fingerprint.
+    - The security level definitions are a house summary in our own words (rules file), used in the UI, the summary and the criteria appendix.
 
 ## To verify against a licensed copy of IEC 62443-3-2
 

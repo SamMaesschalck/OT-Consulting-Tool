@@ -57,7 +57,7 @@ window.RiskExports = (function () {
     "high":      { fill: COLOR.gapBg,  text: COLOR.gap,  name: "High" },
     "very-high": { fill: COLOR.deepBg, text: COLOR.deep, name: "Very high" }
   };
-  function bandStyle(id) { return BAND_STYLE[id] || { fill: COLOR.naBg, text: COLOR.muted, name: id ? cap(id) : "—" }; }
+  function bandStyle(id) { return BAND_STYLE[id] || { fill: COLOR.naBg, text: COLOR.muted, name: id ? cap(id) : "Not rated" }; }
   function bandSolid(id) { // strong segment colours for the stacked bars
     return { "low": COLOR.met, "medium": COLOR.near, "high": COLOR.gap, "very-high": COLOR.deep }[id] || "CBD5DE";
   }
@@ -72,7 +72,8 @@ window.RiskExports = (function () {
   // Names for stored ids: a deliverable prints the name, never the id.
   function sevName(id) { return id ? RT().impactName(id) : ""; }
   function likName(id) { return id ? RT().likelihoodName(id) : ""; }
-  function flagNames(o) { return Object.keys(o.flags || {}).filter(function (k) { return o.flags[k]; }).map(function (k) { return RT().flagLabel(k); }); }
+  // noSafety: the safety designation is stated on its own row.
+  function flagNames(o, noSafety) { return Object.keys(o.flags || {}).filter(function (k) { return o.flags[k] && !(noSafety && k === "sis-present"); }).map(function (k) { return RT().flagLabel(k); }); }
   function assetText(a) { return a.name + (a.type && a.type !== "other" ? " (" + RT().assetTypeLabel(a.type) + ")" : ""); }
 
   // The sentences the asset owner's sign-off prints outside the Sign-off
@@ -80,15 +81,54 @@ window.RiskExports = (function () {
   // yet signed]. One place, because a review's content hash leaves them out
   // (js/review.js): signing off after an approval is not a change to what was
   // reviewed.
+  // [2] and [3] open the Sign-off section of the detailed and the high-level
+  // report once someone has approved, [4] and [5] while nobody has; after
+  // them, each report's note for an approval older than a change to what it
+  // covers. [0] names every approver who has approved, with the scope of
+  // the approval, read from all of them (step 7), not only the first.
+  var NOT_SIGNED = "The asset owner has not yet signed off the tolerable risk or the results.";
+  var COVERS = {
+    detailed: "An approval covers the tolerable risk, the target security levels and the accepted risks in this report, within the scope given for it.",
+    highLevel: "An approval covers the tolerable risk and the ranking in this report, within the scope given for it."
+  };
   function signOffTexts(p) {
-    var a = p.approval || {};
+    var states = RT().approvalStates(p);
+    var signed = states.filter(function (s) { return s.signed; });
     return [
-      a.approved
-        ? "The asset owner, " + a.name + " (" + a.role + "), signed off the tolerable risk and the results on " + a.date + ": “" + a.statement + "”"
-        : "The asset owner has not yet signed off the tolerable risk or the results.",
-      "The asset owner has not yet signed off the tolerable risk or the results."
-    ];
+      signed.length ? signedSentence(signed) : NOT_SIGNED,
+      NOT_SIGNED,
+      "Signed off as below. " + COVERS.detailed,
+      "Signed off as below. " + COVERS.highLevel,
+      "For approval by the people below. " + COVERS.detailed,
+      "For approval by the people below. " + COVERS.highLevel
+    ].concat([].concat.apply([], states.map(function (s) { return [changedText(s, "detailed"), changedText(s, "highLevel")]; })).filter(Boolean));
   }
+  // "This assessment was signed off by R. Calder (Asset Owner) on 2026-07-04,
+  // for “…”; and by …".
+  function signedSentence(signed) {
+    var bits = signed.map(function (s, i) {
+      var e = s.entry, scope = noStop(e.scope);
+      return (i ? "by " : "") + (e.name || "an approver not named") + (e.role ? " (" + e.role + ")" : "") + (e.date ? " on " + e.date : "") + (scope ? ", for “" + scope + "”" : "");
+    });
+    return "This assessment was signed off by " + (bits.length > 1 ? bits.slice(0, -1).join("; ") + "; and " + bits[bits.length - 1] : bits[0]) + ".";
+  }
+  // The note one report prints for an approval older than a change to what
+  // that report says it covers, or null when nothing it covers moved.
+  function changedText(s, doc) {
+    var parts = RT().approvalChangedFor(s, doc);
+    if (!parts.length) return null;
+    return "Consultant note: " + RT().approvalPartWords(parts, s.legacy) + " changed after " + (s.entry.name || "this approver") + " approved. Confirm the approval before issue.";
+  }
+  // Who has approved, for document control and the workbook's Front sheet.
+  function signOffLine(p, none) {
+    var signed = RT().approvalStates(p).filter(function (s) { return s.signed; });
+    if (!signed.length) return none;
+    return signed.map(function (s) { var e = s.entry; return (e.name || "Name not recorded") + (e.role ? " (" + e.role + ")" : "") + (e.date ? ", " + e.date : ""); }).join("; ");
+  }
+  // The signature table's header: a review's content hash leaves out a table
+  // that starts with it (js/review.js), as recording an approval is not a
+  // change to what was reviewed. "Approver", as a row may not be signed yet.
+  var SIGNATURE_HEAD = ["Approver", "Role", "Organisation", "Scope", "Date", "Revision"];
 
   // Everything the report tells is derived once, shared by both formats: the
   // tool's one view model (js/view-model.js), which the screen, the risk
@@ -96,6 +136,28 @@ window.RiskExports = (function () {
   // rows the builders below walk; see that file for the shape.
   function summarise(p) {
     return RT().viewModel(p);
+  }
+
+  // The zones each ranked system is assigned to, read from the zones' lists
+  // (zone.hlaIds, with fromHLA its first entry): { A1: ["Z1", "Z3"] }. A zone
+  // may hold several systems, and a system may sit in several zones.
+  function zonesBySystem(p) {
+    var rt = RT(), out = {};
+    p.zones.forEach(function (z) { rt.hlaIdsOf(z).forEach(function (id) { (out[id] = out[id] || []).push(z.id); }); });
+    return out;
+  }
+  // The ranked systems the recorded decisions take to a detailed assessment:
+  // on a high-level-only assessment each system's own decision, otherwise a
+  // system assigned to a zone recorded as needing one. Suggestions are not
+  // decisions and count for nothing here.
+  function systemsForDetail(p) {
+    var rt = RT(), hlOnly = rt.assessmentType(p) === "high-level";
+    var byZone = {};
+    p.zones.forEach(function (z) { if (rt.comparison(z, p).required === true) rt.hlaIdsOf(z).forEach(function (id) { byZone[id] = true; }); });
+    return p.srs.highLevelAssets.filter(function (a) {
+      if (!a.name) return false;
+      return hlOnly ? rt.hlaComparison(a, p).required === true : !!byZone[a.id];
+    });
   }
 
   /* ===================== WORD ===================== */
@@ -186,6 +248,114 @@ window.RiskExports = (function () {
         ] });
       }), w);
     }
+    // ---- a zone's or conduit's characteristics: a table of what is
+    // recorded (rows with nothing are left out), then each separation the
+    // zones page raised that is not in place, with its reason, and in red one
+    // not yet answered. ----
+    // EXT is outside the SUC; an end not chosen says so, and is never read
+    // as external.
+    function endName(id) {
+      if (!id) return "not set";
+      if (id === "EXT") return "external";
+      var z = p.zones.filter(function (x) { return x.id === id; })[0];
+      return id + (z && z.name ? " " + z.name : "");
+    }
+    function characteristics(row) {
+      var o = row.o, out = [], pairs;
+      function lines(v) { return (Array.isArray(v) ? v : []).join("; "); }
+      if (row.isZone) {
+        var conds = p.conduits.filter(function (c) { return c.fromZone === o.id || c.toZone === o.id; });
+        pairs = [
+          ["Function", o.fn], ["Logical boundary", o.description], ["Physical boundary", o.physicalBoundary],
+          ["Accountable organisation", o.accountableOrg],
+          ["Safety designation", rt.zoneSafety(o) ? "Safety related" : "Not safety related"],
+          ["Assets", o.assets.map(function (a) { return assetText(a) + (a.link ? ", " + rt.assetLinkLabel(a.link) : ""); }).join("; ")],
+          ["Logical access points", lines(o.accessPoints)], ["Physical access points", lines(o.physicalAccessPoints)],
+          ["Data flows", lines(o.dataFlows)],
+          ["Conduits", conds.map(function (c) { return c.id + (c.name ? " " + c.name : "") + " to " + endName(c.fromZone === o.id ? c.toZone : c.fromZone); }).join("; ")],
+          ["External dependencies", lines(o.externalDependencies)], ["Security policies", lines(o.securityPolicies)],
+          ["Assumptions", lines(o.assumptions)], ["Exposure", cap(flagNames(o, true).join(", "))]
+        ];
+      } else {
+        var dir = o.direction === "both" ? "Both ways" : o.direction === "from-to" ? "One way, " + endName(o.fromZone) + " to " + endName(o.toZone)
+          : o.direction === "to-from" ? "One way, " + endName(o.toZone) + " to " + endName(o.fromZone) : "";
+        var marks = [];
+        if (o.wireless) marks.push("wireless");
+        if (rt.conduitExternal(o)) marks.push("external network" + (o.externalParty ? " (" + o.externalParty + ")" : ""));
+        if (o.temporary) marks.push("temporarily connected");
+        pairs = [
+          ["Ends", cap(endName(o.fromZone) + " and " + endName(o.toZone))], ["Direction", dir],
+          ["Channels and protocols", (o.channels || []).join(", ")], ["Boundary devices", lines(o.boundaryDevices)],
+          ["Connection", marks.length ? cap(marks.join(", ")) : ""], ["Notes", o.notes]
+        ];
+      }
+      out.push(para([run(o.id + ": " + (o.name || "(unnamed " + row.kind.toLowerCase() + ")"), { bold: true })], { spacing: { before: 160, after: 80 } }));
+      out.push(kvTable(pairs.filter(function (kv) { return kv[1] && String(kv[1]).trim(); })));
+      if (row.isZone) rt.separationRows(o, p).forEach(function (r) {
+        if (r.answer === "not-separated") out.push(para([run(r.label + " are not kept separate. ", { bold: true }), run(r.reason || "No reason recorded.", r.reason ? {} : { color: COLOR.note })], { spacing: { before: 80, after: 80 } }));
+        else if (!r.answer) out.push(para([run("Consultant note: whether " + r.label.toLowerCase() + " are kept separate is not yet recorded.", { color: COLOR.note, italics: true })], { spacing: { before: 80, after: 80 } }));
+      });
+      return out;
+    }
+    // ---- the risk criteria appendix: the matrix with the tolerable line
+    // (cells above it carry a heavy border), the impact and likelihood
+    // scales, the security levels and, in the detailed report, the
+    // foundational requirements' key. ----
+    function criteriaAppendix() {
+      var R0 = RULES(), out = [], tol = S.tolerable, tolN = bandStyle(tol).name;
+      var SEVS = R0.severityScale, LIKS = R0.likelihoodScale;
+      function plain(s) { return cap(String(s || "").replace(/^House default:\s*/i, "")); }
+      var BS = (docx.BorderStyle && docx.BorderStyle.SINGLE) || "single";
+      var heavy = { style: BS, size: 18, color: COLOR.text };
+      out.push(h1("Appendix: risk criteria"));
+      // House criteria, and said to be. Where the client's own are in use the
+      // tables are the house's for reference, and how the ratings relate to
+      // the client's criteria is the consultant's to set out (in red until then).
+      out.push(body(p.srs.clientMatrix ? "The SolutionsPT house risk criteria, shown for reference." : "The SolutionsPT house risk criteria used in this assessment."));
+      if (p.srs.clientMatrix) out.push(pinned(body("Consultant note: the client's own risk criteria are in use" + (p.srs.clientMatrixNote ? " (" + noStop(p.srs.clientMatrixNote) + ")" : "") + ". Set out how the ratings in this report relate to them, or replace these tables, before issue.", { color: COLOR.note, italics: true })));
+      out.push(h2("Risk matrix"));
+      var mw = [2500].concat(LIKS.map(function () { return Math.floor(6500 / LIKS.length); }));
+      var mrows = [headerRow(["Impact, by likelihood"].concat(LIKS.map(function (l) { return l.name; })), mw)];
+      SEVS.slice().reverse().forEach(function (sv) {
+        mrows.push(new docx.TableRow({ children: [textCell(sv.name, mw[0], { bold: true, fill: COLOR.subBg })].concat(LIKS.map(function (l, i) {
+          var b = R0.riskMatrix[sv.id][l.id], st = bandStyle(b), above = rt.exceedsTolerable(b, tol);
+          var c = new docx.TableCell({
+            width: dxaW(mw[i + 1]),
+            shading: { type: docx.ShadingType ? docx.ShadingType.SOLID : "solid", color: st.fill, fill: st.fill },
+            margins: { top: 60, bottom: 60, left: 100, right: 100 },
+            borders: above ? { top: heavy, bottom: heavy, left: heavy, right: heavy } : undefined,
+            children: [para([run(st.name + (above ? " (above)" : ""), { bold: true, color: st.text })], { spacing: { after: 0 } })]
+          });
+          return c;
+        })) }));
+      });
+      out.push(fixedTable(mrows, mw));
+      out.push(pinned(body("Tolerable risk is " + tolN + ". Cells marked above, with a heavy border, are above it: " + (opts.highLevelOnly ? "a system rated there is a candidate for a detailed assessment." : "a threat rated there needs a recorded treatment decision."))));
+      function scaleTable(title, arr) {
+        out.push(h2(title));
+        var w = [2000, 7000];
+        out.push(fixedTable([headerRow(["Level", "Meaning"], w)].concat(arr.slice().reverse().map(function (x) {
+          return new docx.TableRow({ children: [textCell(x.name, w[0], { bold: true }), textCell(plain(x.note), w[1])] });
+        })), w));
+      }
+      scaleTable("Impact scale", SEVS);
+      scaleTable("Likelihood scale", LIKS);
+      out.push(h2("Security levels"));
+      var lw = [2000, 7000], defs = R0.slDefinitions || {};
+      out.push(fixedTable([headerRow(["Security level", "Protects against"], lw)].concat(["1", "2", "3", "4"].filter(function (k) { return defs[k]; }).map(function (k) {
+        return new docx.TableRow({ children: [textCell("SL" + k, lw[0], { bold: true }), textCell(defs[k], lw[1])] });
+      })), lw));
+      if (!opts.highLevelOnly) {
+        var m = R0.riskToSL || {};
+        out.push(pinned(body("The house mapping suggests an SL-T from the unmitigated risk: " + R0.riskBands.map(function (b) { var x = m[b.id]; return x ? b.name + " SL" + x.suggest : null; }).filter(Boolean).join(", ") + ". SL4 is considered only where a nation-state-grade adversary is in scope.")));
+        out.push(h2("Foundational requirements"));
+        var fw = [2000, 7000];
+        out.push(fixedTable([headerRow(["Short form", "Foundational requirement"], fw)].concat(FRS().map(function (f) {
+          return new docx.TableRow({ children: [textCell(f.id, fw[0], { bold: true }), textCell(f.fr + " " + String(f.name).replace(/ & /g, " and "), fw[1])] });
+        })), fw));
+      }
+      return out;
+    }
     function bulletList(items) {
       return items.map(function (t) {
         return new docx.Paragraph({ children: [run(t)], bullet: { level: 0 }, spacing: { after: 60 } });
@@ -194,6 +364,13 @@ window.RiskExports = (function () {
     function bandCell(bandId, width) {
       var st = bandStyle(bandId);
       return textCell(st.name, width, { fill: st.fill, color: st.text, bold: true, valign: "center" });
+    }
+    // The recorded decision on a detailed assessment; none recorded is a
+    // prompt, in red.
+    function decisionCell(c, width) {
+      if (c.required === true) return textCell("Required", width, { bold: true });
+      if (c.required === false) return textCell("Not required", width);
+      return textCell("Not decided", width, { bold: true, color: COLOR.note });
     }
     // Tagged as closing a level 2 section, so hiding the sub-section it follows
     // leaves the break in place, while hiding the level 1 section takes it too.
@@ -335,13 +512,13 @@ window.RiskExports = (function () {
       var decided = exceed.filter(function (x) { return x.decided; }).length;
       if (opts.highLevelOnly) {
         var ranked = p.srs.highLevelAssets.filter(function (a) { return a.name; });
-        var highPlus = ranked.filter(function (a) { var b2 = rt.riskFor(a.consequence, a.likelihood); return b2 === "high" || b2 === "very-high"; }).length;
-        var promoted = p.zones.filter(function (z) { return z.fromHLA; }).length;
+        var aboveTol = ranked.filter(function (a) { return rt.exceedsTolerable(rt.riskFor(a.consequence, a.likelihood), S.tolerable); }).length;
+        var forDetail = systemsForDetail(p).length;
         out.push(sbTilesRow([
           { t: String(ranked.length), color: COLOR.navy, label: "systems ranked", fill: COLOR.subBg },
-          { t: String(highPlus), color: highPlus ? COLOR.gap : COLOR.met, label: "ranked High or above", fill: highPlus ? COLOR.gapBg : COLOR.metBg },
+          { t: String(aboveTol), color: aboveTol ? COLOR.gap : COLOR.met, label: "above tolerable risk", fill: aboveTol ? COLOR.gapBg : COLOR.metBg },
           { t: bandStyle(S.tolerable).name, color: bandStyle(S.tolerable).text, label: "tolerable risk", fill: bandStyle(S.tolerable).fill, size: 32 },
-          { t: String(promoted), color: COLOR.navy, label: "promoted to detailed tier", fill: COLOR.subBg }
+          { t: String(forDetail), color: COLOR.navy, label: "for detailed assessment", fill: COLOR.subBg }
         ]));
         out.push(body("Systems in scope ranked by consequence and likelihood on the SolutionsPT house risk matrix.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
         // Ranking as a stacked overview: one row, systems per band.
@@ -375,7 +552,7 @@ window.RiskExports = (function () {
         { t: String(S.threats.length), color: COLOR.navy, label: "threats registered", fill: COLOR.subBg },
         { t: String(exceed.length), color: exceed.length ? COLOR.gap : COLOR.met, label: "above tolerable (" + bandStyle(S.tolerable).name + ")", fill: exceed.length ? COLOR.gapBg : COLOR.metBg },
         { t: decided + "/" + exceed.length, color: decided === exceed.length ? COLOR.met : COLOR.gap, label: "with a treatment decision", fill: decided === exceed.length ? COLOR.metBg : COLOR.gapBg },
-        { t: sltWorst == null ? "—" : "SL" + sltWorst, color: COLOR.navy, label: "highest SL-T set", fill: COLOR.subBg }
+        { t: sltWorst == null ? "None" : "SL" + sltWorst, color: COLOR.navy, label: "highest SL-T set", fill: COLOR.subBg }
       ]));
       out.push(body("Threats per zone and conduit by unmitigated risk band. The tolerable risk is " + bandStyle(S.tolerable).name + ".", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
       out.push(h2("Risk profile by zone and conduit"));
@@ -400,7 +577,7 @@ window.RiskExports = (function () {
       out.push(h2("Target security levels: worst case per foundational requirement"));
       out.push(sbTilesRow(FRS().map(function (f) {
         var v = S.sltMax[f.id];
-        return { t: v == null ? "—" : "SL" + v, color: v != null ? COLOR.navy : COLOR.soft, label: f.id, fill: COLOR.subBg, size: 28 };
+        return { t: v == null ? "Not set" : "SL" + v, color: v != null ? COLOR.navy : COLOR.soft, label: f.id, fill: COLOR.subBg, size: v == null ? 18 : 28 };
       })));
       // Focus cards: above tolerable with no decision first, then worst risks.
       function focusId(x) { return x.owner.id + ":" + x.t.id; }
@@ -440,7 +617,7 @@ window.RiskExports = (function () {
       ["QA review by", notSet(eng.qaReviewBy)],
       ["Confidentiality", notSet(eng.confidentiality)],
       ["Method", opts.highLevelOnly ? "IEC 62443-3-2 high-level risk assessment, using the SolutionsPT house risk matrix" : "IEC 62443-3-2, using the SolutionsPT house risk matrix and risk-to-SL mapping"],
-      ["Asset-owner sign-off", p.approval.approved ? (p.approval.name + " (" + p.approval.role + "), " + p.approval.date) : "Not yet signed off"]
+      ["Asset-owner sign-off", signOffLine(p, "Not yet signed off")]
     ]));
     children.push(pageBreak());
 
@@ -449,7 +626,7 @@ window.RiskExports = (function () {
     children.push(heading("Executive summary", docx.HeadingLevel.HEADING_1, { before: 0 }));
     var ranked = p.srs.highLevelAssets.filter(function (a) { return a.name; });
     var tolName = bandStyle(S.tolerable).name;
-    var promoted = p.zones.filter(function (z) { return z.fromHLA; }).length;
+    var forDetail = systemsForDetail(p);
     function flagsPhrase(o) {
       var on = flagNames(o);
       return on.length ? " (" + on.join(", ") + ")" : "";
@@ -473,13 +650,15 @@ window.RiskExports = (function () {
         out.push(body((p.srs.essentialFunctions ? "The essential functions in scope are " + lc1(p.srs.essentialFunctions) + ". " : "") + (p.srs.worstCase ? "The credible worst-case consequence is " + lc1(p.srs.worstCase) + ". " : "") + "Risk in this report means the likelihood and severity of " + (p.srs.essentialFunctions && !p.srs.worstCase ? "losing those functions" : "that outcome") + ", not the loss of data or an IT service."));
       }
       if (p.srs.adversaryClass) {
-        out.push(body("The assumed adversary is SL" + p.srs.adversaryClass + " grade on the IEC 62443 scale, meaning " + ({1: "casual or accidental misuse", 2: "an intentional attacker using simple means and low resources", 3: "a sophisticated attacker using specific skills and moderate resources", 4: "a sophisticated, well-resourced and motivated attacker (state-grade)"}[p.srs.adversaryClass] || "see the requirements section") + ". This choice is the asset owner's, because it sets how strong the countermeasures must be."));
+        // The house summary of the level (the rules file), as the criteria appendix prints it.
+        var advDef = (RULES().slDefinitions || {})[String(p.srs.adversaryClass)];
+        out.push(body("The assumed adversary is SL" + p.srs.adversaryClass + " grade on the IEC 62443 scale, meaning " + (advDef ? noStop(advDef.charAt(0).toLowerCase() + advDef.slice(1)) : "see the requirements section") + ". This choice is the asset owner's, because it sets how strong the countermeasures must be."));
       }
       return out;
     }
     if (opts.highLevelOnly) {
       children.push(h2("Why this assessment"));
-      children.push(body("A cyber incident on a plant can stop production, damage equipment and put people at risk. Before investing in detailed security engineering, " + notSet(eng.client) + " needs to know which systems across " + (p.suc.name || "the systems in scope") + " carry the most risk, and which justify a full, per-system assessment."));
+      children.push(body("A cyber incident on a plant can stop production, damage equipment and put people at risk. Before investing in detailed security engineering, " + notSet(eng.client) + " needs to know which systems across " + (p.suc.name || "the systems in scope") + " carry the most risk, and which justify a detailed assessment."));
       children = children.concat(stakesKids());
       children.push(h2("What this report is"));
       children.push(body("This is the first tier of an IEC 62443-3-2 risk assessment, the high-level cyber security risk assessment" + (eng.assessmentDate ? ", carried out " + eng.assessmentDate : "") + ". Each system in scope was ranked by the consequence and likelihood of its compromise, and the resulting risk band compared with the tolerable risk of " + tolName + ". The ranking is relative. It puts the systems in priority order but does not measure absolute risk or set security targets."));
@@ -492,17 +671,34 @@ window.RiskExports = (function () {
       [["very-high", "Very high"], ["high", "High"], ["medium", "Medium"], ["low", "Low"]].forEach(function (pr) {
         if (perBandHL[pr[0]].length) bandBits.push(perBandHL[pr[0]].length + " " + pr[1]);
       });
-      var highPlus = perBandHL["very-high"].concat(perBandHL["high"]);
+      // The candidates are the systems above tolerable risk. On a
+      // high-level-only assessment the decision is recorded per system, so a
+      // recorded Not required takes a system out (with its reason), and a
+      // recorded Required adds one; on a full assessment the decision is made
+      // per zone, and the systems in a zone recorded as needing one are counted.
+      var hlOnlyType = rt.assessmentType(p) === "high-level";
+      function decided(a) { return hlOnlyType ? rt.hlaComparison(a, p) : null; }
+      function withReasons(list) { return list.map(function (a) { var r = noStop((decided(a) || {}).reason || ""); return a.name + (r ? ": " + lc1(r) : ""); }).join("; "); }
+      var aboveTol = ranked.filter(function (a) { return rt.exceedsTolerable(rt.riskFor(a.consequence, a.likelihood), S.tolerable); });
+      var skipped = aboveTol.filter(function (a) { var c = decided(a); return c && c.required === false; });
+      var candidates = aboveTol.filter(function (a) { return skipped.indexOf(a) < 0; });
+      var extra = hlOnlyType ? ranked.filter(function (a) { return aboveTol.indexOf(a) < 0 && decided(a).required === true; }) : [];
       if (ranked.length) {
-        children.push(body(ranked.length + " systems were ranked" + (bandBits.length ? ": " + bandBits.join(", ") : "") + ". " +
-          (highPlus.length
-            ? "The systems ranked High or above (" + highPlus.map(function (a) { return a.name; }).join(", ") + ") are the candidates for detailed, per-system assessment" + (promoted ? "; " + promoted + " ranked system" + (promoted === 1 ? " has" : "s have") + " already moved into the detailed tier" : "") + "."
-            : "No system ranks High or above, so on this evidence a detailed assessment is optional.")));
+        var found = ranked.length + " systems were ranked" + (bandBits.length ? ": " + bandBits.join(", ") : "") + ".";
+        if (candidates.length) {
+          found += " The systems above the tolerable risk of " + tolName + " (" + candidates.map(function (a) { return a.name; }).join(", ") + ") are the candidates for a detailed assessment" +
+            (!hlOnlyType && forDetail.length ? "; " + forDetail.length + " ranked system" + (forDetail.length === 1 ? " is" : "s are") + " in zones taken to a detailed assessment" : "") + ".";
+        } else if (!aboveTol.length) {
+          found += " No system is above the tolerable risk of " + tolName + ", so on this evidence a detailed assessment is optional.";
+        }
+        if (extra.length) found += " A detailed assessment was also judged needed for " + withReasons(extra) + ".";
+        if (skipped.length) found += " A detailed assessment was judged not needed for " + withReasons(skipped) + ".";
+        children.push(body(found));
       } else {
         children.push(body("No systems have been ranked yet."));
       }
       children.push(h2("What happens next"));
-      children.push(body("In the detailed tier, each system taken forward is divided into security zones and conduits, its threats are registered and treated, and target security levels are set to scope the engineering work. Systems below the threshold should be re-ranked if their connectivity, criticality or threat exposure changes."));
+      children.push(body("Next, the systems are grouped into security zones and conduits, and the initial risk of each zone and conduit is compared with the tolerable risk to decide where a detailed assessment is needed. There, threats are registered and treated, and target security levels are set to scope the engineering work. Systems below the threshold should be re-ranked if their connectivity, criticality or threat exposure changes."));
     } else {
       var exceed = S.threats.filter(function (x) { return x.exceeds; });
       children.push(h2("Why this assessment"));
@@ -510,7 +706,16 @@ window.RiskExports = (function () {
       children = children.concat(stakesKids());
       children.push(h2("What this report is"));
       function nOf(n, one, many) { return n + " " + (n === 1 ? one : many); }
-      children.push(body("The assessment follows IEC 62443-3-2. " + (ranked.length ? nOf(ranked.length, "system was", "systems were") + " first ranked for relative risk. The system under consideration was then" : "The system under consideration was") + " divided into " + nOf(p.zones.length, "security zone", "security zones") + " and " + nOf(p.conduits.length, "conduit", "conduits") + ". A zone groups assets with the same security requirements, and a conduit is a communication path between zones. Threats to each zone and conduit were rated for likelihood and impact against the tolerable risk of " + tolName + ", and every threat above that level needs a recorded treatment decision. Each zone and conduit then has a target security level (SL-T), the protection it must be engineered and maintained to."));
+      // The method used: each zone and conduit is compared with tolerable
+      // risk first (the risk comparison), and only those recorded as needing
+      // a detailed assessment have their threats rated.
+      function ratedSentence() {
+        var skip = p.zones.concat(p.conduits).filter(function (o) { return rt.comparison(o, p).required === false; }).map(function (o) { return o.id; });
+        if (!skip.length) return "Threats to each zone and conduit were rated for likelihood and impact against the tolerable risk of " + tolName + ", and every threat above that level needs a recorded treatment decision.";
+        var list = skip.length > 1 ? skip.slice(0, -1).join(", ") + " and " + skip[skip.length - 1] : skip[0];
+        return "The initial risk of each zone and conduit was first compared with the tolerable risk of " + tolName + ". " + list + (skip.length === 1 ? " was" : " were") + " found not to need a detailed assessment, and " + (skip.length === 1 ? "its" : "their") + " SL-T rests on the written justification. Threats to the others were rated for likelihood and impact, and every threat above the tolerable risk needs a recorded treatment decision.";
+      }
+      children.push(body("The assessment follows IEC 62443-3-2. " + (ranked.length ? nOf(ranked.length, "system was", "systems were") + " first ranked for relative risk. The system under consideration was then" : "The system under consideration was") + " divided into " + nOf(p.zones.length, "security zone", "security zones") + " and " + nOf(p.conduits.length, "conduit", "conduits") + ". A zone groups assets with the same security requirements, and a conduit is a communication path between zones. " + ratedSentence() + " Each zone and conduit then has a target security level (SL-T), the protection it must be engineered and maintained to."));
       var bSent = basisSentence();
       if (bSent) children.push(body(bSent));
       children.push(h2("What we found"));
@@ -579,7 +784,7 @@ window.RiskExports = (function () {
       children.push(body("The highest target security levels across the system are " + sltBits + "." + (overallMax != null && drivers.length ? " The SL" + overallMax + " ceiling is set by " + (drivers.length > 3 ? drivers.slice(0, 3).join(", ") + " and " + (drivers.length - 3) + " more" : drivers.join(", ")) + "." : "") + " An IEC 62443-3-3 assessment against these targets will measure what the system can withstand today, and the gaps it finds become the security improvement programme."));
       children.push(body("Repeat this assessment after a significant change to the system or its connectivity, after a security incident, and otherwise at regular intervals."));
     }
-    if (p.approval.approved) {
+    if (rt.approvalStates(p).some(function (s) { return s.signed; })) {
       children.push(pinned(body(signOffTexts(p)[0], { italics: true })));
     } else {
       children.push(pinned(body(signOffTexts(p)[0], { color: COLOR.gap, bold: true })));
@@ -595,22 +800,53 @@ window.RiskExports = (function () {
     children = children.concat(scorecardPage());
     children.push(pageBreak());
 
-    // ---- the SUC and its requirements ----
+    // ---- the SUC and its requirements: the cyber security requirements
+    // specification, its parts in the order data/zcr-map.json gives them
+    // (SUC description, drawings, zone and conduit characteristics,
+    // assumptions, threat environment, policies, tolerable risk, regulatory
+    // requirements). The high-level report has no zones, so no drawing and
+    // no characteristics. A heading reworded here needs its old key in
+    // SECTION_KEY_ALIASES (js/model.js). ----
     children.push(heading("System under consideration and requirements", docx.HeadingLevel.HEADING_1, { before: 0 }));
     if (p.suc.description) children.push(body(p.suc.description));
     if (p.suc.scopeStatement) children.push(para([run("Scope: ", { bold: true }), run(p.suc.scopeStatement)]));
     if (p.srs.essentialFunctions) children.push(para([run("Essential functions: ", { bold: true }), run(p.srs.essentialFunctions)]));
     if (p.srs.worstCase) children.push(para([run("Worst-case consequence: ", { bold: true }), run(p.srs.worstCase)]));
-    children.push(para([run("Tolerable risk: ", { bold: true }), run(bandStyle(S.tolerable).name, { bold: true, color: bandStyle(S.tolerable).text }), run("   Assumed adversary: " + (p.srs.adversaryClass ? "SL" + p.srs.adversaryClass + "-grade" : "(not set)"))]));
-    [["Operating-environment assumptions", p.suc.assumptions],
-     ["Known or presumed threats", p.srs.knownThreats],
-     ["Security functions that must be kept", p.srs.mandatorySecurityFunctions],
-     ["Regulatory requirements", p.srs.regulatory]].forEach(function (pair) {
-      if (pair[1] && pair[1].length) {
-        children.push(h2(pair[0]));
-        children = children.concat(bulletList(pair[1]));
+    function listSection(title, items, lead) {
+      if ((!items || !items.length) && !lead) return;
+      children.push(h2(title));
+      if (lead) children.push(lead);
+      children = children.concat(bulletList(items || []));
+    }
+    // Part of the SUC description, as on step 6.
+    listSection("Security functions that must be kept", p.srs.mandatorySecurityFunctions);
+    // A zone's own assumptions and policies are in its characteristics table.
+    if (!opts.highLevelOnly && p.zones.length) {
+      // The same drawing as the Zones and conduits page, as a picture.
+      var map = window.RiskZoneMap ? window.RiskZoneMap.layout(p, rt.suggestZone) : null;
+      var png = map ? window.RiskZoneMap.toPng(map, 3) : null;
+      if (png) {
+        children.push(h2("Zone and conduit drawings"));
+        var mapW = Math.min(600, png.width), mapH = Math.round(png.height * mapW / png.width);
+        children.push(new docx.Paragraph({ alignment: docx.AlignmentType ? docx.AlignmentType.CENTER : "center", spacing: { before: 120, after: 200 }, keepNext: true,
+          children: [new docx.ImageRun({ data: png.bytes, transformation: { width: mapW, height: mapH }, altText: { title: "Zones and conduits", description: "Zone and conduit drawing", name: "zone-map" } })] }));
       }
-    });
+      children.push(h2("Zone and conduit characteristics"));
+      children.push(body("These are the zones and conduits as defined for this assessment. Where a zone holds assets that are normally kept apart and they are not separated, the reason follows its table."));
+      S.owners.forEach(function (row) { children = children.concat(characteristics(row)); });
+    }
+    // The same key as "Operating-environment assumptions": a slug reads a
+    // hyphen and a space alike.
+    listSection("Operating environment assumptions", p.suc.assumptions);
+    // The threat environment: the assumed adversary, then the known threats.
+    listSection("Known or presumed threats", p.srs.knownThreats, p.srs.adversaryClass ? para([run("Assumed adversary: ", { bold: true }), run("SL" + p.srs.adversaryClass + "-grade")]) : null);
+    listSection("Organisational security policies", Array.isArray(p.suc.policies) ? p.suc.policies : []);
+    children.push(h2("Tolerable risk"));
+    children.push(para([run("Tolerable risk: ", { bold: true }), run(bandStyle(S.tolerable).name, { bold: true, color: bandStyle(S.tolerable).text })]));
+    children.push(rt.tolerableConfirmed(p)
+      ? body("Confirmed with the asset owner. The risk matrix, its scales and the tolerable line are in the appendix, Risk criteria.")
+      : pinned(body("The tolerable risk has not yet been confirmed with the asset owner. The risk matrix, its scales and the tolerable line are in the appendix, Risk criteria.", { bold: true, color: COLOR.note })));
+    listSection("Regulatory requirements", p.srs.regulatory);
 
     // ---- basis of assessment ----
     var b = p.basisOfAssessment;
@@ -644,54 +880,67 @@ window.RiskExports = (function () {
     // map (js/model.js, SECTION_KEY_ALIASES), or stored edits lose their place.
     if (ranked.length) {
       children.push(h1("High-level risk ranking"));
-      children.push(body("Systems are ranked by consequence and likelihood on the SolutionsPT house risk matrix" + (p.srs.clientMatrix ? " (client matrix noted: " + (p.srs.clientMatrixNote || "in use") + ")" : "") + ". An arrow and zone ID mark a system taken into the detailed tier."));
-      var rw = [2500, 2400, 1300, 1300, 1200, 2006];
-      var promotedFrom = {};
-      p.zones.forEach(function (z) { if (z.fromHLA) promotedFrom[z.fromHLA] = z.id; });
-      var rows = [headerRow(["System", "Function / location", "Consequence", "Likelihood", "Risk", "Note"], rw)];
+      var inZones = zonesBySystem(p);
+      var anyAssigned = ranked.some(function (a) { return !!inZones[a.id]; });
+      children.push(body("Systems are ranked by consequence and likelihood on the SolutionsPT house risk matrix" + (p.srs.clientMatrix ? " (client matrix noted: " + (p.srs.clientMatrixNote || "in use") + ")" : "") + "." + (anyAssigned ? " An arrow marks the zones a system is assigned to." : "")));
+      // On a high-level-only assessment the comparison with tolerable risk is
+      // recorded per system, so the table carries the decision.
+      var hlDecide = rt.assessmentType(p) === "high-level";
+      var rw = hlDecide ? [2100, 1900, 1150, 1150, 1000, 1350, 1856] : [2500, 2400, 1300, 1300, 1200, 2006];
+      var rows = [headerRow(["System", "Function / location", "Consequence", "Likelihood", "Risk"].concat(hlDecide ? ["Detailed assessment", "Note"] : ["Note"]), rw)];
       ranked.slice().sort(function (a, b2) {
         return (S.bandRank[rt.riskFor(b2.consequence, b2.likelihood)] || 0) - (S.bandRank[rt.riskFor(a.consequence, a.likelihood)] || 0);
       }).forEach(function (a) {
         var band = rt.riskFor(a.consequence, a.likelihood);
-        rows.push(new docx.TableRow({ children: [
-          textCell(a.name + (promotedFrom[a.id] ? "  → " + promotedFrom[a.id] : ""), rw[0], { bold: !!promotedFrom[a.id] }),
+        var zs = inZones[a.id] || [];
+        var cells = [
+          textCell(a.name + (zs.length ? "  → " + zs.join(", ") : ""), rw[0], { bold: zs.length > 0 }),
           textCell(a.functionLocation || "", rw[1]),
-          textCell(sevName(a.consequence) || "—", rw[2]),
-          textCell(likName(a.likelihood) || "—", rw[3]),
-          bandCell(band, rw[4]),
-          textCell(a.note || "", rw[5])
-        ] }));
+          textCell(sevName(a.consequence) || "Not rated", rw[2], a.consequence ? {} : { color: COLOR.muted }),
+          textCell(likName(a.likelihood) || "Not rated", rw[3], a.likelihood ? {} : { color: COLOR.muted }),
+          bandCell(band, rw[4])
+        ];
+        if (hlDecide) {
+          var dc = rt.hlaComparison(a, p);
+          cells.push(decisionCell(dc, rw[5]));
+        }
+        cells.push(textCell(a.note || "", rw[rw.length - 1]));
+        rows.push(new docx.TableRow({ children: cells }));
       });
       children.push(fixedTable(rows, rw));
+    }
+
+    // ---- the risk comparison: each zone's and conduit's initial risk
+    // against tolerable risk, and the decision on a detailed assessment ----
+    if (!opts.highLevelOnly && (p.zones.length || p.conduits.length)) {
+      children.push(h1("Risk comparison"));
+      children.push(body("The initial risk of each zone and conduit was compared with the tolerable risk of " + tolName + " to decide where a detailed risk assessment is needed. Comparing each zone and conduit is the method used in this assessment. A zone's initial risk is the worst of the ranked systems assigned to it, or the rating entered for it. A conduit takes the higher initial risk of the zones it joins, unless a rating is entered for it."));
+      var cw = [2500, 1200, 1700, 1500, 2506];
+      var crows = [headerRow(["Zone or conduit", "Initial risk", "Against tolerable risk", "Detailed assessment", "Reason"], cw)];
+      S.owners.forEach(function (row) {
+        var o = row.o, c = rt.comparison(o, p);
+        crows.push(new docx.TableRow({ children: [
+          textCell(o.id + (o.name ? " " + o.name : ""), cw[0], { bold: true }),
+          c.initial ? bandCell(c.initial, cw[1]) : textCell("Not rated", cw[1], { color: COLOR.muted }),
+          textCell(c.suggested === null ? "Nothing to compare" : (c.suggested ? "Above" : "Within"), cw[2]),
+          decisionCell(c, cw[3]),
+          textCell(c.reason || "", cw[4])
+        ] }));
+      });
+      children.push(fixedTable(crows, cw));
     }
 
     if (!opts.highLevelOnly) {
       // ---- zones & conduits + threat registers ----
       children.push(h1("Zones, conduits and the detailed risk assessment"));
-      children.push(body("Each threat is rated for likelihood and impact on the SolutionsPT house risk matrix and compared with the tolerable risk of " + tolName + "."));
-      // The same drawing as the Zones & conduits page, as a picture.
-      var map = window.RiskZoneMap && p.zones.length ? window.RiskZoneMap.layout(p, rt.suggestZone) : null;
-      var png = map ? window.RiskZoneMap.toPng(map, 3) : null;
-      if (png) {
-        var mapW = Math.min(600, png.width), mapH = Math.round(png.height * mapW / png.width);
-        children.push(new docx.Paragraph({ alignment: docx.AlignmentType ? docx.AlignmentType.CENTER : "center", spacing: { before: 120, after: 200 }, keepNext: true,
-          children: [new docx.ImageRun({ data: png.bytes, transformation: { width: mapW, height: mapH }, altText: { title: "Zones and conduits", description: "Zone and conduit drawing", name: "zone-map" } })] }));
-      }
+      children.push(body("Each threat is rated for likelihood and impact on the SolutionsPT house risk matrix and compared with the tolerable risk of " + tolName + ". The drawing and each zone's and conduit's characteristics are under System under consideration and requirements."));
       S.owners.forEach(function (row) {
         var o = row.o;
         // A zone's own heading is its name, not a section title: it closes the
         // section before it and is renamed where the zone is entered.
-        var ownerHead = h2(o.id + ": " + (o.name || "(unnamed " + row.kind.toLowerCase() + ")") + (row.kind === "Conduit" ? "  (" + (o.fromZone || "?") + " → " + (o.toZone || "external") + ")" : ""));
+        var ownerHead = h2(o.id + ": " + (o.name || "(unnamed " + row.kind.toLowerCase() + ")") + (row.kind === "Conduit" ? "  (" + (o.fromZone || "not set") + " → " + (!o.toZone ? "not set" : o.toZone !== "EXT" ? o.toZone : "external") + ")" : ""));
         ownerHead.__boundaryOnly = true;
         children.push(ownerHead);
-        var meta = [];
-        if (o.fn) meta.push("Function: " + o.fn);
-        if (o.description) meta.push(o.description);
-        if (row.kind === "Conduit" && o.channels && o.channels.length) meta.push("Channels: " + o.channels.join(", "));
-        var flagsOn = flagNames(o);
-        if (flagsOn.length) meta.push("Exposure: " + flagsOn.join(", "));
-        if (meta.length) children.push(body(meta.join("  ·  "), { color: COLOR.muted }));
-        if (o.assets && o.assets.length) children.push(body("Assets: " + o.assets.map(assetText).join("; "), { color: COLOR.muted }));
         if (o.vulnerabilities && o.vulnerabilities.length) {
           children.push(body("Vulnerabilities: " + o.vulnerabilities.map(function (v) { return v.description; }).join(" · "), { color: COLOR.muted }));
         }
@@ -709,7 +958,7 @@ window.RiskExports = (function () {
               textCell((x.t.likelihood || x.t.impact) ? (x.t.likelihood ? likName(x.t.likelihood) : "Not rated") + " × " + (x.t.impact ? sevName(x.t.impact) : "Not rated") : "Not rated",
                 tw[1], (x.t.likelihood && x.t.impact) ? {} : { color: COLOR.muted }),
               bandCell(x.risk, tw[2]),
-              x.residual ? bandCell(x.residual, tw[3]) : textCell("—", tw[3]),
+              x.residual ? bandCell(x.residual, tw[3]) : textCell("Not rated", tw[3], { color: COLOR.muted }),
               // No decision, or an incomplete one, prints in the red of a prompt left to complete.
               textCell(x.label, tw[4], x.exceeds && !x.decided ? { bold: true, color: COLOR.note } : {})
             ] }));
@@ -740,12 +989,12 @@ window.RiskExports = (function () {
         var o = row.o;
         mrows.push(new docx.TableRow({ children: [textCell(o.id + " " + (o.name || ""), mw[0], { bold: true })].concat(frs.map(function (f, i) {
           var v = o.slTargetByFR[f.id];
-          return textCell(v == null ? "—" : "SL" + v, mw[i + 1], v != null ? { bold: true } : { color: COLOR.muted });
+          return textCell(v == null ? "Not set" : "SL" + v, mw[i + 1], v != null ? { bold: true } : { color: COLOR.muted });
         })) }));
       });
       mrows.push(new docx.TableRow({ children: [textCell("Worst case", mw[0], { bold: true, fill: COLOR.subBg })].concat(frs.map(function (f, i) {
         var v = S.sltMax[f.id];
-        return textCell(v == null ? "—" : "SL" + v, mw[i + 1], { bold: true, fill: COLOR.subBg });
+        return textCell(v == null ? "Not set" : "SL" + v, mw[i + 1], { bold: true, fill: COLOR.subBg });
       })) }));
       children.push(fixedTable(mrows, mw));
       S.owners.forEach(function (row) {
@@ -763,21 +1012,37 @@ window.RiskExports = (function () {
     }
 
     // ---- sign-off + limitations ----
+    // The approvers (step 7), as a signature table. Everything here is left
+    // out of a review's content hash (js/review.js), so recording an approval
+    // never reads as a change to what was reviewed.
     children.push(h1("Sign-off"));
-    if (p.approval.approved) {
-      children.push(kvTable([
-        ["Signed off by", p.approval.name + " (" + p.approval.role + ")"],
-        ["Date", p.approval.date],
-        ["Statement", p.approval.statement]
-      ]));
-    } else {
-      children.push(pinned(body(signOffTexts(p)[1], { bold: true, color: COLOR.gap })));
+    var approvals = rt.approvalStates(p), texts = signOffTexts(p), anySigned = approvals.some(function (s) { return s.signed; });
+    var docId = opts.highLevelOnly ? "highLevel" : "detailed";
+    if (!anySigned) children.push(pinned(body(texts[1], { bold: true, color: COLOR.gap })));
+    if (approvals.length) {
+      // "Signed off as below" only once someone has; before that the table
+      // names who it is for.
+      children.push(pinned(body(texts[(anySigned ? 2 : 4) + (opts.highLevelOnly ? 1 : 0)])));
+      var sw = [1900, 1500, 1500, 2300, 1100, 1206];
+      children.push(fixedTable([headerRow(SIGNATURE_HEAD, sw)].concat(approvals.map(function (s) {
+        var e = s.entry;
+        return new docx.TableRow({ children: [
+          textCell(e.name || "Name not recorded", sw[0], { bold: true }), textCell(e.role || "", sw[1]), textCell(e.organisation || "", sw[2]),
+          textCell(e.scope || "", sw[3]),
+          textCell(e.approved ? (e.date || "Date not recorded") : "Not yet signed", sw[4], e.approved ? {} : { color: COLOR.gap, bold: true }),
+          textCell(e.revision || "", sw[5])
+        ] });
+      })), sw));
+      approvals.forEach(function (s) { var note = changedText(s, docId); if (note) children.push(pinned(body(note, { color: COLOR.note, italics: true }))); });
     }
     children.push(h1("Method and limitations"));
     children.push(body("The assessment follows " + rt.zcrMap.standard.id + ". The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults. The standard prescribes no matrix, so a client corporate matrix takes precedence where one exists." + (opts.highLevelOnly ? "" : " Each SL-T is the consultant's judgement, informed by the house mapping.")));
     children.push(body(opts.highLevelOnly
       ? "Consequence and likelihood ratings reflect the evidence available at the time of the engagement. The assessment does not test security capability."
       : "Likelihood and impact ratings reflect the evidence available at the time of the engagement. The assessment sets targets and does not test security capability, which is measured against the SL-T in an IEC 62443-3-3 assessment."));
+
+    // ---- appendix: the risk criteria every rating above rests on ----
+    children = children.concat(criteriaAppendix());
 
     // ---- the consultant's section overrides ----
     // The tree before them says what the generated wording is, and the tree after
@@ -861,7 +1126,7 @@ window.RiskExports = (function () {
      ["Zones / conduits", p.zones.length + " / " + p.conduits.length],
      ["Threats registered", String(S.threats.length)],
      ["Above tolerable", String(S.counts.exceeding)],
-     ["Sign-off", p.approval.approved ? (p.approval.name + " (" + p.approval.role + "), " + p.approval.date) : "Not signed off"],
+     ["Sign-off", signOffLine(p, "Not signed off")],
      ["Method note", "SolutionsPT house risk matrix and risk-to-SL mapping. SL-T values are set by the consultant, with written justification."]
     ].forEach(function (kv) { front.addRow(kv); });
     front.getCell("A1").font = { bold: true, size: 14, color: { argb: argb(COLOR.headBg) } };
@@ -869,16 +1134,20 @@ window.RiskExports = (function () {
 
     // ---- Ranking ----
     var rk = wb.addWorksheet("Ranking", { properties: { tabColor: { argb: argb(COLOR.near) } } });
-    rk.columns = [{ width: 34 }, { width: 40 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 50 }];
-    rk.addRow(["System", "Function / location", "Consequence", "Likelihood", "Risk", "Zone", "Note"]);
-    styleHeader(rk, 1, 7);
-    var promotedFrom = {};
-    p.zones.forEach(function (z) { if (z.fromHLA) promotedFrom[z.fromHLA] = z.id; });
+    // A high-level-only assessment records the risk comparison per system:
+    // its decision is a last column.
+    var hlDecide = rt.assessmentType(p) === "high-level";
+    rk.columns = [{ width: 34 }, { width: 40 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 50 }].concat(hlDecide ? [{ width: 18 }, { width: 40 }] : []);
+    rk.addRow(["System", "Function / location", "Consequence", "Likelihood", "Risk", "Zone", "Note"].concat(hlDecide ? ["Detailed assessment", "Reason"] : []));
+    styleHeader(rk, 1, hlDecide ? 9 : 7);
+    var inZones = zonesBySystem(p);
     p.srs.highLevelAssets.filter(function (a) { return a.name; }).forEach(function (a) {
-      var r = rk.addRow([a.name, a.functionLocation || "", sevName(a.consequence), likName(a.likelihood), "", promotedFrom[a.id] || "", a.note || ""]);
+      var dc = hlDecide ? rt.hlaComparison(a, p) : null;
+      var r = rk.addRow([a.name, a.functionLocation || "", sevName(a.consequence), likName(a.likelihood), "", (inZones[a.id] || []).join(", "), a.note || ""]
+        .concat(dc ? [dc.required === true ? "Required" : (dc.required === false ? "Not required" : "Not decided"), dc.reason || ""] : []));
       bandFillCell(r.getCell(5), rt.riskFor(a.consequence, a.likelihood));
     });
-    rk.autoFilter = { from: "A1", to: "G1" };
+    rk.autoFilter = { from: "A1", to: hlDecide ? "I1" : "G1" };
     freezeTop(rk);
 
     // ---- Threat register (living tracker) ----
@@ -907,23 +1176,43 @@ window.RiskExports = (function () {
     freezeTop(tr);
 
     // ---- Zones / Conduits ----
+    // The risk comparison's decision, as the report prints it.
+    function decisionText(c) { return c.required === true ? "Required" : (c.required === false ? "Not required" : "Not decided"); }
+    function lines(v) { return (Array.isArray(v) ? v : []).join("; "); }
     var zs = wb.addWorksheet("Zones", { properties: { tabColor: { argb: argb(COLOR.met) } } });
-    zs.columns = [{ width: 8 }, { width: 28 }, { width: 34 }, { width: 50 }, { width: 30 }, { width: 40 }, { width: 40 }];
-    zs.addRow(["ID", "Name", "Function", "Description", "Exposure flags", "Assets", "Access points"]);
-    styleHeader(zs, 1, 7);
+    zs.columns = [{ width: 8 }, { width: 28 }, { width: 34 }, { width: 50 }, { width: 30 }, { width: 40 }, { width: 40 },
+      { width: 30 }, { width: 34 }, { width: 34 }, { width: 40 }, { width: 50 }, { width: 18 }, { width: 50 }];
+    zs.addRow(["ID", "Name", "Function", "Description", "Exposure flags", "Assets", "Access points",
+      "Accountable organisation", "Physical boundary", "Physical access points", "Data flows", "Separation not in place", "Detailed assessment", "Reason"]);
+    styleHeader(zs, 1, 14);
     p.zones.forEach(function (z) {
-      zs.addRow([z.id, z.name, z.fn || "", z.description || "",
+      var cmp = rt.comparison(z, p);
+      var notSep = rt.separationRows(z, p).filter(function (r) { return r.answer === "not-separated"; }).map(function (r) { return r.label + (r.reason ? ": " + r.reason : ""); });
+      var r = zs.addRow([z.id, z.name, z.fn || "", z.description || "",
         flagNames(z).join(", "),
-        (z.assets || []).map(assetText).join("; "),
-        (z.accessPoints || []).join("; ")]);
+        (z.assets || []).map(function (a) { return assetText(a) + (a.link ? ", " + rt.assetLinkLabel(a.link) : ""); }).join("; "),
+        (z.accessPoints || []).join("; "),
+        z.accountableOrg || "", z.physicalBoundary || "", lines(z.physicalAccessPoints), lines(z.dataFlows),
+        notSep.join("; "), decisionText(cmp), cmp.reason || ""]);
+      r.alignment = { vertical: "top", wrapText: true };
     });
     freezeTop(zs);
     var cs = wb.addWorksheet("Conduits", { properties: { tabColor: { argb: argb(COLOR.met) } } });
-    cs.columns = [{ width: 8 }, { width: 26 }, { width: 10 }, { width: 10 }, { width: 22 }, { width: 60 }];
-    cs.addRow(["ID", "Name", "From", "To", "Channels", "Notes"]);
-    styleHeader(cs, 1, 6);
+    cs.columns = [{ width: 8 }, { width: 26 }, { width: 10 }, { width: 10 }, { width: 22 }, { width: 60 },
+      { width: 22 }, { width: 34 }, { width: 30 }, { width: 30 }, { width: 18 }, { width: 50 }];
+    cs.addRow(["ID", "Name", "From", "To", "Channels and protocols", "Notes", "Direction", "Boundary devices", "Connection", "External party", "Detailed assessment", "Reason"]);
+    styleHeader(cs, 1, 12);
     p.conduits.forEach(function (c) {
-      cs.addRow([c.id, c.name || "", c.fromZone || "", c.toZone || "(external)", (c.channels || []).join(", "), c.notes || ""]);
+      var cmp = rt.comparison(c, p), marks = [];
+      if (c.wireless) marks.push("wireless");
+      if (rt.conduitExternal(c)) marks.push("external network");
+      if (c.temporary) marks.push("temporarily connected");
+      var dir = c.direction === "both" ? "Both ways"
+        : c.direction === "from-to" ? "One way, " + (c.fromZone || "?") + " to " + (c.toZone || "?")
+        : c.direction === "to-from" ? "One way, " + (c.toZone || "?") + " to " + (c.fromZone || "?") : "";
+      var r = cs.addRow([c.id, c.name || "", c.fromZone || "", c.toZone || "", (c.channels || []).join(", "), c.notes || "",
+        dir, lines(c.boundaryDevices), marks.join(", "), c.externalParty || "", decisionText(cmp), cmp.reason || ""]);
+      r.alignment = { vertical: "top", wrapText: true };
     });
     freezeTop(cs);
 
@@ -951,12 +1240,12 @@ window.RiskExports = (function () {
       var o = row.o;
       var r = sl.addRow([o.id + " " + (o.name || "")].concat(frs.map(function (f) {
         var v = o.slTargetByFR[f.id];
-        return v == null ? "—" : "SL" + v;
+        return v == null ? "Not set" : "SL" + v;
       })).concat([o.justification || ""]));
       r.getCell(1).font = { bold: true, size: 10 };
       r.alignment = { vertical: "top", wrapText: true };
     });
-    var worst = sl.addRow(["Worst case"].concat(frs.map(function (f) { return S.sltMax[f.id] == null ? "—" : "SL" + S.sltMax[f.id]; })).concat([""]));
+    var worst = sl.addRow(["Worst case"].concat(frs.map(function (f) { return S.sltMax[f.id] == null ? "Not set" : "SL" + S.sltMax[f.id]; })).concat([""]));
     worst.eachCell(function (c) { c.font = { bold: true }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(COLOR.subBg) } }; });
     freezeTop(sl);
 
@@ -1010,6 +1299,7 @@ window.RiskExports = (function () {
     // For the review pack (js/review.js): the names the reports print.
     bandName: function (id) { return bandStyle(id).name; },
     signOffTexts: signOffTexts,
+    SIGNATURE_HEAD: SIGNATURE_HEAD.slice(),
     downloadWord: downloadWord,
     downloadExcel: downloadExcel
   };

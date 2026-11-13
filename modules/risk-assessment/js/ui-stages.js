@@ -1,12 +1,16 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
-/* ui-stages.js — the workflow pages and the Basis of assessment page.
+/* ui-stages.js — Home, the workflow steps and Engagement and evidence.
  *
- * 1 System under consideration (suc), 2 High-level risk and requirements
- * (srs, with "Detail →" promoting a ranked system to a zone), 3 Zones and
- * conduits (zones), 4 Detailed risk assessment (risk, with the treatment
- * decision per threat) and 5 SL-T assignment (slt), plus basis. Each page
- * registers itself in RiskApp.Pages for js/app.js to draw. The detailed risk
- * page reads its per-threat facts from js/view-model.js.
+ * Home (home: the kind of assessment, the steps with their status, Open the
+ * demo), 1 Scope and risk criteria (suc, with the risk criteria read-only
+ * beside the form and the tolerable risk's confirmed marker), 2 High-level
+ * risk (srs, with Assign to zone on the ranking, and the comparison column on
+ * a high-level-only assessment), 4 Risk comparison (compare) and 5 Detailed
+ * risk, in two tabs: the threats with the treatment decision per threat
+ * (risk) and the SL-T (slt); plus Engagement and evidence (basis). Step 3 is
+ * js/ui-zones.js; steps 6 and 7 are js/ui-spec.js.
+ * Each page registers itself in RiskApp.Pages for js/app.js to draw. The
+ * detailed risk page reads its per-threat facts from js/view-model.js.
  */
 (function () {
   "use strict";
@@ -25,55 +29,164 @@
   // ---------- Stage 1: the system under consideration (SUC) ----------
 
   function renderSuc(main) {
-    var p = state.project;
-    main.appendChild(h("h1", { class: "page-title", text: "System under consideration" }));
+    var p = state.project, s = p.srs;
+    main.appendChild(h("h1", { class: "page-title", text: "Scope and risk criteria" }));
     main.appendChild(pageSub("suc", "Define the SUC, its boundary and every access point."));
     main.appendChild(card("SUC definition", null, [
       textField("SUC name", p.suc.name, function (v) { p.suc.name = v; touched(); }, { placeholder: "e.g. Riverside Works process control system" }),
       textField("Description", p.suc.description, function (v) { p.suc.description = v; touched(); }, { textarea: true, placeholder: "Function and intended usage of the SUC." }),
       textField("Scope statement / boundary", p.suc.scopeStatement, function (v) { p.suc.scopeStatement = v; touched(); }, { textarea: true, placeholder: "What is inside and outside the boundary, and the access points across it.", hint: "Name the exclusions, e.g. corporate IT or third-party packages." }),
       lineListField("Operating-environment assumptions", p.suc.assumptions, function (a) { p.suc.assumptions = a; touched(); }, "e.g. Physical access to the equipment room is controlled")
-    ]));
+    ], null, { "data-check-anchor": "suc" }));
+
+    // The confirmed marker is the band the asset owner confirmed: changing the
+    // tolerable risk afterwards leaves it unconfirmed until confirmed again.
+    var confirmed = M.tolerableConfirmed(p), staleBand = s.tolerableConfirmed && !confirmed ? s.tolerableConfirmed : null;
+    var body = [
+      selectField("Tolerable risk", s.tolerableRisk, BANDS.map(function (b) { return { value: b.id, text: b.name }; }), function (v) { s.tolerableRisk = v || RULES.tolerableRisk.default; touched(); rerender(); }, { placeholder: false, hint: "The highest unmitigated risk accepted without a treatment decision." }),
+      h("div", { class: "field" }, [
+        h("label", { class: "check-line" }, [
+          h("input", { type: "checkbox", "data-action": "tolerable-confirmed", checked: confirmed, onChange: function (e) {
+            if (e.target.checked) s.tolerableConfirmed = s.tolerableRisk || RULES.tolerableRisk.default; else delete s.tolerableConfirmed;
+            touched(); rerender();
+          } }),
+          "Confirmed with the asset owner"
+        ]),
+        staleBand ? h("div", { class: "hint val-warn", text: "Confirmed for " + BAND_NAME[staleBand].toLowerCase() + ", before the change." }) : null
+      ]),
+      h("div", { class: "field" }, [
+        h("label", { text: "Client risk criteria" }),
+        h("label", { style: "text-transform:none;font-weight:400;font-size:13px;color:var(--text);display:inline-flex;align-items:center;gap:6px;cursor:pointer" }, [
+          h("input", { type: "checkbox", checked: s.clientMatrix, onChange: function (e) { s.clientMatrix = e.target.checked; touched(); rerender(); } }),
+          "The client's own risk matrix or criteria are in use"
+        ]),
+        h("div", { class: "hint", text: "The client's matrix takes precedence over the SolutionsPT house matrix." })
+      ])
+    ];
+    if (s.clientMatrix) body.push(textField("How the client matrix was applied", s.clientMatrixNote, function (v) { s.clientMatrixNote = v; touched(); }, { textarea: true }));
+    main.appendChild(card("Risk criteria", null, [h("div", { class: "criteria-layout" }, [
+      h("div", null, body),
+      criteriaPanel(E.tolerableOf(p))
+    ])], null, { "data-check-anchor": "criteria" }));
   }
 
-  // ---------- Stage 2: high-level risk assessment and requirements ----------
-
-  // Promote a ranked system into a single-system zone carrying the detailed
-  // assessment. The zone is pre-filled from the ranking and seeded with a
-  // starting threat at the ranked impact/likelihood, so the detailed work
-  // continues where the high-level assessment left off.
-  function zoneFromHLA(assetId) { for (var i = 0; i < state.project.zones.length; i++) if (state.project.zones[i].fromHLA === assetId) return state.project.zones[i]; return null; }
-
-  function promoteAssetToZone(asset) {
-    var p = state.project;
-    var existing = zoneFromHLA(asset.id);
-    if (existing) { state.stage = "risk"; render(); toast("Already promoted to " + existing.id + ". Continue its detailed assessment here."); return; }
-    p.counters.zone += 1;
-    var z = M.emptyZone(p.counters.zone);
-    z.name = asset.name || ("System " + asset.id);
-    z.fn = asset.functionLocation || "";
-    z.description = "Promoted from high-level ranking item " + asset.id + (asset.note ? " (" + asset.note + ")" : "") + ".";
-    z.fromHLA = asset.id;
-    if (asset.name) z.assets.push({ name: asset.name, type: "other" });
-    if (asset.consequence || asset.likelihood) {
-      p.counters.threat += 1;
-      var t = M.emptyThreat(p.counters.threat);
-      t.statement = "(Seeded from the high-level ranking: refine the threat statement, source and affected FRs.)";
-      t.impact = asset.consequence || "";
-      t.likelihood = asset.likelihood || "";
-      z.threats.push(t);
+  // The risk criteria, read-only beside the form: the matrix with the
+  // tolerable line (cells above it outlined), and the scale definitions.
+  function criteriaPanel(tol) {
+    var t = h("table", { class: "tbl matrix", "aria-label": "Risk matrix" });
+    t.appendChild(h("thead", null, [h("tr", null, [h("th", { text: "Impact" })].concat(LIK.map(function (l) { return h("th", { class: "center", text: l.name }); })))]));
+    var tb = h("tbody");
+    SEV.slice().reverse().forEach(function (sv) {
+      tb.appendChild(h("tr", null, [h("th", { scope: "row", text: sv.name })].concat(LIK.map(function (l) {
+        var b = RULES.riskMatrix[sv.id][l.id], above = E.exceedsTolerable(b, tol);
+        return h("td", { class: "center" + (above ? " above-tol" : ""), "data-band": b }, [riskPill(b)]);
+      }))));
+    });
+    t.appendChild(tb);
+    function scale(title, arr) {
+      return h("div", null, [h("strong", { text: title }), h("ul", { class: "scale-list" }, arr.map(function (x) {
+        return h("li", null, [h("span", { class: "scale-name", text: x.name + ": " }), U.cap(String(x.note || "").replace(/^House default:\s*/i, ""))]);
+      }))]);
     }
-    p.zones.push(z);
+    return h("div", { class: "criteria-panel", "data-criteria": "matrix" }, [
+      h("div", { class: "muted criteria-cap", text: "Likelihood across, impact down. Outlined cells are above tolerable risk (" + BAND_NAME[tol].toLowerCase() + ")." }),
+      t,
+      h("details", { class: "scales" }, [h("summary", { text: "Scale definitions" }), scale("Impact", SEV), scale("Likelihood", LIK)])
+    ]);
+  }
+
+  // ---------- Stage 2: high-level risk assessment ----------
+
+  // Assign to zone: a ranked system goes to an existing zone, or to a new
+  // zone named after it. The link is the zone's (hlaIds, with fromHLA its
+  // first entry); no threat is seeded. The page moves on to step 3, at the zone.
+  function assignToZone(asset, value) {
+    var p = state.project, z = null;
+    if (value === "new") {
+      p.counters.zone += 1;
+      z = M.emptyZone(p.counters.zone);
+      z.name = asset.name || ("System " + asset.id);
+      z.fn = asset.functionLocation || "";
+      if (asset.name) z.assets.push({ name: asset.name, type: "other" });
+      p.zones.push(z);
+    } else z = E.findZone(p, value);
+    if (!z) return;
+    M.setHlaIds(z, M.hlaIdsOf(z).concat([asset.id]));
     touched();
-    state.stage = "risk";
-    render();
-    toast("Created " + z.id + " from “" + (asset.name || asset.id) + "”. Complete its detailed assessment here.");
+    A.goToItem({ stage: "zones", target: { kind: "zone", id: z.id } });
+    toast(asset.id + " assigned to " + z.id + ".");
+  }
+  function unassign(z, asset) {
+    M.setHlaIds(z, M.hlaIdsOf(z).filter(function (id) { return id !== asset.id; }));
+    touched(); rerender();
+  }
+  // Choosing a zone and assigning are two steps, so browsing the list with the
+  // keyboard records nothing: the Assign button acts on the choice.
+  function assignCell(asset) {
+    var p = state.project, zs = E.zonesOfHLA(p, asset.id);
+    var box = h("div", { class: "assign" });
+    // A high-level-only assessment has no zone work: its zones, if any, are shown only.
+    if (M.assessmentType(p) === "high-level") {
+      box.appendChild(h("span", { class: "muted assign-ro", text: zs.map(function (z) { return z.id; }).join(", ") }));
+      return box;
+    }
+    zs.forEach(function (z) {
+      box.appendChild(h("span", { class: "pill neutral assign-zone", title: z.name || z.id }, [
+        z.id,
+        h("button", { type: "button", class: "assign-x", "data-action": "unassign-" + z.id, "aria-label": "Remove from " + z.id, title: "Remove from " + z.id, text: "×", onClick: function () { unassign(z, asset); } })
+      ]));
+    });
+    var btn = h("button", { type: "button", class: "btn sm", "data-action": "assign", text: "Assign", disabled: "disabled",
+      "aria-label": "Assign " + asset.id + " to the chosen zone",
+      onClick: function () { if (sel.value) assignToZone(asset, sel.value); } });
+    var sel = h("select", { "data-action": "assign-zone", "aria-label": "Zone for " + asset.id,
+      onChange: function (e) { btn.disabled = !e.target.value; } });
+    sel.appendChild(h("option", { value: "", text: zs.length ? "Add to zone" : "Assign to zone" }));
+    p.zones.forEach(function (z) { if (zs.indexOf(z) < 0) sel.appendChild(h("option", { value: z.id, text: z.id + (z.name ? " " + z.name : "") })); });
+    sel.appendChild(h("option", { value: "new", text: "New zone" }));
+    box.appendChild(sel);
+    box.appendChild(btn);
+    return box;
+  }
+
+  // The decision on a detailed assessment (the risk comparison, step 4; on a
+  // high-level-only assessment a column of the ranking). Required or Not
+  // required, one click each, the suggestion dashed until it is chosen; a
+  // choice that differs from the comparison asks for its reason.
+  var DETAIL_CHOICES = [{ v: true, id: "required", text: "Required" }, { v: false, id: "not-required", text: "Not required" }];
+  function setDetailed(o, v) {
+    if (!o.detailed || typeof o.detailed !== "object") o.detailed = M.emptyDetailed();
+    o.detailed.required = o.detailed.required === v ? null : v;
+  }
+  function decisionControl(o, cmp) {
+    var kids = [h("div", { class: "treat-opts", role: "group", "aria-label": "Detailed assessment" }, DETAIL_CHOICES.map(function (c) {
+      var on = cmp.required === c.v, sug = cmp.required === null && cmp.suggested === c.v;
+      return h("button", {
+        type: "button", "data-detailed": c.id,
+        class: "treat-opt" + (on ? " on" : (sug ? " suggested" : "")),
+        "aria-pressed": on ? "true" : "false",
+        title: sug ? "Suggested by the comparison" : null,
+        text: (on ? "✓ " : (sug ? "? " : "")) + c.text,
+        onClick: function () { setDetailed(o, c.v); touched(); rerender(); }
+      });
+    }))];
+    if (cmp.override || cmp.noBasis || (o.detailed && o.detailed.reason)) {
+      kids.push(A.changeRedraw(h("input", { type: "text", class: "detailed-reason", "data-reason": "detailed", value: (o.detailed && o.detailed.reason) || "",
+        "aria-label": "Reason for the decision", placeholder: cmp.noBasis ? "Why, with no initial risk to compare" : "Why the decision differs from the comparison",
+        onInput: function (e) { o.detailed.reason = e.target.value; touched(); } })));
+    }
+    if (cmp.reasonMissing) kids.push(h("div", { class: "hint val-warn", text: "Give a reason." }));
+    return h("div", { class: "detailed-choice", "data-detailed-state": cmp.state }, kids);
+  }
+  function comparisonWords(cmp) {
+    if (cmp.suggested === null) return "Not rated";
+    return cmp.suggested ? "Above tolerable" : "Within tolerable";
   }
 
   function renderSrs(main) {
-    var p = state.project, s = p.srs;
-    main.appendChild(h("h1", { class: "page-title", text: "High-level risk & requirements" }));
-    main.appendChild(pageSub("srs", "Rank the systems to frame the zoning, and set the requirements, including tolerable risk."));
+    var p = state.project, s = p.srs, hlOnly = M.assessmentType(p) === "high-level";
+    main.appendChild(h("h1", { class: "page-title", text: "High-level risk" }));
+    main.appendChild(pageSub("srs", hlOnly ? "Rank the systems and decide where a detailed assessment is needed." : "Rank the systems to frame the zoning, and assign them to zones."));
 
     main.appendChild(card("High-level risk assessment", "context for the zoning; nothing here is calculated", [
       selectField("Assumed adversary class (threat context)", s.adversaryClass, Object.keys(RULES.slDefinitions).filter(function (k) { return k !== "_note"; }).map(function (k) { return { value: k, text: "SL" + k + "-grade: " + RULES.slDefinitions[k] }; }), function (v) { s.adversaryClass = v ? Number(v) : null; touched(); rerender(); }, { hint: "Per-FR suggestions below this class are flagged as a mismatch." }),
@@ -86,50 +199,48 @@
     // likelihood give a house risk band.
     var sevOpts = SEV.map(function (sv) { return { value: sv.id, text: sv.name }; });
     var likOpts = LIK.map(function (l) { return { value: l.id, text: l.name }; });
+    var cols = [
+      { key: "name", label: "Asset / system", placeholder: "e.g. DCS servers", width: "18%" },
+      { key: "functionLocation", label: "Function & location", placeholder: "e.g. Primary control, equipment room" },
+      { key: "consequence", label: "Impact", kind: "select", options: sevOpts, width: "110px", placeholder: "Not rated" },
+      { key: "likelihood", label: "Likelihood", kind: "select", options: likOpts, width: "110px", placeholder: "Not rated" },
+      { key: "__risk", label: "Risk", kind: "computed", width: "88px", render: function (it) { return riskPill(riskFor(it.consequence, it.likelihood)); } },
+      { key: "note", label: "Candidate grouping / notes", placeholder: "e.g. → Process Control zone" }
+    ];
+    // A high-level-only assessment records the comparison with tolerable risk
+    // here, as there are no zones to record it on.
+    if (hlOnly) cols.push({ key: "__detailed", label: "Detailed assessment", kind: "computed", width: "190px", render: function (it) {
+      var c = E.hlaComparison(it, p);
+      return h("div", null, [h("div", { class: "muted cmp-words", text: comparisonWords(c) }), decisionControl(it, c)]);
+    } });
+    // A high-level-only assessment shows the column only when zones exist.
+    if (!hlOnly || p.zones.length) cols.push({ key: "__zone", label: "Zone", kind: "computed", width: "200px", render: assignCell });
     main.appendChild(card("Asset / system risk ranking", "HSE & financial impact by function/location, ranked to guide zoning", [
       h("p", { class: "hint", style: "margin-top:0", text: "Rate each system's worst-credible impact and, where known, its likelihood." }),
-      registerTable(s.highLevelAssets, [
-        { key: "name", label: "Asset / system", placeholder: "e.g. DCS servers", width: "18%" },
-        { key: "functionLocation", label: "Function & location", placeholder: "e.g. Primary control, equipment room" },
-        { key: "consequence", label: "Impact", kind: "select", options: sevOpts, width: "110px" },
-        { key: "likelihood", label: "Likelihood", kind: "select", options: likOpts, width: "110px" },
-        { key: "__risk", label: "Risk", kind: "computed", width: "88px", render: function (it) { return riskPill(riskFor(it.consequence, it.likelihood)); } },
-        { key: "note", label: "Candidate grouping / notes", placeholder: "e.g. → Process Control zone" },
-        { key: "__promote", label: "Detailed", kind: "computed", width: "96px", render: function (it) {
-          var z = zoneFromHLA(it.id);
-          if (z) return h("span", { class: "pill neutral", title: "Detailed assessment is in " + z.id, text: z.id + " ✓" });
-          return h("button", { class: "btn sm", title: "Make it a zone and assess it in detail", text: "Detail →", onClick: function () { promoteAssetToZone(it); } });
-        } }
-      ], { empty: "No assets ranked yet. Add the systems in scope to build the relative risk ranking.", addLabel: "+ Add asset / system", rowLabel: "ranked system", onAdd: function () { p.counters.hla += 1; s.highLevelAssets.push(M.emptyHLA(p.counters.hla)); touched(); rerender(); } }),
+      registerTable(s.highLevelAssets, cols, {
+        empty: "No assets ranked yet. Add the systems in scope to build the relative risk ranking.", addLabel: "+ Add asset / system", rowLabel: "ranked system",
+        rowAttrs: function (it) { return { "data-hla-id": it.id }; },
+        // A system taken out of the ranking leaves no zone pointing at it.
+        onRemove: function () { R.Migrate.pruneDangling(p); },
+        onAdd: function () { p.counters.hla += 1; s.highLevelAssets.push(M.emptyHLA(p.counters.hla)); touched(); rerender(); }
+      }),
       h("div", { class: "btn-row", style: "margin-top:12px" }, [
-        h("button", { class: "btn", text: "Generate high-level report →", title: "No zones or SL-T needed", onClick: function () { state.stage = "hlreport"; render(); } })
+        h("button", { class: "btn", text: "High-level report →", title: "No zones or SL-T needed", onClick: function () { A.navigate("hlreport"); } })
       ])
-    ]));
+    ], null, { "data-check-anchor": "ranking" }));
 
-    var body = [
-      selectField("Tolerable risk", s.tolerableRisk, BANDS.map(function (b) { return { value: b.id, text: b.name }; }), function (v) { s.tolerableRisk = v || RULES.tolerableRisk.default; touched(); rerender(); }, { placeholder: false, hint: "The highest unmitigated risk accepted without a treatment decision." }),
+    main.appendChild(card("Threats and requirements", null, [
       lineListField("Known or presumed threats", s.knownThreats, function (a) { s.knownThreats = a; touched(); }, "e.g. Capable criminal adversary; insider misuse of engineering access"),
-      lineListField("Security functions that must be kept", s.mandatorySecurityFunctions, function (a) { s.mandatorySecurityFunctions = a; touched(); }, "e.g. Hard-wired ESD independent of the BPCS"),
-      lineListField("Regulatory requirements", s.regulatory, function (a) { s.regulatory = a; touched(); }, "e.g. UK NIS Regulations 2018"),
-      h("div", { class: "field" }, [
-        h("label", { text: "Client risk criteria" }),
-        h("label", { style: "text-transform:none;font-weight:400;font-size:13px;color:var(--text);display:inline-flex;align-items:center;gap:6px;cursor:pointer" }, [
-          h("input", { type: "checkbox", checked: s.clientMatrix, onChange: function (e) { s.clientMatrix = e.target.checked; touched(); rerender(); } }),
-          "The client's own risk matrix or criteria are in use"
-        ]),
-        h("div", { class: "hint", text: "The client's matrix takes precedence over the SolutionsPT house matrix." })
-      ])
-    ];
-    if (s.clientMatrix) body.push(textField("How the client matrix was applied", s.clientMatrixNote, function (v) { s.clientMatrixNote = v; touched(); }, { textarea: true }));
-    main.appendChild(card("Risk criteria and requirements", null, body));
+      lineListField("Security functions that must be kept", s.mandatorySecurityFunctions, function (a) { s.mandatorySecurityFunctions = a; touched(); }, "e.g. Hard-wired ESD independent of the BPCS")
+    ]));
   }
 
   // ---------- Basis of assessment (evidence register) ----------
 
   function renderBasis(main) {
     var b = state.project.basisOfAssessment, p = state.project;
-    main.appendChild(h("h1", { class: "page-title", text: "Basis of assessment" }));
-    main.appendChild(h("p", { class: "page-sub", text: "The evidence behind the assessment, as printed in the report." }));
+    main.appendChild(h("h1", { class: "page-title", text: "Engagement and evidence" }));
+    main.appendChild(h("p", { class: "page-sub", text: "The engagement details and the evidence behind the assessment, as printed in the report." }));
 
     // Engagement details: document control for the Word/Excel deliverables.
     var eng = p.engagement;
@@ -200,94 +311,7 @@
     ]));
   }
 
-  // ---------- Stage 3: Zones & conduits ----------
-
-  function renderZones(main) {
-    var p = state.project;
-    main.appendChild(h("h1", { class: "page-title", text: "Zones & conduits" }));
-    main.appendChild(pageSub("zones", "Partition the SUC into zones and conduits, keeping safety, wireless and temporarily connected devices separate; EXT is anything outside the SUC."));
-
-    p.zones.forEach(function (z, zi) {
-      var assetsBox = h("div", null, []);
-      z.assets.forEach(function (a, ai) {
-        var typeSel = h("select", { onChange: function (e) { a.type = e.target.value; touched(); rerender(); } });
-        ASSET_TYPES.forEach(function (t) { var o = h("option", { value: t, text: assetTypeLabel(t) }); if (a.type === t) o.setAttribute("selected", "selected"); typeSel.appendChild(o); });
-        assetsBox.appendChild(h("div", { class: "asset-row" }, [
-          h("input", { type: "text", value: a.name, placeholder: "Asset name", onInput: function (e) { a.name = e.target.value; touched(); } }),
-          typeSel,
-          h("button", { class: "btn sm danger", text: "Remove", onClick: function () {
-            if (!confirmRemove(!!a.name, "asset")) return;
-            z.assets.splice(ai, 1); touched(); rerender();
-          } })
-        ]));
-      });
-      assetsBox.appendChild(h("button", { class: "btn sm", text: "+ Add asset", onClick: function () { z.assets.push({ name: "", type: "plc" }); touched(); rerender(); } }));
-
-      main.appendChild(card(z.id + (z.name ? ": " + z.name : ""), zoneSafety(z) ? "safety-related" : null, [
-        h("div", { class: "grid-2" }, [
-          textField("Zone name", z.name, function (v) { z.name = v; touched(); }),
-          textField("Function", z.fn, function (v) { z.fn = v; touched(); }, { placeholder: "e.g. basic process control, safety, DMZ" })
-        ]),
-        textField("Description / logical boundary", z.description, function (v) { z.description = v; touched(); }, { textarea: true }),
-        h("div", { class: "field" }, [h("label", { text: "Assets" }), assetsBox]),
-        h("div", { class: "grid-2" }, [
-          lineListField("Access points & boundary devices", z.accessPoints, function (a) { z.accessPoints = a; touched(); }, "e.g. Vendor VPN (C2); Historian replication (C3)"),
-          lineListField("External dependencies", z.externalDependencies, function (a) { z.externalDependencies = a; touched(); }, "e.g. Vendor support contract")
-        ]),
-        lineListField("Applicable security policies", z.securityPolicies, function (a) { z.securityPolicies = a; touched(); }, "e.g. No engineering changes without MoC"),
-        flagEditor(z)
-      ], h("button", { class: "btn sm danger", text: "Remove zone", onClick: function () {
-        if (!confirm("Remove zone " + z.id + (z.name ? " (" + z.name + ")" : "") + "? Conduits referencing it will also be removed.")) return;
-        p.zones.splice(zi, 1);
-        p.conduits = p.conduits.filter(function (c) { return c.fromZone !== z.id && c.toZone !== z.id; });
-        touched(); rerender();
-      } })));
-    });
-
-    main.appendChild(h("div", { class: "btn-row", style: "margin-bottom:18px" }, [
-      h("button", { class: "btn primary", text: "+ Add zone", onClick: function () { p.counters.zone += 1; p.zones.push(M.emptyZone(p.counters.zone)); touched(); rerender(); } })
-    ]));
-
-    // Conduits
-    var condBody = [];
-    if (p.conduits.length) {
-      var tbl = h("table", { class: "tbl" }, [h("thead", null, [h("tr", null, [
-        h("th", { text: "Id" }), h("th", { text: "From" }), h("th", { text: "To" }), h("th", { text: "Name" }), h("th", { text: "Channels / dataflows" }), h("th", { text: "Notes" }), h("th", { text: "" })
-      ])])]);
-      var tbody = h("tbody");
-      p.conduits.forEach(function (c, ci) {
-        var zoneSel = function (key) {
-          var sel = h("select", { onChange: function (e) { c[key] = e.target.value; touched(); rerender(); } });
-          sel.appendChild(h("option", { value: "", text: "—" }));
-          p.zones.forEach(function (z) { var o = h("option", { value: z.id, text: z.id + (z.name ? " " + z.name : "") }); if (c[key] === z.id) o.setAttribute("selected", "selected"); sel.appendChild(o); });
-          var ext = h("option", { value: "EXT", text: "EXT (external)" }); if (c[key] === "EXT") ext.setAttribute("selected", "selected"); sel.appendChild(ext);
-          return sel;
-        };
-        tbody.appendChild(h("tr", null, [
-          h("td", { text: c.id }),
-          h("td", null, [zoneSel("fromZone")]),
-          h("td", null, [zoneSel("toZone")]),
-          h("td", null, [h("input", { type: "text", value: c.name, onInput: function (e) { c.name = e.target.value; touched(); } })]),
-          h("td", null, [h("input", { type: "text", value: c.channels.join(", "), placeholder: "e.g. opc-ua, vpn", onInput: function (e) { c.channels = e.target.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean); touched(); } })]),
-          h("td", null, [h("input", { type: "text", value: c.notes, onInput: function (e) { c.notes = e.target.value; touched(); } })]),
-          h("td", null, [h("button", { class: "btn sm danger", text: "×", title: "Remove conduit", onClick: function () {
-            var filled = !!(c.name || c.fromZone || c.toZone || (c.channels && c.channels.length) || c.notes || c.threats.length || c.vulnerabilities.length || c.countermeasures.length);
-            if (!confirmRemove(filled, "conduit " + c.id)) return;
-            p.conduits.splice(ci, 1); touched(); rerender();
-            if (filled) toast("Conduit " + c.id + " removed.");
-          } })])
-        ]));
-      });
-      tbl.appendChild(tbody);
-      condBody.push(tbl);
-    } else {
-      condBody.push(h("p", { class: "muted", text: "No conduits yet: add one for each connection between zones or to EXT." }));
-    }
-    condBody.push(h("div", { style: "margin-top:10px" }, [h("button", { class: "btn", text: "+ Add conduit", onClick: function () { p.counters.conduit += 1; p.conduits.push(M.emptyConduit(p.counters.conduit)); touched(); rerender(); } })]));
-    main.appendChild(card("Conduits", "channels between zones; EXT = external", condBody));
-
-    main.appendChild(card("Zone & conduit drawing", "drawn automatically from the zones and conduits", [renderZoneMap(p)]));
-  }
+  // Step 3, Zones and conduits, is js/ui-zones.js.
 
   // ---------- Stage 4: detailed risk assessment ----------
 
@@ -333,13 +357,13 @@
     if (T.decision === "accept" || (t.acceptance || "").trim()) {
       kids.push(h("div", { class: "field", style: "margin:8px 0 0" }, [
         h("label", { text: "Reason for acceptance" }),
-        h("input", { type: "text", "data-reason": "accept", value: t.acceptance, placeholder: "e.g. Accepted by J. Smith (Operations Director), 2026-07: production constraint; revisit at next assessment.", onInput: function (e) { t.acceptance = e.target.value; touched(); }, onChange: function () { rerender(); } })
+        A.changeRedraw(h("input", { type: "text", "data-reason": "accept", value: t.acceptance, placeholder: "e.g. Accepted by J. Smith (Operations Director), 2026-07: production constraint; revisit at next assessment.", onInput: function (e) { t.acceptance = e.target.value; touched(); } }))
       ]));
     }
     if (T.decision === "slt" && (T.sltShortfall.length || T.reason)) {
       kids.push(h("div", { class: "field", style: "margin:8px 0 0" }, [
         h("label", { text: sltWhy.length ? "Reason " + sltWhy.join(" and ") : "Reason for treating through the SL-T" }),
-        h("input", { type: "text", "data-reason": "slt", value: t.treatment.reason, placeholder: "e.g. Raised in phase 2 of the programme, agreed with the asset owner.", onInput: function (e) { t.treatment.reason = e.target.value; touched(); }, onChange: function () { rerender(); } })
+        A.changeRedraw(h("input", { type: "text", "data-reason": "slt", value: t.treatment.reason, placeholder: "e.g. Raised in phase 2 of the programme, agreed with the asset owner.", onInput: function (e) { t.treatment.reason = e.target.value; touched(); } }))
       ]));
     }
     return h("div", { class: "treat", "data-treatment-state": T.state }, kids);
@@ -453,10 +477,13 @@
     var owner = row.o;
     var worst = row.worstRisk;
     var exceeding = row.exceeding, open = row.open, suggested = row.suggested;
+    var skip = E.comparison(owner, project).skip;
     var head = [];
+    if (skip) head.push(h("span", { class: "pill neutral", text: "Not required" }));
     if (worst) head.push(riskPill(worst));
     if (exceeding.length) head.push(h("span", { class: "pill flag", style: "margin-left:6px", text: exceeding.length + " over tolerable" }));
     return card(label, null, [
+      skip ? h("p", { class: "hint no-print", style: "margin-top:0", text: "No detailed assessment needed (step 4): set its SL-T and give the basis in the justification." }) : null,
       h("div", { class: "field" }, [
         h("label", { text: "Threats: likelihood × impact = unmitigated risk" }),
         exceeding.length ? h("div", { class: "hint treat-summary" + (open.length ? " val-warn" : ""), style: "margin-bottom:6px" }, [
@@ -479,13 +506,28 @@
     ], head.length ? h("span", null, head) : null, { "data-owner-id": owner.id });
   }
 
+  // Step 5's two tabs: the threats (risk) and the SL-T (slt), each with its count.
+  function stepTabs(active) {
+    var p = state.project, threats = p.zones.concat(p.conduits).reduce(function (a, o) { return a + o.threats.length; }, 0), slt = A.sltCount();
+    function tab(id, text, badge) {
+      var on = active === id;
+      return h("button", { type: "button", class: "sl-btn step-tab" + (on ? " active" : ""), "data-tab": id, "aria-pressed": on ? "true" : "false",
+        onClick: function () { if (!on) A.navigate(id, '.step-tabs [data-tab="' + id + '"]'); } }, [text, badge ? h("span", { class: "badge", text: badge }) : null]);
+    }
+    return h("div", { class: "step-tabs no-print", role: "group", "aria-label": "Detailed risk" }, [
+      tab("risk", "Threats", threats ? String(threats) : null),
+      tab("slt", "SL-T", slt)
+    ]);
+  }
+
   function renderRisk(main) {
     var p = state.project;
     main.appendChild(h("h1", { class: "page-title", text: "Detailed risk assessment" }));
     main.appendChild(pageSub("risk", "Rate the threats to each zone and conduit, compare with tolerable risk and record a treatment decision where it is exceeded."));
-    main.appendChild(h("div", { class: "framing-note", text: "SolutionsPT house risk matrix, not the standard's; tolerable risk is " + (p.srs.tolerableRisk || "medium") + " (stage 2)." }));
+    main.appendChild(stepTabs("risk"));
+    main.appendChild(h("div", { class: "framing-note", text: "SolutionsPT house risk matrix, not the standard's; tolerable risk is " + (p.srs.tolerableRisk || "medium") + " (step 1)." }));
 
-    if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in stage 3 first." })])); return; }
+    if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
 
     var vm = R.ViewModel.build(p);
     vm.zones.forEach(function (row) { var z = row.o; main.appendChild(detailedRiskCard(row, p, vm.tolerable, z.id + (z.name ? ": " + z.name : ""))); });
@@ -512,20 +554,21 @@
         h("td", null, [h("strong", { text: f.id })]),
         h("td", null, [f.name, traceDetails(cell.trace)]),
         h("td", { class: "center" }, [riskPill(cell.risk)]),
-        h("td", { class: "center", text: cell.sl != null ? "SL" + cell.sl : "—" }),
+        h("td", { class: "center", text: cell.sl != null ? "SL" + cell.sl : "None" }),
         h("td", null, [slButtonsFR(owner.slTargetByFR[f.id], function (n) { owner.slTargetByFR[f.id] = n; touched(); rerender(); })])
       ]));
     });
     tbl.appendChild(tb);
 
     var body = [];
+    if (E.comparison(owner, project).skip) body.push(h("p", { class: "hint no-print", style: "margin-top:0", text: "No detailed assessment needed (step 4): give the basis for this SL-T in the justification." }));
     if (safety && SIS_RULE) body.push(h("div", { class: "sis-box" }, [h("strong", { text: "SIS handling: " }), SIS_RULE.actions[0] + " An SL" + SIS_RULE.floorSL + " floor is applied to every FR."]));
     body.push(tbl);
     var tgt = maxDefined(owner.slTargetByFR);
     var needsJust = tgt != null && !(owner.justification || "").trim();
     body.push(h("div", { class: "field", style: "margin-top:12px" }, [
       h("label", null, [document.createTextNode("Justification "), h("span", { class: "req-star", text: "*" })]),
-      h("textarea", { value: owner.justification, placeholder: "Why this SL-T is right, including any FR held below its suggestion.", onInput: function (e) { owner.justification = e.target.value; touched(); }, onChange: function () { rerender(); } }),
+      A.changeRedraw(h("textarea", { value: owner.justification, placeholder: "Why this SL-T is right, including any FR held below its suggestion.", onInput: function (e) { owner.justification = e.target.value; touched(); } })),
       needsJust
         ? h("div", { class: "hint val-warn", text: "SL-T set but not justified: say why, especially for any FR below its suggestion." })
         : h("div", { class: "hint", text: "Required." })
@@ -542,9 +585,10 @@
     var p = state.project;
     main.appendChild(h("h1", { class: "page-title", text: "SL-T assignment" }));
     main.appendChild(pageSub("slt", "Set one target security level per foundational requirement, and justify it."));
+    main.appendChild(stepTabs("slt"));
     main.appendChild(h("div", { class: "framing-note", text: "Suggestions are a SolutionsPT house heuristic, not the standard's; an SL-T below one is fine if justified." }));
 
-    if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in stage 3 first." })])); return; }
+    if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
 
     p.zones.forEach(function (z) { var s = E.suggestZone(z, p); main.appendChild(sltVectorCard(z, s, p, z.id + (z.name ? ": " + z.name : ""), s.safetyRelated)); });
 
@@ -554,7 +598,131 @@
     }
   }
 
+  // ---------- Stage 4: risk comparison ----------
+  //
+  // One table: each zone's and conduit's initial risk against tolerable risk,
+  // and the decision whether it needs a detailed assessment (js/engine.js
+  // comparison). Comparing per zone and conduit is the method this tool
+  // uses; the page says so, and does not present it as the standard's words.
+
+  function initialCell(o, cmp, isZone) {
+    var p = state.project, kids = [riskPill(cmp.initial)];
+    var bandOpts = BANDS.map(function (b) { return { value: b.id, text: b.name }; });
+    function entry(placeholderText) {
+      var sel = h("select", { "data-action": "initial-risk", "aria-label": "Initial risk of " + o.id, onChange: function (e) {
+        if (e.target.value) o.initialRisk = e.target.value; else delete o.initialRisk;
+        touched(); rerender();
+      } });
+      sel.appendChild(h("option", { value: "", text: placeholderText }));
+      bandOpts.forEach(function (b) { var op = h("option", { value: b.value, text: b.text }); if (o.initialRisk === b.value) op.setAttribute("selected", "selected"); sel.appendChild(op); });
+      return sel;
+    }
+    var ids = (cmp.systems || []).map(function (a) { return a.id; }).join(", ");
+    if (isZone) {
+      // Rated systems give the initial risk; unrated ones leave it to be entered.
+      if (cmp.source === "systems" && cmp.initial) kids.push(h("div", { class: "muted cmp-source", text: "From " + ids }));
+      else {
+        if (ids) kids.push(h("div", { class: "muted cmp-source", text: ids + " not rated" }));
+        kids.push(h("div", { class: "cmp-entry" }, [entry("Enter")]));
+      }
+    } else {
+      kids.push(h("div", { class: "muted cmp-source", text: cmp.source === "entered" ? "Entered" : (cmp.ruleBand ? "From the zones" : "No rated zone") }));
+      kids.push(h("div", { class: "cmp-entry" }, [entry(cmp.ruleBand ? "From the zones (" + BAND_NAME[cmp.ruleBand].toLowerCase() + ")" : "Enter")]));
+    }
+    return h("td", null, kids);
+  }
+
+  function renderCompare(main) {
+    var p = state.project, tol = E.tolerableOf(p);
+    main.appendChild(h("h1", { class: "page-title", text: "Risk comparison" }));
+    main.appendChild(pageSub("compare", "Compare each zone's and conduit's initial risk with tolerable risk, and decide where a detailed assessment is needed."));
+    main.appendChild(h("div", { class: "framing-note", text: "The method used here compares each zone and conduit; " + E.CONDUIT_RULE + "." }));
+    if (!p.zones.length && !p.conduits.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
+
+    var owners = p.zones.map(function (z) { return { o: z, isZone: true }; }).concat(p.conduits.map(function (c) { return { o: c, isZone: false }; }));
+    var rows = owners.map(function (x) { x.cmp = E.comparison(x.o, p); return x; });
+    var suggested = rows.filter(function (x) { return x.cmp.state === "suggested"; });
+    var tbl = h("table", { class: "tbl cmp-table" }, [h("thead", null, [h("tr", null, [
+      h("th", { text: "Zone or conduit" }), h("th", { text: "Initial risk", style: "width:170px" }),
+      h("th", { text: "Against tolerable", style: "width:130px" }), h("th", { text: "Detailed assessment", style: "width:300px" })
+    ])])]);
+    var tb = h("tbody");
+    rows.forEach(function (x) {
+      var o = x.o, cmp = x.cmp;
+      var name = o.id + (o.name ? ": " + o.name : "") + (x.isZone ? "" : " (" + (o.fromZone || "?") + " ↔ " + (o.toZone || "?") + ")");
+      tb.appendChild(h("tr", { "data-owner-id": o.id, "data-compare-state": cmp.state }, [
+        h("td", { text: name }),
+        initialCell(o, cmp, x.isZone),
+        h("td", { class: cmp.suggested ? "val-warn" : "muted", text: comparisonWords(cmp) }),
+        h("td", null, [decisionControl(o, cmp)])
+      ]));
+    });
+    tbl.appendChild(tb);
+    var open = rows.filter(function (x) { return x.cmp.open; }).length;
+    main.appendChild(card("Initial risk against tolerable risk", "tolerable risk: " + BAND_NAME[tol].toLowerCase() + (open ? ", " + open + " to decide" : ""), [
+      suggested.length ? h("div", { class: "btn-row no-print", style: "margin-bottom:10px" }, [
+        h("button", { type: "button", class: "btn sm", "data-action": "confirm-compare", text: "Confirm suggested (" + suggested.length + ")", onClick: function () {
+          suggested.forEach(function (x) { setDetailed(x.o, x.cmp.suggested); });
+          touched(); rerender();
+        } })
+      ]) : null,
+      tbl,
+      h("p", { class: "hint", style: "margin-top:8px", text: "Not required skips step 5: set the SL-T by hand and give its basis in the justification." })
+    ]));
+  }
+
+  // ---------- Home ----------
+
+  var STEPS = [
+    { id: "basis", label: "Engagement and evidence" },
+    { id: "suc", num: "1", label: "Scope and risk criteria" },
+    { id: "srs", num: "2", label: "High-level risk" },
+    { id: "zones", num: "3", label: "Zones and conduits" },
+    { id: "compare", num: "4", label: "Risk comparison" },
+    { id: "risk", num: "5", label: "Detailed risk" },
+    { id: "spec", num: "6", label: "Requirements specification" },
+    { id: "approval", num: "7", label: "Approval" },
+    { id: "review", label: "Check and issue" }
+  ];
+  function renderHome(main) {
+    var p = state.project, st = E.stepStatus(p), type = p.assessmentType || null;
+    main.appendChild(h("h1", { class: "page-title", text: p.suc.name || "Risk assessment" }));
+    main.appendChild(h("p", { class: "page-sub", text: A.isTour() ? "The demo: a completed assessment. Autosave is off." : "Choose the kind of assessment, then work through the steps." }));
+
+    var kinds = [
+      { id: "high-level", text: "High-level assessment only", hint: "The ranking and its report, with no zones." },
+      { id: "full", text: "Full assessment", hint: "Zones, conduits, the detailed risk and SL-T." }
+    ];
+    main.appendChild(card("Assessment", null, [
+      h("div", { class: "home-kinds", role: "group", "aria-label": "Kind of assessment" }, kinds.map(function (k) {
+        var on = type === k.id;
+        return h("button", { type: "button", class: "home-kind" + (on ? " on" : ""), "data-assessment-type": k.id, "aria-pressed": on ? "true" : "false",
+          onClick: function () { p.assessmentType = k.id; touched(); rerender(); } }, [
+          h("strong", { text: k.text }), h("span", { class: "muted", text: k.hint })
+        ]);
+      }))
+    ]));
+
+    var list = h("ol", { class: "home-steps" }, STEPS.map(function (s) {
+      var x = st[s.id] || { state: "empty", text: "" };
+      return h("li", { "data-stage": s.id, "data-status": x.state }, [
+        h("button", { type: "button", class: "home-step", onClick: function () { A.navigate(s.id); } }, [
+          h("span", { class: "home-step-name" }, [s.num ? h("span", { class: "nav-num", text: s.num }) : null, (s.num ? " " : "") + s.label]),
+          h("span", { class: "nav-status", "data-status": x.state, text: x.text })
+        ])
+      ]);
+    }));
+    main.appendChild(card("Steps", null, [list]));
+
+    if (!A.isTour()) {
+      main.appendChild(h("div", { class: "btn-row no-print" }, [
+        h("button", { type: "button", class: "btn", id: "home-demo", text: "Open the demo", onClick: function () { A.openDemo(); } })
+      ]));
+    }
+  }
+
   var P = R.Pages;
+  P.home = renderHome;
   P.suc = renderSuc; P.srs = renderSrs; P.basis = renderBasis;
-  P.zones = renderZones; P.risk = renderRisk; P.slt = renderSlt;
+  P.compare = renderCompare; P.risk = renderRisk; P.slt = renderSlt;
 }());

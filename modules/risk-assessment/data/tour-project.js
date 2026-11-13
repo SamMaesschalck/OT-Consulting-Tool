@@ -5,13 +5,18 @@
  * tour, so the stage-6 risk-context export chains into that tool's "Import
  * risk context" story.
  *
- * Every tier is finished: SUC definition, the high-level risk ranking (with
- * the high scorers promoted to zones), zones & conduits with exposure flags,
- * a detailed threat register with likelihood x impact, vulnerabilities and
+ * Every tier is finished: a full assessment (assessmentType), SUC definition,
+ * the high-level risk ranking (with the high scorers assigned to zones),
+ * zones & conduits with exposure flags, the risk comparison decided for each
+ * (two conduits found not to need a detailed assessment, each with its
+ * reason), a detailed threat register with likelihood x impact, vulnerabilities and
  * countermeasures (existing ones flagged), every above-tolerable threat
  * given a confirmed treatment decision (reduce with countermeasures / accept),
  * per-FR SL-T vectors with written justifications, the basis of assessment,
- * and the asset-owner sign-off.
+ * the zone and conduit characteristics with the separation rows the tool
+ * raises answered (one not separated, with its reason), the tolerable risk
+ * confirmed with the asset owner, the organisational policies, and two
+ * approvers recorded against the current fingerprint.
  *
  * Shape: spt-risk-project/0.2 (see emptyProject() in index.html). This file
  * is NOT loaded by index.html - only by tour.html and its test.
@@ -20,6 +25,7 @@
 window.SPT_TOUR_PROJECT = {
   "schema": "spt-risk-project/0.2",
   "savedOn": "2026-07-04T16:20:00.000Z",
+  "assessmentType": "full",
   "engagement": {
     "client": "Acme Petrochemicals Ltd",
     "consultant": "S. Maesschalck",
@@ -36,6 +42,11 @@ window.SPT_TOUR_PROJECT = {
       "The corporate network is assumed compromised for the purposes of this assessment (untrusted)",
       "Unit 300 operates continuously; a control-system outage forces a manual unit shutdown within 30 minutes",
       "Vendor support for the DCS is contractually required and uses the remote access path assessed here"
+    ],
+    "policies": [
+      "Acme Group OT cyber security standard GS-104 (zones, remote access, removable media)",
+      "Teesport permit-to-work and management of change procedures",
+      "Acme Group incident response plan, OT annex"
     ]
   },
   "srs": {
@@ -43,13 +54,14 @@ window.SPT_TOUR_PROJECT = {
     "essentialFunctions": "Continuous closed-loop control of the alkylation reaction (temperature, acid ratio, pressure), operator view and command from the central control room, and the SIS safety instrumented functions (emergency depressurisation, acid feed isolation).",
     "worstCase": "Loss or manipulation of control or safety functions leading to an acid release or reactor overpressure: potential for multiple serious injuries on-site, off-site public exposure at the fence line, a COMAH-reportable event and multi-week unit outage.",
     "tolerableRisk": "medium",
+    "tolerableConfirmed": "medium",
     "highLevelAssets": [
-      { "id": "A1", "name": "Unit 300 BPCS (DCS servers, HMIs, unit PLCs)", "functionLocation": "Closed-loop control and operator interface - control room / field aux rooms", "consequence": "serious", "likelihood": "medium", "note": "Primary control layer; loss forces manual shutdown, manipulation is the acid-release path. Promoted to detailed assessment (Z1)." },
-      { "id": "A2", "name": "Safety Instrumented System (SIS)", "functionLocation": "Emergency depressurisation and acid isolation - field aux room 2", "consequence": "severe", "likelihood": "low", "note": "Last line of defence; any compromise is intolerable regardless of likelihood. Promoted to detailed assessment (Z2)." },
-      { "id": "A3", "name": "Plant DMZ & process historian", "functionLocation": "Data brokerage between OT and corporate - server room", "consequence": "serious", "likelihood": "medium", "note": "Every external path transits here; a foothold pivots into the BPCS. Promoted to detailed assessment (Z3)." },
-      { "id": "A4", "name": "Engineering workstations & config management", "functionLocation": "DCS/PLC/SIS configuration - control building office", "consequence": "serious", "likelihood": "medium", "note": "Holds the keys to every controller; removable media and legacy tooling in routine use. Promoted to detailed assessment (Z4)." },
+      { "id": "A1", "name": "Unit 300 BPCS (DCS servers, HMIs, unit PLCs)", "functionLocation": "Closed-loop control and operator interface - control room / field aux rooms", "consequence": "serious", "likelihood": "medium", "note": "Primary control layer; loss forces manual shutdown, manipulation is the acid-release path. Assigned to Z1, where a detailed assessment is required." },
+      { "id": "A2", "name": "Safety Instrumented System (SIS)", "functionLocation": "Emergency depressurisation and acid isolation - field aux room 2", "consequence": "severe", "likelihood": "low", "note": "Last line of defence; any compromise is intolerable regardless of likelihood. Assigned to Z2, where a detailed assessment is required." },
+      { "id": "A3", "name": "Plant DMZ & process historian", "functionLocation": "Data brokerage between OT and corporate - server room", "consequence": "serious", "likelihood": "medium", "note": "Every external path transits here; a foothold pivots into the BPCS. Assigned to Z3, where a detailed assessment is required." },
+      { "id": "A4", "name": "Engineering workstations & config management", "functionLocation": "DCS/PLC/SIS configuration - control building office", "consequence": "serious", "likelihood": "medium", "note": "Holds the keys to every controller; removable media and legacy tooling in routine use. Assigned to Z4, where a detailed assessment is required." },
       { "id": "A5", "name": "Laboratory information system link", "functionLocation": "Sample results feed to the historian - lab", "consequence": "serious", "likelihood": "low", "note": "One-way feed, no control path; ranked medium, monitored at high level only." },
-      { "id": "A6", "name": "CCTV & physical security systems", "functionLocation": "Site perimeter and unit cameras - site-wide", "consequence": "negligible", "likelihood": "high", "note": "Commodity IP kit, frequently probed, but no process consequence; ranked low, out of the detailed tier." }
+      { "id": "A6", "name": "CCTV & physical security systems", "functionLocation": "Site perimeter and unit cameras - site-wide", "consequence": "negligible", "likelihood": "high", "note": "Commodity IP kit, frequently probed, but no process consequence; ranked low, so not taken to a detailed assessment." }
     ],
     "knownThreats": [
       "Capable criminal/ransomware adversary reaching OT via corporate IT or vendor access",
@@ -95,6 +107,10 @@ window.SPT_TOUR_PROJECT = {
     "statement": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), and the per-FR SL-T vectors as the target for the security programme.",
     "approved": true
   },
+  "approvals": [
+    { "scope": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), and the per-FR SL-T vectors as the target for the security programme.", "name": "R. Calder", "role": "Asset Owner - Unit 300", "organisation": "Acme Petrochemicals Ltd", "date": "2026-07-04", "revision": "1.0", "approved": true, "fingerprint": "a2-9c820478-54f40a85-ca6a499d-bc2f3b65" },
+    { "scope": "The SL-T of the Safety Instrumented System zone (Z2).", "name": "S. Adeyemi", "role": "Process Safety Engineer", "organisation": "Acme Petrochemicals Ltd", "date": "2026-07-04", "revision": "1.0", "approved": true, "fingerprint": "a2-9c820478-54f40a85-ca6a499d-bc2f3b65" }
+  ],
   "zones": [
     {
       "id": "Z1",
@@ -102,6 +118,7 @@ window.SPT_TOUR_PROJECT = {
       "description": "DCS servers, operator HMIs and unit PLCs performing closed-loop control of the alkylation unit.",
       "fn": "Continuous process control and operator interface for Unit 300.",
       "fromHLA": "A1",
+      "detailed": { "required": true, "reason": "" },
       "assets": [
         { "name": "DCS server pair (redundant)", "type": "server" },
         { "name": "Operator HMIs x4", "type": "hmi" },
@@ -112,6 +129,22 @@ window.SPT_TOUR_PROJECT = {
         "Vendor VPN via jump host (C2)",
         "Historian replication to DMZ (C1)"
       ],
+      "accountableOrg": "Acme Petrochemicals, Unit 300 operations",
+      "physicalBoundary": "Central control room (DCS servers and HMIs) and field auxiliary rooms 1 and 3 (unit PLCs).",
+      "physicalAccessPoints": [
+        "Control room door, badge controlled and logged",
+        "Field auxiliary rooms 1 and 3, keyed and on the operator round"
+      ],
+      "dataFlows": [
+        "Process values to the historian through the OPC UA broker (C1)",
+        "Vendor diagnostic sessions through the jump host (C2)"
+      ],
+      "assumptions": [
+        "The control network carries no traffic from outside the zone other than C1 and C2"
+      ],
+      "separation": {
+        "external": { "answer": "met", "reason": "Vendor sessions end at the DMZ jump host; nothing in Z1 connects to an external network directly." }
+      },
       "externalDependencies": [
         "DCS vendor support contract (remote diagnostics)",
         "Time sync from DMZ NTP"
@@ -143,6 +176,7 @@ window.SPT_TOUR_PROJECT = {
       "description": "The SIS logic solver and safety I/O performing emergency depressurisation and acid feed isolation.",
       "fn": "Safety instrumented functions for Unit 300 (SIL 2 per LOPA).",
       "fromHLA": "A2",
+      "detailed": { "required": true, "reason": "" },
       "assets": [
         { "name": "SIS logic solver", "type": "safety-plc" },
         { "name": "Safety I/O and final elements", "type": "other" }
@@ -150,6 +184,17 @@ window.SPT_TOUR_PROJECT = {
       "flags": { "sis-present": true, "remote-access": false, "internet-adjacent": false, "wireless": false, "removable-media": false, "many-conduits": false },
       "accessPoints": [
         "Engineering connection from Z4 (keyed, normally disconnected)"
+      ],
+      "accountableOrg": "Acme Petrochemicals, process safety",
+      "physicalBoundary": "Field auxiliary room 2, SIS cabinets.",
+      "physicalAccessPoints": [
+        "Field auxiliary room 2, keyed, keys held by the shift supervisor"
+      ],
+      "dataFlows": [
+        "Hardwired trip and status signals to the BPCS (no network path)"
+      ],
+      "assumptions": [
+        "The SIS program-mode keyswitch stays in run outside authorised changes"
       ],
       "externalDependencies": [
         "SIS vendor for logic changes (site visit only, no remote path)"
@@ -176,6 +221,7 @@ window.SPT_TOUR_PROJECT = {
       "description": "The brokered exchange layer between OT and corporate: process historian, patch/AV staging, NTP, and the vendor jump host.",
       "fn": "Data brokerage and controlled external access; no control function.",
       "fromHLA": "A3",
+      "detailed": { "required": true, "reason": "" },
       "assets": [
         { "name": "Process historian (primary)", "type": "historian" },
         { "name": "Vendor jump host", "type": "server" },
@@ -187,6 +233,22 @@ window.SPT_TOUR_PROJECT = {
         "Historian replication from Z1 (C1)",
         "Vendor VPN termination (C2)"
       ],
+      "accountableOrg": "Acme Petrochemicals, OT network team",
+      "physicalBoundary": "Server room, OT racks 4 and 5.",
+      "physicalAccessPoints": [
+        "Server room door, badge controlled and shared with IT"
+      ],
+      "dataFlows": [
+        "Process values in from the BPCS (C1)",
+        "Read-only reports out to corporate clients (C3)",
+        "Vendor VPN sessions in, onward through the jump host (C2)"
+      ],
+      "assumptions": [
+        "The corporate network beyond the DMZ firewall is untrusted"
+      ],
+      "separation": {
+        "external": { "answer": "met", "reason": "The DMZ is the zone built to meet external networks: it holds no controllers, and the historian it holds is a replica." }
+      },
       "externalDependencies": [
         "Corporate AD federation for jump-host MFA",
         "Vendor VPN concentrator availability"
@@ -214,15 +276,33 @@ window.SPT_TOUR_PROJECT = {
       "description": "Engineering workstations and configuration management for DCS, PLC and SIS tooling.",
       "fn": "Configuration, programming and maintenance of all Unit 300 control and safety systems.",
       "fromHLA": "A4",
+      "detailed": { "required": true, "reason": "" },
       "assets": [
         { "name": "Engineering workstations x3", "type": "engineering-workstation" },
-        { "name": "Config management server (backups, versioning)", "type": "server" }
+        { "name": "Config management server (backups, versioning)", "type": "server" },
+        { "name": "Vendor laptops (turnarounds)", "type": "engineering-workstation", "link": "temporary" }
       ],
       "flags": { "sis-present": false, "remote-access": false, "internet-adjacent": false, "wireless": false, "removable-media": true, "many-conduits": false },
       "accessPoints": [
         "Removable media (controlled USB process)",
         "Engineering VLAN to Z1 controllers"
       ],
+      "accountableOrg": "Acme Petrochemicals, control systems engineering",
+      "physicalBoundary": "Control building engineering office.",
+      "physicalAccessPoints": [
+        "Engineering office door, badge controlled",
+        "USB media kiosk in the engineering office"
+      ],
+      "dataFlows": [
+        "Configuration downloads to the BPCS controllers over the engineering VLAN",
+        "Keyed engineering connection to the SIS for authorised changes"
+      ],
+      "assumptions": [
+        "Vendor laptops are only connected under a permit during turnarounds"
+      ],
+      "separation": {
+        "temporary": { "answer": "not-separated", "reason": "Vendor laptops join the engineering VLAN during turnarounds after the media kiosk check. A separate maintenance zone is planned for the Q2-2027 turnaround." }
+      },
       "externalDependencies": [
         "Vendor licence dongles and offline update bundles"
       ],
@@ -250,21 +330,28 @@ window.SPT_TOUR_PROJECT = {
       "fromZone": "Z1",
       "toZone": "Z3",
       "name": "Historian replication",
-      "channels": ["opc-ua"],
+      "channels": ["OPC UA"],
       "notes": "One-way logical replication from the BPCS to the DMZ historian via the OPC UA broker; no writes toward Z1.",
+      "direction": "from-to",
+      "boundaryDevices": ["OPC UA broker", "DMZ firewall pair"],
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
       "slTargetByFR": { "IAC": 2, "UC": null, "SI": 2, "DC": 1, "RDF": 2, "TRE": null, "RA": null },
-      "justification": "Carries the Z3 pivot risk (T5) as its data-flow path: SL2 on IAC/SI/RDF matches the zone targets either side; the broker enforces direction so no higher target is warranted."
+      "justification": "Carries the Z3 pivot risk (T5) as its data-flow path: SL2 on IAC/SI/RDF matches the zone targets either side; the broker enforces direction so no higher target is warranted.",
+      "detailed": { "required": false, "reason": "One-way replication through the OPC UA broker. Its exposure is the Z3 pivot path, assessed there as T5, so the SL-T is set from the zones it joins." }
     },
     {
       "id": "C2",
       "fromZone": "Z3",
       "toZone": "Z1",
       "name": "Vendor remote access",
-      "channels": ["vpn", "rdp-via-jump-host"],
+      "channels": ["VPN", "RDP through the jump host"],
       "notes": "Vendor VPN terminates in the DMZ; sessions reach Z1 only via the recorded jump host, activated per ticket.",
+      "direction": "from-to",
+      "boundaryDevices": ["Vendor VPN concentrator", "Vendor jump host", "DMZ firewall pair"],
+      "external": true,
+      "externalParty": "DCS vendor support engineers",
       "threats": [
         { "id": "T9", "statement": "A vendor credential or session is hijacked and replayed to reach the DCS outside an authorised window.", "source": "External attacker via vendor access chain", "affectedFR": ["IAC", "RDF"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "low", "residualImpact": "serious", "acceptance": "", "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } }
       ],
@@ -273,20 +360,25 @@ window.SPT_TOUR_PROJECT = {
         { "id": "M7", "description": "MFA on VPN and jump host, per-ticket session activation, session recording, auto-disconnect at window end", "addressesFR": ["IAC", "UC", "RDF"], "reference": "OPS-PROC-118", "existing": true }
       ],
       "slTargetByFR": { "IAC": 3, "UC": 2, "SI": null, "DC": null, "RDF": 3, "TRE": 2, "RA": null },
-      "justification": "This conduit is the highest-exposure path into the BPCS: the hijack threat (T9) starts High and the existing per-session countermeasures (M7) bring the residual within tolerable, but the SL-T is held at SL3 on IAC/RDF to match the Z1 targets it lands in, so the conduit is not the weak link. TRE at SL2 preserves the session-recording evidence chain."
+      "justification": "This conduit is the highest-exposure path into the BPCS: the hijack threat (T9) starts High and the existing per-session countermeasures (M7) bring the residual within tolerable, but the SL-T is held at SL3 on IAC/RDF to match the Z1 targets it lands in, so the conduit is not the weak link. TRE at SL2 preserves the session-recording evidence chain.",
+      "detailed": { "required": true, "reason": "" }
     },
     {
       "id": "C3",
       "fromZone": "Z3",
-      "toZone": "",
+      "toZone": "EXT",
       "name": "Corporate reporting",
-      "channels": ["https"],
+      "channels": ["HTTPS"],
       "notes": "Read-only reporting from the historian to corporate clients; corporate side is out of scope (untrusted by assumption).",
+      "direction": "from-to",
+      "boundaryDevices": ["DMZ firewall pair"],
+      "externalParty": "Acme corporate reporting clients",
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
       "slTargetByFR": { "IAC": 2, "UC": null, "SI": null, "DC": 2, "RDF": 2, "TRE": null, "RA": null },
-      "justification": "Boundary conduit to the untrusted corporate network: SL2 on IAC/DC/RDF reflects the read-only brokerage and the confidentiality of throughput data; no control traffic exists on this path."
+      "justification": "Boundary conduit to the untrusted corporate network: SL2 on IAC/DC/RDF reflects the read-only brokerage and the confidentiality of throughput data; no control traffic exists on this path.",
+      "detailed": { "required": false, "reason": "Read-only reporting to the out-of-scope corporate network. The exposure is assessed at the Z3 boundary (T5, T6)." }
     }
   ],
   "counters": { "zone": 4, "conduit": 3, "threat": 9, "vuln": 5, "cm": 7, "hla": 6, "interview": 4, "document": 4, "observation": 3 }

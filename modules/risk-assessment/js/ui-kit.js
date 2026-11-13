@@ -41,7 +41,7 @@ window.RiskApp.UI = (function () {
       else if (k === "onChange") el.addEventListener("change", v);
       else if (k === "checked") el.checked = !!v;
       else if (k === "value") el.value = v;
-      else el.setAttribute(k, v);
+      else if (v != null) el.setAttribute(k, v);   // a null attribute is left off
     });
     (children || []).forEach(function (c) {
       if (c == null) return;
@@ -113,13 +113,21 @@ window.RiskApp.UI = (function () {
 
   // ---------- Field helpers ----------
 
+  // A field's label, tied to its control (label[for]), so a screen reader
+  // names the control by it.
+  var fieldSeq = 0;
+  function labelFor(text, control) {
+    if (!control.id) control.id = "f" + (++fieldSeq);
+    return h("label", { text: text, for: control.id });
+  }
+
   function textField(label, value, onInput, opts) {
     opts = opts || {};
     var input = opts.textarea
       ? h("textarea", { value: value || "", onInput: function (e) { onInput(e.target.value); } })
       : h("input", { type: "text", value: value || "", onInput: function (e) { onInput(e.target.value); } });
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    var kids = [h("label", { text: label }), input];
+    var kids = [labelFor(label, input), input];
     if (opts.hint) kids.push(h("div", { class: "hint", text: opts.hint }));
     return h("div", { class: "field" }, kids);
   }
@@ -133,7 +141,7 @@ window.RiskApp.UI = (function () {
       if (String(value) === String(o.value)) op.setAttribute("selected", "selected");
       sel.appendChild(op);
     });
-    var kids = [h("label", { text: label }), sel];
+    var kids = [labelFor(label, sel), sel];
     if (opts.hint) kids.push(h("div", { class: "hint", text: opts.hint }));
     return h("div", { class: "field" }, kids);
   }
@@ -169,7 +177,7 @@ window.RiskApp.UI = (function () {
   function riskPill(band) {
     return band
       ? h("span", { class: "risk-pill risk-" + band, text: BAND_NAME[band] })
-      : h("span", { class: "risk-pill risk-none", text: "—" });
+      : h("span", { class: "risk-pill risk-none", text: "Not rated" });
   }
 
   // A page's sub-title, led by the one reference to its ZCR (its title is the
@@ -186,6 +194,8 @@ window.RiskApp.UI = (function () {
 
   // Generic editable register table. columns: [{ key, label, kind:'text'|'date'|'select'|'computed',
   // options?, placeholder?, width?, render? }]. 'computed' cells call render(item).
+  // opts.rowAttrs(item): attributes for the row (a data-* id to go to);
+  // opts.onRemove(item): after a row is taken out, before the redraw.
   function registerTable(items, columns, opts) {
     opts = opts || {};
     var tbl = h("table", { class: "tbl" }, [h("thead", null, [h("tr", null,
@@ -201,7 +211,7 @@ window.RiskApp.UI = (function () {
         var inp;
         if (c.kind === "select") {
           inp = h("select", { onChange: function (e) { it[c.key] = e.target.value; touched(); rerender(); } });
-          inp.appendChild(h("option", { value: "", text: c.placeholder || "—" }));
+          inp.appendChild(h("option", { value: "", text: c.placeholder || "Not set" }));
           c.options.forEach(function (o) { var op = h("option", { value: o.value, text: o.text }); if (it[c.key] === o.value) op.setAttribute("selected", "selected"); inp.appendChild(op); });
         } else {
           inp = h("input", { type: c.kind === "date" ? "date" : "text", value: it[c.key] || "", onInput: function (e) { it[c.key] = e.target.value; touched(); } });
@@ -212,21 +222,25 @@ window.RiskApp.UI = (function () {
       cells.push(h("td", null, [h("button", { class: "btn sm danger", text: "×", title: "Remove", onClick: function () {
         var filled = columns.some(function (c) { return c.kind !== "computed" && it[c.key]; });
         if (!confirmRemove(filled, opts.rowLabel || "entry")) return;
-        items.splice(i, 1); touched(); rerender();
+        items.splice(i, 1);
+        if (opts.onRemove) opts.onRemove(it);
+        touched(); rerender();
         if (filled && opts.rowLabel) toast(cap(opts.rowLabel) + " removed.");
       } })]));
-      tb.appendChild(h("tr", null, cells));
+      tb.appendChild(h("tr", opts.rowAttrs ? opts.rowAttrs(it) : null, cells));
     });
     tbl.appendChild(tb);
     return h("div", null, [tbl, h("div", { style: "margin-top:10px" }, [h("button", { class: "btn sm", text: opts.addLabel || "+ Add row", onClick: opts.onAdd })])]);
   }
 
-  function flagEditor(zone) {
+  // opts.noSafety: the safety designation is shown elsewhere (the zones page).
+  function flagEditor(zone, opts) {
+    opts = opts || {};
     var wrap = h("div", { class: "flag-grid" });
     function box(id, label) {
-      return h("label", null, [h("input", { type: "checkbox", checked: zone.flags[id], onChange: function (e) { zone.flags[id] = e.target.checked; touched(); rerender(); } }), label]);
+      return h("label", null, [h("input", { type: "checkbox", "data-flag": id, checked: zone.flags[id], onChange: function (e) { zone.flags[id] = e.target.checked; touched(); rerender(); } }), label]);
     }
-    if (SIS_RULE) wrap.appendChild(box("sis-present", SIS_RULE.label));
+    if (SIS_RULE && !opts.noSafety) wrap.appendChild(box("sis-present", SIS_RULE.label));
     MODS.forEach(function (m) { wrap.appendChild(box(m.id, m.label)); });
     return h("div", { class: "field" }, [h("label", { text: "Exposure flags" }), wrap]);
   }
@@ -234,7 +248,7 @@ window.RiskApp.UI = (function () {
   function slButtonsFR(current, onSet) {
     var row = h("div", { class: "sl-row" });
     [1, 2, 3, 4].forEach(function (n) { row.appendChild(h("button", { class: "sl-btn" + (current === n ? " active" : ""), text: "SL" + n, title: RULES.slDefinitions[String(n)], onClick: function () { onSet(n); } })); });
-    row.appendChild(h("button", { class: "sl-btn na" + (current == null ? " active" : ""), text: "—", title: "Not set (falls back to the default)", onClick: function () { onSet(null); } }));
+    row.appendChild(h("button", { class: "sl-btn na" + (current == null ? " active" : ""), text: "Not set", title: "Not set (falls back to the default)", onClick: function () { onSet(null); } }));
     return row;
   }
 
@@ -247,11 +261,20 @@ window.RiskApp.UI = (function () {
     ]);
   }
 
-  // The zone and conduit drawing (js/zone-map.js), as SVG.
-  function renderZoneMap(p) {
+  // The zone and conduit drawing (js/zone-map.js), as SVG. onPick(zoneId):
+  // a zone's box opens it (click, or Enter on the box).
+  function renderZoneMap(p, onPick) {
     var L = window.RiskZoneMap.layout(p, E.suggestZone);
     if (!L) return h("p", { class: "muted", text: "Add zones to see the drawing." });
-    return h("div", { class: "zone-map-wrap" }, [window.RiskZoneMap.toSvg(L, svgEl)]);
+    var svg = window.RiskZoneMap.toSvg(L, svgEl);
+    if (onPick) [].forEach.call(svg.querySelectorAll("[data-zone-id]"), function (g) {
+      var id = g.getAttribute("data-zone-id");
+      g.setAttribute("role", "button"); g.setAttribute("tabindex", "0"); g.setAttribute("aria-label", "Open " + id);
+      g.setAttribute("class", "zone-box-link");
+      g.addEventListener("click", function () { onPick(id); });
+      g.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(id); } });
+    });
+    return h("div", { class: "zone-map-wrap" }, [svg]);
   }
 
   return {
@@ -260,7 +283,7 @@ window.RiskApp.UI = (function () {
     currentTheme: currentTheme, applyTheme: applyTheme, setupThemeToggle: setupThemeToggle,
     toast: toast, todayISO: E.todayISO, slug: slug, cap: cap, lines: lines, listOf: listOf,
     confirmRemove: confirmRemove, downloadBlob: downloadBlob,
-    textField: textField, selectField: selectField, lineListField: lineListField, card: card,
+    labelFor: labelFor, textField: textField, selectField: selectField, lineListField: lineListField, card: card,
     frChips: frChips, riskPill: riskPill, pageSub: pageSub,
     registerTable: registerTable, flagEditor: flagEditor, slButtonsFR: slButtonsFR, traceDetails: traceDetails,
     renderZoneMap: renderZoneMap

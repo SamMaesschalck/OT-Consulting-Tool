@@ -1,12 +1,15 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
 /* ui-reports.js — the report pages and the downloads.
  *
- * The High-level report page (hlreport) and Full report & export (review),
- * the asset owner's sign-off card both carry, the risk-context export and
- * the Word and Excel downloads with the one question asked before them.
- * Registers its pages in RiskApp.Pages, with the three pages other files
- * draw: peer (js/review.js), report (js/report-page.js) and wordpreview
- * (js/word-preview.js). RiskApp.Reports holds what the header buttons and
+ * The Report page (report) in three views: Sections (js/report-page.js),
+ * Word pages (js/word-preview.js) and Summary (the hand-built one-page
+ * summaries of the detailed and the high-level report). Check and issue
+ * (review): each report's readiness list with Go to, and every download (the
+ * approvals are step 7's, js/ui-spec.js; the summaries show them read-only). The risk-context export and the Word and Excel
+ * downloads, with the one question asked before them, in the page (Generate
+ * anyway). Registers its pages in RiskApp.Pages, Peer review (peer,
+ * js/review.js) among them, and the old page ids hlreport and wordpreview in
+ * RiskApp.StageAliases. RiskApp.Reports holds what the header buttons and
  * window.RiskTool call.
  */
 window.RiskApp = window.RiskApp || {};
@@ -14,7 +17,7 @@ window.RiskApp.Reports = (function () {
   "use strict";
 
   var R = window.RiskApp, M = R.Model, E = R.Engine, U = R.UI, A = R.App;
-  var RULES = M.RULES, FR_IDS = M.FR_IDS, BAND_RANK = M.BAND_RANK, INTERCHANGE = M.INTERCHANGE, TOOL_ID = M.TOOL_ID;
+  var RULES = M.RULES, FR_IDS = M.FR_IDS, BAND_RANK = M.BAND_RANK, INTERCHANGE = M.INTERCHANGE;
   var state = A.state, touched = A.touched, rerender = A.rerender, render = A.render;
   var h = U.h, card = U.card, toast = U.toast, textField = U.textField, riskPill = U.riskPill, pageSub = U.pageSub,
     cap = U.cap, slug = U.slug, todayISO = U.todayISO, downloadBlob = U.downloadBlob, renderZoneMap = U.renderZoneMap;
@@ -23,38 +26,72 @@ window.RiskApp.Reports = (function () {
   // ---------- The risk context (spt-risk-context, js/engine.js) ----------
 
   function exportRiskContext() {
-    var probs = E.exportProblems(state.project);
-    if (probs.length && !confirm("The risk context is incomplete:\n\n- " + probs.slice(0, 20).join("\n- ") + (probs.length > 20 ? "\n…and " + (probs.length - 20) + " more" : "") + "\n\nExport anyway?")) return;
-    downloadBlob(JSON.stringify(E.buildRiskContext(state.project), null, 2), slug(state.project.suc.name) + "-risk-context.json");
-    toast("Risk context exported (" + INTERCHANGE.schema + ").");
+    function groups() { return [{ title: "Still open:", lines: E.exportProblems(state.project) }]; }
+    function go() {
+      downloadBlob(JSON.stringify(E.buildRiskContext(state.project), null, 2), slug(state.project.suc.name) + "-risk-context.json");
+      toast("Risk context exported (" + INTERCHANGE.schema + ").");
+    }
+    ask("Export the risk context anyway?", groups, go, "Export anyway");
+  }
+
+  // ---------- The question before a download (never a block) ----------
+  //
+  // An in-page panel at the top of the page, in place of the browser's
+  // confirm: what is still open, the peer review's warnings, then Generate
+  // anyway (or Export anyway) or Cancel. What is open is worked out again
+  // each time the panel is drawn, so an edit on the page shows in it. It
+  // stays through a redraw of the same page, goes when the page changes or
+  // another project is opened, and Escape cancels it. The focus goes back to
+  // the button that asked.
+  var pending = null;   // { stage, title, groups: fn -> [{ title, lines }], go, yes, trigger }
+  function linesOf(groups) { return groups.reduce(function (n, g) { return n + g.lines.length; }, 0); }
+  // Calls go() straight away when there is nothing to ask.
+  function ask(title, groups, go, yes) {
+    if (!linesOf(groups())) { go(); return; }
+    var a = document.activeElement;
+    if (!a || a.tagName !== "BUTTON") a = null;
+    pending = { stage: state.stage, title: title, groups: groups, go: go, yes: yes || "Generate anyway",
+      trigger: a, triggerSel: a && a.getAttribute("data-download") };
+    drawGuard(document.getElementById("main"), true);
+  }
+  function removePanel() { var old = document.getElementById("issue-guard"); if (old && old.parentNode) old.parentNode.removeChild(old); }
+  function clearGuard() { pending = null; removePanel(); }
+  function closeGuard(P0, main) {
+    pending = null; removePanel();
+    var back = P0.trigger && document.contains(P0.trigger) ? P0.trigger
+      : (P0.triggerSel && main ? main.querySelector('[data-download="' + P0.triggerSel + '"]') : null);
+    if (back) { try { back.focus({ preventScroll: true }); } catch (e) { back.focus(); } }
+  }
+  function drawGuard(main, fresh) {
+    removePanel();
+    if (!pending || !main) return;
+    if (pending.stage !== state.stage) { pending = null; return; }
+    var P0 = pending, kids = [], groups = P0.groups();
+    if (!linesOf(groups)) { pending = null; return; }
+    groups.forEach(function (g) {
+      if (!g.lines.length) return;
+      kids.push(h("p", { class: "guard-group", text: g.title }));
+      kids.push(h("ul", null, g.lines.slice(0, 20).map(function (t) { return h("li", { text: t }); }).concat(g.lines.length > 20 ? [h("li", { class: "muted", text: "and " + (g.lines.length - 20) + " more" })] : [])));
+    });
+    var yes = h("button", { type: "button", class: "btn primary", "data-action": "generate-anyway", text: P0.yes, onClick: function () { closeGuard(P0, main); P0.go(); } });
+    kids.push(h("div", { class: "btn-row" }, [
+      yes,
+      h("button", { type: "button", class: "btn", "data-action": "guard-cancel", text: "Cancel", onClick: function () { closeGuard(P0, main); } })
+    ]));
+    var panel = h("div", { class: "card issue-guard no-print", id: "issue-guard", role: "alertdialog", "aria-labelledby": "issue-guard-title" }, [
+      h("div", { class: "card-h" }, [h("h2", { id: "issue-guard-title", text: P0.title })]),
+      h("div", { class: "card-b" }, kids)
+    ]);
+    panel.addEventListener("keydown", function (e) { if (e.key === "Escape") { e.preventDefault(); closeGuard(P0, main); } });
+    main.insertBefore(panel, main.firstChild);
+    if (fresh) { main.scrollTop = 0; try { yes.focus({ preventScroll: true }); } catch (e) { yes.focus(); } }
   }
 
   // ---------- Shared report fragments (used by the review and the high-level report) ----------
 
-  // Asset-owner sign-off. Editable on both report pages; the
-  // print-only line renders the signed statement in the printed report.
-  function approvalCard(p) {
-    var a = p.approval;
-    return card("Approval / sign-off", null, [
-      h("p", { class: "hint no-print", style: "margin-top:0", text: "Record who approved the tolerable risk and the outcome for the asset owner." }),
-      h("div", { class: "grid-2" }, [
-        textField("Approver name", a.name, function (v) { a.name = v; touched(); }, { placeholder: "e.g. A. Patel" }),
-        textField("Role / title", a.role, function (v) { a.role = v; touched(); }, { placeholder: "e.g. Plant Manager (asset owner)" })
-      ]),
-      h("div", { class: "grid-2" }, [
-        h("div", { class: "field" }, [h("label", { text: "Date approved" }), h("input", { type: "date", value: a.date || "", onInput: function (e) { a.date = e.target.value; touched(); } })]),
-        h("div", { class: "field" }, [
-          h("label", { text: "Status" }),
-          h("label", { style: "display:inline-flex;align-items:center;gap:6px;font-weight:400;font-size:13px;text-transform:none;cursor:pointer" }, [
-            h("input", { type: "checkbox", checked: !!a.approved, onChange: function (e) { a.approved = e.target.checked; touched(); rerender(); } }),
-            h("span", { text: "Signed off / approved" })
-          ])
-        ])
-      ]),
-      textField("What was approved", a.statement, function (v) { a.statement = v; touched(); }, { textarea: true, placeholder: "e.g. Tolerable risk of Medium and the per-zone SL-T targets in this assessment; residual risks accepted as recorded." }),
-      (a.name || a.approved) ? h("p", { class: "print-only", style: "margin-top:8px", text: (a.approved ? "Approved by " : "Prepared for approval by ") + (a.name || "(name not recorded)") + (a.role ? " (" + a.role + ")" : "") + (a.date ? " on " + a.date : "") + "." + (a.statement ? " " + a.statement : "") }) : null
-    ]);
-  }
+  // The approvals, read-only, on the summaries: they are entered in step 7
+  // (js/ui-spec.js).
+  function approvalCard(p) { return R.Spec.approvalSummary(p); }
 
   function basisCount(b) { return b.interviews.length + b.documents.length + b.observations.length; }
 
@@ -63,7 +100,7 @@ window.RiskApp.Reports = (function () {
       if (!rows.length) return null;
       var t = h("table", { class: "tbl" }, [h("thead", null, [h("tr", null, heads.map(function (hd) { return h("th", { text: hd }); }))])]);
       var tb = h("tbody");
-      rows.forEach(function (r) { tb.appendChild(h("tr", null, cells(r).map(function (v) { return h("td", { text: v || "—" }); }))); });
+      rows.forEach(function (r) { tb.appendChild(h("tr", null, cells(r).map(function (v) { return h("td", { text: v || "" }); }))); });
       t.appendChild(tb);
       return t;
     }
@@ -93,11 +130,11 @@ window.RiskApp.Reports = (function () {
     var atb = h("tbody");
     ranked.forEach(function (a) {
       atb.appendChild(h("tr", null, [
-        h("td", { text: a.name || "—" }), h("td", { text: a.functionLocation || "—" }),
-        h("td", { class: "center", text: a.consequence ? cap(a.consequence) : "—" }),
-        h("td", { class: "center", text: a.likelihood ? cap(a.likelihood) : "—" }),
+        h("td", { text: a.name || "" }), h("td", { text: a.functionLocation || "" }),
+        h("td", { class: "center", text: a.consequence ? E.impactName(a.consequence) : "" }),
+        h("td", { class: "center", text: a.likelihood ? E.likelihoodName(a.likelihood) : "" }),
         h("td", { class: "center" }, [riskPill(riskFor(a.consequence, a.likelihood))]),
-        h("td", { text: a.note || "—" })
+        h("td", { text: a.note || "" })
       ]));
     });
     at.appendChild(atb);
@@ -113,7 +150,7 @@ window.RiskApp.Reports = (function () {
     var p = state.project, s = p.srs;
     main.appendChild(h("div", { class: "print-only" }, [
       h("h1", { class: "page-title", text: "High-level cyber security risk assessment: " + (p.suc.name || "unnamed SUC") }),
-      h("p", { class: "page-sub", text: "IEC 62443-3-2 high-level risk assessment · " + TOOL_ID + " · " + todayISO() + " · relative risk ranking to prioritise systems and frame zoning. Risk bands are a SolutionsPT house matrix." })
+      h("p", { class: "page-sub", text: "IEC 62443-3-2 high-level risk assessment · " + todayISO() + " · relative risk ranking to prioritise systems and frame zoning. Risk bands are a SolutionsPT house matrix." })
     ]));
     main.appendChild(h("h1", { class: "page-title no-print", text: "High-level risk assessment report" }));
     main.appendChild(pageSub("hlreport", "A deliverable on its own that needs no zones or SL-T.", "no-print"));
@@ -121,7 +158,7 @@ window.RiskApp.Reports = (function () {
     main.appendChild(h("div", { class: "btn-row no-print", style: "margin-bottom:16px" }, [
       h("button", { class: "btn primary", text: "Download Word report", onClick: function () { downloadWordReport({ highLevelOnly: true }); } }),
       h("button", { class: "btn", text: "Print high-level report", onClick: function () { window.print(); } }),
-      h("button", { class: "btn", text: "Edit the ranking", onClick: function () { state.stage = "srs"; render(); } })
+      h("button", { class: "btn", text: "Edit the ranking", onClick: function () { A.navigate("srs"); } })
     ]));
     // The peer review's warnings, once a review has started (js/review.js).
     var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
@@ -134,7 +171,7 @@ window.RiskApp.Reports = (function () {
     if (s.essentialFunctions) sk.push(h("p", null, [h("strong", { text: "Essential functions: " }), s.essentialFunctions]));
     if (s.worstCase) sk.push(h("p", null, [h("strong", { text: "Worst case: " }), s.worstCase]));
     if (s.adversaryClass) sk.push(h("p", null, [h("strong", { text: "Assumed adversary: " }), "SL" + s.adversaryClass + "-grade: " + RULES.slDefinitions[String(s.adversaryClass)]]));
-    sk.push(h("p", null, [h("strong", { text: "Tolerable risk: " }), s.tolerableRisk || "medium"]));
+    sk.push(h("p", null, [h("strong", { text: "Tolerable risk: " }), M.BAND_NAME[E.tolerableOf(p)]]));
     if (p.suc.assumptions.length) { sk.push(h("p", null, [h("strong", { text: "Assumptions:" })])); sk.push(h("ul", null, p.suc.assumptions.map(function (x) { return h("li", { text: x }); }))); }
     main.appendChild(card(p.suc.name || "System under consideration", null, sk.length ? sk : [h("p", { class: "muted", text: "No SUC details captured yet." })]));
 
@@ -143,23 +180,23 @@ window.RiskApp.Reports = (function () {
     var hl = highLevelRankingTable();
     main.appendChild(card("Relative risk ranking", "highest risk first", hl ? [
       hl,
-      h("p", { class: "hint", style: "margin-top:10px", text: "Promote the top systems to a detailed assessment with “Detail →” in stage 2." })
-    ] : [h("p", { class: "muted", text: "No systems ranked yet: add them in stage 2." })]));
+      h("p", { class: "hint no-print", style: "margin-top:10px", text: "Assign the systems to zones in step 2." })
+    ] : [h("p", { class: "muted", text: "No systems ranked yet: add them in step 2." })]));
 
     main.appendChild(approvalCard(p));
   }
 
-  function renderReview(main) {
+  // The detailed report's one-page summary, hand-built (the Report page's
+  // Summary view, Detailed). What is still open is on Check and issue.
+  function renderDetailedSummary(main) {
     var p = state.project;
     main.appendChild(h("div", { class: "print-only" }, [
       h("h1", { class: "page-title", text: "OT cyber risk assessment summary: " + (p.suc.name || "unnamed SUC") }),
-      h("p", { class: "page-sub", text: "62443-3-2-aligned zones & conduits assessment · " + TOOL_ID + " · " + todayISO() + " · SL suggestions are a SolutionsPT house heuristic; consultant SL-T (per FR) and justification are the deliverable." })
+      h("p", { class: "page-sub", text: "IEC 62443-3-2 zones and conduits assessment · " + todayISO() + " · SL suggestions are a SolutionsPT house heuristic; consultant SL-T (per FR) and justification are the deliverable." })
     ]));
-    main.appendChild(h("h1", { class: "page-title no-print", text: "Full report & export" }));
-    main.appendChild(h("p", { class: "page-sub no-print", text: "Check the summary, then download or export; SL-T is shown per FR (" + FR_IDS.join("/") + ")." }));
+    main.appendChild(h("h1", { class: "page-title no-print", text: "Detailed report summary" }));
+    main.appendChild(h("p", { class: "page-sub no-print", text: "The assessment on one page; SL-T is shown per FR (" + FR_IDS.join("/") + ")." }));
 
-    var probs = E.exportProblems(p);
-    if (probs.length) main.appendChild(card("Completeness", probs.length + " item" + (probs.length === 1 ? "" : "s") + " outstanding", [h("ul", { class: "muted" }, probs.slice(0, 30).map(function (t) { return h("li", { text: t }); }))]));
     var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
     if (rvCard) main.appendChild(rvCard);
 
@@ -167,7 +204,7 @@ window.RiskApp.Reports = (function () {
     var sk = [];
     if (p.suc.description) sk.push(h("p", { text: p.suc.description }));
     if (p.suc.scopeStatement) sk.push(h("p", null, [h("strong", { text: "Scope: " }), p.suc.scopeStatement]));
-    sk.push(h("p", null, [h("strong", { text: "Tolerable risk: " }), p.srs.tolerableRisk || "medium"]));
+    sk.push(h("p", null, [h("strong", { text: "Tolerable risk: " }), M.BAND_NAME[E.tolerableOf(p)]]));
     if (p.srs.adversaryClass) sk.push(h("p", null, [h("strong", { text: "Assumed adversary: " }), "SL" + p.srs.adversaryClass + "-grade: " + RULES.slDefinitions[String(p.srs.adversaryClass)]]));
     [["Known/presumed threats", p.srs.knownThreats], ["Security functions that must be kept", p.srs.mandatorySecurityFunctions], ["Regulatory", p.srs.regulatory], ["Assumptions", p.suc.assumptions]].forEach(function (pair) {
       if (pair[1] && pair[1].length) { sk.push(h("p", null, [h("strong", { text: pair[0] + ":" })])); sk.push(h("ul", null, pair[1].map(function (x) { return h("li", { text: x }); }))); }
@@ -187,7 +224,7 @@ window.RiskApp.Reports = (function () {
     var vm = R.ViewModel.build(p);
     var anyResidual = vm.zones.some(function (row) { return row.threats.some(function (x) { return x.residual != null; }); });
     var zt = h("table", { class: "tbl" }, [h("thead", null, [h("tr", null, [
-      h("th", { text: "Zone" }), h("th", { text: anyResidual ? "Worst risk (unmitig. → residual)" : "Worst risk", class: "center" }),
+      h("th", { text: "Zone" }), h("th", { text: anyResidual ? "Worst risk (unmitigated → residual)" : "Worst risk", class: "center" }),
       h("th", { text: "Threats", class: "center" }), h("th", { text: "Suggested (" + FR_IDS.join("/") + ")" }),
       h("th", { text: "SL-T (" + FR_IDS.join("/") + ")" }), h("th", { text: "Justification" })
     ])])]);
@@ -202,7 +239,7 @@ window.RiskApp.Reports = (function () {
         h("td", { class: "center", text: String(z.threats.length) }),
         h("td", { text: vecStr(frSug(s)) }),
         h("td", null, [h("strong", { text: vecStr(z.slTargetByFR) })]),
-        h("td", { text: z.justification || "—" })
+        h("td", { text: z.justification || "" })
       ]));
     });
     zt.appendChild(ztb);
@@ -213,7 +250,7 @@ window.RiskApp.Reports = (function () {
 
     if (p.conduits.length) {
       var ct = h("table", { class: "tbl" }, [h("thead", null, [h("tr", null, [
-        h("th", { text: "Conduit" }), h("th", { text: "Path" }), h("th", { text: "Channels" }),
+        h("th", { text: "Conduit" }), h("th", { text: "Path" }), h("th", { text: "Channels and protocols" }),
         h("th", { text: "SL-T (" + FR_IDS.join("/") + ")" }), h("th", { text: "Justification" })
       ])])]);
       var ctb = h("tbody");
@@ -221,9 +258,9 @@ window.RiskApp.Reports = (function () {
         ctb.appendChild(h("tr", null, [
           h("td", { text: c.id + (c.name ? ": " + c.name : "") }),
           h("td", { text: (c.fromZone || "?") + " ↔ " + (c.toZone || "?") }),
-          h("td", { text: c.channels.join(", ") || "—" }),
+          h("td", { text: c.channels.join(", ") }),
           h("td", null, [h("strong", { text: vecStr(c.slTargetByFR) })]),
-          h("td", { text: c.justification || "—" })
+          h("td", { text: c.justification || "" })
         ]));
       });
       ct.appendChild(ctb);
@@ -240,7 +277,7 @@ window.RiskApp.Reports = (function () {
       h("button", { class: "btn", text: "Export risk context (" + INTERCHANGE.schema + ")", onClick: exportRiskContext }),
       h("button", { class: "btn", text: "Print one-page summary", onClick: function () { window.print(); } })
     ]));
-    main.appendChild(h("p", { class: "hint no-print", style: "margin-top:8px", text: "Document control comes from the engagement details on the Basis of assessment page." }));
+    main.appendChild(h("p", { class: "hint no-print", style: "margin-top:8px", text: "Document control comes from the engagement details on the Engagement and evidence page." }));
   }
 
   // ---------- Word / Excel deliverables (js/exports.js + vendor libs) ----------
@@ -250,19 +287,20 @@ window.RiskApp.Reports = (function () {
     toast("Report libraries not loaded: open the app from its folder so vendor/ and js/ are alongside index.html.", "err");
     return false;
   }
-  // One question before a download, never a block. The completeness list is
-  // about zones and threats, so the high-level report (the zone-free
-  // deliverable) skips it; the peer review's warnings (js/review.js) apply to
-  // every download, once a review has started.
-  function reportGuard(opts) {
+  // One question before a download, never a block: the report's part of the
+  // completeness list (the high-level report's own, without the zones and
+  // threats), and the peer review's warnings (js/review.js) once a review
+  // has started. Calls go() straight away when there is nothing to ask.
+  function reportGuard(opts, go, what) {
     opts = opts || {};
-    var probs = opts.highLevelOnly ? [] : E.exportProblems(state.project);
-    var rw = window.RiskReview ? window.RiskReview.exportWarningTexts() : [];
-    if (!probs.length && !rw.length) return true;
-    var parts = [];
-    if (probs.length) parts.push("The assessment is incomplete:\n\n- " + probs.slice(0, 20).join("\n- ") + (probs.length > 20 ? "\n…and " + (probs.length - 20) + " more" : ""));
-    if (rw.length) parts.push("Peer review:\n\n- " + rw.join("\n- "));
-    return confirm(parts.join("\n\n") + "\n\nGenerate the report anyway?");
+    function groups() {
+      return [
+        { title: opts.highLevelOnly ? "Still open in the high-level report:" : "Still open in the detailed report:",
+          lines: E.readiness(state.project, opts.highLevelOnly ? "highLevel" : "detailed").map(function (i) { return i.text; }) },
+        { title: "Peer review:", lines: window.RiskReview ? window.RiskReview.exportWarningTexts() : [] }
+      ];
+    }
+    ask("Generate the " + what + " anyway?", groups, go);
   }
   // Whether the report has changed since a review approved it needs the
   // reports as they are now: built first when they are not to hand.
@@ -275,33 +313,133 @@ window.RiskApp.Reports = (function () {
     opts = opts || {};
     if (!reportsAvailable()) return;
     reviewChecked(function () {
-      if (!reportGuard(opts)) return;
-      window.RiskExports.downloadWord(opts, function (err) {
-        toast(err ? ("Word report failed: " + (err && err.message)) : "Word report downloaded.", err ? "err" : undefined);
-      });
+      reportGuard(opts, function () {
+        window.RiskExports.downloadWord(opts, function (err) {
+          toast(err ? ("Word report failed: " + (err && err.message)) : "Word report downloaded.", err ? "err" : undefined);
+        });
+      }, opts.highLevelOnly ? "high-level Word report" : "Word report");
     });
   }
   function downloadExcelReport() {
     if (!reportsAvailable()) return;
     reviewChecked(function () {
-      if (!reportGuard({})) return;
-      window.RiskExports.downloadExcel(function (err) {
-        toast(err ? ("Excel workbook failed: " + (err && err.message)) : "Excel workbook downloaded.", err ? "err" : undefined);
-      });
+      reportGuard({}, function () {
+        window.RiskExports.downloadExcel(function (err) {
+          toast(err ? ("Excel workbook failed: " + (err && err.message)) : "Excel workbook downloaded.", err ? "err" : undefined);
+        });
+      }, "Excel workbook");
     });
   }
 
+  // ---------- Check and issue (review) ----------
+  //
+  // The readiness list for each report, every item linked to the place it is
+  // fixed (js/engine.js completeness), the peer review's warnings, every
+  // download, and the asset owner's sign-off.
+
+  var DOC_TITLES = { detailed: "Detailed report", highLevel: "High-level report" };
+  function readinessCard(p, doc, outOfScope) {
+    var items = E.readiness(p, doc);
+    var list = items.length
+      ? h("ul", { class: "readiness" }, items.map(function (it) {
+          return h("li", { "data-stage": it.stage }, [
+            h("span", { text: it.text }),
+            h("button", { type: "button", class: "btn sm", "data-action": "goto", text: "Go to", "aria-label": "Go to: " + it.text, onClick: function () { A.goToItem(it); } })
+          ]);
+        }))
+      : h("p", { class: "muted", text: "Nothing open." });
+    var body = outOfScope
+      ? [h("p", { class: "muted", text: "Not part of a high-level-only assessment." }), items.length ? h("details", null, [h("summary", { text: "Show what is open" }), list]) : null]
+      : [list];
+    return card(DOC_TITLES[doc], items.length ? items.length + " open" : "ready to issue", body, null, { "data-readiness": doc });
+  }
+  function renderCheckIssue(main) {
+    var p = state.project, hlOnly = M.assessmentType(p) === "high-level";
+    main.appendChild(h("h1", { class: "page-title", text: "Check and issue" }));
+    main.appendChild(h("p", { class: "page-sub", text: (p.suc.name ? p.suc.name + ": what" : "What") + " is still open in each report, and the downloads." }));
+    var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
+    if (rvCard) main.appendChild(rvCard);
+    (hlOnly ? ["highLevel", "detailed"] : ["detailed", "highLevel"]).forEach(function (doc) {
+      main.appendChild(readinessCard(p, doc, hlOnly && doc === "detailed"));
+    });
+    main.appendChild(card("Downloads", null, [
+      h("div", { class: "btn-row" }, [
+        h("button", { class: "btn primary", "data-download": "word", text: "Detailed Word report", onClick: function () { downloadWordReport({}); } }),
+        h("button", { class: "btn primary", "data-download": "word-hl", text: "High-level Word report", onClick: function () { downloadWordReport({ highLevelOnly: true }); } }),
+        h("button", { class: "btn", "data-download": "excel", text: "Excel workbook", onClick: downloadExcelReport }),
+        h("button", { class: "btn", "data-download": "risk-context", text: "Risk context (" + INTERCHANGE.schema + ")", onClick: exportRiskContext })
+      ]),
+      h("p", { class: "hint", style: "margin-top:8px", text: "Document control comes from the engagement details." })
+    ]));
+  }
+
+  // ---------- The Report page (report) ----------
+  //
+  // One page for both reports, Detailed and High level, in three views:
+  // Sections (js/report-page.js, read and edited section by section), Word
+  // pages (js/word-preview.js, the file itself) and Summary (the hand-built
+  // one-page summaries, kept for printing). The report chosen stays chosen
+  // when the view changes. The old page ids open it: hlreport on the
+  // high-level summary, wordpreview on the Word pages.
+
+  var VIEWS = [{ id: "sections", text: "Sections" }, { id: "word", text: "Word pages" }, { id: "summary", text: "Summary" }];
+  var view = { name: "sections", last: "sections", summaryDoc: 0 };
+  function RPg() { return window.RiskReportPage; }
+  function WPv() { return window.RiskWordPreview; }
+  function docOf(name) {
+    if (name === "word") return WPv() ? WPv().state.doc : 0;
+    if (name === "summary") return view.summaryDoc;
+    return RPg() ? RPg().state.doc : 0;
+  }
+  function setDoc(name, d) {
+    d = d === 1 ? 1 : 0;
+    if (name === "word") { if (WPv()) WPv().state.doc = d; return; }
+    if (name === "summary") { view.summaryDoc = d; return; }
+    if (RPg() && RPg().state.doc !== d) { RPg().state.doc = d; RPg().state.open = null; }
+  }
+  // Show a view (and a report) next time the page draws.
+  function reportView(name, doc) {
+    var d = doc == null ? docOf(view.last) : doc;
+    view.name = name; view.last = name;
+    setDoc(name, d);
+  }
+  function renderReportPage(main) {
+    setDoc(view.name, docOf(view.last));
+    view.last = view.name;
+    if (view.name === "word") { if (WPv()) WPv().render(main, h); }
+    else if (view.name === "summary") {
+      if (view.summaryDoc === 1) renderHLReport(main); else renderDetailedSummary(main);
+    } else if (RPg()) RPg().render(main, h);
+    var bar = h("div", { class: "rp-views no-print", role: "group", "aria-label": "View" }, VIEWS.map(function (v) {
+      var on = view.name === v.id;
+      return h("button", { type: "button", class: "sl-btn rp-view" + (on ? " active" : ""), "data-view": v.id, "aria-pressed": on ? "true" : "false",
+        onClick: function () { if (!on) { reportView(v.id); render(); A.focusAfter('.rp-views [data-view="' + v.id + '"]'); } } }, [v.text]);
+    }));
+    var kids = [bar];
+    // The summaries have no report tabs of their own.
+    if (view.name === "summary") kids.push(h("div", { class: "rp-tabs", role: "group", "aria-label": "Which report" }, ["Detailed", "High level"].map(function (t, i) {
+      var on = view.summaryDoc === i;
+      return h("button", { type: "button", class: "sl-btn rp-tab" + (on ? " active" : ""), "data-doc": i ? "highLevel" : "detailed", "aria-pressed": on ? "true" : "false",
+        onClick: function () { if (!on) { view.summaryDoc = i; render(); A.focusAfter('.rp-viewbar .rp-tab[data-doc="' + (i ? "highLevel" : "detailed") + '"]'); } }, text: t });
+    })));
+    var row = h("div", { class: "rp-viewbar no-print" }, kids);
+    var subs = main.querySelectorAll(".page-sub"), after = null;
+    for (var i = 0; i < subs.length; i++) if (!subs[i].closest(".print-only")) { after = subs[i]; break; }
+    if (after && after.parentNode === main) main.insertBefore(row, after.nextSibling); else main.insertBefore(row, main.firstChild);
+  }
+
   var P = R.Pages;
-  P.hlreport = renderHLReport; P.review = renderReview;
+  P.review = renderCheckIssue;
   // js/review.js (loaded after the app): the reports' peer review.
   P.peer = function (m) { if (window.RiskReview) window.RiskReview.render(m, h, card); };
-  // js/report-page.js: both Word reports, to read and edit section by section.
-  P.report = function (m) { if (window.RiskReportPage) window.RiskReportPage.render(m, h); };
-  // js/word-preview.js: the Word file itself, page by page.
-  P.wordpreview = function (m) { if (window.RiskWordPreview) window.RiskWordPreview.render(m, h); };
+  P.report = renderReportPage;
+  // The old page ids (js/app.js render): the high-level summary, the Word pages.
+  R.StageAliases.hlreport = function () { reportView("summary", 1); return "report"; };
+  R.StageAliases.wordpreview = function () { reportView("word"); return "report"; };
 
   return {
     exportRiskContext: exportRiskContext,
-    downloadWordReport: downloadWordReport, downloadExcelReport: downloadExcelReport
+    downloadWordReport: downloadWordReport, downloadExcelReport: downloadExcelReport,
+    drawGuard: drawGuard, clearGuard: clearGuard, reportView: reportView, view: view
   };
 }());

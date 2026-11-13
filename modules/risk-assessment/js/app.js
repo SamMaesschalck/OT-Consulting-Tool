@@ -2,8 +2,11 @@
 /* app.js — the running tool: its state, the page loop and the project file.
  *
  * Holds the one state object ({ project, stage }), unsaved-changes tracking
- * and autosave, Save (in place where the browser allows) and Load, the
- * sidebar, the redraw that keeps keyboard focus, and the header buttons.
+ * and autosave, Save (in place where the browser allows) and Load (which
+ * reopens the step last used), the sidebar (each entry's page id in
+ * data-stage, and each step's status from the completeness list), the old
+ * page ids, Go to an item of that list, Open the demo, the redraw that keeps
+ * keyboard focus, and the header buttons.
  * The pages register themselves in RiskApp.Pages (js/ui-stages.js,
  * js/ui-reports.js, js/ui-about.js, loaded after this file); render() draws
  * whichever the stage names. boot() starts the tool and publishes
@@ -32,16 +35,41 @@ window.RiskApp.App = (function () {
   // since a page it builds in memory can carry no query string.
   var TOUR_MODE = /[?&]tour(=|&|$)/.test(location.search) ||
     !!(window.App.HostBridge && window.App.HostBridge.launch.tour);
+  // Open the demo (Home) puts the running tool into tour mode without a
+  // reload, which the exe and the suite's frame do not allow. It leaves again
+  // on New or on loading a real file.
+  var tourOpenedHere = false;
 
-  var STAGES = [
-    { id: "suc",    label: "1. System under consideration",  sub: "scope and boundary" },
-    { id: "srs",    label: "2. High-level risk & requirements", sub: "ranking · tolerable risk" },
-    { id: "zones",  label: "3. Zones & conduits",            sub: "partition · drawing" },
-    { id: "risk",   label: "4. Detailed risk assessment",    sub: "threats · treatment" },
-    { id: "slt",    label: "5. SL-T assignment",             sub: "per foundational requirement" }
+  // The sidebar, in order. Each entry is a page id (data-stage on the item);
+  // the numbered steps follow IEC 62443-3-2:2020's order. "slt" is part of
+  // step 5 (a tab on its page), and two old ids open the Report page:
+  // hlreport (the high-level summary) and wordpreview (the Word pages).
+  var NAV = [
+    { id: "home",    label: "Home" },
+    { id: "basis",   label: "Engagement and evidence" },
+    { sep: true },
+    { id: "suc",     num: "1", label: "Scope and risk criteria" },
+    { id: "srs",     num: "2", label: "High-level risk" },
+    { id: "zones",   num: "3", label: "Zones and conduits" },
+    { id: "compare", num: "4", label: "Risk comparison" },
+    { id: "risk",    num: "5", label: "Detailed risk", also: ["slt"] },
+    { id: "spec",    num: "6", label: "Requirements specification" },
+    { id: "approval", num: "7", label: "Approval" },
+    { sep: true },
+    { id: "report",  label: "Report" },
+    { id: "review",  label: "Check and issue" },
+    { id: "peer",    label: "Peer review" },
+    { sep: true },
+    { id: "about",   label: "About" }
   ];
+  var STAGE_IDS = ["home", "basis", "suc", "srs", "zones", "compare", "risk", "slt", "spec", "approval", "report", "review", "peer", "about"];
+  var STAGE_ALIASES = ["hlreport", "wordpreview"];
 
-  var state = { project: M.emptyProject(), stage: "suc" };
+  var state = { project: M.emptyProject(), stage: "home" };
+  // The page the open project was loaded or started on: lastStage is written
+  // on Save only once the consultant has moved off it, or the file had one,
+  // so a file loaded and saved again comes back as it was.
+  var openedAt = "home";
 
   // ---------- Persistence ----------
 
@@ -170,6 +198,8 @@ window.RiskApp.App = (function () {
     onDone = onDone || function () {};
     var saveAs = !!(ev && ev.shiftKey);
     state.project.savedOn = new Date().toISOString();
+    // Load reopens the page this was saved on.
+    if (state.project.lastStage != null || state.stage !== openedAt) state.project.lastStage = state.stage;
     var text = JSON.stringify(state.project, null, 2);
     var suggested = slug(state.project.suc.name) + "-risk-project.json";
 
@@ -223,7 +253,8 @@ window.RiskApp.App = (function () {
       });
     }
 
-    if (saveAs) { pick(); return; }
+    // The demo never writes over a real project's file: it always asks where.
+    if (saveAs || TOUR_MODE) { pick(); return; }
     if (projectHandle) { writeTo(projectHandle, true); return; }
     restoreHandle(function (hd) { if (hd) writeTo(hd, true); else pick(); });
   }
@@ -252,7 +283,9 @@ window.RiskApp.App = (function () {
   // Returns true only when the project was actually replaced, so callers can
   // tie follow-up state (e.g. the save-file handle) to a successful load.
   // The file is brought to this build's shape by js/migrate.js.
-  function loadProjectText(text) {
+  // opts.demo: the demo, opened from Home (already asked).
+  function loadProjectText(text, opts) {
+    opts = opts || {};
     var data;
     try { data = JSON.parse(text); }
     catch (e) { toast("Not a valid JSON file.", "err"); return false; }
@@ -260,15 +293,47 @@ window.RiskApp.App = (function () {
       toast("Unrecognised file: expected " + M.ACCEPTED_PROJECT_SCHEMAS.join(" or ") + ", got " + (data && data.schema ? data.schema : "none") + ".", "err");
       return false;
     }
-    if (projectHasContent(state.project)) {
+    if (!opts.demo && projectHasContent(state.project)) {
       var incoming = (data.suc && data.suc.name) ? "“" + data.suc.name + "”" : "this project";
       if (!confirm("Load " + incoming + "? Unsaved changes to the current assessment will be lost. Save first if you want to keep them.")) return false;
     }
+    // A real file, opened while the demo is open from Home: the tool leaves
+    // the demo, and autosave works again. The autosave copy still holds the
+    // real work the demo kept: it is offered back, and not written over.
+    var leftDemo = false;
+    if (!opts.demo && tourOpenedHere) { TOUR_MODE = false; tourOpenedHere = false; leftDemo = true; }
     state.project = MG.normaliseProject(data);
-    state.stage = "suc";
-    render(); writeAutosave(); markClean();
-    toast("Risk project loaded.");
+    state.stage = knownStage(state.project.lastStage) ? state.project.lastStage : "home";
+    openedAt = state.stage;
+    clearGuard();
+    render(); if (!leftDemo) writeAutosave(); markClean();
+    toast(opts.demo ? "The demo is open. Autosave is off." : "Risk project loaded.");
+    if (leftDemo) offerRestore({ forgetFile: true });
     return true;
+  }
+  // A question waiting before a download belongs to the project it was asked about.
+  function clearGuard() { if (R.Reports && R.Reports.clearGuard) R.Reports.clearGuard(); }
+  function knownStage(id) { return typeof id === "string" && (STAGE_IDS.indexOf(id) >= 0 || STAGE_ALIASES.indexOf(id) >= 0) && !!(R.Pages[id] || STAGE_ALIASES.indexOf(id) >= 0); }
+
+  // Home's Open the demo: the completed demo project, in tour mode, in this
+  // window. The single-file build carries it inline; the folder app loads it.
+  function openDemo() {
+    if (TOUR_MODE) { navigate("home"); return; }
+    if (dirty && projectHasContent(state.project) && !confirm("Open the demo? Save first to keep unsaved changes in a file.")) return;
+    flushAutosave();
+    function go() {
+      if (!window.SPT_TOUR_PROJECT) { toast("Tour data missing (data/tour-project.js).", "err"); return; }
+      TOUR_MODE = true; tourOpenedHere = true;
+      projectHandle = null;   // only in memory: Save in the demo always asks where
+      loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT), { demo: true });
+      updateSaveButton();
+    }
+    if (window.SPT_TOUR_PROJECT) { go(); return; }
+    var s = document.createElement("script");
+    s.src = "data/tour-project.js";
+    s.onload = go;
+    s.onerror = function () { toast("Tour data (data/tour-project.js) failed to load.", "err"); };
+    document.head.appendChild(s);
   }
 
   // ---------- Header / nav ----------
@@ -283,70 +348,109 @@ window.RiskApp.App = (function () {
     $("suc-summary").textContent = bits.join(" · ");
   }
 
+  // A count beside a step: evidence rows, zones, threats.
   function stageBadge(id) {
     var p = state.project;
+    if (id === "basis") { var b = p.basisOfAssessment, nb = b.interviews.length + b.documents.length + b.observations.length; return nb ? String(nb) : null; }
     if (id === "zones" && p.zones.length) return String(p.zones.length);
     var owners = p.zones.concat(p.conduits);
     if (id === "risk") { var n = owners.reduce(function (a, o) { return a + o.threats.length; }, 0); return n ? String(n) : null; }
-    if (id === "slt") {
-      var set = owners.filter(function (o) { return FR_IDS.some(function (fr) { return o.slTargetByFR[fr] != null; }); }).length;
-      return p.zones.length ? set + "/" + owners.length : null;
-    }
     return null;
+  }
+  // How many zones and conduits have an SL-T set, of all of them: the SL-T
+  // tab of step 5 shows it.
+  function sltCount() {
+    var p = state.project, owners = p.zones.concat(p.conduits);
+    if (!p.zones.length) return null;
+    return owners.filter(function (o) { return FR_IDS.some(function (fr) { return o.slTargetByFR[fr] != null; }); }).length + "/" + owners.length;
+  }
+
+  // focus: where the keyboard focus goes on the new page. "nav" is the
+  // sidebar's active entry (the sidebar started it), a selector is a control
+  // in the page (a tab), and otherwise it is the page's heading.
+  function navigate(stage, focus) {
+    state.stage = stage;
+    render();
+    var m = $("main"); if (m) m.scrollTop = 0;
+    focusAfter(focus);
+  }
+  function focusEl(el) {
+    if (!el || typeof el.focus !== "function") return false;
+    if (!/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+    try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+    return document.activeElement === el;
+  }
+  function pageHeading() {
+    var hs = $("main").querySelectorAll("h1.page-title");
+    for (var i = 0; i < hs.length; i++) if (!hs[i].closest(".print-only")) return hs[i];
+    return null;
+  }
+  function focusAfter(focus) {
+    var el = null;
+    if (focus === "nav") el = document.querySelector("#sidebar .nav-item.active");
+    else if (focus) el = $("main").querySelector(focus);
+    if (!focusEl(el)) focusEl(pageHeading());
   }
 
   function renderNav() {
     var sb = $("sidebar"); sb.innerHTML = "";
     var sec = h("div", { class: "nav-section" });
-    sec.appendChild(h("div", { class: "nav-section-title", text: "62443-3-2 workflow" }));
-    STAGES.forEach(function (s) {
-      var badge = stageBadge(s.id);
-      sec.appendChild(h("div", {
-        class: "nav-item" + (state.stage === s.id ? " active" : ""),
-        onClick: function () { state.stage = s.id; render(); }
+    var status = E.stepStatus(state.project);
+    NAV.forEach(function (s) {
+      if (s.sep) { sec.appendChild(h("div", { class: "nav-sep", role: "separator" })); return; }
+      var st = status[s.id] || null, badge = stageBadge(s.id);
+      var on = state.stage === s.id || (s.also && s.also.indexOf(state.stage) >= 0);
+      var item = h("div", {
+        class: "nav-item" + (on ? " active" : ""), "data-stage": s.id, role: "button", tabindex: "0",
+        "aria-current": on ? "page" : "false",
+        onClick: function () { navigate(s.id, "nav"); }
       }, [
-        h("span", null, [s.label, s.sub ? h("span", { class: "muted", style: "display:block;font-size:11px", text: s.sub }) : null]),
+        h("span", { class: "nav-label" }, [
+          s.num ? h("span", { class: "nav-num", text: s.num }) : null,
+          (s.num ? " " : "") + s.label,
+          st ? h("span", { class: "nav-status", "data-status": st.state, text: st.text }) : null
+        ]),
         badge ? h("span", { class: "badge", text: badge }) : null
-      ]));
+      ]);
+      item.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(s.id, "nav"); } });
+      sec.appendChild(item);
     });
-    sec.appendChild(h("div", { class: "nav-section-title", text: "Engagement" }));
-    var basisCount = state.project.basisOfAssessment.interviews.length + state.project.basisOfAssessment.documents.length + state.project.basisOfAssessment.observations.length;
-    sec.appendChild(h("div", {
-      class: "nav-item" + (state.stage === "basis" ? " active" : ""),
-      onClick: function () { state.stage = "basis"; render(); }
-    }, [
-      h("span", null, ["Basis of assessment", h("span", { class: "muted", style: "display:block;font-size:11px", text: "who / what / observed" })]),
-      basisCount ? h("span", { class: "badge", text: String(basisCount) }) : null
-    ]));
-    sec.appendChild(h("div", { class: "nav-section-title", text: "Reports" }));
-    sec.appendChild(h("div", {
-      class: "nav-item" + (state.stage === "report" ? " active" : ""),
-      onClick: function () { state.stage = "report"; render(); }
-    }, [h("span", null, ["Report", h("span", { class: "muted", style: "display:block;font-size:11px", text: "both reports, section by section" })])]));
-    // The Word file itself, page by page (js/word-preview.js).
-    sec.appendChild(h("div", {
-      class: "nav-item" + (state.stage === "wordpreview" ? " active" : ""), id: "nav-word-preview",
-      onClick: function () { state.stage = "wordpreview"; render(); }
-    }, [h("span", null, ["Word preview", h("span", { class: "muted", style: "display:block;font-size:11px", text: "the Word file, page by page" })])]));
-    sec.appendChild(h("div", {
-      class: "nav-item" + (state.stage === "hlreport" ? " active" : ""),
-      onClick: function () { state.stage = "hlreport"; render(); }
-    }, [h("span", null, ["High-level report", h("span", { class: "muted", style: "display:block;font-size:11px", text: "the ranking on its own" })])]));
-    sec.appendChild(h("div", {
-      class: "nav-item" + (state.stage === "review" ? " active" : ""),
-      onClick: function () { state.stage = "review"; render(); }
-    }, [h("span", null, ["Full report & export", h("span", { class: "muted", style: "display:block;font-size:11px", text: "zones · SL-T · risk context" })])]));
-    sec.appendChild(h("div", {
-      class: "nav-item" + (state.stage === "peer" ? " active" : ""),
-      onClick: function () { state.stage = "peer"; render(); }
-    }, [h("span", null, ["Peer review", h("span", { class: "muted", style: "display:block;font-size:11px", text: "send for review · comments" })])]));
-    sec.appendChild(h("div", { class: "nav-section-title", text: "Reference" }));
-    sec.appendChild(h("div", {
-      class: "nav-item" + (state.stage === "about" ? " active" : ""),
-      onClick: function () { state.stage = "about"; render(); }
-    }, [h("span", { text: "About & framing" })]));
     sb.appendChild(sec);
     sb.appendChild(h("div", { class: "sidebar-legal", title: U.LEGAL_NOTICE, text: U.LEGAL_SHORT }));
+  }
+
+  // Go to the place an item of the completeness list is fixed (js/engine.js
+  // completeness): its page, scrolled to its zone, conduit, threat, ranked
+  // system or card, which flashes.
+  function flash(el) {
+    if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("check-flash");
+    void el.offsetWidth;
+    el.classList.add("check-flash");
+    setTimeout(function () { el.classList.remove("check-flash"); }, 2200);
+  }
+  function attrSel(name, v) { return "[" + name + '="' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"]'; }
+  function goToItem(item) {
+    var t = (item && item.target) || {};
+    // Step 3 shows one zone or conduit at a time: the one named is opened.
+    if (item.stage === "zones" && R.ZonesPage) R.ZonesPage.select(t.kind, t.id);
+    navigate(item.stage);
+    var main = $("main"), el = null;
+    if (t.kind === "zone" || t.kind === "conduit") el = main.querySelector(attrSel("data-owner-id", t.id));
+    else if (t.kind === "threat") {
+      var own = main.querySelector(attrSel("data-owner-id", t.ownerId));
+      el = own ? (own.querySelector(attrSel("data-threat-id", t.id)) || own) : null;
+    } else if (t.kind === "system") el = main.querySelector(attrSel("data-hla-id", t.id));
+    else if (t.kind === "spec") el = main.querySelector(attrSel("data-check-anchor", "spec-" + t.id));
+    else if (t.kind === "approval" && t.id != null) el = main.querySelector(attrSel("data-approval", t.id)) || main.querySelector(attrSel("data-check-anchor", "approval"));
+    else if (t.kind) el = main.querySelector(attrSel("data-check-anchor", t.kind));
+    // A part of the item, such as one separation row of a zone.
+    if (el && t.part) el = el.querySelector(attrSel("data-part", t.part)) || el;
+    // The keyboard lands on the item too, not only the eye: on one approver,
+    // on what settles it (Approved again, or the Approved tick).
+    var key = el && t.kind === "approval" && t.id != null ? (el.querySelector('[data-action="approved-again"]') || el.querySelector('[data-approval-field="approved"]')) : null;
+    if (el) { flash(el); if (!focusEl(key)) focusEl(el); }
+    return el;
   }
 
   // A redraw rebuilds the page, so the control that had keyboard focus is
@@ -357,13 +461,18 @@ window.RiskApp.App = (function () {
   function focusMark() {
     var el = document.activeElement, main = $("main");
     if (!el || !main || el === main || !main.contains(el) || !el.getAttribute) return null;
-    var own = el.closest("[data-owner-id]"), thr = el.closest("[data-threat-id]"), sel = null, index = 0;
-    ["data-decision", "data-reason", "data-action"].forEach(function (a) {
+    // The owner: a zone or conduit, or a ranked system's row (data-hla-id).
+    var key = el.closest("[data-owner-id]") ? "data-owner-id" : "data-hla-id";
+    var own = el.closest("[" + key + "]"), thr = el.closest("[data-threat-id]"), sel = null, index = 0;
+    ["data-decision", "data-detailed", "data-reason", "data-action", "data-assessment-type", "data-view", "data-doc", "data-separation", "data-marker", "data-end", "data-approval-field", "data-flag", "data-asset-name"].forEach(function (a) {
       if (!sel && el.getAttribute(a)) sel = "[" + a + '="' + el.getAttribute(a) + '"]';
     });
     if (!sel && el.tagName === "SELECT") { sel = "select"; index = Array.prototype.indexOf.call((thr || own || main).querySelectorAll("select"), el); }
+    // Anything else that takes the keyboard, by its place among those of its
+    // card: a redraw that adds or removes nothing puts it back where it was.
+    if (!sel && el.matches && el.matches(FOCUSABLE)) { sel = FOCUSABLE; index = Array.prototype.indexOf.call((thr || own || main).querySelectorAll(FOCUSABLE), el); }
     if (!sel) return null;
-    return { owner: own ? own.getAttribute("data-owner-id") : null, ownerAt: own ? Array.prototype.indexOf.call(main.querySelectorAll("[data-owner-id]"), own) : -1,
+    return { key: key, owner: own ? own.getAttribute(key) : null, ownerAt: own ? Array.prototype.indexOf.call(main.querySelectorAll("[" + key + "]"), own) : -1,
       threat: thr ? thr.getAttribute("data-threat-id") : null, sel: sel, index: index,
       caret: el.tagName === "INPUT" ? el.selectionStart : null };
   }
@@ -377,19 +486,42 @@ window.RiskApp.App = (function () {
     }
     var own = $("main");
     if (mark.owner != null) {
-      own = own.querySelectorAll("[data-owner-id]")[mark.ownerAt] || null;
-      if (own && own.getAttribute("data-owner-id") !== mark.owner) own = null;
+      own = own.querySelectorAll("[" + mark.key + "]")[mark.ownerAt] || null;
+      if (own && own.getAttribute(mark.key) !== mark.owner) own = null;
     }
     var scope = within(own, "data-threat-id", mark.threat);
     var el = scope ? scope.querySelectorAll(mark.sel)[mark.index] : null;
     // The action that was pressed has gone (nothing left to confirm): the
-    // first treatment choice of the same card takes the focus.
-    if (!el && own && /data-action/.test(mark.sel)) el = own.querySelector("[data-decision]");
+    // first treatment choice of the same card takes the focus, or, for an
+    // action outside a card (step 4's Confirm suggested), the page's first
+    // decision.
+    if (!el && /data-action/.test(mark.sel)) el = (own || $("main")).querySelector("[data-decision], [data-detailed]");
     if (!el || typeof el.focus !== "function") return;
     try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
     if (mark.caret != null && typeof el.setSelectionRange === "function") { try { el.setSelectionRange(mark.caret, mark.caret); } catch (e2) { /* not a text field */ } }
   }
-  function rerender() { var m = $("main"), y = m.scrollTop, mark = focusMark(); render(); $("main").scrollTop = y; focusBack(mark); }
+  function rerender() { clearTimeout(soonTimer); var m = $("main"), y = m.scrollTop, mark = focusMark(); render(); $("main").scrollTop = y; focusBack(mark); }
+  var FOCUSABLE = "a[href], button, input, select, textarea, summary, [tabindex]";
+  // A redraw once the focus has moved on: a field left with Tab redraws after
+  // the keyboard has reached the next control, which the redraw then keeps.
+  var soonTimer = null;
+  function rerenderSoon() { clearTimeout(soonTimer); soonTimer = setTimeout(function () { soonTimer = null; rerender(); }, 0); }
+  // A field that redraws the page when it changes. Left with Tab, the redraw
+  // waits for the focus to arrive; otherwise (Enter, a script) it is at once,
+  // and the field keeps the focus.
+  function changeRedraw(el) {
+    var tab = false;
+    el.addEventListener("keydown", function (e) { tab = e.key === "Tab"; });
+    el.addEventListener("change", function () { if (tab) { tab = false; rerenderSoon(); } else rerender(); });
+    return el;
+  }
+  // The step status in the sidebar, after an edit that does not redraw the
+  // page (typing in a field). Left alone while the keyboard is in the sidebar.
+  function refreshNav() {
+    var sb = $("sidebar");
+    if (!sb || sb.contains(document.activeElement)) return;
+    renderNav();
+  }
 
   // ---------- Render root ----------
   // The pages: js/ui-stages.js, js/ui-reports.js and js/ui-about.js. Three
@@ -397,17 +529,29 @@ window.RiskApp.App = (function () {
   // js/report-page.js (report) and js/word-preview.js (wordpreview), all
   // loaded after the app.
 
+  // An old page id that now opens another page (hlreport, wordpreview): the
+  // page that registered it (js/ui-reports.js) sets what to show and names
+  // the page it opens.
+  R.StageAliases = R.StageAliases || {};
   function render() {
+    var alias = R.StageAliases[state.stage];
+    if (alias) state.stage = alias();
+    if (!R.Pages[state.stage]) state.stage = "home";
     renderNav(); renderHeaderSummary();
     var main = $("main"); main.innerHTML = "";
-    var fn = R.Pages[state.stage];
-    (fn || R.Pages.suc)(main);
+    R.Pages[state.stage](main);
+    // The question before a download, when one is waiting on this page.
+    if (R.Reports && R.Reports.drawGuard) R.Reports.drawGuard(main);
   }
 
   // ---------- Autosave restore ----------
 
-  function offerRestore() {
+  // opts.forgetFile: the file open now is not the restored work's, so a
+  // restore forgets it and Save asks where.
+  function offerRestore(opts) {
+    opts = opts || {};
     if (TOUR_MODE) return; // the demo replaces the project; don't offer (or risk) real work here
+    var old = document.querySelector(".autosave-bar"); if (old && old.parentNode) old.parentNode.removeChild(old);
     var raw = null; try { raw = localStorage.getItem(AUTOSAVE_KEY); } catch (e) {}
     if (!raw) return;
     var snap; try { snap = JSON.parse(raw); } catch (e) { return; }
@@ -418,7 +562,12 @@ window.RiskApp.App = (function () {
     if (!projectHasContent(pj)) return;
     var bar = h("div", { class: "autosave-bar no-print" }, [
       h("span", { class: "autosave-msg", text: "Found unsaved work from " + new Date(snap.savedOn).toLocaleString() + (pj.suc.name ? " (“" + pj.suc.name + "”)" : "") + "." }),
-      h("button", { class: "btn sm primary", text: "Restore", onClick: function () { state.project = MG.normaliseProject(pj); state.stage = snap.stage || "suc"; document.body.removeChild(bar); render(); markDirty(); toast("Autosaved work restored."); } }),
+      h("button", { class: "btn sm primary", text: "Restore", onClick: function () {
+        state.project = MG.normaliseProject(pj); state.stage = knownStage(snap.stage) ? snap.stage : "home"; openedAt = state.stage;
+        if (opts.forgetFile) forgetProjectFile();
+        clearGuard();
+        document.body.removeChild(bar); render(); markDirty(); toast("Autosaved work restored.");
+      } }),
       h("button", { class: "btn sm", text: "Discard", onClick: function () { try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {} document.body.removeChild(bar); } })
     ]);
     document.body.appendChild(bar);
@@ -429,13 +578,19 @@ window.RiskApp.App = (function () {
   function wireHeader() {
     $("btn-new").addEventListener("click", function () {
       if (dirty && projectHasContent(state.project) && !confirm("Start a new risk assessment? Unsaved changes will be lost. Save first if you want to keep them.")) return;
-      state.project = M.emptyProject(); state.stage = "suc";
+      state.project = M.emptyProject(); state.stage = "home"; openedAt = "home";
+      clearGuard();
       // In tour mode the snapshot belongs to the consultant's real session.
+      var leftDemo = tourOpenedHere;
       if (!TOUR_MODE) { try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {} }
+      // New from a demo opened on Home leaves the demo: autosave works again,
+      // and the real work it kept is offered back.
+      if (tourOpenedHere) { TOUR_MODE = false; tourOpenedHere = false; }
       // Forget the previous project's file so Save can't overwrite it with
       // this new, unrelated assessment — the first save will ask where to save.
       forgetProjectFile();
       render(); markClean(); toast("New risk assessment started.");
+      if (leftDemo) offerRestore();
     });
     $("btn-save").addEventListener("click", saveProject); // Shift+click = Save as…
     $("btn-export").addEventListener("click", function () { R.Reports.exportRiskContext(); });
@@ -559,16 +714,42 @@ window.RiskApp.App = (function () {
       render: render, toast: toast,
       // The published standard's ZCR lookup (data/zcr-map.json) and the
       // old-key-to-new-key map for report sections whose heading was reworded.
-      zcrMap: M.ZCR, zcrOf: M.zcrOf, stageZcr: M.stageZcr, sectionKeyAlias: M.sectionKeyAlias
+      zcrMap: M.ZCR, zcrOf: M.zcrOf, stageZcr: M.stageZcr, sectionKeyAlias: M.sectionKeyAlias,
+      // The pages and their status (phase 3a): the sidebar's page ids, going
+      // to one, each step's status, the one completeness list and a report's
+      // part of it, and opening the place an item of it is fixed.
+      STAGE_IDS: STAGE_IDS.slice(), navigate: navigate,
+      stepStatus: function (project) { return E.stepStatus(project || state.project); },
+      completeness: function (project) { return E.completeness(project || state.project); },
+      readiness: function (doc, project) { return E.readiness(project || state.project, doc); },
+      goToItem: goToItem,
+      // The risk comparison (step 4) and the ranked systems a zone holds.
+      initialRiskOf: function (owner, project) { return E.initialRiskOf(owner, project || state.project); },
+      comparison: function (owner, project) { return E.comparison(owner, project || state.project); },
+      hlaComparison: function (a, project) { return E.hlaComparison(a, project || state.project); },
+      hlaIdsOf: M.hlaIdsOf, assessmentType: function (project) { return M.assessmentType(project || state.project); },
+      openDemo: openDemo, isTour: function () { return TOUR_MODE; },
+      // Phase 3b: the confirmed tolerable risk, a zone's separation rows, the
+      // asset paste, the specification's blocks and the approvals.
+      tolerableConfirmed: function (project) { return M.tolerableConfirmed(project || state.project); },
+      separationRows: function (zone, project) { return E.separationRows(zone, project || state.project); },
+      conduitExternal: E.conduitExternal, parseAssets: E.parseAssets, assetLinkLabel: E.assetLinkLabel, zoneSafety: E.zoneSafety,
+      specBlocks: function (project) { return E.specBlocks(project || state.project); },
+      approvalsOf: function (project) { return M.approvalsOf(project || state.project); },
+      approvalFingerprint: function (project) { return E.approvalFingerprint(project || state.project); },
+      approvalStates: function (project) { return E.approvalStates(project || state.project); },
+      approvalChangedFor: E.approvalChangedFor, approvalPartWords: E.approvalPartWords,
+      zcrSpecBlocks: M.ZCR.specBlocks || null
     };
   }
 
   return {
-    state: state, TOUR_MODE: TOUR_MODE, AUTOSAVE_KEY: AUTOSAVE_KEY,
+    state: state, TOUR_MODE: TOUR_MODE, isTour: function () { return TOUR_MODE; }, AUTOSAVE_KEY: AUTOSAVE_KEY,
     touched: touched, markDirty: markDirty, markClean: markClean, isDirty: function () { return dirty; },
     flushAutosave: flushAutosave, saveProject: saveProject, loadProjectText: loadProjectText,
     forgetProjectFile: forgetProjectFile, supportsFilePickers: supportsFilePickers,
-    render: render, rerender: rerender, renderHeaderSummary: renderHeaderSummary,
+    render: render, rerender: rerender, rerenderSoon: rerenderSoon, changeRedraw: changeRedraw, refreshNav: refreshNav, renderHeaderSummary: renderHeaderSummary,
+    navigate: navigate, focusAfter: focusAfter, goToItem: goToItem, flash: flash, sltCount: sltCount, openDemo: openDemo,
     offerRestore: offerRestore, boot: boot
   };
 }());

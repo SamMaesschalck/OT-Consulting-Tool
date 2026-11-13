@@ -22,6 +22,8 @@ window.App.Data.zcrMap = {
       "What the cyber security requirements specification and the zone and conduit characteristics hold, item by item.",
       "How an SL-T is determined, and setting it as one target per foundational requirement.",
       "Who sets the tolerable risk and who approves what.",
+      "The separation rows on the zones page (business and control system assets, safety related assets, temporarily connected devices, wireless devices, devices connected via external networks), and when the tool raises each one.",
+      "What an approval covers (the tolerable risk, the SL-T and the accepted risks) and the fingerprint that shows a change after it.",
       "The risk matrix, the likelihood and impact scales and the risk-to-SL mapping, which are SolutionsPT house defaults. The standard prescribes no matrix."
     ]
   },
@@ -31,8 +33,22 @@ window.App.Data.zcrMap = {
     "srs": "ZCR 2",
     "hlreport": "ZCR 2",
     "zones": "ZCR 3",
+    "compare": "ZCR 4",
     "risk": "ZCR 5",
-    "slt": "ZCR 5.6"
+    "slt": "ZCR 5.6",
+    "spec": "ZCR 6",
+    "approval": "ZCR 7"
+  },
+  "specBlocks": {
+    "_note": "The blocks of the requirements specification page and the report, in this order, and the ZCR 6 element each one stands for. A house reading: the blocks are assembled from what the tool captures, not from the standard's wording.",
+    "suc": "ZCR 6.2",
+    "drawings": "ZCR 6.3",
+    "characteristics": "ZCR 6.4",
+    "assumptions": "ZCR 6.5",
+    "threats": "ZCR 6.6",
+    "policies": "ZCR 6.7",
+    "tolerable": "ZCR 6.8",
+    "regulatory": "ZCR 6.9"
   },
   "requirements": [
     { "id": "ZCR 1", "title": "Identify the SUC", "clause": "4.2" },
