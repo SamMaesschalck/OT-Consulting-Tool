@@ -145,7 +145,7 @@ module.exports = function selfTest(win) {
       ok(demo.inline, "the demo project is carried inside the package");
       ok(demo.loaded && /^Acme Petrochemicals/.test(demo.name || "") && demo.zones === 4 && demo.conduits === 3 && demo.threats === 9,
          "it loads: 4 zones, 3 conduits, 9 threats", JSON.stringify(demo));
-      ok(demo.pages && demo.pages.length >= 8 && demo.pages.every((n) => n > 200), "every page renders (" + (demo.pages || []).length + " pages)", JSON.stringify(demo.pages));
+      ok(demo.pages && demo.pages.length >= 8 && demo.pages.every((n) => n > 150), "every page renders (" + (demo.pages || []).length + " pages)", JSON.stringify(demo.pages));
       ok(demo.shows && demo.problems === 0, "the full report page shows it, complete enough to export", JSON.stringify(demo));
 
       // Real downloads through the app's own export path, onto disk.

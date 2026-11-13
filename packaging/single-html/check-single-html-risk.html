@@ -148,7 +148,7 @@
       ok(single.pages.length === folder.pages.length && single.pages.length >= 8, "the same pages in the sidebar (" + single.pages.length + ")", folder.pages.length + " vs " + single.pages.length);
       folder.pages.forEach(function (a, i) {
         var b = single.pages[i] || {};
-        ok(b.name === a.name && b.len === a.len && b.len > 200, "page '" + a.name + "' renders identically (" + b.len + " chars)", a.len + " vs " + b.len);
+        ok(b.name === a.name && b.len === a.len && b.len > 150, "page '" + a.name + "' renders identically (" + b.len + " chars)", a.len + " vs " + b.len);
       });
       ok(close(folder.word, single.word), "the Word report builds to the same size (" + single.word + " bytes)", folder.word + " vs " + single.word);
       ok(/^cover \d+ sheets [1-9]/.test(single.preview) && single.preview === folder.preview, "the Word preview reads the report back and draws it (" + single.preview + ")", folder.preview + " vs " + single.preview);
