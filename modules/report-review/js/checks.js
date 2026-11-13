@@ -37,7 +37,7 @@
     "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Empty fields in the document control table. They may be filled in at issue. QA review by is not counted." },
     "numbering": { title: "Section numbering gaps", severity: "should-fix", about: "Numbered sections that skip a number, which usually means a section was hidden." },
     "figures": { title: "Figures that disagree", severity: "must-fix", about: "Counts the report prints that do not match the assessment behind it." },
-    "risk-no-disposition": { title: "Risks above tolerable with no disposition", severity: "must-fix", about: "A threat above the tolerable risk with no countermeasure, no target level on its affected requirements and no recorded acceptance." },
+    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat above the tolerable risk with no confirmed decision to reduce it, accept it or treat it through the target levels, or with a decision that is missing its countermeasure or reason." },
     "risk-slt-justification": { title: "Target levels with no justification", severity: "should-fix", about: "A zone or conduit with target security levels set and no justification recorded." }
   };
 
@@ -330,16 +330,19 @@
 
   // Read from the risk pack's items as the risk tool writes them: a threat's
   // status is a finding when it is above the tolerable risk, and its priority
-  // field holds the disposition (countermeasure, mitigated, accepted, sl-t),
-  // empty when there is none. A risk above tolerable with a disposition but no
-  // countermeasure is a legitimate position (carried into the target levels, or
-  // accepted), so it is not flagged.
+  // field holds the treatment decision the consultant confirmed (reduce with
+  // countermeasures, accept, or treat through the target levels), in the words
+  // the report prints, empty when none is confirmed or the confirmed one is
+  // incomplete (reduce with no countermeasure, accept with no reason, the
+  // target levels with none set and no reason). A complete decision with no
+  // countermeasure is a legitimate position (treated through the target
+  // levels, or accepted), so it is not flagged.
   function riskNoDisposition(pack, out) {
     if (!isRisk(pack) || fieldLabel(pack, "priority", "priority") === null) return;
     (pack.items || []).forEach(function (it) {
       if (isSlt(it) || it.status !== "finding" || norm(it.priority)) return;
       var t = it.targetName, key = targetKey(it) + ":" + it.itemId;
-      out.push(result("risk-no-disposition", key, it.code + (t ? " on " + t : "") + " is above the tolerable risk with no disposition.",
+      out.push(result("risk-no-disposition", key, it.code + (t ? " on " + t : "") + " is above the tolerable risk with no treatment decision.",
         it.title, null, null, 0, itemAnchor(it, legacy("risk-no-disposition", key, t + ":" + it.itemId))));
     });
   }

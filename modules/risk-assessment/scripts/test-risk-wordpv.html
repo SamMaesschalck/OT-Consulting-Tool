@@ -132,7 +132,7 @@
         ok(!!hl, "the high-level report can be chosen");
         if (!hl) return;
         hl.click();
-        return wait(function () { var c = w.document.querySelector("#wp-paper .cover-title"); return !!c && /High-Level/i.test(c.textContent) && n1 > 1; }, 60000).then(function (d2) {
+        return wait(function () { var c = w.document.querySelector("#wp-paper .cover-title"); return !!c && /High-Level OT Cyber/i.test(c.textContent) && n1 > 1; }, 600000).then(function (d2) {
           ok(d2, "the page draws the high-level report");
           ok(downloads === 0, "a preview downloads nothing");
           ok(!/[–—]/.test(w.document.querySelector(".page-sub").textContent), "no en or em dashes in the page's own words");

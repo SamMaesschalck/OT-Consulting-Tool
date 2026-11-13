@@ -7,7 +7,7 @@
   The risk tool's review, second page (test-risk-review.html is the first), on the
   tour's demo project:
   - the pack names its fields as the risk tool does (fieldLabels), prints band and
-    disposition names, lists only the countermeasures that address a threat, adds
+    treatment decisions, lists only the countermeasures that address a threat, adds
     likelihood, impact, FRs and the SL-T suggestion and justification as details,
     and carries each zone's id (targetId) and the author's note (request);
   - the content hash leaves out the asset owner's sign-off and QA review by, and
@@ -101,14 +101,15 @@
       return RR.buildPack(null, { note: "  First round: please look hard at section 4.  ", neededBy: "Thursday 12 November" });
     }).then(function (r) {
       var pack = r.pack, fl = pack.engagement.fieldLabels || {};
-      ok(fl.evidence === "Threat source" && fl.notes === "Risk acceptance" && fl.priority === "Disposition" && fl.answer === "Risk", "the pack names the fields as the risk tool does", JSON.stringify(fl));
+      ok(fl.evidence === "Threat source" && fl.notes === "Risk acceptance" && fl.priority === "Treatment decision" && fl.answer === "Risk", "the pack names the fields as the risk tool does", JSON.stringify(fl));
       ok(fl.owner === null && fl.impact === null, "and has no owner or impact field per threat");
       ok(pack.items.every(function (i) { return i.targetId && pack.items.length && i.itemId.indexOf(i.targetId + ":") === 0; }), "every item carries its zone or conduit's id (targetId)");
       var t1 = item(pack, "Z1:T1"), t2 = item(pack, "Z1:T2");
       ok(/^(Low|Medium|High|Very high)(, residual (low|medium|high|very high))?$/.test(t1.answer) && t1.expected === "Medium", "risk and tolerable risk are band names, not ids", t1.answer + " / " + t1.expected);
-      var labels = Object.keys(RX.DISPOSITION_LABEL).map(function (k) { return RX.DISPOSITION_LABEL[k]; });
-      ok(pack.items.filter(function (i) { return i.code !== "SL-T"; }).every(function (i) { return !i.priority || labels.indexOf(i.priority) >= 0 || /^No disposition/.test(i.priority); }) && labels.indexOf(t1.priority) >= 0,
-        "the disposition is the name the report prints", t1.priority);
+      // The words of a confirmed decision, from the tool's one treatment state.
+      var TL = w.RiskTool.TREATMENT_LABEL, labels = [TL.reduced, TL.reduce, TL.reduceNone, TL.accept, TL.slt];
+      ok(pack.items.filter(function (i) { return i.code !== "SL-T"; }).every(function (i) { return !i.priority || labels.indexOf(i.priority) >= 0; }) && t1.priority === TL.reduced && t2.priority === TL.reduce && item(pack, "Z4:T8").priority === TL.accept && item(pack, "Z1:T3").priority === "",
+        "the treatment decision is in the words the report prints, and a threat within tolerable risk has none", t1.priority + " / " + t2.priority);
       ok(/M2 /.test(t2.action) && /M3 /.test(t2.action) && !/M1 /.test(t2.action), "a threat on SI lists only the countermeasures that address SI (not M1, which covers IAC, UC and RDF)", t2.action);
       ok(/\[existing\]|\[planned\]/.test(t2.action), "each marked existing or planned");
       ok(detail(t1, "Likelihood × impact") === "High × Serious" && detail(t1, "Affected FRs") === "IAC, RDF" && detail(t1, "Residual likelihood × impact") === "Low × Serious", "likelihood, impact, FRs and the residual rating are detail rows", JSON.stringify(t1.details));
@@ -117,7 +118,7 @@
       ok(s1.evidence === "" && detail(s1, "Justification") === zone("Z1").justification.trim() && /^IAC SL\d/.test(detail(s1, "Suggested SL-T")), "an SL-T item shows the suggestion and the justification as details, not as a threat source", JSON.stringify(s1.details));
       ok(/^IAC SL3, UC SL2/.test(s1.answer), "and the set vector with SL levels", s1.answer);
       var over = pack.items.filter(function (i) { return i.status === "finding"; });
-      ok(over.length && over.every(function (i) { return i.priority === "" || labels.indexOf(i.priority) >= 0; }), "a finding's disposition is a name, or empty when there is none (as the review tool's check reads it)");
+      ok(over.length && over.every(function (i) { return i.priority === "" || labels.indexOf(i.priority) >= 0; }), "a finding's treatment decision is its printed name, or empty when none is confirmed (as the review tool's check reads it)");
       ok(Object.prototype.hasOwnProperty.call(pack.engagement.documentControl, "qaReviewBy"), "document control in the pack has QA review by");
       ok(pack.request && pack.request.note === "First round: please look hard at section 4." && pack.request.neededBy === "Thursday 12 November", "the author's note and date go in the pack", JSON.stringify(pack.request));
       return RR.buildPack(null, { note: " ", neededBy: "" });

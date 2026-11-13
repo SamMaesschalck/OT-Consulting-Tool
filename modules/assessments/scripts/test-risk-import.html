@@ -148,6 +148,25 @@
   check("v1.4 import scopes and targets exactly as 1.1 (new fields are context only)",
     t14 && A.Scoring.effectiveTargetSL(ass14.targetProfile, "FR1", t14.id) === 3);
 
+  // ---- A zone the consultant set no SL-T for exports a null scalar and an
+  // empty vector (the risk tool no longer lets its suggestion stand in), and a
+  // threat with no confirmed treatment decision exports a null disposition ----
+  var ctxNull = JSON.parse(JSON.stringify(ctx14));
+  ctxNull.zones[1].slTarget = null;
+  Object.keys(ctxNull.zones[1].slTargetByFR || {}).forEach(function (k) { ctxNull.zones[1].slTargetByFR[k] = null; });
+  ctxNull.zones[1].threats[0].disposition = null;
+  E.newProject();
+  E.activateInstrument("iec-62443-3-3");
+  var threwNull = null;
+  try { E.setRiskContext(ctxNull, { scope: true, zoneIds: ["Z1", "Z2"], fileName: "riverside-null.json" }); } catch (e) { threwNull = e.message; }
+  var assN = A.Storage.findAssessment({ assessments: E.state.assessments }, "iec-62443-3-3");
+  var tN1 = E.state.engagement.targets.filter(function (t) { return t.zoneId === "Z1"; })[0];
+  var tN2 = E.state.engagement.targets.filter(function (t) { return t.zoneId === "Z2"; })[0];
+  check("a zone with a null slTarget and an empty vector imports without error", threwNull === null && !!tN1 && !!tN2);
+  check("it is created with no pre-set target, and the other zone keeps its own",
+    !!tN2 && !(assN.targetProfile.perZone || {})[tN2.id] && !!tN1 && A.Scoring.effectiveTargetSL(assN.targetProfile, "FR1", tN1.id) === 3);
+  check("a null disposition is carried as provenance unchanged", assN.riskContext && assN.riskContext.zones[1].threats[0].disposition === null);
+
   // ---- Round-trip: project save/load keeps riskContext + perZone ----
   E.setRiskContext(ctx11, { scope: true, zoneIds: ["Z1", "Z2"], fileName: "riverside.json" });
   var file = E.getProjectFile();

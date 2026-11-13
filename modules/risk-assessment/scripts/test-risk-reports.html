@@ -85,7 +85,7 @@
     ok(!!doc && doc.sections.length === 2, "full Word doc builds (cover + body)");
     ok(text.indexOf("OT CYBER RISK ASSESSMENT") !== -1 && text.indexOf("OT Cyber Risk") !== -1, "Design-B cover carries the kicker and title lines");
     ok(text.indexOf("www.solutionspt.com") !== -1 && text.indexOf("CLASSIFICATION") !== -1, "cover carries the SolutionsPT address block and issue/author/classification line");
-    ok(text.indexOf("Acme Petrochemicals Ltd") !== -1 && text.indexOf("Unit 300") !== -1, "cover + document control carry the engagement client and SuC");
+    ok(text.indexOf("Acme Petrochemicals Ltd") !== -1 && text.indexOf("Unit 300") !== -1, "cover + document control carry the engagement client and SUC");
     (function () { // cover hero: floating background image behind the text, plus the logo card
       var imgs = [];
       (function walk(n) {
@@ -110,12 +110,14 @@
     ok(text.indexOf("Repeat this assessment after a significant change") !== -1, "exec summary sets the revisit expectation");
     ok(/exceed the tolerable risk of Medium/.test(text), "exec summary names the tolerable risk");
     ok(/The most affected is Z\d/.test(text) && text.indexOf("The highest unmitigated risk is") !== -1, "exec summary says where the risk concentrates and names the worst threat");
-    ok(/1 formally accepted by the asset owner/.test(text), "disposition tally includes the recorded acceptance");
+    ok(/Of the 7 threats above tolerable risk, 2 are reduced to within tolerable risk by countermeasures, 4 are being reduced with countermeasures and 1 is formally accepted by the asset owner\./.test(text), "treatment tally counts the confirmed decisions, and leaves out what there is none of", (text.match(/Of the [0-9]+ threats above.*/) || [""])[0]);
     ok(/Accepted risk T8 \(Z4\): /.test(text) && text.indexOf("revisited at the next assessment") !== -1, "the accepted risk is named in the summary");
-    ok(text.indexOf("no disposition yet") === -1, "fully-dispositioned demo raises no undispositioned warning");
+    ok(text.indexOf("no treatment decision recorded") === -1 && text.indexOf("No decision recorded") === -1 && text.indexOf("7/7") !== -1 && text.indexOf("with a treatment decision") !== -1, "the demo, every decision confirmed, prints no missing decision");
     ok(/ceiling is set by/.test(text) && text.indexOf("IEC 62443-3-3 assessment against these targets") !== -1, "SL-T outcome paragraph names the ceiling driver and the 3-3 handoff");
     ok(text.indexOf("Delete this note.") !== -1, "red consultant tailor-me note present");
-    ok(text.indexOf("High-level risk ranking (§4.2)") !== -1 && text.indexOf("Laboratory information system link") !== -1, "§4.2 ranking table present with all systems");
+    ok(text.indexOf("High-level risk ranking") !== -1 && text.indexOf("Laboratory information system link") !== -1, "high-level risk ranking table present with all systems");
+    ok(text.indexOf("The assessment follows IEC 62443-3-2:2020.") !== -1 && text.split("62443-3-2:2020").length === 2, "the method text names the edition, once");
+    ok(text.indexOf("Security functions that must be kept") !== -1 && text.indexOf("Mandatory security functions") === -1, "the security functions heading says what it holds");
     ok(text.indexOf("Z2: Safety Instrumented System") !== -1 && text.indexOf("T4") !== -1, "zone threat registers present");
     ok(text.indexOf("risk acceptance: Accepted by R. Calder") !== -1, "the recorded acceptance text prints in full");
     ok(text.indexOf("Target security levels") !== -1 && /Worst case/.test(text) && /SL3/.test(text), "SL-T matrix with worst-case row");
@@ -131,12 +133,112 @@
     // ---- Word (high-level only) ----
     var hl = RX.buildWordDoc(p, { highLevelOnly: true });
     var hlText = docText(hl);
-    ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking (§4.2)") !== -1, "high-level variant builds with the ranking");
-    ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked (§4.2)") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
+    ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking") !== -1 && hlText.indexOf("the high-level cyber security risk assessment") !== -1, "high-level variant builds with the ranking");
+    ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
     ok(hlText.indexOf("candidates for detailed, per-system assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the High+ candidates and carries the tailor-me note");
     ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("which justify a full, per-system assessment") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
     ok(hlText.indexOf("Target security levels") === -1 && hlText.indexOf("Zones, conduits and the detailed") === -1, "high-level variant omits the detailed tier");
     ok(hlText.indexOf("Sign-off") !== -1, "high-level variant still carries sign-off");
+
+    // ---- deliverables carry names and judgement: no raw ids, no capitals for emphasis ----
+    ok(!/NO DISPOSITION|WORST CASE|Dispositioned|dispositioned/.test(text), "Word: no capitals for emphasis, no 'dispositioned'");
+    ok(!/safety-plc|engineering-workstation|\(plc\)|\(hmi\)|remote-access|sis-present|internet-adjacent|many-conduits/.test(text), "Word: no flag or asset-type ids",
+      (text.match(/safety-plc|engineering-workstation|\(plc\)|\(hmi\)|remote-access|sis-present|internet-adjacent|many-conduits/) || [""])[0]);
+    ok(text.indexOf("(Safety PLC)") !== -1 && text.indexOf("(PLC)") !== -1 && /Exposure: [a-z ,]*remote access/.test(text), "Word: asset types and exposure print as names");
+    ok(!/Very-high|very-high/.test(text), "Word: no band id");
+    ok(text.indexOf("Reduced to within tolerable risk") !== -1 && text.indexOf("Reduce with countermeasures") !== -1 && text.indexOf("Risk accepted") !== -1 && text.indexOf("Within tolerable risk") !== -1,
+      "Word: each confirmed decision prints in plain words");
+
+    // ---- an unconfirmed suggestion prints as no decision, in red ----
+    function runsOf(d) {
+      var out = [];
+      (function walk(n) {
+        if (!n) return;
+        if (n.__t === "run") { out.push(n); return; }
+        if (n.__t === "p" || n.__t === "cell" || n.__t === "row") { n.children.forEach(walk); return; }
+        if (n.__t === "table") { n.rows.forEach(walk); return; }
+        if (Array.isArray(n)) n.forEach(walk);
+      })(d.sections[1].children);
+      return out;
+    }
+    var z1 = p.zones[0], t2 = z1.threats[1], t8 = p.zones[3].threats[1];
+    t2.treatment.confirmed = false;                  // still "reduce", and M2 still covers it: a suggestion only
+    t8.treatment = { decision: null, confirmed: false, reason: "" }; // the acceptance text is still there, with no decision
+    var undecided = RX.buildWordDoc(p, {}), uText = docText(undecided);
+    var redRuns = runsOf(undecided).filter(function (r) { return r.color === "E00000"; }).map(function (r) { return r.text; });
+    ok(redRuns.filter(function (t) { return t === "No decision recorded"; }).length === 2, "Word: the two threats with no confirmed decision say so in red, in their registers", redRuns.join(" | "));
+    ok(redRuns.some(function (t) { return /^2 threats above tolerable risk have no treatment decision recorded: T2 \(Z1\), T8 \(Z4\)\.$/.test(t); }), "Word: and the executive summary names them, in red", redRuns.join(" | "));
+    ok(uText.indexOf("5/7") !== -1 && /no decision recorded/.test(uText) && uText.indexOf("NO DISPOSITION") === -1, "Word: the scorecard counts only confirmed decisions");
+    ok(uText.indexOf("formally accepted by the asset owner") === -1 && uText.indexOf("risk acceptance: Accepted by R. Calder") === -1, "Word: acceptance text with no confirmed decision is not printed as an acceptance");
+    ok(/Of the 7 threats above tolerable risk, 2 are reduced to within tolerable risk by countermeasures and 3 are being reduced with countermeasures\./.test(uText), "Word: the tally leaves the undecided out", (uText.match(/Of the \d+ threats above[^\n]*/) || [""])[0]);
+    var uWb = RX.buildWorkbook(p), uTr = uWb.getWorksheet("Threat register");
+    ok(String(uTr.getCell("J3").value) === "No decision recorded" && String(uTr.getCell("M3").value) === "Open" && String(uTr.getCell("L9").value) === "", "Excel: no confirmed decision reads as no decision, open, with no reason",
+      [uTr.getCell("J3").value, uTr.getCell("M3").value, uTr.getCell("L9").value].join(" | "));
+    var S2 = RX.summarise(p);
+    ok(S2.threats.filter(function (x) { return x.exceeds && !x.decided; }).length === 2 && S2.dispositionCounts.none === 2, "the shared summary counts them as undecided");
+    t2.treatment.confirmed = true;
+    t8.treatment = { decision: "accept", confirmed: true, reason: "" };
+
+    // ---- a decision recorded without what it rests on is never printed as a treatment ----
+    // Each case is a copy of the demo with one thing taken away. What is read:
+    // the Word text and its red runs, the workbook, the risk context and the pack.
+    function variant(change) {
+      var q = JSON.parse(JSON.stringify(p));
+      change(q);
+      var d = RX.buildWordDoc(q, {}), keep = RT.state.project, out;
+      RT.state.project = q;
+      try { out = { q: q, text: docText(d), red: runsOf(d).filter(function (r) { return r.color === "E00000"; }).map(function (r) { return r.text; }), S: RX.summarise(q), reg: RX.buildWorkbook(q).getWorksheet("Threat register"), ctx: RT.buildRiskContext(), items: w.RiskReview.packItems().items }; }
+      finally { RT.state.project = keep; }
+      out.item = function (id) { return out.items.filter(function (i) { return i.itemId === id; })[0]; };
+      out.tally = (out.text.match(/Of the \d+ threats? above[^\n]*/) || [""])[0];
+      return out;
+    }
+    // Reduce, with a tolerable residual rating and no countermeasure at all (T1 of Z1; T2 loses its cover too).
+    var vR = variant(function (q) { q.zones[0].countermeasures = []; });
+    ok(vR.red.filter(function (t) { return t === "Reduce with countermeasures (none recorded)"; }).length === 2 && vR.text.indexOf("Z1") !== -1 && vR.S.threats[0].residual === "medium",
+      "Word: reduce with no covering countermeasure prints as none recorded, in red, whatever the residual rating", vR.red.join(" | "));
+    ok(/^Of the 7 threats above tolerable risk, 1 is reduced to within tolerable risk by countermeasures, 3 are being reduced with countermeasures and 1 is formally accepted by the asset owner\. The register holds 3 existing and 1 planned countermeasures.$/.test(vR.tally) && vR.S.dispositionCounts.mitigated === 1 && vR.S.dispositionCounts.none === 2,
+      "Word: and is counted in neither 'by countermeasures' clause of the summary", vR.tally);
+    ok(vR.red.some(function (t) { return t === "2 treatment decisions are incomplete: T1 (Z1), reduce with countermeasures (none recorded); T2 (Z1), reduce with countermeasures (none recorded)."; }) && vR.text.indexOf("no treatment decision recorded") === -1 && vR.text.indexOf("5/7") !== -1,
+      "Word: the summary names the incomplete decisions, in red, apart from those with no decision", vR.red.join(" | "));
+    ok(vR.reg.getCell("J2").value === "Reduce with countermeasures (none recorded)" && vR.reg.getCell("M2").value === "Open" && vR.ctx.zones[0].threats[0].disposition === null && vR.ctx.zones[0].threats[1].disposition === null,
+      "Excel reads it as open, and the risk context exports no disposition for it", [vR.reg.getCell("J2").value, vR.reg.getCell("M2").value, vR.ctx.zones[0].threats[0].disposition].join(" | "));
+    ok(vR.item("Z1:T1").status === "finding" && vR.item("Z1:T1").priority === "" && vR.item("Z1:T1").action === "", "the review pack holds it as a finding with no treatment decision, so the reviewer's check raises it", JSON.stringify([vR.item("Z1:T1").status, vR.item("Z1:T1").priority]));
+    // Reduce, with a tolerable residual rating and only planned countermeasures.
+    var vP = variant(function (q) { q.zones[0].countermeasures.forEach(function (m) { m.existing = false; }); });
+    ok(vP.reg.getCell("J2").value === "Reduce with countermeasures" && vP.ctx.zones[0].threats[0].disposition === "countermeasure" && vP.S.dispositionCounts.mitigated === 1 && /1 is reduced to within tolerable risk by countermeasures, 5 are being reduced with countermeasures/.test(vP.tally),
+      "a tolerable residual with only planned countermeasures is still being reduced, not reduced", vP.reg.getCell("J2").value + " | " + vP.tally);
+    // Accept, with no reason.
+    var vA = variant(function (q) { q.zones[3].threats[1].acceptance = ""; });
+    ok(vA.red.indexOf("Accept (no reason recorded)") !== -1 && vA.text.indexOf("formally accepted by the asset owner") === -1 && vA.text.indexOf("Accepted risk") === -1 && vA.text.indexOf("rationale is recorded") === -1 && vA.text.indexOf("Risk accepted") === -1,
+      "Word: an acceptance with no reason is not printed as formally accepted, nor its rationale as recorded", vA.tally);
+    ok(vA.red.some(function (t) { return t === "1 treatment decision is incomplete: T8 (Z4), accept (no reason recorded)."; }) && vA.reg.getCell("J9").value === "Accept (no reason recorded)" && vA.reg.getCell("M9").value === "Open" && vA.ctx.zones[3].threats[1].disposition === null,
+      "it is named as incomplete, open in Excel, and exported with no disposition", vA.red.join(" | "));
+    ok(vA.item("Z4:T8").status === "finding" && vA.item("Z4:T8").priority === "" && vA.item("Z4:T8").notes === "", "and the review pack leaves its treatment decision empty");
+    // Treat through the SL-T, with no SL-T set on a requirement it affects and no reason.
+    function z3slt(reason) { return function (q) { q.zones[2].slTargetByFR.RDF = null; q.zones[2].threats[0].treatment = { decision: "slt", confirmed: true, reason: reason }; }; }
+    var vS = variant(z3slt(""));
+    ok(vS.red.indexOf("Treat through the SL-T programme (no SL-T set)") !== -1 && vS.text.indexOf("Treated through the SL-T programme") === -1 && vS.text.indexOf("treated through the target security level programme") === -1 && vS.S.dispositionCounts["sl-t"] === 0,
+      "Word: the SL-T programme with no SL-T set and no reason is not printed or counted as a treatment", vS.tally);
+    ok(vS.ctx.zones[2].threats[0].disposition === null && vS.item("Z3:T5").priority === "" && vS.item("Z3:T5").status === "finding" && vS.reg.getCell("M6").value === "Open", "nor exported, packed or tracked as one");
+    // With its reason it is a recorded treatment, and the reason is printed with it.
+    var vT = variant(z3slt("Raised in phase 2 of the programme."));
+    ok(vT.text.indexOf("T5 treated through the SL-T programme: Raised in phase 2 of the programme.") !== -1 && /1 is treated through the target security level programme/.test(vT.tally) && vT.red.indexOf("Treated through the SL-T programme") === -1 && vT.text.indexOf("Treated through the SL-T programme") !== -1,
+      "Word: a reasoned SL-T decision prints as treated, is counted, and its reason is printed under the register", vT.tally);
+    ok(vT.reg.getCell("J6").value === "Treated through the SL-T programme" && vT.reg.getCell("L6").value === "Raised in phase 2 of the programme." && vT.reg.getCell("M6").value === "Decided" && vT.ctx.zones[2].threats[0].disposition === "sl-t",
+      "Excel carries the reason beside the decision, and the risk context exports it", [vT.reg.getCell("J6").value, vT.reg.getCell("L6").value].join(" | "));
+    var why = vT.item("Z3:T5").details.filter(function (r) { return r[0] === "Reason for treating through the SL-T"; });
+    ok(why.length === 1 && why[0][1] === "Raised in phase 2 of the programme." && vT.item("Z3:T5").priority === "Treated through the SL-T programme" && !vS.item("Z3:T5").details.some(function (r) { return /Reason for treating/.test(r[0]); }),
+      "the review pack shows the reason as a detail row, and no such row without one");
+    // The decision is changed to reduce: the SL-T reason left behind is not printed against it.
+    var vC = variant(function (q) { z3slt("Raised in phase 2 of the programme.")(q); q.zones[2].threats[0].treatment.decision = "reduce"; });
+    ok(vC.reg.getCell("J6").value === "Reduce with countermeasures" && vC.reg.getCell("L6").value === "" && vC.text.indexOf("Raised in phase 2") === -1 && !vC.item("Z3:T5").details.some(function (r) { return /Reason for treating/.test(r[0]); }),
+      "a reason typed for the SL-T is not printed once the decision is reduce, in Excel, Word or the pack", String(vC.reg.getCell("L6").value));
+    // One threat above tolerable risk, and acceptance as the only decision: the sentence still reads.
+    var vOne = variant(function (q) { q.zones.concat(q.conduits).forEach(function (o) { o.threats.forEach(function (t) { if (t.id !== "T1") { t.likelihood = "low"; t.impact = "minor"; } }); }); });
+    ok(/^Of the 1 threat above tolerable risk, 1 is reduced to within tolerable risk by countermeasures\./.test(vOne.tally), "Word: with one threat above tolerable risk the tally says 'threat'", vOne.tally);
+    var vAcc = variant(function (q) { q.zones.concat(q.conduits).forEach(function (o) { o.threats.forEach(function (t) { if (t.id !== "T8") t.treatment = { decision: null, confirmed: false, reason: "" }; }); }); });
+    ok(/^Of the 7 threats above tolerable risk, 1 is formally accepted by the asset owner\./.test(vAcc.tally), "Word: with acceptance the only decision the tally still has its verb", vAcc.tally);
     w.docx = realDocx;
 
     // ---- Word packs to a real .docx blob with the real (patched) lib ----
@@ -167,13 +269,24 @@
     var tr = wb.getWorksheet("Threat register");
     ok(tr.rowCount === 10, "threat register = header + 9 threats", String(tr.rowCount));
     ok(String(tr.getCell("H2").value).length > 0, "risk band cells filled");
+    ok(tr.getCell("J1").value === "Treatment decision" && tr.getCell("J2").value === "Reduced to within tolerable risk" && tr.getCell("J3").value === "Reduce with countermeasures" && tr.getCell("J4").value === "Within tolerable risk" && tr.getCell("J9").value === "Risk accepted",
+      "Excel: the register prints each confirmed decision in plain words", [tr.getCell("J2").value, tr.getCell("J3").value, tr.getCell("J4").value, tr.getCell("J9").value].join(" | "));
+    ok(tr.getCell("I2").value === "Yes" && tr.getCell("I4").value === "No" && tr.getCell("M2").value === "Decided" && /^Accepted by R\. Calder/.test(String(tr.getCell("L9").value)) && tr.getCell("F2").value === "High" && tr.getCell("G2").value === "Serious",
+      "Excel: no capitals for emphasis, scale names for ratings, the acceptance reason beside its decision");
+    (function () {
+      var all = [];
+      wb.worksheets.forEach(function (ws) { ws.eachRow(function (row) { row.eachCell(function (c) { all.push(String(c.value)); }); }); });
+      var joined = all.join("\n");
+      ok(!/NO DISPOSITION|WORST CASE|\bYES\b|Dispositioned|safety-plc|\(plc\)|remote-access|sis-present|very-high/.test(joined), "Excel: no capitals for emphasis and no raw ids anywhere in the workbook",
+        (joined.match(/NO DISPOSITION|WORST CASE|\bYES\b|Dispositioned|safety-plc|\(plc\)|remote-access|sis-present|very-high/) || [""])[0]);
+    })();
     var dv = tr.getCell("M2").dataValidation;
     ok(!!dv && dv.type === "list", "Status column has the dropdown validation");
     ok(!!tr.autoFilter, "threat register is autofiltered");
     var sl = wb.getWorksheet("SL-T");
     ok(sl.getCell("A1").value === "Zone / conduit" && String(sl.getCell("B3").value) === "SL3", "SL-T matrix rows present (Z2 IAC SL3)");
     var worstRow = sl.getRow(sl.rowCount);
-    ok(String(worstRow.getCell(1).value) === "WORST CASE" && String(worstRow.getCell(2).value) === "SL3", "worst-case SL-T row present");
+    ok(String(worstRow.getCell(1).value) === "Worst case" && String(worstRow.getCell(2).value) === "SL3", "worst-case SL-T row present, not in capitals");
     var rk = wb.getWorksheet("Ranking");
     ok(rk.rowCount === 7, "ranking sheet = header + 6 systems", String(rk.rowCount));
     var cm = wb.getWorksheet("Countermeasures");

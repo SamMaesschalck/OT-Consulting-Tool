@@ -98,7 +98,7 @@
         var text = main.textContent;
         ok(main.querySelectorAll(".rv-comment").length === 4, "the comments list is on its own page");
         ok(/J\. Marsh/.test(text) && /Changes requested/.test(text) && /Tolerable risk agreed/.test(text), "with the reviewer, the verdict and the checklist's no");
-        ok(/Detailed report/.test(text) && /High-level report/.test(text), "grouped per report");
+        ok(/ - Detailed report/.test(text) && / - High-level report/.test(text), "grouped per report, each under the name the tool gives it");
         var first = main.querySelector('[data-comment-id="c1"]');
         ok(first.querySelector(".rv-copy") && !first.querySelector(".rv-accept"), "suggested wording on text written from the zones is Copy, not Accept");
         ok(/written from the zones and threats/.test(first.textContent), "saying why");

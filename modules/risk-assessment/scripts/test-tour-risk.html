@@ -79,14 +79,19 @@
     ok(RT.threatDisposition(z2, z2.threats[0]) === "countermeasure", "Z2 T4 covered by the hardwired keyswitch", RT.threatDisposition(z2, z2.threats[0]));
     ok(RT.threatDisposition(z4, z4.threats[1]) === "accepted", "Z4 T8 carries a recorded risk acceptance", RT.threatDisposition(z4, z4.threats[1]));
     ok(RT.threatDisposition(p.conduits[1], p.conduits[1].threats[0]) === "mitigated", "C2 T9 mitigated by the session controls");
-    var undispositioned = [];
+    var undecided = [], gaps = [], within = 0, decisions = {};
     p.zones.concat(p.conduits).forEach(function (o) {
       o.threats.forEach(function (th) {
-        var risk = RT.threatRisk(th);
-        if (risk && RT.exceedsTolerable(risk, p.srs.tolerableRisk) && !RT.threatDisposition(o, th)) undispositioned.push(th.id);
+        var T = RT.threatTreatment(o, th);
+        if (T.open) undecided.push(th.id);
+        if (T.gap) gaps.push(th.id + ": " + T.gap);
+        if (!T.required) within++; else decisions[T.decision] = (decisions[T.decision] || 0) + 1;
       });
     });
-    ok(undispositioned.length === 0, "no above-tolerable threat is left without a disposition", undispositioned.join(","));
+    ok(undecided.length === 0, "every above-tolerable threat has a confirmed treatment decision", undecided.join(","));
+    ok(gaps.length === 0, "and each decision has what it needs: a covering countermeasure, or its reason", gaps.join(" | "));
+    ok(within === 2 && decisions.reduce === 6 && decisions.accept === 1, "6 reduced with countermeasures, 1 accepted, 2 within tolerable risk needing no decision", JSON.stringify(decisions) + " within " + within);
+    ok(RT.threatTreatment(z4, z4.threats[1]).reason.indexOf("Accepted by R. Calder") === 0, "the acceptance carries its reason");
 
     // ---- SL-T vectors ----
     ok(RT.suggestZone(z2, p).byFR.RA.sl === 3, "SIS floor suggests SL3 on Z2");
@@ -107,7 +112,7 @@
     ok(zc.slTarget === 3 && zc.slTargetByFR && zc.slTargetByFR.IAC === 3, "SIS zone exports SL-T 3 (scalar + per-FR)");
 
     // ---- the demo actually renders (not just state) ----
-    ok(w.document.body.textContent.indexOf("Acme Petrochemicals") !== -1, "the rendered page shows the demo SuC");
+    ok(w.document.body.textContent.indexOf("Acme Petrochemicals") !== -1, "the rendered page shows the demo SUC");
   }
 })();
 </script>

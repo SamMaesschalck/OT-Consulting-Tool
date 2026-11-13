@@ -1,0 +1,266 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<!--
+  The published IEC 62443-3-2:2020 in place of the 2013 working draft.
+
+  - data/zcr-map.json loads with ZCR 1 to 7 and their clause numbers, every
+    sub-requirement, and its note of what was verified.
+  - No draft citation or draft term reaches a rendered page, the Word reports,
+    the Excel workbook or the review pack: no section-sign or "Clause 4."
+    reference, no "def. 3.1", no "SuC" in the wrong case, no "mandatory
+    security functions". "High-level" stays: 62443 goes from high-level to
+    detailed risk assessment.
+  - A workflow page shows its ZCR once, from the lookup; the deliverables show
+    none, and name the edition once, in the method text.
+  - A report section whose heading was reworded is still found by its old key:
+    stored section edits on load, and a review's comments.
+-->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool: the 2020 edition</title></head>
+<body>
+<h1>risk-tool: IEC 62443-3-2:2020 references and terms</h1>
+<pre id="out">running…</pre>
+<iframe id="f" src="../index.html?tour=1" style="width:1400px;height:900px"></iframe>
+<script>
+(function () {
+  "use strict";
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 120000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 120)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+
+  // What must never be shown or printed. Each is a draft citation or a term
+  // the 2020 edition does not use.
+  var BANNED = [
+    ["a section-sign citation", /§/],
+    ["a draft clause citation", /\bclause\s*4\b/i],
+    ["a draft definition citation", /def\.\s*3\.1/i],
+    ["SuC in the wrong case", /\bSuC\b/],
+    ["mandatory security function", /mandatory security function/i],
+    ["security requirements specification without cyber", /(?<!cyber )security requirements specification/i],
+    ["SRS", /\bSRS\b/],
+    ["existing control", /existing controls?\b/i]
+  ];
+  function banned(text) {
+    var hits = [];
+    BANNED.forEach(function (b) { var m = b[1].exec(text); if (m) hits.push(b[0] + ": …" + text.slice(Math.max(0, m.index - 40), m.index + 50).replace(/\s+/g, " ") + "…"); });
+    return hits;
+  }
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var t = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+      if (t.replace(/\s+/g, "")) out.push(t);
+    }
+    return out;
+  }
+
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, RT, RX, RP, RR, DB, d, main;
+    w.confirm = function () { return true; }; w.alert = function () {};
+    function P() { return RT.state.project; }
+    function wordXml(opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(P(), opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
+      });
+    }
+    function wordBlocks(opts) {
+      var probe = [];
+      return w.docx.Packer.toBlob(RX.buildWordDoc(P(), Object.assign({}, opts || {}, { sectionProbe: probe }))).then(function (b) {
+        return DB.fromBlob(b, { idPrefix: "t", headings: probe });
+      }).then(function (r) { return r.blocks.filter(function (x) { return !x.front; }); });
+    }
+    // Everything a page shows: its text, the sidebar, and every tooltip and placeholder.
+    function shown() {
+      var bits = [d.getElementById("sidebar").textContent, main.textContent, d.querySelector("header") ? d.querySelector("header").textContent : ""];
+      [].forEach.call(d.querySelectorAll("[title]"), function (e) { bits.push(e.getAttribute("title")); });
+      [].forEach.call(d.querySelectorAll("[placeholder]"), function (e) { bits.push(e.getAttribute("placeholder")); });
+      [].forEach.call(d.querySelectorAll("option"), function (e) { bits.push(e.textContent); });
+      return bits.join("\n");
+    }
+    function zcrRefs() { return (main.textContent.match(/ZCR \d+(\.\d+)?/g) || []); }
+
+    poll(function () { return w.RiskTool && w.RiskReportPage && w.RiskReview && w.RiskExports && w.docx && w.ExcelJS && w.RiskTool.state.project.zones.length; }).then(function () {
+      RT = w.RiskTool; RX = w.RiskExports; RP = w.RiskReportPage; RR = w.RiskReview; DB = w.App.DocxBlocks; d = w.document; main = d.getElementById("main");
+
+      // ---- the lookup -----------------------------------------------------------------
+      var Z = w.App.Data.zcrMap;
+      ok(Z && Z.schema === "spt-zcr-map/1.0" && Array.isArray(Z.requirements), "zcr-map loads");
+      ok(Z.standard.id === "IEC 62443-3-2:2020", "it is the 2020 edition", Z.standard && Z.standard.id);
+      var want = {
+        "ZCR 1": "4.2", "ZCR 1.1": "4.2.1", "ZCR 2": "4.3", "ZCR 2.1": "4.3.1",
+        "ZCR 3": "4.4", "ZCR 3.1": "4.4.2", "ZCR 3.2": "4.4.3", "ZCR 3.3": "4.4.4", "ZCR 3.4": "4.4.5", "ZCR 3.5": "4.4.6", "ZCR 3.6": "4.4.7",
+        "ZCR 4": "4.5", "ZCR 4.1": "4.5.2",
+        "ZCR 5": "4.6", "ZCR 5.1": "4.6.2", "ZCR 5.2": "4.6.3", "ZCR 5.3": "4.6.4", "ZCR 5.4": "4.6.5", "ZCR 5.5": "4.6.6", "ZCR 5.6": "4.6.7", "ZCR 5.7": "4.6.8",
+        "ZCR 5.8": "4.6.9", "ZCR 5.9": "4.6.10", "ZCR 5.10": "4.6.11", "ZCR 5.11": "4.6.12", "ZCR 5.12": "4.6.13", "ZCR 5.13": "4.6.14",
+        "ZCR 6": "4.7", "ZCR 6.1": "4.7.2", "ZCR 6.2": "4.7.3", "ZCR 6.3": "4.7.4", "ZCR 6.4": "4.7.5", "ZCR 6.5": "4.7.6", "ZCR 6.6": "4.7.7", "ZCR 6.7": "4.7.8", "ZCR 6.8": "4.7.9", "ZCR 6.9": "4.7.10",
+        "ZCR 7": "4.8", "ZCR 7.1": "4.8.2"
+      };
+      var got = {}; Z.requirements.forEach(function (r) { got[r.id] = r.clause; });
+      var top = Z.requirements.filter(function (r) { return r.id.indexOf(".") < 0; });
+      ok(top.map(function (r) { return r.id + "=" + r.clause; }).join(" ") === "ZCR 1=4.2 ZCR 2=4.3 ZCR 3=4.4 ZCR 4=4.5 ZCR 5=4.6 ZCR 6=4.7 ZCR 7=4.8", "ZCR 1 to 7 carry the published clause numbers", top.map(function (r) { return r.id + "=" + r.clause; }).join(" "));
+      var wrong = Object.keys(want).filter(function (k) { return got[k] !== want[k]; });
+      ok(!wrong.length && Z.requirements.length === Object.keys(want).length, "every sub-requirement has its clause number, and there are no others", wrong.join(", ") + " / " + Z.requirements.length);
+      ok(Z.requirements.every(function (r) { return typeof r.title === "string" && r.title.length > 3; }), "each has a title");
+      ok(RT.zcrOf("ZCR 2").title === "Initial cyber security risk assessment" && RT.zcrOf("ZCR 6.1").title === "Cyber security requirements specification" && RT.zcrOf("ZCR 1").title === "Identify the SUC", "the titles use the edition's terms");
+      ok(Z.verified && /contents list/.test(Z.verified.confirmed) && /line by line/.test(Z.verified.notChecked) && Z.verified.houseReading.length >= 5, "the note says what was confirmed, what was not checked and what is a house reading");
+      var stages = Object.keys(Z.stages).filter(function (k) { return k.charAt(0) !== "_"; });
+      ok(stages.length >= 5 && stages.every(function (s) { return !!RT.zcrOf(Z.stages[s]); }), "every page's ZCR is one the lookup holds", stages.join(","));
+      ok(RT.stageZcr("suc").id === "ZCR 1" && RT.stageZcr("srs").id === "ZCR 2" && RT.stageZcr("zones").id === "ZCR 3" && RT.stageZcr("risk").id === "ZCR 5" && !RT.stageZcr("basis"), "the workflow pages map to ZCR 1, 2, 3 and 5");
+
+      // ---- the check itself catches what it is for ----------------------------------------
+      var caught = ["Tolerable risk (§4.3.6)", "Clause 4.1: define the system", "see clause 4.6/4.7", "not the standard's (def. 3.1.39)", "SuC name", "Mandatory security functions", "Security requirements specification", "Existing control (already in place)"]
+        .filter(function (s) { return banned(s).length === 0; });
+      ok(caught.length === 0, "the check catches each draft citation and term", caught.join(" | "));
+      ok(banned("ZCR 5 · Define the SUC. Cyber security requirements specification. High-level risk assessment. Initial risk. Existing countermeasure. Control system. Document control.").length === 0, "and passes the 2020 wording");
+
+      // ---- the pages --------------------------------------------------------------------
+      var navs = [].slice.call(d.querySelectorAll("#sidebar .nav-item")), seen = [], bad = [], refs = {};
+      var chain = Promise.resolve();
+      navs.forEach(function (_, i) {
+        chain = chain.then(function () {
+          var item = d.querySelectorAll("#sidebar .nav-item")[i];
+          item.click();
+          var stage = RT.state.stage;
+          var wait = stage === "report" ? poll(function () { return RP.idle(); })
+            : stage === "wordpreview" ? poll(function () { return d.querySelectorAll("#wp-paper .dpv-sheet").length > 2; }, 60000)
+            : Promise.resolve();
+          return wait.then(function () {
+            seen.push(stage);
+            refs[stage] = zcrRefs();
+            banned(shown()).forEach(function (hit) { bad.push(stage + ": " + hit); });
+          });
+        });
+      });
+      return chain.then(function () {
+        ok(seen.length === navs.length && seen.indexOf("about") >= 0 && seen.indexOf("hlreport") >= 0, "every page in the sidebar was opened (" + seen.length + ")", seen.join(","));
+        ok(bad.length === 0, "no draft citation or draft term on any page, in its text, tooltips or placeholders", bad.slice(0, 6).join(" | "));
+        ["suc", "srs", "zones", "risk", "slt", "hlreport"].forEach(function (s) {
+          ok(refs[s] && refs[s].length === 1 && refs[s][0] === Z.stages[s], "the " + s + " page shows its ZCR once", JSON.stringify(refs[s]));
+        });
+        ["basis", "review", "peer"].forEach(function (s) {
+          ok(refs[s] && refs[s].length === 0, "the " + s + " page shows none", JSON.stringify(refs[s]));
+        });
+        // The reference is the lookup's id, with its title as the tooltip.
+        RT.state.stage = "risk"; RT.render();
+        var ref = main.querySelector(".page-sub .zcr-ref");
+        ok(ref && ref.textContent === "ZCR 5" && ref.getAttribute("title") === RT.zcrOf("ZCR 5").title, "the reference is in the page sub-title, its title the tooltip");
+        ok(!/\b4\.\d/.test(main.querySelector(".page-sub").textContent) && !/ZCR/.test(main.querySelector(".card").textContent), "with no clause number, and none on the fields below");
+
+        // ---- About ------------------------------------------------------------------------
+        RT.state.stage = "about"; RT.render();
+        var about = main.querySelector(".card").textContent;
+        ok(/published IEC 62443-3-2:2020/.test(about) && !/ZCR 1 to ZCR 7/.test(about) && /covers ZCR 1, ZCR 2, ZCR 3 and ZCR 5\./.test(about) && /ZCR 4, ZCR 6 and ZCR 7 are not yet steps of their own\./.test(about),
+          "About claims only the ZCRs the tool has a page for, and names the rest as not yet steps", about.slice(0, 260));
+        ok(/checked against its contents list/.test(about) && /not been checked line by line/.test(about), "that the step references were checked, and the requirement wording was not");
+        ok(/risk matrix and SL mapping are SolutionsPT house defaults/.test(about), "and that the matrix and SL mapping are house defaults");
+
+        // An unsigned, undecided assessment prints different sentences: check those too.
+        return wordXml({});
+      }).then(function (xml) {
+        var text = paragraphsOf(xml).join("\n");
+        ok(banned(text).length === 0, "Word, detailed: no draft citation or term", banned(text).slice(0, 4).join(" | "));
+        ok(!/ZCR/.test(text) && text.split("62443-3-2:2020").length === 2 && /The assessment follows IEC 62443-3-2:2020\./.test(text), "it names the edition once, in the method text, and no ZCR");
+        ok(/High-level risk ranking/.test(text) && /Security functions that must be kept/.test(text), "its reworded headings are there");
+        return wordXml({ highLevelOnly: true });
+      }).then(function (xml) {
+        var text = paragraphsOf(xml).join("\n");
+        ok(banned(text).length === 0, "Word, high-level: no draft citation or term", banned(text).slice(0, 4).join(" | "));
+        ok(!/ZCR/.test(text) && text.split("62443-3-2:2020").length === 2, "it names the edition once, and no ZCR");
+        ok(/High-Level OT Cyber/.test(text) && /the high-level cyber security risk assessment/.test(text), "it is the high-level risk assessment");
+        // The other sentences: nothing signed, nothing decided, nothing above tolerable.
+        window.__keep = JSON.stringify(P());
+        P().approval.approved = false;
+        P().zones.forEach(function (z) { z.threats.forEach(function (t) { t.treatment = { decision: null, confirmed: false, reason: "" }; }); });
+        return wordXml({});
+      }).then(function (xml) {
+        var text = paragraphsOf(xml).join("\n");
+        ok(/has not yet signed off/.test(text) && /No decision recorded/.test(text) && banned(text).length === 0, "Word, unsigned and undecided: the same", banned(text).slice(0, 4).join(" | "));
+        P().srs.tolerableRisk = "very-high";
+        return wordXml({});
+      }).then(function (xml) {
+        var text = paragraphsOf(xml).join("\n");
+        ok(/No registered threat exceeds the tolerable risk/.test(text) && banned(text).length === 0, "Word, nothing above tolerable: the same", banned(text).slice(0, 4).join(" | "));
+        RT.state.project = JSON.parse(window.__keep); RT.render();
+
+        // ---- Excel --------------------------------------------------------------------------
+        var wb = RX.buildWorkbook(P()), cells = [];
+        wb.eachSheet(function (ws) { cells.push(ws.name); ws.eachRow(function (row) { row.eachCell(function (c) { if (c.value != null) cells.push(String(c.value)); }); }); });
+        var xl = cells.join("\n");
+        ok(cells.length > 100 && banned(xl).length === 0 && !/ZCR/.test(xl), "Excel: no draft citation or term, and no ZCR", banned(xl).slice(0, 4).join(" | "));
+
+        // ---- the review pack ----------------------------------------------------------------
+        return RR.buildPack();
+      }).then(function (r) {
+        // A document's title is what the reviewer and the comments list show,
+        // so it is checked with everything else in the pack.
+        var pack = JSON.parse(JSON.stringify(r.pack));
+        ok(pack.documents.length === 2 && pack.documents[0].title === "Detailed report" && pack.documents[1].title === "High-level report", "the pack names its documents as the tool does", pack.documents.map(function (x) { return x.title; }).join(", "));
+        pack.documents.forEach(function (doc) { delete doc.media; });
+        var pk = JSON.stringify(pack);
+        ok(banned(pk).length === 0 && !/ZCR/.test(pk), "review pack: no draft citation or term in its document titles, items, fields or report text", banned(pk).slice(0, 4).join(" | "));
+
+        // ---- reworded headings keep what was stored under the old key ------------------------
+        ok(RT.sectionKeyAlias("high-level-risk-ranking-4-2") === "high-level-risk-ranking" && RT.sectionKeyAlias("mandatory-security-functions") === "security-functions-that-must-be-kept" && RT.sectionKeyAlias("executive-summary") === "executive-summary", "an old section key resolves to the reworded heading's, and others to themselves");
+        ok(w.App.ReportSections.sectionKey("High-level risk ranking") === "high-level-risk-ranking" && w.App.ReportSections.sectionKey("Security functions that must be kept") === "security-functions-that-must-be-kept", "which are the keys the headings now make");
+        var old = JSON.parse(JSON.stringify(P()));
+        delete old.review;
+        old.reportCustom = {
+          detailed: { "high-level-risk-ranking-4-2": { prose: "Ranking opening written before the heading changed." }, "mandatory-security-functions": { title: "Functions to keep" }, "executive-summary": { title: "Summary" } },
+          highLevel: { "high-level-risk-ranking-4-2": { hidden: true } }
+        };
+        old.review = { reviewId: "rv-old", rounds: [], files: [], threads: [
+          { comment: { id: "c-old", author: "R", severity: "should-fix", text: "On the ranking.", anchor: { kind: "block", documentIndex: 0, documentTitle: "Detailed report", sectionKey: "high-level-risk-ranking-4-2", sectionTitle: "High-level risk ranking", blockId: "d0-b1", quote: "x" } },
+            round: 1, status: "resolved", reason: "", replies: [], confirmedBy: [],
+            accepted: { at: "2026-10-01T00:00:00Z", kind: "prose", applied: "x", revert: { report: "detailed", key: "high-level-risk-ranking-4-2", field: "prose", prev: null } } },
+          { comment: { id: "c-other", author: "R", severity: "consider", text: "On the summary.", anchor: { kind: "block", documentIndex: 0, sectionKey: "executive-summary", blockId: "d0-b2", quote: "y" } }, round: 1, status: "open", reason: "", replies: [], confirmedBy: [] }
+        ] };
+        ok(RT.loadProjectText(JSON.stringify(old)) === true, "a project saved before the headings changed still loads");
+        var rc = P().reportCustom;
+        ok(rc.detailed["high-level-risk-ranking"] && rc.detailed["high-level-risk-ranking"].prose === "Ranking opening written before the heading changed." && !rc.detailed["high-level-risk-ranking-4-2"], "its edit to the ranking section is under the new key", JSON.stringify(Object.keys(rc.detailed)));
+        ok(rc.detailed["security-functions-that-must-be-kept"].title === "Functions to keep" && rc.detailed["executive-summary"].title === "Summary", "so is the renamed sub-section, and other sections are untouched");
+        ok(rc.highLevel["high-level-risk-ranking"] && rc.highLevel["high-level-risk-ranking"].hidden === true, "and in the high-level report's own set");
+        var th = RR.store().threads;
+        ok(th[0].comment.anchor.sectionKey === "high-level-risk-ranking" && th[0].accepted.revert.key === "high-level-risk-ranking" && th[1].comment.anchor.sectionKey === "executive-summary", "a review comment on the old heading points at the new key, and so does its accepted change");
+        return wordBlocks({});
+      }).then(function (bl) {
+        var rank = bl.filter(function (b) { return b.sectionKey === "high-level-risk-ranking"; });
+        ok(rank.some(function (b) { return b.text === "Ranking opening written before the heading changed."; }) && rank.some(function (b) { return b.type === "table"; }), "Word prints the stored edit under the reworded heading");
+        ok(bl.some(function (b) { return b.type === "heading" && b.text === "Functions to keep"; }) && !bl.some(function (b) { return b.type === "heading" && b.text === "Security functions that must be kept"; }), "and the renamed sub-section keeps its name");
+        return wordBlocks({ highLevelOnly: true });
+      }).then(function (bl) {
+        ok(!bl.some(function (b) { return b.sectionKey === "high-level-risk-ranking"; }), "and the high-level report still hides the section it hid");
+        // A review file imported later carries the old key too.
+        P().review.threads.push({ comment: { id: "c-late", author: "R", severity: "consider", text: "Late.", anchor: { kind: "block", documentIndex: 0, sectionKey: "mandatory-security-functions", blockId: "d0-b9", quote: "z" } }, round: 1, status: "open", reason: "", replies: [], confirmedBy: [] });
+        ok(RR.store().threads[2].comment.anchor.sectionKey === "security-functions-that-must-be-kept", "a comment that arrives later with an old key is read under the new one");
+
+        // ---- a comment on the high-level report ------------------------------------------------
+        // The comments list heads each group with the report's name, as the pack
+        // named it.
+        P().review.rounds = [{ round: 1, packId: "pk-old", createdAt: "2026-10-01T00:00:00Z", documents: [{ title: "Detailed report", targetName: "", contentHash: "a" }, { title: "High-level report", targetName: "", contentHash: "b" }] }];
+        P().review.threads.push({ comment: { id: "c-hl", author: "R", severity: "should-fix", text: "On the high-level report's summary.", anchor: { kind: "block", documentIndex: 1, documentTitle: "High-level report", sectionKey: "executive-summary", sectionTitle: "Executive summary", blockId: "d1-b3", quote: "q" } }, round: 1, status: "open", reason: "", replies: [], confirmedBy: [] });
+        var st = RR.store();
+        ok(st.rounds[0].documents[1].title === "High-level report" && st.threads[3].comment.anchor.documentTitle === "High-level report" && st.threads[0].comment.anchor.documentTitle === "Detailed report", "a stored round and a comment keep the report's name");
+        RT.state.stage = "peer"; RT.render();
+        ok(/Executive summary - High-level report/.test(main.textContent) && banned(shown()).length === 0, "the Peer review page heads the comment with the report's name, and shows no draft term", banned(shown()).slice(0, 4).join(" | ") || main.textContent.replace(/\s+/g, " ").slice(0, 300));
+      });
+    }).catch(function (e) { ok(false, "threw: " + (e && e.message), e && e.stack); }).then(finish);
+  };
+})();
+</script>
+</body>
+</html>

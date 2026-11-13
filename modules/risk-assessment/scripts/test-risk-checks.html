@@ -7,8 +7,8 @@
   The review tool's automatic checks (modules/report-review/js/checks.js, loaded
   here from its own module) on real packs the risk tool builds from its tour
   demo. The risk checks are read against the risk tool's own functions: what
-  they flag must be exactly the threats above tolerable with no disposition
-  (RiskTool.threatDisposition) and the zones and conduits with target levels and
+  they flag must be exactly the threats above tolerable with no confirmed decision
+  (RiskTool.threatTreatment) and the zones and conduits with target levels and
   no justification. The demo is the clean negative; each positive is made by
   changing the project and building the pack again, not by editing a pack. What
   is flagged is printed ("flagged ...") so a false alarm is read, not assumed
@@ -53,7 +53,7 @@
         owners(p).forEach(function (o) {
           o.threats.forEach(function (t) {
             var band = RT.threatRisk(t), resid = RT.residualRisk(t);
-            if (band && RT.exceedsTolerable(resid || band, tol(p)) && !RT.threatDisposition(o, t, tol(p))) out.push(o.id + ":" + t.id);
+            if (band && RT.threatTreatment(o, t, p).open) out.push(o.id + ":" + t.id);
           });
         });
         return out.sort().join(",");
@@ -69,13 +69,13 @@
         var res = RK.run(P, {});
         res.forEach(function (x) { lines.push("flagged demo " + x.check + ": " + x.message + " [" + String(x.quote).slice(0, 110) + "]"); });
         ok(P.engagement.scoringFamily === "risk-assessment" && P.items.length > 9, "the demo's pack is a risk pack (" + P.items.length + " items)");
-        ok(noDisposition(p0) === "" && of(res, "risk-no-disposition").length === 0, "no disposition: the demo has none, and none is flagged", noDisposition(p0));
+        ok(noDisposition(p0) === "" && of(res, "risk-no-disposition").length === 0, "no treatment decision: the demo has none open, and none is flagged", noDisposition(p0));
         ok(unjustified(p0) === "" && of(res, "risk-slt-justification").length === 0, "target levels with no justification: the demo has none, and none is flagged", unjustified(p0));
         ok(of(res, "no-evidence").length === 0 && of(res, "dashes").length === 0 && of(res, "numbering").length === 0 && of(res, "figures").length === 0,
           "and no evidence, dash, numbering or figure alarm on the demo");
         ok(res.every(function (x) { return x.check === "red-prompts"; }), "the demo's only flags are its red consultant notes", res.map(function (x) { return x.check; }).join(","));
 
-        // ---- a threat above tolerable with nothing done about it --------------------
+        // ---- a threat above tolerable with no confirmed decision ----------------------
         var p = fresh(), hit = null;
         owners(p).forEach(function (o) {
           o.threats.forEach(function (t) {
@@ -84,18 +84,37 @@
           });
         });
         ok(!!hit, "the demo has a threat above tolerable to strip (" + (hit && hit.o.id + ":" + hit.t.id) + ")");
-        hit.o.countermeasures = []; hit.t.acceptance = ""; hit.t.residualLikelihood = null; hit.t.residualImpact = null;
-        (hit.t.affectedFR.length ? hit.t.affectedFR : Object.keys(hit.o.slTargetByFR)).forEach(function (fr) { hit.o.slTargetByFR[fr] = null; });
+        // Its countermeasures, residual rating and target levels all stay: what the
+        // old build read as a disposition is now only a suggestion nobody confirmed.
+        window.__kept = hit.o.countermeasures.length;
+        hit.t.treatment.confirmed = false;
         hit.o.justification = hit.o.justification || "Kept so this case is only about the disposition.";
         window.__truth = noDisposition(p);
         return pack();
       }).then(function (P) {
         var res = RK.run(P, {}), nd = of(res, "risk-no-disposition");
         nd.forEach(function (x) { lines.push("flagged stripped " + x.check + ": " + x.message); });
-        ok(window.__truth.length > 0 && ids(nd) === window.__truth, "flags exactly the threats the risk tool says have no disposition", ids(nd) + " vs " + window.__truth);
-        ok(nd.every(function (x) { return x.kind === "item" && x.severity === "must-fix" && /above the tolerable risk with no disposition/.test(x.message) && "targetId" in x; }),
+        ok(window.__truth.length > 0 && ids(nd) === window.__truth, "flags exactly the threats the risk tool says have no confirmed treatment decision, countermeasures in place or not (" + window.__kept + ")", ids(nd) + " vs " + window.__truth);
+        ok(nd.every(function (x) { return x.kind === "item" && x.severity === "must-fix" && /above the tolerable risk with no treatment decision.$/.test(x.message) && "targetId" in x; }),
           "each anchored to its threat, as a must fix");
         ok(of(res, "no-evidence").length === 0, "and no-evidence stays out of a risk pack");
+
+        // ---- a confirmed decision that lacks what it rests on ----------------------------
+        // Reduce with a tolerable residual rating and no countermeasure (Z1's T1, and T2),
+        // and an acceptance with no reason (Z4's T8): neither is a treatment yet.
+        var p = fresh();
+        p.zones[0].countermeasures = [];
+        p.zones[3].threats[1].acceptance = "";
+        ok(noDisposition(p) === "" && RT.threatTreatment(p.zones[0], p.zones[0].threats[0], p).residualWithin, "every decision is still confirmed, and T1 has a residual rating within tolerable risk");
+        return pack();
+      }).then(function (P) {
+        var nd = of(RK.run(P, {}), "risk-no-disposition");
+        nd.forEach(function (x) { lines.push("flagged incomplete " + x.check + ": " + x.message); });
+        ok(ids(nd) === "Z1:T1,Z1:T2,Z4:T8", "a reduce with no countermeasure and an acceptance with no reason are raised, whatever the residual rating", ids(nd));
+        var t1 = P.items.filter(function (i) { return i.itemId === "Z1:T1"; })[0], t8 = P.items.filter(function (i) { return i.itemId === "Z4:T8"; })[0];
+        function todo(i) { return i.details.filter(function (r) { return r[0] === "Decision still to complete"; }).map(function (r) { return r[1]; }).join(); }
+        ok(t1.status === "finding" && t1.priority === "" && todo(t1) === "Reduce with countermeasures (none recorded)" && t8.priority === "" && todo(t8) === "Accept (no reason recorded)",
+          "the pack leaves their treatment decision empty and says what is still to complete", todo(t1) + " | " + todo(t8));
 
         // ---- target levels with no justification ---------------------------------------
         var p = fresh(), o = owners(p).filter(function (x) { return Object.keys(x.slTargetByFR || {}).some(function (k) { return x.slTargetByFR[k] != null; }); })[0];

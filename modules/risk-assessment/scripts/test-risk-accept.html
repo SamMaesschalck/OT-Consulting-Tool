@@ -72,7 +72,7 @@
         var t2 = thread(0, lead, lead.text + " Reviewed.");
         p = RR.acceptPlan(t2);
         ok(p.can && p.kind === "paragraph", "a paragraph of a section's opening can be accepted, as that paragraph alone", p.why);
-        var cell = d0.blocks.filter(function (b) { return b.type === "table" && b.sectionKey === "high-level-risk-ranking-4-2"; })[0];
+        var cell = d0.blocks.filter(function (b) { return b.type === "table" && b.sectionKey === "high-level-risk-ranking"; })[0];
         p = RR.acceptPlan(thread(0, cell, "Other words", cell.rows[1].cells[0].text));
         ok(!p.can && /written from the zones and threats/.test(p.why), "a table cell is Copy, with the reason", p.why);
         var zh = d0.blocks.filter(function (b) { return b.type === "heading" && /^Z1: /.test(b.text); })[0];

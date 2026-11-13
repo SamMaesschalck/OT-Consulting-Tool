@@ -262,13 +262,13 @@
         reset();
         // What a rewrite leaves alone.
         RP.setSection("detailed", "system-under-consideration-and-requirements", { prose: "A new description." });
-        RP.setSection("detailed", "high-level-risk-ranking-4-2", { prose: "A new opening for the ranking." });
+        RP.setSection("detailed", "high-level-risk-ranking", { prose: "A new opening for the ranking." });
         RP.setSection("detailed", "what-happens-next", { prose: "Our own next steps." });
         return wordBlocks({});
       }).then(function (bl) {
         var sec = bl.filter(function (b) { return b.sectionKey === "system-under-consideration-and-requirements"; });
         ok(sec.some(function (b) { return b.text === "A new description."; }) && sec.some(function (b) { return /^Scope: /.test(b.text); }) && sec.some(function (b) { return /^Tolerable risk: /.test(b.text); }), "a rewrite replaces only the opening wording: scope and tolerable risk stay");
-        var rank = bl.filter(function (b) { return b.sectionKey === "high-level-risk-ranking-4-2"; });
+        var rank = bl.filter(function (b) { return b.sectionKey === "high-level-risk-ranking"; });
         ok(rank.some(function (b) { return b.text === "A new opening for the ranking."; }) && rank.some(function (b) { return b.type === "table"; }), "and a table under it survives");
         var next = bl.filter(function (b) { return b.sectionKey === "what-happens-next" && b.type === "paragraph"; }).map(function (b) { return b.text; });
         ok(next[0] === "Our own next steps." && /signed off/.test(next[1]) && next.length === 2, "the sign-off statement in a rewritten opening is not touched", JSON.stringify(next).slice(0, 200));

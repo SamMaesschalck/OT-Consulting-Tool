@@ -4,7 +4,7 @@
   "commonDocuments": [
     "Network architecture diagrams (current, not as-designed)",
     "Asset inventory for the systems in scope",
-    "P&IDs / process descriptions for the operations the SuC controls",
+    "P&IDs / process descriptions for the operations the SUC controls",
     "PHA / HAZOP results (the usual source for worst-credible impact)",
     "Existing segmentation or zone/conduit documentation, if any",
     "The client's corporate risk matrix and tolerable-risk criteria",

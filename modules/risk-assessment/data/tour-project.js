@@ -5,11 +5,11 @@
  * tour, so the stage-6 risk-context export chains into that tool's "Import
  * risk context" story.
  *
- * Every tier is finished: SuC definition, the §4.2 high-level ranking (with
+ * Every tier is finished: SUC definition, the high-level risk ranking (with
  * the high scorers promoted to zones), zones & conduits with exposure flags,
  * a detailed threat register with likelihood x impact, vulnerabilities and
- * countermeasures (existing controls flagged), every above-tolerable threat
- * dispositioned (mitigated / countermeasure / accepted / carried into SL-T),
+ * countermeasures (existing ones flagged), every above-tolerable threat
+ * given a confirmed treatment decision (reduce with countermeasures / accept),
  * per-FR SL-T vectors with written justifications, the basis of assessment,
  * and the asset-owner sign-off.
  *
@@ -53,7 +53,7 @@ window.SPT_TOUR_PROJECT = {
     ],
     "knownThreats": [
       "Capable criminal/ransomware adversary reaching OT via corporate IT or vendor access",
-      "State-capable adversary interest in refining sector (assumed class 3 for this SuC)",
+      "State-capable adversary interest in refining sector (assumed class 3 for this SUC)",
       "Insider misuse of engineering access (contractor churn on turnarounds)",
       "Commodity malware ingress via removable media and engineering laptops"
     ],
@@ -79,7 +79,7 @@ window.SPT_TOUR_PROJECT = {
     "documents": [
       { "id": "D1", "title": "Unit 300 P&IDs and cause & effect matrix", "reference": "U300-CE-014 r7", "source": "Process safety files", "relevance": "SIS functions and safety-relevant control loops" },
       { "id": "D2", "title": "OT network diagram - Teesport", "reference": "NET-OT-002 r4", "source": "OT engineering", "relevance": "Zone and conduit partitioning baseline" },
-      { "id": "D3", "title": "Vendor remote access procedure", "reference": "OPS-PROC-118", "source": "Operations", "relevance": "Remote access threat scenarios and existing controls" },
+      { "id": "D3", "title": "Vendor remote access procedure", "reference": "OPS-PROC-118", "source": "Operations", "relevance": "Remote access threat scenarios and existing countermeasures" },
       { "id": "D4", "title": "COMAH safety report extract - Unit 300", "reference": "COMAH-U300-2025", "source": "HSE submission", "relevance": "Worst-case consequence calibration" }
     ],
     "observations": [
@@ -92,7 +92,7 @@ window.SPT_TOUR_PROJECT = {
     "name": "R. Calder",
     "role": "Asset Owner - Unit 300",
     "date": "2026-07-04",
-    "statement": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded dispositions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), and the per-FR SL-T vectors as the target for the security programme.",
+    "statement": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), and the per-FR SL-T vectors as the target for the security programme.",
     "approved": true
   },
   "zones": [
@@ -130,9 +130,9 @@ window.SPT_TOUR_PROJECT = {
         { "id": "M3", "description": "Retire OPC DA: migrate the two remaining clients to OPC UA through the DMZ broker", "addressesFR": ["RDF", "SI"], "reference": "Roadmap item R-12", "existing": false }
       ],
       "threats": [
-        { "id": "T1", "statement": "An external attacker hijacks or rides the vendor remote access path to reach the DCS servers and issue control changes.", "source": "External attacker via vendor access", "affectedFR": ["IAC", "RDF"], "likelihood": "high", "impact": "serious", "residualLikelihood": "low", "residualImpact": "serious", "acceptance": "" },
-        { "id": "T2", "statement": "Malware introduced through an engineering connection executes on a DCS server and corrupts control logic or displays.", "source": "Commodity malware via engineering path", "affectedFR": ["SI"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "" },
-        { "id": "T3", "statement": "A flooding or resource-exhaustion event on the control network degrades operator view of the unit.", "source": "Network fault or deliberate DoS", "affectedFR": ["RA"], "likelihood": "low", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "" }
+        { "id": "T1", "statement": "An external attacker hijacks or rides the vendor remote access path to reach the DCS servers and issue control changes.", "source": "External attacker via vendor access", "affectedFR": ["IAC", "RDF"], "likelihood": "high", "impact": "serious", "residualLikelihood": "low", "residualImpact": "serious", "acceptance": "", "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } },
+        { "id": "T2", "statement": "Malware introduced through an engineering connection executes on a DCS server and corrupts control logic or displays.", "source": "Commodity malware via engineering path", "affectedFR": ["SI"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } },
+        { "id": "T3", "statement": "A flooding or resource-exhaustion event on the control network degrades operator view of the unit.", "source": "Network fault or deliberate DoS", "affectedFR": ["RA"], "likelihood": "low", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "treatment": { "decision": null, "confirmed": false, "reason": "" } }
       ],
       "slTargetByFR": { "IAC": 3, "UC": 2, "SI": 3, "DC": 1, "RDF": 3, "TRE": 2, "RA": 2 },
       "justification": "The worst unmitigated risks in this zone are High (vendor-path compromise T1, engineering-path malware T2) against a Medium tolerable risk, and the standing remote access materially raises likelihood on IAC/UC/RDF, so IAC, SI and RDF are set to SL3 in line with the suggestion trace. UC is held at SL2 because use control inside the control room is procedurally constrained and no High risk hits it directly. DC reflects the low confidentiality consequence of process data (SL1). TRE and RA at SL2 support forensics and the 30-minute manual-shutdown resilience requirement. Targets are the treatment plan; capability is built through the 62443-3-3 programme this assessment exports to."
@@ -165,10 +165,10 @@ window.SPT_TOUR_PROJECT = {
         { "id": "M4", "description": "Hardwired keyswitch required for SIS program mode; position alarmed to the control room", "addressesFR": ["IAC", "UC", "SI"], "reference": "C&E U300-CE-014", "existing": true }
       ],
       "threats": [
-        { "id": "T4", "statement": "An unauthorised or malicious logic change to the SIS defeats or degrades a safety instrumented function.", "source": "Insider or attacker with engineering access", "affectedFR": ["IAC", "SI"], "likelihood": "low", "impact": "severe", "residualLikelihood": "", "residualImpact": "", "acceptance": "" }
+        { "id": "T4", "statement": "An unauthorised or malicious logic change to the SIS defeats or degrades a safety instrumented function.", "source": "Insider or attacker with engineering access", "affectedFR": ["IAC", "SI"], "likelihood": "low", "impact": "severe", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } }
       ],
       "slTargetByFR": { "IAC": 3, "UC": 3, "SI": 3, "DC": 3, "RDF": 3, "TRE": 3, "RA": 3 },
-      "justification": "The SIS floor applies: a zone containing safety instrumented functions takes SL3 across every foundational requirement regardless of the per-threat arithmetic, because the SIS is the last line of defence and severe-consequence/low-likelihood events dominate. The one registered threat (T4, High risk) is carried into this SL-T vector as its treatment plan, alongside the existing hardwired keyswitch control. This vector is deliberately not averaged down: any relaxation requires the asset owner to re-open the sign-off."
+      "justification": "The SIS floor applies: a zone containing safety instrumented functions takes SL3 across every foundational requirement regardless of the per-threat arithmetic, because the SIS is the last line of defence and severe-consequence/low-likelihood events dominate. The one registered threat (T4, High risk) is reduced by the existing hardwired keyswitch (M4), and this SL-T vector sets the level the zone is held to. This vector is deliberately not averaged down: any relaxation requires the asset owner to re-open the sign-off."
     },
     {
       "id": "Z3",
@@ -202,11 +202,11 @@ window.SPT_TOUR_PROJECT = {
         { "id": "M5", "description": "Restrict historian web access to the reporting subnet and put it behind the corporate SSO proxy", "addressesFR": ["IAC", "RDF"], "reference": "Firewall change FW-2026-041", "existing": false }
       ],
       "threats": [
-        { "id": "T5", "statement": "A compromised corporate client exploits the historian and uses it as a pivot toward the BPCS replication path.", "source": "Attacker on corporate network", "affectedFR": ["RDF", "SI"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "" },
-        { "id": "T6", "statement": "Process data is exfiltrated from the historian (recipe and throughput confidentiality).", "source": "Attacker on corporate network", "affectedFR": ["DC"], "likelihood": "low", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "" }
+        { "id": "T5", "statement": "A compromised corporate client exploits the historian and uses it as a pivot toward the BPCS replication path.", "source": "Attacker on corporate network", "affectedFR": ["RDF", "SI"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } },
+        { "id": "T6", "statement": "Process data is exfiltrated from the historian (recipe and throughput confidentiality).", "source": "Attacker on corporate network", "affectedFR": ["DC"], "likelihood": "low", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "treatment": { "decision": null, "confirmed": false, "reason": "" } }
       ],
       "slTargetByFR": { "IAC": 2, "UC": 2, "SI": 2, "DC": 2, "RDF": 2, "TRE": 2, "RA": 1 },
-      "justification": "The zone's worst unmitigated risk is High (T5 pivot toward the BPCS) with internet adjacency and many-conduit exposure traced on RDF/SI, but the DMZ exists precisely to absorb that exposure, and the planned historian access restriction (M5) addresses the driving vulnerability. SL2 across the access, integrity and data-flow FRs reflects the brokerage role; RA stays at SL1 because loss of the DMZ does not remove operator view or control (mandatory security function: the unit runs through a DMZ outage). The exfiltration threat T6 sits within tolerable risk and needs no disposition."
+      "justification": "The zone's worst unmitigated risk is High (T5 pivot toward the BPCS) with internet adjacency and many-conduit exposure traced on RDF/SI, but the DMZ exists precisely to absorb that exposure, and the planned historian access restriction (M5) addresses the driving vulnerability. SL2 across the access, integrity and data-flow FRs reflects the brokerage role; RA stays at SL1 because loss of the DMZ does not remove operator view or control (a security function that must be kept: the unit runs through a DMZ outage). The exfiltration threat T6 sits within tolerable risk and needs no treatment decision."
     },
     {
       "id": "Z4",
@@ -237,11 +237,11 @@ window.SPT_TOUR_PROJECT = {
         { "id": "M6", "description": "Media kiosk scanning plus workstation allow-listing for engineering tools", "addressesFR": ["SI", "RDF"], "reference": "HB-EWS-02", "existing": true }
       ],
       "threats": [
-        { "id": "T7", "statement": "Malware carried on removable media or a vendor laptop executes on an engineering workstation and spreads to controllers.", "source": "Commodity malware via media/laptops", "affectedFR": ["SI", "RDF"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "" },
-        { "id": "T8", "statement": "The legacy depropaniser configuration tool's shared account is misused, making an unauthorised controller change unattributable.", "source": "Insider misuse / contractor churn", "affectedFR": ["UC"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "Accepted by R. Calder (Asset Owner) 2026-07-04: the tool is retired at the Q2-2027 turnaround with the PLC upgrade; until then the workstation is isolated on the engineering VLAN, the account password is held by the shift supervisor and issued per use with a written record. Risk accepted at High for this bounded period." }
+        { "id": "T7", "statement": "Malware carried on removable media or a vendor laptop executes on an engineering workstation and spreads to controllers.", "source": "Commodity malware via media/laptops", "affectedFR": ["SI", "RDF"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } },
+        { "id": "T8", "statement": "The legacy depropaniser configuration tool's shared account is misused, making an unauthorised controller change unattributable.", "source": "Insider misuse / contractor churn", "affectedFR": ["UC"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "Accepted by R. Calder (Asset Owner) 2026-07-04: the tool is retired at the Q2-2027 turnaround with the PLC upgrade; until then the workstation is isolated on the engineering VLAN, the account password is held by the shift supervisor and issued per use with a written record. Risk accepted at High for this bounded period.", "treatment": { "decision": "accept", "confirmed": true, "reason": "" } }
       ],
       "slTargetByFR": { "IAC": 2, "UC": 2, "SI": 3, "DC": 1, "RDF": 2, "TRE": 1, "RA": 1 },
-      "justification": "SI is set to SL3: the engineering zone is the integrity chokepoint for every controller and the removable-media exposure is traced against a High malware risk (T7), mitigated in day-to-day terms by the existing kiosk-plus-allow-listing controls (M6). The shared-account threat (T8) exceeds tolerable risk and carries a recorded, time-bounded risk acceptance by the asset owner rather than an SL uplift: the compensating procedure and the Q2-2027 retirement are the treatment. Remaining FRs sit at SL1-2 consistent with no external paths into this zone."
+      "justification": "SI is set to SL3: the engineering zone is the integrity chokepoint for every controller and the removable-media exposure is traced against a High malware risk (T7), mitigated in day-to-day terms by the existing kiosk-plus-allow-listing countermeasures (M6). The shared-account threat (T8) exceeds tolerable risk and carries a recorded, time-bounded risk acceptance by the asset owner rather than an SL uplift: the compensating procedure and the Q2-2027 retirement are the treatment. Remaining FRs sit at SL1-2 consistent with no external paths into this zone."
     }
   ],
   "conduits": [
@@ -266,14 +266,14 @@ window.SPT_TOUR_PROJECT = {
       "channels": ["vpn", "rdp-via-jump-host"],
       "notes": "Vendor VPN terminates in the DMZ; sessions reach Z1 only via the recorded jump host, activated per ticket.",
       "threats": [
-        { "id": "T9", "statement": "A vendor credential or session is hijacked and replayed to reach the DCS outside an authorised window.", "source": "External attacker via vendor access chain", "affectedFR": ["IAC", "RDF"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "low", "residualImpact": "serious", "acceptance": "" }
+        { "id": "T9", "statement": "A vendor credential or session is hijacked and replayed to reach the DCS outside an authorised window.", "source": "External attacker via vendor access chain", "affectedFR": ["IAC", "RDF"], "likelihood": "medium", "impact": "serious", "residualLikelihood": "low", "residualImpact": "serious", "acceptance": "", "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } }
       ],
       "vulnerabilities": [],
       "countermeasures": [
         { "id": "M7", "description": "MFA on VPN and jump host, per-ticket session activation, session recording, auto-disconnect at window end", "addressesFR": ["IAC", "UC", "RDF"], "reference": "OPS-PROC-118", "existing": true }
       ],
       "slTargetByFR": { "IAC": 3, "UC": 2, "SI": null, "DC": null, "RDF": 3, "TRE": 2, "RA": null },
-      "justification": "This conduit is the highest-exposure path into the BPCS: the hijack threat (T9) starts High and the existing per-session controls (M7) bring the residual within tolerable, but the SL-T is held at SL3 on IAC/RDF to match the Z1 targets it lands in, so the conduit is not the weak link. TRE at SL2 preserves the session-recording evidence chain."
+      "justification": "This conduit is the highest-exposure path into the BPCS: the hijack threat (T9) starts High and the existing per-session countermeasures (M7) bring the residual within tolerable, but the SL-T is held at SL3 on IAC/RDF to match the Z1 targets it lands in, so the conduit is not the weak link. TRE at SL2 preserves the session-recording evidence chain."
     },
     {
       "id": "C3",

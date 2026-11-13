@@ -38,7 +38,7 @@
     "risk-assessment": [
       { "id": "risk-tolerable", "text": "The tolerable risk has been agreed with the asset owner." },
       { "id": "risk-slt", "text": "Each zone and conduit's target level follows from its risk assessment." },
-      { "id": "risk-residual", "text": "Risks above the tolerable level each have a disposition: a countermeasure, the target level, or a recorded acceptance." },
+      { "id": "risk-residual", "text": "Risks above the tolerable level each have a recorded treatment decision: reduce with countermeasures, accept, or treat through the target levels." },
       { "id": "risk-coverage", "text": "Every zone has its threats identified, and each conduit has threats or a stated reason why it needs none." },
       { "id": "risk-consequence", "text": "The impact ratings take account of safety, environmental and production consequences, not only the loss of information." },
       { "id": "risk-consistency", "text": "Where a section's wording has been edited, the high-level and detailed reports still give the same tolerable risk, bands and ranking." }

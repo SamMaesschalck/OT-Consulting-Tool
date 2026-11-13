@@ -63,7 +63,7 @@
     ok(s.byFR.IAC.sl === 3 && s.byFR.RDF.sl === 3, "affected FRs (IAC,RDF) suggest SL3");
     ok(s.byFR.SI.sl === null, "unaffected FR (SI) has no suggestion");
     ok(s.byFR.IAC.risk === "high", "per-FR risk band surfaced");
-    ok(s.byFR.IAC.trace.join(" ").indexOf("exceeds tolerable") >= 0, "trace flags exceed-tolerable for high vs medium");
+    ok(s.byFR.IAC.trace.join(" ").indexOf("above tolerable risk (medium)") >= 0 && s.byFR.IAC.trace.join(" ").indexOf("clause") < 0, "trace flags above-tolerable for high vs medium, with no clause number");
 
     // second threat raises SI via severe/medium -> high
     var th2 = RT.emptyThreat(2); th2.affectedFR = ["SI"]; th2.likelihood = "low"; th2.impact = "severe"; // severe×low -> high
@@ -112,14 +112,36 @@
     proj.srs.mandatorySecurityFunctions = ["Hard-wired ESD"]; proj.srs.regulatory = ["UK NIS 2018"];
     proj.srs.clientMatrix = true; proj.srs.clientMatrixNote = "Client matrix v3";
 
-    // high-level asset ranking (§4.2) + basis of assessment
+    // high-level risk ranking + basis of assessment
     proj.srs.highLevelAssets.push({ id: "A1", name: "DCS servers", functionLocation: "Equipment room", consequence: "serious", likelihood: "high", note: "→ Z2" });
     proj.basisOfAssessment.interviews.push({ id: "I1", name: "J. Smith", role: "Control systems engineer", date: "2026-06-30", notes: "Network architecture" });
     proj.basisOfAssessment.documents.push({ id: "D1", title: "Network diagram", reference: "Rev C", source: "SI", relevance: "Confirmed conduits" });
     proj.basisOfAssessment.observations.push({ id: "O1", description: "DMZ firewall rules", location: "Control room", date: "2026-06-30", notes: "ANY-ANY rule" });
 
+    // Nothing is inferred: a covering countermeasure and an SL-T are both in
+    // place, and with no decision recorded neither threat exports a disposition.
+    var ctx0 = RT.buildRiskContext();
+    ok(ctx0.zones[0].threats[0].disposition === null && ctx0.zones[0].threats[1].disposition === null,
+      "no treatment decision recorded: the disposition exports as null, whatever countermeasures and SL-T exist", JSON.stringify(ctx0.zones[0].threats.map(function (t) { return t.disposition; })));
+    ok(RT.threatTreatment(z, th).state === "none" && RT.threatTreatment(z, th).open === true && RT.threatTreatment(z, th).covered === true,
+      "the treatment state says so: required, open, and a countermeasure does cover it");
+    ok(RT.suggestTreatment(z, th, "medium") === "reduce" && RT.suggestTreatment(z, th2, "medium") === "slt", "the old inference survives only as a suggestion");
+    th.treatment = { decision: "reduce", confirmed: false, reason: "" };
+    ok(RT.threatTreatment(z, th).state === "suggested" && RT.buildRiskContext().zones[0].threats[0].disposition === null, "an unconfirmed suggestion is never exported as a decision");
+    // The consultant decides: T1 reduced by M1, T2 treated through the SL-T.
+    th.treatment = { decision: "reduce", confirmed: true, reason: "" };
+    th2.treatment = { decision: "slt", confirmed: true, reason: "" };
+    // A zone with no SL-T of its own: the suggestion must not stand in for it.
+    var zn = RT.emptyZone(4); zn.name = "No target yet"; zn.flags["sis-present"] = true; proj.zones.push(zn);
+    var ctxN = RT.buildRiskContext().zones[3];
+    ok(ctxN.slTarget === null && ctxN.slSuggestedByFR.IAC === 3 && ctxN.slTargetByFR.IAC === null, "no SL-T set: scalar slTarget is null, not the suggestion", JSON.stringify([ctxN.slTarget, ctxN.slSuggestedByFR.IAC]));
+    proj.zones.pop();
+    c.countermeasures.push({ id: "M5", description: "Unidirectional gateway.", addressesFR: ["RDF"], reference: "", existing: true });
+
     var ctx = RT.buildRiskContext();
     ok(ctx.schema === "spt-risk-context/1.4", "export schema is 1.4", "got " + ctx.schema);
+    ok(ctx.conduits[0].countermeasures.length === 1 && ctx.conduits[0].countermeasures[0].existing === true, "conduit countermeasures export the existing-control flag");
+    c.countermeasures.pop();
     ok(ctx.highLevelAssets.length === 1 && ctx.highLevelAssets[0].risk === "high", "high-level asset ranking exported with computed risk (serious×high=high)");
     ok(ctx.basisOfAssessment.interviews.length === 1 && ctx.basisOfAssessment.documents.length === 1 && ctx.basisOfAssessment.observations.length === 1, "basis of assessment exported (interviews/documents/observations)");
     ok(ctx.generatedBy === "spt-risk-tool/" + w.App.Version.number && /^spt-risk-tool\/\d+\.\d+\.\d+$/.test(ctx.generatedBy), "generatedBy stamped with the suite version", ctx.generatedBy);
@@ -133,8 +155,17 @@
     ok(ez.threats.length === 2 && typeof ez.threats[0].unmitigatedRisk === "string" && typeof ez.threats[0].exceedsTolerable === "boolean", "threats exported with risk + exceedsTolerable");
     ok(ez.countermeasures.length === 1 && ez.countermeasures[0].reference === "SR 1.13", "countermeasures exported");
     ok(ez.countermeasures[0].existing === true, "countermeasures export the existing-control flag");
-    ok(ez.threats[0].disposition === "countermeasure", "T1 disposition exported: countermeasure (M1 overlaps IAC/RDF)", "got " + ez.threats[0].disposition);
-    ok(ez.threats[1].disposition === "sl-t", "T2 disposition exported: carried into the SL-T (SI target set, no matching countermeasure)", "got " + ez.threats[1].disposition);
+    ok(ez.threats[0].disposition === "countermeasure", "T1 disposition exported: countermeasure (confirmed reduce, no residual yet)", "got " + ez.threats[0].disposition);
+    // SI is held at SL2 against a suggested SL3, so the SL-T decision needs a reason,
+    // and until it has one it is not exported, printed or packed as a treatment.
+    ok(ez.threats[1].disposition === null, "T2: the SL-T programme below the suggestion with no reason is not exported as a treatment", "got " + ez.threats[1].disposition);
+    var t2T = RT.threatTreatment(z, th2);
+    ok(t2T.sltShortfall.join() === "SI" && t2T.sltBelow.join() === "SI" && t2T.sltUnset.length === 0 && t2T.reasonNeeded && t2T.reasonMissing && /below the suggestion/.test(t2T.gap), "SL-T below the suggestion on an affected FR: a reason is needed", JSON.stringify(t2T.sltShortfall) + " " + t2T.gap);
+    ok(t2T.confirmed && !t2T.complete && t2T.label === "Treat through the SL-T programme (no reason recorded)", "and its label says what is missing", t2T.label);
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("Z1") >= 0 && p.indexOf("T2") >= 0 && p.indexOf("below the suggestion") >= 0; }), "and the completeness list says so");
+    th2.treatment.reason = "SI is raised to SL3 in phase 2, agreed with the asset owner.";
+    ok(!RT.threatTreatment(z, th2).gap && !RT.exportProblems().some(function (p) { return p.indexOf("T2") >= 0 && p.indexOf("below the suggestion") >= 0; }), "a recorded reason settles it");
+    ok(RT.buildRiskContext().zones[0].threats[1].disposition === "sl-t" && RT.threatTreatment(z, th2).complete && RT.threatTreatment(z, th2).label === "Treated through the SL-T programme", "T2 disposition exported: treated through the SL-T (confirmed, with its reason)", RT.threatTreatment(z, th2).label);
     ok(typeof ez.threats[0].acceptance === "string", "threats export an acceptance field");
     ok(ez.threats[0].residualRisk === null && ez.threats[0].residualLikelihood === null, "threats export residual fields (null when untreated)");
     ok(ctx.approval && ctx.approval.name === "A. Approver" && ctx.approval.approved === true, "risk context exports the asset-owner sign-off");
@@ -148,32 +179,86 @@
     var zEmpty = RT.emptyZone(9); proj.zones.push(zEmpty);
     ok(RT.exportProblems().some(function (p) { return p.indexOf("Z9") >= 0 && p.indexOf("no threats") >= 0; }), "empty zone flagged: no threats");
     proj.zones.pop();
+    // Conduits are checked too: one with no threats and nothing written is open,
+    // and one whose justification gives the basis for its SL-T is not.
+    var cEmpty = RT.emptyConduit(9); proj.conduits.push(cEmpty);
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && p.indexOf("no threats") >= 0; }), "empty conduit flagged: no threats");
+    cEmpty.slTargetByFR.IAC = 2;
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && p.indexOf("SL-T set with no threats") >= 0; }), "conduit with an SL-T, no threats and no justification asks for the basis");
+    cEmpty.justification = "Takes the higher SL-T of the two zones it joins.";
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0; }), "a conduit's justification is the basis when it has no threat of its own");
+    proj.conduits.pop();
 
-    // --- §4.6/4.7 disposition: the SL-T is itself a legitimate treatment plan ---
+    // --- treatment decisions: recorded by the consultant, never inferred ---
     var zd = RT.emptyZone(7); proj.zones.push(zd);
     var td = RT.emptyThreat(7); td.statement = "x"; td.affectedFR = ["UC"]; td.likelihood = "high"; td.impact = "serious"; // high > medium tolerable
     zd.threats.push(td);
-    ok(RT.threatDisposition(zd, td) === null, "over-tolerable threat with nothing recorded has no disposition");
-    ok(RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("no disposition") >= 0; }), "completeness flags the undispositioned threat");
-    zd.slTargetByFR.UC = 2; // immature environment: no countermeasures, SL-T set — legitimate
-    ok(RT.threatDisposition(zd, td) === "sl-t", "SL-T on the affected FR addresses the threat (no countermeasures needed)");
-    ok(!RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("no disposition") >= 0; }), "completeness accepts the SL-T as the treatment plan");
+    function z7Open() { return RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("no treatment decision") >= 0; }); }
+    ok(td.treatment && td.treatment.decision === null && td.treatment.confirmed === false && td.treatment.reason === "", "a new threat carries an empty treatment record");
+    ok(RT.threatDisposition(zd, td) === null && RT.threatTreatment(zd, td).state === "none", "over-tolerable threat with nothing recorded has no decision");
+    ok(z7Open(), "completeness flags the threat with no treatment decision");
+    zd.slTargetByFR.UC = 3; // an SL-T alone decides nothing
+    ok(RT.threatDisposition(zd, td) === null && z7Open(), "an SL-T on the affected FR does not clear it by itself");
+    ok(RT.suggestTreatment(zd, td, "medium") === "slt", "it only makes 'treat through the SL-T' the suggestion");
+    td.treatment = { decision: "slt", confirmed: false, reason: "" };
+    ok(RT.threatTreatment(zd, td).state === "suggested" && RT.threatTreatment(zd, td).open && z7Open(), "a suggestion not yet confirmed is still open");
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("suggestion is waiting") >= 0; }), "and the list says a suggestion is waiting");
+    td.treatment.confirmed = true; // immature environment: no countermeasures, SL-T is the plan
+    var tSlt = RT.threatTreatment(zd, td);
+    ok(tSlt.disposition === "sl-t" && tSlt.state === "confirmed" && !tSlt.open && !tSlt.gap && !tSlt.reasonNeeded && tSlt.label === "Treated through the SL-T programme",
+      "confirmed: treated through the SL-T with no countermeasure and, at the suggested level, no reason needed", JSON.stringify(tSlt));
+    ok(!z7Open() && !RT.exportProblems().some(function (p) { return p.indexOf("Z7 / T7") >= 0; }), "completeness accepts the SL-T as the treatment plan");
     zd.slTargetByFR.UC = null;
-    td.acceptance = "Accepted by Operations Director, 2026-07 — revisit at next assessment.";
-    ok(RT.threatDisposition(zd, td) === "accepted", "a recorded acceptance addresses the threat");
+    var tUnset = RT.threatTreatment(zd, td);
+    ok(tUnset.reasonMissing && tUnset.sltUnset.join() === "UC" && tUnset.sltBelow.length === 0 && tUnset.gap === "no SL-T is set on a requirement it affects and no reason is recorded" && !/below the suggestion/.test(tUnset.gap),
+      "with the SL-T unset on the affected FR the decision needs a reason, and the gap says the SL-T is not set", tUnset.gap);
+    ok(tUnset.disposition === null && !tUnset.complete && tUnset.label === "Treat through the SL-T programme (no SL-T set)" && RT.buildRiskContext().zones[RT.state.project.zones.length - 1].threats[0].disposition === null,
+      "and it is not stated or exported as treated", tUnset.label + " / " + tUnset.disposition);
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("Z7 / T7") >= 0 && p.indexOf("no SL-T is set") >= 0; }), "the completeness list says the SL-T is not set");
+    td.treatment.reason = "The SL-T is set at the design workshop in phase 2.";
+    ok(RT.threatDisposition(zd, td) === "sl-t" && RT.threatTreatment(zd, td).gap === "" && RT.threatTreatment(zd, td).label === "Treated through the SL-T programme", "a reason makes it a recorded treatment");
+    // The SL-T reason belongs to the SL-T decision: it is not carried to another.
+    td.treatment.decision = "reduce";
+    ok(RT.threatTreatment(zd, td).reason === "" && td.treatment.reason !== "", "changed to reduce, the SL-T reason is no longer the decision's reason (it is kept in case the choice is changed back)");
+    td.treatment = { decision: "accept", confirmed: true, reason: "" };
+    var tAcc = RT.threatTreatment(zd, td);
+    ok(tAcc.disposition === null && !tAcc.complete && tAcc.gap === "accepted with no reason recorded" && tAcc.label === "Accept (no reason recorded)", "an acceptance always needs its reason, and is not a recorded acceptance without it", tAcc.label + " / " + tAcc.disposition);
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("accepted with no reason") >= 0; }), "the list shows the acceptance with no reason");
+    td.acceptance = "Accepted by Operations Director, 2026-07; revisit at next assessment.";
+    ok(RT.threatTreatment(zd, td).gap === "" && RT.threatTreatment(zd, td).reason === td.acceptance && RT.threatTreatment(zd, td).label === "Risk accepted" && RT.threatDisposition(zd, td) === "accepted", "the acceptance text is the reason");
     td.acceptance = "";
+    td.treatment = { decision: "reduce", confirmed: true, reason: "" };
     zd.countermeasures.push({ id: "M9", description: "Broker access via jump host", addressesFR: ["RDF"], reference: "", existing: false });
-    ok(RT.threatDisposition(zd, td) === null, "a countermeasure on unrelated FRs does NOT silence the check");
+    ok(RT.threatTreatment(zd, td).covered === false && /no countermeasure/.test(RT.threatTreatment(zd, td).gap) && RT.threatTreatment(zd, td).label === "Reduce with countermeasures (none recorded)",
+      "reduce: a countermeasure on unrelated FRs does not cover the threat");
+    // A residual rating alone reduces nothing: with no covering countermeasure
+    // the threat is not "reduced", whatever the residual says.
+    td.residualLikelihood = "low";
+    var tBare = RT.threatTreatment(zd, td);
+    ok(tBare.residualWithin && tBare.label === "Reduce with countermeasures (none recorded)" && tBare.disposition === null && !tBare.complete && /no countermeasure/.test(tBare.gap),
+      "reduce with a tolerable residual and no covering countermeasure is not reduced or mitigated", tBare.label + " / " + tBare.disposition);
+    td.residualLikelihood = "";
+    zd.countermeasures[0].addressesFR = [];
+    ok(RT.threatTreatment(zd, td).covered === false, "reduce: an untagged countermeasure covers nothing");
+    ok(RT.suggestTreatment(zd, td, "medium") === "reduce", "(it can only suggest)");
     zd.countermeasures[0].addressesFR = ["UC"];
-    ok(RT.threatDisposition(zd, td) === "countermeasure", "an FR-overlapping countermeasure addresses the threat");
-    // §4.7 residual risk: countermeasures that bring it to tolerable = mitigated (beats "countermeasure")
+    var tRed = RT.threatTreatment(zd, td);
+    ok(tRed.covered && tRed.covering[0].id === "M9" && tRed.disposition === "countermeasure" && tRed.gap === "" && tRed.label === "Reduce with countermeasures", "reduce: an FR-overlapping countermeasure covers the threat");
+    // Residual risk: countermeasures that bring it within tolerable = mitigated.
     td.residualLikelihood = "low"; td.residualImpact = "serious"; // serious×low = medium = tolerable
     ok(RT.residualRisk(td) === "medium", "residual risk computed from residual likelihood/impact", "got " + RT.residualRisk(td));
-    ok(RT.threatDisposition(zd, td, "medium") === "mitigated", "residual within tolerable = mitigated (§4.7)");
+    ok(RT.threatDisposition(zd, td) === "countermeasure" && RT.threatTreatment(zd, td).residualWithin && RT.threatTreatment(zd, td).label === "Reduce with countermeasures", "residual within tolerable with only a planned countermeasure is still being reduced", RT.threatTreatment(zd, td).label);
+    zd.countermeasures[0].existing = true;
+    ok(RT.threatDisposition(zd, td) === "mitigated" && RT.threatTreatment(zd, td).residualWithin && RT.threatTreatment(zd, td).label === "Reduced to within tolerable risk", "residual within tolerable with a countermeasure in place = mitigated");
     td.residualLikelihood = "medium"; // serious×medium = high, still exceeds
-    ok(RT.threatDisposition(zd, td, "medium") === "countermeasure", "residual still above tolerable falls back to the countermeasure disposition");
+    ok(RT.threatDisposition(zd, td) === "countermeasure" && !RT.threatTreatment(zd, td).residualWithin, "residual still above tolerable stays a countermeasure in progress");
+    td.treatment.confirmed = false;
+    ok(RT.threatDisposition(zd, td) === null, "and unconfirmed, it is no decision at all");
     td.residualLikelihood = ""; td.residualImpact = "";
     ok(RT.residualRisk(td) === null, "residual risk is null when neither residual field is set");
+    // A threat within tolerable risk needs no decision.
+    td.likelihood = "low"; // serious×low = medium
+    ok(RT.threatTreatment(zd, td).state === "within" && !RT.threatTreatment(zd, td).required && !RT.threatTreatment(zd, td).open && RT.threatTreatment(zd, td).label === "Within tolerable risk", "within tolerable risk: no decision needed");
     proj.zones.pop();
 
     // --- project round-trip ---
@@ -196,6 +281,20 @@
     var mt = RT.state.project.zones[0].threats[0], mm = RT.state.project.zones[0].countermeasures[0];
     ok(mt.acceptance === "" && mt.residualLikelihood === "" && mt.residualImpact === "", "pre-1.4 threat gains empty acceptance + residual fields");
     ok(mm.existing === false, "pre-1.4 countermeasure gains an existing=false flag");
+    ok(mt.treatment && mt.treatment.decision === "reduce" && mt.treatment.confirmed === false && mt.treatment.reason === "", "a file from before treatment decisions loads with the old inference as an unconfirmed suggestion", JSON.stringify(mt.treatment));
+    ok(RT.threatTreatment(RT.state.project.zones[0], mt).state === "suggested" && RT.buildRiskContext().zones[0].threats[0].disposition === null, "which is open, and exports as null, until confirmed");
+    ok(RT.state.project.schema === "spt-risk-project/0.2", "the project schema string is unchanged");
+    // The other old inferences, and nothing to infer.
+    RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "Acc2", description: "", scopeStatement: "", assumptions: [] }, zones: [{ id: "Z1", name: "", slTargetByFR: { UC: 2 },
+      threats: [{ id: "T1", statement: "s", affectedFR: ["UC"], likelihood: "high", impact: "serious" },
+                { id: "T2", statement: "s", affectedFR: ["SI"], likelihood: "high", impact: "serious", acceptance: "Accepted by the owner." },
+                { id: "T3", statement: "s", affectedFR: ["RA"], likelihood: "high", impact: "serious" },
+                { id: "T4", statement: "s", affectedFR: ["RA"], likelihood: "low", impact: "minor" },
+                { id: "T5", statement: "s", affectedFR: ["RA"], likelihood: "high", impact: "serious", treatment: { decision: "accept", confirmed: true, reason: "" }, acceptance: "Owner, 2026." },
+                { id: "T6", statement: "s", affectedFR: ["RA"], likelihood: "high", impact: "serious", treatment: { decision: "nonsense", confirmed: true } }],
+      countermeasures: [] }], conduits: [] }));
+    var lt = RT.state.project.zones[0].threats.map(function (t) { return t.treatment.decision + ":" + t.treatment.confirmed; }).join(" ");
+    ok(lt === "slt:false accept:false null:false null:false accept:true null:false", "load: SL-T and acceptance become suggestions, nothing to infer stays empty, a recorded decision is kept, an unknown one is dropped", lt);
     ok(RT.state.project.approval && RT.state.project.approval.approved === false && RT.state.project.approval.name === "", "pre-1.4 project gains an empty approval record");
 
     // --- 0.1 migration: scalar slTarget -> per-FR vector ---
@@ -209,9 +308,26 @@
     ok(navItems.length === 12, "nav shows 5 stages + Basis + Report + Word preview + 2 reports + Peer review + About", "got " + navItems.length);
     function clickNav(label) { var n = doc.querySelectorAll(".nav-item"); for (var i = 0; i < n.length; i++) if (n[i].textContent.indexOf(label) >= 0) { n[i].click(); return true; } return false; }
 
-    clickNav("2. High-level");
-    ok(doc.body.textContent.indexOf("Tolerable risk") >= 0, "stage 2 captures tolerable risk (4.3.6)");
-    ok(doc.body.textContent.indexOf("Asset / system risk ranking") >= 0, "stage 2 has the high-level asset risk ranking (§4.2)");
+    // --- conduits count in the header summary and the stage badges ---
+    function badgeOf(label) { var n = doc.querySelectorAll(".nav-item"); for (var i = 0; i < n.length; i++) if (n[i].textContent.indexOf(label) >= 0) { var b = n[i].querySelector(".badge"); return b ? b.textContent : null; } return null; }
+    var hp = RT.state.project, zoneThreats = hp.zones.reduce(function (a, o) { return a + o.threats.length; }, 0);
+    var ct = RT.emptyThreat(88); ct.statement = "On the conduit."; ct.affectedFR = ["RDF"]; ct.likelihood = "low"; ct.impact = "minor";
+    hp.conduits[0].threats.push(ct); RT.render();
+    ok(doc.getElementById("suc-summary").textContent.indexOf((zoneThreats + 1) + " threats") >= 0 && /1 conduit(?!s)/.test(doc.getElementById("suc-summary").textContent), "the header counts a conduit's threat with the zones'", doc.getElementById("suc-summary").textContent);
+    ok(badgeOf("4. Detailed") === String(zoneThreats + 1), "the detailed risk badge counts it too", String(badgeOf("4. Detailed")));
+    var sltSet = hp.zones.concat(hp.conduits).filter(function (o) { return RT.FR_IDS.some(function (fr) { return o.slTargetByFR[fr] != null; }); }).length;
+    ok(badgeOf("5. SL-T") === sltSet + "/" + (hp.zones.length + hp.conduits.length) && hp.conduits.length === 1, "the SL-T badge counts zones and conduits, set and in all", String(badgeOf("5. SL-T")));
+    var keepSlt = JSON.stringify(hp.conduits[0].slTargetByFR);
+    RT.FR_IDS.forEach(function (fr) { hp.conduits[0].slTargetByFR[fr] = null; }); RT.render();
+    ok(badgeOf("5. SL-T") === (sltSet - 1) + "/" + (hp.zones.length + 1), "and a conduit with no SL-T shows as one still to set", String(badgeOf("5. SL-T")));
+    hp.conduits[0].slTargetByFR = JSON.parse(keepSlt); hp.conduits[0].threats.pop(); RT.render();
+
+    ok(clickNav("2. High-level risk"), "stage 2 is the high-level risk assessment");
+    // The specification is the output of a later step: this page names the card for what it holds.
+    ok(doc.querySelector("#main .page-title").textContent === "High-level risk & requirements" && doc.querySelector("#main").textContent.indexOf("Risk criteria and requirements") >= 0 && doc.querySelector("#main").textContent.indexOf("requirements specification") < 0, "and names its second card for what it holds, not as the requirements specification");
+    ok(doc.body.textContent.indexOf("Tolerable risk") >= 0, "stage 2 captures tolerable risk");
+    ok(doc.body.textContent.indexOf("Security functions that must be kept") >= 0 && doc.body.textContent.indexOf("Mandatory security functions") < 0, "the security functions field says what it holds");
+    ok(doc.body.textContent.indexOf("Asset / system risk ranking") >= 0, "stage 2 has the high-level asset risk ranking");
     ok(doc.body.textContent.indexOf("Detail →") >= 0, "ranking rows offer a promote-to-detailed action");
 
     // --- promote-to-detailed: ranked system -> single-system zone ---
@@ -221,7 +337,7 @@
     detailBtns[0].click();
     ok(RT.state.project.zones.length === zonesBefore + 1, "promoting creates a new zone", zonesBefore + " -> " + RT.state.project.zones.length);
     var promoted = RT.state.project.zones[RT.state.project.zones.length - 1];
-    ok(promoted.fromHLA === "A1", "new zone records the source high-level asset (A1)", "got " + promoted.fromHLA);
+    ok(promoted.fromHLA === "A1", "new zone records the ranked system it came from (A1)", "got " + promoted.fromHLA);
     ok(promoted.threats.length === 1 && promoted.threats[0].impact === "serious" && promoted.threats[0].likelihood === "high", "promoted zone seeded with a threat at the ranked impact/likelihood");
     ok(RT.state.stage === "risk", "promoting jumps to the detailed assessment stage");
 
@@ -243,18 +359,60 @@
     clickNav("4. Detailed");
     ok(doc.querySelectorAll(".threat-card").length >= 1, "stage 4 renders threat register");
     ok(doc.body.textContent.indexOf("Unmitigated risk") >= 0, "stage 4 shows unmitigated risk");
-    ok(doc.body.textContent.indexOf("Risk acceptance") >= 0, "over-tolerable threats offer a risk-acceptance field");
-    ok(doc.body.textContent.indexOf("no disposition yet") >= 0, "freshly promoted threat is flagged as undispositioned");
-    ok(doc.body.textContent.indexOf("carried into the SL-T") >= 0, "an SL-T-addressed threat reads as carried into the SL-T");
-    ok(doc.body.textContent.indexOf("addressed by countermeasure") >= 0, "a countermeasured threat names its countermeasure");
+    // --- the three-way treatment choice ---
+    // By position, zones first: the promoted zone takes its id from a counter this test never advanced, so ids can repeat here.
+    function ownerCard(id) { var all = doc.querySelectorAll('[data-owner-id]'), zs = RT.state.project.zones; for (var i = 0; i < zs.length; i++) if (zs[i] === id || (typeof id === "string" && zs[i].id === id)) return all[i]; return null; }
+    function threatCard(oid, tid) { return ownerCard(oid).querySelector('[data-threat-id="' + tid + '"]'); }
+    function opt(oid, tid, d) { return threatCard(oid, tid).querySelector('.treat-opt[data-decision="' + d + '"]'); }
+    var pz = RT.state.project.zones[RT.state.project.zones.length - 1], pt = pz.threats[0];
+    ok(threatCard("Z1", "T1").querySelectorAll(".treat-opt").length === 3 && /Reduce with countermeasures/.test(opt("Z1", "T1", "reduce").textContent) && /^Accept$/.test(opt(pz, pt.id, "accept").textContent) && /Treat through the SL-T/.test(opt("Z1", "T1", "slt").textContent),
+      "each threat above tolerable risk offers the three choices");
+    ok(opt("Z1", "T1", "reduce").getAttribute("aria-pressed") === "true" && /^✓ /.test(opt("Z1", "T1", "reduce").textContent) && /Addressed by M1/.test(threatCard("Z1", "T1").textContent), "a confirmed reduce is marked in text and names its countermeasure");
+    ok(opt("Z1", "T2", "slt").getAttribute("aria-pressed") === "true" && threatCard("Z1", "T2").querySelector('input[data-reason="slt"]').value.indexOf("phase 2") >= 0, "a confirmed SL-T decision below the suggestion shows its reason");
+    ok(/Reason the SL-T is below the suggestion \(SI\)/.test(threatCard("Z1", "T2").textContent), "under a label that says which requirement is below the suggestion");
+    ok(threatCard(pz, pt.id).querySelector(".treat").getAttribute("data-treatment-state") === "none" && /No decision yet/.test(threatCard(pz, pt.id).textContent), "freshly promoted threat has no decision yet");
+    ok(/1 of 1 threat above tolerable risk needs a treatment decision/.test(ownerCard(pz).textContent), "and its zone says how many are open");
+    ok(!threatCard(pz, pt.id).querySelector("input[data-reason]"), "no reason is asked for before a choice needs one");
+    opt(pz, pt.id, "accept").focus();
+    opt(pz, pt.id, "accept").click();
+    // The page is rebuilt on every choice: the keyboard focus goes back to the same choice.
+    ok(doc.activeElement === opt(pz, pt.id, "accept") && doc.activeElement.getAttribute("aria-pressed") === "true", "the choice keeps the keyboard focus after the page is redrawn", doc.activeElement ? doc.activeElement.tagName + " " + (doc.activeElement.className || "") : "none");
+    ok(pt.treatment.decision === "accept" && pt.treatment.confirmed === true && !!threatCard(pz, pt.id).querySelector('input[data-reason="accept"]') && /Reason for acceptance/.test(threatCard(pz, pt.id).textContent),
+      "one click records Accept, and the reason is asked for");
+    ok(/Accepted with no reason recorded/.test(threatCard(pz, pt.id).textContent) && RT.isDirty(), "an acceptance with no reason says so");
+    opt(pz, pt.id, "slt").click();
+    ok(pt.treatment.decision === "slt" && pt.treatment.confirmed === true && !!threatCard(pz, pt.id).querySelector('input[data-reason="slt"]'), "one click changes it to the SL-T, which asks for a reason while the zone has no SL-T");
+    ok(/Reason no SL-T is set/.test(threatCard(pz, pt.id).textContent) && /No SL-T is set and no reason is recorded\./.test(threatCard(pz, pt.id).textContent) && !/below the suggestion/.test(threatCard(pz, pt.id).textContent),
+      "and says the SL-T is not set, not that it is below a suggestion", threatCard(pz, pt.id).querySelector(".treat").textContent);
+    // A reason typed into the field keeps the focus when the page is redrawn on change.
+    var rIn = threatCard(pz, pt.id).querySelector('input[data-reason="slt"]');
+    rIn.focus(); rIn.value = "Set at the design workshop."; rIn.dispatchEvent(new w.Event("input", { bubbles: true })); rIn.dispatchEvent(new w.Event("change", { bubbles: true }));
+    ok(doc.activeElement === threatCard(pz, pt.id).querySelector('input[data-reason="slt"]') && doc.activeElement !== rIn && pt.treatment.reason === "Set at the design workshop." && RT.threatTreatment(pz, pt).disposition === "sl-t", "the reason field keeps the focus too, and the reason settles the decision");
+    pt.treatment.reason = ""; RT.render();
+    opt(pz, pt.id, "slt").click();
+    ok(pt.treatment.decision === null && pt.treatment.confirmed === false, "clicking the confirmed choice again takes the decision back");
+    // A suggestion carried over from an older file: dashed, worded, one click per zone.
+    pt.treatment = { decision: "reduce", confirmed: false, reason: "" }; RT.render();
+    var sOpt = opt(pz, pt.id, "reduce");
+    ok(/suggested/.test(sOpt.className) && /^\? /.test(sOpt.textContent) && sOpt.getAttribute("aria-pressed") === "false" && /Suggested, not confirmed/.test(threatCard(pz, pt.id).textContent),
+      "a suggestion shows as one, in shape and in words, and not as pressed");
+    var confirmBtn = ownerCard(pz).querySelector('[data-action="confirm-suggested"]');
+    ok(!!confirmBtn && /Confirm suggested \(1\)/.test(confirmBtn.textContent) && !ownerCard("Z1").querySelector('[data-action="confirm-suggested"]'), "the zone with a suggestion offers Confirm suggested, and a zone without does not");
+    confirmBtn.focus();
+    confirmBtn.click();
+    ok(doc.activeElement === opt(pz, pt.id, "reduce"), "Confirm suggested goes once pressed, and the focus moves to the card's first treatment choice");
+    ok(pt.treatment.decision === "reduce" && pt.treatment.confirmed === true && !ownerCard(pz).querySelector('[data-action="confirm-suggested"]'), "Confirm suggested confirms the zone's suggestions");
+    pt.treatment = { decision: null, confirmed: false, reason: "" }; RT.render();
+    ok(doc.querySelectorAll("[data-threat-id]").length >= 3 && !!ownerCard("Z1"), "threat cards and owner cards keep their id attributes");
     ok(doc.body.textContent.indexOf("countermeasure required") < 0, "the old hard 'countermeasure required' wording is gone");
-    ok(doc.body.textContent.indexOf("Residual risk after countermeasures") >= 0, "over-tolerable threats offer a residual-risk capture (§4.7)");
-    ok(doc.body.textContent.indexOf("Existing control") >= 0, "countermeasures can be flagged as existing controls");
+    ok(doc.body.textContent.indexOf("Residual risk with countermeasures in place") >= 0, "over-tolerable threats offer a residual-risk capture");
+    ok(doc.body.textContent.indexOf("Unmitigated likelihood") >= 0, "the likelihood asked for is the unmitigated one");
+    ok(doc.body.textContent.indexOf("Existing countermeasure") >= 0 && doc.body.textContent.indexOf("Existing control") < 0, "countermeasures can be flagged as existing, and are not called controls");
     clickNav("5. SL-T");
     ok(doc.querySelectorAll(".fr-slt-table").length >= 1, "stage 5 renders per-FR SL-T table");
     ok(doc.querySelectorAll(".trace details").length >= 7, "stage 5 shows a trace per FR");
     ok(doc.querySelector(".sis-box") != null, "SIS handling box shown for safety zone");
-    clickNav("High-level report");
+    ok(clickNav("High-level report"), "the sidebar has the high-level report");
     ok(doc.body.textContent.indexOf("High-level risk assessment report") >= 0, "standalone high-level report renders");
     ok(doc.body.textContent.indexOf("Relative risk ranking") >= 0, "high-level report shows the relative risk ranking");
     // The report area, not the page: the sidebar names "Basis of assessment" and
@@ -281,7 +439,8 @@
     ok(doc.documentElement.getAttribute("data-theme") === startTheme, "toggling twice returns to the original theme");
 
     clickNav("About");
-    ok(doc.body.textContent.indexOf("not reproduced here") >= 0, "About states verbatim text is not reproduced (licensing)");
+    ok(/none of the standard.s text is reproduced/.test(doc.body.textContent), "About states verbatim text is not reproduced (licensing)");
+    ok(/published IEC 62443-3-2:2020 and covers ZCR 1, ZCR 2, ZCR 3 and ZCR 5\. ZCR 4, ZCR 6 and ZCR 7 are not yet steps of their own\./.test(doc.body.textContent) && !/ZCR 1 to ZCR 7/.test(doc.body.textContent) && /not been checked line by line/.test(doc.body.textContent), "About names the published edition, the steps the tool covers and those it does not yet, and says what was and was not checked");
     ok(doc.body.textContent.indexOf("house default") >= 0 || doc.body.textContent.indexOf("house defaults") >= 0, "About states the house-heuristic framing");
 
     // --- #2 destructive-delete guard: a filled threat confirms before vanishing ---
@@ -303,19 +462,19 @@
 
     // --- #1 Load guard: predicate + confirm gate ---
     ok(RT.projectHasContent({ suc: {}, srs: {}, basisOfAssessment: {}, zones: [], conduits: [] }) === false, "projectHasContent: an untouched project has no content");
-    ok(RT.projectHasContent({ suc: { name: "X" }, srs: {}, basisOfAssessment: {}, zones: [], conduits: [] }) === true, "projectHasContent: a named SuC counts as content");
+    ok(RT.projectHasContent({ suc: { name: "X" }, srs: {}, basisOfAssessment: {}, zones: [], conduits: [] }) === true, "projectHasContent: a named SUC counts as content");
     ok(RT.projectHasContent({ suc: {}, srs: { highLevelAssets: [{ id: "A1" }] }, basisOfAssessment: {}, zones: [], conduits: [] }) === true, "projectHasContent: a high-level-only ranking counts as content");
-    var other = JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "Other SuC", description: "", scopeStatement: "", assumptions: [] }, zones: [], conduits: [] });
+    var other = JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "Other SUC", description: "", scopeStatement: "", assumptions: [] }, zones: [], conduits: [] });
     var keep = RT.state.project; // current project has content (Test Works)
     w.confirm = function () { return false; };
     RT.loadProjectText(other);
     ok(RT.state.project === keep, "declining the Load confirm keeps the current project");
     w.confirm = function () { return true; };
     RT.loadProjectText(other);
-    ok(RT.state.project !== keep && RT.state.project.suc.name === "Other SuC", "confirming the Load replaces the project");
+    ok(RT.state.project !== keep && RT.state.project.suc.name === "Other SUC", "confirming the Load replaces the project");
 
     // --- #4 empty-zone export is flagged (was a silent 'success' on an empty handoff) ---
-    // state.project is now "Other SuC" with no zones.
+    // state.project is now "Other SUC" with no zones.
     ok(RT.exportProblems().some(function (p) { return p.indexOf("No zones defined") >= 0; }), "#4 export with no zones is flagged (no silent empty handoff to the 3-3 tool)");
 
     // --- #5 dirty tracking, Save*, beforeunload guard, autosave-failure warning, restore gate ---

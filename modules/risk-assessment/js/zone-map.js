@@ -2,7 +2,7 @@
 /* zone-map.js: the zone and conduit drawing, laid out once and drawn two ways.
  *
  * layout(p, suggestZone) places a box per zone (up to three to a row) and the
- * external network above them when a conduit leaves the SuC. Conduits never
+ * external network above them when a conduit leaves the SUC. Conduits never
  * run behind a box: two zones side by side are joined straight across the gap
  * between them; anything else leaves a box from its top or bottom edge and
  * runs along the gaps between the rows (and, to skip a row, down the gap
@@ -160,7 +160,7 @@ window.RiskZoneMap = (function () {
       if (s.safetyRelated) sub.push("SIS");
       return box(z.id, z.name, sub.join(" · "), false, s.safetyRelated, s.worstRisk);
     });
-    if (hasExt) boxes.push(box("EXT", "external", "outside the SuC", true, false, null));
+    if (hasExt) boxes.push(box("EXT", "external", "outside the SUC", true, false, null));
 
     var boxesBottom = rowTop(rows - 1) + BH + laneH(rows - 1);
     var keyTop = boxesBottom + (conduits.length ? 24 : 0);

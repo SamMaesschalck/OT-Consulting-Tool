@@ -30,7 +30,19 @@ window.RiskReview = (function () {
   function RP() { return window.RiskReportPage; }
   function norm(s) { return RC().norm(s); }
   function project() { return RT().state.project; }
-  function store() { var s = project().review; return s ? RC().normaliseStore(s) : null; }
+  // Every read of the store goes through here, so a comment made on a section
+  // whose heading has since been reworded (in the saved project, or in a review
+  // file imported later) finds that section under its new key.
+  function aliasKeys(s) {
+    var alias = RT().sectionKeyAlias;
+    s.threads.forEach(function (t) {
+      var a = t && t.comment && t.comment.anchor, r = t && t.accepted && t.accepted.revert;
+      if (a && a.sectionKey) a.sectionKey = alias(a.sectionKey);
+      if (r && r.key) r.key = alias(r.key);
+    });
+    return s;
+  }
+  function store() { var s = project().review; return s ? aliasKeys(RC().normaliseStore(s)) : null; }
   function ensureStore() {
     var s = store();
     if (!s) { s = RC().emptyStore(); project().review = s; RT().touched(); }
@@ -40,12 +52,13 @@ window.RiskReview = (function () {
   // ---- the documents --------------------------------------------------------
   // reportId is which report's overrides a comment's Accept writes to, and
   // which tab Go to opens. With no zones or conduits there is nothing behind
-  // the detailed report, so only the high-level report (the zone-free §4.2
+  // the detailed report, so only the high-level report (the zone-free
   // deliverable) is packed: a document's place in the pack is therefore not
   // which report it is, and docFor() finds it by title.
+  var HIGH_LEVEL_TITLE = "High-level report";
   var DOCS = [
     { id: "detailed", title: "Detailed report", opts: {} },
-    { id: "highLevel", title: "High-level report", opts: { highLevelOnly: true } }
+    { id: "highLevel", title: HIGH_LEVEL_TITLE, opts: { highLevelOnly: true } }
   ];
   function docsToPack() {
     var p = project();
@@ -62,7 +75,7 @@ window.RiskReview = (function () {
   function reportIdFor(a, docs) {
     var d = docFor(a, docs);
     if (d && d.reportId) return d.reportId;
-    if (a.documentTitle) return a.documentTitle === "High-level report" ? "highLevel" : "detailed";
+    if (a.documentTitle) return a.documentTitle === HIGH_LEVEL_TITLE ? "highLevel" : "detailed";
     return a.documentIndex === 1 ? "highLevel" : "detailed";
   }
 
@@ -111,7 +124,7 @@ window.RiskReview = (function () {
   // impact, affected FRs, the residual rating and an SL-T's justification and
   // suggestion are read-only rows (items[].details).
   var FIELD_LABELS = { answer: "Risk", expected: "Tolerable risk", evidence: "Threat source", notes: "Risk acceptance",
-    action: "Countermeasures addressing this threat", impact: null, priority: "Disposition", owner: null };
+    action: "Countermeasures addressing this threat", impact: null, priority: "Treatment decision", owner: null };
   function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
   function bandName(id) { return id ? RX().bandName(id) : ""; }
   function rating(l, i) { return (l ? cap(l) : "Not rated") + " × " + (i ? cap(i) : "Not rated"); }
@@ -128,27 +141,32 @@ window.RiskReview = (function () {
       (o.threats || []).forEach(function (t) {
         var band = R.threatRisk(t), resid = R.residualRisk(t);
         var over = R.exceedsTolerable(resid || band, tolerable);
-        var status = !band ? "unanswered" : (over ? "finding" : "met");
-        // Only the countermeasures that address this threat, as its disposition
-        // counts them: untagged on either side, coverage cannot be ruled out.
+        // The tool's one treatment state (RiskTool.threatTreatment). A threat
+        // above tolerable risk with no confirmed decision, or with one that
+        // lacks what it rests on (a countermeasure, a reason), is a finding
+        // whatever its residual rating, so the review tool raises it.
+        var T = R.threatTreatment(o, t, p);
+        var status = !band ? "unanswered" : (over || (T.required && !T.complete) ? "finding" : "met");
+        // Only the countermeasures on a requirement this threat affects.
         var affected = t.affectedFR || [];
-        var linked = (o.countermeasures || []).filter(function (m) {
-          if (!(m.description || "").trim()) return false;
-          var fr = m.addressesFR || [];
-          return !fr.length || !affected.length || fr.some(function (x) { return affected.indexOf(x) >= 0; });
-        });
-        var disp = R.threatDisposition(o, t, tolerable);
+        var linked = T.covering;
         var details = [["Likelihood × impact", rating(t.likelihood, t.impact)], ["Affected FRs", affected.length ? affected.join(", ") : "None marked"]];
         if (t.residualLikelihood || t.residualImpact) details.push(["Residual likelihood × impact", rating(t.residualLikelihood || t.likelihood, t.residualImpact || t.impact)]);
+        if (T.confirmed && T.decision === "slt" && T.reason) details.push(["Reason for treating through the SL-T", T.reason]);
+        // A decision recorded without what it rests on: the reviewer sees what
+        // was chosen and what is missing, and the decision field stays empty.
+        if (T.confirmed && !T.complete) details.push(["Decision still to complete", T.label]);
         items.push({
           targetName: ownerName(o), targetId: o.id, itemId: o.id + ":" + t.id, code: t.id, title: t.statement || "(no statement)", groupName: groupName,
           answer: band ? bandName(band) + (resid ? ", residual " + bandName(resid).toLowerCase() : "") : "Not rated",
           expected: bandName(tolerable),
-          evidence: t.source || "", notes: t.acceptance || "",
+          // The acceptance text is not printed against another decision.
+          evidence: t.source || "", notes: (T.confirmed && T.decision !== "accept") ? "" : (t.acceptance || ""),
           owner: "", action: linked.map(function (m) { return m.id + " " + m.description + (m.existing ? " [existing]" : " [planned]"); }).join("; "), impact: "",
-          // Empty when there is none: the review tool's risk-no-disposition
-          // check reads it so, and says what is missing.
-          priority: disp ? RX().DISPOSITION_LABEL[disp] : "",
+          // Empty until the consultant has confirmed a decision and it is
+          // complete: the review tool's risk-no-disposition check reads it so.
+          // A suggestion that is not confirmed is no decision.
+          priority: T.complete ? T.label : "",
           details: details, status: status, shared: false
         });
         fact[field[status]]++;
@@ -555,7 +573,7 @@ window.RiskReview = (function () {
     }
     if (a.kind === "general") { s.stage = "basis"; RT().render(); return; }
     var d = docFor(a, cachedDocs());
-    var tab = d ? (d.reportId === "highLevel" ? 1 : 0) : (a.documentTitle ? (a.documentTitle === "High-level report" ? 1 : 0) : a.documentIndex);
+    var tab = d ? (d.reportId === "highLevel" ? 1 : 0) : (a.documentTitle ? (a.documentTitle === HIGH_LEVEL_TITLE ? 1 : 0) : a.documentIndex);
     RP().goTo(tab, a.sectionKey, a.quote);
   }
 

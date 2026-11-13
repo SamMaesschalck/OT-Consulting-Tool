@@ -2,13 +2,14 @@
 #
 # Regenerates the .js namespace wrappers for the Risk Assessment tool's data
 # files. Same pattern as the Assessments app's build-data.ps1, but this app
-# has no instruments: just two flat data files.
+# has no instruments: just a few flat data files.
 #
 #   powershell -ExecutionPolicy Bypass -File scripts/build-data.ps1
 #
 # Outputs (overwritten in place):
 #   data/slt-suggestion-rules.js      -> window.App.Data.sltRules
 #   data/risk-context-interchange.js  -> window.App.Data.interchange
+#   data/zcr-map.js                   -> window.App.Data.zcrMap
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -41,6 +42,10 @@ Wrap-Assign -jsonRelPath "data/slt-suggestion-rules.json" `
 Wrap-Assign -jsonRelPath "data/risk-context-interchange.json" `
             -jsRelPath   "data/risk-context-interchange.js" `
             -targetExpr  "window.App.Data.interchange"
+
+Wrap-Assign -jsonRelPath "data/zcr-map.json" `
+            -jsRelPath   "data/zcr-map.js" `
+            -targetExpr  "window.App.Data.zcrMap"
 
 Wrap-Assign -jsonRelPath "data/review-pack.json" `
             -jsRelPath   "data/review-pack.js" `

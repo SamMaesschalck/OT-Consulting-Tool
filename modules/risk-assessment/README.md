@@ -1,7 +1,7 @@
 # OT Cyber Risk Assessment Tool
 
-An offline, browser-based zones-and-conduits risk assessment that implements
-the IEC 62443-3-2 Clause 4 workflow. Open `index.html` directly from disk
+An offline, browser-based zones-and-conduits risk assessment that follows the
+order of the published IEC 62443-3-2:2020 (ZCR 1, 2, 3 and 5 so far). Open `index.html` directly from disk
 (file://). There is no backend and nothing to build to use it; for handing
 out, it is also built as one self-contained HTML file and as a portable exe
 (see Builds below).
@@ -23,6 +23,7 @@ The Report page shows both Word reports, Detailed and High level, section by sec
 - **The key and the pass that applies it to Word are shared with the assessment tool** (`js/report-sections.js`, canonical copy `shared/report-sections.js`). A key slugs the generated heading, so a rename does not orphan its override. A rewrite replaces only the run of plain paragraphs opening a section: tables, figures, the scope and tolerable risk lines and the sign-off statement stay.
 - **Per-zone repeats.** The "Justification for ..." sections are one section across the zones and conduits. Its title is the words before the name, which every one of them keeps, and Hide takes them all. A rewrite is refused and the page says why: each has its own wording, written on the SL-T page. An accepted review suggestion can still reword one zone's paragraph, as it replaces that paragraph only.
 - **A zone's or conduit's own heading in the registers is its name,** not a section title: it has no Edit, and is renamed where it is entered. Hiding one zone's register would leave the summary's counts including a zone the report no longer prints.
+- **Reworded headings.** A key slugs the generated heading, so rewording a heading in `js/exports.js` would orphan what is stored under the old key. `SECTION_KEY_ALIASES` in `index.html` maps each old key to its new one, and is applied where stored keys are read: the section overrides on load, and a review's comments (saved in the project or imported later) in `js/review.js`. Add a line there whenever a generated heading is reworded.
 - **Ranked lists.** "Where to focus first" (Detailed) and "Where to look first" (High level) can be reordered by dragging or with the arrows, and Word follows. Rows nobody placed come after the placed ones. The ranking table is sorted by risk band and stays so: that order is what it reports.
 
 ## Word preview
@@ -39,8 +40,9 @@ Once a review has started, the Word downloads (detailed and high level) and the 
 
 The tool is split into two tiers, matching how 3-2 is used in practice.
 
-The high-level tier is a §4.2 relative risk ranking of the systems in scope, and
-it is a deliverable in its own right. You can rank the systems and generate a
+The high-level tier (ZCR 2) is the high-level risk assessment, done
+here as a relative risk ranking of the systems in scope, and it is a
+deliverable in its own right. You can rank the systems and generate a
 *High-level risk assessment report* (Reports → High-level report) without
 defining zones, running the detailed assessment or assigning SL-T.
 
@@ -50,45 +52,73 @@ pre-filled and seeded with a starting threat at the ranked impact and
 likelihood. This keeps the 62443 zone and conduit vocabulary, and the per-zone
 handoff to the 3-3 tool, while the detailed work reads as per-system.
 
-## Workflow (IEC 62443-3-2 Clause 4)
+## Workflow (IEC 62443-3-2:2020)
 
-1. **System under consideration (§4.1):** name, description, scope and
+The standard's zone and conduit requirements (ZCR) are held in
+`data/zcr-map.json`: every ZCR id, its title and its clause number, with a
+note of what was checked against the published contents list and what is a
+house reading. That file is the only place a clause number is written. Each
+workflow page shows its ZCR once, in its sub-title, read from the lookup;
+fields, hints and warnings carry no standard references, and the Word and
+Excel deliverables carry none beyond one sentence in the method text naming
+the edition. The workflow covers ZCR 1, 2, 3 and 5; the risk comparison
+(ZCR 4), the requirements specification as a step of its own (ZCR 6) and
+approval as a step (ZCR 7) are later phases of `docs/risk-tool-redesign.md`.
+
+Terms follow the 2020 edition: SUC, cyber security requirements
+specification, countermeasure. The first tier keeps the 62443 name high-level
+risk assessment, the step before the detailed one. Unmitigated risk is
+the risk before any countermeasure is considered; residual risk is what
+remains with countermeasures in place.
+
+1. **System under consideration (ZCR 1):** name, description, scope and
    boundary, and operating-environment assumptions.
-2. **High-level risk and requirements (§4.2 and 4.3):** the asset and system
+2. **High-level risk and requirements (ZCR 2):** the asset and system
    risk ranking (impact × likelihood → house risk band), which frames the
-   zoning and is the high-level deliverable, plus the security requirements
-   specification. That covers tolerable risk (§4.3.6), known and presumed
-   threats, mandatory security functions, regulatory requirements, the assumed
-   adversary class, and whether the client's own risk matrix is in use.
+   zoning and is the high-level deliverable, plus the risk criteria and
+   requirements card. That covers tolerable risk, known and presumed
+   threats, security functions that must be kept, regulatory requirements, the
+   assumed adversary class, and whether the client's own risk matrix is in use.
    "Detail →" promotes a ranked system into the detailed tier, and
    "Generate high-level report →" produces the standalone report.
-3. **Zones and conduits (§4.4):** a zone editor (assets, access points and
+3. **Zones and conduits (ZCR 3):** a zone editor (assets, access points and
    boundary devices, external dependencies, security policies, exposure
-   flags), a conduit editor, and an auto-generated, read-only SVG drawing
-   (§4.4.2). The tool prompts for safety, wireless and mobile separation per
-   §4.4.4 to 4.4.7.
-4. **Detailed risk assessment (§4.5, 4.6 and 4.7):** per zone or system and per
-   conduit, a threat register (structured threat statements, §4.5.1),
-   vulnerabilities (§4.5.2), and for each threat its likelihood (§4.5.3) ×
-   impact (§4.5.4) = unmitigated risk (§4.5.5), read from a house risk matrix.
-   Each threat's risk is compared with the tolerable risk (§4.6), and those
-   that exceed it need a disposition. That can be countermeasures that bring
-   the residual risk (§4.7) down to tolerable (a countermeasure can be flagged
-   as an existing control or a planned remediation); carrying the risk into the
-   SL-T, where the target is the treatment plan and capability is built through
-   the 3-3 programme, so an empty countermeasure register is a legitimate
-   position in less mature environments; or a recorded risk acceptance, saying
-   who accepted it and why. Only threats with no disposition at all are
-   flagged. The asset owner signs off the tolerable risk and outcome on the
-   review page (§4.3.6 and §4), and the sign-off prints in both reports and
+   flags), a conduit editor, and an auto-generated, read-only SVG drawing.
+   The page reminds the consultant to keep safety, wireless and temporarily
+   connected devices separate.
+4. **Detailed risk assessment (ZCR 5):** per zone or system and per
+   conduit, a threat register (structured threat statements),
+   vulnerabilities, and for each threat its unmitigated likelihood ×
+   impact = unmitigated risk, read from a house risk matrix.
+   Each threat's risk is compared with the tolerable risk, and those
+   that exceed it need a treatment decision, which the consultant records with
+   one click: reduce with countermeasures (a countermeasure can be flagged as
+   existing or as a planned remediation, and the residual risk
+   shows whether it reaches tolerable); accept, with a reason saying who
+   accepted it and why; or treat through the SL-T, where the target is the
+   treatment plan and capability is built through the 3-3 programme, so an
+   empty countermeasure register is a legitimate position in less mature
+   environments. Nothing is inferred: a countermeasure or an SL-T alone
+   decides nothing. A file saved by an older build loads with what that build
+   inferred shown as a suggestion, confirmed one at a time or per zone with
+   Confirm suggested. An unconfirmed suggestion prints and exports as no
+   decision. A confirmed decision that lacks what it rests on (reduce with no
+   countermeasure on a requirement the threat affects, accept with no reason,
+   the SL-T with none set or one below the suggestion and no reason) is not
+   a treatment yet: the reports print it as a prompt saying what is missing,
+   it is left out of the summary's counts, the risk context exports no
+   disposition for it and the review pack leaves its treatment decision
+   empty. "Reduced to within tolerable risk" needs a tolerable residual
+   rating and a covering countermeasure already in place. The asset owner signs off the tolerable risk and outcome on the
+   review page, and the sign-off prints in both reports and
    travels with the export.
-5. **SL-T assignment:** SL-T is a vector, one target per foundational
-   requirement (IAC/UC/SI/DC/RDF/TRE/RA), as in the standard's worked example.
+5. **SL-T assignment (ZCR 5.6):** SL-T is a vector, one target per foundational
+   requirement (IAC/UC/SI/DC/RDF/TRE/RA), which is a house reading.
    Each FR's suggestion comes from the worst unmitigated risk affecting it and
    is shown with a full rule trace. The consultant sets the final per-FR SL-T
    and a mandatory justification, which is the deliverable.
 
-There are two reports. The *High-level report* is the standalone §4.2 output
+There are two reports. The *High-level report* is the standalone high-level risk assessment
 (system under consideration, basis of assessment, ranked systems). *Full report
 & export* covers the per-FR SL-T vectors, zones, threats, the drawing, a
 printable summary and the risk-context JSON export. The basis of assessment
@@ -115,11 +145,12 @@ of that layout code. It has:
 - a "Risk at a glance" scorecard page: headline tiles, per-zone and per-conduit
   risk-band bars, the worst-case SL-T strip and "where to focus first" cards;
 - the system under consideration and requirements specification, the basis,
-  the §4.2 ranking, the zone and conduit threat registers with dispositions and
+  the high-level risk ranking, the zone and conduit threat registers with treatment decisions and
   acceptances, the per-FR SL-T table with justifications, sign-off and
   limitations.
 
-The high-level page generates a §4.2-only version with its own scorecard.
+The high-level report page generates a ranking-only version with its own scorecard,
+downloaded as `<name>-high-level-risk-assessment.docx`.
 
 The Excel workbook is the engineers' working copy: a threat tracker with a
 status dropdown, owner, date and notes columns, colour-coded risk bands and
@@ -135,14 +166,18 @@ switched off in the demo, so real unsaved work can never be touched.
 
 ## What the tool does and does not claim
 
-- The structure follows the published 62443-3-2 process and has been checked
-  against the ISA D4E6 working draft. Verbatim normative text and the
-  standard's own example risk tables are not reproduced, because they belong to
-  the licence holder. The version stays at 0.x because the tool has not been
-  checked line by line against a licensed published copy.
+- The workflow follows the order of the published IEC 62443-3-2:2020 and
+  covers ZCR 1, 2, 3 and 5; ZCR 4, 6 and 7 are not yet steps of their own
+  (the About page says the same, built from the lookup). The ZCR ids, titles and clause numbers in `data/zcr-map.json`
+  were checked against its contents list (13 Nov 2026). The detailed
+  requirement wording has not been checked line by line, and the points listed
+  as a house reading in that file are the tool's interpretation, not claims
+  about the standard. The tool was first built from a 2013 working draft; its
+  clause numbers and terms have been removed. Verbatim normative text and the
+  standard's own example risk tables are not reproduced, because they belong
+  to the licence holder.
 - The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house
-  defaults. 62443-3-2 does not prescribe them; it requires the organisation's
-  own risk criteria and tolerable-risk threshold (def. 3.1.39, §4.3.6). The tool
+  defaults. 62443-3-2 prescribes no matrix. The tool
   always shows the rule trace, and the consultant's per-FR SL-T and written
   justification are the deliverable. A client's own corporate matrix takes
   precedence: tune `data/slt-suggestion-rules.json` or replace the matrix
@@ -171,7 +206,10 @@ css/report-page.css                the Report page, in the assessment tool's cla
 data/slt-suggestion-rules.json     house risk model AS DATA (severity/likelihood
                                    scales, risk matrix, risk->SL, FRs, tolerable
                                    risk, exposure modifiers) + generated .js
-data/risk-context-interchange.json the export contract (spt-risk-context/1.2) + .js
+data/zcr-map.json                  the ZCR ids, titles and clause numbers of
+                                   IEC 62443-3-2:2020 + generated .js; the only
+                                   place a clause number is written
+data/risk-context-interchange.json the export contract (spt-risk-context/1.4) + .js
 data/engagement-guidance.json      advisory prep notes (typical & often-forgotten
                                    documents, key stakeholders) shown on the
                                    Basis of assessment page; never auto-added
@@ -184,12 +222,15 @@ scripts/test-risk-version.html     version shown in the tool, never in Word/Exce
 scripts/test-risk-sections.html    the Report page, on real Word output, against
                                    risk-word-baseline.js (the text with no overrides)
 scripts/test-risk-accept.html      accepting suggested wording, and Go to
+scripts/test-risk-zcr.html         the ZCR lookup, no draft citation or term on
+                                   any page or in the Word reports, and the
+                                   alias for reworded section headings
 vendor/docx.umd.js                 Word lib — the rPr-PATCHED copy (see the
                                    Assessments app's docx patch note); exceljs
                                    drives the Excel workbook; xlsx unused
 ```
 
-After editing either JSON file:
+After editing any of the JSON files:
 
 ```
 powershell -ExecutionPolicy Bypass -File scripts/build-data.ps1
@@ -275,8 +316,8 @@ that the single HTML must carry inline, and the exe's app id and self-test.
 
 ## Out of scope for v0.x
 
-Verbatim zone and conduit requirements and other normative content (this waits
-for a licensed copy), drag-and-drop network diagramming, and any automatic
+Verbatim zone and conduit requirements and other normative content,
+drag-and-drop network diagramming, and any automatic
 scoring of the 3-3 assessment from risk data.
 
 ## Copyright and licence

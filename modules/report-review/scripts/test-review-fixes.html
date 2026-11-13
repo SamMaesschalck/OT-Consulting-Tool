@@ -401,6 +401,22 @@
         var threw = null;
         try { RK.run(bad, {}); } catch (e) { threw = e.message; }
         ok(threw === null, "items[].details that is not a list does not stop the checks", threw);
+        // A risk pack's treatment decisions, as the risk tool writes them: the
+        // priority field holds the confirmed decision in the report's words, and
+        // is empty while a decision is missing or only suggested.
+        var rp = mkPack([para("d0-b0", "Example Water", "", "")], { items: [
+          { targetName: "Control", targetId: "Z1", itemId: "Z1:T1", code: "T1", title: "Vendor access misused", groupName: "Zone", status: "finding", answer: "High", expected: "Medium", evidence: "Vendor", action: "M1 Jump host [existing]", priority: "" },
+          { targetName: "Control", targetId: "Z1", itemId: "Z1:T2", code: "T2", title: "Malware on a server", groupName: "Zone", status: "finding", answer: "High", expected: "Medium", evidence: "Malware", action: "", priority: "Treated through the SL-T programme" },
+          { targetName: "Control", targetId: "Z1", itemId: "Z1:T3", code: "T3", title: "Legacy tool", groupName: "Zone", status: "finding", answer: "High", expected: "Medium", evidence: "Insider", notes: "Accepted by the owner.", action: "", priority: "Risk accepted" },
+          { targetName: "Control", targetId: "Z1", itemId: "Z1:T4", code: "T4", title: "Network flood", groupName: "Zone", status: "met", answer: "Medium", expected: "Medium", evidence: "Fault", action: "", priority: "" },
+          { targetName: "Control", targetId: "Z1", itemId: "Z1:slt", code: "SL-T", title: "Target security levels", groupName: "Zone", status: "recorded", answer: "IAC SL3", details: [["Justification", "Set from the risk assessment."]], priority: "" }] });
+        rp.engagement.scoringFamily = "risk-assessment";
+        rp.engagement.fieldLabels = { answer: "Risk", expected: "Tolerable risk", evidence: "Threat source", notes: "Risk acceptance", action: "Countermeasures addressing this threat", impact: null, priority: "Treatment decision", owner: null };
+        var nd = of(RK.run(rp, {}), "risk-no-disposition");
+        ok(nd.length === 1 && nd[0].itemId === "Z1:T1" && nd[0].severity === "must-fix" && nd[0].message === "T1 on Control is above the tolerable risk with no treatment decision.",
+          "a risk above tolerable with no confirmed treatment decision is a must fix, countermeasure listed or not; the SL-T programme and an acceptance are decisions", JSON.stringify(nd.map(function (x) { return [x.itemId, x.message]; })));
+        ok(RK.CHECKS["risk-no-disposition"].title === "Risks above tolerable with no treatment decision" && !/disposition/i.test(RK.CHECKS["risk-no-disposition"].title + RK.CHECKS["risk-no-disposition"].about),
+          "and the check is named for what it finds", RK.CHECKS["risk-no-disposition"].title);
         open(bad);
         nav("engagement");
         ok(D.querySelectorAll(".rr-item").length === 2 && /First/.test(D.getElementById("main").textContent), "nor blank the Engagement page");
