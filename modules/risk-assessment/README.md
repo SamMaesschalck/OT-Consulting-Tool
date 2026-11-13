@@ -23,7 +23,7 @@ The Report page shows both Word reports, Detailed and High level, section by sec
 - **The key and the pass that applies it to Word are shared with the assessment tool** (`js/report-sections.js`, canonical copy `shared/report-sections.js`). A key slugs the generated heading, so a rename does not orphan its override. A rewrite replaces only the run of plain paragraphs opening a section: tables, figures, the scope and tolerable risk lines and the sign-off statement stay.
 - **Per-zone repeats.** The "Justification for ..." sections are one section across the zones and conduits. Its title is the words before the name, which every one of them keeps, and Hide takes them all. A rewrite is refused and the page says why: each has its own wording, written on the SL-T page. An accepted review suggestion can still reword one zone's paragraph, as it replaces that paragraph only.
 - **A zone's or conduit's own heading in the registers is its name,** not a section title: it has no Edit, and is renamed where it is entered. Hiding one zone's register would leave the summary's counts including a zone the report no longer prints.
-- **Reworded headings.** A key slugs the generated heading, so rewording a heading in `js/exports.js` would orphan what is stored under the old key. `SECTION_KEY_ALIASES` in `index.html` maps each old key to its new one, and is applied where stored keys are read: the section overrides on load, and a review's comments (saved in the project or imported later) in `js/review.js`. Add a line there whenever a generated heading is reworded.
+- **Reworded headings.** A key slugs the generated heading, so rewording a heading in `js/exports.js` would orphan what is stored under the old key. `SECTION_KEY_ALIASES` in `js/model.js` maps each old key to its new one, and is applied where stored keys are read: the section overrides on load, and a review's comments (saved in the project or imported later) in `js/review.js`. Add a line there whenever a generated heading is reworded.
 - **Ranked lists.** "Where to focus first" (Detailed) and "Where to look first" (High level) can be reordered by dragging or with the arrows, and Word follows. Rows nobody placed come after the placed ones. The ranking table is sorted by risk band and stays so: that order is what it reports.
 
 ## Word preview
@@ -186,11 +186,28 @@ switched off in the demo, so real unsaved work can never be touched.
 ## Layout
 
 ```
-index.html                         the whole app (UI + risk engine inline)
+index.html                         the page: header, styles and the script tags, in load order
 module.json                        the module manifest the packaging scripts read
 tour.html                          demo entry: redirects to index.html?tour
 js/version.js                      the suite version (synced copy of shared/version.js)
 js/product.js                      this module's product name
+js/model.js                        the project's shape: rules constants, schema, empty
+                                   records, ZCR lookup, the reworded-heading aliases
+js/engine.js                       the risk maths: matrix, residual, coverage, treatment
+                                   state, SL-T suggestion, completeness, risk context;
+                                   every function takes the project as an argument
+js/migrate.js                      Load and autosave restore: the schema ladder
+                                   (0.1 -> 0.2), the shape fill, the dangling-id prune
+js/view-model.js                   the one view model: per-threat and per-zone facts
+                                   and counts that the pages, Word, Excel, the review
+                                   pack and the risk context all read
+js/ui-kit.js                       h(), toast, theme, cards, fields, register table
+js/app.js                          state, autosave, Save/Load, sidebar, render loop,
+                                   header buttons; boot() publishes window.RiskTool
+js/ui-stages.js                    pages 1 to 5 and Basis of assessment
+js/ui-reports.js                   High-level report, Full report & export, downloads
+js/ui-about.js                     the About page
+js/boot.js                         starts the app once every page has registered
 js/exports.js                      Word + Excel deliverable builders/downloads
 js/report-page.js                  the Report page: both Word reports, section by
                                    section, edited in place
@@ -216,6 +233,9 @@ data/engagement-guidance.json      advisory prep notes (typical & often-forgotte
 data/tour-project.js               the completed demo assessment (tour mode only)
 scripts/build-data.ps1             regenerates the .js mirrors after editing JSON
 scripts/test-risk-tool.html        engine + UI tests (headless Edge)
+scripts/test-risk-migrate.html     the ladder, shape fill and prune on the frozen files
+scripts/fixtures/                  frozen project files: the tour as v0.7 saved it, and a
+                                   hand-made 0.1 file; never edited or regenerated
 scripts/test-tour-risk.html        tour-mode tests (seeding, autosave protection)
 scripts/test-risk-reports.html     Word/Excel deliverable tests
 scripts/test-risk-version.html     version shown in the tool, never in Word/Excel
@@ -229,6 +249,16 @@ vendor/docx.umd.js                 Word lib — the rPr-PATCHED copy (see the
                                    Assessments app's docx patch note); exceljs
                                    drives the Excel workbook; xlsx unused
 ```
+
+The app's own scripts are classic scripts (no modules, no bundler), so the
+folder app runs from file:// and the single-HTML build inlines each
+`<script src>` line in turn. They share one namespace, `window.RiskApp`
+(`Model`, `Engine`, `Migrate`, `ViewModel`, `UI`, `App`, `Reports`, `Pages`),
+and load in the order `index.html` lists them, `js/boot.js` last.
+`window.RiskTool` is the facade everything else uses (exports, review, the
+Report page, the Word preview, the suite, the tests, the exe's self-test);
+keep its members when moving code, and give an engine function the project
+rather than letting it read page state.
 
 After editing any of the JSON files:
 

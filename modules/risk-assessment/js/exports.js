@@ -90,42 +90,12 @@ window.RiskExports = (function () {
     ];
   }
 
-  // Everything the report tells is derived once here, shared by both formats.
+  // Everything the report tells is derived once, shared by both formats: the
+  // tool's one view model (js/view-model.js), which the screen, the risk
+  // context and the review pack read too. Its owners and threats are the
+  // rows the builders below walk; see that file for the shape.
   function summarise(p) {
-    var rt = RT();
-    var tolerable = p.srs.tolerableRisk || "medium";
-    var owners = p.zones.map(function (z) { return { kind: "Zone", o: z }; })
-      .concat(p.conduits.map(function (c) { return { kind: "Conduit", o: c }; }));
-    var threats = [];
-    owners.forEach(function (row) {
-      row.o.threats.forEach(function (t) {
-        var risk = rt.threatRisk(t);
-        // The treatment state comes from the tool's one function for it.
-        // decided: a confirmed decision with nothing missing. One the
-        // consultant has not confirmed prints as no decision, and a confirmed
-        // one that lacks what it rests on (incomplete) prints as a prompt.
-        var T = rt.threatTreatment(row.o, t, p);
-        threats.push({
-          ownerKind: row.kind, owner: row.o, t: t,
-          risk: risk, exceeds: T.required,
-          residual: T.residual,
-          treatment: T, decided: T.complete, incomplete: T.confirmed && !T.complete, label: T.label,
-          disposition: T.disposition
-        });
-      });
-    });
-    var counts = { mitigated: 0, countermeasure: 0, accepted: 0, "sl-t": 0, none: 0 };
-    threats.forEach(function (x) { if (x.exceeds) counts[x.disposition || "none"] += 1; });
-    var bandRank = {}; (RULES().riskBands || []).forEach(function (b) { bandRank[b.id] = b.rank; });
-    var worst = null, worstRank = -1;
-    threats.forEach(function (x) { if (x.risk && (bandRank[x.risk] || 0) > worstRank) { worstRank = bandRank[x.risk] || 0; worst = x; } });
-    var sltMax = {};
-    FRS().forEach(function (f) {
-      var m = null;
-      owners.forEach(function (row) { var v = row.o.slTargetByFR[f.id]; if (v != null && (m === null || v > m)) m = v; });
-      sltMax[f.id] = m;
-    });
-    return { tolerable: tolerable, owners: owners, threats: threats, dispositionCounts: counts, worst: worst, sltMax: sltMax, bandRank: bandRank };
+    return RT().viewModel(p);
   }
 
   /* ===================== WORD ===================== */
@@ -413,7 +383,7 @@ window.RiskExports = (function () {
       S.owners.forEach(function (row) {
         var o = row.o;
         var per = { "very-high": 0, "high": 0, "medium": 0, "low": 0 };
-        S.threats.forEach(function (x) { if (x.owner === o && x.risk && per[x.risk] != null) per[x.risk] += 1; });
+        row.threats.forEach(function (x) { if (x.risk && per[x.risk] != null) per[x.risk] += 1; });
         stacks.push(sbStackRow(o.id + " " + (o.name || ""), [
           { n: per["very-high"], color: COLOR.deep }, { n: per["high"], color: COLOR.gap },
           { n: per["medium"], color: COLOR.near }, { n: per["low"], color: COLOR.met }
@@ -547,7 +517,7 @@ window.RiskExports = (function () {
       // Where the risk sits.
       var hottest = null, hotCount = 0;
       S.owners.forEach(function (row) {
-        var n2 = S.threats.filter(function (x) { return x.owner === row.o && x.exceeds; }).length;
+        var n2 = row.exceeding.length;
         if (n2 > hotCount) { hotCount = n2; hottest = row; }
       });
       var findRuns = [
@@ -567,8 +537,7 @@ window.RiskExports = (function () {
       // The treatment position.
       if (exceed.length) {
         var c = S.dispositionCounts;
-        var cmEx = 0, cmPl = 0;
-        S.owners.forEach(function (row) { (row.o.countermeasures || []).forEach(function (m) { if (m.existing) cmEx++; else cmPl++; }); });
+        var cmEx = S.counts.countermeasuresExisting, cmPl = S.counts.countermeasuresPlanned;
         var accepted = exceed.filter(function (x) { return x.disposition === "accepted"; });
         var undecided = exceed.filter(function (x) { return !x.decided && !x.incomplete; });
         var incomplete = exceed.filter(function (x) { return x.incomplete; });
@@ -672,7 +641,7 @@ window.RiskExports = (function () {
 
     // ---- the high-level risk ranking ----
     // A heading reworded here needs its old key in the tool's section alias
-    // map (index.html, SECTION_KEY_ALIASES), or stored edits lose their place.
+    // map (js/model.js, SECTION_KEY_ALIASES), or stored edits lose their place.
     if (ranked.length) {
       children.push(h1("High-level risk ranking"));
       children.push(body("Systems are ranked by consequence and likelihood on the SolutionsPT house risk matrix" + (p.srs.clientMatrix ? " (client matrix noted: " + (p.srs.clientMatrixNote || "in use") + ")" : "") + ". An arrow and zone ID mark a system taken into the detailed tier."));
@@ -726,7 +695,7 @@ window.RiskExports = (function () {
         if (o.vulnerabilities && o.vulnerabilities.length) {
           children.push(body("Vulnerabilities: " + o.vulnerabilities.map(function (v) { return v.description; }).join(" · "), { color: COLOR.muted }));
         }
-        var oThreats = S.threats.filter(function (x) { return x.owner === o; });
+        var oThreats = row.threats;
         if (!oThreats.length) {
           children.push(body("No threats registered.", { color: COLOR.muted, italics: true }));
         } else {
@@ -891,7 +860,7 @@ window.RiskExports = (function () {
      ["Assumed adversary", p.srs.adversaryClass ? "SL" + p.srs.adversaryClass + "-grade" : "(not set)"],
      ["Zones / conduits", p.zones.length + " / " + p.conduits.length],
      ["Threats registered", String(S.threats.length)],
-     ["Above tolerable", String(S.threats.filter(function (x) { return x.exceeds; }).length)],
+     ["Above tolerable", String(S.counts.exceeding)],
      ["Sign-off", p.approval.approved ? (p.approval.name + " (" + p.approval.role + "), " + p.approval.date) : "Not signed off"],
      ["Method note", "SolutionsPT house risk matrix and risk-to-SL mapping. SL-T values are set by the consultant, with written justification."]
     ].forEach(function (kv) { front.addRow(kv); });

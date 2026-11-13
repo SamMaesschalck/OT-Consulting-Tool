@@ -134,18 +134,22 @@ window.RiskReview = (function () {
   }
   function packItems() {
     var p = project(), R = RT(), items = [], facts = [];
-    var tolerable = p.srs.tolerableRisk || "medium";
-    function addOwner(o, groupName, isZone) {
+    // The tool's one view model (js/view-model.js): each threat's risk,
+    // residual and treatment state, as the reports print them.
+    var vm = R.viewModel(p);
+    var tolerable = vm.tolerable;
+    function addOwner(row, groupName, isZone) {
+      var o = row.o;
       var fact = { targetName: ownerName(o), targetId: o.id, roadmapEntries: 0, findings: 0, met: 0, recorded: 0, toAssess: 0, unanswered: 0, na: 0, groups: [] };
       var field = { finding: "findings", met: "met", recorded: "recorded", "to-assess": "toAssess", unanswered: "unanswered", na: "na" };
-      (o.threats || []).forEach(function (t) {
-        var band = R.threatRisk(t), resid = R.residualRisk(t);
-        var over = R.exceedsTolerable(resid || band, tolerable);
+      row.threats.forEach(function (x) {
+        var t = x.t, band = x.risk, resid = x.residual;
+        var over = x.operativeExceeds;
         // The tool's one treatment state (RiskTool.threatTreatment). A threat
         // above tolerable risk with no confirmed decision, or with one that
         // lacks what it rests on (a countermeasure, a reason), is a finding
         // whatever its residual rating, so the review tool raises it.
-        var T = R.threatTreatment(o, t, p);
+        var T = x.treatment;
         var status = !band ? "unanswered" : (over || (T.required && !T.complete) ? "finding" : "met");
         // Only the countermeasures on a requirement this threat affects.
         var affected = t.affectedFR || [];
@@ -187,8 +191,8 @@ window.RiskReview = (function () {
       fact[set ? "recorded" : "unanswered"]++;
       facts.push(fact);
     }
-    p.zones.forEach(function (z) { addOwner(z, "Zone", true); });
-    p.conduits.forEach(function (c) { addOwner(c, "Conduit", false); });
+    vm.zones.forEach(function (row) { addOwner(row, "Zone", true); });
+    vm.conduits.forEach(function (row) { addOwner(row, "Conduit", false); });
     return { items: items, perTarget: facts };
   }
 

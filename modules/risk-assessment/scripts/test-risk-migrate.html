@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool migration tests</title></head>
+<body>
+<h1>risk-tool migration tests: the ladder, the shape fill and the prune, on frozen files</h1>
+<pre id="out">running…</pre>
+<iframe id="app" src="../index.html" style="width:10px;height:10px;visibility:hidden"></iframe>
+<!-- Frozen files (scripts/fixtures/): never edited or regenerated. -->
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool) { if (++tries > 100) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  function run(w) {
+    var RT = w.RiskTool, MG = w.RiskApp.Migrate, E = w.RiskApp.Engine;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var FX = window.RiskFixtures || {};
+    var TOUR = FX["tour-v0.7-saved"], OLD = FX["hand-made-v0.1"];
+    ok(!!TOUR && !!OLD, "both frozen fixtures are present");
+    function norm(x) { return MG.normaliseProject(clone(x)); }
+    function decisions(pj) {
+      var out = [];
+      pj.zones.concat(pj.conduits).forEach(function (o) { o.threats.forEach(function (th) { out.push(o.id + "/" + th.id + " " + th.treatment.decision + ":" + th.treatment.confirmed); }); });
+      return out.join(", ");
+    }
+
+    // ---- the v0.7 tour file: the new normaliser leaves a v0.7 save exactly as it was ----
+    ok(TOUR.schema === "spt-risk-project/0.2" && /^Acme Petrochemicals/.test(TOUR.suc.name), "the tour fixture is a 0.2 file saved by v0.7");
+    var nT = norm(TOUR);
+    ok(same(nT, TOUR), "a file saved by v0.7 comes through the ladder, the shape fill and the prune unchanged");
+    ok(same(norm(nT), nT), "normalising the tour file twice changes nothing the first pass did not");
+    ok(decisions(nT) === decisions(TOUR), "every recorded treatment decision is kept as saved", decisions(nT));
+
+    // ---- the hand-made 0.1 file ----
+    var nO = norm(OLD);
+    ok(same(norm(nO), nO), "normalising the 0.1 file twice changes nothing the first pass did not");
+    ok(nO.schema === "spt-risk-project/0.2", "the 0.1 file comes out as 0.2", nO.schema);
+    ok(!("initialRisk" in nO) && nO.srs.adversaryClass === 2 && /chlorine dosing/.test(nO.srs.essentialFunctions) && /Overdosing/.test(nO.srs.worstCase) && nO.srs.clientMatrix === true && /5x5/.test(nO.srs.clientMatrixNote),
+      "0.1 -> 0.2: the requirements move from initialRisk to srs", JSON.stringify(nO.srs));
+    ok(nO.srs.tolerableRisk === "medium" && Array.isArray(nO.srs.highLevelAssets) && nO.srs.highLevelAssets.length === 0 && Array.isArray(nO.srs.knownThreats), "and srs gains the default tolerable risk and empty lists");
+    var z1 = nO.zones[0], z2 = nO.zones[1], c1 = nO.conduits[0], c2 = nO.conduits[1];
+    ok(RT.FR_IDS.every(function (fr) { return z1.slTargetByFR[fr] === 2 && z2.slTargetByFR[fr] === 3 && c1.slTargetByFR[fr] === 2 && c2.slTargetByFR[fr] === null; }),
+      "0.1 -> 0.2: a scalar slTarget becomes the per-FR vector, and none stays none", JSON.stringify([z1.slTargetByFR, c2.slTargetByFR]));
+    ok(!("slTarget" in z1) && !("slTarget" in z2) && !("slTarget" in c1) && !("consequences" in z1), "the scalar and the consequences table are gone");
+    ok(nO.basisOfAssessment.interviews.length === 0 && nO.engagement.client === "" && nO.approval.approved === false && nO.approval.name === "", "the shape fill adds the basis, engagement and an unsigned approval");
+    ok(nO.counters.zone === 2 && nO.counters.threat === 4 && nO.counters.hla === 0 && nO.counters.observation === 0, "counters keep their values and gain the missing ones", JSON.stringify(nO.counters));
+    ok(z1.countermeasures[0].existing === false && z1.threats[0].acceptance === "" && z1.threats[0].residualLikelihood === "" && z2.threats[0].acceptance.indexOf("Accepted by") === 0,
+      "countermeasures gain existing=false; threats gain empty acceptance and residual fields, and keep an acceptance they had");
+    ok(z1.fromHLA === "" && Array.isArray(z1.vulnerabilities) && Array.isArray(c2.countermeasures) && z1.flags["remote-access"] === true, "zones gain the fields they lacked and keep their flags");
+    // Phase 1's suggestion-on-load: what the old build inferred, unconfirmed.
+    ok(decisions(nO) === "Z1/T1 reduce:false, Z2/T2 accept:false, Z2/T3 null:false, C1/T4 slt:false",
+      "a threat with no treatment record loads with the old inference as an unconfirmed suggestion (countermeasure, acceptance, within tolerable, SL-T)", decisions(nO));
+    ok(nO["x-reviewer-note"] === OLD["x-reviewer-note"] && z1["x-site-tag"] === "RW-PC-01" && z1.threats[0]["x-ref"] === "HAZOP node 4", "keys no build knows survive, at every level");
+
+    // ---- the treatment suggestion on load, on the tour with its records taken away ----
+    var bare = clone(TOUR);
+    bare.zones.concat(bare.conduits).forEach(function (o) { o.threats.forEach(function (th) { delete th.treatment; }); });
+    var nB = norm(bare), expectB = [];
+    nB.zones.concat(nB.conduits).forEach(function (o) { o.threats.forEach(function (th) { expectB.push(o.id + "/" + th.id + " " + E.suggestTreatment(o, th, nB.srs.tolerableRisk) + ":false"); }); });
+    ok(decisions(nB) === "Z1/T1 reduce:false, Z1/T2 reduce:false, Z1/T3 null:false, Z2/T4 reduce:false, Z3/T5 reduce:false, Z3/T6 null:false, Z4/T7 reduce:false, Z4/T8 accept:false, C2/T9 reduce:false" && decisions(nB) === expectB.join(", "),
+      "the tour with its treatment records removed loads every threat with the suggestion phase 1 gave it", decisions(nB));
+    ok(decisions(norm(clone(nB))) === decisions(nB), "and a second pass keeps those suggestions as they are");
+    var odd = clone(TOUR);
+    odd.zones[0].threats[0].treatment = { decision: "nonsense", confirmed: true };
+    odd.zones[0].threats[1].treatment = { decision: null, confirmed: true, reason: 5 };
+    var nOdd = norm(odd);
+    ok(same(nOdd.zones[0].threats[0].treatment, { decision: null, confirmed: false, reason: "" }) && same(nOdd.zones[0].threats[1].treatment, { decision: null, confirmed: false, reason: "" }),
+      "an unknown decision is dropped, confirmed without a decision is not confirmed, and a missing or odd reason becomes empty",JSON.stringify([nOdd.zones[0].threats[0].treatment, nOdd.zones[0].threats[1].treatment]));
+
+    // ---- unknown keys on the tour file ----
+    var extra = clone(TOUR);
+    extra["x-later-build"] = { anything: [1, 2] };
+    extra.srs["x-criteria"] = "client";
+    extra.zones[0]["x-level"] = 2;
+    extra.conduits[0]["x-direction"] = "one-way";
+    extra.zones[0].threats[0]["x-current"] = "medium";
+    extra.zones[0].countermeasures[0]["x-owner"] = "Ops";
+    var nE = norm(extra);
+    ok(same(nE["x-later-build"], { anything: [1, 2] }) && nE.srs["x-criteria"] === "client" && nE.zones[0]["x-level"] === 2 && nE.conduits[0]["x-direction"] === "one-way" && nE.zones[0].threats[0]["x-current"] === "medium" && nE.zones[0].countermeasures[0]["x-owner"] === "Ops",
+      "fields from a later build survive on the project, srs, a zone, a conduit, a threat and a countermeasure");
+
+    // ---- the dangling-id prune ----
+    var dang = clone(TOUR);
+    var keptHLA = dang.zones[1].fromHLA, keptEnd = dang.conduits[1].fromZone;
+    dang.zones[0].fromHLA = "A99";
+    dang.conduits[0].toZone = "Z99";
+    dang.conduits[2].toZone = "EXT";
+    dang.zones[2].hlaIds = [dang.zones[2].fromHLA, "A98"];
+    dang.zones[0].threats[0].countermeasureIds = [dang.zones[0].countermeasures[0].id, "M99"];
+    dang.zones[0].threats[0].vulnerabilityIds = ["V99"];
+    var nD = norm(dang);
+    ok(nD.zones[0].fromHLA === "" && nD.conduits[0].toZone === "", "a zone's ranked system and a conduit's end that are not in the file are cleared", JSON.stringify([nD.zones[0].fromHLA, nD.conduits[0].toZone]));
+    ok(nD.zones[1].fromHLA === keptHLA && keptHLA && nD.conduits[1].fromZone === keptEnd && nD.conduits[2].toZone === "EXT", "links that resolve, and EXT, are left alone");
+    ok(same(nD.zones[2].hlaIds, [dang.zones[2].fromHLA]) && same(nD.zones[0].threats[0].countermeasureIds, [dang.zones[0].countermeasures[0].id]) && same(nD.zones[0].threats[0].vulnerabilityIds, []),
+      "link lists a later build writes lose only the ids that are not in the file", JSON.stringify([nD.zones[2].hlaIds, nD.zones[0].threats[0].countermeasureIds]));
+    ok(!("hlaIds" in nT.zones[0]) && !("countermeasureIds" in nT.zones[0].threats[0]), "and are never added to a file that has none");
+    ok(same(norm(nD), nD), "pruning twice changes nothing the first pass did not");
+
+    // ---- through the app: Load, the refusal of other schemas, and Save ----
+    var before = RT.state.project;
+    ok(RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.3", suc: { name: "Later" }, zones: [], conduits: [] })) === false && RT.state.project === before, "Load refuses a schema it does not know (0.3)");
+    var KEY = RT.AUTOSAVE_KEY, old = null;
+    try { old = w.localStorage.getItem(KEY); } catch (e) {}
+    var bar0 = w.document.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    try { w.localStorage.setItem(KEY, JSON.stringify({ savedOn: new Date().toISOString(), stage: "suc", project: { schema: "spt-risk-project/0.3", suc: { name: "Later build" }, srs: {}, zones: [], conduits: [] } })); } catch (e) {}
+    RT.offerRestore();
+    ok(!w.document.querySelector(".autosave-bar"), "and the autosave restore does not offer one");
+    try { if (old == null) w.localStorage.removeItem(KEY); else w.localStorage.setItem(KEY, old); } catch (e) {}
+
+    function saveText() {
+      return new Promise(function (resolve) {
+        var text = null;
+        w.showSaveFilePicker = function () {
+          return Promise.resolve({ name: "fixture.json", queryPermission: function () { return Promise.resolve("granted"); },
+            createWritable: function () { return Promise.resolve({ write: function (s) { text = s; return Promise.resolve(); }, close: function () { return Promise.resolve(); } }); } });
+        };
+        RT.forgetProjectFile();
+        RT.saveProject({ shiftKey: true }, function (r) { delete w.showSaveFilePicker; resolve(r && r.ok ? text : null); });
+      });
+    }
+
+    ok(RT.loadProjectText(JSON.stringify(OLD)) === true && RT.state.project.suc.name === OLD.suc.name, "the 0.1 file loads in the app");
+    ok(decisions(RT.state.project) === decisions(nO) && same(RT.state.project.srs, nO.srs), "as the normaliser makes it");
+    return saveText().then(function (text) {
+      var s = null; try { s = JSON.parse(text); } catch (e) {}
+      ok(s && s.schema === "spt-risk-project/0.2" && s.zones[0].slTargetByFR.UC === 2 && !("initialRisk" in s), "and saves again as 0.2", s && s.schema);
+      ok(s && s["x-reviewer-note"] === OLD["x-reviewer-note"] && s.zones[0]["x-site-tag"] === "RW-PC-01" && s.zones[0].threats[0]["x-ref"] === "HAZOP node 4", "with the unknown keys still in it");
+      ok(RT.loadProjectText(text) === true && same(MG.normaliseProject(clone(RT.state.project)), RT.state.project), "the re-saved file loads, already in shape");
+
+      ok(RT.loadProjectText(JSON.stringify(TOUR)) === true && same(RT.state.project, TOUR), "the tour file loads in the app exactly as saved");
+      return saveText();
+    }).then(function (text) {
+      var s = null; try { s = JSON.parse(text); } catch (e) {}
+      var a = clone(TOUR), b = s ? clone(s) : null;
+      if (b) { delete a.savedOn; delete b.savedOn; }
+      ok(s && s.schema === "spt-risk-project/0.2" && same(a, b), "and saves again as 0.2 with nothing changed but the time it was saved");
+    });
+  }
+}());
+</script>
+</body>
+</html>
