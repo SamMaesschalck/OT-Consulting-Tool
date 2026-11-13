@@ -204,7 +204,7 @@
     ok(!!res && hX.store.writes === 1 && /Edit one/.test(hX.store.text) && !/Edit two/.test(hX.store.text), "59: the file holds what was there when it was built, and not the later change");
     ok(A.D.state.dirty === true && A.$("btn-save").textContent === "Save*", "59: so the document is still unsaved: Save*", A.$("btn-save").textContent);
     ok(/unsaved changes$/.test(A.$("save-state").textContent), "59: the header says unsaved changes, not the file name", A.$("save-state").textContent);
-    ok(/Saved to X\.json\./.test(toastOf(A)) && /is not in the file yet: save again/.test(toastOf(A)), "59: and the message says the later change is not in the file", toastOf(A));
+    ok(/Saved to X\.json\./.test(toastOf(A)) && /are not in the file: save again/.test(toastOf(A)), "59: and the message says the later change is not in the file", toastOf(A));
     return guardAsks(A);
   }).then(function (asks) {
     ok(asks, "59: New or Load would ask about unsaved changes");

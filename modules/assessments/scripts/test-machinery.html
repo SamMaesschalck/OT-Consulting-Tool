@@ -170,7 +170,7 @@ window.docx = (function () {
     // The consultant fills the two executive-summary paragraphs IN-TOOL (the
     // rest of the Word exec summary is composed automatically from the data).
     check("report page offers the consultant-input card", t.indexOf("Executive summary: consultant input") !== -1);
-    var tas = [].slice.call(main().querySelectorAll(".card textarea")).filter(function (x) { return /Leave blank to keep the placeholder/.test(x.placeholder || ""); });
+    var tas = [].slice.call(main().querySelectorAll(".card textarea")).filter(function (x) { return /Executive summary: consultant input/.test(x.closest(".card").textContent); });
     check("card has the two narrative fields", tas.length === 2);
     tas[0].value = "Engage the notified body first; the type-examination is the critical path to 2027 placements.";
     tas[0].dispatchEvent(new Event("change", { bubbles: true }));

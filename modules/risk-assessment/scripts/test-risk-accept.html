@@ -139,7 +139,7 @@
           return xml({}).then(function (x) {
             ok(x.indexOf("A plainer sentence about treatment.") !== -1, "Word: it prints");
             ok(x.indexOf("threats were registered") !== -1, "Word: the paragraph before it stays");
-            ok(x.indexOf("Of the above-tolerable threats") === -1, "Word: the one it replaced goes");
+            ok(x.indexOf("Of the threats above tolerable risk") === -1, "Word: the one it replaced goes");
           });
         });
       }).then(function () {

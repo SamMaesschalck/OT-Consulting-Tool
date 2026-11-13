@@ -524,7 +524,7 @@ FixImport.part("a", function (ok, eq) {
       eq([count(r.report, "internal-links"), count(r.report, "other-links"), r.report.carried.links], [2, 4, 1], "15 links to a bookmark are counted apart from links to a file, a share or another address");
       ok(other && r.report.notCarried.indexOf(other) >= 0 && I.CODES.notCarried.indexOf("other-links") >= 0 && other.examples.indexOf("\\\\server\\share\\Design.docx") >= 0, "15 the report quotes where the file links pointed", JSON.stringify(other));
       var s = F.sentence(other);
-      ok(/^4 links to a file or to another address that is not a web or email address were not carried over\. The text of each was kept\.$/.test(s) && s.indexOf("inside the document") < 0 && plainWords(s), "15 the sentence for a file link does not call it a place inside the document", s);
+      ok(/^4 links to a file or to an address other than web or email were not carried over. Their text was kept.$/.test(s) && s.indexOf("inside the document") < 0 && plainWords(s), "15 the sentence for a file link does not call it a place inside the document", s);
       ok(/^2 links to a place inside the document were not carried over/.test(F.sentence(inside)) && /^1 link to a file .* was not carried over/.test(F.sentence({ code: "other-links", count: 1 })), "15 the bookmark sentence is unchanged, and the new one reads properly for one");
     });
   });
@@ -719,7 +719,7 @@ FixImport.part("b", function (ok, eq) {
       eq(e && e.blockIds, [b[0].id, b[1].id, b[2].id, b[5].id], "24 the line points at the paragraphs the fields were in");
       eq([count(r.report, "fields"), count(r.report, "symbols")], [7, 1], "24 the fields that became text are counted as fields kept as text (five symbols, a prompt, a date), not the ones that left nothing; the box is counted");
       var s = F.sentence(e);
-      ok(/^4 fields that Word works out as it prints .* had no text to keep\. Type in what they showed\.$/.test(s) && plainWords(s) && /^1 field that .* Type in what it showed\.$/.test(F.sentence({ code: "fields-no-text", count: 1 })),
+      ok(/^4 automatic fields had no text to keep. Type in what they showed.$/.test(s) && plainWords(s) && /^1 automatic field had no text to keep. Type in what it showed.$/.test(F.sentence({ code: "fields-no-text", count: 1 })),
         "24 the sentence reads properly for one and for many", s);
     });
   });
@@ -782,7 +782,7 @@ FixImport.part("b", function (ok, eq) {
       var lk = entry(r.report, "links-in-drawings");
       eq(lk && [lk.count, lk.blockIds, lk.examples], [4, [box.id, chart.id], ["Link box", "Chart 9"]],
         "26 each link taken off is counted once (not once for each version of the box), with the drawing it was in: a file link, a click action (an address on the shape in the VML version), a field, and one in the chart's own part");
-      ok(lk && r.report.notCarried.indexOf(lk) >= 0 && /^4 links inside a drawing or a text box pointed somewhere other than a web or email address and were removed\. The words and shapes were kept\.$/.test(F.sentence(lk)) && plainWords(F.sentence(lk)),
+      ok(lk && r.report.notCarried.indexOf(lk) >= 0 && /^4 links in a drawing or text box to an address other than web or email were removed. The words and shapes were kept.$/.test(F.sentence(lk)) && plainWords(F.sentence(lk)),
         "26 the sentence says what happened", lk && F.sentence(lk));
       eq([count(r.report, "other-links"), r.report.carried.links], [1, 0], "26 the link in the body is still reported as before, and no link in a drawing is counted as a link brought across in the text");
       ok(!/INCLUDEPICTURE|INCLUDETEXT/.test(inc.xml) && !/fldSimple/.test(inc.xml) && /included words/.test(inc.xml) && !/imagedata/.test(inc.xml),
@@ -836,8 +836,8 @@ FixImport.part("b", function (ok, eq) {
         eq([e && e.count, e && e.examples, !!entry(r.report, "contents")], [1, ["Figure 1: Network overview 4", "Table of Figures", "Figure 2: Zones 6"], false],
           "29 it is reported as a list of figures, with its lines quoted, and not as the table of contents");
         var s = F.sentence(e);
-        ok(r.report.notCarried.indexOf(e) >= 0 && /^A list of figures or tables was not carried over\. The template has none to put in its place\. The captions themselves were kept\.$/.test(s) && !/contents/i.test(s) && plainWords(s) &&
-          /^2 lists of figures or tables were not carried over\. The template has none to put in their place\./.test(F.sentence({ code: "figures-list", count: 2 })), "29 the sentence does not promise a contents list in its place", s);
+        ok(r.report.notCarried.indexOf(e) >= 0 && /^A list of figures or tables was not carried over, and the template has none. The captions were kept.$/.test(s) && !/contents/i.test(s) && plainWords(s) &&
+          /^2 lists of figures or tables were not carried over, and the template has none./.test(F.sentence({ code: "figures-list", count: 2 })), "29 the sentence does not promise a contents list in its place", s);
         return imp({ body: P("Contents", S("Heading1")) + LISTOF(' TOC \\o "1-3" \\h \\z \\u ', ["Scope 2", "Findings 5"], "TOC1") + LISTOF(' TOC \\h \\z \\c "Table" ', ["Table 1: Ports 3"], "TOF") + P("Scope", S("Heading1")) + P("Text.") });
       }).then(function (r) {
         var c = entry(r.report, "contents"), f = entry(r.report, "figures-list");
@@ -860,7 +860,7 @@ FixImport.part("b", function (ok, eq) {
       eq(b[0].rels.filter(function (x) { return x.external; }).map(function (x) { return [x.type.split("/").pop(), x.external]; }), [["hyperlink", "https://www.example.com/network-diagram?rev=3"]],
         "39 and the kept picture has its link, the exact address");
       eq(e && [e.count, e.blockIds, e.examples], [1, [b[1].id], ["file:///C:/plans/site.vsdx"]], "30 the link that was left off is reported, with its picture and where it pointed");
-      ok(e && r.report.notCarried.indexOf(e) >= 0 && F.sentence(e) === "1 picture or drawing had a link on it. It was kept, but without the link." && /^3 pictures or drawings had a link on them\. They were kept, but without the link\.$/.test(F.sentence({ code: "picture-links", count: 3 })),
+      ok(e && r.report.notCarried.indexOf(e) >= 0 && F.sentence(e) === "1 picture or drawing lost its link." && /^3 pictures or drawings lost their links.$/.test(F.sentence({ code: "picture-links", count: 3 })),
         "30 in a sentence that reads properly for one and for many", e && F.sentence(e));
       eq([r.report.carried.links, r.report.carried.pictures, r.report.carried.keptObjects], [1, 2, 1], "30 only the text link is counted as a link brought across");
       return exported(p).then(function (x) {
@@ -1202,10 +1202,10 @@ FixImport.part("r2", function (ok, eq) {
         eq(pics && pics.examples, [UNC, "\\\\fileserver.example\\share\\only.png", "http://tracker.example/both.png", "https://tracker.example/group.png", "https://tracker.example/plain.png"],
           "2 with each address");
         ok(objs && r.report.notCarried.indexOf(objs) >= 0 && objs.count === 1 && objs.examples[0] === "file:///\\\\host\\share\\Book1.xlsx", "2 the chart's workbook link is listed as not carried over, with its address", JSON.stringify(objs));
-        eq(F.sentence({ code: "linked-pictures", count: 1 }), "A picture linked to a file or web address outside the document was left out, because Word would fetch it when the file is opened. Insert the picture itself if it is needed.",
+        eq(F.sentence({ code: "linked-pictures", count: 1 }), "A picture linked to a file or web address outside the document was left out. Insert the picture itself if it is needed.",
           "2 the sentence for one");
         var many = F.sentence(pics), lo = F.sentence(objs);
-        ok(/^5 pictures linked to a file or web address outside the document were left out, because Word would fetch them when the file is opened\. Insert the pictures themselves if they are needed\.$/.test(many) &&
+        ok(/^5 pictures linked to a file or web address outside the document were left out. Insert the pictures themselves if they are needed\.$/.test(many) &&
           plainWords(many) && plainWords(lo) && /left out/.test(lo), "2 the sentences read properly for many and say what was left out", many + " | " + lo);
         return exported(M.normalise(p));
       }).then(function (x) {

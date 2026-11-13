@@ -284,7 +284,7 @@
       window.__project = JSON.stringify(P());
       P().zones = []; P().conduits = []; RT.touched();
       RT.state.stage = "peer"; RT.render();
-      ok(/holding the high-level report and its basis of assessment/.test(main.textContent), "with no zones the Peer review page says the pack holds the high-level report");
+      ok(/the pack holds only the high-level report/.test(main.textContent), "with no zones the Peer review page says the pack holds the high-level report");
       return RR.buildPack();
     }).then(function (r) {
       ok(r.pack.documents.length === 1 && r.pack.documents[0].title === "High-level report", "and so it does", r.pack.documents.map(function (x) { return x.title; }).join(", "));

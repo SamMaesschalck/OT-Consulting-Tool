@@ -85,9 +85,9 @@ window.RiskExports = (function () {
     var a = p.approval || {};
     return [
       a.approved
-        ? "The asset owner, " + a.name + " (" + a.role + "), signed off the tolerable risk and this outcome on " + a.date + ": “" + a.statement + "”"
-        : "The tolerable risk and assessment outcome have not yet been signed off by the asset owner.",
-      "The tolerable risk (§4.3.6) and the assessment outcome have not yet been signed off by the asset owner."
+        ? "The asset owner, " + a.name + " (" + a.role + "), signed off the tolerable risk and the results on " + a.date + ": “" + a.statement + "”"
+        : "The asset owner has not yet signed off the tolerable risk or the results.",
+      "The asset owner has not yet signed off the tolerable risk (§4.3.6) or the results."
     ];
   }
 
@@ -369,7 +369,7 @@ window.RiskExports = (function () {
           { t: bandStyle(S.tolerable).name, color: bandStyle(S.tolerable).text, label: "tolerable risk", fill: bandStyle(S.tolerable).fill, size: 32 },
           { t: String(promoted), color: COLOR.navy, label: "promoted to detailed tier", fill: COLOR.subBg }
         ]));
-        out.push(body("Relative ranking of the systems in scope by consequence and likelihood against the house risk matrix. The full ranking table follows; systems in the upper bands are the candidates for detailed, per-system assessment.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
+        out.push(body("Systems in scope ranked by consequence and likelihood on the SolutionsPT house risk matrix.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
         // Ranking as a stacked overview: one row, systems per band.
         var perBand = { "very-high": 0, "high": 0, "medium": 0, "low": 0 };
         p.srs.highLevelAssets.forEach(function (a) { var b3 = rt.riskFor(a.consequence, a.likelihood); if (b3 && perBand[b3] != null) perBand[b3] += 1; });
@@ -403,7 +403,7 @@ window.RiskExports = (function () {
         { t: dispositioned + "/" + exceed.length, color: dispositioned === exceed.length ? COLOR.met : COLOR.gap, label: "dispositioned", fill: dispositioned === exceed.length ? COLOR.metBg : COLOR.gapBg },
         { t: sltWorst == null ? "—" : "SL" + sltWorst, color: COLOR.navy, label: "highest SL-T set", fill: COLOR.subBg }
       ]));
-      out.push(body("Unmitigated risk per zone and conduit (threat counts by band), against a tolerable risk of " + bandStyle(S.tolerable).name + ". Dispositions and residual positions are in the detailed register; the SL-T vector per zone follows with the consultant's justifications.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
+      out.push(body("Threats per zone and conduit by unmitigated risk band. The tolerable risk is " + bandStyle(S.tolerable).name + ".", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
       out.push(h2("Risk profile by zone and conduit"));
       var stacks = [];
       S.owners.forEach(function (row) {
@@ -465,7 +465,7 @@ window.RiskExports = (function () {
       // (shared/docx-blocks.js), as an approval is what fills it in.
       ["QA review by", notSet(eng.qaReviewBy)],
       ["Confidentiality", notSet(eng.confidentiality)],
-      ["Method", "IEC 62443-3-2 Clause 4 workflow; SolutionsPT house risk matrix and risk-to-SL mapping (shown with every suggestion; the consultant's per-FR SL-T and written justification are the deliverable)"],
+      ["Method", opts.highLevelOnly ? "IEC 62443-3-2 §4.2, using the SolutionsPT house risk matrix" : "IEC 62443-3-2 Clause 4, using the SolutionsPT house risk matrix and risk-to-SL mapping"],
       ["Asset-owner sign-off", p.approval.approved ? (p.approval.name + " (" + p.approval.role + "), " + p.approval.date) : "Not yet signed off"]
     ]));
     children.push(pageBreak());
@@ -483,28 +483,32 @@ window.RiskExports = (function () {
     var bs = p.basisOfAssessment || { interviews: [], documents: [], observations: [] };
     function basisSentence() {
       var bits = [];
-      if (bs.interviews.length) bits.push(bs.interviews.length + " interview" + (bs.interviews.length > 1 ? "s" : "") + " with operations, engineering and management staff");
-      if (bs.documents.length) bits.push(bs.documents.length + " document" + (bs.documents.length > 1 ? "s" : "") + " reviewed");
-      if (bs.observations.length) bits.push(bs.observations.length + " system" + (bs.observations.length > 1 ? "s" : "") + " and items of evidence observed directly");
+      if (bs.interviews.length) bits.push(bs.interviews.length + " interview" + (bs.interviews.length > 1 ? "s" : ""));
+      if (bs.documents.length) bits.push(bs.documents.length + " document" + (bs.documents.length > 1 ? "s" : ""));
+      if (bs.observations.length) bits.push(bs.observations.length + " direct observation" + (bs.observations.length > 1 ? "s" : ""));
       if (!bits.length) return null;
-      return "The findings rest on the evidence gathered during the engagement: " + bits.join(", ") + ". All of it is recorded in the Basis of assessment section, so every judgement in this report can be traced back to its source.";
+      var listed = bits.length > 1 ? bits.slice(0, -1).join(", ") + " and " + bits[bits.length - 1] : bits[0];
+      return "The findings are based on " + listed + ", all listed under Basis of assessment.";
     }
+    // The consultant's own phrase inside our sentence: "are Continuous control"
+    // reads as a typo, but an acronym such as "SIS" keeps its capitals.
+    function lc1(s) { s = String(s || "").replace(/\.\s*$/, ""); return /^[A-Z][a-z]/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
     function stakesKids() {
       var out = [];
       if (p.srs.essentialFunctions || p.srs.worstCase) {
-        out.push(body("The operational stakes are recorded in the security requirements" + (p.srs.essentialFunctions ? ": the essential functions this assessment protects are " + p.srs.essentialFunctions.replace(/\.\s*$/, "") : "") + (p.srs.worstCase ? (p.srs.essentialFunctions ? ", and the" : ": the") + " credible worst-case consequence considered is " + p.srs.worstCase.replace(/\.\s*$/, "") : "") + ". That is what “risk” means throughout this document: the likelihood and severity of those outcomes, not the loss of data or an IT service."));
+        out.push(body((p.srs.essentialFunctions ? "The essential functions in scope are " + lc1(p.srs.essentialFunctions) + ". " : "") + (p.srs.worstCase ? "The credible worst-case consequence is " + lc1(p.srs.worstCase) + ". " : "") + "Risk in this report means the likelihood and severity of " + (p.srs.essentialFunctions && !p.srs.worstCase ? "losing those functions" : "that outcome") + ", not the loss of data or an IT service."));
       }
       if (p.srs.adversaryClass) {
-        out.push(body("Protection has been judged against an assumed adversary of SL" + p.srs.adversaryClass + " grade on the 62443 threat scale, meaning " + ({1: "casual or accidental misuse", 2: "an intentional attacker using simple means and low resources", 3: "a sophisticated attacker using specific skills and moderate resources", 4: "a sophisticated, well-resourced and motivated attacker (state-grade)"}[p.srs.adversaryClass] || "see the requirements section") + ". Choosing the adversary class is a business decision: it sets how strong the eventual countermeasures must be."));
+        out.push(body("The assumed adversary is SL" + p.srs.adversaryClass + " grade on the IEC 62443 scale, meaning " + ({1: "casual or accidental misuse", 2: "an intentional attacker using simple means and low resources", 3: "a sophisticated attacker using specific skills and moderate resources", 4: "a sophisticated, well-resourced and motivated attacker (state-grade)"}[p.srs.adversaryClass] || "see the requirements section") + ". This choice is the asset owner's, because it sets how strong the countermeasures must be."));
       }
       return out;
     }
     if (opts.highLevelOnly) {
       children.push(h2("Why this assessment"));
-      children.push(body("Operational technology is now as connected as enterprise IT, and it attracts the same attackers. The difference is that a cyber incident in a plant environment puts production, equipment and potentially people at risk rather than data alone. Before committing to detailed security engineering, " + notSet(eng.client) + " needs to know where across " + (p.suc.name || "the systems in scope") + " that risk actually sits, and which systems justify the cost of a full, per-system assessment. That triage question is what this high-level assessment answers."));
+      children.push(body("A cyber incident on a plant can stop production, damage equipment and put people at risk. Before investing in detailed security engineering, " + notSet(eng.client) + " needs to know which systems across " + (p.suc.name || "the systems in scope") + " carry the most risk, and which justify a full, per-system assessment."));
       children = children.concat(stakesKids());
       children.push(h2("What this report is"));
-      children.push(body("This document is the record of the first tier of an IEC 62443-3-2 security risk assessment, the standard's §4.2 initial system risk assessment" + (eng.assessmentDate ? ", carried out " + eng.assessmentDate : "") + ". Each system in scope has been ranked for relative cyber risk: the consultant judged the consequence of its compromise and the likelihood of that compromise, and combined the two through the organisation's risk criteria into a risk band, compared against the tolerable risk of " + tolName + ". The ranking is deliberately comparative. Its job is to put the systems in a defensible priority order, not to measure absolute risk, and this tier sets no security targets. The “Risk at a glance” page gives the one-page picture; the ranking table carries the judgements and their notes."));
+      children.push(body("This is the first tier of an IEC 62443-3-2 risk assessment, the §4.2 initial system risk assessment" + (eng.assessmentDate ? ", carried out " + eng.assessmentDate : "") + ". Each system in scope was ranked by the consequence and likelihood of its compromise, and the resulting risk band compared with the tolerable risk of " + tolName + ". The ranking is relative. It puts the systems in priority order but does not measure absolute risk or set security targets."));
       var bSent = basisSentence();
       if (bSent) children.push(body(bSent));
       children.push(h2("What we found"));
@@ -518,21 +522,21 @@ window.RiskExports = (function () {
       if (ranked.length) {
         children.push(body(ranked.length + " systems were ranked" + (bandBits.length ? ": " + bandBits.join(", ") : "") + ". " +
           (highPlus.length
-            ? "The systems ranked High or above (" + highPlus.map(function (a) { return a.name; }).join(", ") + ") are the candidates for detailed, per-system assessment" + (promoted ? "; " + promoted + " of the ranked systems " + (promoted === 1 ? "has" : "have") + " already been taken into the detailed tier" : "") + "."
-            : "No system ranks High or above; on this evidence, proceeding to detailed assessment is at the organisation's discretion.")));
+            ? "The systems ranked High or above (" + highPlus.map(function (a) { return a.name; }).join(", ") + ") are the candidates for detailed, per-system assessment" + (promoted ? "; " + promoted + " ranked system" + (promoted === 1 ? " has" : "s have") + " already moved into the detailed tier" : "") + "."
+            : "No system ranks High or above, so on this evidence a detailed assessment is optional.")));
       } else {
-        children.push(body("No systems have been ranked yet; the ranking table below is the deliverable of this tier once populated."));
+        children.push(body("No systems have been ranked yet."));
       }
       children.push(h2("What happens next"));
-      children.push(body("For each system taken forward, the detailed tier of the assessment partitions it into security zones and conduits, registers the credible threats, decides the treatment of everything above the tolerable risk, and sets the target security levels that scope the engineering work. Systems ranked below the threshold stay on the record here and should be re-ranked when their connectivity, criticality or the threat landscape changes materially."));
+      children.push(body("In the detailed tier, each system taken forward is divided into security zones and conduits, its threats are registered and treated, and target security levels are set to scope the engineering work. Systems below the threshold should be re-ranked if their connectivity, criticality or threat exposure changes."));
     } else {
       var exceed = S.threats.filter(function (x) { return x.exceeds; });
       children.push(h2("Why this assessment"));
-      children.push(body("Operational technology is now as connected as enterprise IT, and it attracts the same attackers. The difference is that a cyber incident in a plant environment puts production, equipment and potentially people at risk rather than data alone. Regulation, insurers and good engineering practice increasingly expect an asset owner to be able to show where that risk sits, that anything above the organisation's appetite has been consciously dealt with, and that the level of protection being engineered is proportionate to it. " + notSet(eng.client) + " commissioned this assessment of " + (p.suc.name || "the system under consideration") + (eng.assessmentDate ? " (" + eng.assessmentDate + ")" : "") + " to establish exactly that, on evidence rather than assumption."));
+      children.push(body("A cyber incident on a plant can stop production, damage equipment and put people at risk. Regulators and insurers increasingly expect an asset owner to show where that risk sits and that the protection in place is proportionate to it. " + notSet(eng.client) + " commissioned this assessment of " + (p.suc.name || "the system under consideration") + (eng.assessmentDate ? " (" + eng.assessmentDate + ")" : "") + " to establish that."));
       children = children.concat(stakesKids());
       children.push(h2("What this report is"));
-      children.push(body("This document is the record and decision instrument of a security risk assessment following IEC 62443-3-2, the international standard for assessing cyber risk in industrial automation and control systems. Its method, in plain terms: the systems in scope were first ranked for relative risk (§4.2, " + ranked.length + " systems); the system under consideration was then partitioned into " + p.zones.length + " security zones and " + p.conduits.length + " conduits. A zone groups assets that share security requirements, and a conduit is the communication path between zones; the partitioning is itself a security measure, because it contains an incident to the zone it starts in. For each zone and conduit the credible threats were registered and each was judged for likelihood and impact against the organisation's stated tolerable risk of " + tolName + "; everything above that line requires a recorded treatment decision. The result is a target security level (SL-T) for every zone and conduit, which is the level of protection the system must be engineered and maintained to sustain."));
-      children.push(body("Three artefacts leave this engagement together: this document, the readable record and the basis for management decisions; a companion Excel workbook carrying the same registers as a living tracker for the engineering team; and a machine-readable risk-context export that scopes the follow-on IEC 62443-3-3 assessment, where actual security capability is measured against the targets set here. The “Risk at a glance” page after this summary gives the one-page picture; the registers behind it carry the full evidence trail."));
+      function nOf(n, one, many) { return n + " " + (n === 1 ? one : many); }
+      children.push(body("The assessment follows IEC 62443-3-2. " + (ranked.length ? nOf(ranked.length, "system was", "systems were") + " first ranked for relative risk (§4.2). The system under consideration was then" : "The system under consideration was") + " divided into " + nOf(p.zones.length, "security zone", "security zones") + " and " + nOf(p.conduits.length, "conduit", "conduits") + ". A zone groups assets with the same security requirements, and a conduit is a communication path between zones. Threats to each zone and conduit were rated for likelihood and impact against the tolerable risk of " + tolName + ", and every threat above that level needs a recorded treatment decision. Each zone and conduit then has a target security level (SL-T), the protection it must be engineered and maintained to."));
       var bSent = basisSentence();
       if (bSent) children.push(body(bSent));
       children.push(h2("What we found"));
@@ -548,10 +552,10 @@ window.RiskExports = (function () {
         run(" exceed the tolerable risk of " + tolName + " before treatment.")
       ];
       if (hottest && hotCount > 1) {
-        findRuns.push(run(" The exposure concentrates in " + hottest.o.id + (hottest.o.name ? " " + hottest.o.name : "") + flagsPhrase(hottest.o) + ", which carries " + hotCount + " of them."));
+        findRuns.push(run(" The most affected is " + hottest.o.id + (hottest.o.name ? " " + hottest.o.name : "") + flagsPhrase(hottest.o) + ", with " + hotCount + "."));
       }
       if (S.worst) {
-        findRuns.push(run(" The single highest unmitigated risk is "));
+        findRuns.push(run(" The highest unmitigated risk is "));
         findRuns.push(run(bandStyle(S.worst.risk).name, { bold: true, color: bandStyle(S.worst.risk).text }));
         findRuns.push(run(": " + noStop(S.worst.t.statement) + " (" + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ")."));
       }
@@ -563,15 +567,16 @@ window.RiskExports = (function () {
         S.owners.forEach(function (row) { (row.o.countermeasures || []).forEach(function (m) { if (m.existing) cmEx++; else cmPl++; }); });
         var accepted = exceed.filter(function (x) { return x.disposition === "accepted"; });
         var undisp = exceed.filter(function (x) { return !x.disposition; });
-        children.push(body("Of the above-tolerable threats, " + c.mitigated + " are mitigated by controls that bring the residual risk within tolerance, " + c.countermeasure + " are covered by countermeasures (" + cmEx + " existing controls and " + cmPl + " planned across the registers), " + c["sl-t"] + " are carried into the target security level as the treatment plan, and " + c.accepted + " formally accepted by the asset owner."));
+        function isAre(n) { return n + (n === 1 ? " is" : " are"); }
+        children.push(body("Of the threats above tolerable risk, " + isAre(c.mitigated) + " mitigated to within tolerance, " + isAre(c.countermeasure) + " covered by countermeasures (" + cmEx + " existing and " + cmPl + " planned), " + isAre(c["sl-t"]) + " carried into the target security levels, and " + c.accepted + " formally accepted by the asset owner."));
         if (accepted.length) {
-          children.push(body((accepted.length > 1 ? "Accepted risks: " : "Accepted risk ") + accepted.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + noStop(x.t.statement); }).join("; ") + ". The acceptance rationale is recorded against the threat in the register and should be revisited at the next assessment."));
+          children.push(body((accepted.length > 1 ? "Accepted risks: " : "Accepted risk ") + accepted.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + noStop(x.t.statement); }).join("; ") + ". The rationale is recorded in the threat register and should be revisited at the next assessment."));
         }
         if (undisp.length) {
           children.push(body(undisp.length + " above-tolerable threat" + (undisp.length > 1 ? "s have" : " has") + " no disposition yet and need" + (undisp.length > 1 ? "" : "s") + " a decision: " + undisp.map(function (x) { return x.t.id + " (" + x.owner.id + ")"; }).join(", ") + ".", { bold: true, color: COLOR.gap }));
         }
       } else if (S.threats.length) {
-        children.push(body("No registered threat exceeds the tolerable risk of " + tolName + "; no treatment was required beyond the controls already reflected in the likelihood and impact judgements."));
+        children.push(body("No registered threat exceeds the tolerable risk of " + tolName + ", so no treatment is needed beyond the existing controls already counted in the ratings."));
       }
       // The outcome: the SL-T vector and what happens next.
       children.push(h2("What happens next"));
@@ -584,8 +589,8 @@ window.RiskExports = (function () {
           if (hit) drivers.push(row.o.id + (row.o.name ? " " + row.o.name : ""));
         });
       }
-      children.push(body("The output of the assessment is a target security level for every zone and conduit, with one target per foundational requirement. Worst case across the system: " + sltBits + (overallMax != null && drivers.length ? "; the SL" + overallMax + " ceiling is set by " + (drivers.length > 3 ? drivers.slice(0, 3).join(", ") + " and " + (drivers.length - 3) + " more" : drivers.join(", ")) : "") + ". These targets, together with the consultant's written justifications in the SL-T section, scope the ISA/IEC 62443-3-3 capability assessment, which this report's risk-context export feeds directly: the 3-3 work measures what the system can actually withstand today against what this assessment says it must withstand, and the gap between the two becomes the security improvement programme."));
-      children.push(body("This assessment is a snapshot. It should be revisited when the system, its connectivity or the threat landscape changes materially, after any security-relevant incident, and periodically in any case. The registers in the companion workbook are structured so that the next assessment starts from this one rather than from scratch."));
+      children.push(body("The highest target security levels across the system are " + sltBits + "." + (overallMax != null && drivers.length ? " The SL" + overallMax + " ceiling is set by " + (drivers.length > 3 ? drivers.slice(0, 3).join(", ") + " and " + (drivers.length - 3) + " more" : drivers.join(", ")) + "." : "") + " An IEC 62443-3-3 assessment against these targets will measure what the system can withstand today, and the gaps it finds become the security improvement programme."));
+      children.push(body("Repeat this assessment after a significant change to the system or its connectivity, after a security incident, and otherwise at regular intervals."));
     }
     if (p.approval.approved) {
       children.push(pinned(body(signOffTexts(p)[0], { italics: true })));
@@ -650,7 +655,7 @@ window.RiskExports = (function () {
     // ---- §4.2 ranking ----
     if (ranked.length) {
       children.push(h1("High-level risk ranking (§4.2)"));
-      children.push(body("Systems ranked by consequence and likelihood against the house risk matrix" + (p.srs.clientMatrix ? " (client matrix noted: " + (p.srs.clientMatrixNote || "in use") + ")" : "") + ". Systems promoted into the detailed tier are marked."));
+      children.push(body("Systems are ranked by consequence and likelihood on the SolutionsPT house risk matrix" + (p.srs.clientMatrix ? " (client matrix noted: " + (p.srs.clientMatrixNote || "in use") + ")" : "") + ". An arrow and zone ID mark a system taken into the detailed tier."));
       var rw = [2500, 2400, 1300, 1300, 1200, 2006];
       var promotedFrom = {};
       p.zones.forEach(function (z) { if (z.fromHLA) promotedFrom[z.fromHLA] = z.id; });
@@ -674,7 +679,15 @@ window.RiskExports = (function () {
     if (!opts.highLevelOnly) {
       // ---- zones & conduits + threat registers ----
       children.push(h1("Zones, conduits and the detailed risk assessment"));
-      children.push(body("Each zone and conduit below lists its registered threats with the consultant's likelihood × impact judgement against the house matrix, the comparison to tolerable risk, and the recorded disposition. Countermeasures marked “existing” are controls already in place; the rest are planned remediations."));
+      children.push(body("Each threat is rated for likelihood and impact on the SolutionsPT house risk matrix and compared with the tolerable risk of " + tolName + "."));
+      // The same drawing as the Zones & conduits page, as a picture.
+      var map = window.RiskZoneMap && p.zones.length ? window.RiskZoneMap.layout(p, rt.suggestZone) : null;
+      var png = map ? window.RiskZoneMap.toPng(map, 3) : null;
+      if (png) {
+        var mapW = Math.min(600, png.width), mapH = Math.round(png.height * mapW / png.width);
+        children.push(new docx.Paragraph({ alignment: docx.AlignmentType ? docx.AlignmentType.CENTER : "center", spacing: { before: 120, after: 200 }, keepNext: true,
+          children: [new docx.ImageRun({ data: png.bytes, transformation: { width: mapW, height: mapH }, altText: { title: "Zones and conduits", description: "Zone and conduit drawing", name: "zone-map" } })] }));
+      }
       S.owners.forEach(function (row) {
         var o = row.o;
         // A zone's own heading is its name, not a section title: it closes the
@@ -728,7 +741,7 @@ window.RiskExports = (function () {
 
       // ---- SL-T ----
       children.push(h1("Target security levels (SL-T, per foundational requirement)"));
-      children.push(body("The SL-T is a vector: one target per foundational requirement, set by the consultant from the risk picture (the suggestions made during the assessment, and their rule trace, are advisory). The written justification is part of the deliverable. Capability against these targets is assessed in the 62443-3-3 programme, which this assessment's risk-context export scopes."));
+      children.push(body("Each zone and conduit has one target per foundational requirement, set by the consultant from the risk assessment."));
       var frs = FRS();
       var mw = [2200].concat(frs.map(function () { return 940; }));
       var mrows = [headerRow(["Zone / conduit"].concat(frs.map(function (f) { return f.id; })), mw)];
@@ -770,8 +783,10 @@ window.RiskExports = (function () {
       children.push(pinned(body(signOffTexts(p)[1], { bold: true, color: COLOR.gap })));
     }
     children.push(h1("Method and limitations"));
-    children.push(body("This assessment follows the IEC 62443-3-2 Clause 4 workflow. The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults: the standard prescribes none and requires the organisation's own risk criteria, so a client corporate matrix takes precedence where one exists. Every SL suggestion made during the assessment carries a full rule trace, and the consultant's per-FR SL-T with written justification is the deliverable, not the suggestion."));
-    children.push(body("Likelihood and impact judgements reflect the evidence recorded in the basis of assessment at the time of the engagement. The assessment is indicative and does not verify security capability; capability against the SL-T targets is established through the ISA/IEC 62443-3-3 assessment this report's risk-context export feeds."));
+    children.push(body("The assessment follows IEC 62443-3-2 Clause 4. The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults. The standard prescribes none and expects the organisation's own risk criteria, so a client corporate matrix takes precedence where one exists." + (opts.highLevelOnly ? "" : " Each SL-T is the consultant's judgement, informed by the house mapping.")));
+    children.push(body(opts.highLevelOnly
+      ? "Consequence and likelihood ratings reflect the evidence available at the time of the engagement. The assessment does not test security capability."
+      : "Likelihood and impact ratings reflect the evidence available at the time of the engagement. The assessment sets targets and does not test security capability, which is measured against the SL-T in an IEC 62443-3-3 assessment."));
 
     // ---- the consultant's section overrides ----
     // The tree before them says what the generated wording is, and the tree after
@@ -856,7 +871,7 @@ window.RiskExports = (function () {
      ["Threats registered", String(S.threats.length)],
      ["Above tolerable", String(S.threats.filter(function (x) { return x.exceeds; }).length)],
      ["Sign-off", p.approval.approved ? (p.approval.name + " (" + p.approval.role + "), " + p.approval.date) : "Not signed off"],
-     ["Method note", "House risk matrix / risk-to-SL mapping (62443-3-2 prescribes none); consultant SL-T + justification are the deliverable"]
+     ["Method note", "SolutionsPT house risk matrix and risk-to-SL mapping (IEC 62443-3-2 prescribes none). SL-T values are set by the consultant, with written justification."]
     ].forEach(function (kv) { front.addRow(kv); });
     front.getCell("A1").font = { bold: true, size: 14, color: { argb: argb(COLOR.headBg) } };
     for (var fr2 = 2; fr2 <= 14; fr2++) front.getCell("A" + fr2).font = { bold: true, size: 10 };

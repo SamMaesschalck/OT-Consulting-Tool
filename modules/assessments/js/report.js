@@ -80,7 +80,7 @@ window.App.Report = (function () {
         ]);
       }))]));
     } else {
-      body.push(h("p", { class: "muted", style: "margin-top:0;", text: "No engagement details captured yet. Fill them in on the Engagement details page; they head the Word report." }));
+      body.push(h("p", { class: "muted", style: "margin-top:0;", text: "No engagement details yet. Add them on the Engagement details page." }));
     }
     if (empty.length) {
       body.push(h("p", { class: "muted", style: "margin-bottom:0; font-size:12px;", text:
@@ -1147,7 +1147,7 @@ window.App.Report = (function () {
             var d = h("div", null, []);
             d.appendChild(window.App.Charts.closenessBars(scoredCurrent, taxonomy, { width: 540 }));
             d.appendChild(h("div", { class: "spacer-12" }));
-            d.appendChild(h("div", { class: "muted", text: "Closeness is the mean of per-requirement scores, excluding N/A. It is shown for context and does not change the achieved SL." }));
+            d.appendChild(h("div", { class: "muted", text: "Closeness is the mean per-requirement score, excluding N/A. It does not change the achieved SL." }));
             return d;
           })()
         ])
@@ -1812,7 +1812,7 @@ window.App.Report = (function () {
       // Shown rather than hidden: a blank section is a prompt to the consultant
       // that the report is not finished, and it matches the Word placeholder.
       body = h("p", { class: "muted placeholder-note", style: "margin:0;", text:
-        "Not yet written. Set out the proposed next steps on the report page so the document does not go out with this section empty." });
+        "Not yet written. Add the proposed next steps before the report goes out." });
     } else if (lines.length === 1 && !nextStepsIsPrompt(lines[0])) {
       body = h("p", { style: "margin:0;", text: lines[0] });
     } else {
@@ -2704,7 +2704,7 @@ window.App.Report = (function () {
           lbl,
           h("p", {
             style: "border-left:4px solid var(--near); background:var(--near-bg); padding:10px 14px; margin:10px 0 0; color:var(--text);",
-            text: "This regulator profile is a placeholder with no expected states yet, so there are no meeting or below counts. Results show how the outcomes split across Achieved, Partially Achieved and Not Achieved."
+            text: "This regulator profile is a placeholder with no expected states, so there are no meeting or below counts."
           })
         ])
       ]);
@@ -2862,7 +2862,7 @@ window.App.Report = (function () {
         // that objective, not how many there are. Without saying so, an
         // objective holding nineteen outcomes and one holding five draw
         // identically. The counts beside each bar carry the magnitude.
-        h("div", { class: "muted", style: "margin-top:6px; font-size:12px;", text: "Each bar splits that objective's outcomes by state, so every bar is the same length however many outcomes it holds. The figures beside it are the counts." }),
+        h("div", { class: "muted", style: "margin-top:6px; font-size:12px;", text: "Bars show each state's share of the objective's outcomes. The figures beside them are the counts." }),
         h("div", { class: "spacer-12" }),
         h("table", { class: "tbl" }, [head, body, foot])
       ])
@@ -3398,7 +3398,7 @@ window.App.Report = (function () {
       return tr;
     });
     var leadText = interactive
-      ? "Drag rows to set the priority order. Click a row to edit the evidence and record the owner, recommended action, business impact and priority band. All of it goes into the Excel and Word exports."
+      ? "Drag rows to reorder. Click a row to edit it."
       : opts.leadStatic;
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: opts.title })]),
@@ -3549,7 +3549,7 @@ window.App.Report = (function () {
       return tr;
     });
     var leadText = interactive
-      ? "Drag rows to set the priority order. Click a row to edit the evidence and record the owner, recommended action, business impact and priority band. All of it goes into the Excel and Word exports."
+      ? "Drag rows to reorder. Click a row to edit it."
       : "Every applicable obligation that is Partially or Not Achieved, Not Achieved first. Priority, owner, business impact and recommended action are set by the consultant.";
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Gap roadmap" })]),

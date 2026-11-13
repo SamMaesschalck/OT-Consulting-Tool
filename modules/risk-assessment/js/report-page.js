@@ -395,7 +395,7 @@ window.RiskReportPage = (function () {
         if (lead.indexOf(b) !== -1) {
           if (!box) {
             box = h("textarea", { class: "sect-prose-input", "aria-label": "Section wording",
-              title: "One paragraph per line. The tables and charts below are not affected." });
+              title: "One paragraph per line" });
             box.value = cur.prose || printedProse;
             commitOn(box, function (v) {
               saveText({ prose: (sameProse(v, printedProse) || norm(v) === "") ? null : v.trim() });
@@ -421,13 +421,13 @@ window.RiskReportPage = (function () {
     if (editing) {
       if (s.repeat) {
         bodyEl.insertBefore(h("p", { class: "muted sect-note", "data-no-rewrite": "1", text:
-          "Each zone and conduit has its own wording here, so a rewrite in one box would replace all of them. Change it on the SL-T assignment page." }), bodyEl.firstChild);
+          "Each zone and conduit has its own wording here. Change it on the SL-T assignment page." }), bodyEl.firstChild);
       } else if (ids && ids.length > 1) {
         bodyEl.insertBefore(h("p", { class: "muted sect-note", text:
-          "Drag a row, or use its arrows, to change the order. Word prints them in this order." }), bodyEl.firstChild);
+          "Drag a row, or use its arrows, to reorder." }), bodyEl.firstChild);
       } else if (!lead.length) {
         bodyEl.insertBefore(h("p", { class: "muted sect-note", text:
-          "What this section prints comes from the assessment, so there is no opening wording to rewrite here. The title and Hide still apply." }), bodyEl.firstChild);
+          "There is no opening wording to rewrite here. You can still rename or hide it." }), bodyEl.firstChild);
       }
       var actions = [h("button", {
         class: "sl-btn" + (cur.hidden ? " active" : ""),
@@ -456,7 +456,7 @@ window.RiskReportPage = (function () {
         var into = top || root;
         if (!noted && topKey && ui.open === topKey) {
           noted = true;
-          into.appendChild(h("p", { class: "muted sect-note", text: "The headings below are the names of the zones and conduits. Rename them on the Zones & conduits page." }));
+          into.appendChild(h("p", { class: "muted sect-note", text: "Rename the zones and conduits below on the Zones & conduits page." }));
         }
         into.appendChild(h("h3", { class: "rp-subhead", text: s.title }));
         blocksInto(into, s.blocks, model.media);
@@ -499,7 +499,6 @@ window.RiskReportPage = (function () {
         h("p", { class: "wo-prose muted", text: "Generated: " + clip(r.from) }),
         h("p", { class: "wo-prose", text: "Reworded: " + clip(r.to) }),
         h("button", { type: "button", class: "inherited-edit wo-back", text: "Back to the generated version",
-          title: "Takes out this rewording. The paragraph is written from the assessment again",
           onClick: function () {
             if (setSection(docId, r.key, { paragraphs: RS().setParagraph(sectionOf(docId, r.key).paragraphs, r.from, null) })) { paint(); pump(); }
           } })
@@ -508,7 +507,7 @@ window.RiskReportPage = (function () {
     return h("div", { class: "card reworded-changes no-print", "data-check-anchor": "reworded" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Paragraphs reworded from review comments" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted sect-note", text: "Accepting a reviewer's wording on a paragraph that opens a section replaces that paragraph only. The rest of the section is still written from the assessment. If the assessment changes the paragraph it replaced, the rewording stops applying and the generated text prints." }),
+        h("p", { class: "muted sect-note", text: "If the assessment changes a reworded paragraph, the rewording stops applying and the generated text prints." }),
         h("ul", { class: "wo-list" }, items)
       ])
     ]);
@@ -581,7 +580,7 @@ window.RiskReportPage = (function () {
   function render(main, h) {
     ui.h = h;
     main.appendChild(h("h1", { class: "page-title", text: "Report preview" }));
-    main.appendChild(h("p", { class: "page-sub", text: "The Word report as the client will read it, read back from the generated file after each edit. Edit on a section renames, rewrites or hides it, here and in Word. The cover and page headers come from the engagement details." }));
+    main.appendChild(h("p", { class: "page-sub", text: "The Word report, section by section; use Edit to rename, rewrite or hide one." }));
     ui.tabs = h("div", { class: "rp-tabs", role: "group", "aria-label": "Which report" }, DOCS.map(function (d, i) {
       return h("button", { class: "sl-btn rp-tab", text: d.label, onClick: function () { openDoc(i); } });
     }));

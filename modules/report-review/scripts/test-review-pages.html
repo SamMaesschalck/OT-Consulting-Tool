@@ -125,7 +125,7 @@
     ok(pcs.backgroundColor === "rgb(255, 255, 255)" && pcs.fontSize === "14.67px", "white, in the house body size");
     var h1 = block(tops[1].id).querySelector("h1"), hcs = W.getComputedStyle(h1);
     ok(hcs.color === "rgb(23, 50, 103)" && hcs.fontWeight === "400" && hcs.fontSize === "21.33px", "headings in the house style", hcs.color + " " + hcs.fontWeight + " " + hcs.fontSize);
-    ok(/Word decides where pages break/.test(q("#rr-pages-note").textContent), "and the page says Word decides where pages break");
+    ok(/Page breaks in Word may differ/.test(q("#rr-pages-note").textContent), "and the page says Word may break pages differently");
     var picB = body.filter(function (b) { return b.type === "image" && Number(b.width) > 0; })[0], pic = picB && block(picB.id).querySelector("img");
     ok(pic && pic.style.width === Math.round(picB.width) + "px" && pic.getBoundingClientRect().width <= pr.width - 190, "a picture is shown at its size in the Word file, within the page", picB && (picB.width + " " + pic.style.width));
     var prevs = all("#rr-paper [data-prev-id]");

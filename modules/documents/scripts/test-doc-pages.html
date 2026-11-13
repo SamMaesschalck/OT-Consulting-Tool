@@ -273,10 +273,10 @@
       });
     });
     ok(bad.length === 0, "every code has its own sentence, for one and for many", bad.join(" | "));
-    ok(F.sentence({ code: "front-matter", count: 9 }) === "The original starts with 9 blocks before its first heading. This is often its own cover, document control table or contents list, which the template already prints. Check whether you still need them.",
+    ok(F.sentence({ code: "front-matter", count: 9 }) === "9 blocks come before the original's first heading. If they are a cover, document control or contents list, the template prints its own.",
        "front matter reads as designed", F.sentence({ code: "front-matter", count: 9 }));
     ok(/^1 comment was not/.test(F.sentence({ code: "comments", count: 1 })) && /^4 comments were not/.test(F.sentence({ code: "comments", count: 4 })), "one and many agree with their verb");
-    ok(/^Headers and footers were not carried over\. The SolutionsPT header and footer replace them\.$/.test(F.sentence({ code: "headers-footers", count: 2 })), "headers and footers read as designed");
+    ok(/^Headers and footers were replaced by the SolutionsPT header and footer\.$/.test(F.sentence({ code: "headers-footers", count: 2 })), "headers and footers read as designed");
     ok(/12 insertions accepted and 1 deletion removed/.test(F.sentence({ code: "tracked-changes", count: 13, insertions: 12, deletions: 1 })), "tracked changes give both counts when the reader does");
     ok(/later-code/.test(F.sentence({ code: "later-code", count: 2 })), "a code from a later version still gets a line", F.sentence({ code: "later-code", count: 2 }));
     ok(F.summary({ carried: { headings: 31, paragraphs: 212, listItems: 0, tables: 8, pictures: 14, keptObjects: 6, captions: 9, footnotes: 3, links: 0 } }) ===
@@ -346,7 +346,7 @@
 
     // front matter
     var fm = $("dp-card-check").querySelector('[data-code="front-matter"]');
-    ok(/starts with 3 blocks before its first heading/.test(fm.textContent), "the front matter is explained");
+    ok(/3 blocks come before the original's first heading/.test(fm.textContent), "the front matter is explained");
     reset();
     click(fm.querySelector(".btn"));
     ok(calls.go.length === 1 && calls.go[0][0] === "edit" && JSON.stringify(calls.go[0][1]) === '{"blockIds":["b1","b2","b3"]}', "Show opens the editor with those blocks selected", JSON.stringify(calls.go));
@@ -376,13 +376,13 @@
        "a drawing's row: number, kind and size, its name, its text, its caption, the heading it sits under", rows[0].textContent);
     ok(/^Picture/.test(rows[1].textContent) && /EMF picture, 12\.0 x 8\.0 cm, plan\.emf/.test(rows[1].textContent) && /placeholder/.test(rows[1].textContent) && /Under: Network/.test(rows[1].textContent),
        "a picture the browser cannot draw is listed with its type, size and name", rows[1].textContent);
-    ok(/^Drawing 2 of 3/.test(rows[2].textContent) && /without being opened or checked/.test(rows[2].textContent), "an embedded object says it is carried unopened", rows[2].textContent);
-    ok(/^Drawing 3 of 3/.test(rows[3].textContent) && /Shape, 3\.2 x 1\.6 cm/.test(rows[3].textContent) && /In a table under: Network/.test(rows[3].textContent) && /floats/.test(rows[3].textContent),
+    ok(/^Drawing 2 of 3/.test(rows[2].textContent) && /kept unopened/.test(rows[2].textContent), "an embedded object says it is carried unopened", rows[2].textContent);
+    ok(/^Drawing 3 of 3/.test(rows[3].textContent) && /Shape, 3\.2 x 1\.6 cm/.test(rows[3].textContent) && /In a table under: Network/.test(rows[3].textContent) && /Floats/.test(rows[3].textContent),
        "a drawing inside a table cell is listed too, described from its kind and size", rows[3].textContent);
     reset();
     click(rows[3].querySelector(".btn"));
     ok(JSON.stringify(calls.go[0]) === '["edit",{"blockId":"b15"}]', "its Show goes to the drawing", JSON.stringify(calls.go));
-    ok($("dp-drawings-note").textContent === "Drawings kept from the Word file cannot be shown here. Export a draft and open it in Word to see them.", "the list explains itself");
+    ok($("dp-drawings-note").textContent === "Drawings from the Word file show only in Word.", "the list explains itself");
     ok($("dp-report-draft").textContent === "Export a draft to check in Word", "with the button to export a draft");
     click($("dp-report-draft"));
     ok(exported.join() === "draft", "which exports a draft", exported.join());
@@ -468,7 +468,7 @@
       ]
     }));
     draw(P.preview);
-    ok($("dp-preview-note").textContent === "Word decides where the pages break. Drawings kept from an imported file show as placeholders here and print in the Word export as they were.",
+    ok($("dp-preview-note").textContent === "Word decides the page breaks. Drawings from an imported file show here as placeholders.",
        "the preview says once what it is", $("dp-preview-note").textContent);
     var sheets = Array.prototype.slice.call(main.querySelectorAll(".dp-sheet"));
     var parts = sheets.map(function (s) { return s.getAttribute("data-part") + (s.classList.contains("land") ? "-land" : ""); });

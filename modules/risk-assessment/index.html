@@ -128,9 +128,9 @@
       <div class="header-actions no-print">
         <button id="btn-theme" class="btn ghost" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
         <button id="btn-new"  class="btn ghost" title="Start a new risk assessment">New</button>
-        <button id="btn-load" class="btn ghost" title="Open a saved risk project (.json). Save then writes back to it">Load</button>
-        <button id="btn-save" class="btn ghost" title="Save over the project file (Shift+click to save a new copy)">Save</button>
-        <button id="btn-export" class="btn primary" title="Export the risk context file for the assessment tool">Export risk context</button>
+        <button id="btn-load" class="btn ghost" title="Open a saved risk project">Load</button>
+        <button id="btn-save" class="btn ghost" title="Shift+click to save a copy">Save</button>
+        <button id="btn-export" class="btn primary" title="For the assessment tool's 62443-3-3 import">Export risk context</button>
         <input id="file-input" type="file" accept="application/json,.json" class="hidden" />
       </div>
     </div>
@@ -149,6 +149,7 @@
   <script src="data/slt-suggestion-rules.js"></script>
   <script src="data/risk-context-interchange.js"></script>
   <script src="data/engagement-guidance.js"></script>
+<script src="js/zone-map.js"></script>
 
   <script>
   (function () {
@@ -370,8 +371,8 @@
       if (window.App.HostBridge) window.App.HostBridge.setDirty(dirty && !TOUR_MODE);
       var b = document.getElementById("btn-save");
       if (!b) return;
-      if (dirty) { b.textContent = "Save*"; b.classList.add("btn-unsaved"); b.title = "Unsaved changes. Save over the project file (Shift+click to save a new copy)"; }
-      else { b.textContent = "Save"; b.classList.remove("btn-unsaved"); b.title = "Save over the project file (Shift+click to save a new copy)"; }
+      if (dirty) { b.textContent = "Save*"; b.classList.add("btn-unsaved"); b.title = "Unsaved changes. Shift+click to save a copy"; }
+      else { b.textContent = "Save"; b.classList.remove("btn-unsaved"); b.title = "Shift+click to save a copy"; }
     }
     function markDirty() { if (!dirty) { dirty = true; updateSaveButton(); } }
     function markClean() { if (dirty) { dirty = false; updateSaveButton(); } else updateSaveButton(); }
@@ -522,7 +523,7 @@
       function download(blocked) {
         downloadBlob(text, suggested);
         markClean();
-        toast(blocked ? "Risk project saved (downloaded as " + suggested + "). Saving back into the same file is not available here, so each save downloads a new copy."
+        toast(blocked ? "Risk project saved as a download (" + suggested + "). Each save here downloads a new copy."
                       : "Risk project saved (downloaded).");
         noteRecentFile("save", suggested, null);
         onDone({ ok: true, method: "download", name: suggested, blocked: !!blocked });
@@ -964,11 +965,11 @@
     function renderSuc(main) {
       var p = state.project;
       main.appendChild(h("h1", { class: "page-title", text: "System under consideration" }));
-      main.appendChild(h("p", { class: "page-sub", text: "Clause 4.1: define the SuC, its boundary and every access point. The assumptions recorded here go into the export and the summary." }));
+      main.appendChild(h("p", { class: "page-sub", text: "Clause 4.1: define the SuC, its boundary and every access point." }));
       main.appendChild(card("SuC definition", "§4.1.1", [
         textField("SuC name", p.suc.name, function (v) { p.suc.name = v; touched(); }, { placeholder: "e.g. Riverside Works process control system" }),
         textField("Description", p.suc.description, function (v) { p.suc.description = v; touched(); }, { textarea: true, placeholder: "Function and intended usage of the SuC (§4.3.2)." }),
-        textField("Scope statement / boundary", p.suc.scopeStatement, function (v) { p.suc.scopeStatement = v; touched(); }, { textarea: true, placeholder: "What is inside and outside the boundary, and the access points across it.", hint: "Be explicit about exclusions (e.g. corporate IT, third-party packages)." }),
+        textField("Scope statement / boundary", p.suc.scopeStatement, function (v) { p.suc.scopeStatement = v; touched(); }, { textarea: true, placeholder: "What is inside and outside the boundary, and the access points across it.", hint: "Name the exclusions, e.g. corporate IT or third-party packages." }),
         lineListField("Operating-environment assumptions (§4.3.3)", p.suc.assumptions, function (a) { p.suc.assumptions = a; touched(); }, "e.g. Physical access to the equipment room is controlled")
       ]));
     }
@@ -1010,12 +1011,12 @@
     function renderSrs(main) {
       var p = state.project, s = p.srs;
       main.appendChild(h("h1", { class: "page-title", text: "High-level risk & security requirements" }));
-      main.appendChild(h("p", { class: "page-sub", text: "Clause 4.2 frames the zoning (relative risk ranking); clause 4.3 records the security requirements specification, including the tolerable risk that the detailed assessment is measured against." }));
+      main.appendChild(h("p", { class: "page-sub", text: "Rank the systems to frame the zoning (§4.2) and set the security requirements, including tolerable risk (§4.3)." }));
 
       main.appendChild(card("High-level risk assessment", "§4.2: context for the zoning; nothing here is calculated", [
-        selectField("Assumed adversary class (threat context)", s.adversaryClass, Object.keys(RULES.slDefinitions).filter(function (k) { return k !== "_note"; }).map(function (k) { return { value: k, text: "SL" + k + "-grade: " + RULES.slDefinitions[k] }; }), function (v) { s.adversaryClass = v ? Number(v) : null; touched(); rerender(); }, { hint: "Uses the published 62443 SL attacker-class definitions. A per-FR suggestion below this class is left as it is and flagged as a mismatch." }),
+        selectField("Assumed adversary class (threat context)", s.adversaryClass, Object.keys(RULES.slDefinitions).filter(function (k) { return k !== "_note"; }).map(function (k) { return { value: k, text: "SL" + k + "-grade: " + RULES.slDefinitions[k] }; }), function (v) { s.adversaryClass = v ? Number(v) : null; touched(); rerender(); }, { hint: "Per-FR suggestions below this class are flagged as a mismatch." }),
         textField("Essential functions", s.essentialFunctions, function (v) { s.essentialFunctions = v; touched(); }, { textarea: true, placeholder: "What the system must keep doing (production, safety, quality, compliance)." }),
-        textField("Worst-case consequences", s.worstCase, function (v) { s.worstCase = v; touched(); }, { textarea: true, placeholder: "Plain-language worst case (informed by any PHA/HAZOP) used to rank and group assets." })
+        textField("Worst-case consequences", s.worstCase, function (v) { s.worstCase = v; touched(); }, { textarea: true, placeholder: "The worst credible outcome, e.g. from the PHA/HAZOP." })
       ]));
 
       // §4.2 relative risk ranking: rate each asset/system so the ranking drives
@@ -1024,7 +1025,7 @@
       var sevOpts = SEV.map(function (sv) { return { value: sv.id, text: sv.name }; });
       var likOpts = LIK.map(function (l) { return { value: l.id, text: l.name }; });
       main.appendChild(card("Asset / system risk ranking", "§4.2: HSE & financial impact by function/location, ranked to guide zoning", [
-        h("p", { class: "hint", style: "margin-top:0", text: "List the assets or systems in scope and rate the worst-credible impact (a PHA/HAZOP is the usual source) and, where known, the likelihood. The ranking is a §4.2 deliverable on its own: you can produce a high-level report from it and stop there. It does not set SL-T; that comes from the detailed assessment. “Detail →” promotes a system to its own detailed assessment." }),
+        h("p", { class: "hint", style: "margin-top:0", text: "Rate each system's worst-credible impact and, where known, its likelihood." }),
         registerTable(s.highLevelAssets, [
           { key: "name", label: "Asset / system", placeholder: "e.g. DCS servers", width: "18%" },
           { key: "functionLocation", label: "Function & location", placeholder: "e.g. Primary control, equipment room" },
@@ -1035,16 +1036,16 @@
           { key: "__promote", label: "Detailed", kind: "computed", width: "96px", render: function (it) {
             var z = zoneFromHLA(it.id);
             if (z) return h("span", { class: "pill neutral", title: "Detailed assessment is in " + z.id, text: z.id + " ✓" });
-            return h("button", { class: "btn sm", title: "Create a single-system zone and start its detailed assessment", text: "Detail →", onClick: function () { promoteAssetToZone(it); } });
+            return h("button", { class: "btn sm", title: "Make it a zone and assess it in detail", text: "Detail →", onClick: function () { promoteAssetToZone(it); } });
           } }
         ], { empty: "No assets ranked yet. Add the systems in scope to build the relative risk ranking.", addLabel: "+ Add asset / system", rowLabel: "ranked system", onAdd: function () { p.counters.hla += 1; s.highLevelAssets.push(emptyHLA(p.counters.hla)); touched(); rerender(); } }),
         h("div", { class: "btn-row", style: "margin-top:12px" }, [
-          h("button", { class: "btn", text: "Generate high-level report →", title: "A standalone §4.2 deliverable: no zones or SL-T needed", onClick: function () { state.stage = "hlreport"; render(); } })
+          h("button", { class: "btn", text: "Generate high-level report →", title: "No zones or SL-T needed", onClick: function () { state.stage = "hlreport"; render(); } })
         ])
       ]));
 
       var body = [
-        selectField("Tolerable risk (§4.3.6)", s.tolerableRisk, BANDS.map(function (b) { return { value: b.id, text: b.name }; }), function (v) { s.tolerableRisk = v || RULES.tolerableRisk.default; touched(); rerender(); }, { placeholder: false, hint: "The highest unmitigated risk band accepted without additional countermeasures. Any threat above this must be treated (clause 4.6/4.7)." }),
+        selectField("Tolerable risk (§4.3.6)", s.tolerableRisk, BANDS.map(function (b) { return { value: b.id, text: b.name }; }), function (v) { s.tolerableRisk = v || RULES.tolerableRisk.default; touched(); rerender(); }, { placeholder: false, hint: "The highest unmitigated risk accepted without countermeasures. Anything above it must be treated (clause 4.6/4.7)." }),
         lineListField("Known or presumed threats (§4.3.4)", s.knownThreats, function (a) { s.knownThreats = a; touched(); }, "e.g. Capable criminal adversary; insider misuse of engineering access"),
         lineListField("Mandatory security functions (§4.3.5)", s.mandatorySecurityFunctions, function (a) { s.mandatorySecurityFunctions = a; touched(); }, "e.g. Hard-wired ESD independent of the BPCS"),
         lineListField("Regulatory requirements (§4.3.7)", s.regulatory, function (a) { s.regulatory = a; touched(); }, "e.g. UK NIS Regulations 2018"),
@@ -1054,7 +1055,7 @@
             h("input", { type: "checkbox", checked: s.clientMatrix, onChange: function (e) { s.clientMatrix = e.target.checked; touched(); rerender(); } }),
             "The client's own risk matrix or criteria are in use"
           ]),
-          h("div", { class: "hint", text: "Hard rule: where the client has its own risk matrix, it takes precedence over the SolutionsPT house matrix." })
+          h("div", { class: "hint", text: "The client's matrix takes precedence over the SolutionsPT house matrix." })
         ])
       ];
       if (s.clientMatrix) body.push(textField("How the client matrix was applied", s.clientMatrixNote, function (v) { s.clientMatrixNote = v; touched(); }, { textarea: true }));
@@ -1066,11 +1067,11 @@
     function renderBasis(main) {
       var b = state.project.basisOfAssessment, p = state.project;
       main.appendChild(h("h1", { class: "page-title", text: "Basis of assessment" }));
-      main.appendChild(h("p", { class: "page-sub", text: "Record the evidence this assessment rests on: the people interviewed, the documents reviewed and the systems observed. It prints in the report and goes with the risk-context export as provenance." }));
+      main.appendChild(h("p", { class: "page-sub", text: "The evidence behind the assessment, as printed in the report." }));
 
       // Engagement details: document control for the Word/Excel deliverables.
       var eng = p.engagement;
-      main.appendChild(card("Engagement details", "document control for the Word and Excel reports", [
+      main.appendChild(card("Engagement details", "for document control", [
         h("div", { class: "grid-2" }, [
           textField("Client / organisation", eng.client, function (v) { eng.client = v; touched(); }, { placeholder: "e.g. Acme Petrochemicals Ltd" }),
           textField("Consultant", eng.consultant, function (v) { eng.consultant = v; touched(); }, { placeholder: "who carried out the assessment" })
@@ -1097,7 +1098,7 @@
           ]);
         }
         main.appendChild(card("Preparation guidance", "what a 3-2 risk assessment usually needs", [
-          h("p", { class: "muted", style: "margin:0 0 8px;font-size:13px", text: "Advisory only: a prompt for scoping and the site visit. Nothing here is added to the registers below; record there what was reviewed and who was interviewed." }),
+          h("p", { class: "muted", style: "margin:0 0 8px;font-size:13px", text: "Advisory only: nothing here is added to the registers below." }),
           h("details", null, [
             h("summary", { style: "cursor:pointer;color:var(--brand-blue);font-weight:600;font-size:13px", text: "Show typical documents & stakeholders" }),
             h("div", { class: "grid-3", style: "margin-top:12px" }, [
@@ -1191,7 +1192,7 @@
     function renderZones(main) {
       var p = state.project;
       main.appendChild(h("h1", { class: "page-title", text: "Zones & conduits" }));
-      main.appendChild(h("p", { class: "page-sub", text: "Clause 4.4: partition the SuC into zones and conduits with shared security requirements, document their characteristics (§4.4.3), and separate safety, wireless and mobile per §4.4.4 to 4.4.7. Use EXT for anything outside the SuC." }));
+      main.appendChild(h("p", { class: "page-sub", text: "Group the SuC into zones and conduits (§4.4), keeping safety, wireless and mobile separate (§4.4.4 to 4.4.7); EXT is anything outside the SuC." }));
 
       p.zones.forEach(function (z, zi) {
         var assetsBox = h("div", null, []);
@@ -1267,7 +1268,7 @@
         tbl.appendChild(tbody);
         condBody.push(tbl);
       } else {
-        condBody.push(h("p", { class: "muted", text: "No conduits yet. Every connection between zones (and to EXT) should be a conduit. §4.4.7: keep wireless in its own conduit." }));
+        condBody.push(h("p", { class: "muted", text: "No conduits yet: add one for each connection between zones or to EXT (§4.4.7)." }));
       }
       condBody.push(h("div", { style: "margin-top:10px" }, [h("button", { class: "btn", text: "+ Add conduit", onClick: function () { p.counters.conduit += 1; p.conduits.push(emptyConduit(p.counters.conduit)); touched(); rerender(); } })]));
       main.appendChild(card("Conduits", "§4.4.1: channels between zones; EXT = external", condBody));
@@ -1285,45 +1286,9 @@
     }
 
     function renderZoneMap(p) {
-      if (!p.zones.length) return h("p", { class: "muted", text: "Add zones to see the drawing." });
-      var BW = 200, BH = 64, GX = 90, GY = 70;
-      var cols = Math.min(3, p.zones.length);
-      var hasExt = p.conduits.some(function (c) { return c.fromZone === "EXT" || c.toZone === "EXT"; });
-      var topPad = hasExt ? BH + GY : 0;
-      var rows = Math.ceil(p.zones.length / cols);
-      var W = cols * BW + (cols - 1) * GX + 40;
-      var H = topPad + rows * BH + (rows - 1) * GY + 40;
-      var pos = {};
-      p.zones.forEach(function (z, i) { var col = i % cols, row = Math.floor(i / cols); var x = 20 + col * (BW + GX), y = 20 + topPad + row * (BH + GY); pos[z.id] = { x: x, y: y, cx: x + BW / 2, cy: y + BH / 2 }; });
-      if (hasExt) pos["EXT"] = { x: W / 2 - BW / 2, y: 20, cx: W / 2, cy: 20 + BH / 2 };
-
-      var svg = svgEl("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Zone and conduit drawing" });
-      p.conduits.forEach(function (c) {
-        var a = pos[c.fromZone], b = pos[c.toZone]; if (!a || !b) return;
-        svg.appendChild(svgEl("line", { x1: a.cx, y1: a.cy, x2: b.cx, y2: b.cy, stroke: "#C8D2DD", "stroke-width": 2 }));
-        var mx = (a.cx + b.cx) / 2, my = (a.cy + b.cy) / 2, lbl = c.id + (c.name ? " " + c.name : "");
-        if (lbl.length > 26) lbl = lbl.slice(0, 25) + "…";
-        svg.appendChild(svgEl("text", { x: mx, y: my - 5, "text-anchor": "middle", "font-size": 10, fill: "#5A6B7B", text: lbl }));
-      });
-      var RISK_COL = { "low": "#2E7D52", "medium": "#C28A1E", "high": "#B23A33", "very-high": "#7A241F" };
-      function box(id, name, subText, isExt, safety, worstBand) {
-        var q = pos[id], g = svgEl("g", {});
-        g.appendChild(svgEl("rect", { x: q.x, y: q.y, width: BW, height: BH, rx: 5, fill: isExt ? "#ECF1F6" : "#FFFFFF", stroke: safety ? "#C28A1E" : (worstBand ? RISK_COL[worstBand] : "#0F5FA6"), "stroke-width": safety ? 2.5 : (worstBand === "very-high" || worstBand === "high" ? 2.5 : 1.5), "stroke-dasharray": isExt ? "5,4" : "none" }));
-        var title = id + (name ? ": " + name : ""); if (title.length > 30) title = title.slice(0, 29) + "…";
-        g.appendChild(svgEl("text", { x: q.cx, y: q.y + 26, "text-anchor": "middle", "font-size": 12, "font-weight": 600, fill: "#1A2533", text: title }));
-        if (subText) g.appendChild(svgEl("text", { x: q.cx, y: q.y + 44, "text-anchor": "middle", "font-size": 10, fill: "#5A6B7B", text: subText }));
-        return g;
-      }
-      p.zones.forEach(function (z) {
-        var s = suggestZone(z, p), tgt = maxDefined(z.slTargetByFR), sug = maxDefined(frSug(s));
-        var sub = [];
-        if (tgt != null) sub.push("SL-T≤" + tgt); else if (sug != null) sub.push("sug SL≤" + sug);
-        if (s.worstRisk) sub.push("risk " + s.worstRisk);
-        if (s.safetyRelated) sub.push("SIS");
-        svg.appendChild(box(z.id, z.name, sub.join(" · "), false, s.safetyRelated, s.worstRisk));
-      });
-      if (hasExt) svg.appendChild(box("EXT", "external", "outside the SuC", true, false, null));
-      return h("div", { class: "zone-map-wrap" }, [svg]);
+      var L = window.RiskZoneMap.layout(p, suggestZone);
+      if (!L) return h("p", { class: "muted", text: "Add zones to see the drawing." });
+      return h("div", { class: "zone-map-wrap" }, [window.RiskZoneMap.toSvg(L, svgEl)]);
     }
 
     function frSug(sug) { var o = {}; FR_IDS.forEach(function (fr) { o[fr] = sug.byFR[fr].sl; }); return o; }
@@ -1360,7 +1325,7 @@
               ? h("span", { class: "val-warn", text: "  still exceeds tolerable (" + tolerable + "): add countermeasures, carry it into the SL-T, or accept it." })
               : h("span", { class: "muted", text: "  meets tolerable risk (" + tolerable + ")." })
           ])
-        : h("div", { class: "hint", style: "margin-top:2px", text: "Set once countermeasures are in place to show the risk after treatment (take credit for existing controls). Leave blank in a first-pass or immature assessment: the unmitigated risk then stands, carried by the SL-T." });
+        : h("div", { class: "hint", style: "margin-top:2px", text: "Leave blank until countermeasures are in place." });
       return h("div", { class: "field", style: "margin:8px 0 0" }, [
         h("label", { text: "Residual risk after countermeasures (§4.7: optional)" }),
         h("div", { class: "threat-grid" }, [
@@ -1444,7 +1409,7 @@
           h("div", { class: "field", style: "margin-bottom:8px" }, [h("label", { text: "Countermeasure (§4.7)" }), h("input", { type: "text", value: m.description, placeholder: "e.g. Broker vendor access via a DMZ jump host; remove the standing tunnel.", onInput: function (e) { m.description = e.target.value; touched(); } })]),
           h("label", { style: "display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:8px" }, [
             h("input", { type: "checkbox", checked: !!m.existing, onChange: function (e) { m.existing = e.target.checked; touched(); rerender(); } }),
-            h("span", { text: "Existing control (already in place, not a planned remediation)" })
+            h("span", { text: "Existing control (already in place)" })
           ]),
           h("div", { class: "threat-grid" }, [
             h("div", { class: "field", style: "margin:0" }, [h("label", { text: "Addresses foundational requirements" }), frChips(m.addressesFR, function (fr) { var i = m.addressesFR.indexOf(fr); if (i >= 0) m.addressesFR.splice(i, 1); else m.addressesFR.push(fr); touched(); rerender(); })]),
@@ -1469,9 +1434,9 @@
         h("div", { class: "field" }, [h("label", { text: "Vulnerabilities (§4.5.2)" }), vulnEditor(owner, project)]),
         h("div", { class: "field" }, [
           h("label", { text: "Countermeasures (§4.7: where risk exceeds tolerable, §4.6)" }),
-          unaddressed.length ? h("div", { class: "hint val-warn", text: unaddressed.length + " of " + exceeding.length + " threat" + (exceeding.length === 1 ? "" : "s") + " above tolerable risk (" + tolerable + ") ha" + (unaddressed.length === 1 ? "s" : "ve") + " no disposition yet: reduce it with a countermeasure (record the residual risk), set the SL-T on the affected FRs, or record an acceptance on the threat." }) : null,
-          !unaddressed.length && exceeding.length ? h("div", { class: "hint", text: "All " + exceeding.length + " over-tolerable threat" + (exceeding.length === 1 ? " is" : "s are") + " addressed (residual within tolerable, a countermeasure, the SL-T target, or a recorded acceptance). An empty countermeasure register is fine where the SL-T carries the treatment: the follow-up assessment records countermeasures as they land." }) : null,
-          h("div", { class: "hint no-print", style: "margin-bottom:6px", text: "Mark controls already in place as “existing” to take credit for them; leave planned remediations unmarked. Both travel with the export." }),
+          unaddressed.length ? h("div", { class: "hint val-warn", text: unaddressed.length + " of " + exceeding.length + " threat" + (exceeding.length === 1 ? "" : "s") + " above tolerable risk (" + tolerable + ") ha" + (unaddressed.length === 1 ? "s" : "ve") + " no disposition yet: add a countermeasure, set the SL-T on the affected FRs, or record an acceptance." }) : null,
+          !unaddressed.length && exceeding.length ? h("div", { class: "hint", text: "All " + exceeding.length + " over-tolerable threat" + (exceeding.length === 1 ? " has" : "s have") + " a disposition." }) : null,
+          h("div", { class: "hint no-print", style: "margin-bottom:6px", text: "Tick Existing control for controls already in place." }),
           cmEditor(owner, project)
         ])
       ], head.length ? h("span", null, head) : null, { "data-owner-id": owner.id });
@@ -1480,8 +1445,8 @@
     function renderRisk(main) {
       var p = state.project;
       main.appendChild(h("h1", { class: "page-title", text: "Detailed risk assessment" }));
-      main.appendChild(h("p", { class: "page-sub", text: "Clause 4.5: for each zone (and conduit) identify threats and vulnerabilities, rate likelihood and impact, and derive the unmitigated risk. Clause 4.6: compare it against the tolerable risk set in stage 2. Clause 4.7: where it exceeds, design countermeasures (62443-3-3 is the control catalogue)." }));
-      main.appendChild(h("div", { class: "framing-note", text: "The risk matrix (likelihood × impact → risk band) is a SolutionsPT house default, not taken from the standard. Tolerable risk for this SuC: " + (p.srs.tolerableRisk || "medium") + " (set in stage 2)." }));
+      main.appendChild(h("p", { class: "page-sub", text: "Rate the threats to each zone and conduit (§4.5), compare with tolerable risk (§4.6) and add countermeasures where it is exceeded (§4.7)." }));
+      main.appendChild(h("div", { class: "framing-note", text: "SolutionsPT house risk matrix, not the standard's; tolerable risk is " + (p.srs.tolerableRisk || "medium") + " (stage 2)." }));
 
       if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in stage 3 first." })])); return; }
 
@@ -1489,7 +1454,7 @@
 
       if (p.conduits.length) {
         main.appendChild(h("h1", { class: "page-title", style: "font-size:18px;margin-top:24px", text: "Conduits" }));
-        main.appendChild(h("p", { class: "page-sub", text: "Conduits may carry their own threats; where none are captured, the SL-T suggestion inherits from the connected zones." }));
+        main.appendChild(h("p", { class: "page-sub", text: "A conduit's SL-T suggestion is the higher of its own threats and its connected zones." }));
         p.conduits.forEach(function (c) { main.appendChild(detailedRiskCard(c, p, c.id + (c.name ? ": " + c.name : "") + " (" + (c.fromZone || "?") + " ↔ " + (c.toZone || "?") + ")")); });
       }
     }
@@ -1532,16 +1497,16 @@
       tbl.appendChild(tb);
 
       var body = [];
-      if (safety && SIS_RULE) body.push(h("div", { class: "sis-box" }, [h("strong", { text: "SIS handling: " }), SIS_RULE.actions[0] + " An SL" + SIS_RULE.floorSL + " floor is applied to every FR. This zone is marked safetyRelated in the export."]));
+      if (safety && SIS_RULE) body.push(h("div", { class: "sis-box" }, [h("strong", { text: "SIS handling: " }), SIS_RULE.actions[0] + " An SL" + SIS_RULE.floorSL + " floor is applied to every FR."]));
       body.push(tbl);
       var tgt = maxDefined(owner.slTargetByFR);
       var needsJust = tgt != null && !(owner.justification || "").trim();
       body.push(h("div", { class: "field", style: "margin-top:12px" }, [
         h("label", null, [document.createTextNode("Justification "), h("span", { class: "req-star", text: "*" })]),
-        h("textarea", { value: owner.justification, placeholder: "Why this SL-T vector is right. This text is the deliverable and goes to the assessment tool as the target's provenance. Note any FR held below its suggestion, and why.", onInput: function (e) { owner.justification = e.target.value; touched(); }, onChange: function () { rerender(); } }),
+        h("textarea", { value: owner.justification, placeholder: "Why this SL-T is right, including any FR held below its suggestion.", onInput: function (e) { owner.justification = e.target.value; touched(); }, onChange: function () { rerender(); } }),
         needsJust
-          ? h("div", { class: "hint val-warn", text: "SL-T set but not justified. The justification is the deliverable, and export will flag it. Record why, especially for any FR held below its suggestion or a target with no threats behind it." })
-          : h("div", { class: "hint", text: "Required. Records your decision, especially where an FR differs from its suggestion." })
+          ? h("div", { class: "hint val-warn", text: "SL-T set but not justified: say why, especially for any FR below its suggestion." })
+          : h("div", { class: "hint", text: "Required." })
       ]));
 
       var headPill = tgt == null
@@ -1554,8 +1519,8 @@
     function renderSlt(main) {
       var p = state.project;
       main.appendChild(h("h1", { class: "page-title", text: "SL-T assignment" }));
-      main.appendChild(h("p", { class: "page-sub", text: "SL-T is a vector: one target security level per foundational requirement (as in the standard's worked example). The tool suggests each from the unmitigated risk affecting that FR and shows the rule trace; you set the final SL-T and the justification, which is the deliverable." }));
-      main.appendChild(h("div", { class: "framing-note", text: "The suggestion engine is a SolutionsPT house heuristic. 62443-3-2 leaves the risk-to-SL mapping to the organisation's security policy and consequence analysis (def. 3.1.39). Setting an SL-T below the suggestion is a legitimate decision, recorded in the justification." }));
+      main.appendChild(h("p", { class: "page-sub", text: "Set one target security level per foundational requirement, and justify it." }));
+      main.appendChild(h("div", { class: "framing-note", text: "Suggestions are a SolutionsPT house heuristic, not the standard's (def. 3.1.39); an SL-T below one is fine if justified." }));
 
       if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in stage 3 first." })])); return; }
 
@@ -1571,29 +1536,29 @@
 
     function exportProblems() {
       var p = state.project, probs = [], tolerable = p.srs.tolerableRisk || RULES.tolerableRisk.default;
-      if (!p.zones.length) probs.push("No zones defined: the exported risk context will carry no zones or per-zone SL-T, so the 3-3 tool will have nothing to scope. Define zones in stage 3 first (the high-level report is the zone-free §4.2 deliverable).");
+      if (!p.zones.length) probs.push("No zones defined: the risk context gives the 3-3 tool nothing to scope. Define zones in stage 3.");
       function checkOwner(o, label, isZone) {
         var hasSLT = FR_IDS.some(function (fr) { return o.slTargetByFR[fr] != null; });
         var hasJust = !!(o.justification || "").trim();
         if (isZone && !o.threats.length) {
           probs.push(label + (hasSLT
-            ? ": SL-T set on a zone with no threats. Record the basis (corporate floor, SIS, regulation, judgement) in the justification (§4.5.1)."
+            ? ": SL-T set with no threats. Give the basis in the justification (§4.5.1)."
             : ": no threats identified (§4.5.1)."));
         }
         o.threats.forEach(function (t) {
           if (!t.likelihood || !t.impact) probs.push(label + " / " + t.id + ": likelihood or impact not set.");
           if (!t.affectedFR.length) probs.push(label + " / " + t.id + ": no affected foundational requirements marked.");
-          if (exceedsTolerable(threatRisk(t), tolerable) && !threatDisposition(o, t, tolerable)) probs.push(label + " / " + t.id + ": exceeds tolerable risk with no disposition: no countermeasure, no SL-T on its affected FRs and no recorded acceptance (§4.6/4.7).");
+          if (exceedsTolerable(threatRisk(t), tolerable) && !threatDisposition(o, t, tolerable)) probs.push(label + " / " + t.id + ": exceeds tolerable risk with no disposition (§4.6/4.7).");
         });
         // The justification is the deliverable, so flag it only where there is a
         // target to justify — a zone with no SL-T yet is 'incomplete', not
         // 'unjustified'. Neither blocks export (the ruling: never hard-gate).
         if (!hasSLT) probs.push(label + ": no SL-T set for any FR.");
-        else if (!hasJust) probs.push(label + ": SL-T set but no justification. The per-FR justification is the deliverable, so record why, especially for any FR held below its suggestion.");
+        else if (!hasJust) probs.push(label + ": SL-T set but no justification.");
       }
       p.zones.forEach(function (z) { checkOwner(z, z.id + (z.name ? " (" + z.name + ")" : ""), true); });
       p.conduits.forEach(function (c) { checkOwner(c, c.id + (c.name ? " (" + c.name + ")" : ""), false); });
-      if (p.zones.length && !(p.approval && (p.approval.name || "").trim())) probs.push("No asset-owner sign-off recorded: add the asset owner's approval of the tolerable risk and outcome on the Full report & export page (§4.3.6 / §4).");
+      if (p.zones.length && !(p.approval && (p.approval.name || "").trim())) probs.push("No asset-owner sign-off recorded (§4.3.6 / §4).");
       return probs;
     }
 
@@ -1667,8 +1632,8 @@
     // print-only line renders the signed statement in the printed report.
     function approvalCard(p) {
       var a = p.approval;
-      return card("Approval / sign-off", "asset-owner approval of the tolerable risk and outcome (§4.3.6 / §4)", [
-        h("p", { class: "hint no-print", style: "margin-top:0", text: "62443-3-2 expects the asset owner (or a delegate) to approve the tolerable-risk criteria and the assessment outcome. Record who signed it off: it prints in the report and travels with the export." }),
+      return card("Approval / sign-off", "§4.3.6 / §4", [
+        h("p", { class: "hint no-print", style: "margin-top:0", text: "Record who approved the tolerable risk and the outcome for the asset owner." }),
         h("div", { class: "grid-2" }, [
           textField("Approver name", a.name, function (v) { a.name = v; touched(); }, { placeholder: "e.g. A. Patel" }),
           textField("Role / title", a.role, function (v) { a.role = v; touched(); }, { placeholder: "e.g. Plant Manager (asset owner)" })
@@ -1748,10 +1713,10 @@
         h("p", { class: "page-sub", text: "IEC 62443-3-2 §4.2 high-level risk assessment · " + TOOL_ID + " · " + todayISO() + " · relative risk ranking to prioritise systems and frame zoning. Risk bands are a SolutionsPT house matrix." })
       ]));
       main.appendChild(h("h1", { class: "page-title no-print", text: "High-level risk assessment report" }));
-      main.appendChild(h("p", { class: "page-sub no-print", text: "A standalone §4.2 deliverable: the system under consideration, the evidence basis and the relative risk ranking of systems. It needs no zones, detailed assessment or SL-T. Print it as it is, or carry on to the detailed assessment." }));
+      main.appendChild(h("p", { class: "page-sub no-print", text: "A standalone §4.2 deliverable that needs no zones or SL-T." }));
 
       main.appendChild(h("div", { class: "btn-row no-print", style: "margin-bottom:16px" }, [
-        h("button", { class: "btn primary", text: "Download Word report", title: "The high-level (§4.2) report as a Word document", onClick: function () { downloadWordReport({ highLevelOnly: true }); } }),
+        h("button", { class: "btn primary", text: "Download Word report", onClick: function () { downloadWordReport({ highLevelOnly: true }); } }),
         h("button", { class: "btn", text: "Print high-level report", onClick: function () { window.print(); } }),
         h("button", { class: "btn", text: "Edit the ranking", onClick: function () { state.stage = "srs"; render(); } })
       ]));
@@ -1764,7 +1729,7 @@
       if (p.suc.description) sk.push(h("p", { text: p.suc.description }));
       if (p.suc.scopeStatement) sk.push(h("p", null, [h("strong", { text: "Scope: " }), p.suc.scopeStatement]));
       if (s.essentialFunctions) sk.push(h("p", null, [h("strong", { text: "Essential functions: " }), s.essentialFunctions]));
-      if (s.worstCase) sk.push(h("p", null, [h("strong", { text: "Headline worst case: " }), s.worstCase]));
+      if (s.worstCase) sk.push(h("p", null, [h("strong", { text: "Worst case: " }), s.worstCase]));
       if (s.adversaryClass) sk.push(h("p", null, [h("strong", { text: "Assumed adversary: " }), "SL" + s.adversaryClass + "-grade: " + RULES.slDefinitions[String(s.adversaryClass)]]));
       sk.push(h("p", null, [h("strong", { text: "Tolerable risk: " }), s.tolerableRisk || "medium"]));
       if (p.suc.assumptions.length) { sk.push(h("p", null, [h("strong", { text: "Assumptions:" })])); sk.push(h("ul", null, p.suc.assumptions.map(function (x) { return h("li", { text: x }); }))); }
@@ -1773,10 +1738,10 @@
       main.appendChild(card("Basis of assessment", basisCount(p.basisOfAssessment) + " item" + (basisCount(p.basisOfAssessment) === 1 ? "" : "s"), basisCardKids(p.basisOfAssessment)));
 
       var hl = highLevelRankingTable();
-      main.appendChild(card("Relative risk ranking", "§4.2: highest risk first; drives prioritisation and zoning", hl ? [
+      main.appendChild(card("Relative risk ranking", "§4.2: highest risk first", hl ? [
         hl,
-        h("p", { class: "hint", style: "margin-top:10px", text: "Systems at the top warrant a detailed risk assessment (§4.5), where their SL-T and countermeasures are worked out. Promote them with “Detail →” on the high-level risk stage." })
-      ] : [h("p", { class: "muted", text: "No systems ranked yet. Add them on the high-level stage (§4.2)." })]));
+        h("p", { class: "hint", style: "margin-top:10px", text: "Promote the top systems to a detailed assessment (§4.5) with “Detail →” in stage 2." })
+      ] : [h("p", { class: "muted", text: "No systems ranked yet: add them in stage 2 (§4.2)." })]));
 
       main.appendChild(approvalCard(p));
     }
@@ -1788,7 +1753,7 @@
         h("p", { class: "page-sub", text: "62443-3-2-aligned zones & conduits assessment · " + TOOL_ID + " · " + todayISO() + " · SL suggestions are a SolutionsPT house heuristic; consultant SL-T (per FR) and justification are the deliverable." })
       ]));
       main.appendChild(h("h1", { class: "page-title no-print", text: "Full report & export" }));
-      main.appendChild(h("p", { class: "page-sub no-print", text: "Check the summary, then export the risk context for the assessment tool or print the one-page summary. SL-T is shown as a per-FR vector (" + FR_IDS.join("/") + ")." }));
+      main.appendChild(h("p", { class: "page-sub no-print", text: "Check the summary, then download or export; SL-T is shown per FR (" + FR_IDS.join("/") + ")." }));
 
       var probs = exportProblems();
       if (probs.length) main.appendChild(card("Completeness", probs.length + " item" + (probs.length === 1 ? "" : "s") + " outstanding", [h("ul", { class: "muted" }, probs.slice(0, 30).map(function (t) { return h("li", { text: t }); }))]));
@@ -1838,7 +1803,7 @@
       zt.appendChild(ztb);
       main.appendChild(card("Zones", p.zones.length + " zone" + (p.zones.length === 1 ? "" : "s"), [
         p.zones.length ? zt : h("p", { class: "muted", text: "No zones defined." }),
-        anyResidual ? h("p", { class: "hint", style: "margin-top:8px", text: "Worst risk shows unmitigated → residual where recorded countermeasures reduce it (§4.7). Residual is the operative risk for the tolerable-risk comparison." }) : null
+        anyResidual ? h("p", { class: "hint", style: "margin-top:8px", text: "Unmitigated → residual where countermeasures reduce the risk (§4.7)." }) : null
       ]));
 
       if (p.conduits.length) {
@@ -1865,12 +1830,12 @@
       main.appendChild(approvalCard(p));
 
       main.appendChild(h("div", { class: "btn-row no-print" }, [
-        h("button", { class: "btn primary", text: "Download Word report", title: "The full report, written for a management audience", onClick: function () { downloadWordReport({}); } }),
-        h("button", { class: "btn primary", text: "Download Excel workbook", title: "For engineers: the threat tracker, registers and SL-T matrix", onClick: downloadExcelReport }),
+        h("button", { class: "btn primary", text: "Download Word report", title: "For management", onClick: function () { downloadWordReport({}); } }),
+        h("button", { class: "btn primary", text: "Download Excel workbook", title: "For engineers: threat tracker and registers", onClick: downloadExcelReport }),
         h("button", { class: "btn", text: "Export risk context (" + INTERCHANGE.schema + ")", onClick: exportRiskContext }),
         h("button", { class: "btn", text: "Print one-page summary", onClick: function () { window.print(); } })
       ]));
-      main.appendChild(h("p", { class: "hint no-print", style: "margin-top:8px", text: "Word is the report; Excel is the engineers' tracker. Document control (client, consultant, date) comes from the engagement details on the Basis of assessment page. The assessment tool's 62443-3-3 instrument imports the risk-context file (“Import risk context”) to scope the assessment by zone, with each zone's SL-T already set." }));
+      main.appendChild(h("p", { class: "hint no-print", style: "margin-top:8px", text: "Document control comes from the engagement details on the Basis of assessment page." }));
     }
 
     // ---------- Word / Excel deliverables (js/exports.js + vendor libs) ----------
@@ -1928,9 +1893,9 @@
       main.appendChild(h("p", { class: "page-sub", text: VERSION.product + " (zones & conduits) " + VERSION.label + " (version " + VERSION.number + ")" }));
 
       main.appendChild(card("What the tool does", null, [
-        h("p", null, ["This tool implements the IEC 62443-3-2 Clause 4 workflow: define the SuC (4.1), high-level risk for zoning (4.2), a security requirements specification including tolerable risk (4.3), zones & conduits (4.4), a per-zone/conduit detailed risk assessment covering threats, vulnerabilities and likelihood × impact = unmitigated risk (4.5), comparison against tolerable risk (4.6), and countermeasures with the resulting residual risk (4.7). SL-T is assigned as a vector, one target per foundational requirement, and the asset owner signs off the tolerable risk and outcome."]),
-        h("p", null, [h("strong", { text: "Built from the public process description." }), " The workflow follows the 62443-3-2 process as publicly described (also in NIST SP 800-82 and ISA public material). The standard's normative text and its example risk tables are not reproduced here; they belong to the licence holder. The 0.x version number reflects that the tool has not been checked line by line against a licensed copy of the standard."]),
-        h("p", null, [h("strong", { text: "The risk matrix and SL mapping are SolutionsPT house defaults." }), " 62443-3-2 does not prescribe a risk matrix or a risk-to-SL mapping; it requires the organisation's own risk criteria and tolerable-risk threshold (def. 3.1.39, clause 4.3.6). The tool shows the full rule trace for every suggestion; the consultant's per-FR SL-T and written justification are the deliverable. Where the client has their own corporate matrix, it takes precedence."])
+        h("p", null, ["Follows the IEC 62443-3-2 Clause 4 workflow (4.1 to 4.7), with SL-T set per foundational requirement."]),
+        h("p", null, ["Built from the public description of the process. The standard's text and example risk tables are not reproduced here, and the tool has not been checked line by line against a licensed copy."]),
+        h("p", null, ["The risk matrix and SL mapping are SolutionsPT house defaults; 62443-3-2 prescribes neither (def. 3.1.39, clause 4.3.6). A client's own matrix takes precedence."])
       ]));
 
       main.appendChild(card("Security level definitions", "paraphrased from published 62443 material", [
@@ -1940,7 +1905,7 @@
         ])
       ]));
 
-      main.appendChild(card("House risk matrix", "impact × likelihood → risk band (tune in data/slt-suggestion-rules.json)", [
+      main.appendChild(card("House risk matrix", "impact × likelihood → risk band", [
         (function () {
           var t = h("table", { class: "tbl" });
           var head = h("tr", null, [h("th", { text: "Impact \\ Likelihood" })].concat(LIK.map(function (l) { return h("th", { text: l.name, class: "center" }); })));
@@ -1967,7 +1932,7 @@
       main.appendChild(card("Hard rules", null, [h("ul", null, RULES.hardRules.map(function (r) { return h("li", { text: r }); }))]));
 
       main.appendChild(card("Interchange with the assessment tool", null, [
-        h("p", null, ["“Export risk context” writes a ", h("strong", { text: INTERCHANGE.schema }), " JSON file. The assessment tool's 62443-3-3 instrument imports it to scope the assessment by zone, pre-setting each zone's SL-T (one level, or one per FR where supported; it can still be changed there) and showing your justification as the target's provenance. The threat, vulnerability and countermeasure registers go with it as context and never score the 3-3 assessment. The two tools share nothing else."])
+        h("p", null, ["“Export risk context” writes a ", h("strong", { text: INTERCHANGE.schema }), " file. The assessment tool's 62443-3-3 instrument imports it to scope the assessment by zone, with each zone's SL-T pre-set."])
       ]));
 
       main.appendChild(card("Copyright and licence", null, [h("p", { text: LEGAL_NOTICE })]));

@@ -212,7 +212,7 @@
     var b = $("btn-save");
     b.textContent = state.dirty ? "Save*" : "Save";
     b.classList.toggle("btn-unsaved", state.dirty);
-    b.title = "Save your document file (Shift+click: Save as)" +
+    b.title = "Shift+click to Save as" +
       (ui.lastSave ? ". Last saved to " + ui.lastSave.name + " at " + fmtTime(ui.lastSave.at) + "." : "");
     if (state.doc) b.removeAttribute("disabled"); else b.setAttribute("disabled", "");
     var where = !state.doc ? "" : state.tour ? "tour" : state.dirty ? "unsaved changes"
@@ -376,7 +376,7 @@
     });
   }
   var TEXT_MAX = 500 * 1048576;
-  var OLD_WORD ="is an old Word file (.doc), which cannot be read. In Word, use Save as and choose Word Document (.docx), then load that.";
+  var OLD_WORD ="is an old Word file (.doc). Save it as .docx in Word, then load that.";
   function loadFile(file, handle) {
     if (!file) return Promise.resolve(false);
     var name = String(file.name || "file");
@@ -479,9 +479,9 @@
         }
         var over = M.sizeOf(doc) > M.LIMITS.warnBytes
           ? " Its pictures and kept content are over " + mb(M.LIMITS.warnBytes) + " MB." : "";
-        if (later) over = " What you changed while it was being saved is not in the file yet: save again." + over;
+        if (later) over = " Changes made during the save are not in the file: save again." + over;
         toast(res.how === "file" ? "Saved to " + res.name + "." + over
-          : res.blocked ? "Saved (downloaded as " + res.name + "). Saving back into the same file is not available here, so each save downloads a new copy." + over
+          : res.blocked ? "Saved (downloaded as " + res.name + "). Each save here downloads a new copy." + over
           : "Saved (downloaded as " + res.name + ")." + over, over ? "warn" : "");
         noteRecent("save", res.name, res.handle);
         return res;
@@ -851,7 +851,7 @@
   function fallbackPage(main, page) {
     main.appendChild(h("h1", { class: "page-title", tabindex: "-1", text: page === "welcome" ? "OT Cyber Document Tool" : PAGE_NAMES[page] }));
     if (page !== "welcome") return;
-    main.appendChild(h("p", { text: "Write a document in the SolutionsPT template, or load a Word file to have it rebuilt in the template." }));
+    main.appendChild(h("p", { text: "Write a document in the SolutionsPT template, or rebuild a Word file in it." }));
     main.appendChild(h("div", { class: "btn-row" }, [
       h("button", { type: "button", class: "btn primary", text: "New document", onClick: function () { newDocument(); } }),
       h("button", { type: "button", class: "btn", text: "Load a document or a Word file", onClick: chooseFile }),
@@ -940,7 +940,7 @@
     var files = Array.prototype.slice.call(e.dataTransfer.files || []);
     var file = files.filter(function (f) { return /\.(json|docx|doc)$/i.test(f.name || ""); })[0] || files[0];
     if (!file) return;
-    if (/^image\//.test(file.type || "")) { toast("To add a picture, drop it on the page in Edit, or use Insert picture there.", "warn"); return; }
+    if (/^image\//.test(file.type || "")) { toast("To add a picture, drop it on the page in Edit.", "warn"); return; }
     if (files.length > 1) toast("Only one file can be opened at a time. Opening " + file.name + ".", "warn");
     loadFile(file, null);
   });

@@ -215,7 +215,7 @@ window.RiskReview = (function () {
         RC().recordRound(r.store, r.pack);
         RT().touched();
         snap.signature = signature(); snap.docs = r.docs;
-        done({ ok: true, message: "Round " + r.pack.round + " pack saved as " + res.name + ". It holds client data: share it as you would the project file, then give it to each reviewer to open in the OT Cyber Report Review Tool.", pack: r.pack, name: res.name });
+        done({ ok: true, message: "Round " + r.pack.round + " pack saved as " + res.name + ". It holds client data, so share it as you would the project file.", pack: r.pack, name: res.name });
       });
     }).catch(function (e) {
       console.error(e);
@@ -719,14 +719,14 @@ window.RiskReview = (function () {
   function render(main, h, card) {
     pageH = h;
     main.appendChild(h("h1", { class: "page-title", text: "Peer review" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Have the reports reviewed through the tools rather than by marking up Word files. Nothing on this page reaches the Word or Excel reports." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Send the reports for review and import the comments." }));
     var holder = h("div", { class: "rv-panel" });
     var warnBox = h("ul", { class: "rv-warnings", style: "margin:0 0 10px;padding-left:18px;font-size:13px" });
     var p = project(), lead = (p.zones.length || p.conduits.length)
-      ? "Send for review writes a pack holding both Word reports and the zones and threats behind them."
-      : "Send for review writes a pack holding the high-level report and its basis of assessment. The detailed report joins it once there are zones or conduits.";
+      ? "Reviewers open the pack in the OT Cyber Report Review Tool; import their review files here."
+      : "Until there are zones, the pack holds only the high-level report; import reviewers' files here.";
     main.appendChild(card("Review", null, [
-      h("p", { class: "issue-lead", text: lead + " Each reviewer opens it in the OT Cyber Report Review Tool and sends back a small review file; import those here." }),
+      h("p", { class: "issue-lead", text: lead }),
       warnBox,
       holder
     ]));

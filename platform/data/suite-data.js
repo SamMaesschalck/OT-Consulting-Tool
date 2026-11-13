@@ -11,8 +11,8 @@ window.Suite.Data = {
                         "name":  "OT Cyber Assessment Tool",
                         "shortName":  "Assessments",
                         "navLabel":  "Assess",
-                        "summary":  "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and more, with an on-screen report, a Word report and an Excel tracker.",
-                        "useWhen":  "Use it when the question is how well a site, system, product or supplier meets a framework or standard. Choose the framework, record answers and evidence, then issue the Word report and Excel tracker. One project file can hold several assessments for the same customer, such as this year\u0027s review and a later re-assessment. Send for review on the report page writes a pack for the Report Review Tool, and Import review files brings the comments back.",
+                        "summary":  "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and more.",
+                        "useWhen":  "To measure a site, system, product or supplier against a standard and report the gaps. One project file can hold several assessments for a customer, such as this year\u0027s and a re-assessment.",
                         "entry":  "../modules/assessments/index.html",
                         "payload":  "assessments",
                         "tour":  {
@@ -20,7 +20,7 @@ window.Suite.Data = {
                                      "payload":  "assessments-tour",
                                      "launch":  null,
                                      "label":  "Take the tour",
-                                     "note":  "A completed demo of every assessment. Nothing you do in it touches your own work."
+                                     "note":  "A finished demo of every assessment"
                                  }
                     },
                     {
@@ -28,8 +28,8 @@ window.Suite.Data = {
                         "name":  "OT Cyber Risk Assessment Tool",
                         "shortName":  "Risk assessment",
                         "navLabel":  "Risk",
-                        "summary":  "Run an IEC 62443-3-2 risk assessment of zones and conduits, set target security levels, and produce the Word and Excel reports and a risk context file for the assessment tool.",
-                        "useWhen":  "Use it before a 62443-3-3 assessment, to work out what each zone and conduit needs: define the system under consideration, split it into zones and conduits, assess the threats and set target security levels. Export the risk context file and import it into the 62443-3-3 assessment in the assessment tool. Send for review on the Peer review page writes a pack for the Report Review Tool, and Import review files brings the comments back.",
+                        "summary":  "Run an IEC 62443-3-2 risk assessment and set a target security level for each zone and conduit.",
+                        "useWhen":  "Before a 62443-3-3 assessment, to set the targets it is measured against. Export the risk context file and import it into that assessment.",
                         "entry":  "../modules/risk-assessment/index.html",
                         "payload":  "risk-assessment",
                         "tour":  {
@@ -39,7 +39,7 @@ window.Suite.Data = {
                                                     "tour":  true
                                                 },
                                      "label":  "Take the tour",
-                                     "note":  "A completed demo risk assessment of a petrochemical unit. Its changes are never kept."
+                                     "note":  "A finished demo risk assessment of a petrochemical unit"
                                  }
                     },
                     {
@@ -47,8 +47,8 @@ window.Suite.Data = {
                         "name":  "OT Cyber Report Review Tool",
                         "shortName":  "Report review",
                         "navLabel":  "Review",
-                        "summary":  "Review a colleague\u0027s report and the engagement behind it, from the pack they send. Comment on any paragraph, table or item, suggest wording, go through the checklist and automatic checks, then give a verdict.",
-                        "useWhen":  "Use it when a colleague sends you a review pack from the assessment or risk tool. Read the report as the client will and question the findings as well as the wording. Your comments go into a small review file for the author to import, and files from several reviewers merge without overwriting each other.",
+                        "summary":  "Review a colleague\u0027s report and the engagement behind it, and give a verdict.",
+                        "useWhen":  "When a colleague sends you a review pack. Save your comments to a review file and send it back to them.",
                         "entry":  "../modules/report-review/index.html",
                         "payload":  "report-review",
                         "tour":  {
@@ -58,7 +58,7 @@ window.Suite.Data = {
                                                     "tour":  true
                                                 },
                                      "label":  "Take the tour",
-                                     "note":  "A demo pack made from a demo assessment, at its second review round. Its changes are never kept."
+                                     "note":  "A demo pack at its second review round"
                                  }
                     },
                     {
@@ -66,8 +66,8 @@ window.Suite.Data = {
                         "name":  "OT Cyber Document Tool",
                         "shortName":  "Documents",
                         "navLabel":  "Write",
-                        "summary":  "Write proposals, method statements, reports and other documents in the SolutionsPT template, or load a Word file to have it rebuilt in the template with its pictures and drawings kept.",
-                        "useWhen":  "Use it for any document that is not an assessment or risk report but should look like one. Start a new document or load a Word file, fill in the document information, edit, then export a Word file as a draft or a final. Anything from an imported file that could not be carried over is listed after the import.",
+                        "summary":  "Write proposals, method statements and other documents in the SolutionsPT template, or rebuild a Word file in it.",
+                        "useWhen":  "For any document that is not an assessment or risk report but should look like one.",
                         "entry":  "../modules/documents/index.html",
                         "payload":  "documents",
                         "tour":  {
@@ -77,7 +77,7 @@ window.Suite.Data = {
                                                     "tour":  true
                                                 },
                                      "label":  "Take the tour",
-                                     "note":  "A short demo proposal with a table, a picture and a diagram kept from Word. Its changes are never kept."
+                                     "note":  "A short demo proposal"
                                  }
                     }
                 ],
@@ -86,6 +86,6 @@ window.Suite.Data = {
                          "version":  "0.7.0",
                          "label":  "v0.7",
                          "file":  "docs/releases/v0.7.0.md",
-                         "markdown":  "### OT Cyber Document Tool\n- A new tool for documents that are not assessment or risk reports but should look like one: proposals, method statements, reports, procedures and short notes.\n- A document with a cover prints with the same cover, document control page, header and footer as an assessment report. A short document has no cover and opens with its title.\n- Write in an editor with headings, paragraphs, bulleted and numbered lists, tables, pictures, footnotes, links, page breaks and landscape pages. The template decides fonts, sizes and colours, so every document looks the same.\n- Red prompts mark what is still to write. The Issue check lists them, and a Final export is refused while any remain.\n- Export a Word file as a Draft, with a watermark, or as a Final, which opens read-only.\n- Optional numbered headings and a Contents list of linked headings.\n- The cover is always one page, and the footer carries the document\u0027s own classification.\n- A picture taller than a page, such as a phone screenshot, is fitted to the page.\n- Pasting from Word carries footnotes, and says what it left out: comments, tracked deletions, pictures it could not read.\n\n### Bringing in a Word file\n- Load a `.docx` and it is rebuilt in the SolutionsPT template: headings, lists, tables, footnotes and links become the template\u0027s own.\n- Pictures are kept. Charts, SmartArt, shapes, text boxes, embedded sheets and equations are carried across as they were and print in the Word export, made smaller only where one would not fit the page.\n- A drawing that floated beside the text stays beside the same words, and a diagram drawn as loose shapes and lines is kept whole.\n- Anything that could not be carried over, such as comments, headers and footers, hidden text or a hand-made cover, is listed after the import, with a link to where it was. So is anything that was changed, such as list and heading numbers that no longer match a reference in the text.\n- A Word report from the assessment or risk tool, or a document exported by the document tool, has its SolutionsPT cover and document control page recognised: they are taken out, Document information is filled from them, and the export prints the current template\u0027s pages. One button on the import report puts the originals back, and another takes them out again.\n- A first page that looks like another company\u0027s cover is pointed out on the import report, with a button to remove it.\n- The Word file you load is never changed.\n- Charts drawn as tables keep their look: a report\u0027s tiles, stacked bars, heatmaps and coloured cells come across with their fills, widths and borders, legend squares keep their colours, and they print in the Word export as they were. An ordinary table still takes the template\u0027s look.\n\n### Word preview in the assessment and risk tools\n- A new Word preview page, beside the report page, shows the Word report as Export Word makes it, page by page: the cover, document control, then the body, with landscape pages, charts and coloured tables as they print. It is drawn from the Word file itself, so it cannot disagree with it.\n- In the assessment tool it follows the export\u0027s choices: Draft or Final, which site, zone or product, or the organisation-wide report. In the risk tool it shows the detailed or the high-level report.\n- The report is still written and edited on the report page; the preview builds again when anything changes.\n\n### Saving and files\n- The document tool saves its own document file, in place where the browser allows, with an autosave copy and a warning before unsaved changes are lost.\n- A document file and a Word file both open with Load in the document tool.\n- Save as makes a separate document, with its own autosave copy. Two windows of the tool can be open without one disturbing the other\u0027s unsaved work.\n\n### SolutionsPT OT Cyber Suite\n- The home page has a fourth card and the rail a fourth button, Write, for the document tool, with a tour of a demo proposal.\n- A document file dropped anywhere in the suite, or chosen with Open a file, opens in the document tool. A Word file is opened with Load in the document tool itself, and so is a document file over 100 MB.\n- No files pass between the document tool and the other tools.\n- An open tool can be closed, with the cross beside it in the rail or Close on its card on the home page. It opens fresh the next time. If it has unsaved changes the suite asks first, and closing anyway throws them away, autosave copy included.\n\n### OT Cyber Report Review Tool\n- The report a reviewer reads and comments on is shown as A4 pages, opening on the house cover with the client, site, title, issue, author and classification. Word decides where the pages break. The lines on the cover can be commented on like any other text. Commenting, suggestions, the checklist, the automatic checks and the keyboard controls work as before.\n- In the suite, the buttons that opened a review pack straight in the review tool, and gave the review file straight back to the author\u0027s tool, are gone. Someone other than the author does the review, so the pack and the review file go between people as files.\n\nSaved project files from v0.5, v0.5.1 and v0.6 open unchanged."
+                         "markdown":  "### OT Cyber Document Tool\n- A new tool for documents that are not assessment or risk reports but should look like one: proposals, method statements, reports, procedures and short notes.\n- A document with a cover prints with the same cover, document control page, header and footer as an assessment report. A short document has no cover and opens with its title.\n- Write with headings, lists, tables, pictures, footnotes, links, page breaks and landscape pages. The template sets fonts, sizes and colours.\n- Red prompts mark what is still to write. The Issue check lists them, and a Final export is refused while any remain.\n- Export a Word file as a Draft, with a watermark, or as a Final, which opens read-only.\n- Optional numbered headings and a Contents list of linked headings.\n- The cover is always one page, and the footer carries the document\u0027s own classification.\n- A picture taller than a page, such as a phone screenshot, is fitted to the page.\n- Pasting from Word carries footnotes, and says what it left out: comments, tracked deletions, pictures it could not read.\n\n### Bringing in a Word file\n- Load a `.docx` and it is rebuilt in the SolutionsPT template: headings, lists, tables, footnotes and links become the template\u0027s own.\n- Pictures are kept. Charts, SmartArt, shapes, text boxes, embedded sheets and equations are carried across as they were and print in the Word export, made smaller only where one would not fit the page.\n- A drawing that floated beside the text stays beside the same words, and a diagram drawn as loose shapes and lines is kept whole.\n- Anything that could not be carried over, such as comments, headers and footers, hidden text or a hand-made cover, is listed after the import, with a link to where it was. So is anything that was changed, such as list and heading numbers that no longer match a reference in the text.\n- The SolutionsPT cover and document control page of a report from these tools are recognised, used to fill in Document information and replaced by the current template\u0027s. The import report can put the originals back.\n- A first page that looks like another company\u0027s cover is pointed out on the import report, with a button to remove it.\n- The Word file you load is never changed.\n- Charts drawn as tables, such as a report\u0027s tiles, bars and heatmaps, keep their colours, widths and borders. Ordinary tables take the template\u0027s look.\n\n### Word preview in the assessment and risk tools\n- A new Word preview page shows the Word report page by page as it prints, with landscape pages, charts and coloured tables. It is drawn from the Word file itself.\n- In the assessment tool it follows the export\u0027s choices: Draft or Final, which site, zone or product, or the organisation-wide report. In the risk tool it shows the detailed or the high-level report.\n- You still edit the report on the report page; the preview updates when it changes.\n\n### Saving and files\n- The document tool saves to its own document file, with autosave and a warning before unsaved changes are lost.\n- A document file and a Word file both open with Load in the document tool.\n- Save as makes a separate document. Two windows of the tool can be open at once.\n\n### SolutionsPT OT Cyber Suite\n- The home page has a fourth card and the rail a fourth button, Write, for the document tool, with a tour of a demo proposal.\n- A document file dropped on the suite, or chosen with Open a file, opens in the document tool. Open Word files with Load in the document tool.\n- No files pass between the document tool and the other tools.\n- Close an open tool with the cross beside it in the rail or Close on its card. It opens fresh the next time. If it has unsaved changes, the suite asks first.\n\n### OT Cyber Report Review Tool\n- The report is shown as A4 pages, starting with the house cover, whose lines can be commented on too.\n- In the suite, the buttons that passed a review pack straight to the review tool and the review file straight back are gone. Someone other than the author does the review, so packs and review files go between people.\n\nSaved project files from v0.5, v0.5.1 and v0.6 open unchanged."
                      }
 };

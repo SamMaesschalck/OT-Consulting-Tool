@@ -371,7 +371,7 @@ H.test(function (ok, done) {
     return acceptIt(m.t0);
   });
   step(function (res) {
-    ok(res.ok && /printed 2 times across the documents, and each now has the new wording/.test(res.message), "accepted, and the message says both now have it", res.message);
+    ok(res.ok && /Changed in all 2 places it is printed/.test(res.message), "accepted, and the message says both now have it", res.message);
     return docs();
   });
   step(function (d) {

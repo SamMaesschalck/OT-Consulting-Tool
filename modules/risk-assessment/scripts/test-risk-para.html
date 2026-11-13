@@ -192,8 +192,8 @@
       ok(!!note && has(d[0], signed), "the last opening of the summary holds the sign-off sentence and the red note to the consultant");
       var plan = RR.acceptPlan(thread(0, note, "A note the reviewer would rather see."));
       ok(!plan.can && /note to complete in the tool, printed in red/.test(plan.why) && !/[–—]/.test(plan.why), "the red note itself cannot be reworded, with the reason", JSON.stringify(plan));
-      var gen = ps.filter(function (b) { return !b.red && /^This assessment is a snapshot\./.test(b.text); })[0];
-      x.t3 = thread(0, gen, "This assessment is a snapshot, to be repeated each year.");
+      var gen = ps.filter(function (b) { return !b.red && /^Repeat this assessment\b/.test(b.text); })[0];
+      x.t3 = thread(0, gen, "Repeat this assessment each year.");
       x.beforeNext = texts(d[0]);
       return accept(x.t3);
     }).then(function (res) {
@@ -201,7 +201,7 @@
       return docs();
     }).then(function (d) {
       var ps = opening(d[0], "what-happens-next");
-      ok(diffCount(x.beforeNext, texts(d[0])) === 1 && has(d[0], "This assessment is a snapshot, to be repeated each year."), "and only it changes");
+      ok(diffCount(x.beforeNext, texts(d[0])) === 1 && has(d[0], "Repeat this assessment each year."), "and only it changes");
       ok(has(d[0], RX.signOffTexts(P())[0]) && ps.filter(function (b) { return b.red && /^Consultant note:/.test(b.text); }).length === 1, "the sign-off sentence still prints, and the note is still there in red");
       return undo(x.t3);
     }).then(function (res) {

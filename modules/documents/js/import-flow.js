@@ -22,64 +22,56 @@
   var SENTENCES = {
     // toCheck
     "cover-like": function (e) {
-      return "The original's first page, before its first page break, has large type or a large picture and few words, so it may be a cover. " +
-        "The template prints its own cover. Remove " + (e.count === 1 ? "it" : "these blocks") + " if you do not need " + (e.count === 1 ? "it" : "them") + ".";
+      return "The original's first page looks like a cover. The template prints its own, so remove " +
+        (e.count === 1 ? "it" : "these blocks") + " if you do not need " + (e.count === 1 ? "it" : "them") + ".";
     },
     "front-matter": function (e) {
-      return "The original starts with " + plural(e.count, "block", "blocks") + " before its first heading. " +
-        "This is often its own cover, document control table or contents list, which the template already prints. " +
-        "Check whether you still need " + (e.count === 1 ? "it" : "them") + ".";
+      return plural(e.count, "block comes", "blocks come") + " before the original's first heading. " +
+        "If " + (e.count === 1 ? "it is" : "they are") + " a cover, document control or contents list, the template prints its own.";
     },
     // notCarried
     "comments": function (e) {
       return plural(e.count, "comment", "comments") + " " + was(e.count) + " not carried over.";
     },
     "headers-footers": function () {
-      return "Headers and footers were not carried over. The SolutionsPT header and footer replace them.";
+      return "Headers and footers were replaced by the SolutionsPT header and footer.";
     },
     "contents": function () {
-      return "The table of contents was not carried over. A contents list of the headings is switched on in its place; " +
-        "you can switch it off under Document information.";
+      return "The table of contents was replaced by the template's contents list. You can switch it off under Document information.";
     },
     "figures-list": function (e) {
       return (e.count > 1 ? plural(e.count, "list", "lists") + " of figures or tables were" : "A list of figures or tables was") +
-        " not carried over. The template has none to put in " + (e.count > 1 ? "their" : "its") +
-        " place. The captions themselves were kept.";
+        " not carried over, and the template has none. The captions were kept.";
     },
     "cover-page": function () {
-      return "The original's cover page was not carried over. The template's cover replaces it.";
+      return "The original's cover page was replaced by the template's cover.";
     },
     "internal-links": function (e) {
       return plural(e.count, "link", "links") + " to a place inside the document " + was(e.count) +
-        " not carried over. The text of each was kept.";
+        " not carried over. " + (e.count === 1 ? "Its" : "Their") + " text was kept.";
     },
     "other-links": function (e) {
-      return plural(e.count, "link", "links") + " to a file or to another address that is not a web or email address " +
-        was(e.count) + " not carried over. The text of each was kept.";
+      return plural(e.count, "link", "links") + " to a file or to an address other than web or email " +
+        was(e.count) + " not carried over. " + (e.count === 1 ? "Its" : "Their") + " text was kept.";
     },
     "picture-links": function (e) {
-      return plural(e.count, "picture or drawing", "pictures or drawings") + " had a link on " + (e.count === 1 ? "it" : "them") +
-        ". " + (e.count === 1 ? "It was" : "They were") + " kept, but without the link.";
+      return plural(e.count, "picture or drawing", "pictures or drawings") + " lost " + (e.count === 1 ? "its link" : "their links") + ".";
     },
     "links-in-drawings": function (e) {
-      return plural(e.count, "link", "links") + " inside a drawing or a text box pointed somewhere other than a web or email address and " +
+      return plural(e.count, "link", "links") + " in a drawing or text box to an address other than web or email " +
         was(e.count) + " removed. The words and shapes were kept.";
     },
     "hidden-text": function (e) {
-      return plural(e.count, "piece", "pieces") + " of hidden text " + was(e.count) + " left out. " +
-        "Word does not show or print hidden text, so the original did not show " + (e.count === 1 ? "it" : "them") +
-        " either. Type in anything you do want.";
+      return plural(e.count, "piece", "pieces") + " of hidden text " + was(e.count) + " left out. Type in any you want.";
     },
     "controls": function (e) {
-      return plural(e.count, "form or ActiveX control", "form or ActiveX controls") + " " + was(e.count) +
-        " not carried over. Active content is never brought across.";
+      return plural(e.count, "form or ActiveX control", "form or ActiveX controls") + " " + was(e.count) + " not carried over.";
     },
     "macros": function () {
-      return "The file's macros were not carried over. Active content is never brought across.";
+      return "The file's macros were not carried over.";
     },
     "fields-no-text": function (e) {
-      return plural(e.count, "field", "fields") + " that Word works out as it prints (such as an automatic clause number or an " +
-        "old-style equation) had no text to keep. Type in what " + (e.count === 1 ? "it" : "they") + " showed.";
+      return plural(e.count, "automatic field", "automatic fields") + " had no text to keep. Type in what " + (e.count === 1 ? "it" : "they") + " showed.";
     },
     "objects-in-notes": function (e) {
       // The reader says how many of them were tables, whose words it keeps as lines of the note.
@@ -106,8 +98,7 @@
         (e.count === 1 ? "It was" : "They were") + " kept, but may not look right. Check in a draft.";
     },
     "theme-missing": function () {
-      return "The original's theme (its set of colours and fonts) could not be read. Drawings kept as they were may show " +
-        "other colours. Check in a draft.";
+      return "The original's theme colours and fonts could not be read, so drawings may show other colours. Check in a draft.";
     },
     // changed
     "tracked-changes": function (e) {
@@ -121,13 +112,11 @@
         " settled: insertions were accepted and deleted text was removed.";
     },
     "floating-pictures": function (e) {
-      return plural(e.count, "picture", "pictures") + " that floated beside the text " + was(e.count) +
-        " put in line, where " + (e.count === 1 ? "it was" : "they were") + " anchored.";
+      return plural(e.count, "floating picture", "floating pictures") + " " + was(e.count) + " put in line where " +
+        (e.count === 1 ? "it was" : "they were") + " anchored.";
     },
     "floating-drawings": function (e) {
-      return plural(e.count, "drawing", "drawings") + " that floated over or beside the text still " +
-        (e.count === 1 ? "floats, anchored where it was" : "float, anchored where they were") +
-        ". The text round " + (e.count === 1 ? "it" : "them") + " now has the house fonts and spacing, so check where " +
+      return plural(e.count, "floating drawing still floats", "floating drawings still float") + ". Check where " +
         (e.count === 1 ? "it sits" : "they sit") + " in a draft.";
     },
     "inline-objects": function (e) {
@@ -137,13 +126,12 @@
     // The address is shown with the line (the entry's examples).
     "linked-pictures": function (e) {
       return (e.count === 1 ? "A picture" : plural(e.count, "picture", "pictures")) + " linked to a file or web address outside the document " +
-        was(e.count) + " left out, because Word would fetch " + (e.count === 1 ? "it" : "them") + " when the file is opened. " +
+        was(e.count) + " left out. " +
         (e.count === 1 ? "Insert the picture itself if it is needed." : "Insert the pictures themselves if they are needed.");
     },
     "linked-objects": function (e) {
       return (e.count === 1 ? "A link" : plural(e.count, "link", "links")) + " from a chart or an object to a file outside the document " +
-        was(e.count) + " left out, because Word would fetch that file when the document is opened. " +
-        "A chart keeps the figures it showed; an object that was only a link was left out.";
+        was(e.count) + " left out. A chart keeps its figures; an object that was only a link is gone.";
     },
     "heading-numbers": function (e) {
       // The reader says how many headings had no number and how many references were kept as text.
@@ -155,10 +143,9 @@
       }
       if (refs) {
         s += " " + plural(refs, "cross-reference", "cross-references") + " to a section or a page " + was(refs) +
-          " kept as the text " + (refs === 1 ? "it" : "they") + " showed, which may now be the wrong number.";
+          " kept as the text " + (refs === 1 ? "it" : "they") + " showed and may now be wrong.";
       }
-      return s + " Check every reference to a section or page number in the text. Heading numbers can be switched off " +
-        "under Document information, for every heading at once.";
+      return s + " Check every reference to a section or page number in the text.";
     },
     "headings-deeper": function (e) {
       return plural(e.count, "heading", "headings") + " below level 3 became " +
@@ -169,8 +156,7 @@
         " brought up to the third level.";
     },
     "list-numbering": function (e) {
-      return plural(e.count, "numbered item", "numbered items") + " may not show the number the original showed " +
-        "(letters or a custom label, or a start other than 1). Check any reference to " +
+      return plural(e.count, "numbered item", "numbered items") + " may not show the number the original showed. Check any reference to " +
         (e.count === 1 ? "it" : "them") + " in the text, such as \"see 4(b)\".";
     },
     "lists-in-drawings": function (e) {
@@ -185,8 +171,7 @@
       return plural(e.count, "endnote", "endnotes") + " became " + (e.count === 1 ? "a footnote" : "footnotes") + ".";
     },
     "fields": function (e) {
-      return plural(e.count, "field", "fields") + " (such as a date, a cross-reference or a page number) " +
-        was(e.count) + " kept as the text " + (e.count === 1 ? "it" : "they") + " showed.";
+      return plural(e.count, "field", "fields") + " " + was(e.count) + " kept as the text " + (e.count === 1 ? "it" : "they") + " showed.";
     },
     "symbols": function (e) {
       return plural(e.count, "symbol", "symbols") + " from a symbol font could not be matched and " +
@@ -196,7 +181,7 @@
       return "Text set in columns was brought across as one column.";
     },
     "formatting": function () {
-      return "Fonts, sizes, colours, spacing and table styling were replaced by the house style.";
+      return "Formatting was replaced by the house style.";
     }
   };
 

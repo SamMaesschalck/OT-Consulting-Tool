@@ -176,7 +176,7 @@
     if (!b) return;
     b.textContent = state.dirty ? "Save*" : "Save";
     b.classList.toggle("btn-unsaved", state.dirty);
-    b.title = "Save your review file (Shift+click: Save as)" + (state.lastSave ? ". Last saved to " + state.lastSave.name + " at " + fmtTime(state.lastSave.at) + "." : "");
+    b.title = "Shift+click to Save as" + (state.lastSave ? ". Last saved to " + state.lastSave.name + " at " + fmtTime(state.lastSave.at) + "." : "");
     if (state.review) b.removeAttribute("disabled"); else b.setAttribute("disabled", "");
   }
   function markClean() { state.dirty = false; cix = null; updateSaveButton(); }
@@ -196,7 +196,7 @@
     var r = state.restore ? withOffered() : state.review;
     if (!lsSet(KEY_AUTOSAVE + state.pack.packId, JSON.stringify({ savedOn: new Date().toISOString(), review: r })) && !autosaveBroken) {
       autosaveBroken = true;
-      toast("Autosave is not available here (browser storage blocked or full). Save to a file regularly.", "err");
+      toast("Autosave is not working in this browser. Save to a file regularly.", "err");
     }
   }
   function clearAutosave() { if (!state.demo && state.pack) lsDel(KEY_AUTOSAVE + state.pack.packId); }
@@ -343,7 +343,7 @@
     var dlg = modal("Your name", function (m) {
       return [
         h("h2", { text: "Your name" }),
-        h("div", { text: "It goes on your comments and on your review file, so the author knows who said what. This browser remembers it." }),
+        h("div", { text: "It goes on your comments and your review file." }),
         input,
         h("div", { class: "btn-row" }, [
           h("button", { type: "button", class: "btn", id: "rr-name-cancel", text: "Cancel", onClick: m.cancel }),
@@ -382,7 +382,7 @@
     modal("Comments already in the file", function (m) {
       return [
         h("h2", { text: "Also put your new name on " + RC.plural(list.length, "comment") + " already saved as " + old + "?" }),
-        h("p", { text: "Choose this only if they are yours under another spelling. If " + old + " is someone else, leave them as they are." }),
+        h("p", { text: "Only if they are yours under another spelling." }),
         h("div", { class: "rr-modal-choices" }, [
           h("button", { type: "button", class: "btn primary", id: "rr-rename-keep", text: "Leave them as " + old, onClick: m.cancel }),
           h("button", { type: "button", class: "btn", id: "rr-rename-also", text: "They are mine: put " + v + " on them", onClick: function () {
@@ -572,7 +572,7 @@
       function pick(v) { return function () { fileQuestion = null; m.close(); cb(v); }; }
       return [
         h("h2", { text: "This is " + theirs + (isFile ? "'s review file" : "'s unsaved work") }),
-        h("p", { text: (me ? "This browser knows you as " + me + "." : "This browser does not know your name yet.") + " If you carry on as " + theirs + ", what you add goes out under that name" + (isFile ? " and Save writes into their file." : ".") }),
+        h("p", { text: "If you carry on as " + theirs + ", what you add goes out under their name" + (isFile ? " and Save writes into their file." : ".") }),
         h("div", { class: "rr-modal-choices" }, [
           h("button", { type: "button", class: "btn primary", id: "rr-whose-mine", text: (me ? "I am " + me : "I am someone else") + ": show their comments, read only", onClick: pick("mine") }),
           h("button", { type: "button", class: "btn", id: "rr-whose-theirs", text: "I am " + theirs + ": carry on as " + theirs, onClick: pick("theirs") }),
@@ -587,7 +587,7 @@
       function pick(v) { return function () { fileQuestion = null; m.close(); cb(v); }; }
       return [
         h("h2", { text: "You have unsaved work on this pack" }),
-        h("p", { text: "It can be added to the review file you are opening" + (name ? " (" + name + ")" : "") + ", so nothing is lost." }),
+        h("p", { text: "It can be added to the review file you are opening" + (name ? " (" + name + ")" : "") + "." }),
         h("div", { class: "rr-modal-choices" }, [
           h("button", { type: "button", class: "btn primary", id: "rr-merge-yes", text: "Add it to the review file", onClick: pick(true) }),
           h("button", { type: "button", class: "btn", id: "rr-merge-no", text: "Leave everything as it is", onClick: m.cancel })
@@ -602,7 +602,7 @@
       function pick(v) { return function () { fileQuestion = null; m.close(); cb(v); }; }
       return [
         h("h2", { text: "Your review of the open pack is not saved" }),
-        h("p", { text: "Save it first if you want to keep it in your review file. Opening this pack without saving leaves it behind." }),
+        h("p", { text: "Save it first if you want to keep it in your review file." }),
         h("div", { class: "rr-modal-choices" }, [
           h("button", { type: "button", class: "btn primary", id: "rr-leave-no", text: "Stay on the open pack", onClick: m.cancel }),
           h("button", { type: "button", class: "btn", id: "rr-leave-yes", text: "Open the pack without saving", onClick: pick(true) })
@@ -626,8 +626,8 @@
   function textOrNone(v) { return v == null || typeof v === "string"; }
   function identifyFile(text) {
     var t = String(text || "");
-    if (/^PK/.test(t)) return { ok: false, error: "This is a Word or Excel file. Open the review pack (.json) the author sent, not the report itself." };
-    if (/^%PDF/.test(t)) return { ok: false, error: "This is a PDF. Open the review pack (.json) the author sent, not the report itself." };
+    if (/^PK/.test(t)) return { ok: false, error: "This is a Word or Excel file. Open the review pack (.json) instead." };
+    if (/^%PDF/.test(t)) return { ok: false, error: "This is a PDF. Open the review pack (.json) instead." };
     var d = RC.parseJson(t);
     if (!d || typeof d !== "object") return { ok: false, error: "This is not a review pack or a review file: it could not be read." };
     var id = RC.identify(t);
@@ -691,15 +691,15 @@
       if (failed && last === "pack") return;   // the file's own message stands
       if (last === "pending") {
         var pr = state.pendingReview, seen = seenOf(pr.file.packId);
-        msg = "Your review file is ready. Now open the review pack it answers" + (seen && seen.packName ? ": " + seen.packName : " (round " + (pr.file.round || 1) + ")") + ".";
+        msg = "Now open the review pack for this file" + (seen && seen.packName ? ": " + seen.packName : " (round " + (pr.file.round || 1) + ")") + ".";
       } else if (last === "colleague") {
-        msg = state.colleague.reviewer + "'s comments are shown read only. Your own comments, and Save, stay in your own review file.";
+        msg = state.colleague.reviewer + "'s comments are shown read only.";
       } else if (last === "opened") {
-        msg = state.restore ? "Your review file is open. Unsaved work that is not in it was also found: Restore or Discard it at the top of the page."
+        msg = state.restore ? "Your review file is open. Unsaved work not in it is offered at the top of the page."
           : state.carried ? "Your review file is open, with your unsaved work added to it. Save to keep it."
           : "Your review is open (round " + (r.round || state.pack.round) + (r.reviewer ? ", as " + r.reviewer : "") + ").";
       } else {
-        msg = "Review pack opened: round " + state.pack.round + "." + (realInTour ? " This is the tour's window. Use the Report Review Tool itself for real work." : "");
+        msg = "Review pack opened: round " + state.pack.round + "." + (realInTour ? " This is the tour's window: use the Report Review Tool for real work." : "");
       }
       toast(msg);
     }
@@ -720,14 +720,14 @@
           if (state.dirty) writeAutosave();
           else if (state.restore) lsSet(KEY_AUTOSAVE + state.pack.packId, JSON.stringify({ savedOn: state.restore.savedOn, review: state.restore.review }));
           render();
-          toast("That review file is damaged and was not opened. Your work is as it was.", "err");
+          toast("That review file is damaged and was not opened.", "err");
           return false;
         } catch (e2) {}
       }
       state.pack = null; state.review = null; state.restore = null; state.savedHint = null; state.colleague = null;
       state.page = "welcome"; state.composer = null;
       markClean(); render();
-      toast("That pack could not be shown: it is damaged or incomplete. Ask the author to send it again.", "err");
+      toast("That pack is damaged or incomplete. Ask the author to send it again.", "err");
       return false;
     }
   }
@@ -781,9 +781,9 @@
       state.review.dismissedCheckTitles = dismissedTitles();
       var text = JSON.stringify(state.review, null, 1);
       var name = suggestedName();
-      var DEMO_SAVED = " This is the demo review, so there is no author to send it to.";
+      var DEMO_SAVED = " There is no author to send the demo review to.";
       // A comment still being written is not in the file: say so, never block.
-      var DRAFT = composerHasDraft() ? " The comment you are still writing is not in it: add it, then save again." : "";
+      var DRAFT = composerHasDraft() ? " Your unfinished comment is not in it: add it, then save again." : "";
       function saved(method, shown, handle) {
         state.lastSave = { name: shown, at: new Date().toISOString(), method: method, text: text };
         if (DRAFT) toast("Saved to " + shown + "." + DRAFT, "warn");
@@ -802,9 +802,9 @@
       }
       function download(blocked) {
         RC.downloadText(text, name);
-        toast(state.demo ? "Saved (downloaded as " + name + ")." + DEMO_SAVED
-          : blocked ? "Review file saved (downloaded as " + name + "). Saving back into the same file is not available here, so each save downloads a new copy."
-          : "Review file saved (downloaded as " + name + ").");
+        toast(state.demo ? "Downloaded as " + name + "." + DEMO_SAVED
+          : blocked ? "Review file downloaded as " + name + ". Each save here downloads a new copy."
+          : "Review file downloaded as " + name + ".");
         saved("download", name, null);
       }
       function pick() {
@@ -825,7 +825,7 @@
             return w.write(text).then(function () { return w.close(); });
           }).then(function () {
             state.handle = handle;
-            toast("Saved to " + handle.name + "." + (state.demo ? DEMO_SAVED : " Send this file to the author by shared folder or email."));
+            toast("Saved to " + handle.name + "." + (state.demo ? DEMO_SAVED : " Send it to the author."));
             saved("file", handle.name, handle);
           }).catch(function (e) {
             if (canFallback) pick();
@@ -1476,10 +1476,10 @@
   }
   function raiseAgain(p) {
     var c = p.comment, r = raiseAnchor(c.anchor);
-    var why = { near: "The text has changed since round " + p.round + ", so this goes on it as it reads now.",
-      section: "The text has changed since round " + p.round + ", so this goes on its section heading.",
-      tie: "This could not be matched to one place for certain, so check it is on the right one.",
-      gone: "That text is no longer in the report, so this keeps only the section it was in." }[r.moved] || "";
+    var why = { near: "The text has changed since round " + p.round + ".",
+      section: "The text has changed, so this goes on its section heading.",
+      tie: "Check this is the right place.",
+      gone: "That text is no longer in the report." }[r.moved] || "";
     var comp = { anchor: r.anchor, severity: c.severity, text: "", relatesTo: c.id, suggest: false, suggestion: "",
       label: "Raising again: " + cut(c.text, 120) + (why ? " " + why : "") };
     if (r.anchor.kind === "item") {
@@ -1536,8 +1536,8 @@
       where ? h("div", { class: "small muted rr-prev-where", text: where }) : null,
       a.quote ? h("div", { class: "quote small" }, [changed ? h("span", { class: "rr-lbl", text: "Was: " }) : a.cell ? h("span", { class: "rr-lbl", text: "On a cell: " }) : null, cut(a.quote, 240)]) : null,
       now != null ? h("div", { class: "rr-now small" }, [h("span", { class: "rr-lbl", text: "Now reads: " })].concat(wordDiff(a.quote, now))) : null,
-      changed && loc && loc.how === "section" ? h("div", { class: "small muted", text: inline ? "No close match for it now, so it is shown on its section heading." : "No close match for it now. Go to takes you to its section." }) : null,
-      loc && loc.tie ? h("div", { class: "small muted rr-tie", text: (a.cell ? "These words could not be matched to one cell for certain." : "The same words are in the report more than once.") + " Check this is the right place." }) : null,
+      changed && loc && loc.how === "section" ? h("div", { class: "small muted", text: inline ? "No close match now, so shown on its section heading." : "No close match now. Go to opens its section." }) : null,
+      loc && loc.tie ? h("div", { class: "small muted rr-tie", text: (a.cell ? "These words could not be matched to one cell." : "These words are in the report more than once.") + " Check this is the right place." }) : null,
       gone && !inline ? h("div", { class: "small rr-gone", text: a.kind === "item" ? "This item is no longer in the engagement." : "This is no longer in the report." }) : null,
       h("div", { class: "text", text: c.text }),
       c.suggestion ? h("div", { class: "sug" }, [h("div", { class: "small muted", text: "Suggested wording" }), c.suggestion]) : null,
@@ -1959,8 +1959,8 @@
       tb.push(h("label", { class: "rr-markread", id: "rr-markread" }, [tick, "Read"]));
     }
     tb.push(findBox());
-    tb.push(h("button", { type: "button", class: "btn sm", id: "rr-keys", text: "Keyboard", title: "The keys that work on this page", onClick: showKeys }));
-    tb.push(h("span", { class: "muted", text: "Click a paragraph, heading, table or table cell to comment on it. Select some words first to comment on just those words." }));
+    tb.push(h("button", { type: "button", class: "btn sm", id: "rr-keys", text: "Keyboard", title: "Keyboard shortcuts", onClick: showKeys }));
+    tb.push(h("span", { class: "muted", text: "Click anything in the report to comment. Select some words first to comment on just those." }));
     main.appendChild(h("h1", { class: "page-title", text: (e.instrumentTitle || "Report") }));
     // Who and which round stay in view at any width (the header hides them
     // on a narrow window); with two reports, which one this is.
@@ -1971,7 +1971,7 @@
     var rq = requestPanel();
     if (rq) main.appendChild(rq);
     main.appendChild(h("div", { class: "rr-toolbar" }, tb));
-    main.appendChild(h("p", { class: "rr-pages-note", id: "rr-pages-note", text: "Shown as A4 pages with the house cover. Word decides where pages break." }));
+    main.appendChild(h("p", { class: "rr-pages-note", id: "rr-pages-note", text: "Page breaks in Word may differ." }));
     main.appendChild(h("span", { class: "rr-sr", id: "rr-block-hint", text: "Press Enter to comment on it." }));
     var hintBox = h("div", { class: "rr-sr", id: "rr-hints" }, [
       h("span", { id: "rr-head-hint", text: "Heading. Press Enter to comment on it." }),
@@ -2255,8 +2255,8 @@
       else if (ev.key === "Escape") { input.value = ""; f.q = ""; f.i = 0; applyFind($("rr-paper"), false); }
     });
     return h("span", { class: "rr-findbox" }, [input,
-      h("button", { type: "button", class: "btn sm", id: "rr-find-prev", text: "Previous", title: "Previous match (Shift+Enter)", onClick: function () { stepFind(-1); } }),
-      h("button", { type: "button", class: "btn sm", id: "rr-find-next", text: "Next", title: "Next match (Enter)", onClick: function () { stepFind(1); } }),
+      h("button", { type: "button", class: "btn sm", id: "rr-find-prev", text: "Previous", title: "Shift+Enter", onClick: function () { stepFind(-1); } }),
+      h("button", { type: "button", class: "btn sm", id: "rr-find-next", text: "Next", title: "Enter", onClick: function () { stepFind(1); } }),
       h("span", { class: "small muted", id: "rr-find-count", "aria-live": "polite" })]);
   }
   // The marks in the report, in order. Kept from the last search (the report's
@@ -2509,7 +2509,7 @@
   function renderEngagement(main) {
     var pack = state.pack, all = pack.items || [], targets = targetsOf(pack);
     main.appendChild(h("h1", { class: "page-title", text: "Engagement" }));
-    main.appendChild(h("p", { class: "page-sub", text: "The answers, evidence and plans behind the report, so you can challenge a finding as well as its wording." }));
+    main.appendChild(h("p", { class: "page-sub", text: "The answers and evidence behind the report." }));
     // "No evidence" is named for what the pack calls that field, and left out
     // when it has none.
     var evLabel = fieldLabel("evidence");
@@ -2630,7 +2630,7 @@
   }
   function renderChecklist(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Checklist" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Your answers go in your review file. If you answer no, add a comment saying why." }));
+    main.appendChild(h("p", { class: "page-sub", text: "If you answer no, add a comment saying why." }));
     checklistItems().forEach(function (g) {
       main.appendChild(card(g.title, null, g.items.map(function (q) {
         var a = answerOf(q.id) || {};
@@ -2718,7 +2718,7 @@
   }
   function renderChecks(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Automatic checks" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Possible problems in this pack. Look at each one in place, then make it a comment or dismiss it." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Possible problems in this pack. Make each one a comment or dismiss it." }));
     var all = currentChecks(), active = all.filter(function (r) { return !isDismissed(r); }), gone = all.length - active.length;
     // What was found first, in the checks' own order; the clean checks folded
     // into one card, each opening to say what it looked for.
@@ -2796,14 +2796,14 @@
       state.checks = null;
       render(true);
     });
-    return h("div", { style: "margin-bottom:8px" }, [ta, h("div", { class: "small muted", text: "This list stays in this browser, and is never put in your review file." })]);
+    return h("div", { style: "margin-bottom:8px" }, [ta, h("div", { class: "small muted", text: "Kept in this browser only." })]);
   }
 
   // ---------- previous round ----------
   function renderPrevious(main) {
     var list = prevComments();
     main.appendChild(h("h1", { class: "page-title", text: "Previous round" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Each earlier comment, with what the author did about it and how the text reads now. Look at each one in place, then confirm the fix, accept the author's reason, or raise it again." }));
+    main.appendChild(h("p", { class: "page-sub", text: "What the author did about each earlier comment. Confirm it or raise it again." }));
     var verdicts = (state.pack.previousRound && state.pack.previousRound.verdicts) || [];
     if (verdicts.length) {
       main.appendChild(card("Verdicts so far", null, verdicts.map(function (v) {
@@ -2896,7 +2896,7 @@
   function renderSummary(main) {
     var r = state.review, list = comments();
     main.appendChild(h("h1", { class: "page-title rr-sum-title", text: "Summary and verdict" }));
-    main.appendChild(h("p", { class: "page-sub", text: "When you have finished, choose a verdict and save. Send the file to the author by shared folder or email. It holds only your review, and the author's tool merges it with other reviewers' files." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Choose a verdict, save, and send the file to the author." }));
     main.appendChild(printHeader());
     var rq = requestPanel();
     if (rq) main.appendChild(rq);
@@ -2926,7 +2926,7 @@
       ]),
       h("div", { class: "rr-actions no-print" }, [
         h("button", { type: "button", class: "rr-linkbtn", id: "rr-rename", text: "Change your name", onClick: function () { askName(null, r.reviewer || reviewerName()); } }),
-        h("button", { type: "button", class: "rr-linkbtn", id: "rr-print", text: "Print or save as PDF", title: "A printout of your review, for your own records or to brief someone", onClick: function () { window.print(); } })
+        h("button", { type: "button", class: "rr-linkbtn", id: "rr-print", text: "Print or save as PDF", onClick: function () { window.print(); } })
       ])
     ]);
     yours.querySelector(".card-h .sub").classList.add("no-print");
@@ -2944,11 +2944,11 @@
       });
       return h("label", { class: "rr-verdict" + (on ? " on" : ""), "data-verdict": v }, [radio, h("span", null, [h("strong", { text: RC.VERDICTS[v] }), h("div", { class: "small muted", text: verdictHelp(v) })])]);
     }));
-    var warn = RC.isApproval(r.verdict.value) && sev["must-fix"] ? h("div", { class: "rr-warn", text: "You have " + RC.plural(sev["must-fix"], "must-fix comment") + " and an approval. That is allowed, but the author will see both." }) : null;
+    var warn = RC.isApproval(r.verdict.value) && sev["must-fix"] ? h("div", { class: "rr-warn", text: "You have " + RC.plural(sev["must-fix"], "must-fix comment") + " and an approval. The author will see both." }) : null;
     // Where the last save went, and when. A file opened from disk has only
     // the date it was saved on.
     var ls = state.lastSave, savedText = null;
-    if (!state.dirty && ls) savedText = "Saved to " + ls.name + " at " + fmtTime(ls.at) + "." + (ls.method === "download" ? " Each save downloads a new copy; send the newest." : "");
+    if (!state.dirty && ls) savedText = "Saved to " + ls.name + " at " + fmtTime(ls.at) + "." + (ls.method === "download" ? " Send the newest copy." : "");
     else if (!state.dirty && r.savedAt) savedText = "Saved " + fmtDate(r.savedAt) + ".";
     // The note is saved as it is typed: closing the window straight after
     // must not lose it. Nothing is drawn again for a key; only the line that
@@ -2968,7 +2968,7 @@
         h("button", { type: "button", class: "btn primary", id: "rr-save-2", text: "Save my review file", onClick: function (e) { saveReview(e); } }),
         savedText ? h("span", { class: "small muted", id: "rr-saved-at", text: savedText }) : null
       ]),
-      (r.verdict.value || "none") === "none" ? h("div", { class: "small muted no-print", id: "rr-no-verdict", text: "No verdict yet. You can save without one and carry on later, but choose one before you send the file to the author." }) : null
+      (r.verdict.value || "none") === "none" ? h("div", { class: "small muted no-print", id: "rr-no-verdict", text: "No verdict yet. Choose one before you send the file." }) : null
     ]);
     // No button sends the saved file to the author's tool, even in the suite:
     // the reviewer is someone else, who sends the file to the author.
@@ -2986,7 +2986,7 @@
       ];
       if (state.composer && state.composer.editing === c.id) kids.push(composerNode());
       return h("div", { class: "rr-check", "data-sum-comment": c.id }, kids);
-    }) : [h("p", { class: "muted", text: "Comments you add on the Report and Engagement pages are listed here." })]));
+    }) : [h("p", { class: "muted", text: "Comments you add appear here." })]));
     var col = state.colleague;
     if (col) {
       main.appendChild(card(col.reviewer + "'s comments", "read only" + (col.verdict && col.verdict.value !== "none" ? ", " + (RC.VERDICTS[col.verdict.value] || col.verdict.value) : ""), col.comments.length ? col.comments.map(function (c) {
@@ -3056,7 +3056,7 @@
   // ---------- welcome and about ----------
   function renderWelcome(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Report review" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Read a report as the client will, look at the engagement behind it, and comment here instead of marking up a Word file." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Read a report as the client will, and comment on it." }));
     var drop = h("div", { class: "rr-drop", id: "rr-drop" }, [
       h("p", { text: "Drop a review pack here, or" }),
       h("button", { type: "button", class: "btn primary", id: "rr-open", text: "Open a review pack", onClick: chooseFiles }),
@@ -3064,16 +3064,16 @@
     ]);
     main.appendChild(drop);
     main.appendChild(card("How a review works", null, [h("ol", { class: "rr-steps" }, [
-      h("li", { text: "The author sends a review pack from the assessment or risk tool. It holds client data: handle it as you would the project file." }),
-      h("li", { text: "Open it here. Read the report, look at the engagement, work through the checklist and the automatic checks, and comment as you go." }),
-      h("li", { text: "On Summary and verdict, choose a verdict and save your review file. To carry on later, open the pack and your review file in either order. Any unsaved work this browser kept is offered back." }),
-      h("li", { text: "Send the file to the author. Their tool merges it with other reviewers' files, so nobody overwrites anyone." })
+      h("li", { text: "Open the review pack. It holds client data: handle it as you would the project file." }),
+      h("li", { text: "Read the report and comment as you go. Then work through the checklist and the automatic checks." }),
+      h("li", { text: "On Summary and verdict, choose a verdict and save your review file. To carry on later, open the pack and your review file." }),
+      h("li", { text: "Send the file to the author." })
     ])]));
   }
   function renderAbout(main) {
     main.appendChild(h("h1", { class: "page-title", text: "About" }));
     main.appendChild(card(V.product + " " + V.label, "version " + V.number, [
-      h("p", { text: "Works offline, with no server. A review pack holds client data, so handle it as you would the project file. Your review file holds your comments, your checklist answers and your verdict, with the short quotes they are about." }),
+      h("p", { text: "Works offline. Review packs hold client data: handle them as you would the project file." }),
       h("p", { text: "It reads " + RC.packSchema() + " and writes " + RC.fileSchema() + "." })
     ]));
     main.appendChild(card("Keyboard", null, [keysList()]));
@@ -3082,17 +3082,17 @@
   // The keys, in one place: on About, and from the Keyboard button above the
   // report. Keep it in step with paperKey, itemKey and the wiring.
   var KEYS = [
-    ["Tab", "Moves between the parts of the page. The report is one stop, and so are the list of sections and the items on Engagement: the keys below move inside them."],
-    ["Up and Down", "In the report, the paragraph, heading, table or picture before or after. In the list of sections and between items on Engagement, the one before or after."],
-    ["Page Up and Page Down", "In the report, the section before or after."],
-    ["Home and End", "The start or the end of the report, the list of sections or the items. In a table, the first or last cell of the row."],
-    ["Enter or Space", "Comment on the paragraph, heading or picture. On a table, Enter goes into its cells and Space comments on the whole table."],
-    ["In a table", "The arrow keys move between cells, Enter comments on the cell, and Escape goes back out to the table."],
-    ["Tab from a paragraph", "Goes to the comments beside it, then on out of the report."],
-    ["Escape", "Closes an empty comment or reply box and goes back to where it was opened from. A box with something written in it stays until you add or cancel it. Escape also closes a question, and clears the find box."],
-    ["Left and Right", "Move between the buttons of a group: the severities, Yes, No and N/A, and the filters."],
-    ["Ctrl+F", "On the Report page, find in the report. Enter and Shift+Enter go to the next and the previous match."],
-    ["Ctrl+Z", "Undoes a delete while Undo is on offer. After a delete made from the keyboard, the keyboard is on Undo."]
+    ["Tab", "Moves between parts of the page. Use the keys below inside the report, the section list and the items."],
+    ["Up and Down", "Previous or next block, section or item."],
+    ["Page Up and Page Down", "Previous or next section of the report."],
+    ["Home and End", "First or last block, section or item. In a table, first or last cell of the row."],
+    ["Enter or Space", "Comment on the block. On a table, Enter goes into the cells and Space comments on the whole table."],
+    ["In a table", "Arrow keys move between cells, Enter comments on the cell, Escape goes back to the table."],
+    ["Tab from a paragraph", "Goes to its comments, then out of the report."],
+    ["Escape", "Closes an empty comment or reply box, or a question. Clears the find box."],
+    ["Left and Right", "Move between buttons in a group."],
+    ["Ctrl+F", "Find in the report. Enter and Shift+Enter go to the next and previous match."],
+    ["Ctrl+Z", "Undoes a delete while Undo is showing."]
   ];
   function keysList() {
     var kids = [];
@@ -3111,7 +3111,7 @@
       if (!window.SPT_REVIEW_DEMO_PACK) { toast("The demo pack (data/demo-pack.js) is missing.", "err"); return; }
       openPack(JSON.parse(JSON.stringify(window.SPT_REVIEW_DEMO_PACK)), true);
       render();
-      toast("Demo pack opened: a real report from a demo assessment, round " + state.pack.round + ".");
+      toast("Demo pack opened.");
     }
     if (window.SPT_REVIEW_DEMO_PACK) { go(); return; }
     var s = document.createElement("script");
@@ -3294,14 +3294,14 @@
     var when = fmtDate(snap.savedOn) + " " + (function () { var d = new Date(snap.savedOn); return isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); })();
     var other = !snap.overFile && snap.someoneElse;
     var text = snap.overFile
-      ? "Unsaved work on this review from " + when + " is not in the review file you opened. Restore adds it to the file, and keeps everything already in it."
-      : other ? "Unsaved work by " + other + " on this pack, from " + when + ", is kept in this browser."
-      : "This browser kept unsaved review work on this pack from " + when + "." + (hasWork(state.review) ? " Restore adds it to what you have done since." : "");
+      ? "Unsaved work from " + when + " is not in the review file you opened. Restore adds it to the file."
+      : other ? "Unsaved work by " + other + " on this pack, from " + when + "."
+      : "Unsaved work on this pack from " + when + "." + (hasWork(state.review) ? " Restore adds it to what you have done since." : "");
     function restore() {
       state.review = withOffered();
       state.restore = null;
       touched(); render();
-      toast("Your autosaved review is restored, with anything you added since. Save to keep it.");
+      toast("Unsaved work restored. Save to keep it.");
     }
     return h("div", { class: "rr-banner autosave-bar", id: "rr-restore" }, [
       h("span", { class: "t", text: text }),
@@ -3323,7 +3323,7 @@
           showColleague(snap.review, "");
           state.restore = null;
           render();
-          toast(other + "'s unsaved work is shown read only. This browser keeps one copy of unsaved work per pack, so theirs is replaced once you change anything here.");
+          toast(other + "'s unsaved work is shown read only. It is replaced once you change anything here.");
         });
       } }),
       h("button", { type: "button", class: "btn sm", id: "rr-restore-no", text: "Discard", onClick: function () {
@@ -3339,7 +3339,7 @@
     var seen = seenOf(pr.file.packId), B = HB();
     var packName = seen && seen.packName;
     return h("div", { class: "rr-banner", id: "rr-pending" }, [
-      h("span", { class: "t", text: "Your review file " + (pr.name || "") + " (round " + (pr.file.round || 1) + (pr.file.reviewer ? ", " + pr.file.reviewer : "") + ") is ready. Open the review pack it answers" + (packName ? ", " + packName + "," : "") + " to carry on." }),
+      h("span", { class: "t", text: "Open the review pack" + (packName ? " " + packName : "") + " to carry on with your review file " + (pr.name || "") + " (round " + (pr.file.round || 1) + (pr.file.reviewer ? ", " + pr.file.reviewer : "") + ")." }),
       h("button", { type: "button", class: "btn sm primary", id: "rr-pending-open", text: "Open the pack", onClick: function () {
         if (B && packName) B.openRecent({ name: packName, label: "" }); else chooseFiles();
       } })
@@ -3350,7 +3350,7 @@
     if (!s || !state.pack || state.demo) return null;
     var B = HB();
     return h("div", { class: "rr-banner", id: "rr-saved-hint" }, [
-      h("span", { class: "t", text: "This browser has a review file for this pack: " + s.reviewName + (s.savedAt ? ", saved " + fmtDate(s.savedAt) : "") + ". Open it to carry on, rather than starting a second one." }),
+      h("span", { class: "t", text: "You have a review file for this pack: " + s.reviewName + (s.savedAt ? ", saved " + fmtDate(s.savedAt) : "") + "." }),
       h("button", { type: "button", class: "btn sm primary", id: "rr-saved-open", text: "Open it", onClick: function () {
         if (B) B.openRecent({ name: s.reviewName, label: (state.pack.engagement || {}).client || "" }); else chooseFiles();
       } }),
@@ -3361,7 +3361,7 @@
     var c = state.colleague;
     if (!c) return null;
     return h("div", { class: "rr-banner", id: "rr-colleague" }, [
-      h("span", { class: "t", text: c.reviewer + "'s comments" + (c.name ? " from " + c.name : "") + " are shown read only, beside the report and on Summary. Your own comments, and Save, stay in your own review file; theirs is not changed." }),
+      h("span", { class: "t", text: c.reviewer + "'s comments" + (c.name ? " from " + c.name : "") + " are shown read only. Their file is not changed." }),
       h("button", { type: "button", class: "btn sm", id: "rr-colleague-hide", text: "Hide them", onClick: function () { state.colleague = null; render(true); } })
     ]);
   }
@@ -3472,7 +3472,7 @@
     renderNav(); renderHeader();
     main.innerHTML = "";
     if (state.demo) {
-      main.appendChild(h("div", { class: "rr-banner", id: "rr-demo-note" }, [h("span", { class: "t", text: "This is a demo pack, made from a demo assessment. Nothing you do here affects real work." })]));
+      main.appendChild(h("div", { class: "rr-banner", id: "rr-demo-note" }, [h("span", { class: "t", text: "This is a demo pack." })]));
     }
     [restoreBar(), pendingBar(), savedHintBar(), colleagueBar()].forEach(function (bar) { if (bar) main.appendChild(bar); });
     var page = state.page;

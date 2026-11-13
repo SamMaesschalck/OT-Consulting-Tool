@@ -238,6 +238,8 @@
     ok(RT.state.project.basisOfAssessment.interviews.length === 1, "registers hold only consultant-entered rows (guidance not auto-added)");
     clickNav("3. Zones");
     ok(doc.querySelector(".zone-map-wrap svg") != null, "stage 3 renders the SVG drawing");
+    ok(doc.querySelectorAll(".zone-map-wrap svg polyline").length === RT.state.project.conduits.filter(function (c) { return c.fromZone && c.toZone && c.fromZone !== c.toZone; }).length,
+      "with a line for each conduit between two zones");
     clickNav("4. Detailed");
     ok(doc.querySelectorAll(".threat-card").length >= 1, "stage 4 renders threat register");
     ok(doc.body.textContent.indexOf("Unmitigated risk") >= 0, "stage 4 shows unmitigated risk");

@@ -243,7 +243,7 @@ window.App.Review = (function () {
         RC().recordRound(r.store, r.pack);
         E().touchReview();
         rememberSnapshot(r.docs);
-        done({ ok: true, message: "Round " + r.pack.round + " pack saved as " + res.name + ". It holds client data: share it as you would the project file, then give it to each reviewer to open in the OT Cyber Report Review Tool.", pack: r.pack, name: res.name });
+        done({ ok: true, message: "Round " + r.pack.round + " pack saved as " + res.name + ". It holds client data, so share it only with the reviewers.", pack: r.pack, name: res.name });
       });
     }).catch(function (e) {
       console.error(e);
@@ -532,7 +532,7 @@ window.App.Review = (function () {
     return hit ? out.join("\n") : null;
   }
 
-  var NOT_EDITABLE = "This text is written by the tool from the answers or the framework, so it cannot be changed here. Copy the wording, then use Go to.";
+  var NOT_EDITABLE = "The tool writes this text, so it cannot be changed here. Copy the wording and use Go to.";
 
   function headingHasTarget(text) {
     var R = window.App.Report, eng = E().state.engagement;
@@ -548,19 +548,19 @@ window.App.Review = (function () {
     var e = E(), R = window.App.Report, eng = e.state.engagement;
     // One accepted change per comment: a second would write over the record
     // of what the first replaced, and its Undo with it.
-    if (t.accepted && t.accepted.revert) return { can: false, why: "Wording from this comment is already in the report. Undo the accepted wording first, then accept the new suggestion." };
+    if (t.accepted && t.accepted.revert) return { can: false, why: "Wording from this comment is already in the report. Undo it first." };
 
     if (a.kind === "item") {
       var target = targetOf(a);
-      if (!target) return { can: false, why: "The " + targetWord() + " this comment is on can no longer be found, so copy the wording and compare." };
-      if (!ITEM_FIELDS[a.field]) return { can: false, why: "This comment does not name one field of the item, so copy the wording and use Go to." };
+      if (!target) return { can: false, why: "The " + targetWord() + " this comment is on can no longer be found. Copy the wording instead." };
+      if (!ITEM_FIELDS[a.field]) return { can: false, why: "This comment is not on a single field. Copy the wording and use Go to." };
       var holder = holderOf(target.id, a.itemId, a.field);
-      if (norm(holder.value) !== norm(a.quote)) return { can: false, why: "The " + ITEM_FIELDS[a.field] + " has changed since the review, so copy the wording and compare." };
+      if (norm(holder.value) !== norm(a.quote)) return { can: false, why: "The " + ITEM_FIELDS[a.field] + " has changed since the review. Copy the wording and compare." };
       return itemPlan(holder.targetId, a.itemId, a.field, holder.value, String(sug).trim(), docs);
     }
     if (a.kind !== "block") return { can: false, why: "This comment is not on a piece of the report's text." };
     if (!docs) return { can: false, why: "Still checking this against the current report." };
-    if (!docContains(docs, a.quote)) return { can: false, why: "The report has changed, so this wording no longer matches what is there. Copy it and compare." };
+    if (!docContains(docs, a.quote)) return { can: false, why: "This wording no longer matches the report. Copy it and compare." };
     // Where the new wording has to be once the document is rebuilt: in the
     // section the comment is on, in its document, not just somewhere.
     var doc = docFor(a, docs) || {};
@@ -571,8 +571,8 @@ window.App.Review = (function () {
       return dd.blocks.some(function (b) { return b.type === "heading" && !b.sub && b.sectionKey === a.sectionKey && norm(b.text) === norm(a.quote); });
     });
     if (isHeading) {
-      if (!a.sectionKey) return { can: false, why: "This heading is a name from the assessment, not a section title. Rename it where it is entered." };
-      if (headingHasTarget(a.quote)) return { can: false, why: "This heading is built from a target's name, so it cannot be renamed for one document." };
+      if (!a.sectionKey) return { can: false, why: "This heading comes from the assessment. Rename it where it is entered." };
+      if (headingHasTarget(a.quote)) return { can: false, why: "This heading is a target's name and cannot be renamed here." };
       var title = DB().stripNumber(sug), prevTitle = e.getReportSection(a.sectionKey).title || null;
       return { can: true, kind: "section title", label: "Accept", where: where,
         apply: function () { e.setReportSection(a.sectionKey, { title: title }); },
@@ -599,7 +599,7 @@ window.App.Review = (function () {
         return DB().flatten(d.blocks.filter(function (b) { return b.sectionKey === nsKey && b.type !== "heading"; })).map(function (b) { return b.text; });
       });
       if (linesPerDoc.some(function (l) { return JSON.stringify(l) !== JSON.stringify(linesPerDoc[0]); })) {
-        return { can: false, why: "The next steps differ between the documents, so editing them here would overwrite the others. Copy the wording and use Go to." };
+        return { can: false, why: "The next steps differ between the documents. Copy the wording and use Go to." };
       }
       var lines = linesPerDoc[0] || [], idx = -1;
       lines.forEach(function (l, k) { if (idx === -1 && norm(l) === norm(a.quote)) idx = k; });
@@ -629,14 +629,14 @@ window.App.Review = (function () {
       ip.mustPrint = true; ip.where = where;
       return ip;
     }
-    if (about && matches.length > 1) return { can: false, why: "The same wording is recorded on " + matches.length + " items, so copy the wording and change the ones it should apply to." };
+    if (about && matches.length > 1) return { can: false, why: "The same wording is on " + matches.length + " items. Copy it and change the ones it applies to." };
 
     // A red prompt is answered where it is entered, never reworded: as plain
     // words it would print in black, unanswered, and the Issue check would
     // stop counting it. That is the whole of a prompt paragraph, and a
     // paragraph that closes in one.
     if (!a.cell && redTexts(docs)[nq]) {
-      return { can: false, why: "This is a prompt to complete in the tool, printed in red until it is answered, so it cannot be reworded here. Use Go to and answer it where it is entered." };
+      return { can: false, why: "This is a prompt to complete in the tool. Use Go to and answer it there." };
     }
 
     // A paragraph of a section's opening.
@@ -852,7 +852,7 @@ window.App.Review = (function () {
           plan.undo();
           currentDocs(function () {
             markPlanFailed(t);
-            done({ ok: false, message: "That wording did not reach the Word document when it was rebuilt, so the change was undone. Copy the wording and use Go to." });
+            done({ ok: false, message: "That wording did not reach the Word document, so the change was undone. Copy it and use Go to." });
           });
           return;
         }
@@ -863,11 +863,11 @@ window.App.Review = (function () {
         if (plan.revert) { t.accepted.revert = plan.revert; t.accepted.applied = plan.applied; }
         t.status = "resolved"; t.statusAt = t.accepted.at;
         E().touchReview();
-        done({ ok: true, message: "Accepted into the " + plan.kind + ", and checked in the rebuilt Word document." +
-          (plan.mustPrint ? "" : " This field does not print in the Word report, so the change shows only in the assessment.") +
-          (plan.kind === "paragraph" ? " Only that paragraph is changed: the rest of the section's opening is still written from the assessment." : "") +
-          (plan.places > 1 ? " The same paragraph is printed " + plan.places + " times across the documents, and each now has the new wording." : "") +
-          (plan.shared ? " This is a system-wide answer, so the change applies to every " + targetWord() + " that inherits it." : "") });
+        done({ ok: true, message: "Accepted into the " + plan.kind + " and checked in the Word document." +
+          (plan.mustPrint ? "" : " This field is not in the Word report.") +
+          (plan.kind === "paragraph" ? " Only that paragraph is changed." : "") +
+          (plan.places > 1 ? " Changed in all " + plan.places + " places it is printed." : "") +
+          (plan.shared ? " It applies to every " + targetWord() + " that inherits this system-wide answer." : "") });
       });
     });
   }
@@ -890,12 +890,12 @@ window.App.Review = (function () {
   // throw that edit away.
   function undoAccept(t, done) {
     var acc = t && t.accepted, rv = acc && acc.revert;
-    if (!rv) { done({ ok: false, message: "There is no record of what this replaced, so change it where it is entered." }); return; }
+    if (!rv) { done({ ok: false, message: "There is nothing to put back. Change it where it is entered." }); return; }
     if (rv.what === "paragraph") { undoParagraph(t, done); return; }
     var e = E(), cur = revertTarget(rv);
     if (cur === undefined && rv.what === "item") { done({ ok: false, message: "That " + targetWord() + " is no longer in this assessment, so there is nothing to put back." }); return; }
     if (norm(cur) !== norm(acc.applied)) {
-      done({ ok: false, message: "The wording has been edited since it was accepted, so the earlier wording was not put back. Use Edit where it is, or change it where it is entered." });
+      done({ ok: false, message: "The wording has been edited since it was accepted, so it was not put back. Change it where it is entered." });
       return;
     }
     var p = {};
@@ -923,7 +923,7 @@ window.App.Review = (function () {
     var list = e.getReportSection(rv.key).paragraphs, entry = RS.paragraphFor(list, rv.from);
     var gone = !entry && !(rv.prevTo != null && norm(acc.applied) === norm(rv.from));
     if (entry && norm(entry.to) !== norm(acc.applied)) {
-      done({ ok: false, message: "The wording has been changed since it was accepted, so the earlier wording was not put back. Use Back to the generated version on the report page." });
+      done({ ok: false, message: "The wording has changed since it was accepted, so it was not put back. Use Back to the generated version on the report page." });
       return;
     }
     if (!gone) {
@@ -931,7 +931,7 @@ window.App.Review = (function () {
       catch (x) { done({ ok: false, message: "The earlier wording could not be put back: " + (x.message || x) }); return; }
     }
     reopenAfterUndo(t);
-    done({ ok: true, message: gone ? "The accepted wording had already been taken out, so the comment is open again."
+    done({ ok: true, message: gone ? "The accepted wording had already been taken out. The comment is open again."
       : "The earlier wording is back, and the comment is open again." });
   }
   // Remembered for this session, so the failed Accept is not offered again.
@@ -1051,7 +1051,7 @@ window.App.Review = (function () {
       went = placeSection(hb.sectionKey, have, U);
       if (went) return went;
     }
-    U.toast((a.sectionTitle ? "\"" + a.sectionTitle + "\" is" : "That part is") + " only in the Word report, so the report page has no card for it.", "warn");
+    U.toast((a.sectionTitle ? "\"" + a.sectionTitle + "\" is" : "That part is") + " only in the Word report.", "warn");
     return null;
   }
 
@@ -1123,7 +1123,7 @@ window.App.Review = (function () {
     });
     if (!hit) return null;
     var row = (e.listAssessments ? e.listAssessments() : []).filter(function (x) { return x.id === hit; })[0];
-    return "This file is for the " + ((row && (row.label || row.instrumentTitle)) || "other") + " assessment in this project: switch to it, then import the file.";
+    return "This file is for the " + ((row && (row.label || row.instrumentTitle)) || "other") + " assessment: switch to it, then import the file.";
   }
 
   // ---- QA review by ------------------------------------------------------------
@@ -1185,7 +1185,7 @@ window.App.Review = (function () {
       beginPaint: beginPaint,
       endPaint: endPaint,
       acceptPlan: function (t) {
-        if (failedPlans[t.comment.id]) return { can: false, why: "That wording did not reach the Word document when it was rebuilt, so copy it and use Go to." };
+        if (failedPlans[t.comment.id]) return { can: false, why: "That wording did not reach the Word document. Copy it and use Go to." };
         return acceptPlan(t);
       },
       accept: accept,
@@ -1210,7 +1210,7 @@ window.App.Review = (function () {
       h("div", { class: "card-h" }, [h("h2", { text: "Review" })]),
       body
     ]);
-    body.appendChild(h("p", { class: "issue-lead", text: "Send the report for review as a pack. Each reviewer opens it in the OT Cyber Report Review Tool and sends back a small review file; import those here. Nothing on this card reaches the Word or Excel report." }));
+    body.appendChild(h("p", { class: "issue-lead", text: "Send a review pack to each reviewer, then import the review files they send back." }));
     var holder = h("div", { class: "rv-panel" });
     liveHolder = holder;   // Accept can redraw the page while it is checking
     body.appendChild(holder);

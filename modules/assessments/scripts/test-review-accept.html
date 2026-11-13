@@ -284,7 +284,7 @@ H.test(function (ok, done) {
   });
   step(function (notice) {
     var main = document.getElementById("main");
-    ok(/Accepted into the narrative, and checked in the rebuilt Word document\./.test(notice.textContent), "the button accepts, and the card says it was checked in the Word document", notice.textContent);
+    ok(/Accepted into the narrative and checked in the Word document\./.test(notice.textContent), "the button accepts, and the card says it was checked in the Word document", notice.textContent);
     ok(!main.querySelector(".review-card .rv-send").hasAttribute("disabled"), "and the card is usable again");
     ok(window.__t2.status === "resolved", "the comment is resolved");
     ok(/accepted through the button/.test(E.getReportNarrative().topPriorities), "and the field changed");
@@ -671,7 +671,7 @@ H.test(function (ok, done) {
     it3.t2.status = "open"; it3.t2.comment.suggestion = it3.t2.comment.suggestion.replace("Site Engineering Lead", "Engineering Director");
     var keep = JSON.stringify(it3.t2.accepted);
     var plan = RV.acceptPlan(it3.t2);
-    ok(!plan.can && /Undo the accepted wording first/.test(plan.why), "a second Accept is refused while the first is in the report", JSON.stringify(plan));
+    ok(!plan.can && /already in the report\. Undo it first/.test(plan.why), "a second Accept is refused while the first is in the report", JSON.stringify(plan));
     return acceptIt(it3.t2).then(function (res2) {
       ok(!res2.ok && JSON.stringify(it3.t2.accepted) === keep && E.findResponse(it3.tid, it3.itemId).owner === "Site Engineering Lead", "and the record of what the first replaced is not written over", res2.message);
       return new Promise(function (r) { RV.undoAccept(it3.t2, r); });
@@ -761,7 +761,7 @@ H.test(function (ok, done) {
   });
   step(function (res) {
     ok(res.ok && E.findResponse(sh.S, sh.id).action === "Shared recommended action, agreed with the site.", "accepted into the system-wide answer", res.message);
-    ok(/This is a system-wide answer, so the change applies to every .+ that inherits it\./.test(res.message) && !/[\u2013\u2014]/.test(res.message), "and the message says it applies to every zone that inherits it", res.message);
+    ok(/It applies to every .+ that inherits this system-wide answer\./.test(res.message) && !/[\u2013\u2014]/.test(res.message), "and the message says it applies to every zone that inherits it", res.message);
     return new Promise(function (r) { RV.undoAccept(sh.t2, r); });
   });
   step(function (res) {

@@ -528,7 +528,7 @@
       }
     } else {
       // A block from a later version of the tool: kept as it is, printed as nothing.
-      wrap.appendChild(h("p", { class: "unknown", text: "This part was made by a newer version of the tool. It is kept unchanged but does not print." }));
+      wrap.appendChild(h("p", { class: "unknown", text: "Made by a newer version of the tool. It is kept but does not print." }));
     }
     wrap.style.setProperty("contain-intrinsic-block-size", "auto " + Math.round(roughHeight(block)) + "px");
     return wrap;

@@ -9,33 +9,33 @@
       "id": "assessments",
       "shortName": "Assessments",
       "navLabel": "Assess",
-      "summary": "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and more, with an on-screen report, a Word report and an Excel tracker.",
-      "useWhen": "Use it when the question is how well a site, system, product or supplier meets a framework or standard. Choose the framework, record answers and evidence, then issue the Word report and Excel tracker. One project file can hold several assessments for the same customer, such as this year's review and a later re-assessment. Send for review on the report page writes a pack for the Report Review Tool, and Import review files brings the comments back.",
-      "tour": { "entry": "tour.html", "label": "Take the tour", "note": "A completed demo of every assessment. Nothing you do in it touches your own work." }
+      "summary": "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and more.",
+      "useWhen": "To measure a site, system, product or supplier against a standard and report the gaps. One project file can hold several assessments for a customer, such as this year's and a re-assessment.",
+      "tour": { "entry": "tour.html", "label": "Take the tour", "note": "A finished demo of every assessment" }
     },
     {
       "id": "risk-assessment",
       "shortName": "Risk assessment",
       "navLabel": "Risk",
-      "summary": "Run an IEC 62443-3-2 risk assessment of zones and conduits, set target security levels, and produce the Word and Excel reports and a risk context file for the assessment tool.",
-      "useWhen": "Use it before a 62443-3-3 assessment, to work out what each zone and conduit needs: define the system under consideration, split it into zones and conduits, assess the threats and set target security levels. Export the risk context file and import it into the 62443-3-3 assessment in the assessment tool. Send for review on the Peer review page writes a pack for the Report Review Tool, and Import review files brings the comments back.",
-      "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A completed demo risk assessment of a petrochemical unit. Its changes are never kept." }
+      "summary": "Run an IEC 62443-3-2 risk assessment and set a target security level for each zone and conduit.",
+      "useWhen": "Before a 62443-3-3 assessment, to set the targets it is measured against. Export the risk context file and import it into that assessment.",
+      "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A finished demo risk assessment of a petrochemical unit" }
     },
     {
       "id": "report-review",
       "shortName": "Report review",
       "navLabel": "Review",
-      "summary": "Review a colleague's report and the engagement behind it, from the pack they send. Comment on any paragraph, table or item, suggest wording, go through the checklist and automatic checks, then give a verdict.",
-      "useWhen": "Use it when a colleague sends you a review pack from the assessment or risk tool. Read the report as the client will and question the findings as well as the wording. Your comments go into a small review file for the author to import, and files from several reviewers merge without overwriting each other.",
-      "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A demo pack made from a demo assessment, at its second review round. Its changes are never kept." }
+      "summary": "Review a colleague's report and the engagement behind it, and give a verdict.",
+      "useWhen": "When a colleague sends you a review pack. Save your comments to a review file and send it back to them.",
+      "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A demo pack at its second review round" }
     },
     {
       "id": "documents",
       "shortName": "Documents",
       "navLabel": "Write",
-      "summary": "Write proposals, method statements, reports and other documents in the SolutionsPT template, or load a Word file to have it rebuilt in the template with its pictures and drawings kept.",
-      "useWhen": "Use it for any document that is not an assessment or risk report but should look like one. Start a new document or load a Word file, fill in the document information, edit, then export a Word file as a draft or a final. Anything from an imported file that could not be carried over is listed after the import.",
-      "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A short demo proposal with a table, a picture and a diagram kept from Word. Its changes are never kept." }
+      "summary": "Write proposals, method statements and other documents in the SolutionsPT template, or rebuild a Word file in it.",
+      "useWhen": "For any document that is not an assessment or risk report but should look like one.",
+      "tour": { "launch": { "tour": true }, "label": "Take the tour", "note": "A short demo proposal" }
     }
   ],
   "singleHtml": {

@@ -30,7 +30,7 @@ window.App.UI = (function () {
     opts = opts || {};
     return h("span", {
       class: "pmark" + (opts.large ? " lg" : ""),
-      title: "Provisional: coverage below threshold, so treat as indicative"
+      title: "Provisional: coverage too low to be more than indicative"
     }, ["P"]);
   }
   function confidenceTag(level) {
@@ -568,7 +568,7 @@ window.App.UI = (function () {
     var more = list.length - 1;
     var bar = h("div", { id: "autosave-bar", class: "autosave-bar" }, [
       h("span", { class: "autosave-msg", text: "Unsaved work found from " + when + " (" + detail + ")." +
-        (more > 0 ? " " + more + " more " + (more === 1 ? "copy is" : "copies are") + " kept and offered after this one." : "") })
+        (more > 0 ? " " + more + " more " + (more === 1 ? "copy" : "copies") + " after this one." : "") })
     ]);
 
     var restore = h("button", { class: "btn primary", text: "Restore" });
@@ -580,11 +580,11 @@ window.App.UI = (function () {
       // the next start offers it from there: kept either way.
       if (dirtySinceSave && projectHasContent(E.getProjectFile()) &&
           !confirm("Restore the unsaved work from " + when + "? It replaces the project open now. " +
-            "The unsaved changes in the project open now are kept in this browser and offered the next time the app starts, until you restore or discard them. " +
-            "To keep them in a file instead, choose Cancel and Save first.")) return;
+            "Its unsaved changes are kept in this browser and offered the next time the app starts. " +
+            "To keep them in a file, choose Cancel and Save first.")) return;
       var current = pendingEntry(entry.id);
       if (!current) {
-        toast("That unsaved work is no longer waiting in this browser. It may have been saved, or opened again, in another window.", "warn");
+        toast("That unsaved work is gone. Another window may have saved or opened it.", "warn");
         showRestoreBar();
         return;
       }
@@ -633,7 +633,7 @@ window.App.UI = (function () {
       showRestoreBar();   // the next copy, if more than one was kept
     });
     var dismiss = h("button", {
-      class: "autosave-dismiss", text: "×", title: "Dismiss (keeps the unsaved work and offers it again next time)",
+      class: "autosave-dismiss", text: "×", title: "Hide until next time",
       "aria-label": "Dismiss"
     });
     dismiss.addEventListener("click", closeRestoreBar);
@@ -658,11 +658,11 @@ window.App.UI = (function () {
     // The tooltip follows what Save will do: overwrite the open file, ask where
     // to save the first time, or (no file dialogs here) download a copy.
     var what;
-    if (!STG.supportsFilePickers()) what = "Download the project as a new JSON file. This browser cannot save over the original.";
-    else if (STG.currentFileHandle()) what = "Save over the project file. Shift+click to save a copy as a new file.";
-    else what = "Save the project to a file. You choose where the first time.";
+    if (!STG.supportsFilePickers()) what = "Download a copy of the project";
+    else if (STG.currentFileHandle()) what = "Save over the project file. Shift+click to save as a new file.";
+    else what = "Save the project to a file";
     b.classList.toggle("btn-unsaved", dirtySinceSave);
-    b.title = (dirtySinceSave ? "You have unsaved changes. " : "All changes saved. ") + what;
+    b.title = what;
   }
   function markDirty() { if (!dirtySinceSave) { dirtySinceSave = true; updateSaveButton(); } }
   function markClean() { dirtySinceSave = false; updateSaveButton(); }
@@ -816,10 +816,10 @@ window.App.UI = (function () {
       // is no click to use up.
       if (projectHasContent(E.getProjectFile())) {
         var newQuestion = dirtySinceSave
-          ? "Start a new project? The project open now has unsaved changes (engagement details, evidence register or answers). " +
-            "They are kept in this browser and offered the next time the app starts, until you restore or discard them. " +
-            "To keep them in a file instead, choose Cancel and Save first."
-          : "Start a new project? It replaces the project open now. There are no unsaved changes, and the project's saved file is not changed.";
+          ? "Start a new project? The open project has unsaved changes. " +
+            "They are kept in this browser and offered the next time the app starts. " +
+            "To keep them in a file, choose Cancel and Save first."
+          : "Start a new project? It replaces the open project, whose saved file is not changed.";
         if (!confirm(newQuestion)) return;
       }
       // Bring the backstop up to date while it still describes the session on
@@ -863,12 +863,12 @@ window.App.UI = (function () {
           } else if (res.blocked) {
             // The browser has the save dialog but would not show it here (the
             // tool is inside another page), so the save went to Downloads.
-            toast("Downloaded " + res.name + ". Saving back into the same file is not available here, so each save downloads a new copy.", "warn", 9000);
+            toast("Downloaded " + res.name + ". Each save here downloads a new copy.", "warn", 9000);
           } else if (!noInPlaceHintShown) {
             noInPlaceHintShown = true;
-            toast("Downloaded " + res.name + ". This browser can't overwrite the file from an offline page, so it adds \"(1)\", \"(2)\" to the name. To overwrite the same file with one click, open this tool in Edge or Chrome. (In Firefox you can also turn on Settings → \"Always ask you where to save files\" and choose Replace.)", "warn", 12000);
+            toast("Downloaded " + res.name + ". This browser cannot save over the file, so each save makes a new copy. Use Edge or Chrome to save in place.", "warn", 12000);
           } else {
-            toast("Downloaded " + res.name + " (a new copy; see the earlier note).", "warn");
+            toast("Downloaded " + res.name + " as a new copy.", "warn");
           }
         } else if (!res.aborted) {
           toast("Save failed: " + (res.error || "unknown error"), "err");
@@ -903,7 +903,7 @@ window.App.UI = (function () {
       var newer = newerFileWarning(res.data);
       if (newer) msgs.unshift(newer);
       if (msgs.length > 0) toast(msgs.join(" "), "warn", newer ? 12000 : undefined);
-      else if (res.migrated) toast("Loaded an older 1.0 file and migrated it to the project format. Save to keep it in the new format.", "warn");
+      else if (res.migrated) toast("Loaded an older 1.0 file. Save to keep it in the current format.", "warn");
       else toast("Project loaded" + (res.fileName ? " from " + res.fileName : "") + ".");
       return true;
     }
@@ -928,8 +928,8 @@ window.App.UI = (function () {
         h("div", { class: "modal", role: "dialog", "aria-modal": "true" }, [
           h("div", { class: "modal-h" }, [h("h2", { text: "Load another project?" })]),
           h("div", { class: "modal-b" }, [
-            h("p", { style: "margin-top:0;", text: "The project open now has unsaved changes (engagement details, evidence register or answers). Loading another file replaces it in this window." }),
-            h("p", { text: "The unsaved changes are kept in this browser and offered the next time the app starts, until you restore or discard them. To keep them in a file instead, choose Cancel and Save first." })
+            h("p", { style: "margin-top:0;", text: "The open project has unsaved changes. Loading another file replaces it." }),
+            h("p", { text: "They are kept in this browser and offered the next time the app starts. To keep them in a file, choose Cancel and Save first." })
           ]),
           h("div", { class: "modal-f" }, [
             h("button", { class: "btn load-guard-cancel", onClick: closeModal, text: "Cancel" }),
@@ -1254,8 +1254,8 @@ window.App.UI = (function () {
       return h("label", { style: "display:flex; align-items:center; gap:8px; padding:4px 0; font-weight:400;" }, [cb, document.createTextNode(t.name)]);
     });
     var scopeNote = whole
-      ? "One " + fileWord + " will be produced, covering all the selected " + pluralLabel(noun) + "."
-      : "This report is per-" + noun + ": one " + fileWord + " will be produced for each selected " + noun + ", with the " + noun + " name in the filename.";
+      ? "One " + fileWord + " covering the selected " + pluralLabel(noun) + "."
+      : "One " + fileWord + " per selected " + noun + ".";
     // Where an organisation-wide roll-up is meaningful, offer it as a second
     // shape of output. Not for zones, components or products: those are parts
     // of one system, not places the organisation operates.
@@ -1276,7 +1276,7 @@ window.App.UI = (function () {
       ]);
       var orgBtn = h("button", { type: "button", class: "scope-choice" }, [
         h("strong", { text: "One organisation-wide " + fileWord }),
-        h("div", { class: "muted small", text: "Across the " + siteEntries.length + " " + pluralLabel(noun) + " assessed in this customer file (" + siteEntries.map(function (s) { return s.name; }).join(", ") + "): each requirement at its weakest " + noun + ", with the " + pluralLabel(noun) + " that set it named. The tick list above does not apply to this shape." })
+        h("div", { class: "muted small", text: "Each requirement at its weakest " + noun + " across all " + siteEntries.length + " in this file (" + siteEntries.map(function (s) { return s.name; }).join(", ") + "). Ignores the ticks above." })
       ]);
       function pick(which) {
         shape = which;
@@ -1302,11 +1302,11 @@ window.App.UI = (function () {
       var remembered = E.getReportNarrative().issueAs === "final" ? "final" : "draft";
       var draftBtn = h("button", { type: "button", class: "scope-choice active", "data-issue": "draft" }, [
         h("strong", { text: "Draft" }),
-        h("div", { class: "muted small", text: "Marked DRAFT on every page, with Status Draft in document control. For review rounds." })
+        h("div", { class: "muted small", text: "Marked DRAFT on every page. For review rounds." })
       ]);
       var finalBtn = h("button", { type: "button", class: "scope-choice disabled", "data-issue": "final", disabled: "" }, [
         h("strong", { text: "Final" }),
-        h("div", { class: "muted small", text: "Status Final and no draft marking. The file opens read-only and marked as final: make the client's PDF from it." })
+        h("div", { class: "muted small", text: "Opens read-only, marked as final. Make the client's PDF from it." })
       ]);
       var issueNote = h("p", { class: "export-issue-note muted" });
       var setIssue = function (which) {
@@ -1343,7 +1343,7 @@ window.App.UI = (function () {
           if (n) {
             issueNote.className = "export-issue-note blocked";
             issueNote.appendChild(document.createTextNode("Final is not available yet: " + n + " thing" + (n === 1 ? " is" : "s are") +
-              " still to write, and would print in red in the Word report. "));
+              " still to write. "));
             issueNote.appendChild(h("button", { type: "button", class: "issue-go", text: "See what is left", onClick: function () {
               closeModal();
               revealOnReport('[data-check-anchor="issue-check"]');
@@ -1352,7 +1352,7 @@ window.App.UI = (function () {
           }
           setBlocked(false);
           issueNote.className = "export-issue-note muted";
-          issueNote.textContent = "Nothing is left to write, so it can be issued as final.";
+          issueNote.textContent = "Nothing is left to write.";
           if (!userPicked && remembered === "final") setIssue("final");
         });
       };
@@ -1373,7 +1373,7 @@ window.App.UI = (function () {
           list = list.filter(function (w) { return w.kind !== "changed-since-approval"; });
         } else if (whole && RV.store && RV.store() && selectedIds().length && selectedIds().length < targets.length) {
           lines.push({ kind: "subset-not-reviewed", text: "The review covered all " + targets.length + " " + pluralLabel(noun) + ". This report covers " + selectedIds().length +
-            ", so its summary and scores are not what the reviewers read." });
+            ", so its summary and scores differ from what the reviewers read." });
         }
         lines.concat(list).forEach(function (w) {
           reviewNote.appendChild(h("p", { class: "export-issue-note warn", "data-review-warning": w.kind, text: w.text }));
@@ -1411,7 +1411,7 @@ window.App.UI = (function () {
           h("button", { class: "btn ghost", style: "color:var(--text);", onClick: closeModal, text: "Close" })
         ]),
         h("div", { class: "modal-b" }, [
-          many ? h("p", { class: "muted", style: "margin-top:0;", text: "Choose which " + pluralLabel(noun) + " to include in the report. All are selected by default." }) : null,
+          many ? h("p", { class: "muted", style: "margin-top:0;", text: "Choose which " + pluralLabel(noun) + " to include." }) : null,
           many ? h("div", { class: "export-scope-list" }, rows) : null,
           shapeRow,
           many && !canOrgWide ? h("p", { class: "muted", style: "margin-bottom:0;", text: scopeNote }) : null,
@@ -1556,7 +1556,7 @@ window.App.UI = (function () {
         instrumentProgressNode(E.state.instrument),
         h("button", {
           class: "nav-change",
-          title: "Choose a different assessment. Everything captured here is kept.",
+          title: "Switch assessment",
           onClick: function (ev) { ev.stopPropagation(); go("home"); }
         }, [
           h("span", { class: "nav-change-icon", "aria-hidden": "true", text: "⇄" }),
@@ -1600,7 +1600,7 @@ window.App.UI = (function () {
     if (E.state.instrument.status !== "placeholder" && E.state.scoringFamily !== null) {
       s.appendChild(h("div", {
         class: "nav-item nav-find",
-        title: "Find a requirement by code or keyword (Ctrl+K)",
+        title: "Find a requirement (Ctrl+K)",
         onClick: function () { openFindPalette(); }
       }, [
         h("span", null, ["Find a requirement"]),
@@ -1709,7 +1709,7 @@ window.App.UI = (function () {
           appVersion() ? h("p", { class: "licence-version muted small",
             text: appVersion().product + " " + appVersion().label + " (version " + appVersion().number + ")" }) : null,
           text ? h("pre", { class: "licence-text", text: text })
-               : h("p", { text: LEGAL_NOTICE + " The full licence text is missing from this copy; ask your SolutionsPT engagement contact for it." })
+               : h("p", { text: LEGAL_NOTICE + " The full licence text is missing from this copy; ask your SolutionsPT contact for it." })
         ]),
         h("div", { class: "modal-f" }, [close])
       ])
@@ -1749,7 +1749,7 @@ window.App.UI = (function () {
     return h("button", {
       type: "button",
       class: "sidebar-toggle",
-      title: sidebarSlim ? "Expand the sidebar" : "Collapse the sidebar to a slim rail",
+      title: sidebarSlim ? "Expand the sidebar" : "Collapse the sidebar",
       "aria-label": sidebarSlim ? "Expand the sidebar" : "Collapse the sidebar",
       "aria-pressed": sidebarSlim ? "true" : "false",
       onClick: function () { setSidebarSlim(!sidebarSlim); }
@@ -1782,7 +1782,7 @@ window.App.UI = (function () {
     // screen is how it is actually conducted.
     s.appendChild(h("div", {
       class: "nav-item" + (view === "ra-wizard" ? " active" : ""),
-      title: "One item per page, for interview-led work",
+      title: "One item per page",
       onClick: function () { enterRiskAppetiteWizard(view === "ra-wizard" ? raWizardIdx : 0); }
     }, [
       h("span", { class: "nav-slim", "aria-hidden": "true", text: "GW" }),
@@ -1812,7 +1812,7 @@ window.App.UI = (function () {
     s.appendChild(h("div", { class: "nav-section-title", text: "Verdict" }));
     s.appendChild(h("div", {
       class: "nav-item" + (view === "ra-verdict" ? " active" : ""),
-      title: "The coherence read, and your final say on it",
+      title: "Your final say on the read",
       onClick: function () { go("ra-verdict"); }
     }, [
       h("span", { class: "nav-slim", "aria-hidden": "true", text: "VD" }),
@@ -2012,7 +2012,7 @@ window.App.UI = (function () {
     var name = meta.name || "General CAF";
     if (meta.status === "placeholder") {
       return h("div", { class: "caf-placeholder-banner",
-        title: "This profile's expected-state data has not yet been loaded; gap comparison is unavailable."
+        title: "Expected states not loaded, so there is no gap comparison"
       }, [
         h("strong", { text: "Profile selected: " + name }),
         h("div", { style: "margin-top:4px;", text:
@@ -2082,7 +2082,7 @@ window.App.UI = (function () {
     var prog = instrumentProgress(inst);
     if (!prog.total) return null;
     var pct = Math.round(100 * prog.answered / prog.total);
-    return h("div", { class: "nav-progress", title: prog.answered + " of " + prog.total + " answered (Unknown and N/A excluded, as in the report)" }, [
+    return h("div", { class: "nav-progress", title: prog.answered + " of " + prog.total + " answered (excluding Unknown and N/A)" }, [
       h("div", { class: "nav-progress-bar" }, [
         h("div", { class: "nav-progress-fill" + (pct === 100 ? " done" : ""), style: "width:" + pct + "%;" })
       ]),
@@ -2357,7 +2357,7 @@ window.App.UI = (function () {
         class: "engagement-profile-chip" + (meta.status === "placeholder" ? " placeholder" : ""),
         title: meta.status === "placeholder"
           ? "Placeholder profile: expected states not yet populated"
-          : "Active CAF profile: outcomes are compared against its expected states"
+          : "Active profile"
       }, [
         document.createTextNode("Profile: " + (meta.name || "General CAF")),
         meta.status === "placeholder" ? h("span", { class: "chip-tag", text: "placeholder" }) : null
@@ -2396,22 +2396,22 @@ window.App.UI = (function () {
     var title = inst.title;
     switch (E.state.scoringFamily) {
       case "capability-sl":
-        return "This assessment measures the security capability of the in-scope system against " + title + ", requirement by requirement, for the target security level set for the engagement. It shows where current capability meets the target and where it falls short, then turns the shortfalls into a prioritised remediation roadmap. It is an advisory gap analysis to guide hardening and investment, not a certification.";
+        return "Measures the security capability of the in-scope system against " + title + ", requirement by requirement, at the engagement's target security level, and turns the shortfalls into a prioritised roadmap. An advisory gap analysis, not a certification.";
       case "domain-letter":
-        return "This is a lightweight posture screener that profiles the organisation's security across a set of domains through a guided interview. It gives a quick, structured read of relative strengths and weak spots, and a posture profile you can share. It is not a control-by-control audit.";
+        return "A quick posture screener: a guided interview that grades the organisation's security across a set of domains. It is not a control-by-control audit.";
       case "program-maturity-ml":
-        return "This assessment rates the maturity of the security programme against " + title + ", element by element, on a four-level maturity scale. It shows how established and repeatable each part of the programme is, where it needs to mature, and what to prioritise next. It is an advisory maturity review, not a certification.";
+        return "Rates the maturity of the security programme against " + title + ", element by element, on a four-level scale, and shows what to prioritise. An advisory maturity review, not a certification.";
       case "nis2-conformance":
-        return "This is a conformance and gap analysis against the obligations in " + title + ". It reviews each obligation to find where the organisation already conforms and where work is needed, and produces a prioritised roadmap. It is advisory and is not a determination of legal compliance.";
+        return "Conformance and gap analysis against each obligation in " + title + ", with a prioritised roadmap. Advisory only: not a determination of legal compliance.";
       case "csms-conformance":
         if (isCRA()) {
-          return "This assessment evaluates the product against the essential cybersecurity requirements of " + title + ", layer by layer. It shows where the product already meets the requirements and where gaps remain ahead of any conformity work. It is an advisory gap analysis, not a conformity assessment or certification.";
+          return "Assesses the product against the essential cybersecurity requirements of " + title + ", layer by layer. An advisory gap analysis, not a conformity assessment or certification.";
         }
-        return "This assessment reviews the organisation's cyber security management system against " + title + ", element by element, to establish how fully each part is in place and where to focus improvement. It is an advisory conformance review, not a certification.";
+        return "Reviews the cyber security management system against " + title + ", element by element, to show what is in place and where to improve. An advisory conformance review, not a certification.";
       case "caf-achieved":
-        return "This is an alignment and gap analysis against " + title + ". It weighs current practice against the expected standard for the selected profile, highlights the gaps that matter most, and produces a prioritised improvement roadmap and a client-ready report. It is an advisory gap analysis, not a formal audit or certification.";
+        return "Alignment and gap analysis against " + title + " for the selected profile, with a prioritised improvement roadmap. An advisory gap analysis, not a formal audit or certification.";
       default:
-        return "This assessment reviews the organisation against " + title + " to find where current practice meets the expected standard and where gaps remain, and to produce a prioritised improvement roadmap and a client-ready report. It is an advisory gap analysis, not a formal audit or certification.";
+        return "Gap analysis against " + title + ", with a prioritised improvement roadmap. An advisory gap analysis, not a formal audit or certification.";
     }
   }
 
@@ -2548,8 +2548,8 @@ window.App.UI = (function () {
     var hasInstrument = !!E.state.instrument;
     refs.main.appendChild(h("h1", { class: "page-title", text: hasInstrument ? "Change assessment" : "Start an assessment" }));
     refs.main.appendChild(h("p", { class: "page-sub", text: hasInstrument
-      ? "Every assessment keeps its own answers, so switching never loses work. The customer and site are shared across the file; the opportunity, consultant and dates belong to each assessment. You can hold more than one assessment of the same instrument, for example a review this year and a re-assessment in two years' time."
-      : "Choose the framework for this engagement. You can add more assessments to the same file later, including another of the same framework, and they will all share the customer and site recorded below." }));
+      ? "Each assessment keeps its own answers. The customer and site are shared across the file."
+      : "Choose the framework for this engagement." }));
 
     refs.main.appendChild(homeEngagementStrip());
 
@@ -2671,7 +2671,7 @@ window.App.UI = (function () {
     return h("div", { class: "home-strip" }, [
       h("div", { class: "home-strip-title", text: "Who is this engagement for?" }),
       h("div", { class: "home-fields" }, cells),
-      h("p", { class: "muted home-strip-note", text: "Optional for now. These carry into every assessment in the project. The other report details are on the Engagement details page." })
+      h("p", { class: "muted home-strip-note", text: "Optional for now. Shared by every assessment in the project." })
     ]);
   }
 
@@ -2763,7 +2763,7 @@ window.App.UI = (function () {
       (isStub || !existing.length) ? null : h("button", {
         class: "home-card-new",
         text: "+ New assessment",
-        title: "Start another assessment of this instrument, alongside the existing one",
+        title: "Start another assessment of this instrument",
         onClick: function (ev) { ev.stopPropagation(); startNewAssessment(inst); }
       })
     ]);
@@ -2799,7 +2799,7 @@ window.App.UI = (function () {
           h("span", { class: "home-instance-meta", text: answered
             ? answered + " answered" : "not started" }),
           h("button", {
-            class: "home-instance-rename", text: "Rename", title: "Give this assessment a name of your own",
+            class: "home-instance-rename", text: "Rename",
             onClick: function (ev) {
               ev.stopPropagation();
               var v = prompt("Name for this assessment", STG.assessmentLabel(ass, inst));
@@ -2807,7 +2807,7 @@ window.App.UI = (function () {
             }
           }),
           h("button", {
-            class: "home-instance-del", text: "Delete", title: "Remove this assessment from the file",
+            class: "home-instance-del", text: "Delete",
             onClick: function (ev) {
               ev.stopPropagation();
               if (!confirm("Delete this assessment (" + STG.assessmentLabel(ass, inst) + ")?\n\n" +
@@ -2844,22 +2844,14 @@ window.App.UI = (function () {
     refs.main.innerHTML = "";
     refs.main.appendChild(h("h1", { class: "page-title", text: inst.title }));
     var subtitle;
-    if (E.state.scoringFamily === "domain-letter") {
-      subtitle = "Capture engagement details, then walk through the interview by domain from the sidebar.";
-    } else if (E.state.scoringFamily === "caf-achieved") {
-      subtitle = (inst.display && inst.display.subtitle) || "Alignment and gap analysis against NCSC CAF 4.0 (not a formal assessment). Capture engagement details, pick the regulator profile below, then work through the objectives and principles from the sidebar.";
-    } else if (E.state.scoringFamily === "program-maturity-ml") {
-      subtitle = window.App.Report.standardRef(inst) + " maturity assessment. Capture engagement details, then set a maturity level (ML1-ML4) per requirement, by " +
-        window.App.Report.mlNoun(inst, "elementNounTitle").toLowerCase() + ", from the sidebar.";
-    } else if (E.state.scoringFamily === "nis2-conformance") {
-      subtitle = "EU NIS2 conformance and gap analysis (not a determination of legal compliance). Capture engagement details, then judge each obligation Achieved / Partially / Not Achieved by NIS2 area from the sidebar.";
-    } else if (E.state.scoringFamily === "csms-conformance") {
-      subtitle = "ISA/IEC 62443-2-1:2010 CSMS element conformance (not a certification). Capture engagement details, then judge each element Not in place / Partially / Largely / In place by category from the sidebar.";
-    } else {
-      subtitle = "Capture engagement details, set the target SL per " + (inst.targetDimensionLabel || "Site").toLowerCase() +
-        ", then work through the FR tabs in the sidebar.";
+    // The About card below says what the assessment is; the subtitle only
+    // carries an instruction where there is one for this page.
+    if (E.state.scoringFamily === "caf-achieved") {
+      subtitle = (inst.display && inst.display.subtitle) || "Pick the regulator profile below.";
+    } else if (E.state.scoringFamily === "capability-sl") {
+      subtitle = "Set the target SL for each " + (inst.targetDimensionLabel || "Site").toLowerCase() + " below.";
     }
-    refs.main.appendChild(h("p", { class: "page-sub", text: subtitle }));
+    if (subtitle) refs.main.appendChild(h("p", { class: "page-sub", text: subtitle }));
     refs.main.appendChild(engagementAboutCard());
     // Instruments may carry hard "read before relying on this" caveats (e.g. the
     // ONR SyAPs instruments: not an ONR assessment, not a security plan, no SNI).
@@ -2968,10 +2960,10 @@ window.App.UI = (function () {
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [
         h("h2", { text: "Preparation guidance" }),
-        h("span", { class: "sub", text: "typical for this assessment, not a fixed list" })
+        h("span", { class: "sub", text: "typical, not a fixed list" })
       ]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin:0 0 8px; font-size:13px;", text: "A prompt for scoping and the site visit. Record what was reviewed and who was interviewed in the Basis of assessment above; nothing here is added to it automatically." }),
+        h("p", { class: "muted", style: "margin:0 0 8px; font-size:13px;", text: "A prompt for scoping the site visit. Record what you actually covered in the Basis of assessment above." }),
         details
       ])
     ]);
@@ -3072,7 +3064,7 @@ window.App.UI = (function () {
     return h("div", { class: "card", "data-check-anchor": "basis" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Basis of assessment" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "Record the interviews, documentation and system observations this assessment rests on. It is specific to this assessment and appears as a “Basis of assessment” section in the Word report and a sheet in the Excel workbook." })
+        h("p", { class: "muted", style: "margin-top:0;", text: "The interviews, documents and system observations this assessment rests on." })
       ].concat(BASIS_REGISTERS.map(basisRegisterBlock)))
     ]);
   }
@@ -3096,10 +3088,10 @@ window.App.UI = (function () {
           h("li", null, ["The unit of capture is the " + window.App.Report.mlNoun(inst, "requirementNoun") +
             ", grouped into " + (inst.elements || []).length + " " +
             window.App.Report.mlNoun(inst, "elementNounPlural") + "."]),
-          h("li", null, ["You set one maturity level per requirement, independently of the others: ML1-ML4, or Not met. Documentation is implied from ML2 upward."]),
-          h("li", null, ["Unknown reduces coverage and lowers confidence; Not applicable drops the requirement from the score and coverage."]),
-          h("li", null, ["An optional target ML per requirement should derive from risk (62443-3-2), not a flat default. Where set, the report shows met / below per requirement and per element."]),
-          h("li", null, ["No single program grade is produced. The report is an achieved-ML profile by SPE and theme; mean ML is shown for context only. A Not met, or a requirement below its target, is surfaced as a floor finding, not averaged away."])
+          h("li", null, ["One maturity level per requirement: ML1-ML4, or Not met. Documentation is implied from ML2 upward."]),
+          h("li", null, ["Unknown lowers coverage and confidence. Not applicable drops the requirement from the score."]),
+          h("li", null, ["An optional target ML per requirement should come from risk (62443-3-2). Where set, the report shows met or below."]),
+          h("li", null, ["No overall grade. The report gives an achieved-ML profile by SPE and theme. Not met, or below target, is reported as a floor finding."])
         ]),
         h("table", { class: "tbl", style: "margin-top:10px;" }, [
           h("thead", null, [h("tr", null, [h("th", null, ["Maturity level"]), h("th", null, ["Anchor (paraphrased guide)"])])]),
@@ -3157,8 +3149,6 @@ window.App.UI = (function () {
     refs.main.appendChild(h("h1", titleAttrs, titleKids));
     // SPE summary as orientation for the consultant - shown only when expanded.
     if (el.summary && sumOpen) refs.main.appendChild(h("p", { class: "page-sub ml-spe-summary", text: el.summary }));
-    refs.main.appendChild(h("p", { class: "page-sub", text:
-      "Set one maturity level per requirement from the scale, or Not met / Unknown / N/A." }));
     refs.main.appendChild(buildSitesToolbar());
 
     // Maturity-level reference: the full ML1-ML4 definitions shown ONCE here
@@ -3201,7 +3191,7 @@ window.App.UI = (function () {
         }))
       ]));
       body.push(h("p", { class: "muted", style: "margin:8px 0 0;", text:
-        "Not met sits below ML1 and is a floor finding. Unknown reduces coverage and confidence (not scored). N/A is excluded. No single program grade is produced." }));
+        "Not met sits below ML1 and is a floor finding." }));
     }
     return h("div", { class: "card" }, [head].concat(mlRefOpen ? [h("div", { class: "card-b" }, body)] : []));
   }
@@ -3417,8 +3407,8 @@ window.App.UI = (function () {
         h("p", { text: inst.framing || "" }),
         h("ul", null, [
           h("li", null, ["Each obligation is judged Achieved / Partially Achieved / Not Achieved against full conformance with NIS2."]),
-          h("li", null, ["Unknown reduces coverage and lowers confidence; Not applicable drops the obligation from the score and coverage."]),
-          h("li", null, ["No single grade or pass mark is produced. The report is a conformance profile by NIS2 area, plus a gap roadmap of every Partially or Not Achieved obligation."]),
+          h("li", null, ["Unknown lowers coverage and confidence. Not applicable drops the obligation from the score."]),
+          h("li", null, ["No overall grade or pass mark. The report gives a conformance profile by NIS2 area and a gap roadmap."]),
           h("li", null, ["This is a readiness gap analysis, not a determination of legal compliance with NIS2 or the national law that transposes it."])
         ]),
         h("table", { class: "tbl", style: "margin-top:10px;" }, [
@@ -3468,8 +3458,7 @@ window.App.UI = (function () {
     if (!cat) { refs.main.appendChild(h("p", { class: "muted", text: "No NIS2 areas defined." })); return; }
 
     refs.main.appendChild(h("h1", { class: "page-title", text: cat.id + "  " + cat.name }));
-    refs.main.appendChild(h("p", { class: "page-sub", text:
-      (cat.article ? cat.article + "  -  " : "") + "Judge each obligation Achieved / Partially / Not Achieved, or Unknown / N/A." }));
+    if (cat.article) refs.main.appendChild(h("p", { class: "page-sub", text: cat.article }));
     refs.main.appendChild(buildSitesToolbar());
 
     var scored = E.scoreActiveTarget();
@@ -3754,8 +3743,8 @@ window.App.UI = (function () {
     if ((!isGap || !openOnGap) && !filled && remOpen[itemId] !== true) {
       return h("button", {
         type: "button", class: "req-add-note req-add-rec" + (isGap ? " is-wanted" : ""),
-        title: isGap ? "This is a gap. Record what should be done about it."
-                     : "Record a recommendation for this item, whether or not it is a gap",
+        title: isGap ? "Record what should be done about this gap"
+                     : "Record advice for this item",
         onClick: function () { remOpen[itemId] = true; if (onChange) onChange(); },
         text: "+ Add a recommendation"
       });
@@ -3792,7 +3781,7 @@ window.App.UI = (function () {
     ownerIn.addEventListener("change", function () { save({ owner: ownerIn.value }); });
     var actionIn = h("textarea", { rows: "2", placeholder: isGap
       ? "What to do to close this gap."
-      : "What you would recommend here, even though it meets its target." });
+      : "What you would recommend here." });
     actionIn.value = resp.action || "";
     actionIn.addEventListener("change", function () { save({ action: actionIn.value }); });
     var impactIn = h("textarea", { rows: "2", placeholder: "Why it matters if left open." });
@@ -4086,7 +4075,7 @@ window.App.UI = (function () {
                  (wAbove && n === sr.targetSL + 1 ? " first-above" : ""),
           title: wAbove
             ? "Above the target of " + S.formatSL(sr.targetSL) + " for this " + targetNoun() +
-              ". Recording it shows where there is already headroom; it is never counted as outstanding work."
+              ". Recorded as headroom, not as outstanding work."
             : "",
           // Writing above the target is what was asked for, so the ceiling is
           // the level picked, not the target.
@@ -4321,9 +4310,9 @@ window.App.UI = (function () {
         h("p", { text: inst.framing || "" }),
         h("ul", null, [
           h("li", null, ["Each CSMS element is judged Not in place / Partially in place / Largely in place / In place against full conformance with ISA/IEC 62443-2-1:2010."]),
-          h("li", null, ["Unknown reduces coverage and lowers confidence; Not applicable drops the element from the score and coverage."]),
-          h("li", null, ["No single CSMS grade is produced. The report is a conformance profile by category and element group, plus a gap roadmap of every Not in place or Partially in place element."]),
-          h("li", null, ["This is a conformance gap analysis, not a certification. The 2024 edition restructures this CSMS into a maturity-based Security Program (a separate instrument in this tool)."])
+          h("li", null, ["Unknown lowers coverage and confidence. Not applicable drops the element from the score."]),
+          h("li", null, ["No overall grade. The report gives a conformance profile by category and element group, and a gap roadmap."]),
+          h("li", null, ["This is a conformance gap analysis, not a certification. The 2024 edition replaces it with the maturity-based Security Program, a separate instrument."])
         ]),
         h("table", { class: "tbl", style: "margin-top:10px;" }, [
           h("thead", null, [h("tr", null, [h("th", null, ["Category"]), h("th", { class: "center" }, ["Elements"])])]),
@@ -4442,7 +4431,7 @@ window.App.UI = (function () {
     var on = raIsNotEstablished(resp);
     var btn = h("button", {
       class: "ra-band-btn ra-ne-btn" + (on ? " active" : ""),
-      title: "Asked about, but nobody could say. Left out of the band and reported as a finding.",
+      title: "Nobody could say. Reported as a finding, not banded.",
       text: "Could not establish"
     });
     btn.addEventListener("click", function () {
@@ -4478,10 +4467,9 @@ window.App.UI = (function () {
       h("label", { text: "Is this a choice, or a constraint?" }),
       row,
       h("p", { class: "muted small", style: "margin:4px 0 0;", text:
-        "Count it as appetite where the state is a choice, or has been left unmanaged. A genuine operational "
-        + "constraint that is being managed (firmware pinned by vendor certification, say, with the risk "
-        + "compensated and tracked) is not appetite, and is reported without being counted. A constraint "
-        + "nobody is managing still counts. Left unset, the reading counts." })
+        "A choice, or an unmanaged state, counts as appetite. A managed operational constraint (firmware "
+        + "pinned by vendor certification, with the risk compensated and tracked) is reported but not "
+        + "counted. Left unset, it counts." })
     ]);
   }
 
@@ -4497,8 +4485,7 @@ window.App.UI = (function () {
     var toggleSpec = spec.filter(function (s) { return s.type === "toggle"; })[0] || {};
 
     refs.main.appendChild(h("h1", { class: "page-title", text: "Sector and scope" }));
-    refs.main.appendChild(h("p", { class: "page-sub", text:
-      "Sets the starting point for the exposure conversation. Everything here is a starting point you can override." }));
+    refs.main.appendChild(h("p", { class: "page-sub", text: "Starting points you can override." }));
 
     // --- sector ---
     var sectors = RA.sectors();
@@ -4518,14 +4505,13 @@ window.App.UI = (function () {
       h("div", { class: "card-h" }, [h("h2", { text: sectorSpec.question || "Organisation sector" })]),
       h("div", { class: "card-b" }, [
         h("p", { class: "muted", style: "margin-top:0;", text:
-          sectorSpec.drives || "Pre-sets the baseline exposure band; you confirm or override it." }),
+          sectorSpec.drives || "Pre-sets the baseline exposure band." }),
         sel,
         chosen ? h("p", { class: "muted small", style: "margin-bottom:0;", text: chosen.note }) : null,
         // Said plainly, because a baseline that looks like a verdict is the
         // failure mode for this whole instrument.
         h("p", { class: "muted small", text:
-          "This is a house default, not a determination. The sector baselines can be tuned, and you set "
-          + "the final band." })
+          "A house default, not a determination. You set the final band." })
       ])
     ]));
 
@@ -4552,8 +4538,8 @@ window.App.UI = (function () {
         h("div", { class: "card-h" }, [h("h2", { text: "Exposure modifiers" })]),
         h("div", { class: "card-b" }, [
           h("p", { class: "muted", style: "margin-top:0;", text:
-            "Considerations that push the baseline up or down. These are prompts for your judgement. Ticking one "
-            + "records that you weighed it, and none of them moves the band on its own." })
+            "Prompts that may push the baseline up or down. Ticking one records that you weighed it; "
+            + "it does not move the band." })
         ].concat(modRows))
       ]));
     }
@@ -4574,7 +4560,7 @@ window.App.UI = (function () {
         h("p", { class: "muted", text: toggleSpec.drives ||
           "Adds the technical section and enables the stated-vs-revealed comparison." }),
         h("p", { class: "muted small", style: "margin-bottom:0;", text:
-          "Switching it off later hides the section from the read but keeps anything already recorded." })
+          "Switching it off later hides the section but keeps what you recorded." })
       ])
     ]));
   }
@@ -4719,7 +4705,7 @@ window.App.UI = (function () {
 
     refs.main.appendChild(h("h1", { class: "page-title", text: "Assessor's read" }));
     refs.main.appendChild(h("p", { class: "page-sub", text:
-      "What the two positions compute to, and your judgement on whether that is the right reading." }));
+      "The computed read, and your judgement on it." }));
 
     // What the plot shows.
     refs.main.appendChild(h("div", { class: "card" }, [
@@ -4768,10 +4754,8 @@ window.App.UI = (function () {
 
     var body = [
       h("p", { class: "muted", style: "margin-top:0;", text:
-        "The bands are a starting point. You have the final say on whether an appetite is appropriate to the "
-        + "risks faced, because there are circumstances a four-by-four grid cannot see: a compensating group "
-        + "control, an imminent divestment, a site mid-migration, a regulator-agreed trajectory, or a board that "
-        + "has knowingly decided to carry a risk." }),
+        "You have the final say. The grid cannot see a compensating group control, an imminent divestment, "
+        + "a regulator-agreed trajectory or a board that has knowingly accepted a risk." }),
       sel
     ];
     if (setup.verdictOverride) {
@@ -4780,14 +4764,10 @@ window.App.UI = (function () {
       ]));
       if (v.rationaleMissing) {
         body.push(h("p", { class: "placeholder-note", text:
-          "Record your reasoning. It goes into the report as the basis for this verdict, and it is the part the "
-          + "client is paying for. Without it, the report states a conclusion with nothing behind it." }));
+          "Record your reasoning. The report gives it as the basis for this verdict." }));
       }
       body.push(h("p", { class: "muted small", style: "margin-bottom:0;", text:
-        "This changes the verdict only. The exposure and appetite positions stand as you characterised them, and "
-        + "the plot still shows where the organisation sits. The computed read above, and the fact that "
-        + "you set the verdict yourself, stay on this page. The report gives your judgement and your "
-        + "reasoning, with no comparison against the tool." }));
+        "This changes the verdict only, not the positions or the plot. The report does not mention the computed read." }));
     }
     refs.main.appendChild(h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Your verdict" })]),
@@ -4937,10 +4917,9 @@ window.App.UI = (function () {
         h("div", { class: "card-b" }, [
           h("p", { class: "muted", style: "margin-top:0;", text:
             (secRes.rollUp === "worst"
-              ? "The suggestion is the highest band above: exposure follows the worst credible consequence, so a "
-                + "high regulatory reading does not dilute a severe consequence. "
-              : "The suggestion is the mean of the bands above, rounded, since appetite is an overall posture. ")
-            + "Treat it as a starting position and set the band yourself where your read differs." }),
+              ? "The suggestion is the highest band above: exposure follows the worst credible consequence. "
+              : "The suggestion is the rounded mean of the bands above. ")
+            + "Override it where your read differs." }),
           h("p", null, [
             h("strong", { text: secRes.bandLabel || "Not yet set" }),
             secRes.overridden ? h("span", { class: "muted small", text: "  (your override)" })
@@ -4965,8 +4944,6 @@ window.App.UI = (function () {
     if (!cat) { refs.main.appendChild(h("p", { class: "muted", text: "No CSMS categories defined." })); return; }
 
     refs.main.appendChild(h("h1", { class: "page-title", text: cat.name }));
-    refs.main.appendChild(h("p", { class: "page-sub", text:
-      "Judge each element Not in place / Partially / Largely / In place, or Unknown / N/A." }));
     if (cat.summary) refs.main.appendChild(h("p", { class: "muted", text: cat.summary }));
     refs.main.appendChild(buildSitesToolbar());
 
@@ -5126,10 +5103,10 @@ window.App.UI = (function () {
       Noun: noun.charAt(0).toUpperCase() + noun.slice(1),
       conformityLayer: il.conformityLayer || "P3",
       referenceTag: d.referenceTag || "EU CRA (Regulation (EU) 2024/2847)",
-      captureBanner: d.captureBanner || "Indicative. Requirements are shown in the Regulation's own wording where a single provision maps to the question, and assessor-phrased where the question spans several; the Regulation text governs. This informs CRA conformity; it is not a conformity assessment or certification.",
-      productsCardNote: d.productsCardNote || "Rename, add or remove products here; select one to set its classification below. Part I (product requirements) and most of the conformity layer are assessed per product; Part II (vulnerability handling) and the organisation-level conformity obligations (Art 14 reporting readiness, component due diligence) are organisation-wide and shared across all products. New products inherit the shared answers.",
-      wizardOrgNote: d.wizardOrgNote || "Organisation-wide obligations (Annex I Part II vulnerability handling, plus Article 14 reporting readiness and component due diligence). These are answered once and apply to every product. Do this first, then switch to By product.",
-      wizardProductNote: d.wizardProductNote || "Per-product obligations (Annex I Part I product requirements and the product conformity work). Pick a product below and work through it, then pick the next product and do the same."
+      captureBanner: d.captureBanner || "Indicative. Requirements use the Regulation's wording where one provision maps to the question; the Regulation text governs. Not a conformity assessment or certification.",
+      productsCardNote: d.productsCardNote || "Select a product to set its classification below. Part I and most of the conformity layer are assessed per product; Part II and the Art 14 and component due diligence obligations are shared across all products.",
+      wizardOrgNote: d.wizardOrgNote || "Organisation-wide obligations, answered once for every product. Do these first, then switch to By product.",
+      wizardProductNote: d.wizardProductNote || "Per-product obligations. Pick a product below and work through it, then the next."
     };
   }
 
@@ -5188,7 +5165,7 @@ window.App.UI = (function () {
     classSel.addEventListener("change", function () { E.setCRAProductClass(classSel.value); });
     var classField = h("div", { class: "field" }, [
       h("label", { text: classSpec.question || (d.Noun + " class") }),
-      h("p", { class: "muted", style: "margin:0 0 6px;", text: "Set the class the " + d.noun + " falls under. This drives the " + d.conformityLayer + " conformity route. Use the classification aid below if you are unsure." }),
+      h("p", { class: "muted", style: "margin:0 0 6px;", text: "The class sets the " + d.conformityLayer + " conformity route." }),
       classSel,
       cls.route ? h("p", { class: "muted", style: "margin:8px 0 0;" }, [h("strong", { text: "Conformity route (" + d.conformityLayer + "): " }), cls.route]) : null
     ]);
@@ -5196,7 +5173,7 @@ window.App.UI = (function () {
     // 2) Classification aid - the annex category lookup (optional).
     var aidKids = [
       h("label", { text: "Classification aid - " + annexRef + " category (optional)" }),
-      h("p", { class: "muted", style: "margin:0 0 6px;", text: (classSpec.method || "Match the " + d.noun + " to a category to get a suggested class. Selecting one fills the class above; you can still override it.") })
+      h("p", { class: "muted", style: "margin:0 0 6px;", text: (classSpec.method || "Pick a category to suggest a class.") })
     ];
     if (lk && lk.categories) {
       var groupOrder = (lk.groupOrder && lk.groupOrder.length) ? lk.groupOrder : ["annex-iii-class-i", "annex-iii-class-ii", "annex-iv"];
@@ -5216,7 +5193,7 @@ window.App.UI = (function () {
         aidKids.push(h("p", { class: "muted", style: "margin:6px 0 0;" }, [h("strong", { text: "Category suggests: " }), cls.suggestedClassLabel]));
       }
     } else {
-      aidKids.push(h("p", { class: "muted", text: "Category lookup is not loaded, so set the class directly above. (If this persists, hard-reload the page.)" }));
+      aidKids.push(h("p", { class: "muted", text: "Category lookup is not loaded. Set the class above." }));
     }
     var aidField = h("div", { class: "field" }, aidKids);
 
@@ -5318,7 +5295,7 @@ window.App.UI = (function () {
     // 2) Per product: classification (class + category) for the SELECTED product
     // (chosen in the Products card above). The product name is the target name.
     var prodKids = [
-      h("p", { class: "muted", style: "margin-top:0;", text: "Classification applies to the selected " + d.noun + " above. Select a different " + d.noun + " there to classify it." })
+      h("p", { class: "muted", style: "margin-top:0;", text: "For the " + d.noun + " selected above." })
     ];
     if (classSpec) prodKids.push(craClassificationField(classSpec, setup));
     cards.push(h("div", { class: "card" }, [
@@ -5412,7 +5389,7 @@ window.App.UI = (function () {
     if (CRAsc && CRAsc.itemScope(E.state.instrument, item) === "organisation") {
       var layerDef = (E.state.instrument.layers || []).filter(function (l) { return l.id === item.layerId; })[0];
       if (!(layerDef && layerDef.scope === "organisation") && E.state.engagement.targets.length > 1) {
-        meta.unshift(h("span", { class: "pill neutral", title: "An organisation-wide obligation: this answer is shared across all " + craDisplay().noun + "s in the engagement.", text: "Organisation-wide" }));
+        meta.unshift(h("span", { class: "pill neutral", title: "Shared across all " + craDisplay().noun + "s", text: "Organisation-wide" }));
       }
     }
 
@@ -5468,8 +5445,8 @@ window.App.UI = (function () {
     layerId = layer.id;
 
     refs.main.appendChild(h("h1", { class: "page-title", text: layer.id + " - " + layer.name }));
-    refs.main.appendChild(h("p", { class: "page-sub", text:
-      (layer.scope ? "Scope: " + layer.scope + ". " : "") + "Judge each requirement In place / Partially in place / Not in place, or Unknown / N/A." }));
+    if (layer.scope) refs.main.appendChild(h("p", { class: "page-sub", text:
+      "Scope: " + layer.scope + "." }));
     if (layer.summary) refs.main.appendChild(h("p", { class: "muted", text: layer.summary }));
     // Organisation-scope layers describe the manufacturer's process, so the
     // answers are one set shared by every product (edits apply to all).
@@ -5477,7 +5454,7 @@ window.App.UI = (function () {
       refs.main.appendChild(h("div", { class: "card", style: "border-left:3px solid var(--brand-blue);" }, [
         h("div", { class: "card-b", style: "padding:10px 14px;" }, [
           h("div", { class: "muted", style: "font-size:12.5px;",
-            text: "Organisation-wide layer: these answers are shared across all " + d.noun + "s in this engagement. A change made here applies to every " + d.noun + "." })
+            text: "Organisation-wide layer: these answers apply to every " + d.noun + "." })
         ])
       ]));
     }
@@ -5620,7 +5597,7 @@ window.App.UI = (function () {
         h("div", null, [
           h("span", { class: "req-code", text: item.code }),
           h("span", { class: "req-title", text: item.title }),
-          isOrg ? h("span", { class: "pill neutral", style: "margin-left:8px;", title: "Shared across every product in this engagement.", text: "Organisation-wide" }) : null
+          isOrg ? h("span", { class: "pill neutral", style: "margin-left:8px;", title: "Shared across every product", text: "Organisation-wide" }) : null
         ])
       ])
     ];
@@ -5746,9 +5723,9 @@ window.App.UI = (function () {
     // End-of-track guidance so the org-then-products flow is obvious.
     if (atEnd) {
       if (craWizMode === "org") {
-        wrap.appendChild(h("p", { class: "muted", style: "margin-top:10px;", text: "That completes the organisation-wide obligations. Choose “Assess " + d.noun + "s” (or the By " + d.noun + " button above) to work through each " + d.noun + "’s own requirements." }));
+        wrap.appendChild(h("p", { class: "muted", style: "margin-top:10px;", text: "Organisation-wide obligations done. Choose “Assess " + d.noun + "s” to move on to each " + d.noun + "." }));
       } else {
-        wrap.appendChild(h("p", { class: "muted", style: "margin-top:10px;", text: "That completes this " + d.noun + ". Use the " + d.noun + " bar above to select or add another " + d.noun + " and work through it, or jump to the report." }));
+        wrap.appendChild(h("p", { class: "muted", style: "margin-top:10px;", text: "This " + d.noun + " is done. Select another in the bar above, or jump to the report." }));
       }
     }
     refs.main.appendChild(wrap);
@@ -5771,10 +5748,9 @@ window.App.UI = (function () {
         intro: gs.intro || "This is an alignment and gap analysis against the NCSC CAF 4.0 indicators of good practice, with an OT focus. It is not a formal CAF assessment and not a regulatory submission.",
         profileHeading: gs.profileHeading || "Regulator profile (sets the expected states)",
         bullets: gs.bullets || [
-          "The unit of capture is the contributing outcome (41 of them across 4 objectives and 14 principles).",
-          "You set one state per outcome: Achieved, Partially Achieved, or Not Achieved. Unknown reduces confidence; Not applicable drops the outcome.",
-          "The regulator profile above sets the expected state for each outcome. The report shows the gap between actual and expected. The default General profile expects Achieved on every outcome.",
-          "No single CAF grade is produced. The report is a profile of Achieved / Partially / Not counts by objective and principle, plus the roadmap of outcomes below expected."
+          "One state per contributing outcome (41, across 4 objectives and 14 principles): Achieved, Partially Achieved or Not Achieved. Unknown lowers confidence; Not applicable drops the outcome.",
+          "The regulator profile sets the expected state for each outcome; the General profile expects Achieved throughout. The report shows the gaps.",
+          "No overall CAF grade. The report gives counts by objective and principle and a roadmap of outcomes below expected."
         ],
         profilesHeading: gs.profilesHeading || "Available profiles"
       }
@@ -5821,12 +5797,12 @@ window.App.UI = (function () {
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "How this instrument scores" })]),
       h("div", { class: "card-b" }, [
-        h("p", { text: "Open a domain from the sidebar and work through the questions. You set the band for each scored question on the four-point scale; the fields below it are for evidence and notes." }),
+        h("p", { text: "Band each scored question on the four-point scale." }),
         h("ul", null, [
-          h("li", null, ["The headline grade is the average across the graded domains, then held down twice: it can never sit more than two grades above the weakest domain, and the top grade is only awarded when every domain reaches it. A weak domain pulls the headline down sharply, but does not set it on its own."]),
-          h("li", null, ["Unknown answers reduce coverage but are not counted as zero."]),
-          h("li", null, ["Not applicable answers drop out of both the score and the coverage denominator."]),
-          h("li", null, ["Coverage below " + thr + "% causes a grade to be reported as indicative rather than confident."])
+          h("li", null, ["The headline grade is the average across graded domains, capped at two grades above the weakest. The top grade needs every domain at the top."]),
+          h("li", null, ["Unknown lowers coverage but does not count as zero."]),
+          h("li", null, ["Not applicable drops out of the score and coverage."]),
+          h("li", null, ["Coverage below " + thr + "% makes a grade indicative."])
         ])
       ])
     ]);
@@ -5931,8 +5907,8 @@ window.App.UI = (function () {
     });
 
     bodyKids.push(h("p", { class: "hint", style: "margin:0 0 10px;", text:
-      "ISA/IEC 62443-3-2 assigns each zone and conduit its own SL-T across the seven Foundational Requirements. Set the engagement default on the first row; each " +
-      labelSing.toLowerCase() + " below overrides only what it needs. “-” means inherit, and the number in brackets is what would apply." }));
+      "Set the default on the first row; each " +
+      labelSing.toLowerCase() + " below overrides only what it needs. “-” inherits the value in brackets." }));
     bodyKids.push(h("div", { style: "overflow-x:auto;" }, [h("table", { class: "tbl slt-matrix" }, [head, h("tbody", null, rows)])]));
 
     // Provenance of an imported risk context, with the zone SL-T rationale
@@ -5959,7 +5935,7 @@ window.App.UI = (function () {
         h("button", {
           class: "btn ghost sm",
           onClick: function () {
-            if (confirm("Remove the imported risk context? Sites and their responses stay; the imported per-zone SL-Ts are cleared.")) E.clearRiskContext();
+            if (confirm("Remove the imported risk context? The imported SL-Ts are cleared; sites and responses stay.")) E.clearRiskContext();
           },
           text: "Remove imported context"
         })
@@ -6063,7 +6039,7 @@ window.App.UI = (function () {
             h("thead", null, [h("tr", null, [h("th", { text: "" }), h("th", { text: "Zone" }), h("th", { class: "center", text: "SL-T" })])]),
             h("tbody", null, zoneRows)
           ]),
-          h("p", { class: "muted", text: "One assessment " + label.toLowerCase() + " is created per selected zone, with its Target SL pre-set from the zone's SL-T (you can still change it). " + scopeNote + " Untick every zone to store the context for provenance only, without creating " + label.toLowerCase() + "s." })
+          h("p", { class: "muted", text: "One " + label.toLowerCase() + " per selected zone, with its Target SL set from the zone's SL-T. " + scopeNote + " Untick every zone to store the context only." })
         ]),
         h("div", { class: "modal-f" }, [
           h("button", { class: "btn", onClick: closeModal, text: "Cancel" }),
@@ -6092,7 +6068,7 @@ window.App.UI = (function () {
     refs.main.innerHTML = "";
     var label = E.state.instrument.targetDimensionLabel || "Site";
     refs.main.appendChild(h("h1", { class: "page-title", text: pluralLabel(label) }));
-    refs.main.appendChild(h("p", { class: "page-sub", text: "Each " + label.toLowerCase() + " holds its own responses. Use the bar above each FR page to switch between " + label.toLowerCase() + "s." }));
+    refs.main.appendChild(h("p", { class: "page-sub", text: "Each " + label.toLowerCase() + " holds its own responses." }));
     refs.main.appendChild(targetsCard());
   }
 
@@ -6137,7 +6113,7 @@ window.App.UI = (function () {
           ])]),
           h("tbody", null, rows)
         ]),
-        h("p", { class: "muted", style: "margin-bottom:0;", text: "Each " + label.toLowerCase() + " holds its own responses. Switch between them from the bar at the top of any capture page." })
+        h("p", { class: "muted", style: "margin-bottom:0;", text: "Switch between them from the bar at the top of any capture page." })
       ])
     ]);
   }
@@ -6163,14 +6139,14 @@ window.App.UI = (function () {
       refs.main.appendChild(h("div", { class: "card card-note" }, [
         h("div", { class: "card-b" }, [
           h("p", { style: "margin:0;", text:
-            "Answers recorded here are written once and used by more than one " + targetNoun() +
-            " - a single directory service, one log collector, one patching process. By default every " +
+            "Answers here are used by more than one " + targetNoun() +
+            ", such as one directory service or log collector. By default every " +
             targetNoun() + " takes them; where a countermeasure does not reach them all, set which " +
             targetNounPlural() + " it applies to. Answer an item in a " + targetNoun() +
             " to override it there." }),
           h("p", { class: "muted", style: "margin:6px 0 0;", text:
-            "Items are listed against the highest target Security Level any " + targetNoun() +
-            " asks for, so nothing a " + targetNoun() + " needs is hidden here. This page is not scored in its own right." })
+            "Items are listed up to the highest target Security Level any " + targetNoun() +
+            " asks for. This page is not scored on its own." })
         ])
       ]));
     }
@@ -6186,7 +6162,7 @@ window.App.UI = (function () {
           h("div", { class: "card-b" }, [
             h("p", { style: "margin:0;", text:
               "This " + targetNoun() + " was added after " + plural(activeT.inheritedAtCreation, "requirement") +
-              " had already been answered as shared answers, and it takes them automatically. " +
+              " had shared answers, and it takes them. " +
               "Check they do reach it, and answer here anything they do not." }),
             h("div", { style: "margin-top:8px;" }, [
               h("button", {
@@ -6298,7 +6274,7 @@ window.App.UI = (function () {
       bar.appendChild(h("button", {
         class: "btn" + (hideAnswered ? " primary" : ""),
         style: "margin-left:auto;",
-        title: "Show only the items that do not have an answer yet",
+        title: "Show only unanswered items",
         onClick: function () { hideAnswered = !hideAnswered; render(); },
         text: hideAnswered ? "Showing unanswered only" : "Hide answered"
       }));
@@ -6312,12 +6288,12 @@ window.App.UI = (function () {
   var SL_ITEM_STATES = [
     { value: "met",              label: "Met",           cls: "caf-state-achieved" },
     { value: "met-compensating", label: "Met (comp.)",   cls: "caf-state-achieved sl-comp",
-      title: "Satisfied by a compensating countermeasure. Counts toward the level, but is reported separately as a fragility signal." },
+      title: "Met by a compensating countermeasure. Counts toward the level; reported separately." },
     { value: "partial",          label: "Partial",       cls: "caf-state-partially",
-      title: "Partially satisfied. Never counts toward a Security Level, but carries into the gap report." },
+      title: "Partially met. Never counts toward a level; goes into the gap report." },
     { value: "not-met",          label: "Not met",       cls: "caf-state-not" },
     { value: "na",               label: "N/A",           cls: "na",
-      title: "Not applicable. Needs a justification, otherwise it blocks the level rather than being excluded." }
+      title: "Not applicable. Blocks the level until justified." }
   ];
 
   var SL_ITEM_LABEL = (function () {
@@ -6446,7 +6422,7 @@ window.App.UI = (function () {
       h("div", { class: "sl-coverage-body" }, [
         h("div", { class: "hint", text: cov.mixed
           ? "The items of this requirement currently reach different " + targetNounPlural() +
-            ". Choosing here sets the same reach for all of them; to keep them different, set each one under \"What each level requires\" below."
+            ". Choosing here sets them all the same."
           : "A countermeasure implemented once does not always reach every " + targetNoun() +
             ". Clear the ones it does not reach: they will show this requirement as unanswered rather than inheriting it." }),
         h("div", { class: "sl-coverage-list" }, boxes),
@@ -6525,7 +6501,7 @@ window.App.UI = (function () {
       type: "button",
       class: "sl-link-toggle" + (open ? " open" : "") + (isLinked ? " linked" : ""),
       title: isLinked
-        ? "Answered once for " + linked.length + " " + targetNounPlural() + ". Editing it here edits it in all of them."
+        ? "Shared by " + linked.length + " " + targetNounPlural() + ". Edits apply to all of them."
         : "Use this same answer in another " + targetNoun(),
       text: isLinked
         ? "Shared with " + (linked.length - 1) + " other " + (linked.length - 1 === 1 ? targetNoun() : targetNounPlural())
@@ -6582,11 +6558,10 @@ window.App.UI = (function () {
 
     var body = [
       h("div", { class: "hint", text: isLinked
-        ? "This answer, its evidence, notes and remediation plan are held once and used by " +
-          linked.map(nameOf).join(", ") + ". Editing any of it here changes it for all of them."
-        : "Tick the " + targetNounPlural() + " where this is the same. They will use one answer, "
-          + "with its evidence, notes and remediation plan, instead of being asked again. "
-          + "Any not ticked keep what they have." }),
+        ? "Shared with " +
+          linked.map(nameOf).join(", ") + ", with its evidence, notes and plan. Edits apply to all of them."
+        : "Tick the " + targetNounPlural() + " where this is the same. They will share one answer, "
+          + "with its evidence, notes and plan." }),
       h("div", { class: "sl-coverage-list" }, rows)
     ];
 
@@ -6640,8 +6615,8 @@ window.App.UI = (function () {
           ]);
         })),
         h("div", { class: "hint", text: candidates.length > 1
-          ? "The one you choose becomes the shared answer. What the others hold for this requirement is replaced by it."
-          : "Nothing is being replaced: no other " + targetNoun() + " in this link has an answer of its own." }),
+          ? "The one you choose replaces what the others hold for this requirement."
+          : "Nothing is replaced: no other " + targetNoun() + " here has its own answer." }),
         h("div", { class: "sl-link-actions" }, [
           h("button", {
             type: "button", class: "btn primary btn-small",
@@ -6735,7 +6710,7 @@ window.App.UI = (function () {
       onChange();
     }, overriding ? "Revert to shared" : null,
        overriding ? ("The shared answer is " + (SL_ITEM_LABEL[scoredItem.sharedState] || scoredItem.sharedState) +
-                     ". Reverting removes this " + targetNoun() + "'s own answer and takes that one instead.") : null);
+                     ". Reverting drops this " + targetNoun() + "'s own answer.") : null);
     if (clear) btns.appendChild(clear);
 
     var kids = [
@@ -6748,10 +6723,10 @@ window.App.UI = (function () {
         // already says it is connected to that layer, and says what reverting
         // would restore.
         inherited
-          ? h("span", { class: "pill inherit", title: "Answered once and shared. Inherited here; answer it below to override it for this " + targetNoun() + ".", text: "Shared" })
+          ? h("span", { class: "pill inherit", title: "Inherited. Answer below to override it here.", text: "Shared" })
           : null,
         scoredItem.aboveTarget
-          ? h("span", { class: "pill above", title: "Above the target for this " + targetNoun() + ". Recorded because it is in place, not because it is required; it is never counted as an outstanding gap.", text: "Above target" })
+          ? h("span", { class: "pill above", title: "Above the target for this " + targetNoun() + ". Never counted as a gap.", text: "Above target" })
           : null,
         onShared
           ? h("span", { class: "muted sl-item-inherit-count", text: inheritCountText(req.id, scoredItem.componentId) })
@@ -6773,7 +6748,7 @@ window.App.UI = (function () {
     // above, written to every item, and repeating it per item was the same
     // question asked five times with the same answer already in it.
     if (isNA && !hideNaNote) {
-      var ta = h("textarea", { rows: "2", placeholder: "Why is this not applicable to this zone? Required: without it, this item blocks the Security Level instead of being excluded." });
+      var ta = h("textarea", { rows: "2", placeholder: "Why is this not applicable to this zone? Required, or the item blocks the level." });
       ta.value = scoredItem.note || "";
       ta.addEventListener("change", function () {
         E.setItemState(tid, req.id, scoredItem.componentId, "na", ta.value);
@@ -6817,7 +6792,7 @@ window.App.UI = (function () {
     var needs = String(current).trim() === "";
     var ta = h("textarea", { rows: "2", placeholder:
       "Why does this requirement not apply to this " + targetNoun() +
-      "? Required: without it, the items count as not assessed and block the Security Level instead of being excluded." });
+      "? Required, or the items block the level." });
     ta.value = current;
     ta.addEventListener("change", function () {
       scoped.forEach(function (i) { E.setItemState(tid, req.id, i.componentId, "na", ta.value); });
@@ -6902,10 +6877,10 @@ window.App.UI = (function () {
                  // equal buttons.
                  (above && n === scoredReq.targetSL + 1 ? " first-above" : ""),
           title: derived
-            ? "Achieves SL " + n + ", worked out from the items below. Click to reset the items to what SL " + n + " means."
+            ? "Achieves SL " + n + ", worked out from the items below. Click to reset the items to SL " + n + "."
             : above
               ? "Above the target of " + S.formatSL(scoredReq.targetSL) + " for this " + targetNoun() +
-                ". Recording it shows where there is already headroom; it is never counted as outstanding work."
+                ". Recorded as headroom, not as outstanding work."
               : (n === 0 ? "Nothing this requirement asks for is in place"
                          : "Everything required up to SL " + n + " is in place"),
           onClick: function () {
@@ -6919,7 +6894,7 @@ window.App.UI = (function () {
       }).concat([
         h("button", {
           class: "sl-btn na" + (allNA ? " active" : ""),
-          title: "Not applicable here. Needs a justification, otherwise it blocks the level rather than being excluded.",
+          title: "Not applicable. Blocks the level until justified.",
           onClick: function () {
             E.setRequirementSL(tid, req.id, "na", scoredReq.targetSL, resp.naNote || "");
             rerender();
@@ -6979,7 +6954,7 @@ window.App.UI = (function () {
     var detailToggle = h("button", {
       type: "button",
       class: "sl-items-toggle" + (detailOpen ? " open" : ""),
-      title: "What each Security Level requires, and the items behind this answer",
+      title: "The items behind this answer",
       onClick: function () { slGuidanceOpen[req.id] = !detailOpen; rerender(); },
       text: "What each level requires"
     });
@@ -7229,7 +7204,7 @@ window.App.UI = (function () {
       text: "Example questions to ask"
     });
     var panel = open ? h("div", { class: "caf-state-guide" }, [
-      h("div", { class: "caf-summary-label", text: "Example questions to ask (prompts, not a checklist)" }),
+      h("div", { class: "caf-summary-label", text: "Prompts, not a checklist" }),
       h("ul", { class: "caf-questions" }, qs.map(function (q) { return h("li", null, [q]); }))
     ]) : null;
     return { toggle: toggle, panel: panel };
@@ -7605,7 +7580,7 @@ window.App.UI = (function () {
     var notRequired = ov && ov.applicable === false;
     var expectedBadge = null;
     if (notRequired) {
-      expectedBadge = h("span", { class: "pill neutral", style: "margin-left:6px;", title: "This control is not required by the selected profile. Marking it Implemented records it as 'above baseline' for the report; it does not affect the score.", text: "Not required by this profile" });
+      expectedBadge = h("span", { class: "pill neutral", style: "margin-left:6px;", title: "If implemented, it is reported as above baseline and does not affect the score.", text: "Not required by this profile" });
     } else if (expected) {
       var lbl = window.App.ScoringCAF.stateLabelFor(expected, inst) || expected;
       expectedBadge = h("span", { class: "pill exceeds", style: "margin-left:6px;", text: "Expected: " + lbl });
@@ -7615,13 +7590,13 @@ window.App.UI = (function () {
 
     // "Above baseline" badge: implemented a control the profile does not require.
     var aboveBadge = (notRequired && (resp.state === "achieved" || resp.state === "partially"))
-      ? h("span", { class: "pill met", style: "margin-left:6px;", title: "Implemented but not required by this profile. Captured for the report and reassessment tracking, and excluded from the score.", text: "Above baseline" })
+      ? h("span", { class: "pill met", style: "margin-left:6px;", title: "Implemented but not required by this profile. Not scored.", text: "Above baseline" })
       : null;
 
     // "Added by overlay" badge: the profile overlay marks this control as one the
     // ICS overlay adds beyond the standard baseline (overlaySource === "added").
     var addedBadge = (ov && ov.overlaySource === "added")
-      ? h("span", { class: "pill exceeds", style: "margin-left:6px;", title: "Added by the ICS overlay beyond the standard 800-53B baseline", text: "Added by overlay" })
+      ? h("span", { class: "pill exceeds", style: "margin-left:6px;", title: "Beyond the standard 800-53B baseline", text: "Added by overlay" })
       : null;
 
     // State buttons row.
@@ -8190,7 +8165,7 @@ window.App.UI = (function () {
       var naOn = resp.applicable === false;
       naToggle = h("button", {
         class: "na-toggle" + (naOn ? " active" : ""),
-        title: naOn ? "This requirement is marked not applicable" : "Mark this requirement not applicable",
+        title: naOn ? "Click to undo" : "Not applicable",
         onClick: function () { if (naOn) clearAnswer(); else setNA(); },
         text: naOn ? "N/A ✓" : "Mark N/A"
       });
@@ -8212,7 +8187,7 @@ window.App.UI = (function () {
         h("span", { class: "band-choice-num", text: "?" }),
         h("span", { class: "band-choice-body" }, [
           h("span", { class: "band-choice-label", text: "Unknown" }),
-          h("span", { class: "band-choice-anchor", text: "Not established: reduces coverage and confidence, and is not scored." })
+          h("span", { class: "band-choice-anchor", text: "Not established. Not scored; lowers coverage." })
         ])
       ]);
       var bandBtns = bandScale.map(function (b) {
@@ -8766,7 +8741,7 @@ window.App.UI = (function () {
       openRemediationModal(itemId, {
         targetId: E.SHARED_TARGET_ID,
         title: "Action across " + window.App.Report.pluralLower(E.state.instrument.targetDimensionLabel || "zone", E.state.instrument),
-        note: "Written once on the shared layer, so it reaches every " +
+        note: "On the shared layer, so it applies to every " +
           String(E.state.instrument.targetDimensionLabel || "zone").toLowerCase() + " that inherits this answer." });
       return;
     }
@@ -8820,10 +8795,10 @@ window.App.UI = (function () {
     card.appendChild(h("div", { class: "card-h" }, [h("h2", { text: "Issue check" }), pill]));
     var b = h("div", { class: "card-b" });
     if (state === "blocked") {
-      b.appendChild(h("p", { class: "issue-lead", text: "These would print in red in the Word report, so it cannot go out as final yet. Write them here, not in Word." }));
+      b.appendChild(h("p", { class: "issue-lead", text: "These print in red in the Word report and block Final. Write them here, not in Word." }));
       b.appendChild(issueList("block", blockers));
     } else if (state === "ready") {
-      b.appendChild(h("p", { class: "issue-lead", text: "Nothing in the Word report is left to write: it can be issued as final." }));
+      b.appendChild(h("p", { class: "issue-lead", text: "Nothing in the Word report is left to write." }));
     } else if (state === "error") {
       b.appendChild(h("p", { class: "issue-lead muted", text: "The Word report could not be checked (" + (res.error.message || res.error) + ")." }));
     } else {
@@ -8865,7 +8840,7 @@ window.App.UI = (function () {
     if (view !== "report") go("report");
     var card = key ? refs.main.querySelector('[data-section="' + String(key).replace(/"/g, '\\"') + '"]') : null;
     if (card) { revealNode(card); return true; }
-    if (!quiet) toast("That part is only in the Word report, so the report page has no card for it.", "warn");
+    if (!quiet) toast("That part is only in the Word report.", "warn");
     return false;
   }
   // The report page's section keys, rendering the page first if need be.
@@ -8907,7 +8882,7 @@ window.App.UI = (function () {
     var DP = window.App.DocPreview, X = window.App.ExportDOCX;
     refs.main.innerHTML = "";
     refs.main.appendChild(h("h1", { class: "page-title", text: "Word preview" }));
-    refs.main.appendChild(h("p", { class: "page-sub", text: "The Word report as Export Word makes it, page by page. Word decides where the pages break. To change the report, edit it on the Preview page." }));
+    refs.main.appendChild(h("p", { class: "page-sub", text: "The Word report, page by page. Edit it on the Preview page." }));
     if (!DP || !X || !window.App.DocxImport) {
       refs.main.appendChild(h("p", { class: "muted", text: "The Word preview is not available in this copy of the tool." }));
       return;
@@ -8988,7 +8963,7 @@ window.App.UI = (function () {
       say("", null);
       state.classList.add("hidden");
       var name = X.docxFilename(job.engagement, opts);
-      note.textContent = "This is " + name + (read.cover ? "" : ", drawn without its cover") + ". It is read from the file itself, so a change on the Preview page shows here the next time this page is opened.";
+      note.textContent = "This is " + name + (read.cover ? "" : ", drawn without its cover") + ". Changes on the Preview page show here next time you open it.";
       DP.drawRead(paper, read, { watermark: wordPreview.status === "final" ? "" : "DRAFT", fit: true });
     }
     var key = wordPreviewKey(job, wordPreview.status);
@@ -9030,7 +9005,6 @@ window.App.UI = (function () {
   function renderReportPage() {
     refs.main.innerHTML = "";
     refs.main.appendChild(h("h1", { class: "page-title", text: "Report preview" }));
-    refs.main.appendChild(h("p", { class: "page-sub", text: "The same figures as the Excel and Word exports. Download those with the export buttons in the header." }));
     refs.main.appendChild(buildSitesToolbar());
 
     // Scored up front: the next-steps scaffolding is built from the roadmap and
@@ -9097,7 +9071,7 @@ window.App.UI = (function () {
         // not a remediation - same editor, honest heading.
         editFurther: function (id) {
           openRemediationModal(id, { title: "Recommendation",
-            note: "This requirement already meets its target. The advice is recorded as a recommendation and is not counted as outstanding work." });
+            note: "This already meets its target, so the advice is not counted as outstanding work." });
         },
         // A cross-zone action is written once on the shared layer, which is what
         // makes it one piece of work rather than one per zone.
@@ -9106,7 +9080,7 @@ window.App.UI = (function () {
             targetId: E.SHARED_TARGET_ID,
             title: "Action across " + window.App.Report.pluralLower(
               E.state.instrument.targetDimensionLabel || "zone", E.state.instrument),
-            note: "Written once on the shared layer, so it reaches every " +
+            note: "On the shared layer, so it applies to every " +
               String(E.state.instrument.targetDimensionLabel || "zone").toLowerCase() +
               " that inherits this answer." });
         }
@@ -9145,7 +9119,7 @@ window.App.UI = (function () {
       h("div", { class: "card-b" }, [
         h("label", { class: "check-row" }, [cb, h("span", null, [
           h("strong", { text: "Show what good looks like for each roadmap item" }),
-          h("span", { class: "muted small", text: "  The question's own description of good practice, under each improvement in the Word roadmap. Adds some length; untick to leave it out." })
+          h("span", { class: "muted small", text: "  Under each improvement in the Word roadmap. Adds length." })
         ])])
       ])
     ]);
@@ -9159,11 +9133,11 @@ window.App.UI = (function () {
   function buildRiskAppetiteNarrativeCard() {
     var rn = E.getReportNarrative();
 
-    var ctxTa = h("textarea", { rows: "4", placeholder: "What this means for this organisation in particular: the services and people that depend on it, the regulatory or commercial pressures on it, and anything that sets it apart from others in its sector. Leave blank to keep the placeholder in the Word report." });
+    var ctxTa = h("textarea", { rows: "4", placeholder: "What this means for this organisation: who depends on it, the pressures on it, what sets it apart in its sector." });
     ctxTa.value = rn.regulatoryExposure || "";
     ctxTa.addEventListener("change", function () { E.setReportNarrative({ regulatoryExposure: ctxTa.value }); });
 
-    var decTa = h("textarea", { rows: "3", placeholder: "The one or two decisions this board should take, in terms that fit the organisation. Leave blank to keep the placeholder in the Word report." });
+    var decTa = h("textarea", { rows: "3", placeholder: "The one or two decisions this board should take." });
     decTa.value = rn.topPriorities || "";
     decTa.addEventListener("change", function () { E.setReportNarrative({ topPriorities: decTa.value }); });
 
@@ -9177,13 +9151,13 @@ window.App.UI = (function () {
     return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "The Word executive summary is written from the verdict and the two positions. These two paragraphs are yours; anything left blank shows in the export as a placeholder to complete." }),
+        h("p", { class: "muted", style: "margin-top:0;", text: "Your two paragraphs for the executive summary. Blank ones print as placeholders." }),
         h("div", { class: "field", "data-check-anchor": "narrative-regulatoryExposure" }, [h("label", { text: "Context for the board" }), ctxTa]),
         h("div", { class: "field", "data-check-anchor": "narrative-topPriorities" }, [h("label", { text: "The decision for the board" }), decTa]),
         methodField(),
         h("label", { class: "check-row" }, [ctxCb, h("span", null, [
           h("strong", { text: "Include the general paragraph on this verdict" }),
-          h("span", { class: "muted small", text: "  In the Word verdict section: what this kind of verdict usually means in practice. The same for every client with this verdict, so it is off unless you want it." })
+          h("span", { class: "muted small", text: "  Standard text on what this verdict usually means. The same for every client." })
         ])])
       ])
     ]);
@@ -9199,18 +9173,18 @@ window.App.UI = (function () {
     var rn = E.getReportNarrative();
     var d = craDisplay();
 
-    var priTa = h("textarea", { rows: "3", placeholder: "Sequencing: what must close first (e.g. the notified-body route), what gates CE marking for which " + d.noun + ", and what can run in parallel. Leave blank to keep the placeholder in the Word report." });
+    var priTa = h("textarea", { rows: "3", placeholder: "Sequencing: what must close first (e.g. the notified-body route), what gates CE marking for which " + d.noun + ", and what can run in parallel." });
     priTa.value = rn.topPriorities || "";
     priTa.addEventListener("change", function () { E.setReportNarrative({ topPriorities: priTa.value }); });
 
-    var expoTa = h("textarea", { rows: "3", placeholder: "Commercial exposure: which " + d.noun + " sales and markets depend on CE marking under this regulation, and what non-conformity would mean for them. Leave blank to keep the placeholder in the Word report." });
+    var expoTa = h("textarea", { rows: "3", placeholder: "Commercial exposure: which " + d.noun + " sales and markets depend on CE marking under this regulation, and what non-conformity would mean." });
     expoTa.value = rn.regulatoryExposure || "";
     expoTa.addEventListener("change", function () { E.setReportNarrative({ regulatoryExposure: expoTa.value }); });
 
     return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "The Word executive summary is composed automatically from the scores, classification, gaps and remediation plans. These two paragraphs are the consultant's own words; anything left blank shows in the export as a placeholder to complete." }),
+        h("p", { class: "muted", style: "margin-top:0;", text: "Your two paragraphs for the executive summary. Blank ones print as placeholders." }),
         h("div", { class: "field", "data-check-anchor": "narrative-topPriorities" }, [h("label", { text: "Top priorities / sequencing" }), priTa]),
         h("div", { class: "field", "data-check-anchor": "narrative-regulatoryExposure" }, [h("label", { text: "Regulatory & commercial exposure" }), expoTa])
       ])
@@ -9283,7 +9257,7 @@ window.App.UI = (function () {
     return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "The rest of the Word report is composed from the assessment. These are the consultant's own words; anything left blank prints in red in the export for you to complete." })
+        h("p", { class: "muted", style: "margin-top:0;", text: "Your own words for the report. Anything left blank prints in red." })
       ].concat(kids))
     ]);
   }
@@ -9381,7 +9355,7 @@ window.App.UI = (function () {
     return h("div", { class: "card word-only-changes", "data-check-anchor": "word-only" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Changes to sections only in the Word report" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "issue-lead", text: "These sections print in the Word report but have no card on this page, so their changes are listed here. A rewritten opening is fixed text: any figures in it no longer update." }),
+        h("p", { class: "issue-lead", text: "Changes to Word-only sections. A rewritten opening is fixed text, so its figures no longer update." }),
         h("ul", { class: "wo-list" }, rows)
       ])
     ]);
@@ -9426,14 +9400,14 @@ window.App.UI = (function () {
         h("p", { class: "wo-prose muted", text: "Generated: " + clip(r.from) }),
         h("p", { class: "wo-prose", text: "Reworded: " + clip(r.to) }),
         h("button", { type: "button", class: "inherited-edit wo-back", text: "Back to the generated version",
-          title: "Takes out this rewording. The paragraph is written from the assessment again",
+          title: "Remove this rewording",
           onClick: function () { RV.removeParagraph(r.key, r.from); renderReportPage(); } })
       ]);
     });
     return h("div", { class: "card reworded-changes", "data-check-anchor": "reworded" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Paragraphs reworded from review comments" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "issue-lead", text: "Accepting a reviewer's wording on a paragraph that opens a section replaces that paragraph only. The rest of the section is still written from the assessment. If the assessment changes the paragraph it replaced, the rewording stops applying and the generated text prints." }),
+        h("p", { class: "issue-lead", text: "Each rewording replaces one opening paragraph. If the assessment changes that paragraph, the generated text prints instead." }),
         h("ul", { class: "wo-list" }, items)
       ])
     ]);
@@ -9490,7 +9464,7 @@ window.App.UI = (function () {
         "aria-label": isNextSteps ? "Proposed next steps" : "Section wording",
         title: isNextSteps
           ? "One step per line, in the order you would do them."
-          : "One paragraph per line. The tables and charts below are not affected." });
+          : "One paragraph per line." });
       // The box starts from the text as printed. With paragraphs reworded
       // from review comments, that is the generated wording with those put
       // in; saving a rewrite then makes it the whole opening, and the
@@ -9509,7 +9483,7 @@ window.App.UI = (function () {
       autoGrow(proseTa);
       if (isNextSteps) {
         cardBody.insertBefore(h("p", { class: "muted", style: "margin:0 0 8px; font-size:12.5px;", text:
-          "One step per line, in the order you would do them. Lines in [square brackets] are prompts and print in red until you replace or delete them." }), proseTa);
+          "One step per line, in order. Lines in [square brackets] print in red until replaced." }), proseTa);
       }
     }
 
@@ -9575,8 +9549,8 @@ window.App.UI = (function () {
     var editor = h("div", { class: "terms-editor" }, [
       h("h3", { text: "Other terms used in this report" }),
       h("p", { class: "muted", style: "margin:2px 0 8px;", text: terms.length
-        ? "Your own terms. They print after the definitions above, in this order."
-        : "Nothing added yet. Anything you add prints after the definitions above." })
+        ? "Printed after the definitions above, in this order."
+        : "Nothing added yet." })
     ].concat(rows).concat([
       h("button", { class: "sl-btn", text: "+ Add a term",
         onClick: function () { commit(terms.concat([{ term: "New term", definition: "" }])); } })
@@ -9676,18 +9650,18 @@ window.App.UI = (function () {
     var authIn = h("input", { type: "text", value: rn.competentAuthority || "", placeholder: "e.g. the relevant national competent authority / CSIRT" });
     authIn.addEventListener("change", function () { E.setReportNarrative({ competentAuthority: authIn.value }); });
 
-    var expoTa = h("textarea", { rows: "3", placeholder: "Client-specific regulatory exposure: consequences arising from the weakest areas, especially any Not-Achieved incident-reporting duties. Leave blank to keep the placeholder in the Word report." });
+    var expoTa = h("textarea", { rows: "3", placeholder: "Regulatory exposure from the weakest areas, especially any Not Achieved incident-reporting duties." });
     expoTa.value = rn.regulatoryExposure || "";
     expoTa.addEventListener("change", function () { E.setReportNarrative({ regulatoryExposure: expoTa.value }); });
 
-    var priTa = h("textarea", { rows: "3", placeholder: "The top one or two priorities for this client. Leave blank to use the suggestion drawn from the roadmap." });
+    var priTa = h("textarea", { rows: "3", placeholder: "The top one or two priorities. Blank uses the roadmap's suggestion." });
     priTa.value = rn.topPriorities || "";
     priTa.addEventListener("change", function () { E.setReportNarrative({ topPriorities: priTa.value }); });
 
     return h("div", { class: "card", "data-check-anchor": "consultant-input" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Executive summary: consultant input" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "These fields complete the consultant sections of the executive summary in the Word report. Anything left blank shows there as a placeholder to complete." }),
+        h("p", { class: "muted", style: "margin-top:0;", text: "Your input to the executive summary. Blank fields print as placeholders." }),
         h("div", { class: "grid-2" }, [
           h("div", { class: "field" }, [h("label", { text: "Entity classification" }), clsSel]),
           h("div", { class: "field" }, [h("label", { text: "Competent authority" }), authIn])
@@ -9729,7 +9703,7 @@ window.App.UI = (function () {
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Basis of assessment" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "Edit these on the engagement page. They export into the Word report and the Excel workbook." })
+        h("p", { class: "muted", style: "margin-top:0;", text: "Edit these on the engagement page." })
       ].concat(kids))
     ]);
   }
@@ -9782,7 +9756,7 @@ window.App.UI = (function () {
 
     var s = roll.summary;
     var lead = s.differing === 0
-      ? "All " + roll.siteCount + " " + pluralLabel(noun) + " reached the same result on every requirement assessed at more than one, so the organisation-wide position is the same as each " + noun + "'s."
+      ? "All " + roll.siteCount + " " + pluralLabel(noun) + " agree on every requirement they share, so the organisation-wide position matches each one."
       : s.differing + " of " + s.compared + " requirements differ between " + pluralLabel(noun) +
         ". For those, the organisation-wide result is the weakest " + noun + "'s, and the " + pluralLabel(noun) + " setting it are named.";
     var included = "Across " + roll.siteCount + " assessments in this customer file: " + roll.siteNames.join(", ") + ".";
@@ -9811,7 +9785,7 @@ window.App.UI = (function () {
         h("p", { class: "muted", style: "margin-top:0;", text: included }),
         h("p", { class: "muted", text: lead }),
         s.withUnscoredSites
-          ? h("p", { class: "muted", text: s.withUnscoredSites + " requirement" + (s.withUnscoredSites === 1 ? " was" : "s were") + " not assessed at every " + noun + "; a " + noun + " that was not assessed is not a " + noun + " that passed, so it is listed rather than counted." })
+          ? h("p", { class: "muted", text: s.withUnscoredSites + " requirement" + (s.withUnscoredSites === 1 ? " was" : "s were") + " not assessed at every " + noun + ". Those are listed, not counted as met." })
           : null,
         rows.length ? h("table", { class: "tbl" }, [
           h("thead", null, [h("tr", null, [
@@ -9869,7 +9843,7 @@ window.App.UI = (function () {
     return h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: pluralLabel(cap(noun)) + " side by side" })]),
       h("div", { class: "card-b" }, [
-        h("p", { class: "muted", style: "margin-top:0;", text: "Each " + noun + " is assessed and reported independently; this is a quick rollup. Switch the detailed report between " + pluralLabel(noun) + " with the toolbar above." }),
+        h("p", { class: "muted", style: "margin-top:0;", text: "Switch the detailed report between " + pluralLabel(noun) + " with the toolbar above." }),
         h("table", { class: "tbl" }, [
           h("thead", null, [h("tr", null, [
             h("th", null, [cap(noun)]), h("th", { class: "center" }, ["Answered"]),
@@ -9952,7 +9926,7 @@ window.App.UI = (function () {
       var out;
       try { out = window.App.Compare.extractBaseline(res.data, E.state.instrument.id, file.name); }
       catch (e) {
-        toast("That file could not be used as the previous assessment: its contents are not in a form this copy can read.", "err", 8000);
+        toast("That file could not be used as the previous assessment.", "err", 8000);
         return;
       }
       if (!out.ok) { toast(out.error, "err"); return; }
@@ -9976,14 +9950,14 @@ window.App.UI = (function () {
     var isRA = E.state.scoringFamily === "risk-appetite-coherence";
     if (!baseline) {
       kids.push(h("p", { class: "muted", style: "margin-top:0;", text: isRA
-        ? "Load the saved project JSON from an earlier visit to show how the two positions have moved and whether the organisation is closer to proportion than it was. The comparison also appears in the Excel and Word exports."
-        : "Load the saved project JSON from an earlier visit to show what has moved since: improvements, regressions and the change in open gaps. The comparison also appears in the Excel and Word exports." }));
+        ? "Load the project file from an earlier visit to show how the two positions have moved."
+        : "Load the project file from an earlier visit to show what has moved since." }));
       kids.push(h("button", { class: "btn", onClick: function () { fileIn.click(); }, text: "Load previous assessment…" }));
     } else {
       var res = computeComparison();
       kids.push(h("p", { class: "muted", style: "margin-top:0;", text: "Baseline: " + C.sourceLine(baseline) }));
       if (res && res.versionMismatch) {
-        kids.push(h("p", { class: "muted", text: "The baseline was scored against instrument content version " + baseline.instrumentContentVersion + "; the current version is " + (E.state.instrument.contentVersion || "unknown") + ". Renamed or removed items compare as not assessed." }));
+        kids.push(h("p", { class: "muted", text: "The baseline was scored against instrument content version " + baseline.instrumentContentVersion + "; the current version is " + (E.state.instrument.contentVersion || "unknown") + ". Renamed or removed items show as not assessed." }));
       }
 
       // Baseline target pairing - only when the previous file held several.
@@ -10096,7 +10070,7 @@ window.App.UI = (function () {
           kids.push(h("table", { class: "tbl" }, [abHead, abBody]));
         }
 
-        kids.push(h("p", { class: "muted", style: "margin-bottom:0;", text: "The previous responses are re-scored against the current instrument content and targets so both visits are compared on the same yardstick." }));
+        kids.push(h("p", { class: "muted", style: "margin-bottom:0;", text: "The previous answers are re-scored against the current content and targets." }));
       }
 
       kids.push(h("div", { class: "sl-row", style: "margin-top:12px;" }, [
@@ -10274,12 +10248,12 @@ window.App.UI = (function () {
         h("span", { class: "muted", text: instName })
       ]));
       fields.push(h("p", { class: "muted", style: "margin:0 0 10px; font-size:12.5px;", text:
-        "The opportunity, who carried it out, when, and how this report is controlled. " +
+        "Opportunity, consultant, dates and document control. " +
         "Another assessment in the same file keeps its own." }));
       fields.push(h("div", { class: "grid-2" }, STG.ASSESSMENT_META_KEYS.map(fieldFor)));
     } else {
       fields.push(h("p", { class: "muted", style: "margin:12px 0 0; font-size:12.5px;", text:
-        "Open an assessment to record its opportunity ID, consultant, dates and document control. Those belong to the assessment, not to the customer." }));
+        "Open an assessment to record its opportunity ID, consultant, dates and document control." }));
     }
 
     var modal = h("div", { class: "modal-backdrop" }, [

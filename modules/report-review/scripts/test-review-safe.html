@@ -141,7 +141,7 @@
         var bar = D.getElementById("rr-restore");
         ok(!!bar && /not in the review file you opened/.test(bar.textContent), "the unsaved work is offered over the file");
         ok(storedTexts().indexOf("UNSAVED one.") !== -1, "and is still stored");
-        ok(/Unsaved work that is not in it/.test(toastText()), "the message points at it", toastText());
+        ok(/Unsaved work not in it/.test(toastText()), "the message points at it", toastText());
         D.getElementById("rr-restore-yes").click();
         ok(texts().indexOf("UNSAVED one.") !== -1 && texts().indexOf("Saved earlier.") !== -1 && R.state.handle === h3 && R.state.review.fileId === "rf-mine" && R.isDirty(), "Restore adds it to the file, which Save still writes", texts().join());
       });
@@ -234,7 +234,7 @@
         R.loadTexts([{ name: "safe-pack.json", text: PACK }]);
         var alice = JSON.stringify(rfile({ fileId: "rf-alice", reviewer: "Alice Smith", comments: [cmt("c-a1", "Alice's must-fix.", "2026-11-01T09:00:00.000Z", "Alice Smith")] }));
         R.loadTexts([{ name: "alice.json", text: alice }]);
-        ok(!!D.getElementById("rr-whose-theirs") && /does not know your name/.test(D.querySelector(".rr-modal").textContent) && !localStorage.getItem("spt-review:reviewer:v1"),
+        ok(!!D.getElementById("rr-whose-theirs") && /I am someone else/.test(D.querySelector(".rr-modal").textContent) && !localStorage.getItem("spt-review:reviewer:v1"),
           "it asks whether you are them, rather than taking their name in silence");
         D.getElementById("rr-whose-mine").click();
         ok(!!D.getElementById("rr-name-input"), "someone else is asked for their own name");
@@ -339,7 +339,7 @@
           R.loadTexts([{ name: "mine.json", text: FILE }]);
           D.getElementById("rr-merge-yes").click();
         } finally { W.Element.prototype.appendChild = orig; }
-        ok(!!R.state.pack && texts().join() === "One.,Two." && R.isDirty() && /not opened. Your work is as it was/.test(toastText()), "the pack stays open with the work as it was, and says so", toastText());
+        ok(!!R.state.pack && texts().join() === "One.,Two." && R.isDirty() && /damaged and was not opened/.test(toastText()), "the pack stays open with the work as it was, and says so", toastText());
         ok(storedTexts().join() === "One.,Two.", "and the crash copy holds both comments", storedTexts().join());
       });
     }],
@@ -424,7 +424,7 @@
         ok(/damaged/.test(toastText()) && R.state.review.fileId !== "rf-mine", "and a review file whose comments cannot be read", toastText());
         var broken = JSON.parse(PACK); broken.packId = "rp-bad-3"; broken.documents[0].blocks = [null];
         R.loadTexts([{ name: "broken.json", text: JSON.stringify(broken) }]);
-        ok(!R.state.pack && /could not be shown/.test(toastText()) && /Open a review pack/.test(D.getElementById("main").textContent), "a pack that cannot be drawn is closed again, never a blank page", toastText());
+        ok(!R.state.pack && /damaged or incomplete/.test(toastText()) && /Open a review pack/.test(D.getElementById("main").textContent), "a pack that cannot be drawn is closed again, never a blank page", toastText());
       });
     }],
     ["the tour's window (findings 58, 59, 70)", function () {
@@ -439,10 +439,10 @@
         ok(!ev.defaultPrevented && dirtySent.indexOf(true) === -1, "demo work is not reported as unsaved, nor warned about on close", dirtySent.join());
         W.showSaveFilePicker = undefined;
         return new Promise(function (res) { R.saveReview(null, res); }).then(function () {
-          ok(/demo review, so there is no author/.test(toastText()), "saving the demo says there is no author to send it to", toastText());
+          ok(/no author to send the demo review to/.test(toastText()), "saving the demo says there is no author to send it to", toastText());
           R.loadTexts([{ name: "real.json", text: PACK }]);
           ok(!R.state.demo && !D.getElementById("rr-demo-note"), "a real pack opened there is not called a demo");
-          ok(/tour's window/.test(toastText()) && /Use the Report Review Tool itself for real work/.test(toastText()), "and the message says where real work belongs, naming the tool as everywhere else", toastText());
+          ok(/tour's window/.test(toastText()) && /use the Report Review Tool for real work/.test(toastText()), "and the message says where real work belongs, naming the tool as everywhere else", toastText());
           R.addComment({ severity: "suggestion", anchor: GEN, text: "Real in the tour." });
           R.writeAutosave();
           ok(storedTexts().indexOf("Real in the tour.") !== -1 && dirtySent[dirtySent.length - 1] === true, "it gets the crash net, and its unsaved work is reported");

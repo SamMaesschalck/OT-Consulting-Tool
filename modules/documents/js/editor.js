@@ -612,7 +612,7 @@
     // stays as it is, and says why, sooner than lose the footnote unseen.
     if (kind === "prompt" && hits.some(function (f) { return hasFootnote(f.block); })) {
       hits = hits.filter(function (f) { return !hasFootnote(f.block); });
-      toast("A prompt is plain text and cannot hold a footnote. Remove the footnote first.");
+      toast("A prompt cannot hold a footnote. Remove the footnote first.");
     }
     if (!hits.length) return;
     if ((kind === "bullet" || kind === "number") && hits.every(function (f) { return kindOf(f.block) === kind; })) kind = "paragraph";
@@ -1290,7 +1290,7 @@
     ["bold", "B", "Bold (Ctrl+B)", "b"], ["italic", "I", "Italic (Ctrl+I)", "i"], ["underline", "U", "Underline (Ctrl+U)", "u"],
     ["strike", "S", "Strikethrough (Ctrl+Shift+X)", "s"], ["superscript", "x²", "Superscript (Ctrl+.)", "sup"],
     ["subscript", "x₂", "Subscript (Ctrl+,)", "sub"], ["code", "Code", "Fixed-width text", "code"],
-    ["red", "Red", "Red prompt text: something still to complete (Ctrl+Space clears it)", "red"],
+    ["red", "Red", "Mark as still to complete (Ctrl+Space clears it)", "red"],
     ["link", "Link", "Link (Ctrl+K)"], ["footnote", "Footnote", "Add a footnote"], null,
     ["bullet", "Bullets", "Bulleted list (Ctrl+Shift+8)"], ["number", "Numbers", "Numbered list (Ctrl+Shift+7)"],
     ["indent", "Indent", "Indent the list item (Tab)"], ["outdent", "Outdent", "Outdent the list item (Shift+Tab)"], null,
@@ -1451,7 +1451,7 @@
     return [
       ctxButton("Move up", "Move up (Alt+Shift+Up)", function () { move(-1); }),
       ctxButton("Move down", "Move down (Alt+Shift+Down)", function () { move(1); }),
-      ctxButton("Duplicate", "Make a copy after it", duplicate),
+      ctxButton("Duplicate", "Copy it below", duplicate),
       ctxButton("Paragraph after", "Add a paragraph after it", function () { paragraphAfter(); }),
       ctxButton("Delete", "Delete what is selected", deleteSelected, { danger: true })
     ];
@@ -1478,7 +1478,7 @@
     var id = block.id;
     return h("div", { class: "tb-group", role: "group", "aria-label": "Drawing kept from Word" }, alignButtons(block, "center").concat([
       ctxButton("Caption", "Add or edit the caption", function () { addCaption(id); }),
-      ctxButton("Replace with a picture", "Put a picture in its place. Undo brings the drawing back.", function () { pickFile(function (file) { replaceWithFile(id, file); }); })
+      ctxButton("Replace with a picture", "Put a picture in its place", function () { pickFile(function (file) { replaceWithFile(id, file); }); })
     ]).concat(blockButtons()));
   }
   function refreshContext(force) {

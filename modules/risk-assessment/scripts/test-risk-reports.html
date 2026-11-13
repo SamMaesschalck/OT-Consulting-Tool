@@ -104,16 +104,16 @@
     ok(text.indexOf("Where to focus first") !== -1, "scorecard page: focus cards");
     ok(text.indexOf("Executive summary") !== -1 && text.indexOf("9 threats were registered") !== -1, "exec summary composed from the data (9 threats)");
     ok(text.indexOf("Why this assessment") !== -1 && text.indexOf("What this report is") !== -1 && text.indexOf("What we found") !== -1 && text.indexOf("What happens next") !== -1, "exec summary has the why/what/found/next structure");
-    ok(text.indexOf("essential functions this assessment protects") !== -1 && text.indexOf("assumed adversary of SL3 grade") !== -1, "exec summary states the operational stakes and adversary assumption from the SRS");
-    ok(text.indexOf("The findings rest on the evidence gathered during the engagement") !== -1 && text.indexOf("4 interviews") !== -1, "exec summary cites the evidence base (basis of assessment)");
-    ok(text.indexOf("record and decision instrument") !== -1 && text.indexOf("Three artefacts leave this engagement") !== -1, "exec summary explains what the report is and the Word/Excel/export trio");
-    ok(text.indexOf("This assessment is a snapshot") !== -1, "exec summary sets the revisit expectation");
+    ok(text.indexOf("essential functions in scope are") !== -1 && text.indexOf("assumed adversary is SL3 grade") !== -1, "exec summary states the operational stakes and adversary assumption from the SRS");
+    ok(text.indexOf("The findings are based on") !== -1 && text.indexOf("4 interviews") !== -1, "exec summary cites the evidence base (basis of assessment)");
+    ok(text.indexOf("The assessment follows IEC 62443-3-2.") !== -1 && text.indexOf("Three artefacts") === -1 && text.indexOf("this document") === -1, "exec summary says what the assessment did, without talking about the document itself");
+    ok(text.indexOf("Repeat this assessment after a significant change") !== -1, "exec summary sets the revisit expectation");
     ok(/exceed the tolerable risk of Medium/.test(text), "exec summary names the tolerable risk");
-    ok(/The exposure concentrates in Z\d/.test(text) && text.indexOf("The single highest unmitigated risk is") !== -1, "exec summary says where the risk concentrates and names the worst threat");
+    ok(/The most affected is Z\d/.test(text) && text.indexOf("The highest unmitigated risk is") !== -1, "exec summary says where the risk concentrates and names the worst threat");
     ok(/1 formally accepted by the asset owner/.test(text), "disposition tally includes the recorded acceptance");
     ok(/Accepted risk T8 \(Z4\): /.test(text) && text.indexOf("revisited at the next assessment") !== -1, "the accepted risk is named in the summary");
     ok(text.indexOf("no disposition yet") === -1, "fully-dispositioned demo raises no undispositioned warning");
-    ok(/ceiling is set by/.test(text) && text.indexOf("risk-context export feeds directly") !== -1, "SL-T outcome paragraph names the ceiling driver and the 3-3 handoff");
+    ok(/ceiling is set by/.test(text) && text.indexOf("IEC 62443-3-3 assessment against these targets") !== -1, "SL-T outcome paragraph names the ceiling driver and the 3-3 handoff");
     ok(text.indexOf("Delete this note.") !== -1, "red consultant tailor-me note present");
     ok(text.indexOf("High-level risk ranking (§4.2)") !== -1 && text.indexOf("Laboratory information system link") !== -1, "§4.2 ranking table present with all systems");
     ok(text.indexOf("Z2: Safety Instrumented System") !== -1 && text.indexOf("T4") !== -1, "zone threat registers present");
@@ -134,7 +134,7 @@
     ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking (§4.2)") !== -1, "high-level variant builds with the ranking");
     ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked (§4.2)") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
     ok(hlText.indexOf("candidates for detailed, per-system assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the High+ candidates and carries the tailor-me note");
-    ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("triage question is what this high-level assessment answers") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
+    ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("which justify a full, per-system assessment") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
     ok(hlText.indexOf("Target security levels") === -1 && hlText.indexOf("Zones, conduits and the detailed") === -1, "high-level variant omits the detailed tier");
     ok(hlText.indexOf("Sign-off") !== -1, "high-level variant still carries sign-off");
     w.docx = realDocx;
@@ -143,6 +143,18 @@
     var realDoc = RX.buildWordDoc(p, {});
     var packPromise = w.docx.Packer.toBlob(realDoc).then(function (blob) {
       ok(blob && blob.size > 5000, "real docx lib packs the report to a non-trivial blob", blob && ("size " + blob.size));
+      return w.App.DocxBlocks.unzip(blob);
+    }).then(function (parts) {
+      var xml = new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
+      var zonesAt = xml.indexOf("Zones, conduits and the detailed risk assessment"), mapAt = xml.indexOf("name=\"zone-map\"");
+      var firstZone = xml.indexOf(p.zones[0].id + ": ", zonesAt);
+      ok(zonesAt > 0 && mapAt > zonesAt && mapAt < firstZone, "the zone and conduit drawing is in the report, at the top of the zones section", zonesAt + " / " + mapAt + " / " + firstZone);
+      var pngs = parts.filter(function (x) { return /^word\/media\//.test(x.name) && x.bytes[0] === 0x89 && x.bytes[1] === 0x50; });
+      ok(pngs.some(function (x) { return x.bytes.length > 8000; }), "and it is a real picture", pngs.map(function (x) { return x.name + " " + x.bytes.length; }).join(", "));
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, { highLevelOnly: true })).then(function (b) { return w.App.DocxBlocks.unzip(b); }).then(function (hp) {
+        var hx = new w.TextDecoder().decode(hp.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
+        ok(hx.indexOf("zone-map") === -1, "the high-level report has no drawing");
+      });
     });
 
     // ---- Excel via the real ExcelJS ----
@@ -178,7 +190,7 @@
     var emptyP = RT.state.project;
     w.docx = mockDocx();
     var emptyDoc = RX.buildWordDoc(emptyP, {});
-    ok(!!emptyDoc && docText(emptyDoc).indexOf("not yet been signed off") !== -1, "Word builder handles an empty project");
+    ok(!!emptyDoc && docText(emptyDoc).indexOf("not yet signed off") !== -1, "Word builder handles an empty project");
     w.docx = realDocx;
     var emptyWb = RX.buildWorkbook(emptyP);
     ok(emptyWb.worksheets.length === 8, "Excel builder handles an empty project");

@@ -150,7 +150,7 @@
       h("summary", { text: "Add a note for the reviewers (optional)" }),
       h("label", { class: "rv-req-label" }, ["Note to reviewers", noteBox]),
       h("label", { class: "rv-req-label" }, ["Needed by", dueBox]),
-      h("p", { class: "muted rv-req-hint", text: "Both go in the next pack you send. The reviewers see them in the review tool; they never reach the report." })
+      h("p", { class: "muted rv-req-hint", text: "Reviewers see both in the next pack. Neither goes in the report." })
     ]);
     if (ui.request.open || ui.request.note || ui.request.neededBy) reqBox.open = true;
     reqBox.addEventListener("toggle", function () { ui.request.open = reqBox.open; });
@@ -165,7 +165,7 @@
     // ---- where it stands ----------------------------------------------------
     var last = RC().lastRound(store);
     if (!last) {
-      container.appendChild(h("p", { class: "muted rv-empty", text: "Nothing has been sent yet. Send for review writes a pack: give it to each reviewer by shared folder or email, and keep it as carefully as the project file: it holds client data." }));
+      container.appendChild(h("p", { class: "muted rv-empty", text: "Nothing has been sent yet. Send for review saves a pack to give each reviewer. It holds client data, so treat it like the project file." }));
       return;
     }
     var fileRows = store.files.slice().sort(function (a, b) { return b.round - a.round || String(a.reviewer).localeCompare(b.reviewer); });
@@ -187,7 +187,7 @@
           // another name: their verdict stops counting, their comments stay.
           h("button", { type: "button", class: "btn sm rv-aside", text: f.setAside ? "Count this review again" : "Set aside this review",
             title: f.setAside ? "This review counts towards the warnings again."
-              : "This review no longer counts towards the warnings. Its comments stay, and you can count it again at any time.",
+              : "This review no longer counts towards the warnings. You can count it again at any time.",
             onClick: function () { RC().setAside(store, f.fileId, !f.setAside); adapter.touch(); repaint(); } })
         ];
         if (f.verdict && f.verdict.note) kids.push(h("div", { class: "rv-note", text: f.verdict.note }));
@@ -553,7 +553,7 @@
     var canUndo = !!(t.accepted && typeof t.accepted === "object" && t.accepted.revert && adapter.undoAccept);
     if (canUndo) {
       actions.push(h("button", { type: "button", class: "btn sm rv-undo", text: "Undo the accepted wording",
-        title: "Puts back the text the accepted wording replaced, and opens the comment again", onClick: function () {
+        title: "Undo the accepted wording and reopen the comment", onClick: function () {
           ui.busy = "Putting the earlier wording back…"; repaint();
           adapter.undoAccept(t, function (res) {
             ui.busy = null;

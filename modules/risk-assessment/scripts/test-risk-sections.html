@@ -280,7 +280,7 @@
         ok(/Consultant note: tailor this summary/.test(box.value), "the red consultant note is in the box, to be deleted there");
         ok(!/signed off/.test(box.value), "the sign-off statement is not");
         ok(cardOwn("what-happens-next", "p.rp-p").some(function (p) { return /signed off/.test(p.textContent); }), "it stays on the page beside the box");
-        return type(box, box.value.replace(/^The output/, "An edited output"));
+        return type(box, box.value.replace(/^The highest target/, "An edited target"));
       }).then(function () {
         return wordBlocks({});
       }).then(function (bl) {
@@ -315,7 +315,7 @@
         ok(zones.every(function (o) { return c.textContent.indexOf(o.justification.trim().slice(0, 60)) !== -1; }), "showing each one's own wording");
         edit(key);
         ok(!cardOwn(key, ".sect-prose-input").length, "a rewrite is not offered");
-        ok(cardOwn(key, "[data-no-rewrite]").length === 1 && /has its own wording here, so a rewrite in one box would replace all of them/.test(cardOwn(key, "[data-no-rewrite]")[0].textContent), "saying why on screen");
+        ok(cardOwn(key, "[data-no-rewrite]").length === 1 && /has its own wording here\. Change it on the SL-T assignment page/.test(cardOwn(key, "[data-no-rewrite]")[0].textContent), "saying why on screen");
         return type(cardOwn(key, ".sect-title-input")[0], "SL-T rationale for");
       }).then(function () {
         return wordBlocks({});
@@ -343,7 +343,7 @@
         ok(heads.length === P().zones.length + P().conduits.length, "each zone's register heading is in its parent section (" + heads.length + ")");
         ok(heads.every(function (h) { return h.querySelector("button") === null; }), "as a name, with no Edit of its own");
         edit("zones-conduits-and-the-detailed-risk-assessment");
-        ok(/names of the zones and conduits/.test(cardOwn("zones-conduits-and-the-detailed-risk-assessment", ".sect-note").map(function (x) { return x.textContent; }).join(" ")), "and the parent says where to rename them");
+        ok(/Rename the zones and conduits below on the Zones & conduits page/.test(cardOwn("zones-conduits-and-the-detailed-risk-assessment", ".sect-note").map(function (x) { return x.textContent; }).join(" ")), "and the parent says where to rename them");
         // Keys do not move when a zone is named like a fixed heading.
         ok(RS.sectionKey("Justification for Z1 Unit 300 BPCS", ["Z1 Unit 300 BPCS"]) === "justification-for", "the key strips the zone's name");
         var saved = P().zones[0].name;

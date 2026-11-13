@@ -146,9 +146,9 @@
 
   // ---------- welcome ----------
   function welcome(main) {
-    head(main, "Documents", "Write a document in the SolutionsPT template, or load a Word file to have it rebuilt in the template with its pictures and drawings kept.");
+    head(main, "Documents", "Write a document in the SolutionsPT template, or rebuild a Word file in it.");
     main.appendChild(h("div", { class: "dp-start", id: "dp-start" }, [
-      h("p", { text: "You can also drop a document file or a Word file anywhere on this page." }),
+      h("p", { text: "You can also drop a file on this page." }),
       btn("New document", "primary", function () {
         D().setDoc(M().create("report"), { from: "new" });
       }, "dp-new"),
@@ -161,11 +161,11 @@
       btn("Try the demo", "", openDemo, "dp-demo")
     ]));
     main.appendChild(card("How it works", null, [h("ol", { class: "dp-steps" }, [
-      h("li", { text: "Fill in Document information: the title, the client and who it is issued to. The cover and the document control page are made from it." }),
-      h("li", { text: "Write on the Edit page: headings, paragraphs, lists, tables, pictures and red prompts for anything still to complete." }),
-      h("li", { text: "Or load a Word file. Its text is rebuilt in the template, its pictures and drawings are kept, and anything that could not be carried over is listed." }),
-      h("li", { text: "On Issue and export, check what is still to complete and export a Word file as a draft or a final." }),
-      h("li", { text: "Save keeps your work in a document file. It holds client data: handle it as you would the document itself." })
+      h("li", { text: "Fill in Document information for the cover and document control." }),
+      h("li", { text: "Write on the Edit page. Mark anything still to complete in red." }),
+      h("li", { text: "Or load a Word file to rebuild it in the template." }),
+      h("li", { text: "Export a draft or final Word file from Issue and export." }),
+      h("li", { text: "Save writes your work to a document file. It holds client data." })
     ])]));
   }
 
@@ -197,19 +197,19 @@
   // What each field's hint says depends on the kind: a short document has no
   // cover and no document control page, and prints only the title, one line
   // of client, revision and date under it, and the footer (design, section 2).
-  var NOT_SHORT = "Not printed in a short document. Kept in case you change its kind.";
+  var NOT_SHORT = "Not printed in a short document.";
   var HINTS = {
     report: {
-      title: "Needed before the document can be issued as Final.",
+      title: "Needed to issue as Final.",
       docType: "Printed in capitals at the top of the cover.",
-      reference: "A document or opportunity reference, when there is one.",
+      reference: "A document or opportunity reference.",
       revision: "Printed on the cover and in document control.",
       date: "Printed on the cover until an issued date is set.",
-      issuedDate: "Printed in document control and, once set, on the cover in place of the date.",
+      issuedDate: "Printed in document control, and on the cover in place of the date.",
       classification: "Printed on the cover, in the footer and as Confidentiality in document control."
     },
     short: {
-      title: "Needed before the document can be issued as Final.",
+      title: "Needed to issue as Final.",
       docType: NOT_SHORT,
       reference: NOT_SHORT,
       client: "Printed under the title and in the footer.",
@@ -222,12 +222,12 @@
     }
   };
   var LEADS = {
-    report: "The cover, the document control page and the footer are filled in from these fields. Changes are kept as you type.",
-    short: "The title, the line under it and the footer are filled in from these fields. Changes are kept as you type."
+    report: "These fill in the cover, document control page and footer.",
+    short: "These fill in the title, the line under it and the footer."
   };
   var KIND_TEXT = {
-    report: ["Report", "A cover and a document control page, then the body. For proposals, method statements, reports and procedures."],
-    short: ["Short document", "No cover. The title, then the body. For notes, letters and documents of a few pages."]
+    report: ["Report", "Cover and document control page, then the body."],
+    short: ["Short document", "No cover: the title, then the body."]
   };
 
   function info(main, arg) {
@@ -295,7 +295,7 @@
     on(lines, "input", commitLines); on(lines, "change", commitLines);
     var linesField = d.kind === "report" ? h("div", { class: "field dp-wide" }, [
       h("label", { for: "info-coverTitleLines", text: "Title lines on the cover" }), lines,
-      h("div", { class: "hint", text: "Leave empty to split the title over two lines automatically, or type up to three lines to choose the breaks yourself." })
+      h("div", { class: "hint", text: "Leave empty to split the title automatically, or type up to three lines." })
     ]) : null;
 
     main.appendChild(card("Document", null, [h("div", { class: "dp-info" }, [
@@ -319,11 +319,11 @@
     }
     var isShort = d.kind === "short";
     main.appendChild(card("Document control", null, [
-      isShort ? h("p", { class: "muted", id: "dp-control-note", text: "A short document prints no document control page. These are kept in case you change its kind. The issued date is the exception: when set, it is printed under the title." }) : null,
+      isShort ? h("p", { class: "muted", id: "dp-control-note", text: "A short document prints no document control page. If set, the issued date replaces the date under the title." }) : null,
       h("div", { class: "grid-2" }, [field("qaReviewBy"), field("authorisedBy"), field("issuedTo"), field("issuedDate"), field("classification")]),
       h("div", { class: "dp-options" }, [
-        option("numberHeadings", "Number the headings.", "1, 1.1 and 1.1.1 are printed before the headings."),
-        option("contents", "Add a contents list.", isShort ? "For a report only." : "A list of the level 1 and 2 headings after document control, each a link. It has no page numbers.", isShort)
+        option("numberHeadings", "Number the headings.", "As 1, 1.1 and 1.1.1."),
+        option("contents", "Add a contents list.", isShort ? "For a report only." : "Level 1 and 2 headings, without page numbers.", isShort)
       ])
     ], "dp-card-control"));
 
@@ -383,9 +383,9 @@
     var size = M().sizeOf(d) || 0, L = M().LIMITS;
     var name = A.DocStorage && A.DocStorage.currentName ? A.DocStorage.currentName() : "";
     return card("File", null, [
-      h("p", { id: "dp-file-name", text: name ? "Save writes to " + name + "." : "Save will ask where to keep the document file." }),
+      h("p", { id: "dp-file-name", text: name ? "Save writes to " + name + "." : "Save will ask where to keep the file." }),
       h("p", { id: "dp-file-size", text: "Pictures and kept content: " + bytesText(size) + "." }),
-      size > L.warnBytes ? h("p", { class: "dp-warn", id: "dp-file-warn", text: "This is over " + mb(L.warnBytes) + ". The file still saves, but saving and opening will be slow. Nothing more can be added past " + mb(L.refuseBytes) + "." }) : null
+      size > L.warnBytes ? h("p", { class: "dp-warn", id: "dp-file-warn", text: "This is over " + mb(L.warnBytes) + ". It still saves, but slowly. Nothing more can be added past " + mb(L.refuseBytes) + "." }) : null
     ], "dp-card-file");
   }
 
@@ -399,7 +399,7 @@
     var d = doc();
     if (!d) { welcome(main); return; }
     head(main, "Preview");
-    main.appendChild(h("p", { class: "dp-note", id: "dp-preview-note", text: "Word decides where the pages break. Drawings kept from an imported file show as placeholders here and print in the Word export as they were." }));
+    main.appendChild(h("p", { class: "dp-note", id: "dp-preview-note", text: "Word decides the page breaks. Drawings from an imported file show here as placeholders." }));
     var paper = h("div", { class: "dp-preview", id: "dp-preview" });
     main.appendChild(paper);
 
@@ -476,7 +476,7 @@
   function issue(main) {
     var d = doc();
     if (!d) { welcome(main); return; }
-    head(main, "Issue and export", "Check what is still to complete, then export the Word file as a draft or a final.");
+    head(main, "Issue and export", "Check what is still to complete, then export.");
     var seq = ++issueSeq;
 
     var todo = h("div", { id: "dp-todo", "aria-live": "polite" }, [h("p", { class: "muted", text: "Checking the document..." })]);
@@ -515,8 +515,8 @@
       nameLine.textContent = "The file will be called " + A.DocExport.filename(d, s) + ".";
     }
     var radios = h("fieldset", { class: "dp-kinds", id: "dp-status" }, [h("legend", { text: "Export as" })]);
-    [["draft", "Draft", "Has a Draft watermark and Status Draft. Anything still to complete prints red."],
-     ["final", "Final", "Has Status Final, opens read-only and is marked as final. Not available while anything is still to complete."]
+    [["draft", "Draft", "Draft watermark. Anything still to complete prints red."],
+     ["final", "Final", "Opens read-only, marked as final. Needs nothing left to complete."]
     ].forEach(function (o) {
       var radio = h("input", { type: "radio", name: "dp-status", id: "dp-status-" + o[0], value: o[0] });
       radio.checked = st === o[0];
@@ -535,7 +535,7 @@
       if (!list.length) {
         todo.appendChild(h("p", { id: "dp-todo-none", text: "Nothing is outstanding." }));
       } else {
-        todo.appendChild(h("p", { class: "muted", id: "dp-todo-count", text: plural(list.length, "thing", "things") + " still to complete. Each prints red in a draft, and Final is refused until none is left." }));
+        todo.appendChild(h("p", { class: "muted", id: "dp-todo-count", text: plural(list.length, "thing", "things") + " still to complete. Final is refused until none is left." }));
         todo.appendChild(h("ul", { class: "dp-list", id: "dp-todo-list" }, list.map(function (p) {
           var where = p.where || {};
           var run = where.kind === "info" ? function () { D().go("info", { field: where.field }); }
@@ -621,7 +621,7 @@
   function frontCard(d, main, fr) {
     var kept = frontKept(d, fr), kids = [];
     if (!kept) {
-      kids.push(h("p", { class: "dp-entry-t", text: "The original's cover and document control page were taken out. The current template prints its own in their place, filled in from what they said, so a later change to the template reaches this document too." }));
+      kids.push(h("p", { class: "dp-entry-t", text: "The original's cover and document control page were replaced by the template's, filled in from them." }));
       if ((fr.fields || []).length) {
         kids.push(h("p", { class: "muted dp-entry-said", text: "Filled in under Document information:" }));
         kids.push(h("ul", { class: "dp-quotes", id: "dp-front-fields" }, fr.fields.map(function (p) {
@@ -629,26 +629,26 @@
         })));
       }
       if ((fr.unused || []).length) {
-        kids.push(h("p", { class: "muted dp-entry-said", text: "Not used, because Document information has no field for them:" }));
+        kids.push(h("p", { class: "muted dp-entry-said", text: "Not used (no matching field):" }));
         kids.push(h("ul", { class: "dp-quotes", id: "dp-front-unused" }, fr.unused.map(function (p) { return h("li", { text: p[0] + ": " + p[1] }); })));
       }
-      if (fr.contents) kids.push(h("p", { text: "Its contents list was taken out too. A contents list is switched on in its place." }));
+      if (fr.contents) kids.push(h("p", { text: "Its contents list was replaced too." }));
       kids.push(h("div", { class: "btn-row" }, [
         btn("Keep the original pages instead", "small", function () {
           var n = keepFront(d, fr);
-          if (n) D().toast("The original pages are back at the start of the document. Undo on the Edit page takes them out again.");
+          if (n) D().toast("The original pages are back. Undo on the Edit page removes them.");
           redraw(main, report);
         }, "dp-front-keep"),
         btn("Go to Document information", "small", function () { D().go("info"); }, "dp-front-info")
       ]));
     } else {
-      kids.push(h("p", { class: "dp-entry-t", text: "The original's cover and document control page are back at the start of the document, as they were brought in. The template still prints its own cover and document control page before them." }));
+      kids.push(h("p", { class: "dp-entry-t", text: "The original's cover and document control page are back at the start, after the template's own." }));
       var ids = fr.blocks.map(function (b) { return b.id; }).filter(function (id) { return exists(d, id); });
       kids.push(h("div", { class: "btn-row" }, [
         rowBtn("Show", "the original cover and document control", function () { D().go("edit", ids.length === 1 ? { blockId: ids[0] } : { blockIds: ids }); }),
         btn("Use the current template's pages", "small", function () {
           var n = useTemplateFront(d, fr);
-          if (n) D().toast("The original pages were taken out again. Undo on the Edit page brings them back.");
+          if (n) D().toast("The original pages were removed. Undo on the Edit page brings them back.");
           redraw(main, report);
         }, "dp-front-use")
       ]));
@@ -677,13 +677,13 @@
     if (b.type === "kept") {
       title = "Drawing " + it.kept + " of " + total;
       lines.push(b.description || [KEPT_NAMES[b.kind] || KEPT_NAMES.other, sizeText(b)].filter(Boolean).join(", "));
-      if (b.kind === "ole") lines.push("An embedded file, kept as it was without being opened or checked.");
-      if (b.floating) lines.push("It floats beside the text, where the original put it.");
+      if (b.kind === "ole") lines.push("An embedded file, kept unopened.");
+      if (b.floating) lines.push("Floats beside the text.");
     } else {
       title = "Picture";
       var m = it.media, type = m && m.type ? String(m.type).replace(/^image\/(x-)?/, "").toUpperCase() : "";
       if (!m || m.missing) lines.push("It could not be restored.");
-      else lines.push([type + " picture", sizeText(b), m.name].filter(Boolean).join(", ") + ". Shown as a placeholder here. It prints in the Word file.");
+      else lines.push([type + " picture", sizeText(b), m.name].filter(Boolean).join(", ") + ". Shown as a placeholder.");
     }
     if (b.label) lines.push("Named in the Word file: " + b.label);
     if (b.text) lines.push("Text inside it: " + String(b.text).slice(0, 160));
@@ -701,11 +701,11 @@
     var rep = d.importReport;
     if (!rep) {
       head(main, "Import report");
-      main.appendChild(h("p", { id: "dp-report-none", text: "This document was not brought in from a Word file, so there is nothing to report." }));
+      main.appendChild(h("p", { id: "dp-report-none", text: "This document was not imported from Word." }));
       return;
     }
     var src = rep.source || {};
-    head(main, "Import report", src.name ? "What happened to " + src.name + " when it was rebuilt in the template." : "What happened to the Word file when it was rebuilt in the template.");
+    head(main, "Import report", src.name ? "What changed when " + src.name + " was rebuilt in the template." : "What changed when the Word file was rebuilt in the template.");
     main.appendChild(h("p", { class: "dp-summary", id: "dp-report-summary", text: A.DocImportFlow.summary(rep) }));
     main.appendChild(h("div", { class: "btn-row dp-report-go" }, [
       btn("Go to the document", "primary", function () { D().go("edit"); }, "dp-report-edit"),
@@ -766,10 +766,10 @@
 
     var list = drawings(d);
     main.appendChild(card("Pictures and drawings", null, list.length ? [
-      h("p", { id: "dp-drawings-note", text: "Drawings kept from the Word file cannot be shown here. Export a draft and open it in Word to see them." }),
+      h("p", { id: "dp-drawings-note", text: "Drawings from the Word file show only in Word." }),
       h("div", { class: "btn-row" }, [btn("Export a draft to check in Word", "", function () { A.DocExport.word("draft"); }, "dp-report-draft")]),
       h("ul", { class: "dp-entries", id: "dp-drawings" }, list.map(function (it) { return drawingRow(d, it, list.keptTotal); }))
-    ] : [h("p", { class: "muted", id: "dp-drawings-none", text: "There are no drawings kept from the Word file, and every picture shows on the Edit page." })], "dp-card-drawings"));
+    ] : [h("p", { class: "muted", id: "dp-drawings-none", text: "Nothing here needs checking in Word." })], "dp-card-drawings"));
   }
 
   // ---------- about ----------
@@ -778,30 +778,30 @@
   // The editor's keys, for the reader. Keep it in step with the keyboard map
   // in editor.js.
   var KEYS = [
-    ["Enter", "Starts a new block. After a heading, the new block is a paragraph. In an empty list item, leaves the list."],
-    ["Shift+Enter", "Adds a line break inside the block."],
+    ["Enter", "New block. In an empty list item, leaves the list."],
+    ["Shift+Enter", "Line break."],
     ["Ctrl+B, Ctrl+I, Ctrl+U", "Bold, italic, underline."],
     ["Ctrl+Shift+X", "Strikethrough."],
     ["Ctrl+. and Ctrl+,", "Superscript and subscript."],
-    ["Ctrl+Space", "Clears red from the selection."],
-    ["Ctrl+K", "Adds a link (http, https or mailto)."],
+    ["Ctrl+Space", "Clears red."],
+    ["Ctrl+K", "Link."],
     ["Ctrl+Alt+1, 2, 3 and Ctrl+Alt+0", "Heading 1, 2, 3 and paragraph."],
     ["Ctrl+Shift+8 and Ctrl+Shift+7", "Bulleted list and numbered list."],
-    ["Tab and Shift+Tab", "In a list, indent and outdent. In a table, the next and the previous cell. Elsewhere in the text they do nothing: press Escape, then Tab, to leave the page."],
-    ["Ctrl+Enter", "Adds a page break after the block."],
-    ["Alt+Shift+Up and Down", "Moves the block, or the selected blocks, up or down."],
+    ["Tab and Shift+Tab", "Indent and outdent in a list; next and previous cell in a table. To leave the page, press Escape, then Tab."],
+    ["Ctrl+Enter", "Page break."],
+    ["Alt+Shift+Up and Down", "Moves the selected blocks."],
     ["Ctrl+Z, Ctrl+Y", "Undo and redo."],
-    ["Ctrl+A", "Selects the text in the block. Press again to select every block."],
-    ["Escape", "Moves from the text to the block, then from the block to its section in the outline."],
+    ["Ctrl+A", "Selects the block's text, then every block."],
+    ["Escape", "Steps out from the text to the block, then to the outline."],
     ["F6", "Moves between the sidebar, the toolbar and the page."],
-    ["Ctrl+F", "Opens the browser's own find, which searches the whole document."]
+    ["Ctrl+F", "Find."]
   ];
   function about(main) {
     var V = A.Version || {};
     head(main, "About");
     main.appendChild(card((V.product || (A.Product && A.Product.name) || "") + " " + (V.label || ""), V.number ? "version " + V.number : null, [
-      h("p", { text: "It works offline and needs no server. Your document file holds the document, its pictures and anything kept from an imported Word file, so handle it as you would the document itself." }),
-      h("p", { text: "It reads and writes " + M().SCHEMA + ", reads Word files (.docx) and writes Word files in the SolutionsPT template." })
+      h("p", { text: "Works offline. Your document file holds client data." }),
+      h("p", { text: "Opens " + M().SCHEMA + " document files and Word files (.docx). Exports Word files in the SolutionsPT template." })
     ], "dp-card-about"));
     var keys = [];
     KEYS.forEach(function (k) { keys.push(h("dt", { text: k[0] }), h("dd", { text: k[1] })); });

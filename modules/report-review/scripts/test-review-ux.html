@@ -197,7 +197,7 @@
       type(w, d.querySelector(".rr-c-text"), "Not yet added.");
       return new Promise(function (res) { R.saveReview(null, res); });
     }).then(function () {
-      ok(/still writing is not in it/.test(txt(w, "#toast")), "saving with a comment still open says it is not in the file", txt(w, "#toast"));
+      ok(/unfinished comment is not in it/.test(txt(w, "#toast")), "saving with a comment still open says it is not in the file", txt(w, "#toast"));
       d.querySelector(".rr-c-cancel").click();
     });
   }).then(function () {

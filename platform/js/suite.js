@@ -296,8 +296,7 @@
       h("div", { class: "modal", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "close-h", "aria-describedby": "close-b" }, [
         h("div", { class: "modal-h" }, [h("h2", { id: "close-h", text: "Close the " + name + "?" })]),
         h("div", { class: "modal-b", id: "close-b" }, [
-          h("p", { text: "It has unsaved changes. If you close it, they are lost." }),
-          h("p", { class: "muted", text: "To keep them, choose Cancel and save in the tool first." })
+          h("p", { text: "It has unsaved changes, which closing it loses. To keep them, cancel and save in the tool first." })
         ]),
         h("div", { class: "modal-f" }, [close, cancel])
       ])
@@ -438,7 +437,7 @@
     if (/^spt-review\//.test(s)) return { module: "report-review", what: "review file" };
     if (/^spt-risk-project\//.test(s)) return { module: "risk-assessment", what: "project file" };
     if (/^spt-risk-context\//.test(s)) return { module: null, what: "risk context file",
-      hint: "Open or start an IEC 62443-3-3 assessment in the OT Cyber Assessment Tool and use Import risk context on the Target SL card of its Engagement details page." };
+      hint: "In a 62443-3-3 assessment, use Import risk context on the Engagement details page." };
     // Before the line below: a file with no schema string and a schemaVersion
     // is taken for an assessment project, so the document file always says
     // what it is.
@@ -932,8 +931,7 @@
     }
     return h("span", null, [
       input,
-      h("button", { type: "button", class: "btn small recent-pick", title: "Open a project file, document file, review pack or review file in the tool that reads it",
-        onClick: pick }, [icon("folder"), "Open a file"])
+      h("button", { type: "button", class: "btn small recent-pick", onClick: pick }, [icon("folder"), "Open a file"])
     ]);
   }
 
@@ -943,8 +941,8 @@
     if (!list.length) {
       body = h("div", { class: "recent-empty" }, [
         icon("drop"),
-        h("p", { text: "Project files, document files, review packs and review files you open or save in a tool appear here." }),
-        h("p", { text: "Drop one anywhere in the suite and it opens in the right tool." })
+        h("p", { text: "Files you open or save in a tool appear here." }),
+        h("p", { text: "Drop a file anywhere in the suite to open it." })
       ]);
     } else {
       body = h("ul", { class: "recent-list" }, list.map(function (e) {
@@ -977,9 +975,7 @@
         ])
       ]),
       body,
-      h("div", { class: "recent-foot", text: list.length
-        ? "The list keeps only each file's name, its customer, system or document title and the time. Picking one switches to its tool, which offers to reopen the file if the browser still has access to it, or shows where to load it from."
-        : "The list keeps only each file's name, its customer, system or document title and the time." })
+      list.length ? h("div", { class: "recent-foot", text: "Pick a file to open it again." }) : null
     ]);
   }
 
@@ -1002,28 +998,28 @@
     }
     var flow = [];
     if (risk) {
-      flow.push(step(risk, "Zones and conduits, and a target security level for each."));
-      if (assess) flow.push(link("down", "Risk context file", "Imported into an IEC 62443-3-3 assessment with Import risk context, on its Engagement details page."));
+      flow.push(step(risk, "Zones, conduits and their target security levels."));
+      if (assess) flow.push(link("down", "Risk context file", "Brought into a 62443-3-3 assessment with Import risk context."));
     }
-    if (assess) flow.push(step(assess, "Answers and evidence against the framework, then the Word report and Excel tracker."));
+    if (assess) flow.push(step(assess, "The assessment, its Word report and Excel tracker."));
     if (review && (risk || assess)) {
-      flow.push(link("down", "Review pack", risk && assess ? "Sent from either tool with Send for review." : "Sent with Send for review."));
-      flow.push(step(review, "A colleague comments on the report and the engagement behind it, and gives a verdict."));
-      flow.push(link("back", "Review file", "Goes back to the author, who brings the comments in with Import review files."));
+      flow.push(link("down", "Review pack", "Made with Send for review."));
+      flow.push(step(review, "A colleague comments and gives a verdict."));
+      flow.push(link("back", "Review file", "Sent back to the author, who uses Import review files."));
     }
-    if (docs) flow.push(step(docs, "Proposals, method statements and other documents in the SolutionsPT template, written here or brought in from a Word file. No files pass between it and the other tools.", true));
+    if (docs) flow.push(step(docs, "Proposals, method statements and other documents in the SolutionsPT template. No files pass between it and the other tools.", true));
     // Dropping files is said by the empty Recent files; once the list has
     // entries, this is the only place that says it.
     var tips = [];
-    if (readRecent().length) tips.push("Drop a project file, document file, review pack or review file anywhere in the suite and it opens in the right tool.");
-    tips.push("A tool you leave keeps your work until you close it or the suite. In the rail, a ring on a tool means it is open and a filled amber dot means it has unsaved changes. The suite asks before closing while any tool has them.");
-    tips.push("To close a tool, use the cross beside it in the rail or Close on its card. It opens fresh the next time.");
+    if (readRecent().length) tips.push("Drop a file anywhere in the suite to open it.");
+    tips.push("In the rail, a ring on a tool means it is open and a filled amber dot means it has unsaved changes.");
+    tips.push("Close a tool with its cross in the rail. It opens fresh the next time.");
     return h("section", { class: "card help-card", "aria-labelledby": "help-h" }, [
       h("div", { class: "card-h" }, [h("h2", { id: "help-h", text: "How the tools fit together" })]),
       h("div", { class: "card-b" }, [
         h("ol", { class: "flow" }, flow),
         h("ul", { class: "help-tips" }, tips.map(function (t) { return h("li", { text: t }); })),
-        BUNDLE ? null : h("p", { class: "help-dev muted small", text: "This is the developer copy of the suite, run from its folder. The browser does not let a tool save back into the same file here, so Save downloads a new copy each time." })
+        BUNDLE ? null : h("p", { class: "help-dev muted small", text: "Developer copy: Save downloads a new file each time." })
       ])
     ]);
   }

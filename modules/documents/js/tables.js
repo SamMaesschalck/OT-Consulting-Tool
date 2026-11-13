@@ -210,7 +210,7 @@
     ["colLeft", "Column left", "Add a column to the left of this one"],
     ["colRight", "Column right", "Add a column to the right of this one"],
     ["delCol", "Delete column", "Delete this column"],
-    ["header", "Header row", "Print the first row as a header row, repeated on each page"],
+    ["header", "Header row", "Repeat the first row on each page"],
     ["equal", "Equal widths", "Make every column the same width"],
     ["narrower", "Narrower", "Make this column narrower"],
     ["wider", "Wider", "Make this column wider"],
