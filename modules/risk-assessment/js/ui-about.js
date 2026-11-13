@@ -34,12 +34,15 @@
 
     main.appendChild(card("House risk matrix", "impact × likelihood → risk band", [
       (function () {
+        // The house criteria (criteriaOf with no project); a project's own
+        // are on step 1.
+        var hc = M.criteriaOf(null);
         var t = h("table", { class: "tbl" });
-        var head = h("tr", null, [h("th", { text: "Impact \\ Likelihood" })].concat(LIK.map(function (l) { return h("th", { text: l.name, class: "center" }); })));
+        var head = h("tr", null, [h("th", { text: "Impact \\ Likelihood" })].concat(hc.likelihood.map(function (l) { return h("th", { text: l.name, class: "center" }); })));
         t.appendChild(h("thead", null, [head]));
         var tb = h("tbody");
-        SEV.slice().reverse().forEach(function (sv) {
-          tb.appendChild(h("tr", null, [h("td", null, [h("strong", { text: sv.name })])].concat(LIK.map(function (l) { var b = RULES.riskMatrix[sv.id][l.id]; return h("td", { class: "center" }, [riskPill(b)]); }))));
+        hc.impact.slice().reverse().forEach(function (sv) {
+          tb.appendChild(h("tr", null, [h("td", null, [h("strong", { text: sv.name })])].concat(hc.likelihood.map(function (l) { var b = hc.matrix[sv.id][l.id]; return h("td", { class: "center" }, [riskPill(b)]); }))));
         });
         t.appendChild(tb);
         return t;

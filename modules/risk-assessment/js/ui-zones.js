@@ -5,7 +5,8 @@
  * zones and the conduits, and one selected zone or conduit in a detail panel:
  * its assets (pasted several at a time if wanted), its safety designation,
  * the separation rows the tool has raised for it (js/engine.js
- * separationRows) and, collapsed, its characteristics. Registers itself in
+ * separationRows), its drawing level and place in the band (phase 5b) and,
+ * collapsed, its characteristics. A remove offers Undo. Registers itself in
  * RiskApp.Pages; js/app.js goToItem selects the item an entry of the
  * completeness list names (RiskApp.ZonesPage.select) before drawing it.
  */
@@ -36,6 +37,11 @@
     return null;
   }
   function pick(kind, id) { select(kind, id); rerender(); }
+  // What an undo opens again (js/app.js offerUndo): the zone or conduit, with
+  // the keyboard on focusSel, else on its row's button in the table.
+  function backTo(kind, id, focusSel) {
+    return function () { select(kind, id); return focusSel || '[data-' + kind + '-row="' + id + '"] [data-action="pick-' + id + '"]'; };
+  }
 
   // Optional fields: written once set, gone again when cleared.
   function setText(o, k, v) { if (v) o[k] = v; else delete o[k]; touched(); }
@@ -136,8 +142,9 @@
         selectOf(a.link || "", LINK_OPTS, function (v) { if (v) a.link = v; else delete a.link; touched(); rerender(); }, { "aria-label": "Connection", class: "asset-link" }),
         h("button", { type: "button", class: "btn sm danger", "aria-label": "Remove " + (a.name || "asset " + (ai + 1)), text: "Remove", onClick: function () {
           if (!confirmRemove(!!a.name, "asset")) return;
-          z.assets.splice(ai, 1); R.Migrate.pruneDangling(state.project); touched(); rerender();
+          var mk = A.undoMark(); z.assets.splice(ai, 1); R.Migrate.pruneDangling(state.project); touched(); rerender();
           focusAsset(Math.min(ai, z.assets.length - 1));
+          A.offerUndo((a.name ? a.name : "Asset") + " removed.", backTo("zone", z.id, '[data-detail="zone"] [data-asset-name="' + ai + '"]'), mk);
         } })
       ]));
     });
@@ -155,13 +162,14 @@
         h("div", { class: "hint", text: "One per line. Optional tab-separated columns: type, connection." }),
         h("div", { class: "btn-row", style: "margin-top:6px" }, [
           h("button", { type: "button", class: "btn sm primary", "data-action": "paste-add", text: "Add", onClick: function () {
-            var list = E.parseAssets(sel.pasteText), first = z.assets.length;
+            var mk = A.undoMark(); var list = E.parseAssets(sel.pasteText), first = z.assets.length;
             list.forEach(function (a) { z.assets.push(M.newAsset(state.project, a)); });
             sel.paste = false; sel.pasteText = "";
             if (list.length) touched();
             rerender();
             if (list.length) focusAsset(first); else A.focusAfter('[data-detail="zone"] [data-action="paste-open"]');
-            toast((list.length ? list.length + " asset" + (list.length === 1 ? "" : "s") + " added" : "Nothing to add") + (list.headerSkipped ? ", header row skipped." : "."));
+            var said = (list.length ? list.length + " asset" + (list.length === 1 ? "" : "s") + " added" : "Nothing to add") + (list.headerSkipped ? ", header row skipped." : ".");
+            if (list.length) A.offerUndo(said, backTo("zone", z.id, '[data-detail="zone"] [data-action="paste-open"]'), mk); else toast(said);
           } }),
           h("button", { type: "button", class: "btn sm", "data-action": "paste-cancel", text: "Cancel", onClick: function () { sel.paste = false; sel.pasteText = ""; rerender(); A.focusAfter('[data-detail="zone"] [data-action="paste-open"]'); } })
         ])
@@ -207,6 +215,46 @@
     return det;
   }
 
+  // The zone's band on the drawing (phase 5b): a level of the house layering,
+  // and its place within the band, nudged left or right.
+  function levelField(p, z) {
+    var lv = M.zoneLevel(z);
+    var s = selectOf(lv || "", [{ value: "", text: "Not set" }].concat(M.ZONE_LEVELS.map(function (l) { return { value: l.id, text: l.name }; })), function (v) {
+      if (v) z.level = v; else delete z.level;
+      delete z.levelOrder;
+      touched(); rerender();
+    }, { "data-action": "zone-level" });
+    var kids = [U.labelFor("Drawing level", s), h("div", { class: "level-row" }, [s])];
+    if (lv) {
+      var band = window.RiskZoneMap.bandOrder(p, lv), at = band.indexOf(z);
+      if (band.length > 1) {
+        var row = kids[1];
+        row.appendChild(h("button", { type: "button", class: "btn sm", "data-action": "level-left", text: "← Move left", "aria-label": "Move " + z.id + " left in its band", disabled: at <= 0 ? "disabled" : null, onClick: function () { nudge(p, z, -1); } }));
+        row.appendChild(h("button", { type: "button", class: "btn sm", "data-action": "level-right", text: "Move right →", "aria-label": "Move " + z.id + " right in its band", disabled: at >= band.length - 1 ? "disabled" : null, onClick: function () { nudge(p, z, 1); } }));
+      }
+    }
+    kids.push(h("div", { class: "hint", text: "House layering; sets the zone's row on the drawing." }));
+    return h("div", { class: "field" }, kids);
+  }
+  // Swaps the zone with its neighbour in the band; the band's order is then
+  // written out for every zone in it.
+  function nudge(p, z, by) {
+    var band = window.RiskZoneMap.bandOrder(p, M.zoneLevel(z)), at = band.indexOf(z), to = at + by;
+    if (at < 0 || to < 0 || to >= band.length) return;
+    band.splice(at, 1); band.splice(to, 0, z);
+    band.forEach(function (x, i) { x.levelOrder = i; });
+    touched(); rerender();
+    // At an end the button is disabled: the keyboard goes to the other one.
+    var m = document.getElementById("main"), btn = m && m.querySelector('[data-detail="zone"] [data-action="level-' + (by < 0 ? "left" : "right") + '"]');
+    if (btn && btn.disabled) A.focusAfter('[data-detail="zone"] [data-action="level-' + (by < 0 ? "right" : "left") + '"]');
+  }
+
+  // The safety floor's reach, narrowed on step 5's SL-T strip (phase 5b).
+  function floorHint(p) {
+    var fw = E.safetyFloorWords(p), sl = SIS_RULE ? SIS_RULE.floorSL : 3;
+    return fw.none ? "No SL" + sl + " floor in this assessment." : "Sets an SL" + sl + " floor on " + fw.words + ".";
+  }
+
   function zoneDetail(p, z) {
     var systems = M.hlaIdsOf(z).map(function (id) { return E.hlaById(p, id); }).filter(Boolean);
     var safetyByAsset = !z.flags["sis-present"] && E.zoneSafety(z);
@@ -221,8 +269,9 @@
         h("label", { text: "Safety designation" }),
         checkLine("Safety related", !!z.flags["sis-present"] || safetyByAsset, function (v) { z.flags["sis-present"] = v; touched(); rerender(); },
           safetyByAsset ? { disabled: "disabled", "data-action": "safety" } : { "data-action": "safety" }),
-        h("div", { class: "hint", text: safetyByAsset ? "It holds a safety PLC." : "Sets an SL" + (SIS_RULE ? SIS_RULE.floorSL : 3) + " floor on every requirement." })
+        h("div", { class: "hint", text: safetyByAsset ? "It holds a safety PLC." : floorHint(p) })
       ]),
+      levelField(p, z),
       assetsField(z),
       separationField(p, z),
       characteristics([
@@ -246,11 +295,13 @@
     return card(z.id + (z.name ? ": " + z.name : ""), E.zoneSafety(z) ? "safety related" : null, kids,
       h("button", { type: "button", class: "btn sm danger", text: "Remove zone", onClick: function () {
         if (!confirm("Remove zone " + z.id + (z.name ? " (" + z.name + ")" : "") + "? Conduits referencing it will also be removed.")) return;
+        var mk = A.undoMark();
         p.zones.splice(p.zones.indexOf(z), 1);
         p.conduits = p.conduits.filter(function (c) { return c.fromZone !== z.id && c.toZone !== z.id; });
         R.Migrate.pruneDangling(p);
         sel.kind = null; sel.id = null;
         touched(); rerender();
+        A.offerUndo("Zone " + z.id + " removed.", backTo("zone", z.id), mk);
       } }), { "data-owner-id": z.id, "data-detail": "zone" });
   }
 
@@ -299,10 +350,11 @@
       h("button", { type: "button", class: "btn sm danger", text: "Remove conduit", onClick: function () {
         var filled = !!(c.name || c.fromZone || c.toZone || (c.channels && c.channels.length) || c.notes || c.threats.length || c.vulnerabilities.length || c.countermeasures.length);
         if (!confirmRemove(filled, "conduit " + c.id)) return;
+        var mk = A.undoMark();
         p.conduits.splice(p.conduits.indexOf(c), 1);
         sel.kind = null; sel.id = null;
         touched(); rerender();
-        if (filled) toast("Conduit " + c.id + " removed.");
+        A.offerUndo("Conduit " + c.id + " removed.", backTo("conduit", c.id), mk);
       } }), { "data-owner-id": c.id, "data-detail": "conduit" });
   }
 
@@ -312,7 +364,7 @@
     var p = state.project;
     main.appendChild(h("h1", { class: "page-title", text: "Zones and conduits" }));
     main.appendChild(pageSub("zones", "Partition the SUC into zones and conduits, and answer the separation rows raised."));
-    main.appendChild(card("Zone and conduit drawing", p.zones.length ? "select a zone to open it" : null, [renderZoneMap(p, function (id) { pick("zone", id); A.focusAfter('[data-detail="zone"] h2'); })]));
+    main.appendChild(card("Zone and conduit drawing", p.zones.length ? "select a zone to open it" : null, [renderZoneMap(p, function (id) { pick("zone", id); A.focusAfter('[data-detail="zone"] h2'); })], null, { "data-drawing": "" }));
     var o = selected(p);
     var detail = o ? (sel.kind === "zone" ? zoneDetail(p, o) : conduitDetail(p, o))
       : card("Nothing selected", null, [h("p", { class: "muted", text: "Add a zone to start." })]);

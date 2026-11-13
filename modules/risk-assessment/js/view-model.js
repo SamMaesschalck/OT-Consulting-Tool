@@ -30,7 +30,8 @@
  *            (bands or null), currentExceeds, plannedExceeds, residual (the planned band),
  *            operative (planned, else current, else unmitigated), operativeExceeds, today and
  *            todayExceeds (the rating that stands today: the engine's one rule), afterPlan and
- *            afterPlanExceeds (once the planned countermeasures are complete), residualRisk
+ *            afterPlanExceeds (once the planned countermeasures are complete), categories (the
+ *            impact per consequence category, where given: engine categoryRatings), residualRisk
  *            (the risk context's: planned, else current, else null), treatment (the
  *            full threatTreatment), decided (complete), incomplete (confirmed, not
  *            complete), label, disposition
@@ -51,7 +52,7 @@ window.RiskApp.ViewModel = (function () {
 
     function ownerRow(kind, o) {
       var rows = o.threats.map(function (t) {
-        var risk = E.threatRisk(t);
+        var risk = E.threatRisk(t, p);
         var T = E.threatTreatment(o, t, p);
         var operative = T.operative;
         var x = {
@@ -60,9 +61,13 @@ window.RiskApp.ViewModel = (function () {
           residual: T.residual,
           // The three states: unmitigated (risk), current (with the linked
           // existing countermeasures) and planned (after the planned measures).
+          // Each against tolerable risk as the engine compares it (per
+          // consequence category where the criteria set one per category).
           current: T.current, planned: T.planned,
-          currentExceeds: E.exceedsTolerable(T.current, tolerable), plannedExceeds: E.exceedsTolerable(T.planned, tolerable),
-          operative: operative, operativeExceeds: E.exceedsTolerable(operative, tolerable),
+          currentExceeds: T.currentExceeds, plannedExceeds: T.plannedExceeds,
+          operative: operative, operativeExceeds: T.operativeExceeds,
+          // The threat's impact per consequence category, where given.
+          categories: T.categories,
           // The rating that stands today and once the plan is complete (the
           // engine's one rule; see threatTreatment).
           today: T.today, todayExceeds: !!T.today && !T.todayWithin,
@@ -88,10 +93,10 @@ window.RiskApp.ViewModel = (function () {
         suggested: exceeding.filter(function (x) { return x.treatment.state === "suggested"; }),
         // Threats with suggested countermeasure links waiting (from a 0.2 file).
         linkSuggested: rows.filter(function (x) { return x.treatment.linkSuggested.length > 0; }),
-        worstRisk: E.worstRiskOf(o.threats),
+        worstRisk: E.worstRiskOf(o.threats, p),
         worstCurrent: E.worstBand(rows.map(function (x) { return x.current; })),
         worstPlanned: E.worstBand(rows.map(function (x) { return x.planned; })),
-        worstOperative: E.worstResidualOf(o.threats),
+        worstOperative: E.worstResidualOf(o.threats, p),
         sltSet: M.FR_IDS.some(function (fr) { return o.slTargetByFR[fr] != null; })
       };
     }
@@ -139,5 +144,43 @@ window.RiskApp.ViewModel = (function () {
     };
   }
 
-  return { build: build };
+  // A threat row in one of the three states the heat maps show (unmitigated,
+  // current, planned): its likelihood and impact, a state not rated taking
+  // the rating before it, and whether that rating is above tolerable risk as
+  // the engine compares it (per consequence category where set). Step 5's
+  // heat map and the workbook's Summary both read this.
+  function stateCell(x, st) {
+    var t = x.t, L = t.likelihood, I = t.impact, exceeds = !!x.exceeds;
+    if (st === "current" || st === "planned") {
+      L = t.currentLikelihood || L; I = t.currentImpact || I;
+      if (x.current) exceeds = !!x.currentExceeds;
+    }
+    if (st === "planned") {
+      L = t.residualLikelihood || L; I = t.residualImpact || I;
+      if (x.planned) exceeds = !!x.plannedExceeds;
+    }
+    return { L: L, I: I, exceeds: exceeds };
+  }
+  // The heat map's cells for one state: { "I:L": { n, exceeds } }, exceeds
+  // when any threat counted in the cell is above tolerable risk.
+  function heatCells(vm, st) {
+    var out = {};
+    vm.threats.forEach(function (x) {
+      var c = stateCell(x, st);
+      if (!c.L || !c.I) return;
+      var k = c.I + ":" + c.L, cell = out[k] = out[k] || { n: 0, exceeds: false };
+      cell.n++; if (c.exceeds) cell.exceeds = true;
+    });
+    return out;
+  }
+
+  // Whether a heat map cell is outlined as above tolerable risk: a cell
+  // holding threats when one of them is; an empty one when its band is above
+  // the general tolerable risk.
+  function heatAbove(cells, I, L, band, tolerable) {
+    var c = cells[I + ":" + L];
+    return c && c.n ? c.exceeds : E.exceedsTolerable(band, tolerable);
+  }
+
+  return { build: build, stateCell: stateCell, heatCells: heatCells, heatAbove: heatAbove };
 }());

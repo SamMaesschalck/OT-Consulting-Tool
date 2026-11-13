@@ -17,6 +17,10 @@
  * field and a click straight after typing lands. Choices (a select, a chip,
  * a button) redraw the page, which keeps the focus (js/app.js).
  * Every per-threat fact comes from js/view-model.js and js/engine.js.
+ * Add from library (js/ui-library.js) adds house scenarios as unrated
+ * drafts; the floor box on a safety zone's strip and the SL-T grid narrows
+ * the safety floor for the project; a remove, Move, Copy to or bulk accept
+ * offers Undo in its toast (js/app.js offerUndo).
  * RiskApp.RiskPage.select(ownerId, threatId) opens a zone or conduit and a
  * scenario; Go to (js/app.js) and the peer review (js/review.js) use it.
  */
@@ -130,24 +134,30 @@
   function section(title, kids, attrs) {
     return h("div", Object.assign({ class: "ed-section" }, attrs || {}), [h("h3", { class: "ed-h", text: title })].concat(kids));
   }
-  function ratingLine(label, band, tol, cls) {
+  // exceeds: the rating is above tolerable risk, as the engine compares it
+  // (per consequence category where the criteria set one per category).
+  function ratingLine(label, band, exceeds, cls) {
     return h("div", { class: "rating-line" + (cls ? " " + cls : "") }, [
       h("strong", { text: label + ": " }), riskPill(band),
-      band ? h("span", { class: E.exceedsTolerable(band, tol) ? "val-warn" : "muted", text: E.exceedsTolerable(band, tol) ? "  above tolerable risk" : "  within tolerable risk" }) : h("span", { class: "muted", text: "  not rated" })
+      band ? h("span", { class: exceeds ? "val-warn" : "muted", text: exceeds ? "  above tolerable risk" : "  within tolerable risk" }) : h("span", { class: "muted", text: "  not rated" })
     ]);
   }
 
   // ---------- The scales ----------
 
-  function scalesPop() {
+  // Every definition of the project's risk criteria (js/model.js criteriaOf).
+  function scalesPop(p) {
+    var crit = M.criteriaOf(p);
     function list(title, arr) {
       return h("div", null, [h("strong", { text: title }), h("ul", { class: "scale-list" }, arr.map(function (x) {
         return h("li", null, [h("span", { class: "scale-name", text: x.name + ": " }), cap(String(x.note || "").replace(/^House default:\s*/i, ""))]);
       }))]);
     }
+    var byCat = E.tolerableByCategoryWords(p);
     var d = h("details", { class: "scales-pop no-print", "data-scales": "" }, [
       h("summary", { text: "Scales" }),
-      h("div", { class: "scales-pop-body" }, [list("Impact", SEV), list("Likelihood", LIK),
+      h("div", { class: "scales-pop-body" }, [list("Impact", crit.impact), list("Likelihood", crit.likelihood),
+        byCat ? h("p", { class: "hint", text: "Tolerable risk by category: " + byCat + "." }) : null,
         h("p", { class: "hint", text: "Unmitigated likelihood counts no countermeasure, existing ones included." })])
     ]);
     if (ui.scalesOpen) d.setAttribute("open", "");
@@ -327,8 +337,9 @@
     var showPlanned = x.exceeds || !!(t.residualLikelihood || t.residualImpact) || T.plannedLinked.length > 0;
     var ed = h("div", { class: "threat-card scen-editor" });
 
-    // 1. The scenario.
-    var sev = opts(SEV), lik = opts(LIK);
+    // 1. The scenario. The levels are the project's risk criteria.
+    var crit = M.criteriaOf(p);
+    var sev = opts(crit.impact), lik = opts(crit.likelihood);
     var vulnIn = h("input", { type: "text", "data-field": "new-vuln", "aria-label": "New vulnerability", placeholder: "Add a vulnerability" });
     function addVuln() {
       var text = vulnIn.value.trim(); if (!text) { vulnIn.focus(); return; }
@@ -360,12 +371,30 @@
         }))])
     ]));
 
-    // 2. The unmitigated rating.
+    // 2. The unmitigated rating. The impact is one level, or one per
+    // consequence category (By category), when it is the worst of them.
+    var cats = x.categories || [];
+    var impactField = cats.length
+      ? h("div", { class: "field" }, [h("div", { class: "lbl", text: "Impact of the worst credible consequence" }),
+        h("div", { class: "derived", "data-derived": "impact" }, [h("strong", { text: E.impactName(t.impact, p) || "Not rated" }), h("span", { class: "muted", text: " worst category" })])])
+      : pick("Impact of the worst credible consequence", t.impact, sev, function (v) { t.impact = v; }, { attrs: { "data-field": "impact" } });
+    var catKids = [h("summary", { text: "Impact by category" + (cats.length ? " (" + cats.length + ")" : "") })];
+    catKids.push(h("div", { class: "cat-grid" }, crit.categories.map(function (c) {
+      var cur = t.impactByCategory && t.impactByCategory[c.id];
+      var s = h("select", { "data-field": "impact-cat-" + c.id, "aria-label": c.name + " impact", onChange: function (e) {
+        E.setCategoryRating(t, "impact", "impactByCategory", c.id, e.target.value, p); touched(); rerender();
+      } });
+      s.appendChild(h("option", { value: "", text: "Not rated" }));
+      crit.impact.forEach(function (l) { var op = h("option", { value: l.id, text: l.name }); if (cur === l.id) op.setAttribute("selected", "selected"); s.appendChild(op); });
+      return h("label", { class: "cat-line" }, [h("span", { text: c.name + (c.tolerable ? " (tolerable " + BAND_NAME[c.tolerable].toLowerCase() + ")" : "") }), s]);
+    })));
+    var catBox = keptDetails({ class: "owner-sec cat-sec", "data-part": "impact-categories" }, catKids, "sec", "cat:" + o.id + "/" + t.id, cats.length > 0);
     ed.appendChild(section("Unmitigated risk", [
       h("div", { class: "threat-grid" }, [
         pick("Unmitigated likelihood", t.likelihood, lik, function (v) { t.likelihood = v; }, { attrs: { "data-field": "likelihood" }, hint: "Before any countermeasure, existing ones included." }),
-        pick("Impact of the worst credible consequence", t.impact, sev, function (v) { t.impact = v; }, { attrs: { "data-field": "impact" } })
+        impactField
       ]),
+      catBox,
       liveText("Likelihood rationale", t.likelihoodRationale, function (v) { t.likelihoodRationale = v; }, { attrs: { "data-field": "likelihoodRationale" },
         placeholder: "One line: why this likelihood." }),
       h("div", { class: "rating-line" }, [h("strong", { text: "Unmitigated risk: " }), riskPill(x.risk),
@@ -388,7 +417,7 @@
         pick("Current likelihood", t.currentLikelihood, lik, function (v) { t.currentLikelihood = v; }, { empty: "Unchanged", attrs: { "data-field": "currentLikelihood" } }),
         pick("Current impact", t.currentImpact, sev, function (v) { t.currentImpact = v; }, { empty: "Unchanged", attrs: { "data-field": "currentImpact" } })
       ]));
-      ex.push(ratingLine("Current risk", x.current, tol));
+      ex.push(ratingLine("Current risk", x.current, x.currentExceeds));
     }
     ed.appendChild(section("Existing countermeasures", ex, { "data-part": "existing" }));
 
@@ -402,7 +431,7 @@
         pick("Planned likelihood", t.residualLikelihood, lik, function (v) { t.residualLikelihood = v; }, { empty: "Unchanged", attrs: { "data-field": "residualLikelihood" } }),
         pick("Planned impact", t.residualImpact, sev, function (v) { t.residualImpact = v; }, { empty: "Unchanged", attrs: { "data-field": "residualImpact" } })
       ]));
-      add.push(x.planned ? ratingLine("Planned risk", x.planned, tol) : h("div", { class: "hint", text: "Rate it for when the additional countermeasures are in place." }));
+      add.push(x.planned ? ratingLine("Planned risk", x.planned, x.plannedExceeds) : h("div", { class: "hint", text: "Rate it for when the additional countermeasures are in place." }));
     }
     ed.appendChild(section("Additional countermeasures", add, { "data-part": "additional" }));
 
@@ -418,6 +447,10 @@
     var n = M.emptyThreat(0); n.id = id;
     COPY_FIELDS.forEach(function (k) { n[k] = t[k] || ""; });
     n.affectedFR = t.affectedFR.slice();
+    // Where the scenario came from, when it came from the house library.
+    if (t.libraryId) n.libraryId = t.libraryId;
+    // The impact per category is part of the unmitigated rating.
+    if (t.impactByCategory && typeof t.impactByCategory === "object" && Object.keys(t.impactByCategory).length) n.impactByCategory = JSON.parse(JSON.stringify(t.impactByCategory));
     return n;
   }
   function duplicate(o, t) {
@@ -458,6 +491,17 @@
     ui.sel = to.id; ui.selObj = to; ui.open[to.id] = t.id; ui.reveal = true;
     return true;
   }
+  // What an undo opens again (js/app.js offerUndo): the zone or conduit and
+  // the scenario, with the keyboard on focusSel (else the scenario's open
+  // button). sec: a zone section to open ("vuln", "cm").
+  function backTo(ownerId, threatId, focusSel, sec) {
+    return function () {
+      ui.sel = ownerId; ui.selObj = null; ui.view = "zone"; ui.reveal = true;
+      if (threatId) ui.open[ownerId] = threatId;
+      if (sec) ui.sec[sec + ":" + ownerId] = true;
+      return focusSel || (threatId ? '[data-threat-id="' + threatId + '"] [data-action="open-scenario"]' : null);
+    };
+  }
   function scenarioActions(o, t, p) {
     var others = owners(p).filter(function (x) { return x !== o; });
     var copySel = h("select", { multiple: "multiple", size: String(Math.min(5, Math.max(2, others.length))), "data-action": "copy-targets", "aria-label": "Copy " + t.id + " to" },
@@ -474,26 +518,31 @@
             var ids = [].filter.call(copySel.options, function (op) { return op.selected; }).map(function (op) { return op.value; });
             if (!ids.length) { toast("Choose where to copy it."); return; }
             ui.move[o.id + "/" + t.id] = true;
-            var made = copyTo(o, t, ids); touched(); rerender(); toast(t.id + " copied: " + made.join(", ") + ".");
+            var mk = A.undoMark(); var made = copyTo(o, t, ids); touched(); rerender();
             A.focusAfter('[data-threat-id="' + t.id + '"] [data-action="copy-to"]');
+            A.offerUndo(t.id + " copied: " + made.join(", ") + ".", backTo(o.id, t.id, '[data-threat-id="' + t.id + '"] [data-action="copy-to"]'), mk);
           } })]),
         h("div", { class: "field" }, [labelFor("Move to", moveSel), moveSel,
           h("button", { type: "button", class: "btn sm", "data-action": "move-to", text: "Move", onClick: function () {
             if (!moveSel.value) { toast("Choose where to move it."); return; }
             var to = moveSel.value;
-            if (moveTo(o, t, to)) { touched(); rerender(); toast(t.id + " moved to " + to + "."); A.focusAfter('[data-threat-id="' + t.id + '"] [data-action="open-scenario"]'); }
+            var mk = A.undoMark();
+            if (moveTo(o, t, to)) {
+              touched(); rerender(); A.focusAfter('[data-threat-id="' + t.id + '"] [data-action="open-scenario"]');
+              A.offerUndo(t.id + " moved to " + to + ".", backTo(o.id, t.id), mk);
+            }
           } })])
       ])], "move", o.id + "/" + t.id, false) : null,
       h("button", { type: "button", class: "btn sm danger", "data-action": "remove-scenario", text: "Remove", onClick: function () {
         var filled = !!(t.statement || t.source || t.likelihood || t.impact || (t.affectedFR && t.affectedFR.length));
         if (!confirmRemove(filled, "threat " + t.id)) return;
-        var i = o.threats.indexOf(t); o.threats.splice(i, 1);
+        var mk = A.undoMark(); var i = o.threats.indexOf(t); o.threats.splice(i, 1);
         if (ui.open[o.id] === t.id) ui.open[o.id] = o.threats[Math.min(i, o.threats.length - 1)] ? o.threats[Math.min(i, o.threats.length - 1)].id : null;
         touched(); rerender();
-        if (filled) toast("Threat " + t.id + " removed.");
         // The keyboard goes to the scenario now open, else to + Add scenario.
         var now = ui.open[o.id];
         A.focusAfter(now ? '[data-threat-id="' + now + '"] [data-action="open-scenario"]' : '[data-action="add-scenario"]');
+        A.offerUndo("Threat " + t.id + " removed.", backTo(o.id, t.id), mk);
       } })
     ]);
   }
@@ -559,6 +608,25 @@
     return n;
   }
   function suggestionOf(o, p) { return isConduit(o) ? E.suggestConduit(o, p) : E.suggestZone(o, p); }
+  // The safety floor's box (a safety related zone's strip, and the SL-T grid):
+  // the house handling, and the requirements the floor covers, which the
+  // project can narrow (phase 5b). safe: the safety related zones, named on the grid.
+  function floorBox(p, safe) {
+    var fw = E.safetyFloorWords(p), house = M.houseFloorFR();
+    // The rules file's wording is written for the consultant; its "Prompt:" label is not shown.
+    var action = String(SIS_RULE.actions[0] || "").replace(/^Prompt:\s*/i, "");
+    var text = (safe ? "Safety related: " + safe.map(function (z) { return z.id; }).join(", ") + ". " : "") + cap(action) +
+      (fw.none ? " No SL" + SIS_RULE.floorSL + " floor is applied." : " An SL" + SIS_RULE.floorSL + " floor is applied to " + fw.words + ".");
+    return h("div", { class: "sis-box", "data-floor": "" }, [
+      h("strong", { text: "SIS handling: " }), text,
+      h("div", { class: "chip-row floor-frs no-print", role: "group", "aria-label": "Requirements the safety floor covers" }, [h("span", { class: "muted", text: "Floor on" })].concat(house.map(function (fr) {
+        var on = fw.list.indexOf(fr) >= 0;
+        return chip(fr, on, "floor-" + fr, function () {
+          var list = fw.list.slice(); toggleIn(list, fr); M.setSafetyFloorFR(p, list); touched(); rerender();
+        }, { cls: "xs", title: on ? "Take " + fr + " out of the safety floor" : "Put " + fr + " back in the safety floor" });
+      })))
+    ]);
+  }
   function sltStrip(o, p) {
     var sug = suggestionOf(o, p);
     var fill = FR_IDS.filter(function (fr) { return sug.byFR[fr].sl != null && o.slTargetByFR[fr] == null; }).length;
@@ -598,14 +666,15 @@
     }
     hint(); live(hint);
     var kids = [];
-    if (sug.safetyRelated && SIS_RULE) kids.push(h("div", { class: "sis-box" }, [h("strong", { text: "SIS handling: " }), SIS_RULE.actions[0] + " An SL" + SIS_RULE.floorSL + " floor is applied to every FR."]));
+    if (sug.safetyRelated && SIS_RULE) kids.push(floorBox(p, null));
     kids.push(tbl);
     kids.push(h("div", { class: "btn-row strip-actions no-print" }, [
       h("button", { type: "button", class: "btn sm", "data-action": "accept-all-suggested", text: "Accept all suggested" + (fill ? " (" + fill + ")" : ""), disabled: fill ? null : "disabled",
         title: "Sets each requirement not yet set to its suggestion.", onClick: function () {
-          var n = acceptSuggested(o, sug); touched(); rerender(); toast(n + " suggestion" + (n === 1 ? "" : "s") + " accepted for " + o.id + ".");
+          var mk = A.undoMark(); var n = acceptSuggested(o, sug); touched(); rerender();
           // The button is now disabled: the keyboard goes to the first SL-T.
           A.focusAfter("[data-slt-strip] select[data-slt-fr]");
+          A.offerUndo(n + " suggestion" + (n === 1 ? "" : "s") + " accepted for " + o.id + ".", backTo(o.id, null, '[data-slt-strip] [data-action="accept-all-suggested"]'), mk);
         } }),
       from.length ? fromSel : null,
       from.length ? h("button", { type: "button", class: "btn sm", "data-action": "copy-slt", text: "Copy", onClick: function () {
@@ -635,7 +704,8 @@
           placeholder: "e.g. Vendor advisory, scan, walk-down", onInput: function (e) { v.reference = e.target.value; edited(); } })]),
         h("td", null, [h("button", { type: "button", class: "btn sm danger", text: "×", "aria-label": "Remove " + v.id, onClick: function () {
           if (!confirmRemove(!!v.description, "vulnerability")) return;
-          o.vulnerabilities.splice(vi, 1); R.Migrate.pruneDangling(p); touched(); rerender(); A.focusAfter('[data-action="add-vulnerability"]');
+          var mk = A.undoMark(); o.vulnerabilities.splice(vi, 1); R.Migrate.pruneDangling(p); touched(); rerender(); A.focusAfter('[data-action="add-vulnerability"]');
+          A.offerUndo("Vulnerability " + v.id + " removed.", backTo(o.id, null, '[data-field="vuln-' + v.id + '"]', "vuln"), mk);
         } })])
       ]);
     });
@@ -666,8 +736,8 @@
         h("td", null, [h("button", { type: "button", class: "btn sm danger", text: "×", "aria-label": "Remove " + m.id, onClick: function () {
           var filled = !!(m.description || (m.addressesFR && m.addressesFR.length) || m.reference);
           if (!confirmRemove(filled, "countermeasure " + m.id)) return;
-          o.countermeasures.splice(mi, 1); R.Migrate.pruneDangling(p); touched(); rerender(); A.focusAfter('[data-action="add-countermeasure"]');
-          if (filled) toast("Countermeasure " + m.id + " removed.");
+          var mk = A.undoMark(); o.countermeasures.splice(mi, 1); R.Migrate.pruneDangling(p); touched(); rerender(); A.focusAfter('[data-action="add-countermeasure"]');
+          A.offerUndo("Countermeasure " + m.id + " removed.", backTo(o.id, null, '[data-cm-field="' + m.id + '-reg-description"]', "cm"), mk);
         } })])
       ]);
     });
@@ -739,21 +809,40 @@
         h("h3", { class: "ed-h", text: "Scenarios" }),
         tally ? h("div", { class: "hint treat-summary" + (openT.length ? " val-warn" : "") }, [tally]) : null,
         suggested.length ? h("button", { type: "button", class: "btn sm", "data-action": "confirm-suggested", text: "Confirm suggested (" + suggested.length + ")", onClick: function () {
-          suggested.forEach(function (x) { x.t.treatment.confirmed = true; });
+          var mk = A.undoMark(); suggested.forEach(function (x) { x.t.treatment.confirmed = true; });
           touched(); rerender();
+          A.offerUndo(suggested.length + " suggested decision" + (suggested.length === 1 ? "" : "s") + " confirmed.", backTo(o.id, null, '[data-action="confirm-suggested"]'), mk);
         } }) : null,
         linkSug.length ? h("button", { type: "button", class: "btn sm", "data-action": "confirm-links", text: "Confirm suggested links (" + linkSug.length + ")", onClick: function () {
-          linkSug.forEach(function (x) { E.confirmLinkSuggestions(o, x.t); });
+          var mk = A.undoMark(); linkSug.forEach(function (x) { E.confirmLinkSuggestions(o, x.t); });
           touched(); rerender();
+          A.offerUndo("Suggested links confirmed.", backTo(o.id, null, '[data-action="confirm-links"]'), mk);
         } }) : null,
         h("span", { class: "spacer" }),
-        scalesPop()
+        scalesPop(p)
       ]),
       scenarioTable(row, p, tol, open),
       h("div", { class: "btn-row", style: "margin-top:8px" }, [h("button", { type: "button", class: "btn sm", "data-action": "add-scenario", text: "+ Add scenario", onClick: function () {
         p.counters.threat += 1; var t = M.emptyThreat(p.counters.threat); o.threats.push(t); ui.open[o.id] = t.id; touched(); rerender();
         A.focusAfter('[data-threat-id="' + t.id + '"] [data-field="statement"]');
-      } })]),
+      } }),
+        M.LIBRARY ? h("button", { type: "button", class: "btn sm", "data-action": "add-from-library", text: "Add from library", "aria-expanded": R.LibraryUI.isOpen(o.id) ? "true" : "false", "aria-controls": R.LibraryUI.isOpen(o.id) ? R.LibraryUI.pickerId(o.id) : null,
+          onClick: function () {
+            if (R.LibraryUI.isOpen(o.id)) { R.LibraryUI.close(); rerender(); return; }
+            R.LibraryUI.open(o.id); rerender(); A.focusAfter('[data-library-picker] [data-field="lib-search"]');
+          } }) : null]),
+      R.LibraryUI.isOpen(o.id) ? R.LibraryUI.picker(o, p, {
+        // The drafts are added; the first opens, with the keyboard in its statement.
+        onAdded: function (res) {
+          if (!res.threats.length) { rerender(); return; }
+          ui.open[o.id] = res.threats[0].id; touched(); rerender();
+          A.focusAfter('[data-threat-id="' + res.threats[0].id + '"] [data-field="statement"]');
+          var n = res.threats.length;
+          A.offerUndo(n + " scenario" + (n === 1 ? "" : "s") + " added from the library" + (res.cms ? ", with " + res.cms + " draft countermeasure" + (res.cms === 1 ? "" : "s") : "") + ".",
+            backTo(o.id, null, '[data-action="add-from-library"]'), res.mark);
+        },
+        onClose: function () { rerender(); A.focusAfter('[data-action="add-from-library"]'); }
+      }) : null,
       vulnList(o, p),
       cmList(o, p)
     ];
@@ -808,7 +897,7 @@
       filterSelect("decision", "Decision", DECISION_FILTERS),
       h("label", { class: "check-line" }, [h("input", { type: "checkbox", "data-filter": "open", checked: f.open, onChange: function (e) { f.open = e.target.checked; rerender(); } }), "Open only"]),
       f.cell ? h("span", { class: "pill neutral reg-cell", "data-cell-filter": "" }, [
-        cap(f.cell.state) + ": " + E.impactName(f.cell.I) + " impact, " + E.likelihoodName(f.cell.L).toLowerCase() + " likelihood",
+        cap(f.cell.state) + ": " + E.impactName(f.cell.I, p) + " impact, " + E.likelihoodName(f.cell.L, p).toLowerCase() + " likelihood",
         h("button", { type: "button", class: "assign-x", "data-action": "clear-cell", "aria-label": "Clear the heat map filter", text: "×", onClick: function () { f.cell = null; rerender(); A.focusAfter('[data-filter="owner"]'); } })
       ]) : null
     ]);
@@ -839,27 +928,30 @@
   }
   function renderHeatmap(main, p, vm) {
     var st = ui.heat, tol = vm.tolerable;
-    var counts = {};
-    vm.threats.forEach(function (x) { var li = stateLI(x.t, st); if (li.L && li.I) { var k = li.I + ":" + li.L; counts[k] = (counts[k] || 0) + 1; } });
+    // The cells' counts and outlines (js/view-model.js heatCells, the rule
+    // the workbook's Summary reads too).
+    var cells = R.ViewModel.heatCells(vm, st);
     var toggle = h("div", { class: "treat-opts heat-toggle no-print", role: "group", "aria-label": "Rating shown" }, HEAT_STATES.map(function (s) {
       var on = s.id === st;
       return h("button", { type: "button", class: "treat-opt" + (on ? " on" : ""), "data-heat": s.id, "aria-pressed": on ? "true" : "false", text: s.text, onClick: function () { ui.heat = s.id; rerender(); } });
     }));
     var t = h("table", { class: "tbl matrix heat", "aria-label": "Heat map" });
+    // The project's criteria give the dimensions and the cells' bands.
+    var crit = M.criteriaOf(p), LIKS = crit.likelihood;
     // Both axes named: impact down the side, likelihood across the top.
     t.appendChild(h("thead", null, [
-      h("tr", null, [h("th", { rowspan: "2", scope: "col", text: "Impact" }), h("th", { class: "center heat-axis", colspan: String(LIK.length), scope: "colgroup", text: "Likelihood" })]),
-      h("tr", null, LIK.map(function (l) { return h("th", { class: "center", scope: "col", text: l.name }); }))
+      h("tr", null, [h("th", { rowspan: "2", scope: "col", text: "Impact" }), h("th", { class: "center heat-axis", colspan: String(LIKS.length), scope: "colgroup", text: "Likelihood" })]),
+      h("tr", null, LIKS.map(function (l) { return h("th", { class: "center", scope: "col", text: l.name }); }))
     ]));
     var tb = h("tbody");
-    SEV.slice().reverse().forEach(function (sv) {
-      tb.appendChild(h("tr", null, [h("th", { scope: "row", text: sv.name })].concat(LIK.map(function (l) {
-        var b = RULES.riskMatrix[sv.id][l.id], n = counts[sv.id + ":" + l.id] || 0;
-        return h("td", { class: "center heat-cell risk-" + b + (E.exceedsTolerable(b, tol) ? " above-tol" : "") }, [
+    crit.impact.slice().reverse().forEach(function (sv) {
+      tb.appendChild(h("tr", null, [h("th", { scope: "row", text: sv.name })].concat(LIKS.map(function (l) {
+        var b = E.riskFor(sv.id, l.id, p) || "none", n = (cells[sv.id + ":" + l.id] || {}).n || 0;
+        return h("td", { class: "center heat-cell risk-" + b + (R.ViewModel.heatAbove(cells, sv.id, l.id, b, tol) ? " above-tol" : "") }, [
           h("button", { type: "button", class: "heat-btn", "data-cell": sv.id + ":" + l.id, disabled: n ? null : "disabled",
             "aria-label": n + " scenario" + (n === 1 ? "" : "s") + ", " + sv.name + " impact, " + l.name.toLowerCase() + " likelihood",
             onClick: function () { ui.filter = { owner: "", band: "", decision: "", open: false, cell: { state: st, I: sv.id, L: l.id } }; ui.view = "register"; A.navigate("risk", '[data-filter="owner"]'); } },
-            [h("span", { class: "heat-n", text: n ? String(n) : "" }), h("span", { class: "heat-band", text: BAND_NAME[b] })])
+            [h("span", { class: "heat-n", text: n ? String(n) : "" }), h("span", { class: "heat-band", text: BAND_NAME[b] || "Not set" })])
         ]);
       }))));
     });
@@ -911,9 +1003,10 @@
           fill ? h("button", { type: "button", class: "btn xs", "data-action": "accept-row", text: "Accept (" + fill + ")", title: "Sets each requirement not yet set to its suggestion.",
             "aria-label": "Accept " + fill + " suggestion" + (fill === 1 ? "" : "s") + " for " + o.id,
             onClick: function () {
-              acceptSuggested(o, sug); touched(); rerender();
+              var mk = A.undoMark(); var n = acceptSuggested(o, sug); touched(); rerender();
               // The button has gone: the keyboard goes to the row's first SL-T.
               A.focusAfter('tr[data-owner-id="' + o.id + '"] select[data-slt-fr]');
+              A.offerUndo(n + " suggestion" + (n === 1 ? "" : "s") + " accepted for " + o.id + ".", function () { return 'tr[data-owner-id="' + o.id + '"] [data-action="accept-row"]'; }, mk);
             } }) : null,
           h("button", { type: "button", class: "btn xs", "data-action": "open-zone", text: "Open", "aria-label": "Open " + o.id, onClick: function () { ui.sel = o.id; ui.selObj = o; ui.view = "zone"; ui.reveal = true; A.navigate("risk", '[data-slt-strip] [data-field="justification"]'); } })
         ])
@@ -921,14 +1014,15 @@
     });
     tbl.appendChild(tb);
     var body = [];
-    if (safe.length && SIS_RULE) body.push(h("div", { class: "sis-box" }, [h("strong", { text: "SIS handling: " }), "Safety related: " + safe.map(function (z) { return z.id; }).join(", ") + ". " + SIS_RULE.actions[0] + " An SL" + SIS_RULE.floorSL + " floor is applied to every FR."]));
+    if (safe.length && SIS_RULE) body.push(floorBox(p, safe));
     body.push(h("div", { class: "btn-row no-print", style: "margin-bottom:8px" }, [
       h("button", { type: "button", class: "btn sm", "data-action": "accept-all-grid", text: "Accept all suggested" + (fillAll ? " (" + fillAll + ")" : ""), disabled: fillAll ? null : "disabled",
         title: "Sets each requirement not yet set to its suggestion, in every zone and conduit.",
         onClick: function () {
-          var n = 0; all.forEach(function (o) { n += acceptSuggested(o, sugs[o.id]); }); touched(); rerender(); toast(n + " suggestion" + (n === 1 ? "" : "s") + " accepted.");
+          var mk = A.undoMark(); var n = 0; all.forEach(function (o) { n += acceptSuggested(o, sugs[o.id]); }); touched(); rerender();
           // The button is now disabled: the keyboard goes to the grid's first SL-T.
           A.focusAfter("table.slt-grid select[data-slt-fr]");
+          A.offerUndo(n + " suggestion" + (n === 1 ? "" : "s") + " accepted.", function () { return '[data-action="accept-all-grid"]'; }, mk);
         } })
     ]));
     body.push(h("div", { class: "grid-scroll" }, [tbl]));
@@ -965,7 +1059,10 @@
     main.appendChild(h("h1", { class: "page-title", text: "Detailed risk assessment" }));
     main.appendChild(pageSub("risk", "Work through each zone and conduit: its scenarios, their ratings and a treatment decision where tolerable risk is exceeded."));
     main.appendChild(stepTabs(view === "zone" ? "risk" : view));
-    main.appendChild(h("div", { class: "framing-note", text: "SolutionsPT house risk matrix, not the standard's; tolerable risk is " + BAND_NAME[E.tolerableOf(p)].toLowerCase() + " (step 1)." }));
+    var cw = E.criteriaWords(p);
+    var tolWords = "tolerable risk is " + BAND_NAME[E.tolerableOf(p)].toLowerCase() + " (step 1).";
+    main.appendChild(h("div", { class: "framing-note", text: cw.source === "client" ? "The client's risk matrix; " + tolWords :
+      cw.source === "project" ? "The risk matrix agreed for this assessment; " + tolWords : "SolutionsPT house risk matrix; the standard prescribes none. " + cap(tolWords) }));
     if (!p.zones.length && !p.conduits.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
     var vm = R.ViewModel.build(p), open = openMap(p);
     if (view === "register") { renderRegister(main, p, vm, open); return; }

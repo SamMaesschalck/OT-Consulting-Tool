@@ -1,0 +1,358 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool drawing levels, notes and legend</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 5b of docs/risk-tool-redesign.md, item 1: the zone and conduit drawing.
+  - With no zone level set, every box, line, id tag and key line sits exactly
+    where the phase 5a layout put it (scripts/fixtures/zone-map-phase5a.js, a
+    frozen copy), for the demo, the frozen files and generated projects; the
+    legend is added below the key and nothing else moves.
+  - With levels, the zones lie in bands top to bottom in the house order,
+    ordered within a band by the nudge; no line runs through a box or a band
+    label, no tag or note overlaps another or a box.
+  - Conduit SL-T and channels sit beside the line where they fit.
+  - The legend says what is used: safety, worst risk borders, outside the
+    SUC, SL-T, the bands.
+  - Step 3: the level select, the nudge, the box click and Enter; step 6 and
+    the summary open the zone too.
+  - Word: the drawing is a landscape page of its own, one layout feeding the
+    SVG and the PNG.
+  - The migration tidies zone.level and zone.levelOrder.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<!-- The frozen phase 5a layout, in this page: its layout() needs only the project and suggestZone. -->
+<script src="fixtures/zone-map-phase5a.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.docx || !w.App.DocxBlocks) { if (++tries > 200) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, MG = w.RiskApp.Migrate, ZM = w.RiskZoneMap, Z0 = window.RiskZoneMapPhase5a, d = w.document, RX = w.RiskExports, DB = w.App.DocxBlocks;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var KEY = RT.AUTOSAVE_KEY;
+    try { w.localStorage.removeItem(KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function detail() { return main().querySelector("[data-detail]"); }
+    function load(pj) { RT.loadProjectText(JSON.stringify(pj)); }
+    ok(!!Z0 && typeof Z0.layout === "function", "the frozen phase 5a layout is loaded");
+
+    // ---- A. no level set: as phase 5a drew it ---------------------------------------
+    // The box's line under its title says the same as phase 5a's in the words
+    // the review settled (SL-T 3, Suggested SL 3, the risk by name): compared
+    // through reword() rather than as the frozen text.
+    var RN = { "low": "low", "medium": "medium", "high": "high", "very-high": "very high" };
+    function reword(s) { return String(s || "").replace(/SL-T≤/g, "SL-T ").replace(/sug SL≤/g, "Suggested SL ").replace(/risk (very-high|low|medium|high)/g, function (m, b) { return "risk " + RN[b]; }); }
+    function boxKey(b) { return [b.id, b.x, b.y, b.cx, b.w, b.h, b.ext, b.stroke, b.strokeWidth, b.title, b.frozen ? reword(b.sub) : b.sub]; }
+    function lineKey(c) { return [c.id, c.points, c.lx, c.ly, c.key]; }
+    function sameAsBefore(pj, label) {
+      var L = ZM.layout(pj, RT.suggestZone), F = Z0.layout(pj, RT.suggestZone);
+      if (!F) { ok(L === null, label + ": no zones, no drawing, as before"); return; }
+      var bad = [];
+      if (L.W !== F.W) bad.push("width " + L.W + " vs " + F.W);
+      if (!same(L.boxes.map(boxKey), F.boxes.map(function (b) { return boxKey(Object.assign({ frozen: true }, b)); }))) bad.push("boxes");
+      if (!same(L.conduits.map(lineKey), F.conduits.map(lineKey))) bad.push("lines, tags or key text");
+      if (!same(L.keys, F.keys)) bad.push("key lines");
+      if (L.banded || L.bands.length) bad.push("bands");
+      var lastKey = F.keys.length ? F.keys[F.keys.length - 1].y + 11 : 0;
+      if (L.legend.length ? !(L.H > F.H && L.legend.every(function (it) { return it.y > lastKey; })) : L.H !== F.H) bad.push("height or legend place " + L.H + " vs " + F.H);
+      ok(!bad.length, label + ": every box, line, id tag and key line is where phase 5a put it, the legend below the key", bad.join(", "));
+    }
+    var FX = window.RiskFixtures || {};
+    var files = { "the demo": window.SPT_TOUR_PROJECT, "the v0.7 tour file": FX["tour-v0.7-saved"], "the phase 3 tour file": FX["tour-phase3-0.2"], "the hand-made 0.1 file": FX["hand-made-v0.1"] };
+    Object.keys(files).forEach(function (k) { ok(!!files[k], k + " is present"); if (files[k]) sameAsBefore(MG.normaliseProject(clone(files[k])), k); });
+    // Generated projects: 1 to 10 zones, conduits between near and far zones and to EXT.
+    var seed = 7;
+    function rnd(n) { seed = (seed * 9301 + 49297) % 233280; return Math.floor(seed / 233280 * n); }
+    function genProject(nz, nc) {
+      var pj = M.emptyProject();
+      for (var i = 1; i <= nz; i++) { var z = M.emptyZone(i); z.name = "Zone " + i; if (i % 4 === 0) z.flags["sis-present"] = true; pj.zones.push(z); }
+      for (var k = 1; k <= nc; k++) {
+        var c = M.emptyConduit(k), a = 1 + rnd(nz), b = rnd(nz + 1);
+        c.fromZone = "Z" + a; c.toZone = b === 0 ? "EXT" : "Z" + b;
+        if (k % 2) c.channels = ["OPC UA"]; if (k % 3 === 0) c.slTargetByFR.IAC = 2;
+        pj.conduits.push(c);
+      }
+      return MG.normaliseProject(pj);
+    }
+    var gens = [];
+    [[1, 0], [2, 1], [3, 3], [4, 4], [5, 6], [7, 8], [9, 12], [10, 14]].forEach(function (s) { var g = genProject(s[0], s[1]); gens.push(g); sameAsBefore(g, s[0] + " zones and " + s[1] + " conduits"); });
+
+    // ---- B. with levels: bands, top to bottom in the house order -----------------------
+    var LV = M.ZONE_LEVELS.map(function (l) { return l.id; });
+    ok(same(LV, ["enterprise", "dmz", "supervisory", "control", "safety", "field"]), "the house layering, top to bottom", LV.join());
+    var demo = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+    function zone(pj, id) { return pj.zones.filter(function (z) { return z.id === id; })[0]; }
+    zone(demo, "Z3").level = "dmz"; zone(demo, "Z4").level = "supervisory"; zone(demo, "Z1").level = "control"; zone(demo, "Z2").level = "safety";
+    var L = ZM.layout(demo, RT.suggestZone);
+    ok(L.banded && same(L.bands.map(function (b) { return b.id; }), ["dmz", "supervisory", "control", "safety"]), "with levels the zones lie in bands in the house order", L.bands.map(function (b) { return b.id; }).join());
+    ok(L.bands.every(function (b, i) { return !i || b.y >= L.bands[i - 1].y + L.bands[i - 1].h; }), "each band below the one before, none overlapping");
+    function boxOf(L2, id) { return L2.boxes.filter(function (b) { return b.id === id; })[0]; }
+    function bandOf(L2, id) { return L2.bands.filter(function (b) { return b.id === id; })[0]; }
+    ok([["Z3", "dmz"], ["Z4", "supervisory"], ["Z1", "control"], ["Z2", "safety"]].every(function (x) { var b = boxOf(L, x[0]), bd = bandOf(L, x[1]); return b.y >= bd.y && b.y + b.h <= bd.y + bd.h; }), "each zone's box inside its band");
+    ok(L.bands.every(function (b) { return b.label && b.lx < boxOf(L, "Z1").x; }), "each band is labelled, left of the boxes");
+    function geometryClean(L2, label) {
+      var bad = [];
+      var rects = L2.boxes.map(function (b) { return { id: b.id, x0: b.x + 1, x1: b.x + b.w - 1, y0: b.y + 1, y1: b.y + b.h - 1 }; });
+      L2.conduits.forEach(function (c) {
+        for (var i = 1; i < c.points.length; i++) {
+          var a = c.points[i - 1], b = c.points[i];
+          var sx0 = Math.min(a[0], b[0]), sx1 = Math.max(a[0], b[0]), sy0 = Math.min(a[1], b[1]), sy1 = Math.max(a[1], b[1]);
+          rects.forEach(function (r) { if (sx0 < r.x1 && sx1 > r.x0 && sy0 < r.y1 && sy1 > r.y0) bad.push(c.id + " through " + r.id); });
+          if (L2.banded && sx1 < 20 + 100) bad.push(c.id + " in the label gutter");
+        }
+      });
+      var tagR = L2.conduits.map(function (c) { var tw = c.id.length * 6.4 + 8; return { id: c.id, x0: c.lx - tw / 2, x1: c.lx + tw / 2, y0: c.ly - 8, y1: c.ly + 8 }; });
+      var noteR = L2.notes.map(function (n) { return { id: "note " + n.id, x0: n.x - n.w / 2, x1: n.x + n.w / 2, y0: n.y - 7, y1: n.y + 7 }; });
+      var all = tagR.concat(noteR);
+      for (var i = 0; i < all.length; i++) for (var j = i + 1; j < all.length; j++) {
+        var p1 = all[i], q = all[j];
+        if (p1.x0 < q.x1 && p1.x1 > q.x0 && p1.y0 < q.y1 && p1.y1 > q.y0 && i < tagR.length && j < tagR.length) continue;   // two tags: as before
+        if (p1.x0 < q.x1 && p1.x1 > q.x0 && p1.y0 < q.y1 && p1.y1 > q.y0) bad.push(p1.id + " over " + q.id);
+      }
+      noteR.forEach(function (n) { rects.forEach(function (r) { if (n.x0 < r.x1 && n.x1 > r.x0 && n.y0 < r.y1 && n.y1 > r.y0) bad.push(n.id + " over " + r.id); }); });
+      ok(!bad.length, label + ": no line through a box or the label gutter, no note over a box, a tag or another note", bad.slice(0, 6).join("; "));
+    }
+    geometryClean(L, "the demo in bands");
+    // Two zones in one band: ordered by the nudge, then by the zones' order.
+    var two = clone(demo); zone(two, "Z4").level = "control";
+    var L2 = ZM.layout(two, RT.suggestZone);
+    ok(boxOf(L2, "Z1").x < boxOf(L2, "Z4").x && boxOf(L2, "Z1").y === boxOf(L2, "Z4").y, "two zones in a band sit side by side, in the zones' order");
+    zone(two, "Z1").levelOrder = 1; zone(two, "Z4").levelOrder = 0;
+    L2 = ZM.layout(two, RT.suggestZone);
+    ok(boxOf(L2, "Z4").x < boxOf(L2, "Z1").x, "and the nudge order puts Z4 first");
+    geometryClean(L2, "two in a band");
+    // A zone with no level goes in a last band.
+    var mixed = clone(demo); delete zone(mixed, "Z4").level;
+    var L3 = ZM.layout(mixed, RT.suggestZone);
+    ok(L3.bands[L3.bands.length - 1].id === "" && /No level/.test(L3.bands[L3.bands.length - 1].label) && boxOf(L3, "Z4").y > boxOf(L3, "Z2").y, "a zone with no level is drawn in a last band, No level");
+    geometryClean(L3, "one zone with no level");
+    // Ten zones, six in one band: the band wraps at four.
+    var big = genProject(10, 14);
+    big.zones.forEach(function (z, i) { z.level = i < 6 ? "control" : (i < 8 ? "dmz" : "field"); });
+    var L4 = ZM.layout(big, RT.suggestZone);
+    var ctl = bandOf(L4, "control"), rowsY = {};
+    big.zones.slice(0, 6).forEach(function (z) { rowsY[boxOf(L4, z.id).y] = true; });
+    ok(Object.keys(rowsY).length === 2 && L4.W === 20 + 100 + 4 * 200 + 3 * 90 + 20, "a band of six wraps to two rows of at most four", Object.keys(rowsY).join());
+    ok(bandOf(L4, "dmz").y < ctl.y && ctl.y < bandOf(L4, "field").y, "and the bands still run dmz, control, field");
+    geometryClean(L4, "ten zones in three bands");
+    // One zone a band: one column, with room for a line skipping a band.
+    var col = genProject(4, 5); col.zones.forEach(function (z, i) { z.level = LV[i]; });
+    col.conduits = []; [["Z1", "Z4"], ["Z1", "Z3"], ["Z2", "EXT"]].forEach(function (e, i) { var c = M.emptyConduit(i + 1); c.fromZone = e[0]; c.toZone = e[1]; col.conduits.push(c); });
+    var L5 = ZM.layout(col, RT.suggestZone);
+    ok(L5.banded && L5.bands.length === 4, "one zone to a band gives one column");
+    geometryClean(L5, "one column of bands, lines skipping bands");
+    gens.forEach(function (g, i) {
+      if (!g.zones.length) return;
+      var gl = clone(g); gl.zones.forEach(function (z, k) { z.level = LV[(k * 5 + i) % LV.length]; });
+      geometryClean(ZM.layout(gl, RT.suggestZone), "generated project " + (i + 1) + " in bands");
+    });
+
+    // ---- C. conduit notes: SL-T and channels beside the line -------------------------
+    var Ld = ZM.layout(MG.normaliseProject(clone(window.SPT_TOUR_PROJECT)), RT.suggestZone);
+    ok(ZM.noteText({ slTargetByFR: { IAC: 2, SI: 3 }, channels: ["OPC UA"] }) === "SL-T 3 · OPC UA" && ZM.noteText({ slTargetByFR: {}, channels: [] }) === "", "a note is the highest SL-T and the channels, or nothing");
+    ok(Ld.notes.length >= 2 && Ld.notes.every(function (n) { return /^(SL-T \d)?( · )?/.test(n.text) && n.text; }), "the demo's conduits carry their SL-T and channels where they fit", Ld.notes.map(function (n) { return n.id + " " + n.text; }).join("; "));
+    geometryClean(Ld, "the demo with no levels");
+    var plain = clone(demo); plain.conduits.forEach(function (c) { c.channels = []; Object.keys(c.slTargetByFR).forEach(function (fr) { c.slTargetByFR[fr] = null; }); });
+    ok(ZM.layout(plain, RT.suggestZone).notes.length === 0, "a conduit with no SL-T and no channel has no note");
+
+    // ---- D. the legend ----------------------------------------------------------------
+    function legendTexts(L6) { return L6.legend.map(function (x) { return x.text; }); }
+    var lt = legendTexts(Ld);
+    ok(lt.indexOf("Safety related") >= 0 && lt.indexOf("Outside the SUC") >= 0 && lt.some(function (x) { return /^Worst risk (low|medium|high|very high)$/.test(x); }) && lt.indexOf("SL-T: highest on any foundational requirement") >= 0, "the demo's legend: safety, worst risk borders, outside the SUC and SL-T", lt.join(" | "));
+    ok(lt.indexOf("Shaded rows: SolutionsPT house layering") < 0 && legendTexts(L).indexOf("Shaded rows: SolutionsPT house layering") >= 0, "the bands are in the legend only when drawn, named as the house layering");
+    ok(legendTexts(L).concat(L.bands.map(function (b) { return b.label; })).every(function (x) { return !/[–—]|62443|IEC/.test(x); }), "no dash, and no claim the layering comes from a standard");
+    var bare = M.emptyProject(); bare.zones.push(M.emptyZone(1));
+    var Lb = ZM.layout(bare, RT.suggestZone);
+    ok(Lb.legend.every(function (x) { return x.text !== "Safety related" && x.text !== "Outside the SUC"; }), "a mark not used is not in the legend", legendTexts(Lb).join());
+    ok(Ld.legend.every(function (it) { return it.x >= 20 && it.x < Ld.W - 20; }), "the legend wraps within the drawing's width");
+
+    // ---- E. the pages ------------------------------------------------------------------
+    load(window.SPT_TOUR_PROJECT);
+    RT.navigate("zones");
+    var svg = main().querySelector("[data-drawing] svg");
+    ok(!!svg && !svg.querySelector("[data-band]") && !!svg.querySelector("[data-legend] text"), "step 3: the demo, with no level set, has no bands and has a legend");
+    ok(!!svg.querySelector('[data-conduit-note]'), "and its conduits' notes");
+    var b3 = svg.querySelector('g[data-zone-id="Z3"]');
+    b3.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+    ok(detail().getAttribute("data-owner-id") === "Z3" && d.activeElement === detail().querySelector("h2"), "a box opens its zone, with the keyboard on its heading");
+    var b2 = main().querySelector('[data-drawing] g[data-zone-id="Z2"]');
+    b2.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    ok(detail().getAttribute("data-owner-id") === "Z2", "Enter on a box opens it too");
+    var lvSel = detail().querySelector('[data-action="zone-level"]');
+    ok(!!lvSel && lvSel.options.length === 7 && lvSel.value === "", "the zone panel has a drawing level, Not set and the six house levels");
+    ok(/House layering/.test(lvSel.closest(".field").textContent), "labelled as the house layering");
+    change(lvSel, "safety");
+    ok(P().zones[1].level === "safety" && RT.isDirty() && main().querySelector('[data-drawing] svg [data-band="safety"]') && main().querySelector('[data-drawing] svg [data-band="none"]'), "choosing a level stores it and the drawing draws bands (the rest in No level)");
+    ok(!detail().querySelector('[data-action="level-left"]'), "alone in its band, no nudge is offered");
+    main().querySelector('[data-zone-row="Z1"] [data-action="pick-Z1"]').click();
+    change(detail().querySelector('[data-action="zone-level"]'), "safety");
+    var left = detail().querySelector('[data-action="level-left"]'), right = detail().querySelector('[data-action="level-right"]');
+    ok(!!left && !!right && left.disabled && !right.disabled, "two in a band, in the zones' order: Z1 comes first, so it can move right and not left");
+    function xOf(id) { return Number(main().querySelector('[data-drawing] g[data-zone-id="' + id + '"] rect').getAttribute("x")); }
+    ok(xOf("Z1") < xOf("Z2"), "Z1 is drawn first in the band");
+    right.focus(); right.click();
+    ok(xOf("Z2") < xOf("Z1") && P().zones[0].levelOrder === 1 && P().zones[1].levelOrder === 0, "Move right puts Z1 second and writes the band's order");
+    ok(d.activeElement === detail().querySelector('[data-action="level-left"]'), "at the end of the band the keyboard goes to Move left");
+    detail().querySelector('[data-action="level-left"]').click();
+    ok(xOf("Z1") < xOf("Z2") && P().zones[0].levelOrder === 0, "and Move left brings it back");
+    change(detail().querySelector('[data-action="zone-level"]'), "");
+    ok(!("level" in P().zones[0]) && !("levelOrder" in P().zones[0]), "Not set takes the level and the place away");
+    // Step 6's drawing and the summary open the zone on step 3.
+    RT.navigate("spec");
+    var s6 = main().querySelector('.zone-map-wrap g[data-zone-id="Z4"]');
+    ok(!!s6 && s6.getAttribute("role") === "button", "step 6's drawing boxes are buttons");
+    s6.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+    ok(RT.state.stage === "zones" && detail().getAttribute("data-owner-id") === "Z4", "and open the zone on step 3");
+
+    // ---- F. Word: the drawing on a landscape page of its own --------------------------
+    function sections(xml) {
+      var out = [], re = /<w:sectPr[\s\S]*?<\/w:sectPr>/g, m, from = 0;
+      while ((m = re.exec(xml))) { out.push({ body: xml.slice(from, m.index), pr: m[0] }); from = m.index + m[0].length; }
+      return out;
+    }
+    function textOf(xml) { return (xml.match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join(" ").replace(/\s+/g, " ").trim(); }
+    function docXml(pj, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(pj, Object.assign({ preview: true }, opts || {}))).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes);
+      });
+    }
+    var pjW = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+    return docXml(pjW).then(function (xml) {
+      var secs = sections(xml), at = -1;
+      secs.forEach(function (s, i) { if (/descr="Zone and conduit drawing"/.test(s.body)) at = i; });
+      ok(at > 0, "the drawing is in a Word section of its own", String(at));
+      var s = secs[at] || { body: "", pr: "" };
+      ok(/w:orient="landscape"/.test(s.pr), "a landscape one");
+      ok(/^Zone and conduit drawings Conduit Name Joins C1 /.test(textOf(s.body)) && / Mark Meaning /.test(textOf(s.body)) && !/Zone and conduit characteristics/.test(textOf(s.body)), "holding only its heading, the picture, the key and the legend", textOf(s.body).slice(0, 120));
+      ok(!/w:orient="landscape"/.test((secs[at - 1] || {}).pr || "x") && /Security functions that must be kept|System under consideration/.test(textOf((secs[at - 1] || {}).body || "")), "the section before it is portrait, the requirements' start");
+      ok(!/w:orient="landscape"/.test((secs[at + 1] || {}).pr || "x") && /^Zone and conduit characteristics/.test(textOf((secs[at + 1] || {}).body || "")), "and the one after it portrait, from the characteristics on");
+      var ext = /<wp:extent cx="(\d+)" cy="(\d+)"/.exec(s.body), Lw = ZM.layout(pjW, RT.suggestZone);
+      ok(!!ext && Number(ext[1]) <= 940 * 9525 && Number(ext[2]) <= 540 * 9525 && Math.abs(Number(ext[1]) / Number(ext[2]) - Lw.W / Lw.drawH) < 0.02, "the picture fits the landscape page at the drawing's proportions", ext ? ext[1] + " x " + ext[2] : "no extent");
+      var png = ZM.toPng(Lw, 3);
+      ok(!!png && png.width === Lw.W && png.height === Lw.H, "the PNG is drawn from the same layout as the SVG");
+      // Bands in Word as on the page.
+      var pjB = clone(pjW); pjB.zones[0].level = "control"; pjB.zones[2].level = "dmz";
+      var Lw2 = ZM.layout(pjB, RT.suggestZone), png2 = ZM.toPng(Lw2, 3);
+      ok(Lw2.banded && png2.height === Lw2.H, "with levels the PNG is the banded layout");
+      // Phase 5 review: the picture is the drawing alone; its key and legend are Word text.
+      var pic = ZM.toPng(Lw, 3, { picture: true });
+      ok(!!pic && pic.width === Lw.W && pic.height === Lw.drawH && Lw.drawH < Lw.H, "for Word the picture is the drawing alone, without its key and legend", pic ? pic.width + " x " + pic.height + " of " + Lw.W + " x " + Lw.H : "none");
+      var tx = textOf(s.body);
+      ok(Lw.conduits.every(function (c) { return tx.indexOf(c.id + " " + (c.name ? c.name + " " : "") + c.from + " to " + c.to) >= 0; }), "the key prints each conduit's id, name and ends as a table", tx.slice(0, 200));
+      ok(/Safety related/.test(tx) && /Worst risk high/.test(tx) && /Outside the SUC/.test(tx) && /SL-T Highest on any foundational requirement/.test(tx), "and the legend each mark and what it means", tx.slice(-260));
+      var tbls = s.body.split("<w:tbl>").length - 1, between = s.body.slice(s.body.indexOf("</w:tbl>"), s.body.lastIndexOf("<w:tbl>"));
+      ok(tbls === 2 && /<w:p[ >]/.test(between), "the key and the legend are two tables, a paragraph between them so Word keeps them apart", tbls + " tables");
+      ok(!!ext && Number(ext[1]) / 9525 / Lw.W >= 0.95, "the demo prints at full size", ext ? String(Number(ext[1]) / 9525 / Lw.W) : "no extent");
+      return docXml(pjW, { highLevelOnly: true });
+    }).then(function (xml) {
+      ok(!/descr="Zone and conduit drawing"/.test(xml) && !/w:orient="landscape"/.test(sections(xml).map(function (s) { return s.pr; }).join("")), "the high-level report has no drawing and no landscape page");
+
+      // ---- H. phase 5 review: a large banded drawing in Word, the boxes' and notes' words ----
+      // Twelve zones over the six levels (the reviewers' case), and six zones one to a level (tall).
+      function big12(levels) {
+        var pj = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+        for (var i = pj.zones.length + 1; i <= 12; i++) { var z = M.emptyZone(i); z.name = ["Historian", "Engineering", "Batch", "Utilities", "Packaging", "Tank farm", "Boiler house", "Water treatment"][i % 8] + " " + i; pj.zones.push(z); }
+        [["Z5", "Z1"], ["Z6", "Z2"], ["Z7", "Z3"], ["Z8", "Z4"], ["Z9", "Z5"], ["Z10", "EXT"], ["Z11", "Z6"]].forEach(function (pr, k) {
+          var c = M.emptyConduit(pj.conduits.length + 1); c.fromZone = pr[0]; c.toZone = pr[1];
+          c.name = "Link " + (k + 4); c.channels = k % 2 ? ["OPC UA", "Modbus TCP"] : ["Remote desktop over VPN"]; c.slTargetByFR.IAC = 1 + (k % 3);
+          pj.conduits.push(c);
+        });
+        if (levels) pj.zones.forEach(function (z, k) { z.level = LV[[3, 4, 1, 2, 0, 3, 3, 5, 2, 0, 3, 5][k]]; });
+        return MG.normaliseProject(pj);
+      }
+      var pj12 = big12(true), L12 = ZM.layout(pj12, RT.suggestZone);
+      var tall = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+      for (var i6 = tall.zones.length + 1; i6 <= 6; i6++) tall.zones.push(Object.assign(M.emptyZone(i6), { name: "Zone " + i6 }));
+      tall.zones.forEach(function (z, k) { z.level = LV[k]; });
+      var Lt = ZM.layout(tall, RT.suggestZone);
+      function drawingSection(xml2) {
+        var secs = sections(xml2), at = -1;
+        secs.forEach(function (s2, i) { if (/descr="Zone and conduit drawing"/.test(s2.body)) at = i; });
+        return { secs: secs, at: at, s: secs[at] || { body: "", pr: "" }, ext: /<wp:extent cx="(\d+)" cy="(\d+)"/.exec((secs[at] || {}).body || "") };
+      }
+      return docXml(pj12).then(function (xml12) {
+        var ds = drawingSection(xml12), scale = ds.ext ? Number(ds.ext[1]) / 9525 / L12.W : 0;
+        ok(scale >= 0.5, "twelve zones in bands print at no less than half the drawing's size (it was 0.41 with the key and legend in the picture)", scale.toFixed(3) + " for " + L12.W + " x " + L12.drawH);
+        ok(!!ds.ext && Math.abs(Number(ds.ext[1]) / Number(ds.ext[2]) - L12.W / L12.drawH) < 0.02, "at the drawing's proportions");
+        ok(/Conduit Name Joins/.test(textOf(ds.s.body)) && /Shaded rows: SolutionsPT house layering/.test(textOf(ds.s.body)), "with its key and legend as text in the drawing's section");
+        return docXml(tall);
+      }).then(function (xmlT) {
+        var ds = drawingSection(xmlT), scale = ds.ext ? Number(ds.ext[1]) / 9525 / Lt.W : 0;
+        ok(Lt.drawH > Lt.W && ds.at > 0 && !/w:orient="landscape"/.test(ds.s.pr), "a drawing taller than it is wide goes on a portrait page", Lt.W + " x " + Lt.drawH);
+        ok(scale >= 0.8 && Number(ds.ext[2]) / 9525 <= 860 && Number(ds.ext[1]) / 9525 <= 620, "using the page's height, at no less than 0.8 of its size", scale.toFixed(3));
+        ok(/^Zone and conduit drawings Conduit Name Joins/.test(textOf(ds.s.body)) && /^Zone and conduit characteristics/.test(textOf((ds.secs[ds.at + 1] || {}).body || "")), "still a section of its own, before the characteristics");
+
+        // The boxes' and the notes' words.
+        var subs = L12.boxes.map(function (b) { return b.sub || ""; }).concat(Ld.boxes.map(function (b) { return b.sub || ""; }));
+        ok(subs.every(function (x) { return !/≤|very-high|sug SL/.test(x); }) && subs.some(function (x) { return /^SL-T \d/.test(x); }) && subs.some(function (x) { return /risk very high|risk high/.test(x); }), "a box says SL-T 3, as a conduit's note does, and the risk by name, not by id", subs.join(" | "));
+        var sugPj = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT)); sugPj.zones.forEach(function (z) { M.FR_IDS.forEach(function (fr) { z.slTargetByFR[fr] = null; }); });
+        var Ls = ZM.layout(sugPj, RT.suggestZone);
+        ok(Ls.boxes.some(function (b) { return /^Suggested SL \d/.test(b.sub); }) && Ls.legend.some(function (x) { return x.text === "Suggested SL: no SL-T set yet"; }), "with no SL-T set a box says Suggested SL, as the legend does");
+        var ctx = d.createElement("canvas").getContext("2d"); ctx.font = "10px \"Segoe UI\", Arial, sans-serif";
+        var wide = [L12, Ld, Ls].reduce(function (a, L6) { return a.concat(L6.boxes.filter(function (b) { return (b.subLines || []).some(function (s3) { return ctx.measureText(s3).width > b.w - 8; }); }).map(function (b) { return b.id + " " + b.sub; })); }, []);
+        ok(!wide.length, "each line under a box's title fits inside the box (two lines where one would not)", wide.join("; "));
+        ok(ZM.noteText({ slTargetByFR: {}, channels: ["VPN, RDP through the jump host"] }) === "VPN, RDP through the…" && ZM.noteText({ slTargetByFR: { IAC: 2 }, channels: ["Supercalifragilisticexpialidocious"] }) === "SL-T 2", "a channel note is cut at a comma or a space, never mid-word, or left out", ZM.noteText({ slTargetByFR: {}, channels: ["VPN, RDP through the jump host"] }));
+        var off = [];
+        [L12, Ld, L, L4].forEach(function (L6) {
+          L6.notes.forEach(function (n) {
+            var c = L6.conduits.filter(function (x) { return x.id === n.id; })[0];
+            if (c && c.run && n.y === c.ly && (n.x < c.run.x0 - 1 || n.x > c.run.x1 + 1)) off.push(n.id + " at " + n.x + " off " + c.run.x0 + ".." + c.run.x1);
+          });
+        });
+        ok(!off.length, "a note beside its tag sits on its own line, never off the line's end", off.join("; "));
+        geometryClean(L12, "twelve zones in bands");
+
+        // Step 3: the drawing is a group of buttons, each with a visible focus ring.
+        load(window.SPT_TOUR_PROJECT); RT.navigate("zones");
+        var svg3 = main().querySelector("[data-drawing] svg");
+        ok(!!svg3 && svg3.getAttribute("role") === "group" && svg3.getAttribute("aria-label") === "Zone and conduit drawing" && !!svg3.querySelector('g[data-zone-id][role="button"]'), "step 3's drawing is a group of zone buttons, not an image");
+        var rules = [].concat.apply([], [].map.call(d.styleSheets, function (sh) { try { return [].map.call(sh.cssRules, function (r) { return r.cssText; }); } catch (e) { return []; } }));
+        ok(rules.some(function (r) { return /\.zone-box-link:focus-visible rect/.test(r) && /outline: 3px solid/.test(r); }), "and a zone box with the keyboard on it shows a focus ring");
+      });
+    }).then(function () {
+
+      // ---- G. the migration ------------------------------------------------------------
+      var raw = clone(window.SPT_TOUR_PROJECT);
+      raw.zones[0].level = "control"; raw.zones[0].levelOrder = 2;
+      raw.zones[1].level = "basement"; raw.zones[1].levelOrder = "first";
+      raw.zones[2].levelOrder = 1;
+      var n1 = MG.normaliseProject(clone(raw));
+      ok(n1.zones[0].level === "control" && n1.zones[0].levelOrder === 2, "a known level and a numeric place are kept");
+      ok(!("level" in n1.zones[1]) && !("levelOrder" in n1.zones[1]), "an unknown level and a place that is not a number go");
+      ok(n1.zones[2].levelOrder === 1 && !("level" in n1.zones[2]), "a place with no level is kept, and no level is added");
+      ok(same(MG.normaliseProject(clone(n1)), n1), "running the migration again changes nothing");
+      var n0 = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+      ok(n0.zones.every(function (z) { return !("level" in z) && !("levelOrder" in z); }), "a file without levels gains none");
+    });
+  }
+}());
+</script>
+</body>
+</html>

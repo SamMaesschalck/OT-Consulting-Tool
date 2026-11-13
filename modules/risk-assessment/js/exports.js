@@ -72,8 +72,8 @@ window.RiskExports = (function () {
   function todayISO() { return new Date().toISOString().slice(0, 10); }
 
   // Names for stored ids: a deliverable prints the name, never the id.
-  function sevName(id) { return id ? RT().impactName(id) : ""; }
-  function likName(id) { return id ? RT().likelihoodName(id) : ""; }
+  function sevName(id, p) { return id ? RT().impactName(id, p) : ""; }
+  function likName(id, p) { return id ? RT().likelihoodName(id, p) : ""; }
   // noSafety: the safety designation is stated on its own row.
   function flagNames(o, noSafety) { return Object.keys(o.flags || {}).filter(function (k) { return o.flags[k] && !(noSafety && k === "sis-present"); }).map(function (k) { return RT().flagLabel(k); }); }
   function assetText(a) { return a.name + (a.type && a.type !== "other" ? " (" + RT().assetTypeLabel(a.type) + ")" : ""); }
@@ -154,6 +154,22 @@ window.RiskExports = (function () {
     p.zones.forEach(function (z) { rt.hlaIdsOf(z).forEach(function (id) { (out[id] = out[id] || []).push(z.id); }); });
     return out;
   }
+  // Whether the assessment used the consequence categories: a tolerable risk
+  // set per category, or an impact rated per category anywhere. Where it did
+  // not, nothing about them is printed.
+  // systemsOnly: the high-level report, which has the ranked systems only.
+  function usesCategories(p, systemsOnly) {
+    var rt = RT();
+    if (rt.criteriaOf(p).hasCategoryTolerable) return true;
+    return p.srs.highLevelAssets.some(function (a) { return a && rt.categoryRatings(a.consequenceByCategory, p).length > 0; }) ||
+      (!systemsOnly && p.zones.concat(p.conduits).some(function (o) { return o.threats.some(function (t) { return rt.categoryRatings(t.impactByCategory, p).length > 0; }); }));
+  }
+  // An impact per category in words, "Safety: Serious; Financial loss: Minor",
+  // or "" where none is given.
+  function categoryWords(map, p) {
+    return RT().categoryRatings(map, p).map(function (r) { return r.name + ": " + r.levelName; }).join("; ");
+  }
+
   // The ranked systems the recorded decisions take to a detailed assessment:
   // on a high-level-only assessment each system's own decision, otherwise a
   // system assigned to a zone recorded as needing one. Suggestions are not
@@ -220,6 +236,8 @@ window.RiskExports = (function () {
     var S = summarise(p);
     var eng = p.engagement || {};
     var rt = RT();
+    // How the criteria in use are named (house, client's, or agreed for this assessment).
+    var CWD = rt.criteriaWords(p), houseWords = CWD.source === "house" || CWD.source === "client-house";
 
     // The consultant's overrides of this report's sections, kept apart from the
     // other report's because same-named sections say different things. See
@@ -295,6 +313,31 @@ window.RiskExports = (function () {
         layout: docx.TableLayoutType ? docx.TableLayoutType.FIXED : undefined
       });
     }
+    // The drawing's picture size on its own page, in pixels (96 to the inch):
+    // landscape unless portrait prints it larger (a tall drawing). The page
+    // less its margins is about 960 by 630 landscape, 630 by 960 portrait;
+    // the heading, the header and the picture's spacing take some height.
+    // scale: how far the picture is shrunk from the drawing's own size.
+    function drawingFit(W, H) {
+      var sL = Math.min(1, 940 / W, 540 / H), sP = Math.min(1, 620 / W, 860 / H);
+      var portrait = sP > sL + 0.001, s = portrait ? sP : sL;
+      return { portrait: portrait, scale: s, w: Math.round(W * s), h: Math.round(H * s) };
+    }
+    // A legend line's mark: the drawing's own swatch as a bordered, shaded
+    // cell, or the word the drawing uses (SL-T).
+    function legendMark(it, width) {
+      var sw = window.RiskZoneMap && window.RiskZoneMap.swatch(it);
+      if (!sw) return textCell(it.term || "", width, { bold: true });
+      var BSx = docx.BorderStyle || {};
+      var edge = { style: sw.dash ? (BSx.DASHED || "dashed") : (BSx.SINGLE || "single"), size: Math.max(4, Math.round(sw.width * 6)), color: String(sw.stroke).replace("#", "") };
+      return new docx.TableCell({
+        width: dxaW(width),
+        shading: { type: docx.ShadingType ? docx.ShadingType.SOLID : "solid", color: String(sw.fill).replace("#", ""), fill: String(sw.fill).replace("#", "") },
+        margins: { top: 60, bottom: 60, left: 100, right: 100 },
+        borders: { top: edge, bottom: edge, left: edge, right: edge },
+        children: [para([run("")], { spacing: { after: 0 } })]
+      });
+    }
     function kvTable(pairs) {
       var w = [2800, 6200];
       return fixedTable(pairs.map(function (kv) {
@@ -357,24 +400,32 @@ window.RiskExports = (function () {
     // (cells above it carry a heavy border), the impact and likelihood
     // scales, the security levels and, in the detailed report, the
     // foundational requirements' key. ----
+    // The project's own criteria (js/model.js criteriaOf), labelled as the
+    // client's, the house's, or agreed for this assessment. ----
     function criteriaAppendix() {
       var R0 = RULES(), out = [], tol = S.tolerable, tolN = bandStyle(tol).name;
-      var SEVS = R0.severityScale, LIKS = R0.likelihoodScale;
+      var CR = rt.criteriaOf(p), CW = rt.criteriaWords(p);
+      var SEVS = CR.impact, LIKS = CR.likelihood;
       function plain(s) { return cap(String(s || "").replace(/^House default:\s*/i, "")); }
       var BS = (docx.BorderStyle && docx.BorderStyle.SINGLE) || "single";
       var heavy = { style: BS, size: 18, color: COLOR.text };
       out.push(h1("Appendix: risk criteria"));
-      // House criteria, and said to be. Where the client's own are in use the
-      // tables are the house's for reference, and how the ratings relate to
-      // the client's criteria is the consultant's to set out (in red until then).
-      out.push(body(p.srs.clientMatrix ? "The SolutionsPT house risk criteria, shown for reference." : "The SolutionsPT house risk criteria used in this assessment."));
-      if (p.srs.clientMatrix) out.push(pinned(body("Consultant note: the client's own risk criteria are in use" + (p.srs.clientMatrixNote ? " (" + noStop(p.srs.clientMatrixNote) + ")" : "") + ". Set out how the ratings in this report relate to them, or replace these tables, before issue.", { color: COLOR.note, italics: true })));
+      // Whose criteria these are, and said to be. Where the client's own are
+      // marked in use but not entered, the tables are the house's for
+      // reference, and how the ratings relate to the client's criteria is the
+      // consultant's to set out (in red until then).
+      if (CW.source === "client-house") {
+        out.push(body("The SolutionsPT house risk criteria, shown for reference."));
+        out.push(pinned(body("Consultant note: the client's own risk criteria are in use" + (p.srs.clientMatrixNote ? " (" + noStop(p.srs.clientMatrixNote) + ")" : "") + ". Set out how the ratings in this report relate to them, or replace these tables, before issue.", { color: COLOR.note, italics: true })));
+      } else {
+        out.push(body(CW.criteria + (CW.source === "project" ? (CW.generic ? " (from a SolutionsPT generic preset)" : "") : " used in this assessment") + (CW.source === "client" && p.srs.clientMatrixNote ? " (" + noStop(p.srs.clientMatrixNote) + ")" : "") + "."));
+      }
       out.push(h2("Risk matrix"));
       var mw = [2500].concat(LIKS.map(function () { return Math.floor(6500 / LIKS.length); }));
       var mrows = [headerRow(["Impact, by likelihood"].concat(LIKS.map(function (l) { return l.name; })), mw)];
       SEVS.slice().reverse().forEach(function (sv) {
         mrows.push(new docx.TableRow({ children: [textCell(sv.name, mw[0], { bold: true, fill: COLOR.subBg })].concat(LIKS.map(function (l, i) {
-          var b = R0.riskMatrix[sv.id][l.id], st = bandStyle(b), above = rt.exceedsTolerable(b, tol);
+          var b = rt.riskFor(sv.id, l.id, p), st = bandStyle(b), above = rt.exceedsTolerable(b, tol);
           var c = new docx.TableCell({
             width: dxaW(mw[i + 1]),
             shading: { type: docx.ShadingType ? docx.ShadingType.SOLID : "solid", color: st.fill, fill: st.fill },
@@ -387,6 +438,22 @@ window.RiskExports = (function () {
       });
       out.push(fixedTable(mrows, mw));
       out.push(pinned(body("Tolerable risk is " + tolN + ". Cells marked above, with a heavy border, are above it: " + (opts.highLevelOnly ? "a system rated there is a candidate for a detailed assessment." : "a threat rated there needs a recorded treatment decision."))));
+      // The consequence categories, where the assessment used them: a
+      // tolerable risk of their own, or an impact rated per category.
+      // With a tolerable risk per category they are a table; else one sentence.
+      if (usesCategories(p, opts.highLevelOnly)) {
+        out.push(h2("Consequence categories"));
+        var who = opts.highLevelOnly ? "A system" : "A threat or system";
+        if (CR.hasCategoryTolerable) {
+          var cw2 = [5000, 4000];
+          out.push(fixedTable([headerRow(["Category", "Tolerable risk"], cw2)].concat(CR.categories.map(function (c) {
+            return new docx.TableRow({ children: [textCell(c.name, cw2[0], { bold: true }), textCell(c.tolerable ? bandStyle(c.tolerable).name : bandStyle(tol).name + " (general tolerable risk)", cw2[1])] });
+          })), cw2));
+          out.push(pinned(body(who + " rated per category is compared with the tolerable risk of each category it is rated in. Its impact is the worst of its categories.")));
+        } else {
+          out.push(pinned(body("Impact can be rated per consequence category: " + CR.categories.map(function (c) { return c.name; }).join("; ") + ". " + who + " rated per category takes the worst of its categories as its impact.")));
+        }
+      }
       function scaleTable(title, arr) {
         out.push(h2(title));
         var w = [2000, 7000];
@@ -417,6 +484,16 @@ window.RiskExports = (function () {
         return new docx.Paragraph({ children: [run(t)], bullet: { level: 0 }, spacing: { after: 60 } });
       });
     }
+    // A ranked system's consequence: the level, then (only where captured)
+    // its rating per consequence category and where the rating comes from.
+    function consequenceCell(a, width) {
+      if (!a.consequence) return textCell("Not rated", width, { color: COLOR.muted });
+      var kids = [para([run(sevName(a.consequence, p))], { spacing: { after: 0 } })];
+      var cw = categoryWords(a.consequenceByCategory, p);
+      if (cw) kids.push(para([run(cw, { size: 16, color: COLOR.muted })], { spacing: { after: 0 } }));
+      if (String(a.consequenceSource || "").trim()) kids.push(para([run("Source: " + noStop(a.consequenceSource), { size: 16, color: COLOR.muted })], { spacing: { after: 0 } }));
+      return cellDxa(kids, width);
+    }
     function bandCell(bandId, width) {
       var st = bandStyle(bandId);
       return textCell(st.name, width, { fill: st.fill, color: st.text, bold: true, valign: "center" });
@@ -430,10 +507,10 @@ window.RiskExports = (function () {
       // Rated on one side only: the side given, and the other in words. A dash
       // beside a rating reads as a typo, and the review tool's dash check
       // would report it as one.
-      if (!band && li && (li.L || li.I)) return textCell((li.L ? likName(li.L) : "Not rated") + " × " + (li.I ? sevName(li.I) : "Not rated"), width, { color: COLOR.muted });
+      if (!band && li && (li.L || li.I)) return textCell((li.L ? likName(li.L, p) : "Not rated") + " × " + (li.I ? sevName(li.I, p) : "Not rated"), width, { color: COLOR.muted });
       if (!band) return textCell("Not rated", width, { color: COLOR.muted });
       var st = bandStyle(band), kids = [para([run(st.name, { bold: true, color: st.text })], { spacing: { after: 0 } })];
-      if (li && li.L && li.I) kids.push(para([run(likName(li.L) + " × " + sevName(li.I), { color: st.text, size: 16 })], { spacing: { after: 0 } }));
+      if (li && li.L && li.I) kids.push(para([run(likName(li.L, p) + " × " + sevName(li.I, p), { color: st.text, size: 16 })], { spacing: { after: 0 } }));
       return cellDxa(kids, width, { fill: st.fill, valign: "center" });
     }
     // The recorded decision on a detailed assessment; none recorded is a
@@ -583,7 +660,7 @@ window.RiskExports = (function () {
       var decided = exceed.filter(function (x) { return x.decided; }).length;
       if (opts.highLevelOnly) {
         var ranked = p.srs.highLevelAssets.filter(function (a) { return a.name; });
-        var aboveTol = ranked.filter(function (a) { return rt.exceedsTolerable(rt.riskFor(a.consequence, a.likelihood), S.tolerable); }).length;
+        var aboveTol = ranked.filter(function (a) { return rt.hlaExceeds(a, p); }).length;
         var forDetail = systemsForDetail(p).length;
         out.push(sbTilesRow([
           { t: String(ranked.length), color: COLOR.navy, label: "systems ranked", fill: COLOR.subBg },
@@ -591,10 +668,10 @@ window.RiskExports = (function () {
           { t: bandStyle(S.tolerable).name, color: bandStyle(S.tolerable).text, label: "tolerable risk", fill: bandStyle(S.tolerable).fill, size: 32 },
           { t: String(forDetail), color: COLOR.navy, label: "for detailed assessment", fill: COLOR.subBg }
         ]));
-        out.push(body("Systems in scope ranked by consequence and likelihood on the SolutionsPT house risk matrix.", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
+        out.push(body("Systems in scope ranked by consequence and likelihood on " + CWD.matrix + ".", { color: COLOR.muted, spacing: { before: 180, after: 60 } }));
         // Ranking as a stacked overview: one row, systems per band.
         var perBand = { "very-high": 0, "high": 0, "medium": 0, "low": 0 };
-        p.srs.highLevelAssets.forEach(function (a) { var b3 = rt.riskFor(a.consequence, a.likelihood); if (b3 && perBand[b3] != null) perBand[b3] += 1; });
+        p.srs.highLevelAssets.forEach(function (a) { var b3 = rt.riskFor(a.consequence, a.likelihood, p); if (b3 && perBand[b3] != null) perBand[b3] += 1; });
         out.push(h2("Systems by risk band"));
         out.push(sbStackTable([ sbStackRow("All ranked systems", [
           { n: perBand["very-high"], color: COLOR.deep }, { n: perBand["high"], color: COLOR.gap },
@@ -605,13 +682,13 @@ window.RiskExports = (function () {
           { color: COLOR.near, label: "Medium" }, { color: COLOR.met, label: "Low" }
         ]));
         var topRanked = RS.applyOrder(p.srs.highLevelAssets.filter(function (a) { return a.name; }).slice().sort(function (a, b4) {
-          return (S.bandRank[rt.riskFor(b4.consequence, b4.likelihood)] || 0) - (S.bandRank[rt.riskFor(a.consequence, a.likelihood)] || 0);
+          return (S.bandRank[rt.riskFor(b4.consequence, b4.likelihood, p)] || 0) - (S.bandRank[rt.riskFor(a.consequence, a.likelihood, p)] || 0);
         }), orderOf("Where to look first"), function (a) { return a.id; }).slice(0, 3);
         noteList("Where to look first", topRanked.map(function (a) { return a.id; }));
         if (topRanked.length) {
           out.push(h2("Where to look first"));
           topRanked.forEach(function (a, i) {
-            var b5 = rt.riskFor(a.consequence, a.likelihood);
+            var b5 = rt.riskFor(a.consequence, a.likelihood, p);
             out.push(sbFocusCard(i + 1, a.name, bandStyle(b5).name));
             out.push(sbSpacer());
           });
@@ -690,7 +767,7 @@ window.RiskExports = (function () {
       // (shared/docx-blocks.js), as an approval is what fills it in.
       ["QA review by", notSet(eng.qaReviewBy)],
       ["Confidentiality", notSet(eng.confidentiality)],
-      ["Method", opts.highLevelOnly ? "IEC 62443-3-2 high-level risk assessment, using the SolutionsPT house risk matrix" : "IEC 62443-3-2, using the SolutionsPT house risk matrix and risk-to-SL mapping"],
+      ["Method", opts.highLevelOnly ? "IEC 62443-3-2 high-level risk assessment, using " + CWD.matrix : "IEC 62443-3-2, using " + CWD.matrix + (houseWords ? " and risk-to-SL mapping" : " and the SolutionsPT house risk-to-SL mapping")],
       ["Asset-owner sign-off", signOffLine(p, "Not yet signed off")]
     ]));
     children.push(pageBreak());
@@ -740,7 +817,7 @@ window.RiskExports = (function () {
       if (bSent) children.push(body(bSent));
       children.push(h2("What we found"));
       var perBandHL = { "very-high": [], "high": [], "medium": [], "low": [] };
-      ranked.forEach(function (a) { var b0 = rt.riskFor(a.consequence, a.likelihood); if (b0 && perBandHL[b0]) perBandHL[b0].push(a); });
+      ranked.forEach(function (a) { var b0 = rt.riskFor(a.consequence, a.likelihood, p); if (b0 && perBandHL[b0]) perBandHL[b0].push(a); });
       var bandBits = [];
       [["very-high", "Very high"], ["high", "High"], ["medium", "Medium"], ["low", "Low"]].forEach(function (pr) {
         if (perBandHL[pr[0]].length) bandBits.push(perBandHL[pr[0]].length + " " + pr[1]);
@@ -753,7 +830,7 @@ window.RiskExports = (function () {
       var hlOnlyType = rt.assessmentType(p) === "high-level";
       function decided(a) { return hlOnlyType ? rt.hlaComparison(a, p) : null; }
       function withReasons(list) { return list.map(function (a) { var r = noStop((decided(a) || {}).reason || ""); return a.name + (r ? ": " + lc1(r) : ""); }).join("; "); }
-      var aboveTol = ranked.filter(function (a) { return rt.exceedsTolerable(rt.riskFor(a.consequence, a.likelihood), S.tolerable); });
+      var aboveTol = ranked.filter(function (a) { return rt.hlaExceeds(a, p); });
       var skipped = aboveTol.filter(function (a) { var c = decided(a); return c && c.required === false; });
       var candidates = aboveTol.filter(function (a) { return skipped.indexOf(a) < 0; });
       var extra = hlOnlyType ? ranked.filter(function (a) { return aboveTol.indexOf(a) < 0 && decided(a).required === true; }) : [];
@@ -973,12 +1050,39 @@ window.RiskExports = (function () {
     if (!opts.highLevelOnly && p.zones.length) {
       // The same drawing as the Zones and conduits page, as a picture.
       var map = window.RiskZoneMap ? window.RiskZoneMap.layout(p, rt.suggestZone) : null;
-      var png = map ? window.RiskZoneMap.toPng(map, 3) : null;
+      // The picture is the drawing alone; its key and legend follow as text,
+      // so they print at the body's size whatever the drawing's.
+      var png = map ? window.RiskZoneMap.toPng(map, 3, { picture: true }) : null;
       if (png) {
-        children.push(h2("Zone and conduit drawings"));
-        var mapW = Math.min(600, png.width), mapH = Math.round(png.height * mapW / png.width);
-        children.push(new docx.Paragraph({ alignment: docx.AlignmentType ? docx.AlignmentType.CENTER : "center", spacing: { before: 120, after: 200 }, keepNext: true,
-          children: [new docx.ImageRun({ data: png.bytes, transformation: { width: mapW, height: mapH }, altText: { title: "Zones and conduits", description: "Zone and conduit drawing", name: "zone-map" } })] }));
+        // On a page of its own (phase 5b): the heading, the picture, the key
+        // and the legend are tagged, and the section pass at the end cuts the
+        // body around them. The page is landscape, or portrait for a drawing
+        // that prints larger that way (a tall banded one): drawingFit.
+        var fit = drawingFit(png.width, png.height);
+        var onDrawPage = function (n) { n.__landPage = true; if (fit.portrait) n.__portrait = true; return n; };
+        children.push(onDrawPage(h2("Zone and conduit drawings")));
+        var mapPara = new docx.Paragraph({ alignment: docx.AlignmentType ? docx.AlignmentType.CENTER : "center", spacing: { before: 120, after: 200 },
+          children: [new docx.ImageRun({ data: png.bytes, transformation: { width: fit.w, height: fit.h }, altText: { title: "Zones and conduits", description: "Zone and conduit drawing", name: "zone-map" } })] });
+        children.push(onDrawPage(mapPara));
+        // The key: each conduit's id, name and the zones it joins.
+        if (map.conduits.length) {
+          var kw = [1300, 5200, 3000];
+          children.push(onDrawPage(fixedTable([headerRow(["Conduit", "Name", "Joins"], kw)].concat(map.conduits.map(function (c) {
+            return new docx.TableRow({ children: [textCell(c.id, kw[0], { bold: true }), textCell(c.name || "", kw[1]), textCell(c.from + " to " + c.to, kw[2])] });
+          })), kw)));
+        }
+        // The legend: what the borders, the dashed box, the words and the shading mean.
+        if (map.legend.length) {
+          // Two tables side by side in Word become one: a short empty
+          // paragraph keeps the legend a table of its own.
+          if (map.conduits.length) children.push(onDrawPage(para([run("")], { spacing: { before: 0, after: 120 } })));
+          var lw2 = [1300, 8200];
+          children.push(onDrawPage(fixedTable([headerRow(["Mark", "Meaning"], lw2)].concat(map.legend.map(function (it) {
+            var meaning = it.term ? it.text.slice(it.term.length).replace(/^:\s*/, "") : it.text;
+            meaning = meaning.charAt(0).toUpperCase() + meaning.slice(1);
+            return new docx.TableRow({ children: [legendMark(it, lw2[0]), textCell(meaning, lw2[1])] });
+          })), lw2)));
+        }
       }
       children.push(h2("Zone and conduit characteristics"));
       children.push(body("These are the zones and conduits as defined for this assessment. Where a zone holds assets that are normally kept apart and they are not separated, the reason follows its table."));
@@ -992,6 +1096,9 @@ window.RiskExports = (function () {
     listSection("Organisational security policies", Array.isArray(p.suc.policies) ? p.suc.policies : []);
     children.push(h2("Tolerable risk"));
     children.push(para([run("Tolerable risk: ", { bold: true }), run(bandStyle(S.tolerable).name, { bold: true, color: bandStyle(S.tolerable).text })]));
+    // A tolerable risk set per consequence category, where one is.
+    var tolByCat = rt.tolerableByCategoryWords(p);
+    if (tolByCat) children.push(para([run("By consequence category: ", { bold: true }), run(tolByCat + ".")]));
     children.push(rt.tolerableConfirmed(p)
       ? body("Confirmed with the asset owner. The risk matrix, its scales and the tolerable line are in the appendix, Risk criteria.")
       : pinned(body("The tolerable risk has not yet been confirmed with the asset owner. The risk matrix, its scales and the tolerable line are in the appendix, Risk criteria.", { bold: true, color: COLOR.note })));
@@ -1031,22 +1138,22 @@ window.RiskExports = (function () {
       children.push(h1("High-level risk ranking"));
       var inZones = zonesBySystem(p);
       var anyAssigned = ranked.some(function (a) { return !!inZones[a.id]; });
-      children.push(body("Systems are ranked by consequence and likelihood on the SolutionsPT house risk matrix" + (p.srs.clientMatrix ? " (client matrix noted: " + (p.srs.clientMatrixNote || "in use") + ")" : "") + "." + (anyAssigned ? " An arrow marks the zones a system is assigned to." : "")));
+      children.push(body("Systems are ranked by consequence and likelihood on " + CWD.matrix + (CWD.source === "client-house" ? " (client matrix noted: " + (p.srs.clientMatrixNote || "in use") + ")" : "") + "." + (anyAssigned ? " An arrow marks the zones a system is assigned to." : "")));
       // On a high-level-only assessment the comparison with tolerable risk is
       // recorded per system, so the table carries the decision.
       var hlDecide = rt.assessmentType(p) === "high-level";
       var rw = hlDecide ? [2100, 1900, 1150, 1150, 1000, 1350, 1856] : [2500, 2400, 1300, 1300, 1200, 2006];
       var rows = [headerRow(["System", "Function / location", "Consequence", "Likelihood", "Risk"].concat(hlDecide ? ["Detailed assessment", "Note"] : ["Note"]), rw)];
       ranked.slice().sort(function (a, b2) {
-        return (S.bandRank[rt.riskFor(b2.consequence, b2.likelihood)] || 0) - (S.bandRank[rt.riskFor(a.consequence, a.likelihood)] || 0);
+        return (S.bandRank[rt.riskFor(b2.consequence, b2.likelihood, p)] || 0) - (S.bandRank[rt.riskFor(a.consequence, a.likelihood, p)] || 0);
       }).forEach(function (a) {
-        var band = rt.riskFor(a.consequence, a.likelihood);
+        var band = rt.riskFor(a.consequence, a.likelihood, p);
         var zs = inZones[a.id] || [];
         var cells = [
           textCell(a.name + (zs.length ? "  → " + zs.join(", ") : ""), rw[0], { bold: zs.length > 0 }),
           textCell(a.functionLocation || "", rw[1]),
-          textCell(sevName(a.consequence) || "Not rated", rw[2], a.consequence ? {} : { color: COLOR.muted }),
-          textCell(likName(a.likelihood) || "Not rated", rw[3], a.likelihood ? {} : { color: COLOR.muted }),
+          consequenceCell(a, rw[2]),
+          textCell(likName(a.likelihood, p) || "Not rated", rw[3], a.likelihood ? {} : { color: COLOR.muted }),
           bandCell(band, rw[4])
         ];
         if (hlDecide) {
@@ -1148,7 +1255,7 @@ window.RiskExports = (function () {
 
       // ---- zones & conduits: each threat's scenario in detail ----
       children.push(h1("Zones, conduits and the detailed risk assessment"));
-      children.push(body("Each threat is rated for likelihood and impact on the SolutionsPT house risk matrix and compared with the tolerable risk of " + tolName + ". The ratings and treatment decisions are in the risk register. The drawing and each zone's and conduit's characteristics are under System under consideration and requirements."));
+      children.push(body("Each threat is rated for likelihood and impact on " + CWD.matrix + " and compared with the tolerable risk of " + tolName + ". The ratings and treatment decisions are in the risk register. The drawing and each zone's and conduit's characteristics are under System under consideration and requirements."));
       S.owners.forEach(function (row) {
         var o = row.o;
         // A zone's own heading is its name, not a section title: it closes the
@@ -1173,7 +1280,7 @@ window.RiskExports = (function () {
             var rows = [
               ["Source", t.source], ["Entry point", t.entryPoint],
               ["Assets", assetNames(o, t, p).join("; ")], ["Vulnerabilities", vIds.join(", ")],
-              ["Consequence", t.consequence], ["Affected FRs", (t.affectedFR || []).join(", ")],
+              ["Consequence", t.consequence], ["Impact by category", categoryWords(t.impactByCategory, p)], ["Affected FRs", (t.affectedFR || []).join(", ")],
               ["Likelihood rationale", t.likelihoodRationale], ["Countermeasures", cms.join(", ")]
             ].filter(function (kv) { return kv[1] && String(kv[1]).trim(); });
             if (rows.length) children.push(kvTable(rows));
@@ -1212,7 +1319,14 @@ window.RiskExports = (function () {
       children.push(fixedTable(mrows, mw));
       if (anySafety) {
         var sis = (RULES().specialRules || []).filter(function (r) { return r.id === "sis-present"; })[0];
-        children.push(pinned(body("A zone marked safety related holds safety functions. The house method sets a floor of SL" + ((sis && sis.floorSL) || 3) + " on every foundational requirement for it.", { color: COLOR.muted })));
+        // The requirements the floor covers: all seven unless narrowed for
+        // this assessment (phase 5b), when it names them.
+        var fw = rt.safetyFloorWords(p), floorSL = (sis && sis.floorSL) || 3;
+        children.push(pinned(body("A zone marked safety related holds safety functions. " + (fw.none
+          ? "The house floor of SL" + floorSL + " is not applied in this assessment."
+          : (fw.narrowed && !fw.all
+            ? "The house method sets a floor of SL" + floorSL + " for it; in this assessment the floor covers " + fw.words + "."
+            : "The house method sets a floor of SL" + floorSL + " on " + fw.words + " for it.")), { color: COLOR.muted })));
       }
       // What drives each target: per zone and conduit, the threats with the
       // worst unmitigated risk on each requirement (the engine's sltDrivers),
@@ -1286,7 +1400,7 @@ window.RiskExports = (function () {
       approvals.forEach(function (s) { var note = changedText(s, docId); if (note) children.push(pinned(body(note, { color: COLOR.note, italics: true }))); });
     }
     children.push(h1("Method and limitations"));
-    children.push(body("The assessment follows " + rt.zcrMap.standard.id + ". The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults. The standard prescribes no matrix, so a client corporate matrix takes precedence where one exists." + (opts.highLevelOnly ? "" : " Each SL-T is the consultant's judgement, informed by the house mapping.")));
+    children.push(body("The assessment follows " + rt.zcrMap.standard.id + ". " + (houseWords ? (opts.highLevelOnly ? "The risk matrix and likelihood scale are SolutionsPT house defaults." : "The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults.") + " The standard prescribes no matrix, so a client corporate matrix takes precedence where one exists." : "The risk matrix and its scales " + (CWD.source === "client" ? "are the client's" : "were agreed for this assessment") + (opts.highLevelOnly ? "." : ", and the risk-to-SL mapping is a SolutionsPT house default.") + " The standard prescribes no matrix.") + (opts.highLevelOnly ? "" : " Each SL-T is the consultant's judgement, informed by the house mapping.")));
     children.push(body(opts.highLevelOnly
       ? "Consequence and likelihood ratings reflect the evidence available at the time of the engagement. The assessment does not test security capability."
       : "Likelihood and impact ratings reflect the evidence available at the time of the engagement. The assessment sets targets and does not test security capability, which is measured against the SL-T in an IEC 62443-3-3 assessment."));
@@ -1304,7 +1418,7 @@ window.RiskExports = (function () {
       heading: function (n, title) {
         // A repeat keeps its own zone's name after the words the consultant chose.
         var made = n.__make(n.__targetName ? title + " " + n.__targetName : title);
-        made.__targetName = n.__targetName; made.__noProse = n.__noProse;
+        made.__targetName = n.__targetName; made.__noProse = n.__noProse; made.__landPage = n.__landPage; made.__portrait = n.__portrait;
         return made;
       },
       body: function (line) { return line === CONSULTANT_NOTE ? consultantNote() : body(line); },
@@ -1322,10 +1436,14 @@ window.RiskExports = (function () {
     var PO = (docx.PageOrientation) || { PORTRAIT: "portrait" };
     var A4_W = 11906, A4_H = 16838;
     function pageProps(isLand) { return { page: { size: { width: A4_W, height: A4_H, orientation: isLand ? (PO.LANDSCAPE || "landscape") : PO.PORTRAIT }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } } }; }
+    // The drawing (tagged __landPage) is a page of its own, cut out of the
+    // portrait section around it: landscape, or portrait when tagged
+    // __portrait as well (a tall drawing, see drawingFit).
     var segs = [], seg = null, isLand = false;
     children.forEach(function (n) {
       if (n && n.__headingLevel === 1 && !n.__boundaryOnly) isLand = !!LAND_KEYS[n.__sectionKey || keyOf(n)];
-      if (!seg || seg.land !== isLand) { seg = { land: isLand, children: [] }; segs.push(seg); }
+      var own = !!(n && n.__landPage), land = own ? !n.__portrait : isLand;
+      if (!seg || seg.land !== land || seg.own !== own) { seg = { land: land, own: own, children: [] }; segs.push(seg); }
       seg.children.push(n);
     });
     var bodySections = segs.map(function (s) { return { properties: pageProps(s.land), children: s.children }; });
@@ -1352,6 +1470,8 @@ window.RiskExports = (function () {
     var S = summarise(p);
     var eng = p.engagement || {};
     var rt = RT();
+    // The criteria in use (js/model.js criteriaOf) and how they are named.
+    var CRX = rt.criteriaOf(p), CWX = rt.criteriaWords(p), houseX = CWX.source === "house" || CWX.source === "client-house";
     var wb = new ExcelJS.Workbook();
     wb.creator = eng.consultant || "OT Cyber Risk Assessment Tool";
 
@@ -1391,7 +1511,7 @@ window.RiskExports = (function () {
      ["Threats registered", String(S.threats.length)],
      ["Above tolerable", String(S.counts.exceeding)],
      ["Sign-off", signOffLine(p, "Not signed off")],
-     ["Method note", "SolutionsPT house risk matrix and risk-to-SL mapping. SL-T values are set by the consultant, with written justification."],
+     ["Method note", (houseX ? "SolutionsPT house risk matrix and risk-to-SL mapping." : (CWX.source === "client" ? "The client's risk matrix" : "The risk matrix agreed for this assessment") + ", with the SolutionsPT house risk-to-SL mapping.") + " SL-T values are set by the consultant, with written justification."],
      // The workbook is issued from the tool and never read back (phase 4, decision 9).
      ["About this workbook", "Issued from the risk assessment tool. A new issue replaces this workbook in full, so make changes in the tool, not here."]
     ].forEach(function (kv) { front.addRow(kv); });
@@ -1399,7 +1519,7 @@ window.RiskExports = (function () {
     for (var fr2 = 2; fr2 <= front.rowCount; fr2++) { front.getCell("A" + fr2).font = { bold: true, size: 10 }; front.getCell("B" + fr2).alignment = { wrapText: true, vertical: "top" }; }
 
     // ---- Summary: the position in numbers, and a heat map per rating ----
-    var R0 = RULES(), SEVS = R0.severityScale, LIKS = R0.likelihoodScale;
+    var R0 = RULES(), SEVS = CRX.impact, LIKS = CRX.likelihood;
     var exceedX = S.threats.filter(function (x) { return x.exceeds; });
     var plan = plannedCountermeasures(S);
     var su = wb.addWorksheet("Summary", { properties: { tabColor: { argb: argb(COLOR.navy) } } });
@@ -1421,22 +1541,25 @@ window.RiskExports = (function () {
       su.addRow(["Heat map: " + st[1].toLowerCase() + " rating"]).getCell(1).font = { bold: true, size: 11, color: { argb: argb(COLOR.headBg) } };
       var head = su.addRow(["Impact, by likelihood"].concat(LIKS.map(function (l) { return l.name; })));
       styleHeader(su, head.number, LIKS.length + 1);
-      var counts = {};
-      S.threats.forEach(function (x) { var li = stateLI(x.t, st[0]); if (li.L && li.I) { var k = li.I + ":" + li.L; counts[k] = (counts[k] || 0) + 1; } });
+      // The counts and outlines as step 5's heat map has them (one rule:
+      // js/view-model.js heatCells and heatAbove).
+      var cells = rt.heatCells(S, st[0]);
       SEVS.slice().reverse().forEach(function (sv) {
-        var r = su.addRow([sv.name].concat(LIKS.map(function (l) { return counts[sv.id + ":" + l.id] || null; })));
+        var r = su.addRow([sv.name].concat(LIKS.map(function (l) { return (cells[sv.id + ":" + l.id] || {}).n || null; })));
         r.getCell(1).font = { bold: true, size: 10 };
         LIKS.forEach(function (l, i) {
-          var b = R0.riskMatrix[sv.id][l.id], bs = bandStyle(b), cell = r.getCell(i + 2);
+          var b = rt.riskFor(sv.id, l.id, p), bs = bandStyle(b), cell = r.getCell(i + 2);
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(bs.fill) } };
           cell.font = { bold: true, color: { argb: argb(bs.text) }, size: 11 };
           cell.alignment = { horizontal: "center" };
-          if (rt.exceedsTolerable(b, S.tolerable)) cell.border = { top: heavy, bottom: heavy, left: heavy, right: heavy };
+          if (rt.heatAbove(cells, sv.id, l.id, b, S.tolerable)) cell.border = { top: heavy, bottom: heavy, left: heavy, right: heavy };
         });
       });
     });
     su.addRow([]);
-    var suNote = su.addRow(["Each cell counts the threat scenarios rated there. Cells with a heavy border are above the tolerable risk of " + bandStyle(S.tolerable).name + ". A current or planned rating not given takes the rating before it."]);
+    var suNote = su.addRow(["Each cell counts the threat scenarios rated there. " + (CRX.hasCategoryTolerable
+      ? "A cell with a heavy border holds a threat above tolerable risk (per consequence category where one is set), or is empty and above the tolerable risk of " + bandStyle(S.tolerable).name + "."
+      : "Cells with a heavy border are above the tolerable risk of " + bandStyle(S.tolerable).name + ".") + " A current or planned rating not given takes the rating before it."]);
     suNote.getCell(1).alignment = { wrapText: true, vertical: "top" };
     su.mergeCells(suNote.number, 1, suNote.number, LIKS.length + 1);
     suNote.height = 32;
@@ -1446,17 +1569,27 @@ window.RiskExports = (function () {
     // A high-level-only assessment records the risk comparison per system:
     // its decision is a last column.
     var hlDecide = rt.assessmentType(p) === "high-level";
-    rk.columns = [{ width: 34 }, { width: 40 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 50 }].concat(hlDecide ? [{ width: 18 }, { width: 40 }] : []);
-    rk.addRow(["System", "Function / location", "Consequence", "Likelihood", "Risk", "Zone", "Note"].concat(hlDecide ? ["Detailed assessment", "Reason"] : []));
-    styleHeader(rk, 1, hlDecide ? 9 : 7);
+    // The consequence's source and its rating per category are last columns,
+    // there only when one is captured.
+    var rkNamed = p.srs.highLevelAssets.filter(function (a) { return a.name; });
+    var rkSrc = rkNamed.some(function (a) { return String(a.consequenceSource || "").trim(); });
+    var rkCat = rkNamed.some(function (a) { return categoryWords(a.consequenceByCategory, p); });
+    var rkHead = ["System", "Function / location", "Consequence", "Likelihood", "Risk", "Zone", "Note"].concat(hlDecide ? ["Detailed assessment", "Reason"] : [])
+      .concat(rkSrc ? ["Consequence source"] : []).concat(rkCat ? ["Consequence by category"] : []);
+    rk.columns = [{ width: 34 }, { width: 40 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 50 }].concat(hlDecide ? [{ width: 18 }, { width: 40 }] : [])
+      .concat(rkSrc ? [{ width: 26 }] : []).concat(rkCat ? [{ width: 50 }] : []);
+    rk.addRow(rkHead);
+    styleHeader(rk, 1, rkHead.length);
     var inZones = zonesBySystem(p);
-    p.srs.highLevelAssets.filter(function (a) { return a.name; }).forEach(function (a) {
+    rkNamed.forEach(function (a) {
       var dc = hlDecide ? rt.hlaComparison(a, p) : null;
-      var r = rk.addRow([a.name, a.functionLocation || "", sevName(a.consequence), likName(a.likelihood), "", (inZones[a.id] || []).join(", "), a.note || ""]
-        .concat(dc ? [dc.required === true ? "Required" : (dc.required === false ? "Not required" : "Not decided"), dc.reason || ""] : []));
-      bandFillCell(r.getCell(5), rt.riskFor(a.consequence, a.likelihood));
+      var r = rk.addRow([a.name, a.functionLocation || "", sevName(a.consequence, p), likName(a.likelihood, p), "", (inZones[a.id] || []).join(", "), a.note || ""]
+        .concat(dc ? [dc.required === true ? "Required" : (dc.required === false ? "Not required" : "Not decided"), dc.reason || ""] : [])
+        .concat(rkSrc ? [String(a.consequenceSource || "").trim()] : []).concat(rkCat ? [categoryWords(a.consequenceByCategory, p)] : []));
+      bandFillCell(r.getCell(5), rt.riskFor(a.consequence, a.likelihood, p));
+      r.alignment = { vertical: "top", wrapText: true };
     });
-    rk.autoFilter = { from: "A1", to: hlDecide ? "I1" : "G1" };
+    rk.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: rkHead.length } };
     freezeTop(rk);
 
     // ---- Threat register: the three ratings, the decision, and the owner
@@ -1465,13 +1598,17 @@ window.RiskExports = (function () {
     var TR_HEAD = ["Zone/Conduit", "ID", "Threat statement", "Source", "Affected FRs", "Likelihood", "Impact", "Risk",
       "Current likelihood", "Current impact", "Current risk", "Planned likelihood", "Planned impact", "Planned risk",
       "Above tolerable?", "Treatment decision", "Rating that stands", "Reason / notes", "Status", "Owner", "Target date", "Progress notes"];
+    // The impact per consequence category is a last column, there only when
+    // a threat has one (the columns before it keep their letters).
+    var trCat = S.threats.some(function (x) { return x.categories && x.categories.length; });
+    if (trCat) TR_HEAD.push("Impact by category");
     function trCol(name) { return TR_HEAD.indexOf(name) + 1; }
     tr.columns = [
       { width: 12 }, { width: 8 }, { width: 60 }, { width: 24 }, { width: 14 },
       { width: 12 }, { width: 12 }, { width: 12 },
       { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 },
       { width: 10 }, { width: 26 }, { width: 12 }, { width: 50 }, { width: 14 }, { width: 18 }, { width: 14 }, { width: 40 }
-    ];
+    ].concat(trCat ? [{ width: 50 }] : []);
     tr.addRow(TR_HEAD);
     styleHeader(tr, 1, TR_HEAD.length);
     S.threats.forEach(function (x) {
@@ -1481,11 +1618,11 @@ window.RiskExports = (function () {
       var due = pm.map(function (m) { return String(m.dueDate || "").trim(); }).filter(Boolean).sort().pop() || "";
       var r = tr.addRow([
         x.owner.id + (x.owner.name ? " " + x.owner.name : ""), x.t.id, x.t.statement, x.t.source || "",
-        x.t.affectedFR.join(", "), likName(x.t.likelihood), sevName(x.t.impact), "",
-        likName(cur.L), sevName(cur.I), "", likName(pl.L), sevName(pl.I), "",
+        x.t.affectedFR.join(", "), likName(x.t.likelihood, p), sevName(x.t.impact, p), "",
+        likName(cur.L, p), sevName(cur.I, p), "", likName(pl.L, p), sevName(pl.I, p), "",
         x.exceeds ? "Yes" : "No", x.label,
         "", x.decided ? x.treatment.reason : "", x.decided ? "Decided" : (x.exceeds ? "Open" : "Monitor"), owners.join("; "), due, ""
-      ]);
+      ].concat(trCat ? [categoryWords(x.t.impactByCategory, p)] : []));
       bandFillCell(r.getCell(trCol("Risk")), x.risk);
       bandFillCell(r.getCell(trCol("Current risk")), x.current);
       bandFillCell(r.getCell(trCol("Planned risk")), x.planned);
@@ -1623,7 +1760,9 @@ window.RiskExports = (function () {
     function crTitle(t) { var r = cr.addRow([t]); r.getCell(1).font = { bold: true, size: 11, color: { argb: argb(COLOR.headBg) } }; return r; }
     function plainNote(s) { s = String(s || "").replace(/^House default:\s*/i, ""); return s.charAt(0).toUpperCase() + s.slice(1); }
     cr.addRow(["Risk criteria"]).getCell(1).font = { bold: true, size: 14, color: { argb: argb(COLOR.headBg) } };
-    var crLead = cr.addRow([p.srs.clientMatrix ? "The SolutionsPT house risk criteria, shown for reference. The client's own risk criteria are in use." : "The SolutionsPT house risk criteria used in this assessment."]);
+    // Labelled as the client's, the house's, or agreed for this assessment.
+    var crLead = cr.addRow([CWX.source === "client-house" ? "The SolutionsPT house risk criteria, shown for reference. The client's own risk criteria are in use." :
+      CWX.criteria + (CWX.source === "project" ? "" : " used in this assessment") + (CWX.source === "client" && p.srs.clientMatrixNote ? " (" + noStop(p.srs.clientMatrixNote) + ")" : "") + "."]);
     cr.mergeCells(crLead.number, 1, crLead.number, LIKS.length + 2);
     var crTol = cr.addRow(["Tolerable risk", bandStyle(S.tolerable).name]); crTol.getCell(1).font = { bold: true, size: 10 };
     cr.addRow([]);
@@ -1631,10 +1770,10 @@ window.RiskExports = (function () {
     var mh = cr.addRow(["Impact, by likelihood"].concat(LIKS.map(function (l) { return l.name; })));
     styleHeader(cr, mh.number, LIKS.length + 1);
     SEVS.slice().reverse().forEach(function (sv) {
-      var r = cr.addRow([sv.name].concat(LIKS.map(function (l) { var b = R0.riskMatrix[sv.id][l.id]; return bandStyle(b).name + (rt.exceedsTolerable(b, S.tolerable) ? " (above)" : ""); })));
+      var r = cr.addRow([sv.name].concat(LIKS.map(function (l) { var b = rt.riskFor(sv.id, l.id, p); return bandStyle(b).name + (rt.exceedsTolerable(b, S.tolerable) ? " (above)" : ""); })));
       r.getCell(1).font = { bold: true, size: 10 };
       LIKS.forEach(function (l, i) {
-        var b = R0.riskMatrix[sv.id][l.id], bs = bandStyle(b), cell = r.getCell(i + 2);
+        var b = rt.riskFor(sv.id, l.id, p), bs = bandStyle(b), cell = r.getCell(i + 2);
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(bs.fill) } };
         cell.font = { bold: true, color: { argb: argb(bs.text) }, size: 10 };
         if (rt.exceedsTolerable(b, S.tolerable)) cell.border = { top: heavy, bottom: heavy, left: heavy, right: heavy };
@@ -1649,10 +1788,16 @@ window.RiskExports = (function () {
     }
     crScale("Impact scale", ["Impact", "Meaning"], SEVS.slice().reverse().map(function (x) { return [x.name, plainNote(x.note)]; }));
     crScale("Likelihood scale", ["Likelihood", "Meaning"], LIKS.slice().reverse().map(function (x) { return [x.name, plainNote(x.note)]; }));
+    // The consequence categories and their tolerable risk, where used.
+    if (usesCategories(p)) {
+      crScale("Consequence categories", ["Category", "Tolerable risk"], CRX.categories.map(function (c) { return [c.name, c.tolerable ? bandStyle(c.tolerable).name : bandStyle(S.tolerable).name + " (general tolerable risk)"]; }));
+      var crCat = cr.addRow(["A threat or system rated per category is compared with the tolerable risk of each category it is rated in."]);
+      crCat.getCell(1).alignment = { wrapText: true, vertical: "top" };
+    }
     var defs = R0.slDefinitions || {};
-    crScale("Security levels", ["Security level", "Protects against"], ["1", "2", "3", "4"].filter(function (k) { return defs[k]; }).map(function (k) { return ["SL" + k, defs[k]]; }));
+    crScale("Security levels (SolutionsPT house summary)", ["Security level", "Protects against"], ["1", "2", "3", "4"].filter(function (k) { return defs[k]; }).map(function (k) { return ["SL" + k, defs[k]]; }));
     var r2sl = R0.riskToSL || {};
-    crScale("Suggested SL-T", ["Unmitigated risk", "Suggested SL-T"], R0.riskBands.filter(function (b) { return r2sl[b.id]; }).map(function (b) { return [b.name, "SL" + r2sl[b.id].suggest]; }));
+    crScale("Suggested SL-T (SolutionsPT house mapping)", ["Unmitigated risk", "Suggested SL-T"], R0.riskBands.filter(function (b) { return r2sl[b.id]; }).map(function (b) { return [b.name, "SL" + r2sl[b.id].suggest]; }));
     crScale("Foundational requirements", ["Short form", "Foundational requirement"], frs.map(function (f) { return [f.id, f.fr + " " + String(f.name).replace(/ & /g, " and ")]; }));
 
     // ---- Basis ----

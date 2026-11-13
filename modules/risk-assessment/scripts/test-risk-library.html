@@ -1,0 +1,258 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool scenario library and Send to step 5</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 5b of docs/risk-tool-redesign.md, item 3: the house scenario library.
+  - The data (data/scenario-library.json and its .js twin): about thirty
+    scenarios, unique ids, every field present, real IEC 62443-3-3 SR id
+    format (ids only), house tags, no ratings, no dashes, no US spelling, a
+    version, a date and an owner note that never reaches the page.
+  - Step 5's Add from library: search, tag and requirement filters, a fit
+    hint from the zone's or conduit's assets and markers; the chosen
+    scenarios are added as unrated drafts with their libraryId, and their
+    countermeasure ideas only when ticked, unlinked.
+  - Scenarios added from it print like any other; the library and its ids
+    never reach Word, Excel, the risk context or the review pack.
+  - Step 2's Send to step 5: known threats as draft scenarios on a chosen zone.
+  - The migration tidies libraryId.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="../data/scenario-library.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks) { if (++tries > 200) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var tx = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, "").replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, "\""); }).join("");
+      if (tx.replace(/\s+/g, "")) out.push(tx);
+    }
+    return out;
+  }
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks, d = w.document, LU = w.RiskApp.LibraryUI;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    try { w.localStorage.removeItem(RT.AUTOSAVE_KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function owner(id) { return P().zones.concat(P().conduits).filter(function (o) { return o.id === id; })[0]; }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    function tick(el, v) { el.checked = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function picker() { return main().querySelector("[data-library-picker]"); }
+    function shown() { return [].filter.call(picker().querySelectorAll(".lib-item"), function (x) { return !x.hidden; }).map(function (x) { return x.getAttribute("data-lib-id"); }); }
+
+    // ---- A. the data ----------------------------------------------------------------------
+    var LIB = RT.scenarioLibrary, file = window.App && window.App.Data && window.App.Data.scenarioLibrary;
+    ok(!!LIB && !!file && same(LIB, file), "the library is loaded from data/scenario-library.js");
+    ok(/^\d+\.\d+$/.test(LIB.version) && /^\d{4}-\d{2}-\d{2}$/.test(LIB.date), "it carries a version and a date", LIB.version + " " + LIB.date);
+    ok(typeof LIB._note === "string" && /name an owner/.test(LIB._note) && /SolutionsPT/.test(LIB._note), "and a note that SolutionsPT must name an owner for the wording");
+    var S = LIB.scenarios;
+    ok(Array.isArray(S) && S.length === 33 && S[S.length - 1].id === "HS33", "thirty-three scenarios, HS01 to HS33", String(S && S.length));
+    var ids = S.map(function (s) { return s.id; });
+    ok(ids.every(function (id, i) { return typeof id === "string" && /^HS\d{2}$/.test(id) && ids.indexOf(id) === i; }), "each with a unique id", ids.join());
+    var FIELDS = ["title", "statement", "source", "entryPoint", "consequence"];
+    var missing = S.filter(function (s) { return !FIELDS.every(function (k) { return typeof s[k] === "string" && s[k].trim().length > 3; }); }).map(function (s) { return s.id; });
+    ok(!missing.length, "each with a title, statement, typical threat source, entry point and consequence", missing.join());
+    var badFR = S.filter(function (s) { return !Array.isArray(s.affectedFR) || !s.affectedFR.length || !s.affectedFR.every(function (fr) { return M.FR_IDS.indexOf(fr) >= 0; }); }).map(function (s) { return s.id; });
+    ok(!badFR.length, "each names the requirements it affects, by the tool's FR ids", badFR.join());
+    var badType = S.filter(function (s) { return !Array.isArray(s.assetTypes) || !s.assetTypes.length || !s.assetTypes.every(function (a) { return M.ASSET_TYPES.indexOf(a) >= 0; }); }).map(function (s) { return s.id; });
+    ok(!badType.length, "each its typical asset types, by the tool's asset type ids", badType.join());
+    ok(S.every(function (s) { return Array.isArray(s.vulnerabilities) && s.vulnerabilities.length && s.vulnerabilities.every(function (v) { return typeof v === "string" && v.trim(); }); }), "each its typical vulnerabilities");
+    var MAX = { 1: 14, 2: 12, 3: 9, 4: 3, 5: 4, 6: 2, 7: 8 }, badSR = [];
+    S.forEach(function (s) {
+      if (!Array.isArray(s.countermeasures) || !s.countermeasures.length) { badSR.push(s.id + " none"); return; }
+      s.countermeasures.forEach(function (c) {
+        if (typeof c.description !== "string" || !c.description.trim() || !Array.isArray(c.srRefs) || !c.srRefs.length) badSR.push(s.id + " incomplete");
+        (c.srRefs || []).forEach(function (sr) {
+          var m = /^SR ([1-7])\.(\d{1,2})$/.exec(sr);
+          if (!m || Number(m[2]) < 1 || Number(m[2]) > MAX[m[1]]) badSR.push(s.id + " " + sr);
+        });
+        if (Object.keys(c).some(function (k) { return ["description", "srRefs"].indexOf(k) < 0; })) badSR.push(s.id + " extra field");
+      });
+    });
+    ok(!badSR.length, "each countermeasure idea has a description and real IEC 62443-3-3 SR ids, ids only", badSR.join("; "));
+    var badTag = S.filter(function (s) { return !Array.isArray(s.tags) || !s.tags.length || !s.tags.every(function (tg) { return LIB.tags && typeof LIB.tags[tg] === "string"; }); }).map(function (s) { return s.id; });
+    ok(!badTag.length, "each is tagged, every tag named in the library", badTag.join());
+    ["remote-access", "removable-media", "wireless", "safety", "supply-chain", "insider", "ransomware"].forEach(function (tg) {
+      ok(S.some(function (s) { return s.tags.indexOf(tg) >= 0; }), "a scenario is tagged " + LIB.tags[tg].toLowerCase());
+    });
+    // No ratings anywhere: the consultant rates.
+    var rated = [];
+    (function scan(o, path) {
+      if (Array.isArray(o)) { o.forEach(function (x, i) { scan(x, path + "[" + i + "]"); }); return; }
+      if (o && typeof o === "object") Object.keys(o).forEach(function (k) {
+        if (/likelihood|impact|risk|rating|severity|band|residual|score|sl$|slt/i.test(k)) rated.push(path + "." + k);
+        scan(o[k], path + "." + k);
+      });
+    }(S, "scenarios"));
+    ok(!rated.length, "no ratings in the library", rated.join());
+    var strs = [];
+    (function all(o) { if (typeof o === "string") strs.push(o); else if (o && typeof o === "object") Object.keys(o).forEach(function (k) { all(o[k]); }); }({ s: S, t: LIB.tags }));
+    ok(strs.every(function (x) { return !/[–—]/.test(x) && !/ - /.test(x); }), "no dashes", strs.filter(function (x) { return /[–—]| - /.test(x); }).join(" | "));
+    var US = /\b(\w*(authoriz|organiz|recogniz|prioritiz|minimiz|maximiz|analyz|utiliz|realiz|normaliz|optimiz|standardiz|centraliz|categoriz)\w*|color\w*|behavior\w*|center\w*|defense|catalog|program|programs|gray|favor\w*|labor|fulfill|enroll\w*|license[sd]?|licensing|offense|meter)\b/i;
+    ok(strs.every(function (x) { return !US.test(x); }), "UK spelling, no US spellings", strs.filter(function (x) { return US.test(x); }).map(function (x) { return x.match(US)[0]; }).join(", "));
+
+    // ---- B. step 5: Add from library ---------------------------------------------------------
+    RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT));
+    w.RiskApp.RiskPage.select("Z4"); RT.navigate("risk");
+    var z4 = owner("Z4"), nT = z4.threats.length, nM = z4.countermeasures.length, counter = P().counters.threat;
+    var btn = main().querySelector('[data-owner-id="Z4"] [data-action="add-from-library"]');
+    ok(!!btn && btn.getAttribute("aria-expanded") === "false", "a zone's scenarios offer Add from library");
+    btn.click();
+    ok(!!picker() && picker().getAttribute("data-library-picker") === "Z4" && d.activeElement === picker().querySelector('[data-field="lib-search"]'), "it opens an in-page picker, the keyboard in its search");
+    ok(main().querySelectorAll(".lib-item").length === S.length && /^33 of 33$/.test(picker().querySelector(".lib-count").textContent), "listing every scenario", picker().querySelector(".lib-count").textContent);
+    ok(!/name an owner|working draft/.test(main().textContent) && main().textContent.indexOf(LIB._note.slice(0, 40)) < 0, "the library's owner note is not on the page");
+    var first = picker().querySelector(".lib-item");
+    ok(!!first.querySelector(".lib-fit") && /Engineering workstation/.test(first.querySelector(".lib-fit").textContent), "the best fits come first, with a hint from the zone's asset types", first.textContent.slice(0, 120));
+    var fits = [].map.call(picker().querySelectorAll(".lib-item"), function (x) { return !!x.querySelector(".lib-fit"); });
+    ok(fits.indexOf(false) < 0 || fits.slice(fits.indexOf(false)).indexOf(true) < 0, "every scenario that fits is listed before those that do not");
+    type(picker().querySelector('[data-field="lib-search"]'), "wireless");
+    ok(shown().length >= 1 && shown().every(function (id) { var s = S.filter(function (x) { return x.id === id; })[0]; return /wireless/i.test(JSON.stringify(s)) || s.tags.indexOf("wireless") >= 0; }) && shown().indexOf("HS07") >= 0, "search narrows the list as it is typed", shown().join());
+    type(picker().querySelector('[data-field="lib-search"]'), "");
+    change(picker().querySelector('[data-field="lib-tag"]'), "safety");
+    var safeIds = S.filter(function (s) { return s.tags.indexOf("safety") >= 0; }).map(function (s) { return s.id; });
+    ok(same(shown().slice().sort(), safeIds.slice().sort()), "the tag filter shows the scenarios with that tag", shown().join());
+    change(picker().querySelector('[data-field="lib-tag"]'), "");
+    change(picker().querySelector('[data-field="lib-fr"]'), "DC");
+    ok(shown().length && shown().every(function (id) { return S.filter(function (x) { return x.id === id; })[0].affectedFR.indexOf("DC") >= 0; }), "and the requirement filter those affecting it", shown().join());
+    change(picker().querySelector('[data-field="lib-fr"]'), "");
+    var addB = picker().querySelector('[data-action="lib-add"]');
+    ok(addB.disabled, "Add waits for a choice");
+    var item3 = picker().querySelector('[data-lib-id="HS03"]');
+    ok(item3.querySelector(".lib-body").hidden, "a scenario's detail opens when it is chosen");
+    tick(item3.querySelector('[data-lib-pick="HS03"]'), true);
+    ok(!item3.querySelector(".lib-body").hidden && /Typical vulnerabilities/.test(item3.textContent) && item3.querySelectorAll("[data-lib-cm]").length === 3, "chosen: its statement, typical vulnerabilities and three countermeasure ideas");
+    ok([].every.call(item3.querySelectorAll("[data-lib-cm]"), function (c) { return !c.checked; }), "no countermeasure is ticked for you");
+    tick(picker().querySelector('[data-lib-pick="HS18"]'), true);
+    tick(item3.querySelector('[data-lib-cm="HS03:0"]'), true);
+    ok(!addB.disabled && addB.textContent === "Add 2", "Add says how many", addB.textContent);
+    addB.click();
+    var h3 = S.filter(function (s) { return s.id === "HS03"; })[0], h18 = S.filter(function (s) { return s.id === "HS18"; })[0];
+    var added = z4.threats.slice(nT);
+    ok(added.length === 2 && added[0].id === "T" + (counter + 1) && added[1].id === "T" + (counter + 2), "two scenarios added to the zone, with new ids", added.map(function (x) { return x.id; }).join());
+    ok(added[0].statement === h3.statement && added[0].source === h3.source && added[0].entryPoint === h3.entryPoint && added[0].consequence === h3.consequence && same(added[0].affectedFR, M.FR_IDS.filter(function (fr) { return h3.affectedFR.indexOf(fr) >= 0; })), "each with the library's statement, source, entry point, consequence and requirements");
+    ok(added.every(function (x) { return !x.likelihood && !x.impact && !x.currentLikelihood && !x.residualLikelihood && !x.treatment.decision && !x.treatment.confirmed; }), "unrated, with no decision");
+    ok(added.every(function (x) { return !x.assetIds.length && !x.vulnerabilityIds.length && !x.countermeasureIds.length; }), "and nothing linked for you");
+    ok(added[0].libraryId === "HS03" && added[1].libraryId === "HS18", "each records the library id it came from");
+    var cmAdded = z4.countermeasures.slice(nM);
+    ok(cmAdded.length === 1 && cmAdded[0].description === h3.countermeasures[0].description && same(cmAdded[0].srRefs, h3.countermeasures[0].srRefs) && same(cmAdded[0].addressesFR, ["UC", "SI"]) && !cmAdded[0].existing,
+      "only the ticked countermeasure idea is added, with its SR ids and the requirements they belong to, as additional", JSON.stringify(cmAdded));
+    ok(!z4.threats.some(function (x) { return x.countermeasureIds.indexOf(cmAdded[0].id) >= 0; }), "and linked to no scenario");
+    ok(!picker() && d.activeElement === main().querySelector('[data-threat-id="' + added[0].id + '"] [data-field="statement"]'), "the picker closes and the first draft opens, the keyboard in its statement");
+    var toastEl = d.getElementById("toast");
+    ok(/2 scenarios added from the library, with 1 draft countermeasure\./.test(toastEl.textContent) && !!toastEl.querySelector('[data-action="toast-undo"]'), "the toast says what was added, with Undo", toastEl.textContent);
+    ok(RT.isDirty(), "the project is marked changed");
+    var open = RT.completeness().filter(function (i) { return i.target && i.target.kind === "threat" && (i.target.id === added[0].id || i.target.id === added[1].id); });
+    ok(open.length >= 2, "the drafts are open until rated", String(open.length));
+    type(main().querySelector('[data-threat-id="' + added[0].id + '"] [data-field="statement"]'), "A visiting laptop's USB drive carries malware into Z4.");
+    ok(added[0].statement === "A visiting laptop's USB drive carries malware into Z4." && added[0].libraryId === "HS03", "the draft is the consultant's to edit, its provenance kept");
+    main().querySelector('[data-owner-id="Z4"] [data-action="add-from-library"]').click();
+    ok(/Already added/.test(picker().querySelector('[data-lib-id="HS03"]').textContent), "opened again, the picker marks what was added before");
+    picker().querySelector('[data-action="lib-cancel"]').click();
+    ok(!picker() && z4.threats.length === nT + 2 && d.activeElement === main().querySelector('[data-action="add-from-library"]'), "Cancel closes it and adds nothing, back on Add from library");
+    main().querySelector('[data-action="add-from-library"]').click();
+    picker().dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    ok(!picker(), "Escape closes it too");
+    // A conduit: the hint reads its markers.
+    w.RiskApp.RiskPage.select("C2"); RT.navigate("risk");
+    main().querySelector('[data-owner-id="C2"] [data-action="add-from-library"]').click();
+    var hs01 = picker().querySelector('[data-lib-id="HS01"] .lib-fit');
+    ok(!!hs01 && /external network/.test(hs01.textContent), "for a conduit to an external network, a remote access scenario fits it", hs01 ? hs01.textContent : "no hint");
+    picker().querySelector('[data-action="lib-cancel"]').click();
+
+    // ---- C. what prints ------------------------------------------------------------------------
+    var pj = clone(P());
+    function wordText(q) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(q, { preview: true })).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes)).join("\n");
+      });
+    }
+    return wordText(pj).then(function (wt) {
+      ok(wt.indexOf("A visiting laptop's USB drive carries malware into Z4.") >= 0 && wt.indexOf(h18.statement) >= 0, "Word prints the scenarios added from the library like any other");
+      ok(!/\bHS\d\d\b/.test(wt) && !/scenario library|house library|libraryId/i.test(wt), "and says nothing of the library or its ids");
+      var wb = RX.buildWorkbook(pj), all = [];
+      wb.eachSheet(function (ws) { ws.eachRow(function (r) { r.eachCell(function (c) { all.push(String(c.value == null ? "" : (c.value.richText ? c.value.richText.map(function (x) { return x.text; }).join("") : c.value))); }); }); });
+      var xs = all.join("\n");
+      ok(xs.indexOf(h18.statement) >= 0 && xs.indexOf(h3.countermeasures[0].description) >= 0, "Excel lists them, and the countermeasure added, like any other");
+      ok(!/\bHS\d\d\b/.test(xs) && !/libraryId|scenario library/i.test(xs), "and never the library or its ids");
+      var ctx = JSON.stringify(RT.buildRiskContext(pj));
+      ok(ctx.indexOf(h18.statement) >= 0 && ctx.indexOf("libraryId") < 0 && !/\bHS\d\d\b/.test(ctx), "the risk context carries the scenario, not its library id");
+      var pack = JSON.stringify(RR.packItems());
+      ok(pack.indexOf("libraryId") < 0 && !/\bHS\d\d\b/.test(pack), "nor does the review pack");
+
+      // ---- D. the migration ------------------------------------------------------------------
+      var raw = clone(pj);
+      raw.zones[3].threats[nT].libraryId = 42;
+      var n1 = MG.normaliseProject(clone(raw));
+      ok(!("libraryId" in n1.zones[3].threats[nT]) && n1.zones[3].threats[nT + 1].libraryId === "HS18", "the migration keeps a library id that is text and drops one that is not");
+      ok(MG.normaliseProject(clone(window.SPT_TOUR_PROJECT)).zones.every(function (z) { return z.threats.every(function (x) { return !("libraryId" in x); }); }), "and adds none to a file without");
+      ok(same(MG.normaliseProject(clone(n1)), n1), "running it again changes nothing");
+
+      // ---- E. Send to step 5 (step 2) ------------------------------------------------------------
+      RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT));
+      RT.navigate("srs");
+      var panel = main().querySelector("details[data-send]");
+      ok(!!panel && panel.querySelector("summary").textContent === "Send to step 5" && !panel.open, "step 2 offers Send to step 5 under the known threats, closed to start with");
+      panel.open = true; panel.dispatchEvent(new w.Event("toggle"));
+      var known = P().srs.knownThreats.slice();
+      var boxes = panel.querySelectorAll("[data-send-line]");
+      ok(boxes.length === known.length && [].every.call(boxes, function (b) { return b.checked && !b.disabled; }), "each known threat is listed, ticked");
+      var tgt = panel.querySelector('[data-field="send-target"]');
+      ok(tgt.value === "Z1" && tgt.options.length === P().zones.length + P().conduits.length, "to a zone or conduit, the first zone to start with");
+      change(tgt, "Z4");
+      panel = main().querySelector("details[data-send]");
+      tick(panel.querySelector('[data-send-line="1"]'), false);
+      var send = panel.querySelector('[data-action="send-threats"]');
+      ok(send.textContent === "Send " + (known.length - 1), "Send says how many", send.textContent);
+      var z4b = owner("Z4"), before = z4b.threats.length, c0 = P().counters.threat;
+      send.focus(); send.click();
+      var sent = z4b.threats.slice(before);
+      ok(sent.length === known.length - 1 && same(sent.map(function (x) { return x.statement; }), known.filter(function (x, i) { return i !== 1; })), "the ticked threats become draft scenarios on Z4, the line their statement");
+      ok(sent.every(function (x, i) { return x.id === "T" + (c0 + i + 1) && !x.likelihood && !x.impact && !x.source && !x.affectedFR.length && !x.libraryId; }), "new ids, unrated, nothing else filled");
+      ok(RT.state.stage === "srs" && main().querySelector("details[data-send]").open && d.activeElement === main().querySelector('[data-action="send-threats"]'), "the page stays on step 2, the panel open, the keyboard on Send");
+      ok(/sent to Z4 as draft scenarios\./.test(d.getElementById("toast").textContent) && !!d.getElementById("toast").querySelector('[data-action="toast-undo"]'), "the toast says so, with Undo");
+      panel = main().querySelector("details[data-send]");
+      var sentBoxes = [].filter.call(panel.querySelectorAll("[data-send-line]"), function (b) { return b.disabled; });
+      ok(sentBoxes.length === known.length - 1 && /\(in Z4\)/.test(panel.textContent), "those already in Z4 are marked and cannot be sent twice");
+      var ta = [].filter.call(main().querySelectorAll("textarea"), function (x) { return x.value.indexOf(known[0]) === 0; })[0];
+      type(ta, known.join("\n") + "\nLoss of the site's only historian");
+      panel = main().querySelector("details[data-send]");
+      ok(panel.querySelectorAll("[data-send-line]").length === known.length + 1 && /Loss of the site's only historian/.test(panel.textContent), "a threat typed above joins the list at once");
+      ok(panel.querySelector('[data-action="send-threats"]').textContent === "Send 2", "and can be sent with the one left out before", panel.querySelector('[data-action="send-threats"]').textContent);
+      // A high-level-only assessment has no step 5 work, and no zones means nowhere to send.
+      P().assessmentType = "high-level"; RT.render();
+      ok(!main().querySelector("[data-send]"), "a high-level-only assessment has no Send to step 5");
+      var empty = M.emptyProject(); empty.srs.knownThreats = ["Insider misuse"];
+      RT.loadProjectText(JSON.stringify(empty)); RT.navigate("srs");
+      ok(/once there are zones/.test((main().querySelector("[data-send]") || {}).textContent || ""), "with no zones it says threats can be sent once there are some");
+    });
+  }
+}());
+</script>
+</body>
+</html>

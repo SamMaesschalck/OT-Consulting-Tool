@@ -6,7 +6,8 @@
  * reopens the step last used), the sidebar (each entry's page id in
  * data-stage, and each step's status from the completeness list), the old
  * page ids, Go to an item of that list, Open the demo, the redraw that keeps
- * keyboard focus, and the header buttons.
+ * keyboard focus, one-level undo (Ctrl+Z and the toast's Undo), and the
+ * header buttons.
  * The pages register themselves in RiskApp.Pages (js/ui-stages.js,
  * js/ui-reports.js, js/ui-about.js, loaded after this file); render() draws
  * whichever the stage names. boot() starts the tool and publishes
@@ -108,7 +109,7 @@ window.RiskApp.App = (function () {
     autosaveTimer = setTimeout(writeAutosave, 800);
   }
   function flushAutosave() { clearTimeout(autosaveTimer); if (dirty && projectHasContent(state.project)) writeAutosave(); }
-  function touched() { markDirty(); scheduleAutosave(); renderHeaderSummary(); }
+  function touched() { noteChange(); markDirty(); scheduleAutosave(); renderHeaderSummary(); }
 
   // ---------- Save-in-place (File System Access API) ----------
   // A download can never overwrite, so repeated saves pile up as
@@ -306,7 +307,7 @@ window.RiskApp.App = (function () {
     state.stage = knownStage(state.project.lastStage) ? state.project.lastStage : "home";
     openedAt = state.stage;
     clearGuard();
-    render(); if (!leftDemo) writeAutosave(); markClean();
+    render(); undoReset(); if (!leftDemo) writeAutosave(); markClean();
     toast(opts.demo ? "The demo is open. Autosave is off." : "Risk project loaded.");
     if (leftDemo) offerRestore({ forgetFile: true });
     return true;
@@ -549,6 +550,98 @@ window.RiskApp.App = (function () {
     renderNav();
   }
 
+  // ---------- One-level undo (phase 5b) ----------
+  // The project as it stood before the last change, kept as text. Every
+  // change goes through touched(), which happens after the edit, so the state
+  // before it is kept ready (base) and becomes the undo point when a change
+  // starts. Typing in one field is one change until the keyboard or the mouse
+  // goes elsewhere; several touched() calls in one action are one change.
+  // Ctrl+Z outside a text field (inside one the browser's own undo stays)
+  // and the toast's Undo after a destructive or bulk action both undo it. One
+  // level only: undoing clears it. Load, New and Restore clear it too.
+  // seq numbers each undo point as it is made, so an action can tell
+  // whether it made one (undoMark before, offerUndo after); typed: a text
+  // field has had input since the last change that was not typing.
+  var undo = { base: null, stale: false, key: null, entry: null, tick: false, seq: 0, typed: false };
+  function snapshotNow() { return JSON.stringify(state.project); }
+  function undoReset() { undo.base = snapshotNow(); undo.stale = false; undo.key = null; undo.entry = null; undo.tick = false; undo.typed = false; }
+  var TEXT_TYPES = /^(text|search|email|url|tel|password|number|date|datetime-local|month|time|week)$/;
+  function isTextField(el) {
+    if (!el || !el.tagName) return false;
+    if (el.isContentEditable || el.tagName === "TEXTAREA") return true;
+    return el.tagName === "INPUT" && TEXT_TYPES.test((el.getAttribute("type") || "text").toLowerCase());
+  }
+  // Something other than typing is about to happen (a press, a click, a key
+  // outside a field, the focus moving, a choice): the state as it is now is
+  // what the next change undoes to, what was typed included.
+  function undoBoundary(e) {
+    if (undo.base == null) return;
+    if (e && e.type === "keydown" && isTextField(e.target) && e.key !== "Enter") return;
+    undo.base = snapshotNow(); undo.stale = false;
+    undo.key = null; undo.tick = false;
+  }
+  ["pointerdown", "mousedown", "click", "focusin", "change", "keydown"].forEach(function (t) { document.addEventListener(t, undoBoundary, true); });
+  document.addEventListener("input", function (e) { if (isTextField(e.target)) undo.typed = true; }, true);
+  function noteChange() {
+    if (undo.base == null) return;
+    var el = document.activeElement, key = isTextField(el) ? el : null;
+    // A later touched() in the same action, or the next key in the same field.
+    if (undo.tick || (key && key === undo.key)) {
+      if (key) undo.stale = true; else { undo.base = snapshotNow(); undo.stale = false; }
+      return;
+    }
+    var before = undo.base, now = key ? null : snapshotNow();
+    if (now != null && now === before) return;   // nothing changed
+    undo.entry = { json: before, stage: state.stage, mark: focusMark(), after: null, label: "", seq: ++undo.seq };
+    undo.key = key; undo.tick = true;
+    if (key) undo.stale = true; else { undo.base = now; undo.typed = false; }
+  }
+  // Taken before an action that offers Undo: offerUndo shows Undo only for an
+  // undo point made after it, so an action that changed nothing never offers
+  // to undo an earlier, unrelated change.
+  function undoMark() { return undo.seq; }
+  // After a destructive or bulk action: the toast says what happened, with
+  // Undo. after(): run once the state is back, to open what it concerns on
+  // the page (a zone, a scenario); returns where the keyboard goes.
+  // mark: undoMark() taken before the action.
+  function offerUndo(msg, after, mark) {
+    var mine = undo.entry && (typeof mark !== "number" || undo.entry.seq > mark) ? undo.entry : null;
+    if (mine) { mine.after = after || null; mine.label = msg; }
+    toast(msg, null, mine ? { text: "Undo", title: "Undo (Ctrl+Z)", keys: "Control+Z", onClick: doUndo } : null);
+  }
+  function doUndo() {
+    var e = undo.entry;
+    if (!e) { toast("Nothing to undo."); return false; }
+    var data = JSON.parse(e.json), p = state.project;
+    // In place, so the page's own state (what is selected) keeps to the
+    // project; ids never change, so a selection by id finds its item again.
+    Object.keys(p).forEach(function (k) { delete p[k]; });
+    Object.keys(data).forEach(function (k) { p[k] = data[k]; });
+    undo.entry = null; undo.base = e.json; undo.stale = false; undo.key = null; undo.tick = false; undo.typed = false;
+    // A question waiting on the state before (where ratings go, a download) goes.
+    if (R.CriteriaUI && R.CriteriaUI.close) R.CriteriaUI.close();
+    clearGuard();
+    markDirty(); scheduleAutosave();
+    if (R.Pages[e.stage]) state.stage = e.stage;
+    var sel = null;
+    try { sel = e.after ? e.after() : null; } catch (err) { sel = null; }
+    var m = $("main"), y = m ? m.scrollTop : 0;
+    render();
+    $("main").scrollTop = y;
+    if (sel) focusAfter(sel);
+    else { focusBack(e.mark); if (!$("main").contains(document.activeElement)) focusEl(pageHeading()); }
+    toast("Undone.");
+    return true;
+  }
+  document.addEventListener("keydown", function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== "z") return;
+    // In a text field the browser's own undo stays, unless nothing has been
+    // typed since the last change (the keyboard was put there by an action).
+    if (isTextField(e.target) && (undo.typed || !undo.entry)) return;
+    e.preventDefault();
+    doUndo();
+  });
+
   // ---------- Render root ----------
   // The pages: js/ui-stages.js, js/ui-reports.js and js/ui-about.js. Three
   // more are drawn by the files that own them: js/review.js (peer),
@@ -592,7 +685,7 @@ window.RiskApp.App = (function () {
         state.project = MG.normaliseProject(pj); state.stage = knownStage(snap.stage) ? snap.stage : "home"; openedAt = state.stage;
         if (opts.forgetFile) forgetProjectFile();
         clearGuard();
-        document.body.removeChild(bar); render(); markDirty(); toast("Autosaved work restored.");
+        document.body.removeChild(bar); render(); undoReset(); markDirty(); toast("Autosaved work restored.");
       } }),
       h("button", { class: "btn sm", text: "Discard", onClick: function () { try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {} document.body.removeChild(bar); } })
     ]);
@@ -615,7 +708,7 @@ window.RiskApp.App = (function () {
       // Forget the previous project's file so Save can't overwrite it with
       // this new, unrelated assessment — the first save will ask where to save.
       forgetProjectFile();
-      render(); markClean(); toast("New risk assessment started.");
+      render(); undoReset(); markClean(); toast("New risk assessment started.");
       if (leftDemo) offerRestore();
     });
     $("btn-save").addEventListener("click", saveProject); // Shift+click = Save as…
@@ -690,6 +783,7 @@ window.RiskApp.App = (function () {
 
     U.setupThemeToggle();
     render();
+    undoReset();
     updateSaveButton();
     offerRestore();
 
@@ -717,18 +811,39 @@ window.RiskApp.App = (function () {
     window.RiskTool = {
       state: state,
       suggestZone: E.suggestZone, suggestConduit: E.suggestConduit,
-      riskFor: E.riskFor, threatRisk: E.threatRisk, exceedsTolerable: E.exceedsTolerable,
+      // A rating's band and a level's name, on the open project's risk
+      // criteria unless a project is given (phase 5: criteria per project).
+      riskFor: function (impact, likelihood, project) { return E.riskFor(impact, likelihood, project || state.project); },
+      threatRisk: function (t, project) { return E.threatRisk(t, project || state.project); },
+      exceedsTolerable: E.exceedsTolerable,
       threatDisposition: function (owner, t, project) { return E.threatTreatment(owner, t, project && typeof project === "object" ? project : state.project).disposition; },
-      residualRisk: E.residualRisk,
+      residualRisk: function (t, project) { return E.residualRisk(t, project || state.project); },
       threatTreatment: function (owner, t, project) { return E.threatTreatment(owner, t, project || state.project); },
-      suggestTreatment: E.suggestTreatment, TREATMENT_LABEL: E.TREATMENT_LABEL,
+      suggestTreatment: function (owner, t, tolerable, project) { return E.suggestTreatment(owner, t, tolerable, project || state.project); },
+      TREATMENT_LABEL: E.TREATMENT_LABEL,
       assetTypeLabel: E.assetTypeLabel, flagLabel: E.flagLabel,
-      likelihoodName: E.likelihoodName, impactName: E.impactName,
+      likelihoodName: function (id, project) { return E.likelihoodName(id, project || state.project); },
+      impactName: function (id, project) { return E.impactName(id, project || state.project); },
+      // Phase 5: the risk criteria in use (js/model.js criteriaOf), how the
+      // deliverables name them, a threat's or ranked system's impact per
+      // consequence category, and a ranked system against tolerable risk.
+      criteriaOf: function (project) { return M.criteriaOf(project || state.project); },
+      criteriaWords: function (project) { return E.criteriaWords(project || state.project); },
+      categoryRatings: function (map, project) { return E.categoryRatings(map, project || state.project); },
+      hlaExceeds: function (a, project) { return E.hlaExceeds(a, project || state.project); },
+      criteriaMisfits: function (project) { return E.criteriaMisfits(project || state.project); },
+      presetCriteria: M.presetCriteria, CRITERIA_PRESETS: M.PRESETS,
       buildRiskContext: function (project) { return E.buildRiskContext(project || state.project); },
       exportProblems: function (project) { return E.exportProblems(project || state.project); },
       // Everything the outputs print per threat and per zone or conduit
       // (js/view-model.js), for the open project unless one is given.
       viewModel: function (project) { return R.ViewModel.build(project || state.project); },
+      // A heat map's cells for one rating state and whether each is outlined
+      // (the one rule step 5 and the workbook's Summary read), and the
+      // tolerable risk per consequence category in words.
+      heatCells: function (vm, st) { return R.ViewModel.heatCells(vm, st); },
+      heatAbove: function (cells, I, L, band, tolerable) { return R.ViewModel.heatAbove(cells, I, L, band, tolerable); },
+      tolerableByCategoryWords: function (project) { return E.tolerableByCategoryWords(project || state.project); },
       emptyZone: M.emptyZone, emptyConduit: M.emptyConduit, emptyThreat: M.emptyThreat,
       loadProjectText: loadProjectText, projectHasContent: projectHasContent,
       confirmRemove: U.confirmRemove, FR_IDS: FR_IDS,
@@ -770,6 +885,14 @@ window.RiskApp.App = (function () {
       threatAssets: function (owner, project) { return E.threatAssets(owner, project || state.project); },
       // What sets each requirement's suggested SL-T: the driving threats, the safety floor or a zone a conduit joins.
       sltDrivers: function (owner, project) { return E.sltDrivers(owner, project || state.project); },
+      // Phase 5b: the requirements the safety floor covers (narrowed per
+      // project), and the house scenario library.
+      safetyFloorFR: function (project) { return M.safetyFloorFR(project || state.project); },
+      safetyFloorWords: function (project) { return E.safetyFloorWords(project || state.project); },
+      scenarioLibrary: M.LIBRARY,
+      // Phase 5b: one-level undo of the last change (Ctrl+Z, the toast's Undo).
+      undo: function () { return doUndo(); }, canUndo: function () { return !!undo.entry; }, undoMark: undoMark,
+      ZONE_LEVELS: M.ZONE_LEVELS,
       CM_STATUS_LABEL: M.CM_STATUS_LABEL, CM_PRIORITY_LABEL: M.CM_PRIORITY_LABEL
     };
   }
@@ -781,6 +904,7 @@ window.RiskApp.App = (function () {
     forgetProjectFile: forgetProjectFile, supportsFilePickers: supportsFilePickers,
     render: render, rerender: rerender, rerenderSoon: rerenderSoon, changeRedraw: changeRedraw, refreshNav: refreshNav, renderHeaderSummary: renderHeaderSummary,
     navigate: navigate, focusAfter: focusAfter, goToItem: goToItem, flash: flash, sltCount: sltCount, openDemo: openDemo,
-    offerRestore: offerRestore, boot: boot
+    offerRestore: offerRestore, boot: boot,
+    offerUndo: offerUndo, undoMark: undoMark, undo: doUndo, canUndo: function () { return !!undo.entry; }
   };
 }());

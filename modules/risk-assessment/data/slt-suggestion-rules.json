@@ -71,6 +71,8 @@
       "id": "sis-present",
       "label": "Zone contains SIS / safety instrumented function",
       "floorSL": 3,
+      "floorFR": ["IAC", "UC", "SI", "DC", "RDF", "TRE", "RA"],
+      "_floorFR": "The foundational requirements the safety floor applies to. HOUSE default: all seven. A project can narrow it (project.safetyFloorFR), never widen it.",
       "actions": [
         "Prompt: safety systems normally warrant their own zone, separated from basic process control.",
         "Apply an SL3 floor to every foundational requirement for any zone containing a safety function.",

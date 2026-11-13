@@ -81,13 +81,23 @@ window.RiskApp.UI = (function () {
     btn.addEventListener("click", function () { applyTheme(currentTheme() === "dark" ? "light" : "dark"); });
   }
 
+  // action: { text, onClick, title, keys } puts a button in the toast (Undo,
+  // phase 5b), which then stays longer; the keyboard focus is never moved to
+  // it. The toast is a polite live region that stays in the layout when
+  // idle (toast-off, index.html), so a screen reader announces each message.
   var toastTimer = null;
-  function toast(msg, kind) {
+  function toast(msg, kind, action) {
     var t = $("toast");
     t.textContent = msg;
     t.className = "toast" + (kind ? " " + kind : "");
+    if (action && action.text) {
+      t.appendChild(h("button", { type: "button", class: "toast-action", "data-action": "toast-" + action.text.toLowerCase(), text: action.text,
+        title: action.title || null, "aria-keyshortcuts": action.keys || null, onClick: function () {
+        clearTimeout(toastTimer); t.className = "toast toast-off"; action.onClick();
+      } }));
+    }
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.className = "toast hidden"; }, 3800);
+    toastTimer = setTimeout(function () { t.className = "toast toast-off"; }, action ? 9000 : 3800);
   }
 
   function slug(s) { return (s || "risk-assessment").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "risk-assessment"; }
@@ -222,10 +232,11 @@ window.RiskApp.UI = (function () {
       cells.push(h("td", null, [h("button", { class: "btn sm danger", text: "×", title: "Remove", onClick: function () {
         var filled = columns.some(function (c) { return c.kind !== "computed" && it[c.key]; });
         if (!confirmRemove(filled, opts.rowLabel || "entry")) return;
+        var mk = R.App.undoMark();
         items.splice(i, 1);
         if (opts.onRemove) opts.onRemove(it);
         touched(); rerender();
-        if (filled && opts.rowLabel) toast(cap(opts.rowLabel) + " removed.");
+        if (filled && opts.rowLabel) R.App.offerUndo(cap(opts.rowLabel) + " removed.", null, mk);
       } })]));
       tb.appendChild(h("tr", opts.rowAttrs ? opts.rowAttrs(it) : null, cells));
     });
@@ -267,6 +278,8 @@ window.RiskApp.UI = (function () {
     var L = window.RiskZoneMap.layout(p, E.suggestZone);
     if (!L) return h("p", { class: "muted", text: "Add zones to see the drawing." });
     var svg = window.RiskZoneMap.toSvg(L, svgEl);
+    // With its boxes as buttons the drawing is a group of controls, not a picture.
+    if (onPick) svg.setAttribute("role", "group");
     if (onPick) [].forEach.call(svg.querySelectorAll("[data-zone-id]"), function (g) {
       var id = g.getAttribute("data-zone-id");
       g.setAttribute("role", "button"); g.setAttribute("tabindex", "0"); g.setAttribute("aria-label", "Open " + id);

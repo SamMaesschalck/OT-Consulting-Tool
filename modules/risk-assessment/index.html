@@ -50,6 +50,40 @@
       background: var(--near-bg); border: 1px solid var(--near);
       border-radius: var(--radius); padding: 10px 12px; font-size: 13px; margin: 8px 0 12px;
     }
+    .sis-box .floor-frs { margin-top: 6px; align-items: center; }
+    .toast .toast-action {
+      margin-left: 12px; background: transparent; color: #FFF; border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 4px; padding: 2px 10px; font: inherit; font-weight: 600; cursor: pointer;
+    }
+    .toast .toast-action:focus-visible { outline: 2px solid #FFF; outline-offset: 2px; }
+    /* The toast is a live region: idle, it stays in the layout (so the next
+       message is announced) but is out of sight and takes no clicks. */
+    .toast.toast-off { opacity: 0; pointer-events: none; visibility: visible; }
+    .toast.toast-off .toast-action { visibility: hidden; }
+    /* The theme's toast is var(--text), near white in the dark theme, under
+       white text; here it is a dark slate with a light edge in both dark modes. */
+    :root[data-theme="dark"] .toast:not(.warn):not(.err) { background: #2B3A4B; border: 1px solid #5B6E82; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .toast:not(.warn):not(.err) { background: #2B3A4B; border: 1px solid #5B6E82; }
+    }
+    /* Phase 5b: the scenario library picker (step 5) and Send to step 5 (step 2). */
+    .lib-picker { border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface-2); padding: 10px 12px; margin: 8px 0; }
+    .lib-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .lib-filters input[type=search] { flex: 1; min-width: 180px; }
+    .lib-filters input, .lib-filters select, .send-step5 select {
+      background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 6px 9px; font: inherit;
+    }
+    .lib-list { max-height: 420px; overflow: auto; border-top: 1px solid var(--border); }
+    .lib-item { border-bottom: 1px solid var(--border); padding: 6px 2px; }
+    .lib-item .lib-head { display: flex; gap: 8px; align-items: baseline; }
+    .lib-item .lib-fit { font-size: 12px; color: var(--brand-blue-dark); margin-left: 24px; }
+    .lib-item .lib-body { margin: 4px 0 2px 24px; font-size: 13px; }
+    .lib-item .lib-body ul { margin: 2px 0 4px; padding-left: 18px; }
+    .lib-cms label { display: flex; gap: 6px; align-items: baseline; font-weight: 400; font-size: 13px; text-transform: none; }
+    .send-step5 { margin: -4px 0 16px; }
+    .send-step5 summary { cursor: pointer; color: var(--brand-blue); font-size: 13px; }
+    .send-threats label { display: flex; gap: 6px; align-items: baseline; font-weight: 400; font-size: 13px; text-transform: none; }
+    .level-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .framing-note {
       background: var(--brand-blue-tint); border: 1px solid var(--brand-blue);
       border-radius: var(--radius); padding: 10px 12px; font-size: 13px; margin-bottom: 14px;
@@ -168,6 +202,34 @@
     .scales summary { cursor: pointer; color: var(--brand-blue); font-weight: 600; font-size: 12px; }
     .scale-list { margin: 4px 0 8px; padding-left: 18px; }
     .scale-name { font-weight: 600; }
+    .crit-matrix select { width: auto; min-width: 92px; padding: 3px 4px; font-weight: 600; border-color: transparent; }
+    /* The band's own fill on the cell's choice (the theme's select background would hide it). */
+    .crit-matrix select.risk-low { background-color: var(--met-bg); color: var(--met); }
+    .crit-matrix select.risk-medium { background-color: var(--near-bg); color: var(--near); }
+    .crit-matrix select.risk-high { background-color: var(--gap-bg); color: var(--gap); }
+    .crit-matrix select.risk-very-high { background-color: var(--gap); color: #FFF; }
+    .crit-matrix select option { background: var(--surface); color: var(--text); }
+    .crit-preset { margin-top: 8px; align-items: center; }
+    .crit-preset select { width: auto; min-width: 200px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 6px 9px; outline: none; }
+    .crit-preset select:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 2px var(--brand-blue-tint); }
+    .criteria-map { margin-top: 10px; border: 2px solid var(--near); border-radius: var(--radius); padding: 8px 10px; background: var(--surface-2); }
+    .criteria-map-h { margin: 0 0 6px; font-size: 13px; }
+    .crit-scales-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 18px; margin-top: 8px; }
+    @media (max-width: 1100px) { .crit-scales-body { grid-template-columns: 1fr; } }
+    .crit-levels input[type=text] { width: 100%; box-sizing: border-box; }
+    /* A level's meaning wraps rather than being cut off. */
+    .crit-levels textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 0; font-family: inherit; line-height: 1.35; display: block; }
+    .crit-levels select { width: 100%; }
+    .crit-levels .btn-row { margin-top: 6px; align-items: center; }
+    .hla-impact { text-align: left; }
+    .hla-impact select { width: 100%; }
+    .hla-cats { margin-top: 4px; font-size: 12px; }
+    .hla-cats > summary { cursor: pointer; color: var(--brand-blue); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+    .cat-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, 1fr); gap: 4px; align-items: center; margin: 3px 0; font-size: 12px; font-weight: 400; text-transform: none; color: var(--text); }
+    .hla-cats .cat-line { grid-template-columns: 1fr; gap: 1px; margin: 4px 0; }
+    .hla-cats input[type=text] { width: 100%; box-sizing: border-box; }
+    .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; }
+    .derived { font-size: 13px; }
     .zones-layout { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(0, 3fr); gap: 16px; align-items: start; }
     @media (max-width: 1100px) { .zones-layout { grid-template-columns: 1fr; } }
     .zones-detail { position: sticky; top: 0; }
@@ -177,6 +239,9 @@
     .link-btn { border: 0; background: transparent; color: var(--brand-blue); font-weight: 700; cursor: pointer; padding: 0; font-family: inherit; font-size: 13px; }
     .zone-box-link { cursor: pointer; }
     .zone-box-link:focus-visible rect, .zone-box-link:hover rect { stroke-width: 3; }
+    /* A zone box with the keyboard on it: a ring in the brand blue, as the theme's other focus rings. */
+    .zone-box-link:focus { outline: none; }
+    .zone-box-link:focus-visible rect { outline: 3px solid var(--brand-blue); outline-offset: 3px; filter: drop-shadow(0 0 2px var(--brand-blue)); }
     .zones-detail .asset-row { flex-wrap: wrap; }
     .zones-detail .asset-row input[type=text] { flex: 2 1 180px; min-width: 140px; }
     .zones-detail .asset-row select { flex: 1 1 140px; width: auto; min-width: 0; }
@@ -334,7 +399,7 @@
     <div id="sidebar" class="sidebar no-print"></div>
     <div id="main" class="main"></div>
   </div>
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast toast-off" role="status" aria-live="polite"></div>
 
   <!-- The suite version (js/version.js, copied in from shared/version.js) and
        this module's product name (js/product.js). js/host-bridge.js (copied
@@ -347,6 +412,7 @@
   <script src="data/zcr-map.js"></script>
   <script src="data/risk-context-interchange.js"></script>
   <script src="data/engagement-guidance.js"></script>
+  <script src="data/scenario-library.js"></script>
   <script src="js/zone-map.js"></script>
   <!-- The app itself, as classic scripts in this order (no modules, so it
        runs from file:// and the single-HTML build inlines each one): the
@@ -360,6 +426,8 @@
   <script src="js/ui-kit.js"></script>
   <script src="js/app.js"></script>
   <script src="js/ui-stages.js"></script>
+  <script src="js/ui-criteria.js"></script>
+  <script src="js/ui-library.js"></script>
   <script src="js/ui-risk.js"></script>
   <script src="js/ui-zones.js"></script>
   <script src="js/ui-spec.js"></script>

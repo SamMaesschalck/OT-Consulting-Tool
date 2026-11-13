@@ -10,6 +10,7 @@
 #   data/slt-suggestion-rules.js      -> window.App.Data.sltRules
 #   data/risk-context-interchange.js  -> window.App.Data.interchange
 #   data/zcr-map.js                   -> window.App.Data.zcrMap
+#   data/scenario-library.js          -> window.App.Data.scenarioLibrary
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -58,6 +59,10 @@ Wrap-Assign -jsonRelPath "data/review-file.json" `
 Wrap-Assign -jsonRelPath "data/engagement-guidance.json" `
             -jsRelPath   "data/engagement-guidance.js" `
             -targetExpr  "window.App.Data.engagementGuidance"
+
+Wrap-Assign -jsonRelPath "data/scenario-library.json" `
+            -jsRelPath   "data/scenario-library.js" `
+            -targetExpr  "window.App.Data.scenarioLibrary"
 
 Write-Host ""
 Write-Host "Done. index.html loads these via classic <script src> tags."

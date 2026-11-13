@@ -1,0 +1,367 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool phase 5 review fixes</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  The fixes from the phase 5 review (docs/risk-tool-redesign.md, phase 5),
+  each held here where no other page holds it:
+  - Leave as it is never lowers an impact that mirrors its categories; a
+    rating above its categories is compared as its band; the default move
+    between presets keeps each level's place (no band drops); a removed
+    level's or category's id is never reused; an action that changed nothing
+    offers no Undo; the heat maps, the review pack and the SL-T trace compare
+    per consequence category; the approval fingerprint covers what isHouse
+    compares; a matrix cell not set is a completeness item.
+  - Wording: the general tolerable risk named so, the per-category line, the
+    approval note, the high-level method, the generic preset as the client's,
+    the toasts, the presets' definitions, the framing note, the library.
+  - Usability: the toast as a live region readable in the dark theme, Ctrl+Z
+    in a field nothing was typed in, focus after removing a level, the level
+    names' accessible names, Escape in the mapping panel, the picker's live
+    count and aria-controls, step 2's Impact column.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks) { if (++tries > 200) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var tx = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, "").replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, "\""); }).join("");
+      if (tx.replace(/\s+/g, "")) out.push(tx);
+    }
+    return out;
+  }
+  // WCAG contrast of two computed colours ("rgb(r, g, b)").
+  function lum(c) {
+    var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c); if (!m) return null;
+    var v = [m[1], m[2], m[3]].map(function (x) { x = Number(x) / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  }
+  function contrast(a, b) { var x = lum(a), y = lum(b); if (x == null || y == null) return 0; return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks;
+    var d = w.document, RP = w.RiskApp.RiskPage, A = w.RiskApp.App;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var KEY = RT.AUTOSAVE_KEY;
+    try { w.localStorage.removeItem(KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function P() { return RT.state.project; }
+    function main() { return d.getElementById("main"); }
+    function crit() { return main().querySelector('[data-check-anchor="criteria"]'); }
+    function texts(pj) { return RT.completeness(pj).map(function (i) { return i.text; }); }
+    function change(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function zone(id) { return P().zones.concat(P().conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threat(oid, tid) { return zone(oid).threats.filter(function (x) { return x.id === tid; })[0]; }
+    function row(vm, tid) { return vm.threats.filter(function (x) { return x.t.id === tid; })[0]; }
+    function load(pj) { RT.loadProjectText(JSON.stringify(pj)); }
+    function toastEl() { return d.getElementById("toast"); }
+    function toastUndo() { return toastEl().querySelector('[data-action="toast-undo"]'); }
+    function ctrlZ(target) { var e = new w.KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true, cancelable: true }); (target || d.body).dispatchEvent(e); return e; }
+    function words(pj, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(pj, Object.assign({ preview: true }, opts || {}))).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    function col(ws, name) { var n = 0; ws.getRow(1).eachCell(function (c, i) { if (c.value === name) n = i; }); return n; }
+    function rowWhere(ws, colName, value) { var out = null, n = col(ws, colName); ws.eachRow(function (r, i) { if (i > 1 && n && r.getCell(n).value === value) out = r; }); return out; }
+    function findRow(ws, first) { var out = null; ws.eachRow(function (r) { if (!out && r.getCell(1).value === first) out = r; }); return out; }
+    function fresh() {
+      var pj = M.emptyProject();
+      pj.suc.name = "Review Works";
+      pj.srs.highLevelAssets.push({ id: "A1", name: "DCS", functionLocation: "Control room", consequence: "minor", likelihood: "high", note: "" }); pj.counters.hla = 1;
+      var z = M.emptyZone(1); z.name = "Control"; pj.counters.zone = 1;
+      var t1 = M.emptyThreat(1); t1.statement = "Vendor path"; t1.affectedFR = ["IAC"]; t1.likelihood = "high"; t1.impact = "minor";
+      var t2 = M.emptyThreat(2); t2.statement = "Spill by misuse"; t2.affectedFR = ["SI"]; t2.likelihood = "medium"; t2.impact = "minor";
+      z.threats = [t1, t2]; pj.counters.threat = 2; pj.zones.push(z);
+      return pj;
+    }
+    var BAND_RANK = M.BAND_RANK;
+
+    // ---- 1. Leave as it is never lowers an impact that mirrors its categories ----
+    load(window.SPT_TOUR_PROJECT);
+    var t4 = threat("Z2", "T4");
+    ok(same(t4.impactByCategory, { safety: "severe", environmental: "serious", regulatory: "serious" }) && t4.impact === "severe", "the demo's T4: severe for safety, serious for the others, impact severe");
+    RT.navigate("suc");
+    crit().querySelector('[data-action="remove-level-impact-severe"]').click();
+    var mapSel = crit().querySelector('select[data-field="crit-map-impact-severe"]');
+    ok(!!mapSel, "removing Severe asks where its ratings go");
+    change(mapSel, "");
+    crit().querySelector('[data-action="criteria-map-apply"]').click();
+    t4 = threat("Z2", "T4");
+    ok(t4.impactByCategory.safety === "severe" && t4.impact === "severe" && RT.threatRisk(t4) === null, "left as it is, T4's impact stays severe (no band, open) rather than dropping to serious", t4.impact);
+    ok(RT.criteriaMisfits().some(function (f) { return f.item === t4; }) && texts().some(function (x) { return /T4: .*no longer fit/.test(x); }), "and the completeness list says it no longer fits");
+    var mirror = { impactByCategory: { safety: "severe", financial: "minor" }, impact: "severe" }, pjm = MG.normaliseProject(clone(P()));
+    E.syncCategoryMirrors(Object.assign(pjm, { zones: [Object.assign(M.emptyZone(9), { threats: [mirror] })], conduits: [] }));
+    ok(mirror.impact === "severe", "syncCategoryMirrors leaves an impact alone while one of its entries does not fit");
+    var sys = { consequence: "serious", consequenceByCategory: { safety: "gone-level", financial: "minor" } };
+    E.setCategoryRating(sys, "consequence", "consequenceByCategory", "financial", "negligible", P());
+    ok(sys.consequence === "serious", "setting one category while another does not fit leaves a ranked system's consequence as it was");
+    ok(E.categoryMapFits({ safety: "serious" }, P()) && !E.categoryMapFits({ safety: "severe" }, P()) && !E.categoryMapFits({ nowhere: "minor" }, P()), "a category map fits only when every entry is on a category and a level the criteria have");
+
+    // ---- 2. A rating above its categories is compared as its band ----
+    var pj2 = fresh(); pj2.criteria = M.houseCriteria(); pj2.criteria.tolerableByCategory = { safety: "medium" };
+    pj2.zones[0].threats[0].impact = "severe"; pj2.zones[0].threats[0].likelihood = "high"; pj2.zones[0].threats[0].impactByCategory = { financial: "negligible" };
+    pj2.srs.highLevelAssets[0].consequence = "severe"; pj2.srs.highLevelAssets[0].consequenceByCategory = { financial: "negligible" };
+    load(pj2);
+    var x1 = row(RT.viewModel(), "T1");
+    ok(x1.risk === "very-high" && x1.exceeds && x1.treatment.required, "a threat rated severe, its only category negligible, is very high and above tolerable risk (its own impact caps nothing below its band)", x1.risk + " " + x1.exceeds);
+    var ctx2 = RT.buildRiskContext(), ct1 = null; ctx2.zones.forEach(function (z) { z.threats.forEach(function (x) { if (x.id === "T1") ct1 = x; }); });
+    ok(ct1 && ct1.exceedsTolerable === true, "the risk context exports it above tolerable risk");
+    var trWs = RX.buildWorkbook(P()).getWorksheet("Threat register"), trRow = rowWhere(trWs, "ID", "T1");
+    ok(trRow && /^Yes/.test(String(trRow.getCell(col(trWs, "Above tolerable?")).value)), "the threat register says Above tolerable? Yes", trRow ? String(trRow.getCell(col(trWs, "Above tolerable?")).value) : "no row");
+    ok(RT.hlaExceeds(P().srs.highLevelAssets[0]), "and a ranked system rated the same way is above it too");
+
+    // ---- 3. Moving between presets keeps each level's place: no band drops ----
+    function bandOf(c, I, L) { return c.matrix[I][L]; }
+    [["3x3", "5x5"], ["5x5", "3x3"], ["4x4", "5x5"], ["4x4", "3x3"], ["3x3", "4x4"], ["5x5", "4x4"]].forEach(function (pr) {
+      var a = M.presetCriteria(pr[0]), b = M.presetCriteria(pr[1]);
+      var mL = E.defaultMapping(a.likelihood, b.likelihood, true), mI = E.defaultMapping(a.impact, b.impact, true), drops = [];
+      a.impact.forEach(function (iv) { a.likelihood.forEach(function (lv) {
+        var was = bandOf(a, iv.id, lv.id), now = bandOf(b, mI[iv.id], mL[lv.id]);
+        if (BAND_RANK[now] < BAND_RANK[was]) drops.push(iv.name + " x " + lv.name + ": " + was + " to " + now);
+      }); });
+      ok(!drops.length, pr[0] + " to " + pr[1] + ": by default no rating's band drops", drops.join("; "));
+    });
+    var m33 = E.defaultMapping(M.presetCriteria("3x3").likelihood, M.presetCriteria("5x5").likelihood, true);
+    ok(m33.L3 === "L5" && m33.L2 === "L3" && m33.L1 === "L1", "3x3 Likely goes to 5x5 Almost certain, not to Possible because the ids match", JSON.stringify(m33));
+    var cur = M.houseCriteria(), nxt = clone(cur); nxt.impact = nxt.impact.filter(function (x) { return x.id !== "serious"; });
+    var rm = E.defaultMapping(cur.impact, nxt.impact, false);
+    ok(rm.negligible === "negligible" && rm.minor === "minor" && rm.severe === "severe" && rm.serious === "severe", "a level removed: the others stay (same id and name), the removed one goes up to the next", JSON.stringify(rm));
+    var three = [{ id: "L1", name: "Unlikely" }, { id: "L2", name: "Possible" }, { id: "L3", name: "Likely" }];
+    ok(same(E.defaultMapping(three, M.presetCriteria("5x5").likelihood, false), { L1: "L2", L2: "L3", L3: "L4" }), "a level counts as the same only with the same id and name (3x3 Unlikely, L1, is 5x5 Unlikely, L2, not Rare)");
+    var byName = [{ id: "a", name: "Low" }, { id: "b", name: "High" }, { id: "c", name: "Top" }], toName = [{ id: "x", name: "High" }, { id: "y", name: "Low" }, { id: "z", name: "Top" }];
+    ok(same(E.defaultMapping(byName, toName, false), { a: "y", b: "x", c: "z" }), "else a level goes to the one of the same name");
+    // On the page: the 3x3 preset, then 5x5, asks with the place-kept default.
+    load(window.SPT_TOUR_PROJECT); RT.navigate("suc");
+    change(crit().querySelector('select[data-action="criteria-preset"]'), "3x3");
+    crit().querySelector('[data-action="criteria-apply"]').click();
+    crit().querySelector('[data-action="criteria-map-apply"]').click();
+    change(crit().querySelector('select[data-action="criteria-preset"]'), "5x5");
+    crit().querySelector('[data-action="criteria-apply"]').click();
+    var s3 = crit().querySelector('select[data-field="crit-map-likelihood-L3"]');
+    ok(!!s3 && s3.value === "L5", "on the page, 3x3 to 5x5 moves Likely to Almost certain by default", s3 ? s3.value : "no row");
+    crit().querySelector('[data-action="criteria-map-apply"]').click();
+    ok(/^Criteria set to five levels each; \d+ ratings? moved\.$/.test(toastEl().firstChild.textContent), "the toast: Criteria set to five levels each; n ratings moved.", toastEl().textContent);
+
+    // ---- 5. An action that changed nothing offers no Undo; the same criteria again ask nothing ----
+    var tolSel = [].filter.call(main().querySelectorAll("select"), function (s) { return [].some.call(s.options, function (o) { return o.value === "very-high"; }) && !s.getAttribute("data-field") && !s.getAttribute("data-action"); })[0];
+    change(tolSel, P().srs.tolerableRisk === "high" ? "low" : "high");
+    ok(RT.canUndo(), "an earlier change is ready to undo");
+    var before5 = JSON.stringify(P());
+    change(crit().querySelector('select[data-action="criteria-preset"]'), "5x5");
+    crit().querySelector('[data-action="criteria-apply"]').click();
+    ok(!crit().querySelector("[data-criteria-map]") && JSON.stringify(P()) === before5, "applying the criteria already there asks nothing and changes nothing");
+    ok(!toastUndo(), "and its toast offers no Undo, so it cannot undo the earlier, unrelated change", toastEl().textContent);
+    ok(typeof A.undoMark === "function" && typeof RT.undoMark === "function", "an action takes an undo mark before it acts");
+
+    // ---- 4. A removed level's or category's id is never reused ----
+    // 5x5 now: remove Critical (I5), leaving its ratings, then add a level.
+    var usedI5 = (E.ratingUsage(P()).impact.I5 || 0) > 0;
+    crit().querySelector('[data-action="remove-level-impact-I5"]').click();
+    if (crit().querySelector("[data-criteria-map]")) { change(crit().querySelector('select[data-field="crit-map-impact-I5"]'), ""); crit().querySelector('[data-action="criteria-map-apply"]').click(); }
+    var leftOn = E.ratingUsage(P()).impact.I5 || 0;
+    crit().querySelector('[data-action="add-level-impact"]').click();
+    var newTop = P().criteria.impact[P().criteria.impact.length - 1];
+    ok(usedI5 && leftOn > 0 && newTop.name === "New level" && newTop.id !== "I5", "a level added after Critical was removed (its ratings left) gets a new id, so they do not re-attach", newTop.id);
+    ok(RT.criteriaMisfits().length > 0, "and the ratings left on I5 still no longer fit");
+    crit().querySelector('[data-action="add-category"]').click();
+    var cat1 = P().criteria.categories[P().criteria.categories.length - 1].id;
+    threat("Z1", "T1").impactByCategory = Object.assign({}, threat("Z1", "T1").impactByCategory || {}, (function () { var o = {}; o[cat1] = threat("Z1", "T1").impact; return o; }()));
+    RT.touched(); RT.navigate("suc");
+    crit().querySelector('[data-action="remove-category-' + cat1 + '"]').click();
+    ok(P().criteria.categories.every(function (c) { return c.id !== cat1; }) && threat("Z1", "T1").impactByCategory[cat1], "a category rated on is removed, its rating left on it");
+    crit().querySelector('[data-action="add-category"]').click();
+    var newCat = P().criteria.categories[P().criteria.categories.length - 1];
+    ok(newCat.name === "New category" && newCat.id !== cat1, "a category added then never takes the id that rating still holds", cat1 + " then " + newCat.id);
+    ok(M.freshId([{ id: "cat1" }], "cat", ["cat2", "cat3"]) === "cat4", "freshId skips the ids given as taken");
+
+    // ---- 6. The heat maps, the review pack and the SL-T trace compare per category ----
+    var pj6 = fresh(); pj6.criteria = M.houseCriteria(); pj6.criteria.tolerableByCategory = { safety: "low" };
+    pj6.zones[0].threats[1].impactByCategory = { safety: "minor" };   // T2: minor x medium = medium: within the general tolerable risk, above safety's
+    load(pj6);
+    var x2 = row(RT.viewModel(), "T2");
+    ok(x2.risk === "medium" && x2.exceeds, "T2 is medium: within the general tolerable risk, above safety's");
+    RT.navigate("risk"); RP.ui.view = "heatmap"; RP.ui.heat = "unmitigated"; RT.render();
+    var cell = main().querySelector('table.heat [data-cell="minor:medium"]').closest("td");
+    ok(cell.classList.contains("above-tol"), "step 5's heat map outlines the cell T2 is counted in");
+    var empty = main().querySelector('table.heat [data-cell="minor:low"]').closest("td");
+    ok(!empty.classList.contains("above-tol") && main().querySelector('table.heat [data-cell="severe:high"]').closest("td").classList.contains("above-tol"), "an empty cell is outlined by its band against the general tolerable risk");
+    var cells = RT.heatCells(RT.viewModel(), "unmitigated");
+    ok(cells["minor:medium"].n === 1 && cells["minor:medium"].exceeds && RT.heatAbove(cells, "minor", "medium", "medium", "medium"), "one rule for the outline, which the workbook reads too");
+    var su = RX.buildWorkbook(P()).getWorksheet("Summary"), hm = null, rI = null;
+    su.eachRow(function (r, i) { if (r.getCell(1).value === "Heat map: unmitigated rating") hm = i; if (hm && !rI && i > hm && r.getCell(1).value === "Minor") rI = i; });
+    var likIdx = M.criteriaOf(P()).likelihood.map(function (l) { return l.id; }).indexOf("medium");
+    var sc = su.getRow(rI).getCell(likIdx + 2);
+    ok(sc.value === 1 && sc.border && sc.border.top && sc.border.top.style === "medium", "the workbook's Summary gives T2's cell a heavy border");
+    var note = null; su.eachRow(function (r) { var v = String(r.getCell(1).value || ""); if (/^Each cell counts/.test(v)) note = v; });
+    ok(/holds a threat above tolerable risk \(per consequence category where one is set\)/.test(note || ""), "and says what a heavy border means with categories", note);
+    var pk2 = RR.packItems().items.filter(function (i) { return i.itemId === "Z1:T2"; })[0], pk1 = RR.packItems().items.filter(function (i) { return i.itemId === "Z1:T1"; })[0];
+    ok(pk2 && pk2.expected === "Safety (injury / loss of life): Low" && pk1.expected === "Medium", "the review pack's expected value is the category's tolerable risk where it applies, else the general one", (pk2 && pk2.expected) + " / " + (pk1 && pk1.expected));
+    // The SL-T trace: a threat below the worst band can be the one above tolerable risk.
+    var pj6b = fresh(); pj6b.srs.tolerableRisk = "high"; pj6b.criteria = M.houseCriteria(); pj6b.criteria.tolerableByCategory = { safety: "low" };
+    var ta = pj6b.zones[0].threats[0]; ta.affectedFR = ["IAC"]; ta.impact = "serious"; ta.likelihood = "high";              // high: within the general high
+    var tb = pj6b.zones[0].threats[1]; tb.affectedFR = ["IAC"]; tb.impact = "minor"; tb.likelihood = "medium"; tb.impactByCategory = { safety: "minor" };   // medium: above safety's low
+    var sg = RT.suggestZone(pj6b.zones[0], pj6b).byFR.IAC;
+    ok(sg.risk === "high" && sg.trace.some(function (x) { return /^A threat behind this risk is above tolerable risk/.test(x); }), "the SL-T trace tests every threat behind it, not only those at the worst band", sg.trace.join(" | "));
+
+    // ---- 7. The approval fingerprint covers what isHouse compares ----
+    var pj7 = fresh(); pj7.criteria = M.presetCriteria("4x4");
+    pj7.zones[0].threats.forEach(function (x) { x.likelihood = "L2"; x.impact = "I2"; }); pj7.srs.highLevelAssets[0].consequence = "I2"; pj7.srs.highLevelAssets[0].likelihood = "L2";
+    var fp0 = RT.approvalFingerprint(pj7).split("-")[1];
+    var pj7n = clone(pj7); pj7n.criteria.likelihood[0].note = "Not expected in the plant's life.";
+    var pj7c = clone(pj7); pj7c.criteria.categories[0].name = "People";
+    ok(M.criteriaOf(pj7n).isHouse === false && RT.approvalFingerprint(pj7n).split("-")[1] !== fp0, "a level's definition changed moves the tolerable risk's part of the fingerprint");
+    ok(RT.approvalFingerprint(pj7c).split("-")[1] !== fp0, "and so does a category renamed");
+    ok(RT.approvalFingerprint(MG.normaliseProject(clone(window.SPT_TOUR_PROJECT))) === RT.approvalFingerprint(MG.normaliseProject(clone(window.SPT_TOUR_PROJECT))) &&
+      RT.approvalStates(MG.normaliseProject(clone(window.SPT_TOUR_PROJECT))).every(function (s) { return !s.changed; }), "the demo's approvals still match (the house criteria's part is the band alone)");
+
+    // ---- 8. A matrix cell not set is a completeness item ----
+    var pj8 = fresh(); pj8.criteria = M.presetCriteria("3x3"); delete pj8.criteria.matrix.I2.L2;
+    pj8 = MG.normaliseProject(pj8);
+    ok(texts(pj8).indexOf("The risk matrix has cells not set.") >= 0 && RT.completeness(pj8).filter(function (i) { return i.text === "The risk matrix has cells not set."; })[0].target.kind === "criteria", "a matrix with a cell not set says so in the completeness list, with a Go to the criteria");
+    ok(texts(fresh()).indexOf("The risk matrix has cells not set.") < 0, "a file on the house criteria does not");
+
+    // ---- Wording: the generic preset, the approval note, the method, the Criteria sheet ----
+    var pjG = fresh(); pjG.criteria = M.presetCriteria("5x5"); pjG.zones[0].threats.forEach(function (x) { x.likelihood = "L3"; x.impact = "I2"; });
+    pjG.srs.highLevelAssets[0].consequence = "I2"; pjG.srs.highLevelAssets[0].likelihood = "L3";
+    var pjGc = clone(pjG); pjGc.srs.clientMatrix = true;
+    ok(M.genericPresetOf(pjG) === "5x5" && RT.criteriaWords(pjG).generic === "5x5", "criteria still a generic preset are known as such");
+    ok(texts(pjGc).indexOf("The client's criteria are marked in use, but step 1 holds a generic preset.") >= 0 && texts(pjG).indexOf("The client's criteria are marked in use, but step 1 holds a generic preset.") < 0, "marked as the client's while still a generic preset: a completeness item");
+    var pjGe = clone(pjGc); pjGe.criteria.matrix.I1.L1 = "medium";
+    ok(M.genericPresetOf(pjGe) === "" && texts(pjGe).indexOf("The client's criteria are marked in use, but step 1 holds a generic preset.") < 0, "changed, it is the client's own and asks nothing");
+    ok(RT.approvalPartWords(["tolerable"]) === "the tolerable risk or the risk criteria" && RT.approvalPartWords(["tolerable", "slt"]) === "the risk criteria and the SL-T", "the approval note names the tolerable risk or the risk criteria, and just the risk criteria in a list");
+    load(pj6);
+    var wb = RX.buildWorkbook(P()), cr = wb.getWorksheet("Criteria");
+    ok(!!findRow(cr, "Suggested SL-T (SolutionsPT house mapping)") && !!findRow(cr, "Security levels (SolutionsPT house summary)"), "Excel: the Criteria sheet names the SL mapping and the security levels as the house's");
+    ok(!!findRow(cr, "A threat or system rated per category is compared with the tolerable risk of each category it is rated in.") && findRow(cr, "Environmental release / damage").getCell(2).value === "Medium (general tolerable risk)", "and says how the categories are compared, the general tolerable risk named so");
+
+    // ---- Usability: the toast ----
+    load(window.SPT_TOUR_PROJECT); RT.navigate("suc");
+    var te = toastEl();
+    ok(te.getAttribute("role") === "status" && te.getAttribute("aria-live") === "polite", "the toast is a polite live region");
+    RT.toast("Checking.");
+    ok(w.getComputedStyle(te).display !== "none", "shown");
+    var mk0 = RT.undoMark(); tolSel = [].filter.call(main().querySelectorAll("select"), function (s) { return [].some.call(s.options, function (o) { return o.value === "very-high"; }) && !s.getAttribute("data-field") && !s.getAttribute("data-action"); })[0];
+    change(tolSel, "high"); A.offerUndo("Changed.", null, mk0);
+    var ub = toastUndo();
+    ok(!!ub && ub.getAttribute("aria-keyshortcuts") === "Control+Z" && ub.getAttribute("title") === "Undo (Ctrl+Z)", "its Undo names its shortcut");
+    ub.click();
+    ok(/Undone\./.test(te.textContent), "Undo from the toast says Undone");
+    te.className = "toast toast-off";
+    ok(w.getComputedStyle(te).display !== "none" && w.getComputedStyle(te).visibility === "visible" && w.getComputedStyle(te).opacity === "0" && w.getComputedStyle(te).pointerEvents === "none", "idle (toast-off), it stays in the layout, out of sight and taking no clicks, so the next message is announced");
+    var root = d.documentElement, was = root.getAttribute("data-theme");
+    root.setAttribute("data-theme", "dark"); RT.toast("Dark.");
+    var cs = w.getComputedStyle(te), cDark = contrast(cs.color, cs.backgroundColor);
+    ok(cDark >= 4.5, "in the dark theme its text is readable on its background (4.5:1 or more)", cDark.toFixed(2) + " " + cs.color + " on " + cs.backgroundColor);
+    root.setAttribute("data-theme", "light"); RT.toast("Light.");
+    cs = w.getComputedStyle(te);
+    ok(contrast(cs.color, cs.backgroundColor) >= 4.5, "and in the light theme", contrast(cs.color, cs.backgroundColor).toFixed(2));
+    root.setAttribute("data-theme", was || "light");
+
+    // ---- Usability: Ctrl+Z in a field nothing was typed in ----
+    var b0 = JSON.stringify(P());
+    crit().querySelector('[data-action="add-level-impact"]').click();
+    var nameBox = d.activeElement;
+    ok(nameBox && /^crit-impact-name-/.test(nameBox.getAttribute("data-field") || ""), "+ Add level puts the keyboard in the new level's name");
+    var zIn = ctrlZ(nameBox);
+    ok(zIn.defaultPrevented && JSON.stringify(P()) === b0, "Ctrl+Z there, with nothing typed, undoes the level added");
+    crit().querySelector('[data-action="add-level-impact"]').click();
+    nameBox = d.activeElement; nameBox.value = "Extreme"; nameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+    var zT = ctrlZ(nameBox);
+    ok(!zT.defaultPrevented, "once something is typed, Ctrl+Z in the field is the browser's own");
+    load(window.SPT_TOUR_PROJECT); RT.navigate("suc");
+
+    // ---- Usability: the criteria editor ----
+    var names = [].map.call(crit().querySelectorAll('[data-levels="impact"] input[data-field^="crit-impact-name-"]'), function (i) { return i.getAttribute("aria-label"); });
+    ok(names.length === 4 && new Set(names).size === 4 && names[0] === "Impact level 4 of 4 name" && names[3] === "Impact level 1 of 4 name", "each level name is named by its place", names.join(" | "));
+    ok(crit().querySelector('[data-levels="impact"] textarea[data-field="crit-impact-note-severe"]').rows === 2, "a level's meaning wraps over two lines rather than being cut off");
+    ok(/^Same as general \(medium\)$/.test(crit().querySelector('select[data-field="crit-cat-tol-safety"]').options[0].textContent), "a category's tolerable risk offers Same as general (medium)");
+    ok(/^Outlined cells are above tolerable risk \(medium\)\.$/.test(crit().querySelector(".criteria-cap").textContent), "the matrix's caption is one short sentence");
+    change(crit().querySelector('select[data-action="criteria-preset"]'), "4x4");
+    crit().querySelector('[data-action="criteria-apply"]').click();
+    var mp = crit().querySelector("[data-criteria-map]");
+    ok(!!mp && /^Choose where each level's ratings go; any left stay open\.$/.test(mp.querySelector(".criteria-map-h").textContent), "the mapping panel's help is one sentence");
+    var bEsc = JSON.stringify(P());
+    mp.querySelector("select").dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    ok(!crit().querySelector("[data-criteria-map]") && !w.RiskApp.CriteriaUI.pending() && JSON.stringify(P()) === bEsc && d.activeElement === crit().querySelector('[data-action="criteria-apply"]'), "Escape in the mapping panel does what Cancel does, the keyboard back on Apply");
+    // Removing unused levels: the keyboard goes to the next row's Remove, then to Add level.
+    load(M.emptyProject()); RT.navigate("suc");
+    change(crit().querySelector('select[data-action="criteria-preset"]'), "5x5");
+    crit().querySelector('[data-action="criteria-apply"]').click();
+    crit().querySelector('[data-action="remove-level-impact-I3"]').click();
+    ok(!crit().querySelector("[data-criteria-map]") && d.activeElement === crit().querySelector('[data-action="remove-level-impact-I2"]'), "removing a level no rating uses: the keyboard on the next row's Remove", d.activeElement && d.activeElement.outerHTML.slice(0, 90));
+    crit().querySelector('[data-action="remove-level-impact-I2"]').click();
+    ok(d.activeElement === crit().querySelector('[data-action="add-level-impact"]'), "at three levels, where Remove is off, on Add level", d.activeElement && d.activeElement.outerHTML.slice(0, 90));
+    ok(/^Minor removed\.$/.test(toastEl().firstChild.textContent) && !!toastUndo(), "with a toast to undo it");
+    toastUndo().click();
+    ok(P().criteria.impact.length === 4 && d.activeElement === crit().querySelector('[data-action="remove-level-impact-I2"]'), "undone, the level is back and the keyboard on its Remove");
+
+    // ---- Usability: step 2, the picker ----
+    load(window.SPT_TOUR_PROJECT); RT.navigate("srs");
+    var thImpact = [].filter.call(main().querySelectorAll("th"), function (th) { return th.textContent === "Impact"; })[0];
+    ok(thImpact && /width:\s*150px/.test(thImpact.getAttribute("style") || ""), "step 2's Impact column is 150px, so the others keep their room");
+    RP.select("Z1"); RP.ui.view = "zone"; RT.navigate("risk");
+    main().querySelector('[data-action="add-from-library"]').click();
+    var pkr = main().querySelector("[data-library-picker]"), addB = main().querySelector('[data-action="add-from-library"]');
+    ok(pkr.id && addB.getAttribute("aria-controls") === pkr.id, "Add from library controls the picker by its id");
+    ok(pkr.querySelector(".lib-count").getAttribute("aria-live") === "polite", "the picker's count is announced as it changes");
+
+    // ---- Wording: the presets, the framing note, the library ----
+    ["3x3", "4x4", "5x5"].forEach(function (id) {
+      var c = M.presetCriteria(id);
+      ok(c.likelihood.concat(c.impact).every(function (l) { return l.note.indexOf(":") < 0; }), "the " + id + " preset's definitions have no colon in them");
+    });
+    ok(/^SolutionsPT house risk matrix; the standard prescribes none\. Tolerable risk is medium \(step 1\)\.$/.test(main().querySelector(".framing-note").textContent), "step 5's framing note", main().querySelector(".framing-note").textContent);
+    var LIB = RT.scenarioLibrary.scenarios;
+    function hs(id) { return LIB.filter(function (s) { return s.id === id; })[0]; }
+    ok(same(hs("HS04").countermeasures[2].srRefs, ["SR 3.4"]) && same(hs("HS08").countermeasures[2].srRefs, ["SR 7.6", "SR 7.7"]) && same(hs("HS15").countermeasures[1].srRefs, ["SR 6.2"]) &&
+      same(hs("HS20").countermeasures[0].srRefs, ["SR 7.8"]) && same(hs("HS27").countermeasures[0].srRefs, ["SR 7.4"]) && same(hs("HS30").countermeasures[2].srRefs, ["SR 7.1"]), "the library's SR references fit their countermeasures");
+    ok(hs("HS04").title === "Engineering workstation used to change controller logic" && hs("HS19").title === "Physical access to cabinets and racks" && hs("HS30").title === "Change to shared network equipment cuts control traffic" &&
+      hs("HS03").affectedFR.indexOf("RA") >= 0 && RT.scenarioLibrary.tags["supply-chain"] === "Third parties and supply chain", "and the reworded scenarios, HS03's RA and the tag's label");
+    var all = JSON.stringify(LIB);
+    ok(["role-based", "deny-by-default", "logged-on", "Dual-homed", "self-spreading", "Long-lived", "State-sponsored", "Internet-facing", "day-to-day", "General-purpose"].every(function (x) { return all.indexOf(x) >= 0; }), "compound modifiers keep their hyphens");
+    ok(same(hs("HS31").affectedFR, ["IAC", "SI", "RDF"]) && same(hs("HS32").affectedFR, ["IAC", "UC", "SI"]) && same(hs("HS33").affectedFR, ["IAC", "RDF"]), "HS31 to HS33: telemetry, a shared IT management tool, an OEM package unit");
+    function srs(id) { return [].concat.apply([], hs(id).countermeasures.map(function (c) { return c.srRefs; })).sort(); }
+    ok(same(srs("HS31"), ["SR 1.13", "SR 1.2", "SR 3.1", "SR 5.2"]) && same(srs("HS32"), ["SR 1.3", "SR 2.1", "SR 3.2", "SR 5.1"]) && same(srs("HS33"), ["SR 1.13", "SR 5.1", "SR 5.2", "SR 7.8"]), "with the SR references agreed");
+
+    // ---- Word: the per-category line, the high-level method ----
+    var n6 = MG.normaliseProject(clone(pj6)), nG = MG.normaliseProject(clone(pjG));
+    return words(n6).then(function (px) {
+      ok(px.indexOf("By consequence category: Safety (injury / loss of life): Low.") >= 0, "Word: the tolerable risk per category reads name: band");
+      return Promise.all([words(nG, { highLevelOnly: true }), words(nG)]);
+    }).then(function (r) {
+      function method(px) { return px.filter(function (x) { return /^The assessment follows/.test(x) && /prescribes no matrix/.test(x); })[0] || ""; }
+      var hl = method(r[0]), det = method(r[1]);
+      ok(/were agreed for this assessment\. The standard prescribes no matrix\./.test(hl) && !/risk-to-SL/.test(hl), "the high-level method says nothing of the risk-to-SL mapping", hl);
+      ok(/and the risk-to-SL mapping is a SolutionsPT house default\./.test(det), "the detailed one still does", det);
+      ok(r[1].indexOf("The risk criteria agreed for this assessment (from a SolutionsPT generic preset).") >= 0, "the appendix says agreed criteria still a generic preset come from one");
+      try { w.localStorage.removeItem(KEY); } catch (e2) {}
+    });
+  }
+}());
+</script>
+</body>
+</html>

@@ -90,7 +90,9 @@
     var text = docText(doc);
     // Phase 4b: the body is three Word sections, the risk register, treatment plan and accepted risks
     // on landscape pages between portrait ones (was: cover + one body section).
-    ok(!!doc && doc.sections.length === 4 && doc.sections.map(function (s) { return s.properties.page.size.orientation; }).join() === "portrait,portrait,landscape,portrait", "full Word doc builds (cover + body)", doc.sections.map(function (s) { return s.properties.page.size.orientation; }).join());
+    // Phase 5b: the zone and conduit drawing is a landscape page of its own inside the requirements
+    // (was: portrait,portrait,landscape,portrait, four sections).
+    ok(!!doc && doc.sections.length === 6 && doc.sections.map(function (s) { return s.properties.page.size.orientation; }).join() === "portrait,portrait,landscape,portrait,landscape,portrait", "full Word doc builds (cover + body)", doc.sections.map(function (s) { return s.properties.page.size.orientation; }).join());
     ok(text.indexOf("OT CYBER RISK ASSESSMENT") !== -1 && text.indexOf("OT Cyber Risk") !== -1, "Design-B cover carries the kicker and title lines");
     ok(text.indexOf("www.solutionspt.com") !== -1 && text.indexOf("CLASSIFICATION") !== -1, "cover carries the SolutionsPT address block and issue/author/classification line");
     ok(text.indexOf("Acme Petrochemicals Ltd") !== -1 && text.indexOf("Unit 300") !== -1, "cover + document control carry the engagement client and SUC");
@@ -449,14 +451,17 @@
       ok(vAgreed.text.slice(vaDr, vaWhy).indexOf("Nothing is waiting on a decision: every threat above tolerable risk has a treatment decision, the accepted risk is approved and each planned countermeasure has an owner and a due date.") > 0,
         "4b Word: with M8 agreed the demo has no decision outstanding, and says so");
       // The risk register, the treatment plan and the accepted risks, on landscape pages of their own.
-      var land = [].concat(doc.sections[2].children).filter(function (n) { return n.__t === "p" && n.heading === "h1"; }).map(function (n) { return n.text; });
-      ok(land.join("|") === "Risk register|Treatment plan|Accepted risks" && doc.sections[3].children[0].text === "Zones, conduits and the detailed risk assessment",
+      // Phase 5b: the drawing's landscape page is section 2, so the register's is section 4 (was 2).
+      var land = [].concat(doc.sections[4].children).filter(function (n) { return n.__t === "p" && n.heading === "h1"; }).map(function (n) { return n.text; });
+      ok(land.join("|") === "Risk register|Treatment plan|Accepted risks" && doc.sections[5].children[0].text === "Zones, conduits and the detailed risk assessment",
         "4b Word: the risk register, treatment plan and accepted risks are the landscape section, and the zones come after it", land.join("|"));
       // A renamed landscape section keeps its page, and a hidden one takes its page with it.
       var q2 = JSON.parse(JSON.stringify(p));
       q2.reportCustom = { detailed: { "risk-register": { title: "Register of risks" }, "accepted-risks": { hidden: true } } };
-      var d2 = RX.buildWordDoc(q2, {}), land2 = d2.sections.filter(function (s) { return s.properties.page.size.orientation === "landscape"; });
-      ok(land2.length === 1 && land2[0].children.filter(function (n) { return n.__t === "p" && n.heading === "h1"; }).map(function (n) { return n.text; }).join("|") === "Register of risks|Treatment plan" && d2.sections.length === 4,
+      // Phase 5b: the drawing's own landscape page holds no level 1 heading, so it is left out of this
+      // count (was: every landscape section, of four sections).
+      var d2 = RX.buildWordDoc(q2, {}), land2 = d2.sections.filter(function (s) { return s.properties.page.size.orientation === "landscape" && s.children.some(function (n) { return n.__t === "p" && n.heading === "h1"; }); });
+      ok(land2.length === 1 && land2[0].children.filter(function (n) { return n.__t === "p" && n.heading === "h1"; }).map(function (n) { return n.text; }).join("|") === "Register of risks|Treatment plan" && d2.sections.length === 6,
         "4b Word: a renamed register stays on its landscape page, and a hidden section leaves with its page", d2.sections.map(function (s) { return s.properties.page.size.orientation; }).join());
       var rg = at("\nRisk register\n");
       ok(rg > at("\nRisk comparison\n") && at("\nZone or conduit\nThreat scenario\nUnmitigated\nCurrent\nPlanned\nTreatment decision\n", rg) > rg, "4b Word: the register's columns: zone or conduit, scenario, unmitigated, current, planned, decision");
@@ -627,7 +632,7 @@
       var vs = wb.getWorksheet("Vulnerabilities");
       ok(vs.rowCount === 8 && rowVals(vs, 2, 5) === "Z1 Unit 300 BPCS|V1|DCS servers on an extended-support OS awaiting the vendor's qualified upgrade path|DCS vendor lifecycle notice LN-2025-11|T1, T2", "4b Excel: the Vulnerabilities sheet has each one's source and the threats that link it", rowVals(vs, 2, 5));
       var cr = wb.getWorksheet("Criteria");
-      ok(["Risk matrix", "Impact scale", "Likelihood scale", "Security levels", "Suggested SL-T", "Foundational requirements"].every(function (t) { return !!find(cr, t); }) && cr.getCell(find(cr, "Tolerable risk").r, 2).value === "Medium" && !!find(cr, "High (above)"),
+      ok(["Risk matrix", "Impact scale", "Likelihood scale", "Security levels (SolutionsPT house summary)", "Suggested SL-T (SolutionsPT house mapping)", "Foundational requirements"].every(function (t) { return !!find(cr, t); }) && cr.getCell(find(cr, "Tolerable risk").r, 2).value === "Medium" && !!find(cr, "High (above)"),
         "4b Excel: the Criteria sheet holds the matrix with the tolerable line, the scales, the security levels and the FR key");
       var cmw = wb.getWorksheet("Countermeasures");
       ok(rowVals(cmw, 1, 8).split("|").slice(6).join("|") === "SR references|Threat scenarios" && rowVals(cmw, 4, 8).split("|").slice(6).join("|") === "SR 5.1, SR 7.7|T2", "4b Excel: the Countermeasures sheet adds SR references and the scenarios each addresses, after its old columns");

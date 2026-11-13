@@ -134,7 +134,9 @@ window.RiskReview = (function () {
     action: "Countermeasures addressing this threat", impact: null, priority: "Treatment decision", owner: null };
   function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
   function bandName(id) { return id ? RX().bandName(id) : ""; }
-  function rating(l, i) { return (l ? cap(l) : "Not rated") + " × " + (i ? cap(i) : "Not rated"); }
+  // A likelihood × impact in the names of the project's risk criteria (the
+  // house names are the ids in capitals, so a house rating reads as before).
+  function rating(l, i, p) { var R = RT(); return (l ? R.likelihoodName(l, p) : "Not rated") + " × " + (i ? R.impactName(i, p) : "Not rated"); }
   // A planned countermeasure's plan in words: "M3: owner J. Whitmore, high
   // priority, due 2027-03-31, agreed"; what is not given says so.
   function planWords(m) {
@@ -145,6 +147,13 @@ window.RiskReview = (function () {
   function slVector(v) {
     var ids = RT().FR_IDS.filter(function (fr) { return v && v[fr] != null; });
     return ids.map(function (fr) { return fr + " SL" + v[fr]; }).join(", ");
+  }
+  // "Safety (injury / loss of life): Low; Financial loss: Medium", or the
+  // general band where no category of the threat's has its own.
+  function catTolerable(x, tolerable) {
+    var cats = x.categories || [];
+    if (!cats.some(function (r) { return r.tolerable; })) return bandName(tolerable);
+    return cats.map(function (r) { return r.name + ": " + bandName(r.tolerable || tolerable); }).join("; ");
   }
   function packItems() {
     var p = project(), R = RT(), items = [], facts = [];
@@ -170,11 +179,13 @@ window.RiskReview = (function () {
         // Only the countermeasures linked to this threat (the one coverage rule).
         var affected = t.affectedFR || [];
         var linked = T.covering;
-        var details = [["Likelihood × impact", rating(t.likelihood, t.impact)], ["Affected FRs", affected.length ? affected.join(", ") : "None marked"]];
+        var details = [["Likelihood × impact", rating(t.likelihood, t.impact, p)], ["Affected FRs", affected.length ? affected.join(", ") : "None marked"]];
+        // The impact per consequence category, where given (phase 5).
+        if (x.categories && x.categories.length) details.push(["Impact by category", x.categories.map(function (r) { return r.name + ": " + r.levelName; }).join("; ")]);
         // Schema 0.3: the rating with the countermeasures in place today, and
         // after the planned ones; a rating not given takes the one before it.
-        if (x.current) details.push(["Current likelihood × impact", rating(t.currentLikelihood || t.likelihood, t.currentImpact || t.impact)]);
-        if (x.planned) details.push(["Planned likelihood × impact", rating(t.residualLikelihood || t.currentLikelihood || t.likelihood, t.residualImpact || t.currentImpact || t.impact)]);
+        if (x.current) details.push(["Current likelihood × impact", rating(t.currentLikelihood || t.likelihood, t.currentImpact || t.impact, p)]);
+        if (x.planned) details.push(["Planned likelihood × impact", rating(t.residualLikelihood || t.currentLikelihood || t.likelihood, t.residualImpact || t.currentImpact || t.impact, p)]);
         if (T.confirmed && T.decision === "slt" && T.reason) details.push(["Reason for treating through the SL-T", T.reason]);
         // The plan behind a confirmed decision that rests on countermeasures
         // still to come: each one's owner, priority, due date and status.
@@ -190,7 +201,10 @@ window.RiskReview = (function () {
         items.push({
           targetName: ownerName(o), targetId: o.id, itemId: o.id + ":" + t.id, code: t.id, title: t.statement || "(no statement)", groupName: groupName,
           answer: band ? bandName(band) + (resid ? ", " + bandName(resid).toLowerCase() + " after countermeasures" : "") : "Not rated",
-          expected: bandName(tolerable),
+          // The tolerable risk the threat is compared with: the general one, or,
+          // where it is rated per consequence category and a category has its
+          // own, each rated category's (as the engine compares it).
+          expected: catTolerable(x, tolerable),
           // The acceptance text is not printed against another decision.
           evidence: t.source || "", notes: (T.confirmed && T.decision !== "accept") ? "" : (t.acceptance || ""),
           owner: "", action: linked.map(function (m) { return m.id + " " + m.description + (m.existing ? " [existing]" : " [planned]"); }).join("; "), impact: "",

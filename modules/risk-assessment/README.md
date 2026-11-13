@@ -130,14 +130,15 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
   keyboard stays in the field and a click straight after typing lands;
   choices redraw and keep the focus. Elsewhere a field that redraws on
   change (step 4's reason, a separation reason) waits for a press of the
-  mouse to end before it redraws. Go to and the peer review open the zone
+  mouse to end before it redraws. Add from library, beside + Add scenario,
+  adds house scenarios as unrated drafts (see phase 5b). Go to and the peer review open the zone
   and the scenario (`RiskApp.RiskPage.select`).
 
 - **Zones and conduits (step 3)** has the drawing on top (a zone's box opens
   the zone), compact tables of the zones and the conduits, and one selected
   zone or conduit in a detail panel (`js/ui-zones.js`). A zone's panel holds
   its name, function, logical boundary, safety designation (the `sis-present`
-  flag, which still drives `safetyRelated` and the SL3 floor), its assets and
+  flag, which still drives `safetyRelated` and the SL3 floor), its drawing level (see phase 5b below), its assets and
   the separation rows raised for it, then a collapsed Characteristics section:
   accountable organisation, physical boundary, logical and physical access
   points, data flows, external dependencies, security policies, assumptions
@@ -160,11 +161,16 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
   and Go to lands on the row. A row not raised asks nothing, and an answer
   kept for a row no longer raised counts for nothing. When a row is raised is
   the method used here (`data/zcr-map.json`).
-- **Step 1's risk criteria** show the matrix read-only beside the form, the
-  cells above tolerable risk outlined, with the scale definitions. Confirmed
+- **Step 1's risk criteria** are the project's own, editable beside the form
+  (`js/ui-criteria.js`, phase 5): the matrix, one choice of band per cell, the
+  cells above tolerable risk outlined; Start from a preset (the SolutionsPT
+  house criteria, or three, four or five levels each); and below, the impact
+  and likelihood levels (3 to 5 each, highest first, each with a one-line
+  definition and how many ratings use it) and the consequence categories,
+  each with a tolerable risk of its own or "Same as general". Confirmed
   with the asset owner stores the band confirmed (`srs.tolerableConfirmed`):
   until it matches the tolerable risk, "Tolerable risk is not confirmed with
-  the asset owner." is open for both reports.
+  the asset owner." is open for both reports. See Risk criteria below.
 - **Requirements specification (step 6)** is eight blocks in the order
   `data/zcr-map.json` (`specBlocks`) gives: SUC description, zone and conduit
   drawings, zone and conduit characteristics, operating environment
@@ -257,6 +263,212 @@ build opens 0.1, 0.2 and 0.3 files.
   nothing, repeats, and suggestions already linked.
   `scripts/test-risk-schema03.html` checks this on the frozen files.
 
+### Risk criteria and impact per category (phase 5)
+
+The schema stays `spt-risk-project/0.3`; every field here is optional, tidied
+by the migration when present and never added. A file without them reads
+the house criteria exactly as before (`scripts/test-risk-criteria.html`
+proves it on the frozen fixtures and the demo: every band, SL-T suggestion,
+risk context, completeness item and approval fingerprint is unchanged).
+
+- **`project.criteria`** holds the criteria in use: `likelihood` and `impact`
+  (`[{ id, name, note }]`, lowest first, 3 to 5 each), `matrix` (impact id,
+  then likelihood id, to one of the four fixed bands), `categories`
+  (`[{ id, name }]`), optionally `tolerableByCategory` (category id to band)
+  and `preset` (the last preset applied). It is absent until the first change
+  and is seeded from `data/slt-suggestion-rules.json`; a copy that is the
+  house's again, with no tolerable risk per category, is dropped, so the
+  file reads as one never changed. The four band ids (low, medium, high, very
+  high) stay the output vocabulary of the exports and the risk context; the
+  general tolerable risk stays `srs.tolerableRisk`; the risk-to-SL mapping is
+  on the bands, so it is unaffected.
+- **One accessor.** `Model.criteriaOf(project)` (`RiskTool.criteriaOf`) gives
+  the criteria in use, normalised: the levels with their rank, the categories
+  with their tolerable risk, and whether they are the house's, the client's
+  (the "client's criteria in use" tick) or agreed for this assessment.
+  `Engine.riskFor(impact, likelihood, project)` reads the matrix from the
+  project; the engine, the today rule, the view model, the heat map, the
+  Scales popover, the register, the ranking, Word, Excel, the review pack and
+  the risk context all go through these (`RiskTool.riskFor`, `threatRisk`,
+  `residualRisk`, `likelihoodName` and `impactName` take the project, the
+  open one when left out). A level the criteria do not have gives no band.
+- **Presets.** The generic 3x3, 4x4 and 5x5 shapes are the tool's own: words
+  of its own, positional ids (`L1`, `I1`, ...) and a band from the sum of the
+  two positions on their scales, never lower for a higher level. Choosing a
+  preset (or removing a level) with ratings on levels that change asks in the
+  page where each goes; Cancel or Escape changes nothing, and a change that
+  moves nothing (the same criteria again) asks nothing. The default
+  (`Engine.defaultMapping`): a level is the same only when both its id and its
+  name match (the presets reuse `L1`, `I1` with other words); else the level of
+  the same name; else the one at the same relative place on the new scale,
+  rounded up, so no rating reads lower; for a preset every level goes by its
+  place alone, so moving between the generic presets never lowers a band
+  (`scripts/test-risk-p5fix.html` checks every pair). Rounding up means a
+  4-level scale there and back can end a level higher (house Serious to 5x5
+  Major and back is Severe): the panel shows each default before it applies.
+  Leave as it is keeps the rating. A rating left where it is, on a level or a
+  category the criteria no longer have, is open in the completeness list
+  ("the impact no longer fits the risk criteria") on the page it was rated
+  on, with Go to, and a new level or category never takes the id it holds.
+  Nothing moves a rating silently. A matrix cell that is not one of the four
+  bands (a file edited by hand) is open: "The risk matrix has cells not set."
+- **Tolerable risk per category.** A threat rated per category is above
+  tolerable risk when any category's risk (its impact, capped at the
+  rating's own impact, with the state's likelihood) is above that category's
+  tolerable risk, or the general one; a rating whose own impact is above all
+  its categories (one was removed) is its band against the general tolerable
+  risk, so it never reads within below its band. A threat with no category,
+  or criteria with no tolerable risk per category, compares its band with the
+  general tolerable risk as before. The engine's treatment state (required,
+  current, planned, today, once the plan is done) and so every output read
+  it, as do the SL-T trace (every threat behind a requirement, not only the
+  worst band's), the heat maps (a cell holding threats is outlined when one
+  of them is above tolerable risk, an empty one by its band:
+  `ViewModel.heatCells` and `heatAbove`, read by step 5 and the workbook's
+  Summary) and the review pack (its expected value is each rated category's
+  tolerable risk where one has its own). A ranked system does the same
+  (`hlaExceeds`), and a zone's initial risk from its systems. The tolerable
+  risk an approval covers includes the per-category ones and the criteria
+  (the same content `isHouseContent` compares: names, definitions, cells,
+  category names), once they are not the house's, so a change reads as "the
+  tolerable risk or the risk criteria changed".
+- **Impact per category.** A threat may give its impact per consequence
+  category (`impactByCategory`, in the editor's Impact by category); a
+  ranked system its consequence (`consequenceByCategory`) and where the
+  rating comes from (`consequenceSource`: HAZOP, LOPA, a business impact
+  analysis, an interview, typed or picked). The single `impact` (or
+  `consequence`) mirrors the worst category, shown as derived, so every
+  reader of it, the risk context and an older build work as before. With no
+  category left the map goes and the impact stays, set by hand again. While
+  an entry is on a level or category the criteria no longer have (Leave as
+  it is), the single impact is not worked out again, so it never drops. An
+  impact that is not the worst of its categories (an older build edited it)
+  is open. Copy to takes the categories with the unmitigated rating.
+- **Deliverables.** Word prints the project's criteria in the appendix,
+  labelled "The SolutionsPT house risk criteria used in this assessment.",
+  "The client's risk criteria used in this assessment (where they come
+  from)." or "The risk criteria agreed for this assessment." (with "(from a
+  SolutionsPT generic preset)" while they are one unchanged); with the
+  client's criteria marked in use but the house's still on step 1, the old
+  reference wording and red note stay, and "The client's risk criteria are
+  marked in use, but step 1 still holds the house criteria." is open (and
+  "The client's criteria are marked in use, but step 1 holds a generic
+  preset." while step 1 is an unchanged 3x3, 4x4 or 5x5). The
+  method row, the method text and the sentences naming the matrix follow
+  the same label. Where categories were used, the appendix names them (a
+  table with their tolerable risk when one is set per category, a category
+  with none reading "Medium (general tolerable risk)"), the tolerable risk
+  section lists the per-category ones ("Safety: Low; Financial loss: High"), a threat's detail has
+  an Impact by category row and the ranking's consequence its categories and
+  source. Excel: the Criteria sheet is the project's criteria with the same
+  label and the categories (with a line on how they are compared), and names
+  the SL-T mapping and the security levels as the house's; the Threat register gains an Impact by category
+  column and the Ranking sheet Consequence source and Consequence by category
+  columns, each last and only when something is captured. The review pack
+  gains an Impact by category detail row where given, and its ratings print
+  the criteria's level names.
+
+### Drawing levels, safety floor, scenario library and undo (phase 5b, built Nov 2026)
+
+Each item stands on its own. The schema stays `spt-risk-project/0.3`; every
+new field is optional, tidied by the migration when present and never added,
+so a file without them behaves exactly as before.
+
+- **Drawing levels.** A zone may have a drawing level (`zone.level`), chosen
+  in step 3's zone panel from a house layering (Enterprise, DMZ, Supervisory,
+  Control, Safety, Field; `Model.ZONE_LEVELS`), labelled as the house's and
+  not as a model from a standard. Once any zone has one, the drawing lays the
+  zones out in horizontal bands, top to bottom in that order, each band
+  shaded and labelled on the left, at most four zones to a band's row; zones
+  with no level form a last band, No level. Within a band the zones follow
+  `zone.levelOrder` (Move left and Move right in the panel, which write the
+  band's order out) and then the zones' order. With no level set the drawing
+  is laid out exactly as before: `scripts/test-risk-drawing.html` holds every
+  box, line, id tag and key line to a frozen copy of the phase 5a layout
+  (`scripts/fixtures/zone-map-phase5a.js`) on the demo, the frozen files and
+  generated projects.
+  - Every drawing (steps 3 and 6 and the summary) opens a zone from its box,
+    by click or Enter.
+  - A conduit's SL-T (the highest set) and its channels sit beside its id tag
+    where they fit, on its own line (never off the line's end), clear of every
+    box, tag, note and other line; where they do not fit they are left off the
+    drawing (the key, the conduit table and Word's characteristics carry
+    them). Channels too long are cut at a comma or a space, never mid-word.
+  - A box says "SL-T 3" (the conduits' form) or "Suggested SL 3", and the
+    worst risk by name; a line too wide for the box goes on two.
+  - A legend under the key says what is used: the safety related border, the
+    worst-risk border colours, the dashed box outside the SUC, "SL-T: highest
+    on any foundational requirement", "Suggested SL: no SL-T set yet", and
+    "Shaded rows: SolutionsPT house layering".
+  - On step 3 the drawing is a group of zone buttons, each with a focus ring.
+  - Word puts the drawing on a page of its own (the heading, the picture, the
+    key and the legend are a Word section of their own inside the
+    requirements): landscape, or portrait for a drawing that prints larger
+    that way (a tall banded one). The picture is the drawing alone
+    (`toPng(L, 3, { picture: true })`, `L.drawH` tall), up to 940 by 540
+    pixels landscape or 620 by 860 portrait; the key (each conduit's id, name
+    and ends) and the legend (each mark as a bordered cell, or its word, and
+    what it means) are Word tables under it at the body's size. Twelve zones
+    over six levels print at about half size (0.51; 0.41 before); the demo at
+    full size. One `layout()` still feeds the SVG and the PNG.
+- **Safety floor list.** The rules file's `sis-present` rule has `floorFR`,
+  the requirements the SL3 floor applies to, all seven by default (the
+  owner's decision), so results do not change. A project can narrow it
+  (`project.safetyFloorFR`, stored only while narrower, never wider) with the
+  chips in the floor box on the SL-T grid and on a safety related zone's
+  SL-T strip; step 3's safety hint says what it covers. The SL-T suggestion,
+  the Why trace ("the SL3 floor does not cover UC in this assessment"), the
+  driving scenarios ("SLn from the safety floor" only where it applies) and
+  the Word SL-T section ("The house method sets a floor of SL3 for it; in
+  this assessment the floor covers IAC and SI.") read it; the page says
+  "every foundational requirement" when it covers all seven. `scripts/test-risk-floor.html` proves the
+  frozen files and the demo give the same results and Word text as a rules
+  file with no list.
+- **Scenario library.** `data/scenario-library.json` (and its `.js` twin,
+  `scripts/build-data.ps1`, version 1.1) holds 33 OT threat scenarios
+  (`HS01` to `HS33`; HS31 to HS33 cover telemetry to remote sites, an IT
+  management tool shared with the control hosts, and an OEM package unit) in SolutionsPT's
+  own words: id, title, statement, typical threat source, entry point,
+  consequence, affected requirements, typical asset types, typical
+  vulnerabilities, countermeasure ideas with IEC 62443-3-3 SR ids (ids only,
+  no requirement text) and tags. It holds no ratings. Its `_note` asks
+  SolutionsPT to name an owner for the wording; nothing of the note appears
+  in the tool or a deliverable.
+  - Step 5's Add from library opens an in-page picker (search, a tag and a
+    requirement filter, the scenarios that fit the zone or conduit first,
+    with a hint of why: its asset types, an external or wireless conduit, the
+    zone's flags). The chosen scenarios are added as unrated drafts
+    (statement, source, entry point, requirements, consequence) with
+    `threat.libraryId` for provenance; a countermeasure idea is added, as an
+    additional countermeasure linked to nothing, only when ticked. Nothing is
+    rated, decided or linked for the consultant. Escape or Cancel closes it.
+    Add from library controls the picker (`aria-controls`), whose count is
+    a live region; a scenario added before is marked Already added.
+  - Step 2's Send to step 5 makes draft scenarios of the known threats
+    recorded there, on a zone or conduit chosen in the panel (the line is the
+    statement; those already there are marked and cannot be sent twice).
+  - The library never reaches Word, Excel, the risk context or the review
+    pack; a scenario added from it prints like any other.
+- **One-level undo.** Ctrl+Z outside a text field (inside one the browser's
+  own undo stays, unless nothing has been typed since the last change, as
+  when an action has just put the keyboard there) undoes the last change, and the toast after a destructive
+  or bulk action offers Undo: removing a scenario, zone, conduit, asset,
+  countermeasure, vulnerability or ranked system, Move, Copy to, Accept all
+  suggested (strip, grid row and grid), Confirm suggested, a preset applied,
+  assets pasted, scenarios added from the library and threats sent to step 5.
+  The state before the last change is kept as text (`js/app.js`); typing in
+  one field is one change. Each undo point is numbered: an action takes
+  `undoMark()` before it acts, and its toast offers Undo only for a point it
+  made, so an action that changed nothing never offers to undo an earlier
+  one. The toast is a polite live region (`role="status"`), kept in the
+  layout when idle (`toast-off`), with a dark slate background in the dark
+  theme; its Undo carries `aria-keyshortcuts="Control+Z"`. Undo puts the project back in place (ids never
+  change), returns to the page the change was made on, opens the zone,
+  conduit or scenario again and puts the keyboard on it; it marks the project
+  changed and autosaves. One level only, no redo; Load, New and Restore clear
+  it, and a question about where ratings go (step 1) is closed.
+  `scripts/test-risk-undo.html` covers each action.
+
 ## Report page
 
 The Report page has three views, Sections, Word pages and Summary, over both
@@ -323,10 +535,11 @@ remains with countermeasures in place.
 
 1. **Scope and risk criteria (ZCR 1):** name, description, scope and
    boundary, and operating-environment assumptions; and the risk criteria:
-   tolerable risk, confirmed with the asset owner, and whether the client's
-   own risk matrix is in use, with the matrix and scales shown beside them.
+   tolerable risk, confirmed with the asset owner, whether the client's own
+   risk matrix is in use, and the project's own matrix, scales and
+   consequence categories, editable beside them.
 2. **High-level risk (ZCR 2):** the asset and system
-   risk ranking (impact × likelihood → house risk band), which frames the
+   risk ranking (impact, optionally per consequence category and with its source, × likelihood → risk band on the project's criteria), which frames the
    zoning and is the high-level deliverable, the assumed adversary class, and
    the threats and requirements card (known and presumed threats, security
    functions that must be kept). Assign to zone
@@ -447,11 +660,14 @@ of that layout code. It has:
   above what they map to, it says it comes from the safety floor or is
   inherited from a zone the conduit joins) and the justifications; the
   sign-off with a signature table from the approvers,
-  limitations, and an appendix of the SolutionsPT house risk criteria (the
-  matrix with the cells above tolerable risk bordered, the scales, the house
-  summary of the security levels and the FR key). Where the client's own
-  criteria are in use the appendix says the tables are for reference, with a
-  red note asking the consultant to relate the ratings to the client's.
+  limitations, and an appendix of the risk criteria in use (the matrix with
+  the cells above tolerable risk bordered, the scales, the consequence
+  categories where used, the house summary of the security levels and the
+  FR key), labelled as the house's, the client's or agreed for this
+  assessment. Where the client's own criteria are marked in use but step 1
+  still holds the house's, the appendix says the tables are for reference,
+  with a red note asking the consultant to relate the ratings to the
+  client's (see Risk criteria and impact per category).
 
 The high-level Word report is a ranking-only version with its own scorecard,
 downloaded as `<name>-high-level-risk-assessment.docx`. It has the criteria
@@ -505,7 +721,11 @@ rating is recorded only where it differs from the rating before it (T2's
 rationale says why its allow-listing does not lower its likelihood), and each
 countermeasure's SR references are on the FRs it addresses. Conduit C2 (vendor
 remote access) runs both ways, sessions always started from the jump host in
-Z3. `scripts/test-tour-risk.html` holds it to zero completeness problems and
+Z3. Since phase 5 it keeps the house criteria (so the Word baseline stays
+meaningful), and T1, T4 and T6 give their impact per consequence category
+(each impact the worst of them), and A1 and A2 the source of their
+consequence (a HAZOP revalidation, a LOPA and SIL determination).
+`scripts/test-tour-risk.html` holds it to zero completeness problems and
 its approvals to Unchanged since approval.
 
 ## What the tool does and does not claim
@@ -524,8 +744,9 @@ its approvals to Unchanged since approval.
   defaults. 62443-3-2 prescribes no matrix. The tool
   always shows the rule trace, and the consultant's per-FR SL-T and written
   justification are the deliverable. A client's own corporate matrix takes
-  precedence: tune `data/slt-suggestion-rules.json` or replace the matrix
-  entirely.
+  precedence: enter it on step 1 (levels, definitions and matrix, mapped onto
+  the four bands), and the reports print it as the client's. The generic
+  presets are the tool's own shapes, not the standard's example matrices.
 
 ## Layout
 
@@ -552,6 +773,10 @@ js/app.js                          state, autosave, Save/Load, the sidebar (page
                                    publishes window.RiskTool
 js/ui-stages.js                    Home, steps 1, 2 and 4 (with the risk comparison
                                    and Assign to zone) and Engagement and evidence
+js/ui-criteria.js                  step 1's risk criteria editor: the matrix, presets
+                                   and where ratings go, levels and categories
+js/ui-library.js                   step 5's Add from library picker over the house
+                                   scenario library, and step 2's Send to step 5
 js/ui-risk.js                      step 5: the zone workshop (rail, SL-T strip, scenario
                                    table and editor), Register, Heat map, SL-T grid
 js/ui-zones.js                     step 3: drawing, tables, detail panel, paste,
@@ -579,6 +804,8 @@ data/slt-suggestion-rules.json     house risk model AS DATA (severity/likelihood
 data/zcr-map.json                  the ZCR ids, titles and clause numbers of
                                    IEC 62443-3-2:2020 + generated .js; the only
                                    place a clause number is written
+data/scenario-library.json         the house scenario library (33 scenarios, no ratings,
+                                   SR ids only) + generated .js
 data/risk-context-interchange.json the export contract (spt-risk-context/1.4) + .js
 data/engagement-guidance.json      advisory prep notes (typical & often-forgotten
                                    documents, key stakeholders) shown on the
@@ -603,13 +830,35 @@ scripts/test-risk-spec.html        step 3's layout and paste, separation rows, s
                                    criteria, step 6's blocks and links, step 7's
                                    approvers and fingerprint, the review hash, the Word
                                    sections, Excel columns, the 3b fields through v0.7
+scripts/test-risk-criteria.html    phase 5a: files without criteria unchanged (fixtures,
+                                   demo), presets, step 1's editor, a cell moving every
+                                   output, ratings mapped or left open, tolerable risk
+                                   per category, the client's criteria, impact per
+                                   category and consequence source, the migration
+scripts/test-risk-drawing.html     phase 5b: the drawing with no level as phase 5a drew it
+                                   (frozen layout), bands, the nudge, conduit notes, the
+                                   legend, click-through, Word's drawing page (picture,
+                                   key and legend tables, portrait when tall, print scale)
+scripts/test-risk-floor.html       phase 5b: the safety floor list, old files unchanged,
+                                   narrowing in every output, the chips
+scripts/test-risk-library.html     phase 5b: the library's data, Add from library, what
+                                   prints, Send to step 5
+scripts/test-risk-undo.html        phase 5b: undo of each destructive and bulk action,
+                                   Ctrl+Z and text fields, one level, focus, autosave, Load, New
+scripts/test-risk-p5fix.html       the phase 5 review's fixes: Leave as it is, the cap at
+                                   the rating's own impact, preset defaults (no band drops),
+                                   ids not reused, no Undo for no change, per-category heat
+                                   maps, review pack and SL-T trace, the fingerprint, matrix
+                                   gaps, the generic preset, the toast, the editor's focus
+                                   and names, Escape, the picker, the library's content
 scripts/test-risk-nav.html         the sidebar and step status, Home, Assign to zone, the
                                    risk comparison, Check and issue and its links, the
                                    Generate anyway panel, old page ids, lastStage, Open
                                    the demo, and a file with the new fields in v0.7
 scripts/fixtures/                  frozen files: the tour as v0.7 saved it, the tour as
-                                   phase 3 saved it (0.2), a hand-made 0.1 file, and the
-                                   released v0.7 normaliser; never edited or regenerated
+                                   phase 3 saved it (0.2), a hand-made 0.1 file, the
+                                   released v0.7 normaliser and the phase 5a drawing
+                                   layout; never edited or regenerated
 scripts/test-tour-risk.html        tour-mode tests (seeding, autosave protection), and the
                                    demo as a workshop example with zero completeness problems
 scripts/test-risk-reports.html     Word/Excel deliverable tests, with phase 4's sections and

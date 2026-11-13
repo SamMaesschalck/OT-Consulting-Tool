@@ -1,0 +1,260 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool one-level undo</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 5b of docs/risk-tool-redesign.md, item 4: one-level undo.
+  - The toast's Undo after each destructive or bulk action (remove a scenario,
+    zone, conduit, asset, countermeasure or vulnerability; move; copy to;
+    accept all suggested; a preset applied; added from the library; sent to
+    step 5) puts the project back exactly, with the item open again and the
+    keyboard on it.
+  - Ctrl+Z outside a text field undoes the last change, typing in one field
+    counting as one change; inside a text field it is the browser's own.
+  - One level: a second undo has nothing to undo. The project is marked
+    changed and autosaved; Load and New clear it; it goes back to the page the
+    change was made on; a question about where ratings go is closed.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports) { if (++tries > 200) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    try { run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    done();
+  }, 50);
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, d = w.document, RP = w.RiskApp.RiskPage, ZP = w.RiskApp.ZonesPage;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var KEY = RT.AUTOSAVE_KEY;
+    try { w.localStorage.removeItem(KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function snap() { return JSON.stringify(P()); }
+    function owner(id) { return P().zones.concat(P().conduits).filter(function (o) { return o.id === id; })[0]; }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    function toast() { return d.getElementById("toast"); }
+    // Step 1's tolerable risk select (the only one offering Very high without a data attribute).
+    function tolSel() { return [].filter.call(main().querySelectorAll("select"), function (s) { return [].some.call(s.options, function (o) { return o.value === "very-high"; }) && !s.getAttribute("data-field") && !s.getAttribute("data-action"); })[0]; }
+    function toastUndo() { return toast().querySelector('[data-action="toast-undo"]'); }
+    function ctrlZ(target) {
+      var e = new w.KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true, cancelable: true });
+      (target || d.body).dispatchEvent(e);
+      return e;
+    }
+    function demo() { RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT)); }
+    function act(el) { el.focus(); el.click(); }
+    // Each action: the project before, the action, then Undo from the toast.
+    function viaToast(name, before) {
+      var u = toastUndo();
+      ok(!!u, name + ": the toast offers Undo", toast().textContent);
+      if (!u) return false;
+      u.click();
+      ok(snap() === before, name + ": Undo puts the project back exactly");
+      ok(RT.isDirty() && !RT.canUndo(), name + ": the project is marked changed, and there is nothing left to undo");
+      return true;
+    }
+
+    // ---- remove a scenario --------------------------------------------------------------
+    demo();
+    ok(!RT.canUndo(), "a file just loaded has nothing to undo");
+    RP.select("Z1", "T2"); RT.navigate("risk");
+    var before = snap();
+    act(main().querySelector('[data-threat-id="T2"] [data-action="remove-scenario"]'));
+    ok(!owner("Z1").threats.some(function (x) { return x.id === "T2"; }) && RT.canUndo(), "remove a scenario: it goes, and can be undone");
+    ok(/Threat T2 removed\./.test(toast().textContent), "the toast says what was removed");
+    ok(d.activeElement && d.activeElement.getAttribute("data-action") !== "toast-undo", "the keyboard is not moved to the toast");
+    viaToast("remove a scenario", before);
+    ok(owner("Z1").threats.map(function (x) { return x.id; }).join() === "T1,T2,T3", "the scenario is back in its place", owner("Z1").threats.map(function (x) { return x.id; }).join());
+    ok(d.activeElement === main().querySelector('[data-threat-id="T2"] [data-action="open-scenario"]') && main().querySelector('tbody[data-threat-id="T2"]').classList.contains("open"), "opened again, the keyboard on it");
+
+    // ---- remove a countermeasure (its links come back too) ---------------------------------
+    var cm = owner("Z1").countermeasures[0], linkedTo = owner("Z1").threats.filter(function (x) { return x.countermeasureIds.indexOf(cm.id) >= 0; }).map(function (x) { return x.id; });
+    RP.ui.sec["cm:Z1"] = true; RT.navigate("risk");
+    before = snap();
+    act(main().querySelector('[data-cm-row="' + cm.id + '"] .btn.danger'));
+    ok(!owner("Z1").countermeasures.some(function (m) { return m.id === cm.id; }) && !owner("Z1").threats.some(function (x) { return x.countermeasureIds.indexOf(cm.id) >= 0; }), "remove a countermeasure: it and its links go");
+    viaToast("remove a countermeasure", before);
+    ok(linkedTo.length > 0 && owner("Z1").threats.filter(function (x) { return x.countermeasureIds.indexOf(cm.id) >= 0; }).length === linkedTo.length, "its links to scenarios are back", linkedTo.join());
+    ok(d.activeElement === main().querySelector('[data-cm-field="' + cm.id + '-reg-description"]'), "the keyboard on its description");
+
+    // ---- remove a vulnerability ---------------------------------------------------------------
+    var v = owner("Z1").vulnerabilities[0];
+    before = snap();
+    act(main().querySelector('[data-vuln-id="' + v.id + '"] .btn.danger'));
+    ok(!owner("Z1").vulnerabilities.some(function (x) { return x.id === v.id; }), "remove a vulnerability: it goes");
+    viaToast("remove a vulnerability", before);
+    ok(d.activeElement === main().querySelector('[data-field="vuln-' + v.id + '"]'), "the keyboard on it");
+
+    // ---- move ---------------------------------------------------------------------------------
+    RP.select("Z1", "T1"); RT.navigate("risk");
+    RP.ui.move["Z1/T1"] = true; RT.navigate("risk");
+    before = snap();
+    var mv = main().querySelector('[data-threat-id="T1"] [data-action="move-target"]');
+    change(mv, "Z4");
+    act(main().querySelector('[data-threat-id="T1"] [data-action="move-to"]'));
+    ok(owner("Z4").threats.some(function (x) { return x.id === "T1"; }), "move: T1 is in Z4");
+    viaToast("move", before);
+    ok(owner("Z1").threats[0].id === "T1" && main().querySelector('[data-owner-id]').getAttribute("data-owner-id") === "Z1" && d.activeElement === main().querySelector('[data-threat-id="T1"] [data-action="open-scenario"]'), "T1 is back in Z1 with its ratings, the zone open and the keyboard on it");
+
+    // ---- copy to --------------------------------------------------------------------------------
+    RP.ui.move["Z1/T1"] = true; RT.navigate("risk");
+    before = snap();
+    var cs = main().querySelector('[data-threat-id="T1"] [data-action="copy-targets"]');
+    [].forEach.call(cs.options, function (op) { op.selected = op.value === "Z3" || op.value === "Z4"; });
+    act(main().querySelector('[data-threat-id="T1"] [data-action="copy-to"]'));
+    ok(owner("Z3").threats.length === JSON.parse(before).zones[2].threats.length + 1, "copy to: a copy in Z3 and Z4");
+    viaToast("copy to", before);
+    ok(d.activeElement === main().querySelector('[data-threat-id="T1"] [data-action="copy-to"]'), "the keyboard back on Copy");
+
+    // ---- accept all suggested (strip and grid) ---------------------------------------------------
+    var z1 = owner("Z1"); M.FR_IDS.forEach(function (fr) { z1.slTargetByFR[fr] = null; }); RT.touched(); RT.navigate("risk");
+    before = snap();
+    act(main().querySelector('[data-slt-strip] [data-action="accept-all-suggested"]'));
+    ok(M.FR_IDS.some(function (fr) { return owner("Z1").slTargetByFR[fr] != null; }), "accept all suggested fills the SL-T");
+    viaToast("accept all suggested", before);
+    ok(d.activeElement === main().querySelector('[data-slt-strip] [data-action="accept-all-suggested"]'), "the keyboard back on Accept all suggested");
+    RT.navigate("slt");
+    before = snap();
+    act(main().querySelector('[data-action="accept-all-grid"]'));
+    viaToast("accept all suggested on the grid", before);
+    ok(d.activeElement === main().querySelector('[data-action="accept-all-grid"]'), "the keyboard back on the grid's Accept all suggested");
+
+    // ---- remove a zone, a conduit and an asset (step 3), undone with Ctrl+Z --------------------
+    ZP.select("zone", "Z3"); RT.navigate("zones");
+    before = snap();
+    act(main().querySelector('[data-detail="zone"] .card-h .btn.danger'));
+    ok(!owner("Z3") && P().conduits.length === 0, "remove a zone: it goes with the conduits that reach it");
+    ok(!!toastUndo(), "the toast offers Undo");
+    RT.navigate("home");
+    var e = ctrlZ();
+    ok(e.defaultPrevented && snap() === before, "Ctrl+Z outside a text field undoes it, from another page");
+    ok(RT.state.stage === "zones" && main().querySelector('[data-detail="zone"]').getAttribute("data-owner-id") === "Z3", "back on step 3 with the zone open");
+    ok(d.activeElement === main().querySelector('[data-zone-row="Z3"] [data-action="pick-Z3"]'), "the keyboard on its row");
+    ZP.select("conduit", "C2"); RT.navigate("zones");
+    before = snap();
+    act(main().querySelector('[data-detail="conduit"] .card-h .btn.danger'));
+    ok(!owner("C2"), "remove a conduit");
+    viaToast("remove a conduit", before);
+    ok(main().querySelector('[data-detail="conduit"]').getAttribute("data-owner-id") === "C2" && d.activeElement === main().querySelector('[data-conduit-row="C2"] [data-action="pick-C2"]'), "the conduit open again, the keyboard on its row");
+    ZP.select("zone", "Z1"); RT.navigate("zones");
+    before = snap();
+    var name1 = owner("Z1").assets[1].name;
+    act(main().querySelector('[data-detail="zone"] .asset-row:nth-child(2) .btn.danger'));
+    ok(owner("Z1").assets.every(function (a) { return a.name !== name1; }), "remove an asset");
+    viaToast("remove an asset", before);
+    ok(d.activeElement === main().querySelector('[data-detail="zone"] [data-asset-name="1"]'), "the keyboard on its name");
+
+    // ---- a preset applied, and a question about where ratings go ------------------------------
+    RT.navigate("suc");
+    before = snap();
+    change(main().querySelector('[data-action="criteria-preset"]'), "3x3");
+    act(main().querySelector('[data-action="criteria-apply"]'));
+    ok(!!w.RiskApp.CriteriaUI.pending(), "a preset with ratings asks where they go");
+    act(main().querySelector('[data-action="criteria-map-apply"]'));
+    ok(P().criteria && P().criteria.preset === "3x3", "applied, the project has the preset's criteria");
+    viaToast("a preset applied", before);
+    ok(!("criteria" in P()) && d.activeElement === main().querySelector('[data-action="criteria-apply"]'), "the house criteria and every rating are back, the keyboard on Apply");
+    // A question left open, then Ctrl+Z on an earlier change: the question goes.
+    var tolWas = P().srs.tolerableRisk;
+    change(tolSel(), tolWas === "high" ? "low" : "high");
+    var tolNow = P().srs.tolerableRisk;
+    change(main().querySelector('[data-action="criteria-preset"]'), "5x5");
+    act(main().querySelector('[data-action="criteria-apply"]'));
+    ok(!!w.RiskApp.CriteriaUI.pending() && !!main().querySelector("[data-criteria-map]"), "a second preset is waiting on where the ratings go");
+    d.body.focus();
+    ctrlZ();
+    ok(!w.RiskApp.CriteriaUI.pending() && !main().querySelector("[data-criteria-map]") && !("criteria" in P()) && P().srs.tolerableRisk === tolWas, "undo takes back the last change and closes the waiting question cleanly, changing no criteria", String(P().srs.tolerableRisk) + " was " + tolNow);
+
+    // ---- added from the library, and sent to step 5 -------------------------------------------
+    RP.select("Z2"); RT.navigate("risk");
+    before = snap();
+    act(main().querySelector('[data-action="add-from-library"]'));
+    var pk = main().querySelector("[data-library-picker]");
+    var box5 = pk.querySelector('[data-lib-pick="HS05"]'); box5.checked = true; box5.dispatchEvent(new w.Event("change", { bubbles: true }));
+    var cm5 = pk.querySelector('[data-lib-cm="HS05:0"]'); cm5.checked = true; cm5.dispatchEvent(new w.Event("change", { bubbles: true }));
+    act(pk.querySelector('[data-action="lib-add"]'));
+    ok(owner("Z2").threats.some(function (x) { return x.libraryId === "HS05"; }), "library add: the draft is in Z2");
+    viaToast("added from the library", before);
+    ok(d.activeElement === main().querySelector('[data-action="add-from-library"]'), "the keyboard back on Add from library");
+    RT.navigate("srs");
+    var sp = main().querySelector("details[data-send]"); sp.open = true; sp.dispatchEvent(new w.Event("toggle"));
+    before = snap();
+    act(main().querySelector('[data-action="send-threats"]'));
+    ok(owner("Z1").threats.length > JSON.parse(before).zones[0].threats.length, "sent to step 5");
+    viaToast("sent to step 5", before);
+    ok(d.activeElement === main().querySelector('[data-action="send-threats"]'), "the keyboard back on Send");
+
+    // ---- Ctrl+Z and text fields ------------------------------------------------------------------
+    RT.navigate("suc");
+    var nameBox = [].filter.call(main().querySelectorAll("input[type=text]"), function (x) { return x.value === P().suc.name; })[0];
+    var oldName = P().suc.name;
+    before = snap();
+    type(nameBox, oldName + " A");
+    type(nameBox, oldName + " AB");
+    type(nameBox, oldName + " ABC");
+    var inside = ctrlZ(nameBox);
+    ok(!inside.defaultPrevented && P().suc.name === oldName + " ABC", "inside a text field Ctrl+Z is left to the browser");
+    d.body.focus();
+    d.body.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true }));
+    ctrlZ();
+    ok(P().suc.name === oldName && snap() === before, "outside it, typing in one field is undone as one change");
+    ok(/Undone\./.test(toast().textContent), "and the toast says so");
+    var again = ctrlZ();
+    ok(again.defaultPrevented && snap() === before && /Nothing to undo\./.test(toast().textContent), "one level only: a second Ctrl+Z has nothing to undo");
+    // Two changes: only the second is undone.
+    var tol = tolSel();
+    var t0 = P().srs.tolerableRisk;
+    tol.focus(); change(tol, "low");
+    var mid = snap();
+    tol = tolSel();
+    tol.focus(); change(tol, "high");
+    d.body.focus(); ctrlZ();
+    ok(snap() === mid && P().srs.tolerableRisk === "low", "of two changes only the last is undone", P().srs.tolerableRisk + " from " + t0);
+
+    // ---- autosave, Load and New ------------------------------------------------------------------
+    var realKey = null;
+    w.RiskApp.App.markClean();
+    tol = tolSel();
+    tol.focus(); change(tol, "very-high");
+    w.RiskApp.App.markClean();
+    d.body.focus(); ctrlZ();
+    ok(RT.isDirty() && P().srs.tolerableRisk === "low", "an undo marks the project changed");
+    RT.flushAutosave();
+    try { realKey = JSON.parse(w.localStorage.getItem(KEY)); } catch (e2) { realKey = null; }
+    ok(!!realKey && JSON.stringify(realKey.project) === snap(), "and autosave writes the state undone to", realKey ? "" : "no snapshot (tour mode or storage)");
+    tol = tolSel();
+    tol.focus(); change(tol, "medium");
+    ok(RT.canUndo(), "a change is ready to undo");
+    demo();
+    ok(!RT.canUndo(), "Load clears it");
+    var loaded = snap(); ctrlZ();
+    ok(snap() === loaded, "so Ctrl+Z after Load changes nothing");
+    RT.navigate("suc");
+    tol = tolSel();
+    tol.focus(); change(tol, "high");
+    ok(RT.canUndo(), "a change after Load can be undone");
+    d.getElementById("btn-new").click();
+    ok(!RT.canUndo() && P().zones.length === 0, "New clears it");
+    try { w.localStorage.removeItem(KEY); } catch (e3) {}
+  }
+}());
+</script>
+</body>
+</html>

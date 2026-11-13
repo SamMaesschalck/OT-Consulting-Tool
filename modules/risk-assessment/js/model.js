@@ -295,6 +295,199 @@ window.RiskApp.Model = (function () {
     pj.approval = Object.assign(pj.approval || {}, m);
   }
 
+  // ---------- The risk criteria (phase 5) ----------
+  // project.criteria is absent until the consultant changes the criteria on
+  // step 1, and is then seeded from the house rules: the likelihood and
+  // impact levels the client uses (lowest first, 3 to 5 of each, with a
+  // one-line definition), the consequence categories, the matrix (each impact
+  // x likelihood cell one of the four fixed bands, which stay the output
+  // vocabulary) and, optionally, a tolerable band per consequence category
+  // (tolerableByCategory). The general tolerable risk stays srs.tolerableRisk.
+  // A file without criteria reads the house criteria, exactly as before.
+  // Everything that reads the matrix or the scales goes through criteriaOf;
+  // the engine's riskFor reads the stored shape directly, as it is hot.
+  //
+  //   project.criteria  { likelihood: [{ id, name, note }], impact: [...],
+  //                       matrix: { impactId: { likelihoodId: band } },
+  //                       categories: [{ id, name }], tolerableByCategory: { catId: band },
+  //                       preset: the last preset applied (house, 3x3, 4x4, 5x5) }
+  //   threat.impactByCategory       { catId: impact level id }; the threat's
+  //                                 impact mirrors the worst of them
+  //   rankedSystem.consequenceByCategory   the same for a ranked system's consequence
+  //   rankedSystem.consequenceSource       where the consequence rating comes from
+  var LEVEL_MIN = 3, LEVEL_MAX = 5;
+  var CONSEQUENCE_SOURCES = ["HAZOP", "LOPA", "Business impact analysis", "Interview", "Site walk-down"];
+  function plainNote(s) { s = String(s || "").replace(/^House default:\s*/i, ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function houseCriteria() {
+    function lv(arr) { return arr.map(function (x) { return { id: x.id, name: x.name, note: plainNote(x.note) }; }); }
+    var m = {};
+    SEV.forEach(function (s) { m[s.id] = {}; LIK.forEach(function (l) { m[s.id][l.id] = RULES.riskMatrix[s.id][l.id]; }); });
+    return { likelihood: lv(LIK), impact: lv(SEV), matrix: m, categories: CATS.map(function (c) { return { id: c.id, name: c.name }; }) };
+  }
+  // The generic shapes offered beside the house matrix. Their levels, words
+  // and cells are the tool's own (a band from the sum of the two positions on
+  // their scales), not any published example matrix.
+  var PRESETS = [
+    { id: "house", label: "SolutionsPT house criteria" },
+    { id: "3x3", label: "Three levels each" },
+    { id: "4x4", label: "Four levels each" },
+    { id: "5x5", label: "Five levels each" }
+  ];
+  var GENERIC_LIKELIHOOD = {
+    rare: ["Rare", "Not expected over the life of the system."],
+    unlikely: ["Unlikely", "Needs an unusual mix of access, skill and intent."],
+    possible: ["Possible", "Could happen over the life of the system, as the access and the means exist."],
+    likely: ["Likely", "Expected without further action, as the path is exposed or used against similar sites."],
+    certain: ["Almost certain", "Already seen here, or the path is open and actively targeted."]
+  };
+  var GENERIC_IMPACT = {
+    negligible: ["Negligible", "No lasting effect on people, the plant, the environment or the business."],
+    minor: ["Minor", "First aid, a short outage or a small cost, recovered within a shift."],
+    moderate: ["Moderate", "An injury, a reportable event, a multi-shift outage or a material cost."],
+    major: ["Major", "Serious injury, a significant release, loss of an essential function or a large cost."],
+    critical: ["Critical", "Loss of life, a major release, or loss the business may not recover from."]
+  };
+  var GENERIC_ORDER = {
+    3: { likelihood: ["unlikely", "possible", "likely"], impact: ["minor", "moderate", "major"] },
+    4: { likelihood: ["rare", "unlikely", "possible", "likely"], impact: ["minor", "moderate", "major", "critical"] },
+    5: { likelihood: ["rare", "unlikely", "possible", "likely", "certain"], impact: ["negligible", "minor", "moderate", "major", "critical"] }
+  };
+  function genericBand(i, nI, l, nL) {
+    var s = i / (nI - 1) + l / (nL - 1);
+    return s < 0.6 ? "low" : s < 1.1 ? "medium" : s < 1.6 ? "high" : "very-high";
+  }
+  // A preset's criteria, ready to store; null for an unknown id. Generic
+  // levels have positional ids (L1.., I1..), so no word is mistaken for the
+  // same word on another scale.
+  function presetCriteria(id) {
+    if (id === "house") { var hc = houseCriteria(); hc.preset = "house"; return hc; }
+    var n = { "3x3": 3, "4x4": 4, "5x5": 5 }[id];
+    if (!n) return null;
+    var ord = GENERIC_ORDER[n];
+    var L = ord.likelihood.map(function (k, i) { return { id: "L" + (i + 1), name: GENERIC_LIKELIHOOD[k][0], note: GENERIC_LIKELIHOOD[k][1] }; });
+    var I = ord.impact.map(function (k, i) { return { id: "I" + (i + 1), name: GENERIC_IMPACT[k][0], note: GENERIC_IMPACT[k][1] }; });
+    var m = {};
+    I.forEach(function (iv, i) { m[iv.id] = {}; L.forEach(function (lv, l) { m[iv.id][lv.id] = genericBand(i, n, l, n); }); });
+    return { likelihood: L, impact: I, matrix: m, categories: CATS.map(function (c) { return { id: c.id, name: c.name }; }), preset: id };
+  }
+  function isLevelList(a) {
+    if (!Array.isArray(a) || a.length < LEVEL_MIN || a.length > LEVEL_MAX) return false;
+    var seen = {};
+    return a.every(function (x) { if (!x || typeof x.id !== "string" || !x.id || seen[x.id]) return false; seen[x.id] = true; return true; });
+  }
+  // The stored criteria are usable: both scales of 3 to 5 levels with ids,
+  // and a matrix object. Anything else reads as the house criteria.
+  function criteriaUsable(c) {
+    return !!c && typeof c === "object" && !Array.isArray(c) && isLevelList(c.likelihood) && isLevelList(c.impact) && !!c.matrix && typeof c.matrix === "object";
+  }
+  function levelKey(a) { return a.map(function (x) { return [x.id, x.name || "", x.note || ""]; }); }
+  function criteriaContent(c) {
+    var cells = c.impact.map(function (iv) { return c.likelihood.map(function (lv) { var r = c.matrix[iv.id]; return (r && r[lv.id]) || ""; }); });
+    return JSON.stringify([levelKey(c.likelihood), levelKey(c.impact), cells, (c.categories || []).map(function (x) { return [x.id, x.name || ""]; })]);
+  }
+  var HOUSE_CONTENT = null;
+  function isHouseContent(c) {
+    if (HOUSE_CONTENT == null) HOUSE_CONTENT = criteriaContent(houseCriteria());
+    return criteriaContent(c) === HOUSE_CONTENT;
+  }
+  // The generic preset (3x3, 4x4 or 5x5) the project's stored criteria still
+  // are, levels, definitions and cells unchanged, or "" (the categories are
+  // left out: a preset keeps the project's own).
+  function scalesContent(c) { return JSON.stringify(JSON.parse(criteriaContent(c)).slice(0, 3)); }
+  var GENERIC_CONTENT = null;
+  function genericPresetOf(pj) {
+    var c = pj && criteriaUsable(pj.criteria) ? pj.criteria : null;
+    if (!c) return "";
+    if (!GENERIC_CONTENT) { GENERIC_CONTENT = {}; ["3x3", "4x4", "5x5"].forEach(function (id) { GENERIC_CONTENT[id] = scalesContent(presetCriteria(id)); }); }
+    var mine = scalesContent(c);
+    return Object.keys(GENERIC_CONTENT).filter(function (id) { return GENERIC_CONTENT[id] === mine; })[0] || "";
+  }
+  // The criteria in use, normalised for reading:
+  //   likelihood, impact   [{ id, name, note, rank }], lowest first
+  //   categories           [{ id, name, tolerable (band or null) }]
+  //   matrix               impact id -> likelihood id -> band
+  //   tolerableByCategory  category id -> band, only those set and known
+  //   stored               the project holds its own copy
+  //   isHouse              the levels, matrix and categories are the house's
+  //   source               "client" (the client's criteria are marked in use),
+  //                        "house" or "project" (changed for this assessment)
+  function criteriaOf(pj) {
+    var raw = pj && criteriaUsable(pj.criteria) ? pj.criteria : null;
+    var c = raw || houseCriteria();
+    function levels(arr) { return arr.map(function (x, i) { return { id: x.id, name: String(x.name || "").trim() || x.id, note: String(x.note || ""), rank: i }; }); }
+    var catSeen = {};
+    var cats = (Array.isArray(c.categories) ? c.categories : []).filter(function (x) {
+      if (!x || typeof x.id !== "string" || !x.id || catSeen[x.id]) return false; catSeen[x.id] = true; return true;
+    });
+    var tbc = {}, rawT = raw && raw.tolerableByCategory && typeof raw.tolerableByCategory === "object" ? raw.tolerableByCategory : {};
+    cats.forEach(function (x) { if (BAND_RANK[rawT[x.id]] != null) tbc[x.id] = rawT[x.id]; });
+    var isHouse = !raw || isHouseContent(c);
+    var client = !!(pj && pj.srs && pj.srs.clientMatrix);
+    return {
+      likelihood: levels(c.likelihood), impact: levels(c.impact), matrix: c.matrix,
+      categories: cats.map(function (x) { return { id: x.id, name: String(x.name || "").trim() || x.id, tolerable: tbc[x.id] || null }; }),
+      tolerableByCategory: tbc, hasCategoryTolerable: Object.keys(tbc).length > 0,
+      stored: !!raw, isHouse: isHouse, source: client ? "client" : (isHouse ? "house" : "project"),
+      preset: raw && typeof raw.preset === "string" ? raw.preset : (raw ? "" : "house")
+    };
+  }
+  // The project's own copy of the criteria, made from the house's on the
+  // first change.
+  function ensureCriteria(pj) {
+    if (!criteriaUsable(pj.criteria)) pj.criteria = houseCriteria();
+    if (!Array.isArray(pj.criteria.categories)) pj.criteria.categories = [];
+    return pj.criteria;
+  }
+  // A new level or category id not yet used in the list, nor among taken
+  // (ids a rating still holds after its level or category was removed, so
+  // such a rating never re-attaches to a new one).
+  function freshId(list, prefix, taken) {
+    var n = list.length + 1, ids = list.map(function (x) { return x.id; }).concat(taken || []);
+    while (ids.indexOf(prefix + n) >= 0) n++;
+    return prefix + n;
+  }
+
+  // ---------- Phase 5b: the safety floor list and drawing levels ----------
+  // Optional and written only once set, like the fields above.
+  //
+  //   project.safetyFloorFR  the foundational requirements the safety floor
+  //                          applies to, when narrowed from the rules file's
+  //                          floorFR (absent: the rules' list, all seven by
+  //                          default, so results are as before). Never wider.
+  //   zone.level             a band of the house layering (ZONE_LEVELS); with
+  //                          one set the drawing lays the zones out in bands
+  //   zone.levelOrder        the zone's place within its band (the nudge)
+  //   threat.libraryId       the house scenario a draft scenario was added
+  //                          from (provenance only; printed nowhere)
+  function houseFloorFR() {
+    var list = SIS_RULE && Array.isArray(SIS_RULE.floorFR) ? SIS_RULE.floorFR : FR_IDS;
+    return FR_IDS.filter(function (fr) { return list.indexOf(fr) >= 0; });
+  }
+  function safetyFloorFR(pj) {
+    var house = houseFloorFR();
+    if (pj && Array.isArray(pj.safetyFloorFR)) return house.filter(function (fr) { return pj.safetyFloorFR.indexOf(fr) >= 0; });
+    return house;
+  }
+  // Stores the list in FR order, and drops it when it is the house's again.
+  function setSafetyFloorFR(pj, list) {
+    var house = houseFloorFR(), out = house.filter(function (fr) { return list.indexOf(fr) >= 0; });
+    if (out.length === house.length) delete pj.safetyFloorFR; else pj.safetyFloorFR = out;
+  }
+  // The house layering the drawing's bands follow, top to bottom. A house
+  // convention for laying out the drawing, not a model taken from a standard.
+  var ZONE_LEVELS = [
+    { id: "enterprise", name: "Enterprise" },
+    { id: "dmz", name: "DMZ" },
+    { id: "supervisory", name: "Supervisory" },
+    { id: "control", name: "Control" },
+    { id: "safety", name: "Safety" },
+    { id: "field", name: "Field" }
+  ];
+  function zoneLevel(z) { return z && ZONE_LEVELS.some(function (l) { return l.id === z.level; }) ? z.level : null; }
+
+  // The house scenario library (data/scenario-library.json), when loaded.
+  var LIBRARY = (window.App.Data && window.App.Data.scenarioLibrary) || null;
+
   // reference: where the vulnerability is known from (a scan, an advisory, an observation).
   function emptyVulnerability(n) { return { id: "V" + n, description: "", reference: "" }; }
   // existing: in place when assessed. The plan fields (owner, priority, due
@@ -328,7 +521,8 @@ window.RiskApp.Model = (function () {
       eng.client || eng.consultant || eng.assessmentDate ||
       any(pj.zones) || any(pj.conduits) ||
       any(s.policies) || r.tolerableConfirmed || any(approvalsOf(pj)) ||
-      pj.assessmentType || sectionEdits(pj.reportCustom) || (pj.review && any(pj.review.rounds))
+      pj.assessmentType || sectionEdits(pj.reportCustom) || (pj.review && any(pj.review.rounds)) ||
+      criteriaUsable(pj.criteria) || Array.isArray(pj.safetyFloorFR)
     );
   }
   // A report section edited in either report.
@@ -359,6 +553,12 @@ window.RiskApp.Model = (function () {
     nextAssetId: nextAssetId, newAsset: newAsset,
     ASSESSMENT_TYPES: ASSESSMENT_TYPES, assessmentType: assessmentType, emptyDetailed: emptyDetailed,
     hlaIdsOf: hlaIdsOf, setHlaIds: setHlaIds,
+    LEVEL_MIN: LEVEL_MIN, LEVEL_MAX: LEVEL_MAX, PRESETS: PRESETS, CONSEQUENCE_SOURCES: CONSEQUENCE_SOURCES,
+    houseCriteria: houseCriteria, presetCriteria: presetCriteria, criteriaUsable: criteriaUsable,
+    criteriaOf: criteriaOf, ensureCriteria: ensureCriteria, freshId: freshId, isHouseContent: isHouseContent,
+    criteriaContent: criteriaContent, genericPresetOf: genericPresetOf,
+    houseFloorFR: houseFloorFR, safetyFloorFR: safetyFloorFR, setSafetyFloorFR: setSafetyFloorFR,
+    ZONE_LEVELS: ZONE_LEVELS, zoneLevel: zoneLevel, LIBRARY: LIBRARY,
     projectHasContent: projectHasContent
   };
 }());

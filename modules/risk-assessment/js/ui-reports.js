@@ -119,7 +119,7 @@ window.RiskApp.Reports = (function () {
     var p = state.project;
     if (!p.srs.highLevelAssets.length) return null;
     var ranked = p.srs.highLevelAssets.slice().sort(function (x, y) {
-      var rx = riskFor(x.consequence, x.likelihood), ry = riskFor(y.consequence, y.likelihood);
+      var rx = riskFor(x.consequence, x.likelihood, p), ry = riskFor(y.consequence, y.likelihood, p);
       return (ry ? BAND_RANK[ry] : -1) - (rx ? BAND_RANK[rx] : -1);
     });
     var at = h("table", { class: "tbl" }, [h("thead", null, [h("tr", null, [
@@ -131,9 +131,9 @@ window.RiskApp.Reports = (function () {
     ranked.forEach(function (a) {
       atb.appendChild(h("tr", null, [
         h("td", { text: a.name || "" }), h("td", { text: a.functionLocation || "" }),
-        h("td", { class: "center", text: a.consequence ? E.impactName(a.consequence) : "" }),
-        h("td", { class: "center", text: a.likelihood ? E.likelihoodName(a.likelihood) : "" }),
-        h("td", { class: "center" }, [riskPill(riskFor(a.consequence, a.likelihood))]),
+        h("td", { class: "center", text: a.consequence ? E.impactName(a.consequence, p) : "" }),
+        h("td", { class: "center", text: a.likelihood ? E.likelihoodName(a.likelihood, p) : "" }),
+        h("td", { class: "center" }, [riskPill(riskFor(a.consequence, a.likelihood, p))]),
         h("td", { text: a.note || "" })
       ]));
     });
@@ -150,7 +150,7 @@ window.RiskApp.Reports = (function () {
     var p = state.project, s = p.srs;
     main.appendChild(h("div", { class: "print-only" }, [
       h("h1", { class: "page-title", text: "High-level cyber security risk assessment: " + (p.suc.name || "unnamed SUC") }),
-      h("p", { class: "page-sub", text: "IEC 62443-3-2 high-level risk assessment · " + todayISO() + " · relative risk ranking to prioritise systems and frame zoning. Risk bands are a SolutionsPT house matrix." })
+      h("p", { class: "page-sub", text: "IEC 62443-3-2 high-level risk assessment · " + todayISO() + " · relative risk ranking to prioritise systems and frame zoning. Risk bands are from " + E.criteriaWords(p).matrix + "." })
     ]));
     main.appendChild(h("h1", { class: "page-title no-print", text: "High-level risk assessment report" }));
     main.appendChild(pageSub("hlreport", "A deliverable on its own that needs no zones or SL-T.", "no-print"));
@@ -269,7 +269,8 @@ window.RiskApp.Reports = (function () {
       main.appendChild(card("Conduits", p.conduits.length + " conduit" + (p.conduits.length === 1 ? "" : "s"), [ct]));
     }
 
-    main.appendChild(card("Zone & conduit drawing", null, [renderZoneMap(p)]));
+    // A zone's box opens it on step 3, as on the other pages.
+    main.appendChild(card("Zone & conduit drawing", null, [renderZoneMap(p, function (id) { A.goToItem({ stage: "zones", target: { kind: "zone", id: id } }); })]));
 
     main.appendChild(approvalCard(p));
 

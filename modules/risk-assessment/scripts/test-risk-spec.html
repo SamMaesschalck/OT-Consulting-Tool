@@ -8,7 +8,7 @@
   Phase 3b of docs/risk-tool-redesign.md: step 3's layout (the drawing on top,
   compact tables, one zone or conduit in a detail panel, collapsed
   characteristics), pasting assets several at a time, the separation rows
-  raised only by a mix in the data, step 1's read-only criteria and the
+  raised only by a mix in the data, step 1's criteria (editable since phase 5) and the
   tolerable risk's confirmed marker, step 6's eight blocks with their status
   and links, step 7's approvers with their fingerprint, the review hash
   leaving the signature table out, the Word sections (requirements in order,
@@ -177,7 +177,10 @@
     var cells = crit.querySelectorAll(".matrix td[data-band]"), above = crit.querySelectorAll(".matrix td.above-tol");
     var want = 0; Object.keys(RULES.riskMatrix).filter(function (k) { return k !== "_note"; }).forEach(function (s) { Object.keys(RULES.riskMatrix[s]).forEach(function (l) { if (RT.exceedsTolerable(RULES.riskMatrix[s][l], P().srs.tolerableRisk)) want++; }); });
     ok(cells.length === 12 && above.length === want && want > 0, "step 1 shows the matrix beside the form, the cells above tolerable risk outlined", above.length + " / " + want);
-    ok(!!crit.querySelector("details.scales") && /Low:/.test(crit.querySelector("details.scales").textContent) && !/House default/.test(crit.textContent), "with the scale definitions, read-only");
+    // Phase 5: the definitions are the project's criteria, edited in place
+    // (re-pointed from the read-only list: the same definitions, no house prefix).
+    var defIns = [].slice.call(crit.querySelectorAll("details.scales input[type=text], details.scales textarea"));
+    ok(!!crit.querySelector("details.scales") && defIns.some(function (i) { return i.value === "Low"; }) && defIns.some(function (i) { return /^No known history/.test(i.value); }) && !/House default/.test(crit.textContent) && !defIns.some(function (i) { return /House default/.test(i.value); }), "with the scale definitions, without the house prefix");
     ok(has(texts(), /^Tolerable risk is not confirmed with the asset owner\.$/) && !RT.tolerableConfirmed(), "an unconfirmed tolerable risk is open (no silent default)");
     var it = RT.completeness().filter(function (i) { return /Tolerable risk is not confirmed/.test(i.text); })[0];
     ok(it.stage === "suc" && it.doc === "both" && it.target.kind === "criteria", "in step 1, for both reports");

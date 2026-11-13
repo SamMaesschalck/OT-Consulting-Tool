@@ -73,7 +73,9 @@
           zp.length ? h("div", { class: "btn-row" }, [go("zones")]) : null];
       case "tolerable":
         var tol = E.tolerableOf(p), ok = M.tolerableConfirmed(p);
+        var byCat = E.tolerableByCategoryWords(p);
         return [h("p", null, [riskPill(tol), h("span", { class: ok ? "muted" : "val-warn", text: ok ? "  Confirmed with the asset owner." : "  Not confirmed with the asset owner." })]),
+          byCat ? h("p", { class: "muted", "data-tolerable-by-category": "", text: "By category: " + byCat + "." }) : null,
           p.srs.clientMatrix ? h("p", { class: "muted", text: "Client risk matrix in use" + (p.srs.clientMatrixNote ? ": " + p.srs.clientMatrixNote : "") + "." }) : null,
           h("div", { class: "btn-row" }, [go("suc", "criteria")])];
       case "regulatory":
@@ -164,7 +166,7 @@
     kids.push(h("div", { "data-covers": "ranking", style: "margin-top:10px" }, [h("strong", { text: "Ranking" }),
       list(ranked.map(function (a) {
         var c = hlOnly ? E.hlaComparison(a, p) : null;
-        return a.id + (a.name ? " " + a.name : "") + ": " + (a.consequence ? E.impactName(a.consequence) : "not rated") + " impact, " + (a.likelihood ? E.likelihoodName(a.likelihood).toLowerCase() : "not rated") + " likelihood" +
+        return a.id + (a.name ? " " + a.name : "") + ": " + (a.consequence ? E.impactName(a.consequence, p) : "not rated") + " impact, " + (a.likelihood ? E.likelihoodName(a.likelihood, p).toLowerCase() : "not rated") + " likelihood" +
           (c ? (c.required === true ? ", detailed assessment required" : c.required === false ? ", no detailed assessment" : "") : "") + ".";
       }), "None.")]));
     return card("What is being approved", null, kids);

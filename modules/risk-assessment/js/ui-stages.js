@@ -2,10 +2,12 @@
 /* ui-stages.js — Home, the workflow steps and Engagement and evidence.
  *
  * Home (home: the kind of assessment, the steps with their status, Open the
- * demo), 1 Scope and risk criteria (suc, with the risk criteria read-only
- * beside the form and the tolerable risk's confirmed marker), 2 High-level
- * risk (srs, with Assign to zone on the ranking, and the comparison column on
- * a high-level-only assessment) and 4 Risk comparison (compare); plus
+ * demo), 1 Scope and risk criteria (suc, with the project's risk criteria
+ * editable beside the form, js/ui-criteria.js, and the tolerable risk's
+ * confirmed marker), 2 High-level risk (srs, with each system's impact,
+ * optionally per consequence category, and its source; Assign to zone on the
+ * ranking, and the comparison column on a high-level-only assessment) and
+ * 4 Risk comparison (compare); plus
  * Engagement and evidence (basis). Step 3 is js/ui-zones.js, step 5
  * (Detailed risk: risk and slt) js/ui-risk.js, steps 6 and 7 js/ui-spec.js.
  * Each page registers itself in RiskApp.Pages for js/app.js to draw.
@@ -55,42 +57,19 @@
       h("div", { class: "field" }, [
         h("label", { text: "Client risk criteria" }),
         h("label", { style: "text-transform:none;font-weight:400;font-size:13px;color:var(--text);display:inline-flex;align-items:center;gap:6px;cursor:pointer" }, [
-          h("input", { type: "checkbox", checked: s.clientMatrix, onChange: function (e) { s.clientMatrix = e.target.checked; touched(); rerender(); } }),
+          h("input", { type: "checkbox", "data-action": "client-criteria", checked: s.clientMatrix, onChange: function (e) { s.clientMatrix = e.target.checked; touched(); rerender(); } }),
           "The client's own risk matrix or criteria are in use"
         ]),
-        h("div", { class: "hint", text: "The client's matrix takes precedence over the SolutionsPT house matrix." })
+        h("div", { class: "hint", text: "Enter the client's levels and matrix here; the reports print them as the client's." })
       ])
     ];
-    if (s.clientMatrix) body.push(textField("How the client matrix was applied", s.clientMatrixNote, function (v) { s.clientMatrixNote = v; touched(); }, { textarea: true }));
+    if (s.clientMatrix) body.push(textField("Where the client's criteria come from", s.clientMatrixNote, function (v) { s.clientMatrixNote = v; touched(); }, { textarea: true, placeholder: "e.g. Acme corporate risk matrix, revision 3" }));
+    // The project's own criteria, editable (js/ui-criteria.js): the matrix
+    // beside the form, the scales and categories below.
     main.appendChild(card("Risk criteria", null, [h("div", { class: "criteria-layout" }, [
       h("div", null, body),
-      criteriaPanel(E.tolerableOf(p))
-    ])], null, { "data-check-anchor": "criteria" }));
-  }
-
-  // The risk criteria, read-only beside the form: the matrix with the
-  // tolerable line (cells above it outlined), and the scale definitions.
-  function criteriaPanel(tol) {
-    var t = h("table", { class: "tbl matrix", "aria-label": "Risk matrix" });
-    t.appendChild(h("thead", null, [h("tr", null, [h("th", { text: "Impact" })].concat(LIK.map(function (l) { return h("th", { class: "center", text: l.name }); })))]));
-    var tb = h("tbody");
-    SEV.slice().reverse().forEach(function (sv) {
-      tb.appendChild(h("tr", null, [h("th", { scope: "row", text: sv.name })].concat(LIK.map(function (l) {
-        var b = RULES.riskMatrix[sv.id][l.id], above = E.exceedsTolerable(b, tol);
-        return h("td", { class: "center" + (above ? " above-tol" : ""), "data-band": b }, [riskPill(b)]);
-      }))));
-    });
-    t.appendChild(tb);
-    function scale(title, arr) {
-      return h("div", null, [h("strong", { text: title }), h("ul", { class: "scale-list" }, arr.map(function (x) {
-        return h("li", null, [h("span", { class: "scale-name", text: x.name + ": " }), U.cap(String(x.note || "").replace(/^House default:\s*/i, ""))]);
-      }))]);
-    }
-    return h("div", { class: "criteria-panel", "data-criteria": "matrix" }, [
-      h("div", { class: "muted criteria-cap", text: "Likelihood across, impact down. Outlined cells are above tolerable risk (" + BAND_NAME[tol].toLowerCase() + ")." }),
-      t,
-      h("details", { class: "scales" }, [h("summary", { text: "Scale definitions" }), scale("Impact", SEV), scale("Likelihood", LIK)])
-    ]);
+      R.CriteriaUI.panel(p)
+    ]), R.CriteriaUI.scales(p)], null, { "data-check-anchor": "criteria" }));
   }
 
   // ---------- Stage 2: high-level risk assessment ----------
@@ -181,6 +160,44 @@
     return cmp.suggested ? "Above tolerable" : "Within tolerable";
   }
 
+  // A ranked system's impact: one level, or (By category) one per
+  // consequence category, the impact then being the worst of them; and
+  // where the rating comes from (HAZOP, a business impact analysis, ...).
+  var catOpen = {};   // ranked system id -> its By category is open (kept across redraws)
+  function impactCell(a, p, crit) {
+    var cats = E.categoryRatings(a.consequenceByCategory, p);
+    var box = h("div", { class: "hla-impact" });
+    if (cats.length) {
+      box.appendChild(h("div", { class: "derived", "data-derived": "consequence" }, [h("strong", { text: E.impactName(a.consequence, p) || "Not rated" }), h("span", { class: "muted", text: " worst category" })]));
+    } else {
+      var sel = h("select", { "data-field": "hla-consequence", "aria-label": "Impact of " + a.id, onChange: function (e) { a.consequence = e.target.value; touched(); rerender(); } });
+      sel.appendChild(h("option", { value: "", text: "Not rated" }));
+      crit.impact.forEach(function (l) { var o = h("option", { value: l.id, text: l.name }); if (a.consequence === l.id) o.setAttribute("selected", "selected"); sel.appendChild(o); });
+      box.appendChild(sel);
+    }
+    var listId = "cons-src-" + a.id;
+    var src = h("input", { type: "text", "data-field": "hla-source", list: listId, value: a.consequenceSource || "", "aria-label": "Source of the impact of " + a.id, placeholder: "e.g. HAZOP",
+      onInput: function (e) { var v = e.target.value; if (v.trim()) a.consequenceSource = v; else delete a.consequenceSource; touched(); } });
+    var kids = [h("summary", { text: "By category" + (cats.length ? " (" + cats.length + ")" : "") + (a.consequenceSource ? ", source" : "") })];
+    crit.categories.forEach(function (cat) {
+      var s = h("select", { "data-field": "hla-cat-" + cat.id, "aria-label": cat.name + " impact of " + a.id, onChange: function (e) {
+        E.setCategoryRating(a, "consequence", "consequenceByCategory", cat.id, e.target.value, p); touched(); rerender();
+      } });
+      s.appendChild(h("option", { value: "", text: "Not rated" }));
+      var cur = a.consequenceByCategory && a.consequenceByCategory[cat.id];
+      crit.impact.forEach(function (l) { var o = h("option", { value: l.id, text: l.name }); if (cur === l.id) o.setAttribute("selected", "selected"); s.appendChild(o); });
+      kids.push(h("label", { class: "cat-line" }, [h("span", { text: cat.name }), s]));
+    });
+    kids.push(h("label", { class: "cat-line" }, [h("span", { text: "Source" }), src]));
+    kids.push(h("datalist", { id: listId }, M.CONSEQUENCE_SOURCES.map(function (x) { return h("option", { value: x }); })));
+    var d = h("details", { class: "hla-cats" }, kids);
+    // Open while categories are given, until closed; kept across redraws.
+    if (catOpen[a.id] != null ? catOpen[a.id] : cats.length > 0) d.setAttribute("open", "");
+    d.addEventListener("toggle", function () { if (d.isConnected) catOpen[a.id] = d.open; });
+    box.appendChild(d);
+    return box;
+  }
+
   function renderSrs(main) {
     var p = state.project, s = p.srs, hlOnly = M.assessmentType(p) === "high-level";
     main.appendChild(h("h1", { class: "page-title", text: "High-level risk" }));
@@ -195,14 +212,15 @@
     // Relative risk ranking: rate each asset/system so the ranking drives how
     // assets are grouped into zones. Worst-credible impact plus (optional)
     // likelihood give a house risk band.
-    var sevOpts = SEV.map(function (sv) { return { value: sv.id, text: sv.name }; });
-    var likOpts = LIK.map(function (l) { return { value: l.id, text: l.name }; });
+    // The levels of the project's risk criteria (js/model.js criteriaOf).
+    var crit = M.criteriaOf(p);
+    var likOpts = crit.likelihood.map(function (l) { return { value: l.id, text: l.name }; });
     var cols = [
       { key: "name", label: "Asset / system", placeholder: "e.g. DCS servers", width: "18%" },
       { key: "functionLocation", label: "Function & location", placeholder: "e.g. Primary control, equipment room" },
-      { key: "consequence", label: "Impact", kind: "select", options: sevOpts, width: "110px", placeholder: "Not rated" },
+      { key: "__impact", label: "Impact", kind: "computed", width: "150px", render: function (it) { return impactCell(it, p, crit); } },
       { key: "likelihood", label: "Likelihood", kind: "select", options: likOpts, width: "110px", placeholder: "Not rated" },
-      { key: "__risk", label: "Risk", kind: "computed", width: "88px", render: function (it) { return riskPill(riskFor(it.consequence, it.likelihood)); } },
+      { key: "__risk", label: "Risk", kind: "computed", width: "88px", render: function (it) { return riskPill(riskFor(it.consequence, it.likelihood, p)); } },
       { key: "note", label: "Candidate grouping / notes", placeholder: "e.g. → Process Control zone" }
     ];
     // A high-level-only assessment records the comparison with tolerable risk
@@ -227,8 +245,14 @@
       ])
     ], null, { "data-check-anchor": "ranking" }));
 
+    // Known threats can go to step 5 as draft scenarios (js/ui-library.js);
+    // the list there follows what is typed here.
+    var known = lineListField("Known or presumed threats", s.knownThreats, function (a) { s.knownThreats = a; touched(); }, "e.g. Capable criminal adversary; insider misuse of engineering access");
+    var knownBox = known.querySelector("textarea");
+    if (knownBox) knownBox.addEventListener("input", function () { R.LibraryUI.refreshSend(); });
     main.appendChild(card("Threats and requirements", null, [
-      lineListField("Known or presumed threats", s.knownThreats, function (a) { s.knownThreats = a; touched(); }, "e.g. Capable criminal adversary; insider misuse of engineering access"),
+      known,
+      hlOnly ? null : R.LibraryUI.sendPanel(p),
       lineListField("Security functions that must be kept", s.mandatorySecurityFunctions, function (a) { s.mandatorySecurityFunctions = a; touched(); }, "e.g. Hard-wired ESD independent of the BPCS")
     ]));
   }

@@ -25,6 +25,12 @@
  *     first entry's mirror; one an older build edited wins for that entry.
  *     The 0.3 fields of threats, countermeasures and vulnerabilities are
  *     filled (empty strings and lists), and every asset gets an id.
+ *     Phase 5's fields (the project's risk criteria, a threat's impact and a
+ *     ranked system's consequence per category, a ranked system's
+ *     consequence source) are tidied when present and never added: a file
+ *     without criteria reads the house criteria, as before. So are phase
+ *     5b's (the project's safety floor list, a zone's drawing level and place
+ *     in its band, a threat's library id).
  *  3. The dangling-id prune: a reference to a record that is not in the file
  *     (a zone's ranked systems, a conduit's end, a threat's linked assets,
  *     vulnerabilities and countermeasures) is cleared, never invented.
@@ -144,8 +150,9 @@ window.RiskApp.Migrate = (function () {
   // treatment decisions were recorded gets what the old build inferred, as a
   // suggestion for the consultant to confirm.
   function strList(v) { return Array.isArray(v) ? v.filter(function (x) { return typeof x === "string" && x; }) : []; }
-  function normThreat(t, owner, tolerable) {
+  function normThreat(t, owner, tolerable, data) {
     if (!Array.isArray(t.affectedFR)) t.affectedFR = [];
+    normCategoryMap(t, "impactByCategory");
     // The 0.3 fields: every text field a string, every link list a list of ids.
     M.THREAT_TEXT_FIELDS.forEach(function (k) { if (typeof t[k] !== "string") t[k] = ""; });
     M.THREAT_LINK_FIELDS.forEach(function (k) { t[k] = strList(t[k]); });
@@ -159,7 +166,7 @@ window.RiskApp.Migrate = (function () {
     var tr = t.treatment;
     if (!tr || typeof tr !== "object" || Array.isArray(tr)) {
       t.treatment = M.emptyTreatment();
-      t.treatment.decision = owner ? E.suggestTreatment(owner, t, tolerable) : null;
+      t.treatment.decision = owner ? E.suggestTreatment(owner, t, tolerable, data) : null;
       return;
     }
     if (TREATMENT_DECISIONS.indexOf(tr.decision) < 0) tr.decision = null;
@@ -253,6 +260,50 @@ window.RiskApp.Migrate = (function () {
     }
   }
 
+  // The fields phase 5 added (js/model.js), tidied when present and never
+  // added. The risk criteria: a copy that cannot be read (a scale of fewer
+  // than 3 or more than 5 levels, an id missing or repeated, no matrix) goes,
+  // as it already reads as the house criteria; a matrix cell that is not one
+  // of the four bands is dropped (a rating there has no band). A category map
+  // keeps only text values, and goes when empty; a rating on a category or a
+  // level the criteria do not have is kept, and the completeness list says it
+  // no longer fits. Nothing here changes a rating.
+  function normCriteria(data) {
+    if (!("criteria" in data)) return;
+    var c = data.criteria;
+    if (!M.criteriaUsable(c)) { delete data.criteria; return; }
+    [c.likelihood, c.impact].forEach(function (list) {
+      list.forEach(function (x) { if (!isStr(x.name)) x.name = x.id; if (!isStr(x.note)) x.note = ""; });
+    });
+    c.impact.forEach(function (iv) {
+      var row = c.matrix[iv.id];
+      if (!isObj(row)) { delete c.matrix[iv.id]; return; }
+      c.likelihood.forEach(function (lv) { if (lv.id in row && !isBand(row[lv.id])) delete row[lv.id]; });
+    });
+    var seen = {};
+    c.categories = (Array.isArray(c.categories) ? c.categories : []).filter(function (x) {
+      if (!isObj(x) || !isStr(x.id) || !x.id || seen[x.id]) return false; seen[x.id] = true;
+      if (!isStr(x.name)) x.name = x.id;
+      return true;
+    });
+    if ("tolerableByCategory" in c) {
+      var t = c.tolerableByCategory;
+      if (!isObj(t)) delete c.tolerableByCategory;
+      else {
+        Object.keys(t).forEach(function (k) { if (!seen[k] || !isBand(t[k])) delete t[k]; });
+        if (!Object.keys(t).length) delete c.tolerableByCategory;
+      }
+    }
+    if ("preset" in c && !isStr(c.preset)) delete c.preset;
+  }
+  function normCategoryMap(o, key) {
+    if (!(key in o)) return;
+    var m = o[key];
+    if (!isObj(m)) { delete o[key]; return; }
+    Object.keys(m).forEach(function (k) { if (!isStr(m[k]) || !m[k]) delete m[k]; });
+    if (!Object.keys(m).length) delete o[key];
+  }
+
   function fillShape(data) {
     var base = M.emptyProject();
     Object.keys(base).forEach(function (k) { if (data[k] == null) data[k] = base[k]; });
@@ -267,13 +318,20 @@ window.RiskApp.Migrate = (function () {
     if (!data.counters) data.counters = base.counters;
     var loadTolerable = data.srs.tolerableRisk || RULES.tolerableRisk.default;
     M.COUNTER_KEYS.forEach(function (k) { if (typeof data.counters[k] !== "number") data.counters[k] = 0; });
+    // The criteria first: a suggested treatment is worked out on them.
+    normCriteria(data);
+    data.srs.highLevelAssets.forEach(function (a) {
+      if (!isObj(a)) return;
+      normCategoryMap(a, "consequenceByCategory");
+      normText(a, "consequenceSource");
+    });
     (data.zones || []).forEach(function (z) {
       var ez = M.emptyZone(0);
       Object.keys(ez).forEach(function (k) { if (z[k] == null) z[k] = ez[k]; });
       fixVector(z);
       z.countermeasures.forEach(normCM);
       z.vulnerabilities.forEach(normVuln);
-      z.threats.forEach(function (t) { normThreat(t, z, loadTolerable); });
+      z.threats.forEach(function (t) { normThreat(t, z, loadTolerable, data); });
     });
     (data.conduits || []).forEach(function (c) {
       var ec = M.emptyConduit(0);
@@ -281,7 +339,7 @@ window.RiskApp.Migrate = (function () {
       fixVector(c);
       c.countermeasures.forEach(normCM);
       c.vulnerabilities.forEach(normVuln);
-      c.threats.forEach(function (t) { normThreat(t, c, loadTolerable); });
+      c.threats.forEach(function (t) { normThreat(t, c, loadTolerable, data); });
     });
     // Assets had no ids before 0.3; a threat links one by its id. The counter
     // starts above any id already in the file, and ids, once given, never change.
@@ -317,7 +375,27 @@ window.RiskApp.Migrate = (function () {
       });
     }
     normNew(data);
+    normNew5b(data);
     return data;
+  }
+
+  // The fields phase 5b added (js/model.js), tidied when present and never
+  // added: the safety floor list keeps known requirements once each (an empty
+  // list is a floor on none); a zone's level is one of the house layering's,
+  // its place in the band a number; a threat's library id is text.
+  function normNew5b(data) {
+    if ("safetyFloorFR" in data) {
+      if (!Array.isArray(data.safetyFloorFR)) delete data.safetyFloorFR;
+      else data.safetyFloorFR = FR_IDS.filter(function (fr) { return data.safetyFloorFR.indexOf(fr) >= 0; });
+    }
+    (data.zones || []).forEach(function (z) {
+      if (!isObj(z)) return;
+      if ("level" in z && !M.zoneLevel(z)) delete z.level;
+      if ("levelOrder" in z && (typeof z.levelOrder !== "number" || !isFinite(z.levelOrder))) delete z.levelOrder;
+    });
+    (data.zones || []).concat(data.conduits || []).forEach(function (o) {
+      (isObj(o) && Array.isArray(o.threats) ? o.threats : []).forEach(function (t) { if (isObj(t)) normText(t, "libraryId"); });
+    });
   }
 
   // ---------- 3. The dangling-id prune ----------

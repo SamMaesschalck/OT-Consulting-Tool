@@ -30,13 +30,101 @@ window.RiskApp.Engine = (function () {
 
   function findZone(project, id) { for (var i = 0; i < project.zones.length; i++) if (project.zones[i].id === id) return project.zones[i]; return null; }
 
-  function riskFor(impact, likelihood) {
+  // The band of an impact and a likelihood on the project's risk criteria
+  // (js/model.js criteriaOf; a project without its own reads the house
+  // matrix). A level the criteria do not have gives no band. Called often,
+  // so it reads the stored shape directly rather than the normalised one.
+  function hasLevel(list, id) { for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === id) return true; return false; }
+  function riskFor(impact, likelihood, project) {
     if (!impact || !likelihood) return null;
+    var c = project && project.criteria;
+    if (c && M.criteriaUsable(c)) {
+      if (!hasLevel(c.impact, impact) || !hasLevel(c.likelihood, likelihood)) return null;
+      var r = c.matrix[impact], b = r && r[likelihood];
+      return BAND_RANK[b] != null ? b : null;
+    }
     var row = RULES.riskMatrix[impact];
-    return (row && row[likelihood]) || null;
+    var hb = (row && typeof row === "object" && row[likelihood]) || null;
+    return BAND_RANK[hb] != null ? hb : null;
   }
-  function threatRisk(t) { return riskFor(t.impact, t.likelihood); }
+  function threatRisk(t, project) { return riskFor(t.impact, t.likelihood, project); }
   function exceedsTolerable(band, tolerable) { return band ? (BAND_RANK[band] > BAND_RANK[tolerable]) : false; }
+
+  // ---------- Impact per consequence category (phase 5) ----------
+  // A threat may give its impact per consequence category of the criteria
+  // (impactByCategory), and a ranked system its consequence
+  // (consequenceByCategory). The single impact is then the worst of them, kept
+  // as a mirror on the threat or system so every reader of the single value
+  // (and an older build) works as before. Only categories the criteria have,
+  // rated on a level they have, count.
+  function categoryRatings(map, project) {
+    if (!map || typeof map !== "object") return [];
+    var c = M.criteriaOf(project), out = [];
+    c.categories.forEach(function (cat) {
+      var lv = map[cat.id];
+      var level = lv ? c.impact.filter(function (x) { return x.id === lv; })[0] : null;
+      if (level) out.push({ id: cat.id, name: cat.name, level: level.id, levelName: level.name, rank: level.rank, tolerable: cat.tolerable });
+    });
+    return out;
+  }
+  // The worst level of a category map, or "" when none counts.
+  function worstCategoryLevel(map, project) {
+    var best = null;
+    categoryRatings(map, project).forEach(function (r) { if (!best || r.rank > best.rank) best = r; });
+    return best ? best.level : "";
+  }
+  // Every entry of a category map is on a category and a level the criteria
+  // have. Only then is the single impact worked out from it: with one entry
+  // that no longer fits, the worst of the others could understate it, so the
+  // single impact is left as it was (and the completeness list says so).
+  function categoryMapFits(map, project) {
+    if (!map || typeof map !== "object") return true;
+    var keys = Object.keys(map).filter(function (k) { return map[k]; });
+    return categoryRatings(map, project).length === keys.length;
+  }
+  // Sets (or with no level, clears) one category's impact and keeps the
+  // single impact the worst of them. With none left the map goes and the
+  // single impact stays as it was, to be set by hand.
+  function setCategoryRating(item, impactKey, mapKey, catId, level, project) {
+    var map = item[mapKey] && typeof item[mapKey] === "object" && !Array.isArray(item[mapKey]) ? item[mapKey] : {};
+    if (level) map[catId] = level; else delete map[catId];
+    if (Object.keys(map).length) {
+      item[mapKey] = map;
+      var w = categoryMapFits(map, project) ? worstCategoryLevel(map, project) : "";
+      if (w) item[impactKey] = w;
+    }
+    else delete item[mapKey];
+  }
+  function impactRank(id, project) {
+    var l = M.criteriaOf(project).impact.filter(function (x) { return x.id === id; })[0];
+    return l ? l.rank : -1;
+  }
+  // Whether a rating is above tolerable risk. Where tolerable risk is set
+  // per consequence category and the item is rated per category, each
+  // category's risk (its impact, capped at the rating's own impact when the
+  // state gives one) is compared with that category's tolerable risk, or the
+  // general one; otherwise the band is compared with the general tolerable
+  // risk, as it always was. cats: categoryRatings of the item.
+  function aboveTolerable(project, band, likelihood, cats, capImpact) {
+    if (!band) return false;
+    var tol = tolerableOf(project);
+    var crit = cats && cats.length ? M.criteriaOf(project) : null;
+    if (!crit || !crit.hasCategoryTolerable) return exceedsTolerable(band, tol);
+    var capR = capImpact ? impactRank(capImpact, project) : -1;
+    var worst = cats.reduce(function (m, r) { return Math.max(m, r.rank); }, -1);
+    if (capR > worst) return exceedsTolerable(band, tol);
+    return cats.some(function (r) {
+      var I = capR >= 0 && capR < r.rank ? capImpact : r.level;
+      return exceedsTolerable(riskFor(I, likelihood, project), crit.tolerableByCategory[r.id] || tol);
+    });
+  }
+  // A ranked system's rating against tolerable risk (per category where set).
+  // Its own consequence is the cap: one above its categories (they were
+  // changed after it was set) is compared as the band, never below it.
+  function hlaExceeds(a, project) {
+    if (!a) return false;
+    return aboveTolerable(project, hlaRisk(a, project), a.likelihood, categoryRatings(a.consequenceByCategory, project), a.consequence || null);
+  }
 
   // A threat's three ratings (schema 0.3):
   //   unmitigated  likelihood x impact, before any countermeasure, existing
@@ -46,28 +134,28 @@ window.RiskApp.Engine = (function () {
   //                residual pair, which meant "with countermeasures" before 0.3)
   // Current and planned are optional and exist only once one of their pair is
   // entered; the other falls back to the rating before it.
-  function currentRisk(t) {
+  function currentRisk(t, project) {
     if (!t.currentLikelihood && !t.currentImpact) return null;
-    return riskFor(t.currentImpact || t.impact, t.currentLikelihood || t.likelihood);
+    return riskFor(t.currentImpact || t.impact, t.currentLikelihood || t.likelihood, project);
   }
-  function residualRisk(t) {
+  function residualRisk(t, project) {
     if (!t.residualLikelihood && !t.residualImpact) return null;
-    return riskFor(t.residualImpact || t.currentImpact || t.impact, t.residualLikelihood || t.currentLikelihood || t.likelihood);
+    return riskFor(t.residualImpact || t.currentImpact || t.impact, t.residualLikelihood || t.currentLikelihood || t.likelihood, project);
   }
   // The rating that stands once everything recorded is done: planned where
   // rated, else current, else unmitigated. The rating that stands today
   // depends on the links too, so it is threatTreatment's (today).
-  function operativeRisk(t) { return residualRisk(t) || currentRisk(t) || threatRisk(t); }
+  function operativeRisk(t, project) { return residualRisk(t, project) || currentRisk(t, project) || threatRisk(t, project); }
   // Worst operative risk across a set of threats. Used to keep the report
   // from reading as alarmist when countermeasures are already in place.
-  function worstResidualOf(items) {
+  function worstResidualOf(items, project) {
     var worst = null;
-    items.forEach(function (t) { var r = operativeRisk(t); if (r && (worst == null || BAND_RANK[r] > BAND_RANK[worst])) worst = r; });
+    items.forEach(function (t) { var r = operativeRisk(t, project); if (r && (worst == null || BAND_RANK[r] > BAND_RANK[worst])) worst = r; });
     return worst;
   }
-  function worstRiskOf(items) {
+  function worstRiskOf(items, project) {
     var worst = null;
-    items.forEach(function (t) { var r = threatRisk(t); if (r && (worst == null || BAND_RANK[r] > BAND_RANK[worst])) worst = r; });
+    items.forEach(function (t) { var r = threatRisk(t, project); if (r && (worst == null || BAND_RANK[r] > BAND_RANK[worst])) worst = r; });
     return worst;
   }
 
@@ -109,9 +197,9 @@ window.RiskApp.Engine = (function () {
   // What the build before recorded decisions inferred for a threat above
   // tolerable risk. Only ever a suggestion: an untagged countermeasure or an
   // SL-T proves nothing about this threat until the consultant says so.
-  function suggestTreatment(owner, t, tolerable) {
-    if (!exceedsTolerable(threatRisk(t), tolerable)) return null;
-    var resid = residualRisk(t);
+  function suggestTreatment(owner, t, tolerable, project) {
+    if (!exceedsTolerable(threatRisk(t, project), tolerable)) return null;
+    var resid = residualRisk(t, project);
     if (resid != null && !exceedsTolerable(resid, tolerable)) return "reduce";
     var loose = owner.countermeasures.some(function (m) {
       if (!(m.description || "").trim()) return false;
@@ -190,6 +278,11 @@ window.RiskApp.Engine = (function () {
   //                   operative when a planned countermeasure is linked, else
   //                   today (nothing is planned, so nothing changes).
   //                   afterPlanWithin: it is tolerable
+  //   currentExceeds, plannedExceeds, operativeExceeds  that rating is above
+  //                   tolerable risk (per consequence category where the
+  //                   criteria set one per category; see aboveTolerable)
+  //   categories      the threat's impact per consequence category, in the
+  //                   criteria's category order (categoryRatings)
   //   sltUnset        for "slt", affected requirements with no SL-T set
   //   sltBelow        for "slt", affected requirements set below the suggestion
   //   sltShortfall    the two together
@@ -205,25 +298,35 @@ window.RiskApp.Engine = (function () {
   // one still to come and today's rating above tolerable risk, the threat is
   // still "reduce with countermeasures".
   function threatTreatment(owner, t, project) {
-    var tolerable = tolerableOf(project);
     var tr = t.treatment || {};
-    var unmit = threatRisk(t);
-    var required = exceedsTolerable(unmit, tolerable);
+    var unmit = threatRisk(t, project);
+    // Each rating against tolerable risk: per consequence category where
+    // the criteria set a tolerable risk per category and the threat is rated
+    // per category, else the band against the general tolerable risk.
+    var cats = categoryRatings(t.impactByCategory, project);
+    // The unmitigated impact is its own cap: one above its categories reads
+    // as the band, so a threat is never within tolerable risk below its band.
+    var unmitAbove = aboveTolerable(project, unmit, t.likelihood, cats, t.impact || null);
+    var required = unmitAbove;
     var decision = required && TREATMENT_DECISIONS.indexOf(tr.decision) >= 0 ? tr.decision : null;
     var confirmed = !!(decision && tr.confirmed);
-    var resid = residualRisk(t), cur = currentRisk(t);
-    var residualWithin = resid != null && !exceedsTolerable(resid, tolerable);
-    var currentWithin = cur != null && !exceedsTolerable(cur, tolerable);
+    var resid = residualRisk(t, project), cur = currentRisk(t, project);
+    var curAbove = aboveTolerable(project, cur, t.currentLikelihood || t.likelihood, cats, t.currentImpact || t.impact || null);
+    var residAbove = aboveTolerable(project, resid, t.residualLikelihood || t.currentLikelihood || t.likelihood, cats, t.residualImpact || t.currentImpact || t.impact || null);
+    var residualWithin = resid != null && !residAbove;
+    var currentWithin = cur != null && !curAbove;
     var covering = coveringCountermeasures(owner, t);
     var existingLinked = covering.filter(function (m) { return !!m.existing; });
     var plannedLinked = covering.filter(function (m) { return !m.existing; });
     var linkSuggested = linkSuggestions(owner, t);
     // The one "today" rule, and what follows from it.
     var today = cur || (resid && !plannedLinked.length ? resid : null) || unmit || null;
-    var todayWithin = today != null && !exceedsTolerable(today, tolerable);
+    var todayAbove = cur ? curAbove : (resid && !plannedLinked.length ? residAbove : unmitAbove);
+    var todayWithin = today != null && !todayAbove;
     var operative = resid || cur || unmit || null;
+    var operativeAbove = resid ? residAbove : (cur ? curAbove : unmitAbove);
     var afterPlan = plannedLinked.length ? operative : today;
-    var afterPlanWithin = afterPlan != null && !exceedsTolerable(afterPlan, tolerable);
+    var afterPlanWithin = afterPlan != null && !(plannedLinked.length ? operativeAbove : todayAbove);
     var inPlace = existingLinked.length > 0 && todayWithin;
     var sf = decision === "slt" ? sltShortfall(owner, t, project) : { unset: [], below: [] };
     var shortfall = sf.unset.concat(sf.below);
@@ -252,9 +355,11 @@ window.RiskApp.Engine = (function () {
       reason: reason, reasonNeeded: reasonNeeded, reasonMissing: reasonMissing,
       covering: covering, covered: covering.length > 0,
       existingLinked: existingLinked, plannedLinked: plannedLinked, linkSuggested: linkSuggested,
-      current: cur, currentWithin: currentWithin,
-      residual: resid, residualWithin: residualWithin, planned: resid, plannedWithin: residualWithin,
-      today: today, todayWithin: todayWithin, operative: operative, afterPlan: afterPlan, afterPlanWithin: afterPlanWithin,
+      current: cur, currentWithin: currentWithin, currentExceeds: !!cur && curAbove,
+      residual: resid, residualWithin: residualWithin, planned: resid, plannedWithin: residualWithin, plannedExceeds: !!resid && residAbove,
+      today: today, todayWithin: todayWithin, operative: operative, operativeExceeds: !!operative && operativeAbove,
+      afterPlan: afterPlan, afterPlanWithin: afterPlanWithin,
+      categories: cats,
       sltUnset: sf.unset, sltBelow: sf.below, sltShortfall: shortfall, gap: gap,
       disposition: disposition,
       label: label
@@ -272,8 +377,9 @@ window.RiskApp.Engine = (function () {
   function assetTypeLabel(id) { return ASSET_TYPE_LABEL[id] || plainId(id); }
   function flagLabel(id) { return FLAG_LABEL[id] || plainId(id); }
   function scaleName(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i].name; return id ? plainId(id).charAt(0).toUpperCase() + plainId(id).slice(1) : ""; }
-  function likelihoodName(id) { return scaleName(LIK, id); }
-  function impactName(id) { return scaleName(SEV, id); }
+  // A level's name on the project's criteria (the house's without a project).
+  function likelihoodName(id, project) { return scaleName(M.criteriaOf(project).likelihood, id); }
+  function impactName(id, project) { return scaleName(M.criteriaOf(project).impact, id); }
   function zoneSafety(zone) { return !!zone.flags["sis-present"] || zone.assets.some(function (a) { return a.type === "safety-plc"; }); }
 
   // Per-foundational-requirement suggestion for a zone.
@@ -282,15 +388,23 @@ window.RiskApp.Engine = (function () {
     var tolerable = tolerableOf(project);
     var safety = zoneSafety(zone);
     var adv = project.srs.adversaryClass;
-    var result = { byFR: {}, safetyRelated: safety, worstRisk: worstRiskOf(zone.threats) };
+    var result = { byFR: {}, safetyRelated: safety, worstRisk: worstRiskOf(zone.threats, project) };
+    var perCategory = M.criteriaOf(project).hasCategoryTolerable;
+    var floorFR = M.safetyFloorFR(project);
 
     FR_IDS.forEach(function (fr) {
       var trace = [];
-      var maxBand = null, contributing = 0;
+      var maxBand = null, contributing = 0, maxAbove = false;
       zone.threats.forEach(function (t) {
         if (t.affectedFR && t.affectedFR.indexOf(fr) >= 0) {
-          var r = threatRisk(t);
-          if (r) { contributing++; if (maxBand == null || BAND_RANK[r] > BAND_RANK[maxBand]) maxBand = r; }
+          var r = threatRisk(t, project);
+          if (r) {
+            contributing++; if (maxBand == null || BAND_RANK[r] > BAND_RANK[maxBand]) maxBand = r;
+            // Whether any threat behind it is above tolerable risk is each
+            // threat's own (threatTreatment's rule, per consequence category
+            // where the criteria set one), not the worst band's alone.
+            if (aboveTolerable(project, r, t.likelihood, categoryRatings(t.impactByCategory, project), t.impact || null)) maxAbove = true;
+          }
         }
       });
 
@@ -300,7 +414,9 @@ window.RiskApp.Engine = (function () {
         sl = m.suggest;
         trace.push("Unmitigated risk " + BAND_NAME[maxBand].toLowerCase() + " for " + fr + " (from " + contributing + " threat" + (contributing === 1 ? "" : "s") + "): " + m.trace);
         if (maxBand === "very-high" && m.escalateTo) trace.push("Escalation to SL" + m.escalateTo + " available for " + fr + " only if a nation-state-grade adversary is in scope.");
-        if (exceedsTolerable(maxBand, tolerable)) trace.push("This risk is above tolerable risk (" + BAND_NAME[tolerable].toLowerCase() + "), so each threat behind it needs a treatment decision.");
+        if (maxAbove) trace.push(perCategory
+          ? "A threat behind this risk is above tolerable risk (" + BAND_NAME[tolerable].toLowerCase() + ", or the tolerable risk of a consequence category), so it needs a treatment decision."
+          : "This risk is above tolerable risk (" + BAND_NAME[tolerable].toLowerCase() + "), so each threat behind it needs a treatment decision.");
       } else {
         trace.push("No threats affecting " + fr + " captured yet.");
       }
@@ -311,9 +427,12 @@ window.RiskApp.Engine = (function () {
         }
       });
 
+      // The floor applies to the requirements the rules file lists (all seven
+      // by default), narrowed where the project says so (phase 5b).
       if (safety) {
         var floor = SIS_RULE ? SIS_RULE.floorSL : 3;
-        if (sl == null || sl < floor) { sl = floor; trace.push("SL" + floor + " floor applied (SIS present): " + SIS_RULE.trace); }
+        if (floorFR.indexOf(fr) < 0) trace.push("Safety related: the SL" + floor + " floor does not cover " + fr + " in this assessment.");
+        else if (sl == null || sl < floor) { sl = floor; trace.push("SL" + floor + " floor applied (SIS present): " + SIS_RULE.trace); }
         else trace.push("SIS present: SL" + floor + " floor already met.");
       }
 
@@ -334,13 +453,13 @@ window.RiskApp.Engine = (function () {
   // connected zones' suggested SL, per FR (house heuristic).
   function suggestConduit(cond, project) {
     var ends = ["fromZone", "toZone"].map(function (k) { var z = findZone(project, cond[k]); return z ? { id: cond[k], sug: suggestZone(z, project), name: z.name } : (cond[k] === "EXT" ? { id: "EXT", sug: null, name: "external" } : null); });
-    var result = { byFR: {}, worstRisk: worstRiskOf(cond.threats) };
+    var result = { byFR: {}, worstRisk: worstRiskOf(cond.threats, project) };
 
     FR_IDS.forEach(function (fr) {
       var trace = ["House heuristic: a conduit takes the higher of its own risk-derived SL and the connected zones' suggested SL, per FR."];
       var sl = null, band = null;
       cond.threats.forEach(function (t) {
-        if (t.affectedFR.indexOf(fr) >= 0) { var r = threatRisk(t); if (r && (band == null || BAND_RANK[r] > BAND_RANK[band])) band = r; }
+        if (t.affectedFR.indexOf(fr) >= 0) { var r = threatRisk(t, project); if (r && (band == null || BAND_RANK[r] > BAND_RANK[band])) band = r; }
       });
       if (band) { var m = RULES.riskToSL[band]; sl = m.suggest; trace.push("Conduit's own unmitigated risk " + BAND_NAME[band].toLowerCase() + " for " + fr + ": " + m.trace); }
       ends.forEach(function (e) {
@@ -371,19 +490,27 @@ window.RiskApp.Engine = (function () {
     var out = [];
     FR_IDS.forEach(function (fr) {
       var band = null;
-      owner.threats.forEach(function (t) { var r = threatRisk(t); if (r && (t.affectedFR || []).indexOf(fr) >= 0 && (band == null || BAND_RANK[r] > BAND_RANK[band])) band = r; });
-      var drivers = band ? owner.threats.filter(function (t) { return threatRisk(t) === band && (t.affectedFR || []).indexOf(fr) >= 0; }).map(function (t) { return t.id; }) : [];
+      owner.threats.forEach(function (t) { var r = threatRisk(t, project); if (r && (t.affectedFR || []).indexOf(fr) >= 0 && (band == null || BAND_RANK[r] > BAND_RANK[band])) band = r; });
+      var drivers = band ? owner.threats.filter(function (t) { return threatRisk(t, project) === band && (t.affectedFR || []).indexOf(fr) >= 0; }).map(function (t) { return t.id; }) : [];
       var mapped = band && RULES.riskToSL[band] ? RULES.riskToSL[band].suggest : null;
       var sl = sug.byFR[fr] ? sug.byFR[fr].sl : null;
       var raisedBy = null, from = [];
       if (sl != null && (mapped == null || mapped < sl)) {
         if (isCond) { from = ends.filter(function (e) { return e.sug.byFR[fr] && e.sug.byFR[fr].sl === sl; }).map(function (e) { return e.id; }); raisedBy = from.length ? "inherited" : null; }
-        else if (zoneSafety(owner)) raisedBy = "floor";
+        else if (zoneSafety(owner) && M.safetyFloorFR(project).indexOf(fr) >= 0) raisedBy = "floor";
       }
       if (!drivers.length && !raisedBy) return;
       out.push({ fr: fr, sl: sl, band: band, drivers: drivers, mapped: mapped, raisedBy: raisedBy, from: from });
     });
     return out;
+  }
+
+  // The requirements the safety floor covers, for the page and Word:
+  // { list, all, none, words ("every foundational requirement", or "IAC, UC and SI") }.
+  function safetyFloorWords(project) {
+    var list = M.safetyFloorFR(project), all = list.length === FR_IDS.length;
+    var words = all ? "every foundational requirement" : (list.length > 1 ? list.slice(0, -1).join(", ") + " and " + list[list.length - 1] : (list[0] || ""));
+    return { list: list, all: all, none: !list.length, narrowed: Array.isArray(project && project.safetyFloorFR), words: words };
   }
 
   function maxDefined(obj) { var best = null; Object.keys(obj).forEach(function (k) { if (typeof obj[k] === "number" && (best == null || obj[k] > best)) best = obj[k]; }); return best; }
@@ -424,7 +551,7 @@ window.RiskApp.Engine = (function () {
     return worst;
   }
   function hlaById(project, id) { var l = project.srs.highLevelAssets; for (var i = 0; i < l.length; i++) if (l[i] && l[i].id === id) return l[i]; return null; }
-  function hlaRisk(a) { return a ? riskFor(a.consequence, a.likelihood) : null; }
+  function hlaRisk(a, project) { return a ? riskFor(a.consequence, a.likelihood, project) : null; }
   // The zones a ranked system is assigned to.
   function zonesOfHLA(project, id) { return project.zones.filter(function (z) { return M.hlaIdsOf(z).indexOf(id) >= 0; }); }
 
@@ -435,15 +562,23 @@ window.RiskApp.Engine = (function () {
     var entered = isBand(owner.initialRisk) ? owner.initialRisk : null;
     if (!("fromZone" in owner)) {
       var systems = M.hlaIdsOf(owner).map(function (id) { return hlaById(project, id); }).filter(Boolean);
-      var sysBand = worstBand(systems.map(hlaRisk));
-      if (sysBand) return { band: sysBand, source: "systems", systems: systems, zones: [], ruleBand: null };
+      var sysBand = worstBand(systems.map(function (a) { return hlaRisk(a, project); }));
+      // With a tolerable risk per consequence category, the zone is above it
+      // when one of its systems is (hlaExceeds), whatever the worst band says.
+      if (sysBand) return { band: sysBand, source: "systems", systems: systems, zones: [], ruleBand: null,
+        exceeds: M.criteriaOf(project).hasCategoryTolerable ? systems.some(function (a) { return hlaExceeds(a, project); }) : null };
       if (entered) return { band: entered, source: "entered", systems: systems, zones: [], ruleBand: null };
       return { band: null, source: systems.length ? "systems" : null, systems: systems, zones: [], ruleBand: null };
     }
     var ends = [owner.fromZone, owner.toZone].map(function (id) { return id && id !== "EXT" ? findZone(project, id) : null; }).filter(Boolean);
-    var ruleBand = worstBand(ends.map(function (z) { return initialRiskOf(z, project).band; }));
+    var endRisks = ends.map(function (z) { return initialRiskOf(z, project); });
+    var ruleBand = worstBand(endRisks.map(function (ir) { return ir.band; }));
     if (entered) return { band: entered, source: "entered", systems: [], zones: ends, ruleBand: ruleBand };
-    return { band: ruleBand, source: ruleBand ? "zones" : null, systems: [], zones: ends, ruleBand: ruleBand };
+    // Above tolerable risk when a zone it joins is (per category, where set).
+    var ruleExceeds = M.criteriaOf(project).hasCategoryTolerable ? endRisks.some(function (ir) {
+      return !!ir.band && (typeof ir.exceeds === "boolean" ? ir.exceeds : exceedsTolerable(ir.band, tolerableOf(project)));
+    }) : null;
+    return { band: ruleBand, source: ruleBand ? "zones" : null, systems: [], zones: ends, ruleBand: ruleBand, exceeds: ruleExceeds };
   }
 
   // The decision, set against what the comparison suggests:
@@ -455,9 +590,11 @@ window.RiskApp.Engine = (function () {
   //   noBasis       recorded with no initial risk to compare
   //   reasonMissing an override, or a decision with no basis, with no reason
   //   skip          recorded as not required: step 5 asks for no threats
-  function decisionState(d, band, tolerable) {
+  // exceeds: whether the initial risk is above tolerable risk, when that is
+  // not the band against the general tolerable risk (per category); else null.
+  function decisionState(d, band, tolerable, exceeds) {
     d = d && typeof d === "object" && !Array.isArray(d) ? d : {};
-    var suggested = band ? exceedsTolerable(band, tolerable) : null;
+    var suggested = band ? (typeof exceeds === "boolean" ? exceeds : exceedsTolerable(band, tolerable)) : null;
     var required = d.required === true || d.required === false ? d.required : null;
     var override = required !== null && suggested !== null && required !== suggested;
     var noBasis = required !== null && suggested === null;
@@ -475,13 +612,13 @@ window.RiskApp.Engine = (function () {
   }
   function comparison(owner, project) {
     var ir = initialRiskOf(owner, project);
-    var out = decisionState(owner.detailed, ir.band, tolerableOf(project));
+    var out = decisionState(owner.detailed, ir.band, tolerableOf(project), ir.exceeds);
     out.source = ir.source; out.systems = ir.systems; out.zones = ir.zones; out.ruleBand = ir.ruleBand;
     return out;
   }
   // On a high-level-only assessment the decision sits on the ranked system.
   function hlaComparison(a, project) {
-    var out = decisionState(a.detailed, hlaRisk(a), tolerableOf(project));
+    var out = decisionState(a.detailed, hlaRisk(a, project), tolerableOf(project), M.criteriaOf(project).hasCategoryTolerable ? hlaExceeds(a, project) : null);
     out.source = out.initial ? "rating" : null;
     return out;
   }
@@ -623,12 +760,25 @@ window.RiskApp.Engine = (function () {
   // approving, holds one hash per part, so a later change says which part
   // moved and which report it concerns. It only warns.
   var APPROVAL_PARTS = ["tolerable", "ranking", "slt", "accepted"];
-  var APPROVAL_PART_WORDS = { tolerable: "the tolerable risk", ranking: "the ranking", slt: "the SL-T", accepted: "the accepted risks" };
+  var APPROVAL_PART_WORDS = { tolerable: "the tolerable risk or the risk criteria", ranking: "the ranking", slt: "the SL-T", accepted: "the accepted risks" };
   var APPROVAL_DOC_PARTS = { detailed: ["tolerable", "slt", "accepted"], highLevel: ["tolerable", "ranking"] };
   function approvalBasis(project) {
     var vm = VM().build(project), hlOnly = M.assessmentType(project) === "high-level";
+    // The tolerable risk an approval covers includes the criteria it rests
+    // on, once they are not the house's (the levels and the matrix) or a
+    // tolerable risk is set per consequence category. On the house criteria
+    // it is the band alone, as it always was, so earlier approvals still match.
+    // What is fingerprinted is what isHouse compares (js/model.js
+    // criteriaContent: the levels with their names and definitions, the
+    // cells and the categories' names), so a change that makes the criteria
+    // not the house's always moves the fingerprint.
+    var crit = M.criteriaOf(project), tol = tolerableOf(project);
+    var tolPart = crit.isHouse && !crit.hasCategoryTolerable ? tol : {
+      band: tol, byCategory: crit.tolerableByCategory,
+      criteria: crit.isHouse ? null : JSON.parse(M.criteriaContent(project.criteria))
+    };
     return {
-      tolerable: tolerableOf(project),
+      tolerable: tolPart,
       ranking: project.srs.highLevelAssets.map(function (a) {
         var d = hlOnly ? hlaComparison(a, project).required : null;
         return a.id + ":" + (a.consequence || "-") + "/" + (a.likelihood || "-") + (hlOnly ? "/" + (d === true ? "required" : d === false ? "not-required" : "-") : "");
@@ -690,8 +840,10 @@ window.RiskApp.Engine = (function () {
   }
   // "the tolerable risk and the SL-T"; an a1 fingerprint cannot tell which
   // moved, so its parts join with "or".
+  // In a list, "the risk criteria" (which hold the tolerable risk) keeps the
+  // sentence from stacking a second "or".
   function approvalPartWords(parts, or) {
-    var w = parts.map(function (k) { return APPROVAL_PART_WORDS[k]; });
+    var w = parts.map(function (k) { return k === "tolerable" && parts.length > 1 ? "the risk criteria" : APPROVAL_PART_WORDS[k]; });
     return w.length > 1 ? w.slice(0, -1).join(", ") + (or ? " or " : " and ") + w[w.length - 1] : (w[0] || "");
   }
 
@@ -707,6 +859,152 @@ window.RiskApp.Engine = (function () {
   function zoneLabel(o) { return o.id + (o.name ? " (" + o.name + ")" : ""); }
   function lcFirst(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
 
+  // What of a threat's or a ranked system's ratings no longer fits the risk
+  // criteria (a level they no longer have, a category they no longer have,
+  // or a single impact that is not the worst of its categories), in words:
+  // ["the likelihood", "the current impact", ...]. Changing the criteria
+  // never changes a rating silently: what no longer fits is listed here.
+  var THREAT_RATING_WORDS = [["likelihood", "likelihood", "the likelihood"], ["impact", "impact", "the impact"],
+    ["currentLikelihood", "likelihood", "the current likelihood"], ["currentImpact", "impact", "the current impact"],
+    ["residualLikelihood", "likelihood", "the planned likelihood"], ["residualImpact", "impact", "the planned impact"]];
+  var HLA_RATING_WORDS = [["consequence", "impact", "the impact"], ["likelihood", "likelihood", "the likelihood"]];
+  function ratingMisfits(item, words, mapKey, impactKey, project) {
+    var c = M.criteriaOf(project), out = [];
+    function fits(kind, id) { return c[kind].some(function (x) { return x.id === id; }); }
+    words.forEach(function (wd) { var v = item[wd[0]]; if (v && !fits(wd[1], v)) out.push(wd[2]); });
+    var map = item[mapKey];
+    if (map && typeof map === "object" && !Array.isArray(map)) {
+      var keys = Object.keys(map).filter(function (k) { return map[k]; });
+      var good = categoryRatings(map, project);
+      if (good.length < keys.length) out.push("an impact by category");
+      var worst = worstCategoryLevel(map, project);
+      if (worst && item[impactKey] && item[impactKey] !== worst && fits("impact", item[impactKey])) out.push("the impact (not the worst of its categories)");
+    }
+    return out;
+  }
+  function misfitText(list) {
+    var all = list.length > 1 ? list.slice(0, -1).join(", ") + " and " + list[list.length - 1] : list[0];
+    return all + (list.length > 1 ? " no longer fit" : " no longer fits") + " the risk criteria.";
+  }
+  // Every rating that no longer fits, for the completeness list and the
+  // criteria editor: [{ kind: "threat" | "system", owner, item, misfits }].
+  function criteriaMisfits(project) {
+    var out = [];
+    project.srs.highLevelAssets.forEach(function (a) {
+      var m = a ? ratingMisfits(a, HLA_RATING_WORDS, "consequenceByCategory", "consequence", project) : [];
+      if (m.length) out.push({ kind: "system", owner: null, item: a, misfits: m });
+    });
+    project.zones.concat(project.conduits).forEach(function (o) {
+      o.threats.forEach(function (t) {
+        var m = ratingMisfits(t, THREAT_RATING_WORDS, "impactByCategory", "impact", project);
+        if (m.length) out.push({ kind: "threat", owner: o, item: t, misfits: m });
+      });
+    });
+    return out;
+  }
+
+  // ---------- Changing the criteria (step 1) ----------
+  //
+  // How many ratings use each level: { likelihood: { id: n }, impact: { id: n } },
+  // over every threat's three ratings and impacts by category and every
+  // ranked system's ratings.
+  function ratingUsage(project) {
+    var use = { likelihood: {}, impact: {} };
+    function add(kind, id) { if (id) use[kind][id] = (use[kind][id] || 0) + 1; }
+    function addMap(map) { if (map && typeof map === "object") Object.keys(map).forEach(function (k) { add("impact", map[k]); }); }
+    project.srs.highLevelAssets.forEach(function (a) { if (!a) return; add("impact", a.consequence); add("likelihood", a.likelihood); addMap(a.consequenceByCategory); });
+    project.zones.concat(project.conduits).forEach(function (o) {
+      o.threats.forEach(function (t) {
+        THREAT_RATING_WORDS.forEach(function (wd) { add(wd[1], t[wd[0]]); });
+        addMap(t.impactByCategory);
+      });
+    });
+    return use;
+  }
+  // Moves the ratings on one level to another, as the consultant chose:
+  // map { likelihood: { oldId: newId }, impact: { oldId: newId } }. A level
+  // left out of the map keeps its ratings as they are, so they no longer
+  // fit and the completeness list says so. Returns how many changed.
+  function remapRatings(project, map) {
+    var n = 0, L = (map && map.likelihood) || {}, I = (map && map.impact) || {};
+    function mv(obj, key, kind) {
+      var v = obj[key], to = kind === "likelihood" ? L[v] : I[v];
+      if (v && to && to !== v) { obj[key] = to; n++; }
+    }
+    function mvMap(m) { if (m && typeof m === "object") Object.keys(m).forEach(function (k) { mv(m, k, "impact"); }); }
+    project.srs.highLevelAssets.forEach(function (a) { if (!a) return; mv(a, "consequence", "impact"); mv(a, "likelihood", "likelihood"); mvMap(a.consequenceByCategory); });
+    project.zones.concat(project.conduits).forEach(function (o) {
+      o.threats.forEach(function (t) {
+        THREAT_RATING_WORDS.forEach(function (wd) { mv(t, wd[0], wd[1]); });
+        mvMap(t.impactByCategory);
+      });
+    });
+    return n;
+  }
+  // The default move for each level, from one scale to another. A level is
+  // the same only when both its id and its name match (the generic presets
+  // reuse the ids L1, I1, ... with other words at each place); else the
+  // level of the same name; else the one at the same relative place on the
+  // new scale, rounded up, so no rating reads lower than it did. For a
+  // preset (byPosition) every level goes by its place alone.
+  function sameName(a, b) { return String(a.name || "").trim().toLowerCase() === String(b.name || "").trim().toLowerCase(); }
+  function placeOn(i, from, to) {
+    if (from <= 1 || to <= 1) return 0;
+    var at = Math.ceil(i * (to - 1) / (from - 1) - 1e-9);
+    return Math.max(0, Math.min(to - 1, at));
+  }
+  function defaultMapping(fromLevels, toLevels, byPosition) {
+    var out = {};
+    fromLevels.forEach(function (l, i) {
+      if (!byPosition) {
+        var same = toLevels.filter(function (x) { return x.id === l.id && sameName(x, l); })[0] ||
+          toLevels.filter(function (x) { return sameName(x, l); })[0];
+        if (same) { out[l.id] = same.id; return; }
+      }
+      out[l.id] = toLevels[placeOn(i, fromLevels.length, toLevels.length)].id;
+    });
+    return out;
+  }
+  // Recomputes each single impact that mirrors its categories (after the
+  // categories or their levels moved). Only where every entry still fits: a
+  // rating left on a level or category the criteria no longer have keeps the
+  // single impact as it was, so Leave as it is never lowers it.
+  function syncCategoryMirrors(project) {
+    function sync(item, mapKey, impactKey) {
+      var m = item[mapKey];
+      if (!m || typeof m !== "object" || !categoryMapFits(m, project)) return;
+      var w = worstCategoryLevel(m, project);
+      if (w) item[impactKey] = w;
+    }
+    project.srs.highLevelAssets.forEach(function (a) { if (a) sync(a, "consequenceByCategory", "consequence"); });
+    project.zones.concat(project.conduits).forEach(function (o) { o.threats.forEach(function (t) { sync(t, "impactByCategory", "impact"); }); });
+  }
+  // How the deliverables name the criteria in use.
+  // generic: the generic preset the criteria still are, unchanged ("" if none).
+  function criteriaWords(project) {
+    var src = M.criteriaOf(project).source, isHouse = M.criteriaOf(project).isHouse, generic = M.genericPresetOf(project);
+    // The client's criteria marked in use but not entered: the tables are the house's.
+    if (src === "client" && isHouse) return { source: "client-house", matrix: "the SolutionsPT house risk matrix", criteria: "The SolutionsPT house risk criteria", generic: "" };
+    if (src === "client") return { source: "client", matrix: "the client's risk matrix", criteria: "The client's risk criteria", generic: generic };
+    if (src === "project") return { source: "project", matrix: "the risk matrix agreed for this assessment", criteria: "The risk criteria agreed for this assessment", generic: generic };
+    return { source: "house", matrix: "the SolutionsPT house risk matrix", criteria: "The SolutionsPT house risk criteria", generic: "" };
+  }
+  // The tolerable risk set per consequence category, in words, for the page
+  // and Word: "Safety (injury / loss of life): Low; Financial loss: High", or "".
+  function tolerableByCategoryWords(project) {
+    return M.criteriaOf(project).categories.filter(function (c) { return c.tolerable; })
+      .map(function (c) { return c.name + ": " + BAND_NAME[c.tolerable]; }).join("; ");
+  }
+  // The stored criteria's matrix has a cell that is not one of the four
+  // bands (a file edited by hand, say): a rating there has no band.
+  function matrixGaps(project) {
+    var c = project && M.criteriaUsable(project.criteria) ? project.criteria : null;
+    if (!c) return 0;
+    var n = 0;
+    c.impact.forEach(function (iv) { c.likelihood.forEach(function (lv) { var r = c.matrix[iv.id]; if (!r || BAND_RANK[r[lv.id]] == null) n++; }); });
+    return n;
+  }
+
   // Everything but the specification's own items and the approvals'.
   function baseItems(project) {
     var p = project, items = [];
@@ -717,6 +1015,18 @@ window.RiskApp.Engine = (function () {
     if (!(p.suc.name || "").trim()) add("suc", "both", "The SUC has no name.", { kind: "suc" });
     if (!(p.suc.description || "").trim() && !(p.suc.scopeStatement || "").trim()) add("suc", "both", "The SUC has no description or scope statement.", { kind: "suc" });
     if (!M.tolerableConfirmed(p)) add("suc", "both", "Tolerable risk is not confirmed with the asset owner.", { kind: "criteria" });
+    var cwp = criteriaWords(p);
+    if (cwp.source === "client-house") add("suc", "both", "The client's risk criteria are marked in use, but step 1 still holds the house criteria.", { kind: "criteria" });
+    else if (cwp.source === "client" && cwp.generic) add("suc", "both", "The client's criteria are marked in use, but step 1 holds a generic preset.", { kind: "criteria" });
+    if (matrixGaps(p)) add("suc", "both", "The risk matrix has cells not set.", { kind: "criteria" });
+    // Ratings that no longer fit the criteria (a level or category they no
+    // longer have): each on the page it was rated on.
+    var misfits = criteriaMisfits(p);
+    misfits.forEach(function (f) {
+      if (f.kind !== "system") return;
+      var a = f.item;
+      add("srs", "highLevel", a.id + (a.name ? " (" + a.name + ")" : "") + ": " + misfitText(f.misfits), { kind: "system", id: a.id });
+    });
 
     // The high-level report: the ranking.
     var hlOnly = M.assessmentType(p) === "high-level";
@@ -768,6 +1078,7 @@ window.RiskApp.Engine = (function () {
       row.threats.forEach(function (x) {
         var t = x.t, T = x.treatment, tt = { kind: "threat", ownerId: o.id, id: t.id };
         if (!t.likelihood || !t.impact) add("risk", "detailed", label + " / " + t.id + ": likelihood or impact not set.", tt);
+        misfits.forEach(function (f) { if (f.item === t) add("risk", "detailed", label + " / " + t.id + ": " + misfitText(f.misfits), tt); });
         if (!t.affectedFR.length) add("risk", "detailed", label + " / " + t.id + ": no affected foundational requirements marked.", tt);
         if (T.open) add("risk", "detailed", label + " / " + t.id + ": above tolerable risk with no treatment decision" + (T.state === "suggested" ? " (a suggestion is waiting to be confirmed)." : "."), tt);
         else if (T.gap) add("risk", "detailed", label + " / " + t.id + ": " + T.gap + ".", tt);
@@ -883,7 +1194,7 @@ window.RiskApp.Engine = (function () {
         mandatorySecurityFunctions: p.srs.mandatorySecurityFunctions.slice(),
         regulatory: p.srs.regulatory.slice()
       },
-      highLevelAssets: p.srs.highLevelAssets.map(function (a) { return { id: a.id, name: a.name, functionLocation: a.functionLocation, consequence: a.consequence, likelihood: a.likelihood, risk: riskFor(a.consequence, a.likelihood), note: a.note }; }),
+      highLevelAssets: p.srs.highLevelAssets.map(function (a) { return { id: a.id, name: a.name, functionLocation: a.functionLocation, consequence: a.consequence, likelihood: a.likelihood, risk: riskFor(a.consequence, a.likelihood, p), note: a.note }; }),
       basisOfAssessment: {
         interviews: p.basisOfAssessment.interviews.map(function (x) { return { id: x.id, name: x.name, role: x.role, date: x.date, notes: x.notes }; }),
         documents: p.basisOfAssessment.documents.map(function (x) { return { id: x.id, title: x.title, reference: x.reference, source: x.source, relevance: x.relevance }; }),
@@ -936,7 +1247,12 @@ window.RiskApp.Engine = (function () {
     approvalBasis: approvalBasis, approvalFingerprint: approvalFingerprint, approvalStates: approvalStates,
     APPROVAL_DOC_PARTS: APPROVAL_DOC_PARTS, approvalChangedFor: approvalChangedFor, approvalPartWords: approvalPartWords,
     likelihoodName: likelihoodName, impactName: impactName, zoneSafety: zoneSafety,
-    suggestZone: suggestZone, suggestConduit: suggestConduit, sltDrivers: sltDrivers,
+    categoryRatings: categoryRatings, worstCategoryLevel: worstCategoryLevel, setCategoryRating: setCategoryRating,
+    aboveTolerable: aboveTolerable, hlaExceeds: hlaExceeds, criteriaMisfits: criteriaMisfits,
+    ratingUsage: ratingUsage, remapRatings: remapRatings, defaultMapping: defaultMapping, syncCategoryMirrors: syncCategoryMirrors,
+    categoryMapFits: categoryMapFits, matrixGaps: matrixGaps, tolerableByCategoryWords: tolerableByCategoryWords,
+    criteriaWords: criteriaWords, criteriaOf: M.criteriaOf,
+    suggestZone: suggestZone, suggestConduit: suggestConduit, sltDrivers: sltDrivers, safetyFloorWords: safetyFloorWords,
     maxDefined: maxDefined, frSug: frSug, vecStr: vecStr,
     CONDUIT_RULE: CONDUIT_RULE, isBand: isBand, worstBand: worstBand, hlaById: hlaById, hlaRisk: hlaRisk, zonesOfHLA: zonesOfHLA,
     initialRiskOf: initialRiskOf, comparison: comparison, hlaComparison: hlaComparison,

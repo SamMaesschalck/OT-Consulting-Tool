@@ -1,0 +1,588 @@
+{
+  "schema": "spt-scenario-library/1.0",
+  "version": "1.1",
+  "date": "2026-11-13",
+  "_note": "HOUSE scenario library for step 5 of the risk tool. SolutionsPT must name an owner for the wording of these scenarios before they are relied on in client work; until then the wording is a working draft. Every scenario is written in SolutionsPT's own words for this tool and is not taken from any standard, threat framework or vendor document. The SR ids are references to IEC 62443-3-3 system requirements by id only; no requirement text is reproduced. The library holds no ratings: the consultant rates every scenario added from it. Nothing in this note is shown in the tool or printed in a deliverable.",
+  "tags": {
+    "remote-access": "Remote access",
+    "removable-media": "Removable media",
+    "transient": "Temporary devices",
+    "wireless": "Wireless",
+    "safety": "Safety",
+    "supply-chain": "Third parties and supply chain",
+    "insider": "Insider",
+    "ransomware": "Ransomware",
+    "network": "Network",
+    "engineering": "Engineering access",
+    "physical": "Physical access",
+    "denial-of-service": "Loss of availability",
+    "data": "Data and integrity",
+    "cloud": "Cloud and external services",
+    "credentials": "Credentials",
+    "patching": "Patching and software",
+    "monitoring": "Detection"
+  },
+  "scenarios": [
+    {
+      "id": "HS01",
+      "title": "Vendor remote session misused",
+      "statement": "An external attacker uses stolen or reused credentials for the vendor's remote access path to open a session into the control network and change control logic or set points.",
+      "source": "External attacker using a third party's access",
+      "entryPoint": "Vendor remote access gateway or VPN",
+      "consequence": "Unsafe or unplanned process changes, loss of control, unplanned shutdown",
+      "affectedFR": ["IAC", "UC", "RDF"],
+      "assetTypes": ["engineering-workstation", "plc", "hmi", "network"],
+      "vulnerabilities": ["Shared or long-lived vendor accounts", "No multi-factor authentication on remote access", "Sessions not approved or supervised by site staff"],
+      "countermeasures": [
+        { "description": "Require multi-factor authentication for every remote session", "srRefs": ["SR 1.13", "SR 1.1"] },
+        { "description": "Broker vendor sessions through a jump host in the DMZ, approved per session", "srRefs": ["SR 5.2", "SR 2.6"] },
+        { "description": "Record remote sessions and review them", "srRefs": ["SR 2.8", "SR 6.1"] }
+      ],
+      "tags": ["remote-access", "supply-chain", "credentials"]
+    },
+    {
+      "id": "HS02",
+      "title": "Ransomware spreads from the business network",
+      "statement": "Ransomware that has entered the business network crosses into the control network through an open or poorly filtered connection and encrypts operator and server hosts.",
+      "source": "Criminal group running ransomware",
+      "entryPoint": "Connection between the business network and the control network",
+      "consequence": "Loss of view and control from the HMIs, and an extended outage while hosts are rebuilt",
+      "affectedFR": ["RDF", "SI", "RA"],
+      "assetTypes": ["hmi", "server", "historian", "engineering-workstation"],
+      "vulnerabilities": ["Permissive firewall rules between the business and control networks", "One Windows domain shared by business and control hosts", "Unpatched operating systems on operator hosts"],
+      "countermeasures": [
+        { "description": "Separate the business and control networks with a DMZ and deny-by-default rules", "srRefs": ["SR 5.1", "SR 5.2"] },
+        { "description": "Malware protection on Windows hosts in the control network", "srRefs": ["SR 3.2"] },
+        { "description": "Tested offline backups of control system hosts and configurations", "srRefs": ["SR 7.3", "SR 7.4"] }
+      ],
+      "tags": ["ransomware", "network"]
+    },
+    {
+      "id": "HS03",
+      "title": "Infected removable drive on a control host",
+      "statement": "A removable drive carrying malware is plugged into an engineering workstation or HMI, and the malware runs and spreads within the zone.",
+      "source": "Employee or contractor without malicious intent, carrying malware",
+      "entryPoint": "USB port on an engineering workstation or HMI",
+      "consequence": "Compromised hosts in the zone, possible changes to control logic, loss of availability",
+      "affectedFR": ["UC", "SI", "RA"],
+      "assetTypes": ["engineering-workstation", "hmi"],
+      "vulnerabilities": ["USB ports open on control system hosts", "No scanning station for incoming media", "User rights that let unknown files run"],
+      "countermeasures": [
+        { "description": "Control removable media with a scanning kiosk and a list of approved devices", "srRefs": ["SR 2.3", "SR 3.2"] },
+        { "description": "Disable unused ports and services on control system hosts", "srRefs": ["SR 7.7"] },
+        { "description": "Application allow-listing on engineering workstations", "srRefs": ["SR 3.2", "SR 3.4"] }
+      ],
+      "tags": ["removable-media", "engineering"]
+    },
+    {
+      "id": "HS04",
+      "title": "Engineering workstation used to change controller logic",
+      "statement": "An attacker who has taken over an engineering workstation uses its configuration software to download modified logic to a PLC.",
+      "source": "External attacker with a foothold on the engineering workstation",
+      "entryPoint": "Engineering workstation and its configuration software",
+      "consequence": "The process runs outside its design limits, or faults are hidden until they appear later",
+      "affectedFR": ["IAC", "UC", "SI"],
+      "assetTypes": ["engineering-workstation", "plc"],
+      "vulnerabilities": ["Configuration software open to any logged-on user", "No password or key switch protecting controller changes", "No comparison of running logic with a known good copy"],
+      "countermeasures": [
+        { "description": "Named accounts and role-based access to engineering software", "srRefs": ["SR 1.1", "SR 2.1"] },
+        { "description": "Protect controllers against changes outside a maintenance window, by key switch or password", "srRefs": ["SR 2.1"] },
+        { "description": "Compare controller logic with the approved version on a schedule", "srRefs": ["SR 3.4"] }
+      ],
+      "tags": ["engineering", "insider"]
+    },
+    {
+      "id": "HS05",
+      "title": "Safety function altered or bypassed",
+      "statement": "An attacker or a careless change disables or alters a safety instrumented function, so it no longer trips the process when it should.",
+      "source": "Capable attacker targeting safety systems, or unsafe maintenance practice",
+      "entryPoint": "Safety engineering station, or a network shared with the basic control system",
+      "consequence": "Loss of a layer of protection; injury, loss of life or a major release if a demand occurs",
+      "affectedFR": ["IAC", "UC", "SI", "RDF"],
+      "assetTypes": ["safety-plc", "engineering-workstation"],
+      "vulnerabilities": ["Safety and basic control share a network or an engineering station", "Safety controller left in a mode that accepts changes", "Bypasses and overrides not tracked"],
+      "countermeasures": [
+        { "description": "Keep the safety system in its own zone with tightly limited conduits", "srRefs": ["SR 5.1", "SR 5.2"] },
+        { "description": "Physical key or hardware lock for changes to safety logic", "srRefs": ["SR 2.1"] },
+        { "description": "Alarm and log any change of mode, bypass or download on the safety controller", "srRefs": ["SR 2.8", "SR 6.2"] }
+      ],
+      "tags": ["safety", "engineering"]
+    },
+    {
+      "id": "HS06",
+      "title": "Forged commands on an unauthenticated industrial protocol",
+      "statement": "A device on the control network sends forged or altered commands over an industrial protocol that accepts any sender, changing outputs or set points.",
+      "source": "Attacker with a foothold in the control network",
+      "entryPoint": "Control network carrying unauthenticated protocol traffic, such as Modbus TCP",
+      "consequence": "Unexpected valve or drive movement, process upset, equipment damage",
+      "affectedFR": ["IAC", "SI", "RDF"],
+      "assetTypes": ["plc", "hmi", "network"],
+      "vulnerabilities": ["Protocol with no authentication or integrity checks", "Any host on the segment can reach controller ports", "No monitoring for unexpected write commands"],
+      "countermeasures": [
+        { "description": "Limit which hosts can reach controller ports by filtering at the zone boundary", "srRefs": ["SR 5.2", "SR 5.1"] },
+        { "description": "Use protocol variants with message authentication where the devices support them", "srRefs": ["SR 3.1", "SR 1.2"] },
+        { "description": "Monitor control traffic for unexpected write commands", "srRefs": ["SR 6.2"] }
+      ],
+      "tags": ["network", "data"]
+    },
+    {
+      "id": "HS07",
+      "title": "Plant wireless network reached from outside",
+      "statement": "An attacker within radio range joins a plant wireless network that has weak security and reaches control devices behind it.",
+      "source": "Opportunistic or targeted attacker near the site",
+      "entryPoint": "Plant wireless access point or wireless instrument gateway",
+      "consequence": "Unauthorised access to control devices; false or lost readings",
+      "affectedFR": ["IAC", "UC", "RDF"],
+      "assetTypes": ["network", "plc", "other"],
+      "vulnerabilities": ["Weak or shared wireless keys", "Wireless network bridged straight into the control network", "Signal reaches beyond the site fence"],
+      "countermeasures": [
+        { "description": "Strong authentication for every wireless client", "srRefs": ["SR 1.6", "SR 1.1"] },
+        { "description": "Put wireless devices in their own zone behind a firewall", "srRefs": ["SR 5.1", "SR 5.2"] },
+        { "description": "Restrict what wireless users can do once connected", "srRefs": ["SR 2.2"] }
+      ],
+      "tags": ["wireless"]
+    },
+    {
+      "id": "HS08",
+      "title": "Historian used as a route in",
+      "statement": "An attacker compromises a historian or data server that both business users and the control network can reach, and uses it as a route into the control zone.",
+      "source": "External attacker already present in the business network",
+      "entryPoint": "Historian or replication server reachable from both networks",
+      "consequence": "A foothold inside the control zone; altered or lost production data",
+      "affectedFR": ["RDF", "SI", "IAC"],
+      "assetTypes": ["historian", "server"],
+      "vulnerabilities": ["Dual-homed server spanning both networks", "Inbound connections allowed from business users into the control zone", "Unpatched database or web service"],
+      "countermeasures": [
+        { "description": "Place a replica historian in the DMZ and send data out one way", "srRefs": ["SR 5.1", "SR 5.2"] },
+        { "description": "Allow only outbound connections from the control zone", "srRefs": ["SR 5.2"] },
+        { "description": "Harden and patch servers in the DMZ", "srRefs": ["SR 7.6", "SR 7.7"] }
+      ],
+      "tags": ["network", "data"]
+    },
+    {
+      "id": "HS09",
+      "title": "Control network overloaded",
+      "statement": "A flood of traffic, a misbehaving device or a careless scan overloads switches or controllers so that control and visibility are lost.",
+      "source": "Attacker, faulty device or careless network scan",
+      "entryPoint": "Any connected host or switch port in the control network",
+      "consequence": "Loss of view, controllers dropping communication, process trip",
+      "affectedFR": ["RA", "RDF"],
+      "assetTypes": ["network", "plc", "hmi"],
+      "vulnerabilities": ["Controllers with little tolerance for unexpected traffic", "No limits on broadcast or traffic rates", "Active scanning tools used on the live network"],
+      "countermeasures": [
+        { "description": "Rate limiting and storm control on control network switches", "srRefs": ["SR 7.1"] },
+        { "description": "Segment the network so that a fault stays within one zone", "srRefs": ["SR 5.1"] },
+        { "description": "Agree rules for scanning and testing on live systems", "srRefs": ["SR 7.2"] }
+      ],
+      "tags": ["denial-of-service", "network"]
+    },
+    {
+      "id": "HS10",
+      "title": "Default or shared passwords",
+      "statement": "An attacker or an unauthorised user logs on to an HMI, switch or controller with a default or widely shared password.",
+      "source": "Insider, or an attacker with network access",
+      "entryPoint": "Device web page, console or remote management service",
+      "consequence": "Unauthorised configuration changes, with no record of who made them",
+      "affectedFR": ["IAC", "UC", "TRE"],
+      "assetTypes": ["hmi", "network", "plc", "server"],
+      "vulnerabilities": ["Factory default passwords never changed", "Generic accounts shared by a whole shift", "No lockout after failed attempts"],
+      "countermeasures": [
+        { "description": "Change default credentials and give people named accounts", "srRefs": ["SR 1.1", "SR 1.3", "SR 1.5"] },
+        { "description": "Enforce password strength and lockout", "srRefs": ["SR 1.7", "SR 1.11"] },
+        { "description": "Log logons and configuration changes", "srRefs": ["SR 2.8"] }
+      ],
+      "tags": ["credentials", "insider"]
+    },
+    {
+      "id": "HS11",
+      "title": "Tampered software update",
+      "statement": "A software update, firmware image or engineering package from a supplier has been tampered with and is installed on control system hosts or devices.",
+      "source": "Attacker in the supplier's build or delivery chain",
+      "entryPoint": "Supplier update, download portal or delivered media",
+      "consequence": "Hidden malicious code on many hosts or devices at once",
+      "affectedFR": ["SI", "IAC"],
+      "assetTypes": ["engineering-workstation", "server", "plc", "hmi"],
+      "vulnerabilities": ["Updates installed without checking signatures or hashes", "Updates downloaded straight from the internet onto control hosts", "No test system to try updates on first"],
+      "countermeasures": [
+        { "description": "Check signatures or hashes before any update is installed", "srRefs": ["SR 3.4", "SR 1.9"] },
+        { "description": "Stage and test updates on a system that is not in production, and check the security functions still work afterwards", "srRefs": ["SR 3.3"] },
+        { "description": "Keep an inventory of installed software and firmware versions", "srRefs": ["SR 7.8"] }
+      ],
+      "tags": ["supply-chain", "patching"]
+    },
+    {
+      "id": "HS12",
+      "title": "Insider with engineering rights",
+      "statement": "A disgruntled employee or contractor with legitimate engineering rights deliberately changes the configuration to disrupt production.",
+      "source": "Malicious insider",
+      "entryPoint": "Authorised engineering access",
+      "consequence": "Lost production, damaged equipment, risk to safety",
+      "affectedFR": ["UC", "TRE", "IAC"],
+      "assetTypes": ["engineering-workstation", "plc", "hmi"],
+      "vulnerabilities": ["Broad standing rights beyond what the task needs", "Access not removed promptly when people leave", "Changes not reviewed by a second person"],
+      "countermeasures": [
+        { "description": "Least privilege, with access rights reviewed regularly", "srRefs": ["SR 2.1", "SR 1.3"] },
+        { "description": "Remove access promptly when people leave or change roles", "srRefs": ["SR 1.3", "SR 1.4"] },
+        { "description": "Record engineering changes and have them reviewed", "srRefs": ["SR 2.8", "SR 6.1", "SR 2.12"] }
+      ],
+      "tags": ["insider", "engineering"]
+    },
+    {
+      "id": "HS13",
+      "title": "Phished credentials used on OT remote access",
+      "statement": "A phishing email gives an attacker an engineer's credentials, which they then use on the remote access service or jump hosts that serve the control system.",
+      "source": "External attacker",
+      "entryPoint": "Engineer's corporate email, then the remote access portal",
+      "consequence": "The attacker works as a trusted engineer would",
+      "affectedFR": ["IAC", "UC"],
+      "assetTypes": ["engineering-workstation", "business"],
+      "vulnerabilities": ["The same password for corporate and OT accounts", "Remote access protected by a password alone", "OT accounts held in the corporate directory"],
+      "countermeasures": [
+        { "description": "Separate OT accounts from corporate accounts", "srRefs": ["SR 1.1", "SR 1.3"] },
+        { "description": "Multi-factor authentication for access from untrusted networks", "srRefs": ["SR 1.13"] },
+        { "description": "Alert on logons at unusual times or from unusual places", "srRefs": ["SR 6.2"] }
+      ],
+      "tags": ["credentials", "remote-access"]
+    },
+    {
+      "id": "HS14",
+      "title": "Control system service exposed to the internet",
+      "statement": "A control system device or remote service is reachable from the internet, and is found and attacked through automated scanning.",
+      "source": "Opportunistic attacker using internet scanning",
+      "entryPoint": "Internet-facing port on a router, modem or cloud connector",
+      "consequence": "Direct remote manipulation of the process",
+      "affectedFR": ["RDF", "IAC"],
+      "assetTypes": ["network", "plc", "hmi", "other"],
+      "vulnerabilities": ["Port forwarding left in place after commissioning", "Cellular modem fitted by a supplier without the site's knowledge", "No regular check of what can be reached from outside"],
+      "countermeasures": [
+        { "description": "Remove direct internet paths and route access through the managed remote access service", "srRefs": ["SR 5.2", "SR 1.13"] },
+        { "description": "Keep an inventory of every external connection, modems included", "srRefs": ["SR 7.8"] },
+        { "description": "Check regularly, from outside, what the site exposes", "srRefs": ["SR 3.3"] }
+      ],
+      "tags": ["remote-access", "network"]
+    },
+    {
+      "id": "HS15",
+      "title": "Values shown to operators falsified",
+      "statement": "An attacker alters the values shown to operators so that the process looks normal while it is driven out of its limits.",
+      "source": "Capable attacker targeting the process",
+      "entryPoint": "Communication between controllers and HMIs",
+      "consequence": "Operators do not act on a real problem; damage or a release follows",
+      "affectedFR": ["SI", "IAC"],
+      "assetTypes": ["hmi", "plc", "network"],
+      "vulnerabilities": ["No integrity protection on traffic between controllers and HMIs", "A single source for process values, with no cross check", "Network devices that let traffic be intercepted"],
+      "countermeasures": [
+        { "description": "Integrity protection on control communications where supported", "srRefs": ["SR 3.1"] },
+        { "description": "Alarm when a critical value disagrees with an independent reading", "srRefs": ["SR 6.2"] },
+        { "description": "Detect unexpected devices and address conflicts on the network", "srRefs": ["SR 6.2"] }
+      ],
+      "tags": ["data", "network"]
+    },
+    {
+      "id": "HS16",
+      "title": "Design or recipe data taken",
+      "statement": "Design drawings, network diagrams, recipes or set points are copied out of the control system and used to plan an attack, or taken by a competitor.",
+      "source": "Industrial espionage, or an attacker preparing a later attack",
+      "entryPoint": "File shares, historians and engineering backups",
+      "consequence": "Loss of intellectual property, and a better informed attacker",
+      "affectedFR": ["DC", "UC"],
+      "assetTypes": ["server", "historian", "engineering-workstation"],
+      "vulnerabilities": ["Documents stored on open shares", "Backups and project files not encrypted", "No record of who reads design data"],
+      "countermeasures": [
+        { "description": "Restrict and log access to design and recipe data", "srRefs": ["SR 2.1", "SR 2.8"] },
+        { "description": "Encrypt sensitive files when stored and when sent", "srRefs": ["SR 4.1", "SR 4.3"] },
+        { "description": "Wipe data from equipment before it is disposed of", "srRefs": ["SR 4.2"] }
+      ],
+      "tags": ["data", "insider"]
+    },
+    {
+      "id": "HS17",
+      "title": "Backups not there when needed",
+      "statement": "After a failure or an attack the site finds that backups of controller logic and host images are missing, out of date, or encrypted along with everything else.",
+      "source": "Ransomware, hardware failure or poor practice",
+      "entryPoint": "Backup server and backup process",
+      "consequence": "A long outage while systems are rebuilt from scratch",
+      "affectedFR": ["RA"],
+      "assetTypes": ["server", "plc", "engineering-workstation"],
+      "vulnerabilities": ["Backups kept on the same network as the systems they protect", "Restores never tested", "Controller logic saved only on one laptop"],
+      "countermeasures": [
+        { "description": "Regular backups held offline or in a separate zone", "srRefs": ["SR 7.3"] },
+        { "description": "Test restores to a known state on a schedule", "srRefs": ["SR 7.4"] },
+        { "description": "Keep a recovery plan for each critical system", "srRefs": ["SR 7.4"] }
+      ],
+      "tags": ["ransomware", "denial-of-service"]
+    },
+    {
+      "id": "HS18",
+      "title": "Contractor laptop connected to the control network",
+      "statement": "A contractor connects their own laptop to the control network for commissioning or fault finding, bringing in malware or opening an uncontrolled path out.",
+      "source": "Contractor without malicious intent, with malware already on the laptop",
+      "entryPoint": "Spare switch port or a network connection in a cabinet",
+      "consequence": "Malware on control hosts, or an unmanaged route to outside networks",
+      "affectedFR": ["IAC", "SI", "RDF"],
+      "assetTypes": ["engineering-workstation", "network"],
+      "vulnerabilities": ["Open switch ports in cabinets", "No check of visiting laptops", "Laptop also connected to a mobile network"],
+      "countermeasures": [
+        { "description": "Provide laptops managed by the site for work on the control system", "srRefs": ["SR 2.3"] },
+        { "description": "Disable unused switch ports and control which devices can connect", "srRefs": ["SR 7.7", "SR 1.2"] },
+        { "description": "Connect temporary devices only through a dedicated maintenance zone", "srRefs": ["SR 5.1"] }
+      ],
+      "tags": ["transient", "supply-chain"]
+    },
+    {
+      "id": "HS19",
+      "title": "Physical access to cabinets and racks",
+      "statement": "Someone gains physical access to a control cabinet, rack room or field junction box and connects a device or changes settings by hand.",
+      "source": "Intruder, visitor or unauthorised staff",
+      "entryPoint": "Unlocked cabinet, rack room or remote outstation",
+      "consequence": "Direct changes to equipment, and a hidden foothold",
+      "affectedFR": ["IAC", "UC", "RA"],
+      "assetTypes": ["plc", "network", "other"],
+      "vulnerabilities": ["Cabinets and rack rooms left unlocked", "No record of who went in", "Exposed network ports and console connections"],
+      "countermeasures": [
+        { "description": "Lock cabinets and rack rooms, and keep controller key switches in run", "srRefs": ["SR 2.1"] },
+        { "description": "Disable unused ports on devices", "srRefs": ["SR 7.7"] },
+        { "description": "Alarm on cabinet doors or device state changes where possible", "srRefs": ["SR 6.2"] }
+      ],
+      "tags": ["physical"]
+    },
+    {
+      "id": "HS20",
+      "title": "Known flaw on an unpatched host",
+      "statement": "An attacker on the network exploits a known flaw in an unpatched operating system or application on an HMI or server.",
+      "source": "Attacker or self-spreading malware already inside the network",
+      "entryPoint": "Network services on control system hosts",
+      "consequence": "The host is taken over, with loss of view or control from it",
+      "affectedFR": ["SI", "RA"],
+      "assetTypes": ["hmi", "server", "historian", "engineering-workstation"],
+      "vulnerabilities": ["Operating systems past their supplier's support", "Patches not approved or applied for long periods", "Network services running that are not needed"],
+      "countermeasures": [
+        { "description": "Patch management agreed with the system supplier, based on an inventory of installed versions", "srRefs": ["SR 7.8"] },
+        { "description": "Remove or disable services that are not needed", "srRefs": ["SR 7.7"] },
+        { "description": "Malware protection where patching is not possible", "srRefs": ["SR 3.2"] }
+      ],
+      "tags": ["patching"]
+    },
+    {
+      "id": "HS21",
+      "title": "Cloud monitoring link used to reach back in",
+      "statement": "A connection that sends plant data to a supplier's or the owner's cloud service is misused to reach back into the control system.",
+      "source": "Attacker who has compromised the cloud service or its credentials",
+      "entryPoint": "Outbound cloud connector or edge gateway",
+      "consequence": "Remote access to the process through a path meant to run one way",
+      "affectedFR": ["RDF", "IAC", "DC"],
+      "assetTypes": ["server", "network", "other"],
+      "vulnerabilities": ["Connector that also accepts inbound commands", "Long-lived keys stored on the gateway", "Gateway placed inside the control zone"],
+      "countermeasures": [
+        { "description": "Put the gateway in its own zone and allow traffic one way only", "srRefs": ["SR 5.2", "SR 5.1"] },
+        { "description": "Authenticate the gateway with keys that can be changed", "srRefs": ["SR 1.2", "SR 1.8"] },
+        { "description": "Encrypt data leaving the site", "srRefs": ["SR 4.1", "SR 4.3"] }
+      ],
+      "tags": ["cloud", "remote-access", "supply-chain"]
+    },
+    {
+      "id": "HS22",
+      "title": "Attacker works unseen in the control zone",
+      "statement": "An attacker stays in the control zone for weeks, preparing a disruptive attack, because events on hosts and devices are not recorded or reviewed.",
+      "source": "Capable attacker already inside the network",
+      "entryPoint": "Any route into the zone",
+      "consequence": "Late detection, a longer outage and no basis for recovery decisions",
+      "affectedFR": ["TRE"],
+      "assetTypes": ["server", "hmi", "network", "plc"],
+      "vulnerabilities": ["Logging switched off or overwritten quickly", "Clocks not synchronised", "Nobody reviews alerts from security tools"],
+      "countermeasures": [
+        { "description": "Collect logs centrally, with enough storage", "srRefs": ["SR 2.8", "SR 2.9", "SR 6.1"] },
+        { "description": "Synchronise time across the control system", "srRefs": ["SR 2.11"] },
+        { "description": "Monitor security events and respond to them", "srRefs": ["SR 6.2"] }
+      ],
+      "tags": ["monitoring"]
+    },
+    {
+      "id": "HS23",
+      "title": "Firewall and switch settings drift",
+      "statement": "An attacker in the business network reaches the control zone through a firewall rule added for convenience and never removed.",
+      "source": "External attacker, helped by changes made for convenience",
+      "entryPoint": "Firewall and switch management interfaces",
+      "consequence": "Zones that are separate on paper but not in practice, so any attack spreads further",
+      "affectedFR": ["RDF", "RA"],
+      "assetTypes": ["network"],
+      "vulnerabilities": ["Temporary rules never removed", "Management interfaces open to the whole network", "No baseline of approved settings"],
+      "countermeasures": [
+        { "description": "Keep an approved baseline of network and security settings and compare against it", "srRefs": ["SR 7.6"] },
+        { "description": "Review firewall rules on a schedule", "srRefs": ["SR 5.2"] },
+        { "description": "Restrict management access to a dedicated network", "srRefs": ["SR 5.1", "SR 2.1"] }
+      ],
+      "tags": ["network"]
+    },
+    {
+      "id": "HS24",
+      "title": "Destructive malware aimed at the site",
+      "statement": "A targeted attacker deploys malware built to destroy data and disable hosts across the control system.",
+      "source": "State-sponsored or politically motivated attacker",
+      "entryPoint": "Any foothold in the control network, often reached through the business network",
+      "consequence": "Loss of the HMIs and servers for days; manual operation or shutdown",
+      "affectedFR": ["SI", "RA", "TRE"],
+      "assetTypes": ["hmi", "server", "engineering-workstation", "historian"],
+      "vulnerabilities": ["One domain or shared accounts across hosts", "No offline recovery media", "No detection of unusual activity"],
+      "countermeasures": [
+        { "description": "Offline backups and a recovery that has been practised", "srRefs": ["SR 7.3", "SR 7.4"] },
+        { "description": "Application allow-listing on critical hosts", "srRefs": ["SR 3.2"] },
+        { "description": "Continuous monitoring, with a plan to respond", "srRefs": ["SR 6.2"] }
+      ],
+      "tags": ["ransomware", "denial-of-service"]
+    },
+    {
+      "id": "HS25",
+      "title": "Field devices reconfigured",
+      "statement": "Field instruments, drives or remote I/O are reconfigured over a field network or with a handheld configurator, changing their ranges or behaviour.",
+      "source": "Attacker with field network access, or careless maintenance",
+      "entryPoint": "Field network, handheld configurator or instrument management software",
+      "consequence": "Wrong readings or actions at the plant, hidden from the control room",
+      "affectedFR": ["IAC", "SI"],
+      "assetTypes": ["other", "plc", "network"],
+      "vulnerabilities": ["Field devices accept changes without authentication", "Instrument management software open to many users", "No record of field device settings"],
+      "countermeasures": [
+        { "description": "Use device write protection where available", "srRefs": ["SR 2.1"] },
+        { "description": "Restrict and log access to instrument management software", "srRefs": ["SR 1.1", "SR 2.8"] },
+        { "description": "Keep a record of field device settings and compare against it", "srRefs": ["SR 7.6", "SR 3.4"] }
+      ],
+      "tags": ["engineering", "physical"]
+    },
+    {
+      "id": "HS26",
+      "title": "Control hosts used for web and email",
+      "statement": "An operator or engineer uses a control system host to browse the web or read email, and brings in malware.",
+      "source": "Malware author, helped by staff using control hosts for web and email",
+      "entryPoint": "Web browser or email client on a control system host",
+      "consequence": "Malware inside the control zone",
+      "affectedFR": ["UC", "RDF", "SI"],
+      "assetTypes": ["hmi", "engineering-workstation"],
+      "vulnerabilities": ["Internet access allowed from the control zone", "General-purpose software installed on control hosts", "Users with administrator rights"],
+      "countermeasures": [
+        { "description": "Block internet and email access from the control zone", "srRefs": ["SR 5.3", "SR 5.2"] },
+        { "description": "Remove software not needed for operation", "srRefs": ["SR 7.7"] },
+        { "description": "Do day-to-day work without administrator rights", "srRefs": ["SR 2.1"] }
+      ],
+      "tags": ["network", "insider"]
+    },
+    {
+      "id": "HS27",
+      "title": "Single point of failure brings a long outage",
+      "statement": "An attacker disables a single critical server or switch, by a crafted message or by deleting its configuration, and with no redundancy or tested recovery the control system stays down.",
+      "source": "Attacker with network access",
+      "entryPoint": "Single points of failure in the control system",
+      "consequence": "Extended loss of view or control; process shutdown",
+      "affectedFR": ["RA"],
+      "assetTypes": ["server", "network", "hmi"],
+      "vulnerabilities": ["No redundancy for critical servers or network paths", "Uninterruptible power supplies not maintained", "Recovery depends on one person's knowledge"],
+      "countermeasures": [
+        { "description": "Redundancy for critical functions, with a tested failover", "srRefs": ["SR 7.4"] },
+        { "description": "Emergency power sized and maintained for the control system", "srRefs": ["SR 7.5"] },
+        { "description": "Written recovery procedures", "srRefs": ["SR 7.4"] }
+      ],
+      "tags": ["denial-of-service"]
+    },
+    {
+      "id": "HS28",
+      "title": "False time, name or address services",
+      "statement": "An attacker or a misconfiguration supplies false time, name or address information to control system hosts, so records and sessions become unreliable.",
+      "source": "Attacker with network access, or a misconfiguration",
+      "entryPoint": "Time, name and address services on the control network",
+      "consequence": "Unreliable logs, failed authentication, devices pointed at the wrong server",
+      "affectedFR": ["SI", "TRE", "RDF"],
+      "assetTypes": ["server", "network"],
+      "vulnerabilities": ["Time and address services accept answers from any host", "The control zone relies on business network services", "No alert when the time jumps"],
+      "countermeasures": [
+        { "description": "Provide protected time and network services inside the control zone", "srRefs": ["SR 2.11", "SR 3.1"] },
+        { "description": "Alert on time changes and address conflicts", "srRefs": ["SR 6.2"] },
+        { "description": "Limit which hosts may provide these services", "srRefs": ["SR 5.2"] }
+      ],
+      "tags": ["network", "monitoring"]
+    },
+    {
+      "id": "HS29",
+      "title": "Integrator leaves hidden access behind",
+      "statement": "An integrator leaves an undocumented account, remote support tool or modem in place after a project, and it is later found and used.",
+      "source": "Former contractor, or an attacker who finds the access",
+      "entryPoint": "Undocumented accounts, remote desktop tools or modems",
+      "consequence": "An unmonitored route into the control system",
+      "affectedFR": ["IAC", "UC", "RDF"],
+      "assetTypes": ["engineering-workstation", "server", "network"],
+      "vulnerabilities": ["No check of accounts and connections at handover", "Remote support tools installed without approval", "Accounts with no named owner"],
+      "countermeasures": [
+        { "description": "Check accounts, tools and connections at project handover", "srRefs": ["SR 1.3", "SR 7.8"] },
+        { "description": "Approve and list every remote support tool", "srRefs": ["SR 1.13", "SR 7.8"] },
+        { "description": "Review accounts regularly and disable those not used", "srRefs": ["SR 1.3"] }
+      ],
+      "tags": ["supply-chain", "remote-access", "credentials"]
+    },
+    {
+      "id": "HS30",
+      "title": "Change to shared network equipment cuts control traffic",
+      "statement": "A change made by IT staff to core switches shared with the business network, such as a firmware update or VLAN change, delays or cuts control and safety traffic.",
+      "source": "IT staff or an IT service provider",
+      "entryPoint": "Shared switches, VLANs or links",
+      "consequence": "Delayed or lost control messages; safety trips",
+      "affectedFR": ["RDF", "RA"],
+      "assetTypes": ["network", "safety-plc", "plc"],
+      "vulnerabilities": ["VLANs used as the only separation", "Core switches shared with business systems", "No limits on traffic between VLANs"],
+      "countermeasures": [
+        { "description": "Separate control and safety networks from business traffic", "srRefs": ["SR 5.1"] },
+        { "description": "Filter traffic at zone boundaries", "srRefs": ["SR 5.2"] },
+        { "description": "Protect control traffic from overload", "srRefs": ["SR 7.1"] }
+      ],
+      "tags": ["safety", "network"]
+    },
+    {
+      "id": "HS31",
+      "title": "Telemetry link to a remote site misused",
+      "statement": "An attacker with access to the cellular, radio or leased line link to a remote site sends false commands to its RTU, or alters the readings it reports to the control centre.",
+      "source": "Attacker with access to the telemetry network or to a remote site",
+      "entryPoint": "Telemetry link between the control centre and the remote RTUs",
+      "consequence": "Remote plant operated without the control room knowing, or false readings acted on",
+      "affectedFR": ["IAC", "SI", "RDF"],
+      "assetTypes": ["plc", "network", "other"],
+      "vulnerabilities": ["Telemetry protocols that do not check who sent a message", "Cellular modems with public addresses or factory settings", "Remote sites unmanned and rarely visited"],
+      "countermeasures": [
+        { "description": "Authenticate the RTUs and the control centre to each other", "srRefs": ["SR 1.2"] },
+        { "description": "Protect telemetry messages against alteration where the protocol and the devices allow", "srRefs": ["SR 3.1"] },
+        { "description": "Accept telemetry only from known sites at the control centre boundary, and route engineering access to the sites through the managed remote access service", "srRefs": ["SR 5.2", "SR 1.13"] }
+      ],
+      "tags": ["remote-access", "wireless", "network"]
+    },
+    {
+      "id": "HS32",
+      "title": "IT management tool used against control hosts",
+      "statement": "An attacker who takes over a directory service or IT management tool shared with the business network uses it to push malicious software or settings to every control host at once.",
+      "source": "Attacker who has taken over the business network's administration",
+      "entryPoint": "Shared directory service, software deployment or remote management tool",
+      "consequence": "Every managed control host compromised or disabled at the same time",
+      "affectedFR": ["IAC", "UC", "SI"],
+      "assetTypes": ["hmi", "server", "engineering-workstation", "historian"],
+      "vulnerabilities": ["Control hosts joined to the business directory", "IT administrator accounts with rights on control hosts", "Deployment tools that can reach the control zone"],
+      "countermeasures": [
+        { "description": "Manage control hosts from a directory and tools inside the control system, not from the business network", "srRefs": ["SR 5.1"] },
+        { "description": "Keep administrator accounts for control hosts separate, limited to the task and reviewed", "srRefs": ["SR 1.3", "SR 2.1"] },
+        { "description": "Allow only approved software to run on control hosts", "srRefs": ["SR 3.2"] }
+      ],
+      "tags": ["credentials", "network", "ransomware"]
+    },
+    {
+      "id": "HS33",
+      "title": "Package unit connected without review",
+      "statement": "A supplier's package unit arrives with its own network and remote access, and is connected to the control network without review, opening a path around the zone boundaries.",
+      "source": "Attacker using the package supplier's remote access, or malware already on the unit",
+      "entryPoint": "The package unit's network, or its supplier's remote access or modem",
+      "consequence": "An unmanaged route into the control network, and changes to the unit's control the site does not know about",
+      "affectedFR": ["IAC", "RDF"],
+      "assetTypes": ["plc", "hmi", "network", "other"],
+      "vulnerabilities": ["Package units connected by the supplier during commissioning", "Supplier modems or remote tools missing from the site's inventory", "Package networks bridged into the plant network"],
+      "countermeasures": [
+        { "description": "Treat each package unit as a zone of its own, connected through a reviewed conduit", "srRefs": ["SR 5.1", "SR 5.2"] },
+        { "description": "Bring the supplier's remote access onto the site's managed remote access service", "srRefs": ["SR 1.13"] },
+        { "description": "Record the package unit's devices and connections in the site inventory at handover", "srRefs": ["SR 7.8"] }
+      ],
+      "tags": ["supply-chain", "remote-access", "network"]
+    }
+  ]
+}

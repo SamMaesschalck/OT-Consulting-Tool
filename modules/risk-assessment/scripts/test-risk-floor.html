@@ -1,0 +1,186 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool safety floor list</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 5b of docs/risk-tool-redesign.md, item 2: the safety floor list.
+  - The rules file's floorFR is all seven requirements (the owner's default),
+    so old files give the same suggestions, traces, driving scenarios, risk
+    context, completeness, approval fingerprint and Word text as a rules file
+    with no list (the behaviour before), on the frozen files and the demo.
+  - A project narrows it (project.safetyFloorFR): the SL-T suggestion, the
+    Why trace, the driving scenarios ("SLn from the safety floor") and the
+    Word SL-T section read it; the full list again stores nothing.
+  - The SL-T grid's and a safety zone's strip floor box edit it (chips), and
+    step 3's safety hint follows it.
+  - The migration tidies it.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.docx || !w.App.DocxBlocks) { if (++tries > 200) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var tx = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, "").replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, "\""); }).join("");
+      if (tx.replace(/\s+/g, "")) out.push(tx);
+    }
+    return out;
+  }
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, DB = w.App.DocxBlocks, d = w.document;
+    var RULES = w.App.Data.sltRules, SIS = RULES.specialRules.filter(function (r) { return r.id === "sis-present"; })[0];
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    try { w.localStorage.removeItem(RT.AUTOSAVE_KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function words(pj) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(pj, { preview: true })).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    var ALL = M.FR_IDS.slice();
+
+    // ---- A. the rules file ------------------------------------------------------------
+    ok(same(SIS.floorFR, ALL), "the rules file's safety floor covers all seven requirements by default", JSON.stringify(SIS.floorFR));
+    ok(same(M.houseFloorFR(), ALL) && same(RT.safetyFloorFR(M.emptyProject()), ALL), "and a project without a list of its own reads it");
+
+    // ---- B. old files: unchanged results ------------------------------------------------
+    // The behaviour before phase 5b had no list: the floor on every requirement.
+    // The same project is worked out with the rules file's list and without it.
+    function facts(pj) {
+      var out = {};
+      out.sug = pj.zones.map(function (z) { return RT.suggestZone(z, pj); }).concat(pj.conduits.map(function (c) { return RT.suggestConduit(c, pj); }));
+      out.drivers = pj.zones.concat(pj.conduits).map(function (o) { return RT.sltDrivers(o, pj); });
+      var ctx = RT.buildRiskContext(pj); delete ctx.generatedOn; out.ctx = ctx;
+      out.open = RT.completeness(pj).map(function (i) { return i.text; });
+      out.print = RT.approvalFingerprint(pj);
+      return JSON.stringify(out);
+    }
+    var FX = window.RiskFixtures || {};
+    var files = { "the demo": window.SPT_TOUR_PROJECT, "the v0.7 tour file": FX["tour-v0.7-saved"], "the phase 3 tour file": FX["tour-phase3-0.2"], "the hand-made 0.1 file": FX["hand-made-v0.1"] };
+    var wordChecks = [];
+    Object.keys(files).forEach(function (k) {
+      ok(!!files[k], k + " is present");
+      var pj = MG.normaliseProject(clone(files[k]));
+      ok(!("safetyFloorFR" in pj), k + ": loads with no floor list of its own");
+      var withList = facts(pj);
+      var kept = SIS.floorFR; delete SIS.floorFR;
+      var before = facts(pj);
+      SIS.floorFR = kept;
+      ok(withList === before, k + ": suggestions, traces, driving scenarios, risk context, completeness and approval are those of the floor on every requirement");
+      if (pj.zones.length) wordChecks.push({ k: k, pj: pj });
+    });
+    var safeDemo = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT)), z2 = safeDemo.zones[1];
+    ok(RT.zoneSafety(z2) && ALL.every(function (fr) { return RT.suggestZone(z2, safeDemo).byFR[fr].sl >= 3; }), "the demo's safety zone Z2 has the SL3 floor on every requirement");
+
+    var chain = Promise.resolve();
+    wordChecks.forEach(function (c) {
+      chain = chain.then(function () { return words(c.pj); }).then(function (a) {
+        var kept = SIS.floorFR; delete SIS.floorFR;
+        return words(c.pj).then(function (b) { SIS.floorFR = kept; ok(same(a, b), c.k + ": the Word report reads the same", a.length + " vs " + b.length); });
+      });
+    });
+
+    // ---- C. narrowed for a project -------------------------------------------------------
+    return chain.then(function () {
+      var pj = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT)), z = pj.zones[1];
+      M.setSafetyFloorFR(pj, ["SI", "IAC"]);
+      ok(same(pj.safetyFloorFR, ["IAC", "SI"]), "a narrowed list is stored, in requirement order", JSON.stringify(pj.safetyFloorFR));
+      var s = RT.suggestZone(z, pj), base = RT.sltDrivers(z, pj);
+      ok(s.byFR.IAC.sl >= 3 && s.byFR.SI.sl >= 3, "the floor still holds on IAC and SI");
+      var outside = ALL.filter(function (fr) { return fr !== "IAC" && fr !== "SI"; });
+      var bad = outside.filter(function (fr) {
+        var band = s.byFR[fr].risk, mapped = band ? RULES.riskToSL[band].suggest : null;
+        return s.byFR[fr].sl !== mapped || !s.byFR[fr].trace.some(function (x) { return /floor does not cover/.test(x); });
+      });
+      ok(!bad.length, "on the others the suggestion is what the threats map to, and the Why says the floor does not cover it", bad.join());
+      ok(base.every(function (d2) { return d2.raisedBy !== "floor" || d2.fr === "IAC" || d2.fr === "SI"; }) && base.some(function (d2) { return d2.raisedBy === "floor"; }) === base.some(function (d2) { return (d2.fr === "IAC" || d2.fr === "SI") && d2.mapped !== 3 && d2.sl === 3; }),
+        "driving scenarios say SLn from the safety floor only on the requirements it covers", JSON.stringify(base.map(function (d2) { return [d2.fr, d2.raisedBy]; })));
+      ok(RT.buildRiskContext(pj).zones[1].safetyRelated === true, "the zone is still safety related in the risk context");
+      var fw = RT.safetyFloorWords(pj);
+      ok(fw.words === "IAC and SI" && fw.narrowed && !fw.all && !fw.none, "the floor's words name what it covers", fw.words);
+      M.setSafetyFloorFR(pj, ALL.slice().reverse());
+      ok(!("safetyFloorFR" in pj), "all seven again stores nothing");
+      var none = clone(pj); M.setSafetyFloorFR(none, []);
+      ok(same(none.safetyFloorFR, []) && ALL.every(function (fr) { var sl = RT.suggestZone(none.zones[1], none).byFR[fr]; return sl.sl === (sl.risk ? RULES.riskToSL[sl.risk].suggest : null); }), "an empty list is a floor on none");
+      ok(M.projectHasContent(Object.assign(M.emptyProject(), { safetyFloorFR: ["IAC"] })), "a narrowed floor counts as content worth keeping");
+      M.setSafetyFloorFR(pj, ["IAC", "SI"]);
+      return Promise.all([words(pj), words(none)]).then(function (r) {
+        var a = r[0].join("\n"), b = r[1].join("\n");
+        ok(a.indexOf("A zone marked safety related holds safety functions. The house method sets a floor of SL3 for it; in this assessment the floor covers IAC and SI.") >= 0, "Word's SL-T section names the requirements the floor covers");
+        ok(b.indexOf("A zone marked safety related holds safety functions. The house floor of SL3 is not applied in this assessment.") >= 0, "and says when it covers none");
+        var demoW = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+        return words(demoW).then(function (c) {
+          ok(c.join("\n").indexOf("The house method sets a floor of SL3 on every foundational requirement for it.") >= 0, "with the default list the sentence is as it was");
+          function cites(list) { return list.join("\n").split("from the safety floor").length - 1; }
+          ok(cites(r[1]) === 0 && cites(r[0]) <= cites(c), "the driving scenarios cite the floor no more often once narrowed, and never with no floor", [cites(c), cites(r[0]), cites(r[1])].join());
+          ok(r[0].concat(r[1]).every(function (x) { return !/[–—]/.test(x); }), "no dash in the Word text");
+        });
+      });
+    }).then(function () {
+      // ---- D. the page ------------------------------------------------------------------
+      RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT));
+      RT.navigate("slt");
+      var box = main().querySelector("[data-floor]");
+      ok(!!box && /Safety related: Z2\./.test(box.textContent) && /applied to every foundational requirement\./.test(box.textContent) && !/Prompt:/.test(box.textContent), "the SL-T grid's floor box names the safety zone and the floor's reach");
+      var chips = box.querySelectorAll('[data-chip^="floor-"]');
+      ok(chips.length === 7 && [].every.call(chips, function (c) { return c.getAttribute("aria-pressed") === "true"; }), "with a chip per requirement, all on");
+      var uc = box.querySelector('[data-chip="floor-UC"]'); uc.focus(); uc.click();
+      ok(same(P().safetyFloorFR, ["IAC", "SI", "DC", "RDF", "TRE", "RA"]) && RT.isDirty(), "a chip takes a requirement out, for this project", JSON.stringify(P().safetyFloorFR));
+      box = main().querySelector("[data-floor]");
+      ok(/applied to IAC, SI, DC, RDF, TRE and RA\./.test(box.textContent) && box.querySelector('[data-chip="floor-UC"]').getAttribute("aria-pressed") === "false", "the box says what it covers now");
+      ok(d.activeElement === box.querySelector('[data-chip="floor-UC"]'), "and the keyboard stays on the chip");
+      // The strip of the safety zone has the same box; a zone that is not safety related has none.
+      w.RiskApp.RiskPage.select("Z2"); RT.navigate("risk");
+      ok(!!main().querySelector("[data-slt-strip] [data-floor]"), "a safety related zone's SL-T strip has the floor box");
+      w.RiskApp.RiskPage.select("Z1"); RT.navigate("risk");
+      ok(!main().querySelector("[data-floor]"), "another zone's has none");
+      // Step 3's hint.
+      w.RiskApp.ZonesPage.select("zone", "Z1"); RT.navigate("zones");
+      main().querySelector('[data-detail="zone"] [data-action="safety"]').click();
+      ok(/Sets an SL3 floor on IAC, SI, DC, RDF, TRE and RA\./.test(main().querySelector('[data-detail="zone"]').textContent), "step 3's safety hint follows the narrowed list");
+      RT.navigate("slt");
+      main().querySelector('[data-floor] [data-chip="floor-UC"]').click();
+      ok(!("safetyFloorFR" in P()), "putting the requirement back stores nothing again");
+
+      // ---- E. the migration ---------------------------------------------------------------
+      var raw = clone(window.SPT_TOUR_PROJECT);
+      raw.safetyFloorFR = ["SI", "XX", "IAC", "SI"];
+      ok(same(MG.normaliseProject(clone(raw)).safetyFloorFR, ["IAC", "SI"]), "the migration keeps known requirements once each, in order");
+      raw.safetyFloorFR = "all";
+      ok(!("safetyFloorFR" in MG.normaliseProject(clone(raw))), "and drops a list that is not a list");
+      raw.safetyFloorFR = [];
+      ok(same(MG.normaliseProject(clone(raw)).safetyFloorFR, []), "an empty list is kept");
+    });
+  }
+}());
+</script>
+</body>
+</html>

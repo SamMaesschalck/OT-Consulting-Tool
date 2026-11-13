@@ -1,0 +1,427 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool criteria and impact per category</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 5a of docs/risk-tool-redesign.md: the project's own risk criteria and
+  the impact per consequence category.
+  - Files without criteria (the frozen fixtures and the demo) read the house
+    criteria exactly as before: every band is the house matrix's, and the SL-T
+    suggestions, risk context, completeness and approval fingerprint are those
+    of the house criteria stored.
+  - The presets (house, 3x3, 4x4, 5x5) and the accessor.
+  - Step 1's editor: a cell changed moves the screen, Word, Excel, the review
+    pack and the risk context together; levels renamed, added and removed;
+    a preset applied with ratings asks where they go, and one left where it
+    is is open with a Go to; set back to the house's, the project holds none.
+  - Tolerable risk per category, stricter and more lenient, in every output.
+  - The client's criteria: labelled as the client's in Word and Excel.
+  - Impact per category on a threat and a ranked system (with its source):
+    the impact mirrors the worst category, and Word, Excel and the review
+    pack show it only where captured.
+  - The migration tidies the new fields and never changes a rating.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks) { if (++tries > 200) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  // The text of document.xml, one line per paragraph.
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var tx = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, "").replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, "\""); }).join("");
+      if (tx.replace(/\s+/g, "")) out.push(tx);
+    }
+    return out;
+  }
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks;
+    var RULES = w.App.Data.sltRules, d = w.document, RP = w.RiskApp.RiskPage;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var KEY = RT.AUTOSAVE_KEY, keptSnap = null;
+    try { keptSnap = w.localStorage.getItem(KEY); w.localStorage.removeItem(KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function P() { return RT.state.project; }
+    function main() { return d.getElementById("main"); }
+    function crit() { return main().querySelector('[data-check-anchor="criteria"]'); }
+    function texts(pj) { return RT.completeness(pj).map(function (i) { return i.text; }); }
+    function has(list, re) { return list.some(function (x) { return re.test(x); }); }
+    function change(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function zone(id) { return P().zones.concat(P().conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threat(oid, tid) { return zone(oid).threats.filter(function (x) { return x.id === tid; })[0]; }
+    function row(vm, tid) { return vm.threats.filter(function (x) { return x.t.id === tid; })[0]; }
+    function words(pj, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(pj, Object.assign({ preview: true }, opts || {}))).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    function col(ws, name) { var n = 0; ws.getRow(1).eachCell(function (c, i) { if (c.value === name) n = i; }); return n; }
+    function rowWhere(ws, colName, value) { var out = null, n = col(ws, colName); ws.eachRow(function (r, i) { if (i > 1 && n && r.getCell(n).value === value) out = r; }); return out; }
+    function findRow(ws, first) { var out = null; ws.eachRow(function (r) { if (!out && r.getCell(1).value === first) out = r; }); return out; }
+    function packItem(id) { return RR.packItems().items.filter(function (i) { return i.itemId === id; })[0]; }
+    function ctxThreat(ctx, tid) { var out = null; ctx.zones.concat(ctx.conduits).forEach(function (o) { o.threats.forEach(function (x) { if (x.id === tid) out = x; }); }); return out; }
+    function load(pj) { RT.loadProjectText(JSON.stringify(pj)); }
+    // A small project: a ranked system and one zone with two threats.
+    function fresh() {
+      var pj = M.emptyProject();
+      pj.suc.name = "Criteria Works";
+      pj.srs.highLevelAssets.push({ id: "A1", name: "DCS", functionLocation: "Control room", consequence: "minor", likelihood: "high", note: "" }); pj.counters.hla = 1;
+      var z = M.emptyZone(1); z.name = "Control"; pj.counters.zone = 1;
+      var t1 = M.emptyThreat(1); t1.statement = "Vendor path"; t1.affectedFR = ["IAC"]; t1.likelihood = "high"; t1.impact = "minor";
+      var t2 = M.emptyThreat(2); t2.statement = "Spill by misuse"; t2.affectedFR = ["SI"]; t2.likelihood = "medium"; t2.impact = "minor";
+      var t3 = M.emptyThreat(3); t3.statement = "Billing data lost"; t3.affectedFR = ["DC"]; t3.likelihood = "medium"; t3.impact = "minor";
+      z.threats = [t1, t2, t3]; pj.counters.threat = 3; pj.zones.push(z);
+      return pj;
+    }
+    var BAND_RANK = M.BAND_RANK;
+
+    // ---- A. files without criteria read the house criteria, exactly as before ----
+    var FX = window.RiskFixtures || {};
+    var files = { "the v0.7 tour file": FX["tour-v0.7-saved"], "the phase 3 tour file": FX["tour-phase3-0.2"], "the hand-made 0.1 file": FX["hand-made-v0.1"], "the demo": window.SPT_TOUR_PROJECT };
+    function oracle(I, L) { var r = RULES.riskMatrix[I]; return (I && L && r && typeof r === "object" && r[L]) || null; }
+    Object.keys(files).forEach(function (k) {
+      ok(!!files[k], k + " is present");
+      var pj = MG.normaliseProject(clone(files[k]));
+      ok(!("criteria" in pj) && M.criteriaOf(pj).isHouse && !M.criteriaOf(pj).stored, k + ": loads with no criteria of its own, so the house criteria are read");
+      var vm = RT.viewModel(pj), tol = E.tolerableOf(pj), bad = [];
+      vm.threats.forEach(function (x) {
+        var tt = x.t;
+        if (x.risk !== oracle(tt.impact, tt.likelihood)) bad.push(tt.id + " unmitigated");
+        var cur = (tt.currentLikelihood || tt.currentImpact) ? oracle(tt.currentImpact || tt.impact, tt.currentLikelihood || tt.likelihood) : null;
+        if (x.current !== cur) bad.push(tt.id + " current");
+        var pl = (tt.residualLikelihood || tt.residualImpact) ? oracle(tt.residualImpact || tt.currentImpact || tt.impact, tt.residualLikelihood || tt.currentLikelihood || tt.likelihood) : null;
+        if (x.planned !== pl) bad.push(tt.id + " planned");
+        if (x.exceeds !== (x.risk ? BAND_RANK[x.risk] > BAND_RANK[tol] : false)) bad.push(tt.id + " above tolerable");
+        if (x.currentExceeds !== (cur ? BAND_RANK[cur] > BAND_RANK[tol] : false)) bad.push(tt.id + " current above");
+        if (x.plannedExceeds !== (pl ? BAND_RANK[pl] > BAND_RANK[tol] : false)) bad.push(tt.id + " planned above");
+      });
+      pj.srs.highLevelAssets.forEach(function (a) { if (RT.riskFor(a.consequence, a.likelihood, pj) !== oracle(a.consequence, a.likelihood)) bad.push(a.id); });
+      ok(vm.threats.length > 0 && !bad.length, k + ": every rating's band, and whether it is above tolerable risk, is the house matrix's", bad.join(", "));
+      var withHouse = clone(pj); withHouse.criteria = M.houseCriteria();
+      function sug(p2) { return JSON.stringify(p2.zones.map(function (z) { return RT.suggestZone(z, p2).byFR; }).concat(p2.conduits.map(function (c) { return RT.suggestConduit(c, p2).byFR; }))); }
+      ok(sug(pj) === sug(withHouse), k + ": the SL-T suggestions and their traces are those of the house criteria stored");
+      function ctx(p2) { var c = RT.buildRiskContext(p2); delete c.generatedOn; return JSON.stringify(c); }
+      ok(ctx(pj) === ctx(withHouse), k + ": and so is the risk context");
+      ok(same(texts(pj), texts(withHouse)), k + ": and the completeness list", JSON.stringify([texts(pj).length, texts(withHouse).length]));
+      ok(RT.approvalFingerprint(pj) === RT.approvalFingerprint(withHouse), k + ": and the approval fingerprint (the tolerable risk's part is the band alone)");
+      ok(RT.criteriaMisfits(pj).length === 0, k + ": no rating is listed as not fitting the criteria");
+    });
+    var demoN = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+    var withCats = demoN.zones.concat(demoN.conduits).reduce(function (a, o) { return a.concat(o.threats.filter(function (x) { return x.impactByCategory; })); }, []);
+    ok(withCats.length >= 2 && withCats.every(function (x) { return x.impact === E.worstCategoryLevel(x.impactByCategory, demoN); }), "the demo: threats with an impact per category, each impact the worst of its categories", withCats.map(function (x) { return x.id; }).join());
+    ok(demoN.srs.highLevelAssets.filter(function (a) { return a.consequenceSource; }).length >= 2, "the demo: two ranked systems give the source of their consequence");
+    ok(RT.completeness(demoN).length === 0, "the demo: nothing open");
+
+    // ---- B. the accessor and the presets ----
+    var house = M.criteriaOf(null);
+    ok(house.likelihood.map(function (l) { return l.id; }).join() === "low,medium,high" && house.impact.map(function (l) { return l.id; }).join() === "negligible,minor,serious,severe" && house.source === "house" && house.isHouse,
+      "with no project the accessor gives the house criteria");
+    ok(house.likelihood[0].note.indexOf("House default") < 0 && /^No known history/.test(house.likelihood[0].note), "its definitions carry no house prefix");
+    ok(house.categories.map(function (c) { return c.id; }).join() === RULES.consequenceCategories.map(function (c) { return c.id; }).join(), "and the rules file's consequence categories");
+    ["3x3", "4x4", "5x5"].forEach(function (id) {
+      var c = M.presetCriteria(id), n = Number(id.charAt(0)), mono = true, all = true;
+      c.impact.forEach(function (iv, i) { c.likelihood.forEach(function (lv, l) {
+        var b = c.matrix[iv.id][lv.id];
+        if (BAND_RANK[b] == null) all = false;
+        if (i && BAND_RANK[c.matrix[c.impact[i - 1].id][lv.id]] > BAND_RANK[b]) mono = false;
+        if (l && BAND_RANK[c.matrix[iv.id][c.likelihood[l - 1].id]] > BAND_RANK[b]) mono = false;
+      }); });
+      ok(c.likelihood.length === n && c.impact.length === n && all && mono && M.criteriaUsable(c) && !M.isHouseContent(c), "the " + id + " preset: " + n + " levels each, every cell one of the four bands, never lower with a higher level");
+      var bandsUsed = {}; c.impact.forEach(function (iv) { c.likelihood.forEach(function (lv) { bandsUsed[c.matrix[iv.id][lv.id]] = true; }); });
+      ok(Object.keys(bandsUsed).length === 4, "the " + id + " preset uses all four bands");
+      ok(!/[–—]/.test(JSON.stringify(c)), "the " + id + " preset's words carry no dashes");
+    });
+    ok(M.presetCriteria("nope") === null && M.isHouseContent(M.presetCriteria("house")), "an unknown preset gives nothing; the house preset is the house criteria");
+    var two = M.houseCriteria(); two.likelihood = two.likelihood.slice(0, 2);
+    var six = M.houseCriteria(); six.impact = six.impact.concat([{ id: "x1", name: "X1" }, { id: "x2", name: "X2" }]);
+    ok(!M.criteriaUsable(two) && !M.criteriaUsable(six), "a scale of two levels, or of six, is not usable");
+
+    // ---- C. step 1's editor: a cell changed moves every output together ----
+    load(fresh());
+    RT.navigate("suc");
+    ok(!("criteria" in P()), "a new project holds no criteria");
+    var cellSel = crit().querySelector('select[data-field="crit-cell-minor:high"]');
+    ok(!!cellSel && crit().querySelectorAll(".crit-matrix td[data-band]").length === 12 && crit().querySelectorAll(".crit-matrix td select").length === 12, "step 1's matrix is editable: one choice of band per cell");
+    ok(crit().querySelector("select") && crit().querySelector("select").options[0].value === "low" && crit().querySelector("select").parentNode.textContent.indexOf("Tolerable risk") >= 0, "the tolerable risk stays the card's first choice");
+    var before = { vm: row(RT.viewModel(), "T1").risk, ctx: ctxThreat(RT.buildRiskContext(), "T1").unmitigatedRisk };
+    ok(before.vm === "medium" && before.ctx === "medium", "T1 is minor impact, high likelihood: medium on the house matrix");
+    change(cellSel, "high");
+    ok(P().criteria && P().criteria.matrix.minor.high === "high" && P().criteria.likelihood.length === 3 && RT.criteriaOf().source === "project", "a cell changed: the project gets its own criteria, seeded from the house's");
+    ok(crit().querySelector('td[data-cell="minor:high"]').classList.contains("above-tol") && crit().querySelector('[data-criteria-source="project"]'), "the cell is now outlined, and the panel says the criteria were changed for this assessment");
+    ok(d.activeElement && d.activeElement.getAttribute("data-field") === "crit-cell-minor:high", "and the keyboard stays on the cell");
+    var x1 = row(RT.viewModel(), "T1");
+    ok(x1.risk === "high" && x1.exceeds && RT.riskFor("minor", "high") === "high" && RT.threatRisk(threat("Z1", "T1")) === "high", "the engine and the view model read the cell");
+    RT.navigate("srs");
+    ok(main().querySelector('[data-hla-id="A1"] .risk-pill').textContent === "High", "the ranking on screen reads it");
+    RT.navigate("risk"); RP.ui.view = "register"; RT.render();
+    ok(!!main().querySelector('[data-reg-row="Z1/T1"] .risk-pill.risk-high'), "so does the register");
+    RP.ui.view = "heatmap"; RT.render();
+    var hcell = main().querySelector('table.heat [data-cell="minor:high"]');
+    ok(!!hcell && hcell.parentNode.classList.contains("risk-high") && hcell.parentNode.classList.contains("above-tol"), "and the heat map's cell");
+    RP.ui.view = "zone";
+    var ctx1 = RT.buildRiskContext();
+    ok(ctxThreat(ctx1, "T1").unmitigatedRisk === "high" && ctxThreat(ctx1, "T1").exceedsTolerable === true && ctx1.highLevelAssets[0].risk === "high", "the risk context reads it");
+    var pk = packItem("Z1:T1");
+    ok(pk && /^High/.test(pk.answer) && pk.status === "finding", "the review pack reads it", pk && pk.answer);
+    var wb1 = RX.buildWorkbook(P()), tr1 = wb1.getWorksheet("Threat register"), r1 = rowWhere(tr1, "ID", "T1");
+    ok(r1 && r1.getCell(col(tr1, "Risk")).value === "High" && r1.getCell(col(tr1, "Above tolerable?")).value === "Yes", "the Excel register reads it");
+    var cr1 = wb1.getWorksheet("Criteria"), minorRow = findRow(cr1, "Minor");
+    ok(minorRow && minorRow.getCell(4).value === "High (above)" && findRow(cr1, "The risk criteria agreed for this assessment."), "the Excel Criteria sheet prints the project's criteria, labelled as agreed for this assessment");
+    ok(!col(tr1, "Impact by category") && !col(wb1.getWorksheet("Ranking"), "Consequence source"), "with no impact per category or source captured, Excel has no column for them");
+
+    return words(P()).then(function (px) {
+      var ap = px.indexOf("Appendix: risk criteria");
+      ok(px[ap + 1] === "The risk criteria agreed for this assessment.", "Word: the appendix says the criteria were agreed for this assessment", px[ap + 1]);
+      var mi = px.indexOf("Minor", ap);
+      ok(mi > ap && px[mi + 3] === "High (above)", "Word: the appendix prints the project's matrix", px.slice(mi, mi + 4).join(" | "));
+      ok(px.indexOf("IEC 62443-3-2, using the risk matrix agreed for this assessment and the SolutionsPT house risk-to-SL mapping") >= 0, "Word: the method row names the matrix agreed for this assessment");
+      ok(px.some(function (x) { return /^The assessment follows .*The risk matrix and its scales were agreed for this assessment, and the risk-to-SL mapping is a SolutionsPT house default\./.test(x); }), "Word: the method text says so too");
+      var reg = px.indexOf("T1  Vendor path", px.indexOf("Risk register"));
+      ok(reg > 0 && px[reg + 1] === "High", "Word: the register reads the cell", px.slice(reg, reg + 3).join(" | "));
+      ok(px.indexOf("Impact by category") < 0 && px.indexOf("Consequence categories") < 0, "Word: with nothing rated per category, nothing about the categories is printed");
+
+      // Set back to the house's band, the project holds no criteria again.
+      RT.navigate("suc");
+      change(crit().querySelector('select[data-field="crit-cell-minor:high"]'), "medium");
+      ok(!("criteria" in P()) && row(RT.viewModel(), "T1").risk === "medium", "set back to the house's band, the project holds no criteria again");
+
+      // ---- renaming a level and its definition ----
+      type(crit().querySelector('input[data-field="crit-likelihood-name-high"]'), "Frequent");
+      type(crit().querySelector('textarea[data-field="crit-likelihood-note-high"]'), "Seen every month on similar sites.");
+      ok(P().criteria && P().criteria.likelihood[2].name === "Frequent" && RT.likelihoodName("high") === "Frequent" && P().zones[0].threats[0].likelihood === "high", "a level renamed keeps its id, so no rating moves");
+      ok(crit().querySelector(".crit-matrix thead").textContent.indexOf("Frequent") >= 0, "the matrix's header shows the new name");
+      var rk = RX.buildWorkbook(P()).getWorksheet("Ranking");
+      ok(rowWhere(rk, "System", "DCS").getCell(col(rk, "Likelihood")).value === "Frequent", "Excel prints the new name");
+      ok(packItem("Z1:T1").details.some(function (r) { return r[0] === "Likelihood × impact" && r[1] === "Frequent × Minor"; }), "and the review pack");
+      return words(P()).then(function (px2) {
+        var ls = px2.indexOf("Likelihood scale");
+        ok(ls > 0 && px2[ls + 3] === "Frequent" && px2[ls + 4] === "Seen every month on similar sites.", "Word: the likelihood scale prints the new name and definition", px2.slice(ls, ls + 5).join(" | "));
+        RT.navigate("suc");
+        type(crit().querySelector('input[data-field="crit-likelihood-name-high"]'), "High");
+        type(crit().querySelector('textarea[data-field="crit-likelihood-note-high"]'), M.houseCriteria().likelihood[2].note);
+        ok(!("criteria" in P()), "named back as the house's, the project holds no criteria again");
+
+        // ---- adding and removing levels ----
+        crit().querySelector('[data-action="add-level-impact"]').click();
+        var c = P().criteria;
+        ok(c.impact.length === 5 && c.impact[4].name === "New level" && same(c.matrix[c.impact[4].id], c.matrix.severe), "+ Add level puts a new highest impact level, its cells copied from the level below");
+        ok(crit().querySelector('[data-action="add-level-impact"]').disabled && crit().querySelectorAll('.crit-matrix tbody tr').length === 5, "at five levels no more can be added; the matrix has five rows");
+        ok(d.activeElement && d.activeElement.getAttribute("data-field") === "crit-impact-name-" + c.impact[4].id, "and the keyboard is on the new level's name");
+        ok([].every.call(crit().querySelectorAll('[data-levels="likelihood"] [data-action^="remove-level-"]'), function (b) { return b.disabled; }), "a scale of three levels offers no Remove");
+        crit().querySelector('[data-action="remove-level-impact-' + c.impact[4].id + '"]').click();
+        ok(!crit().querySelector("[data-criteria-map]") && !("criteria" in P()), "a level no rating uses goes at once (and the criteria are the house's again)");
+
+        // ---- a preset with ratings: where they go is asked, never assumed ----
+        var preset = crit().querySelector('select[data-action="criteria-preset"]');
+        change(preset, "5x5");
+        crit().querySelector('[data-action="criteria-apply"]').click();
+        var map = crit().querySelector("[data-criteria-map]");
+        ok(!!map && !("criteria" in P()), "a preset with ratings to move asks first, in the page; nothing has changed yet");
+        function mapSel(kind, id) { return map.querySelector('select[data-field="crit-map-' + kind + '-' + id + '"]'); }
+        ok(mapSel("likelihood", "high") && mapSel("likelihood", "medium") && mapSel("impact", "minor") && !mapSel("likelihood", "low") && !mapSel("impact", "severe"), "it lists each level in use, and no other");
+        ok(mapSel("likelihood", "high").value === "L5" && mapSel("likelihood", "medium").value === "L3" && mapSel("impact", "minor").value === "I3", "each goes by default to the level at the same place on the new scale, rounded up (house minor, second of four, to the third of five)");
+        ok(/Leave as it is/.test(mapSel("impact", "minor").textContent), "and can be left as it is");
+        map.querySelector('[data-action="criteria-map-cancel"]').click();
+        ok(!crit().querySelector("[data-criteria-map]") && !("criteria" in P()) && P().zones[0].threats[0].likelihood === "high", "Cancel changes nothing");
+        change(crit().querySelector('select[data-action="criteria-preset"]'), "5x5");
+        crit().querySelector('[data-action="criteria-apply"]').click();
+        map = crit().querySelector("[data-criteria-map]");
+        change(mapSel("impact", "minor"), "");
+        map.querySelector('[data-action="criteria-map-apply"]').click();
+        var t1 = threat("Z1", "T1"), t2 = threat("Z1", "T2"), a1 = P().srs.highLevelAssets[0];
+        ok(P().criteria.preset === "5x5" && P().criteria.impact.length === 5 && t1.likelihood === "L5" && t2.likelihood === "L3" && a1.likelihood === "L5", "Apply stores the preset and moves the ratings as chosen");
+        ok(t1.impact === "minor" && a1.consequence === "minor" && RT.threatRisk(t1) === null, "an impact left as it is keeps its value, and has no band on the new scale");
+        var it = RT.completeness().filter(function (i) { return /T1: the impact no longer fits the risk criteria\.$/.test(i.text); })[0];
+        var ia = RT.completeness().filter(function (i) { return /^A1 \(DCS\): the impact no longer fits the risk criteria\.$/.test(i.text); })[0];
+        ok(!!it && it.stage === "risk" && it.target.kind === "threat" && it.target.id === "T1" && !!ia && ia.stage === "srs" && ia.doc === "highLevel", "each rating left is open in the completeness list, on the page it was rated on");
+        var el = RT.goToItem(it);
+        ok(RT.state.stage === "risk" && el && el.getAttribute("data-threat-id") === "T1", "Go to lands on the scenario");
+        // The 5x5 criteria everywhere the scales are read.
+        RP.ui.view = "heatmap"; RT.render();
+        var heat = main().querySelector("table.heat");
+        ok(heat.querySelectorAll("tbody tr").length === 5 && heat.querySelectorAll("tbody tr:first-child td").length === 5 && /Almost certain/.test(heat.querySelector("thead").textContent), "the heat map takes the criteria's dimensions and names");
+        RP.ui.view = "zone"; RT.render();
+        var pop = main().querySelector(".scales-pop");
+        ok(pop && pop.querySelectorAll("li").length === 10 && /Critical:/.test(pop.textContent) && /Almost certain:/.test(pop.textContent), "the Scales popover lists the criteria's levels");
+        var ed = main().querySelector('[data-threat-id="T1"]');
+        if (ed && !ed.classList.contains("open")) ed.querySelector('[data-action="open-scenario"]').click();
+        var likSel = main().querySelector('[data-threat-id="T1"] select[data-field="likelihood"]');
+        ok(likSel && likSel.options.length === 6 && likSel.options[5].textContent === "Almost certain", "the scenario editor offers the criteria's levels");
+        // Back to the house criteria: the ratings come back.
+        RT.navigate("suc");
+        change(crit().querySelector('select[data-action="criteria-preset"]'), "house");
+        crit().querySelector('[data-action="criteria-apply"]').click();
+        map = crit().querySelector("[data-criteria-map]");
+        ok(map && mapSel("likelihood", "L5").value === "high" && mapSel("likelihood", "L3").value === "medium", "back to the house criteria, the default moves each level to its place on the house scale");
+        map.querySelector('[data-action="criteria-map-apply"]').click();
+        ok(!("criteria" in P()) && t1.likelihood === "high" && t2.likelihood === "medium" && a1.likelihood === "high" && RT.criteriaMisfits().length === 0 && /rating/.test(d.getElementById("toast").textContent), "the ratings are as they were, nothing is left open, and the project holds no criteria");
+        // A preset with no ratings applies at once.
+        var empty = M.emptyProject(); load(empty); RT.navigate("suc");
+        change(crit().querySelector('select[data-action="criteria-preset"]'), "4x4");
+        crit().querySelector('[data-action="criteria-apply"]').click();
+        ok(!crit().querySelector("[data-criteria-map]") && P().criteria && P().criteria.preset === "4x4" && crit().querySelectorAll(".crit-matrix td select").length === 16, "with no ratings, a preset applies at once");
+
+        // ---- D. tolerable risk per consequence category ----
+        load(fresh());
+        RT.navigate("risk");
+        var tb2 = main().querySelector('[data-threat-id="T2"]'); tb2.querySelector('[data-action="open-scenario"]').click();
+        var cs = main().querySelector('[data-threat-id="T2"] [data-part="impact-categories"]');
+        ok(!!cs && !cs.open, "the scenario offers its impact by category, closed while none is given");
+        change(main().querySelector('[data-threat-id="T2"] select[data-field="impact-cat-safety"]'), "minor");
+        t2 = threat("Z1", "T2");
+        ok(t2.impactByCategory && t2.impactByCategory.safety === "minor" && t2.impact === "minor", "a category's impact is stored, and the impact is the worst of them");
+        ok(main().querySelector('[data-threat-id="T2"] [data-derived="impact"]') && !main().querySelector('[data-threat-id="T2"] select[data-field="impact"]') && main().querySelector('[data-threat-id="T2"] [data-part="impact-categories"]').open, "the impact then shows as derived, and the categories stay open");
+        ok(!row(RT.viewModel(), "T2").exceeds, "T2 (safety minor, medium likelihood) is medium: within the general tolerable risk");
+        RT.navigate("suc");
+        var fpBefore = RT.approvalFingerprint();
+        change(crit().querySelector('select[data-field="crit-cat-tol-safety"]'), "low");
+        ok(P().criteria.tolerableByCategory.safety === "low" && RT.criteriaOf().source === "house", "a tolerable risk per category is stored; the criteria are still the house's");
+        ok(RT.approvalFingerprint().split("-")[1] !== fpBefore.split("-")[1] && RT.approvalFingerprint().split("-").slice(2).join() === fpBefore.split("-").slice(2).join(), "it is part of the tolerable risk an approval covers, and nothing else moves");
+        var x2 = row(RT.viewModel(), "T2");
+        ok(x2.exceeds && x2.risk === "medium" && x2.treatment.open, "stricter for safety: T2 is now above tolerable risk and needs a decision");
+        ok(has(texts(), /Z1 \(Control\) \/ T2: above tolerable risk with no treatment decision/), "and the completeness list says so");
+        // More lenient for financial loss: T3 rated serious there is high, within it.
+        change(crit().querySelector('select[data-field="crit-cat-tol-financial"]'), "high");
+        P().zones[0].threats[2].impactByCategory = { financial: "serious" }; P().zones[0].threats[2].impact = "serious";
+        var x3 = row(RT.viewModel(), "T3");
+        ok(x3.risk === "high" && !x3.exceeds && !x3.treatment.required, "more lenient for financial loss: T3 at high is within its category's tolerable risk");
+        var noCat = clone(P()); delete noCat.zones[0].threats[2].impactByCategory;
+        ok(row(RT.viewModel(noCat), "T3").exceeds, "the same rating with no category is above the general tolerable risk");
+        var ctx2 = RT.buildRiskContext();
+        ok(ctxThreat(ctx2, "T2").exceedsTolerable === true && ctxThreat(ctx2, "T3").exceedsTolerable === false, "the risk context agrees");
+        ok(packItem("Z1:T2").status === "finding" && packItem("Z1:T3").status === "met", "the review pack agrees");
+        var tr2 = RX.buildWorkbook(P()).getWorksheet("Threat register");
+        ok(rowWhere(tr2, "ID", "T2").getCell(col(tr2, "Above tolerable?")).value === "Yes" && rowWhere(tr2, "ID", "T3").getCell(col(tr2, "Above tolerable?")).value === "No", "the Excel register agrees");
+        ok(col(tr2, "Impact by category") === 23 && rowWhere(tr2, "ID", "T3").getCell(23).value === "Financial loss: Serious" && !rowWhere(tr2, "ID", "T1").getCell(23).value, "Excel: the impact by category is a last column, filled where captured", String(col(tr2, "Impact by category")));
+        var crs = RX.buildWorkbook(P()).getWorksheet("Criteria");
+        ok(findRow(crs, "Consequence categories") && findRow(crs, "Safety (injury / loss of life)").getCell(2).value === "Low" && findRow(crs, "Environmental release / damage").getCell(2).value === "Medium (general tolerable risk)", "Excel: the Criteria sheet lists the categories and their tolerable risk");
+        RT.navigate("spec");
+        ok(/By category: Safety \(injury \/ loss of life\): Low; Financial loss: High\./.test(main().querySelector('[data-tolerable-by-category]').textContent), "step 6's tolerable risk block lists them");
+        return words(P()).then(function (px3) {
+          ok(px3.indexOf("By consequence category: Safety (injury / loss of life): Low; Financial loss: High.") >= 0, "Word: the tolerable risk section lists the tolerable risk per category");
+          var ci = px3.indexOf("Consequence categories");
+          ok(ci > px3.indexOf("Appendix: risk criteria") && px3[ci + 3] === "Safety (injury / loss of life)" && px3[ci + 4] === "Low" && px3.indexOf("Medium (general tolerable risk)", ci) > ci, "Word: the appendix lists the categories with their tolerable risk", px3.slice(ci, ci + 6).join(" | "));
+          ok(px3.some(function (x) { return /compared with the tolerable risk of each category it is rated in/.test(x); }), "Word: and says how a threat rated per category is compared");
+          var r2 = px3.indexOf("T2  Spill by misuse");
+          ok(r2 > 0 && px3.slice(r2, r2 + 6).indexOf("No decision recorded") > 0, "Word: the register prints T2's open decision", px3.slice(r2, r2 + 6).join(" | "));
+          var det = px3.lastIndexOf("T3  Billing data lost");
+          ok(px3.indexOf("Impact by category", det) > det && px3[px3.indexOf("Impact by category", det) + 1] === "Financial loss: Serious", "Word: the threat's detail gives its impact by category");
+          ok(packItem("Z1:T3").details.some(function (r) { return r[0] === "Impact by category" && r[1] === "Financial loss: Serious"; }) && !packItem("Z1:T1").details.some(function (r) { return r[0] === "Impact by category"; }), "the review pack shows the impact by category only where it is given");
+
+          // ---- E. impact per category in the editor ----
+          RT.navigate("risk");
+          var tb1 = main().querySelector('[data-threat-id="T1"]'); tb1.querySelector('[data-action="open-scenario"]').click();
+          change(main().querySelector('[data-threat-id="T1"] select[data-field="impact-cat-safety"]'), "serious");
+          change(main().querySelector('[data-threat-id="T1"] select[data-field="impact-cat-financial"]'), "minor");
+          t1 = threat("Z1", "T1");
+          ok(t1.impact === "serious" && same(t1.impactByCategory, { safety: "serious", financial: "minor" }) && row(RT.viewModel(), "T1").risk === "high", "two categories: the impact is the worst, and the rating follows it");
+          ok(d.activeElement && d.activeElement.getAttribute("data-field") === "impact-cat-financial", "the keyboard stays on the category");
+          change(main().querySelector('[data-threat-id="T1"] select[data-field="impact-cat-safety"]'), "");
+          ok(t1.impact === "minor" && same(t1.impactByCategory, { financial: "minor" }), "taking the worst away, the next worst is the impact");
+          change(main().querySelector('[data-threat-id="T1"] select[data-field="impact-cat-financial"]'), "");
+          ok(!("impactByCategory" in t1) && t1.impact === "minor" && !!main().querySelector('[data-threat-id="T1"] select[data-field="impact"]'), "with none left the map goes, the impact stays, and is set by hand again");
+          // A copy into another zone takes the categories with the rating.
+          var z2 = M.emptyZone(2); z2.name = "Other"; P().zones.push(z2); P().counters.zone = 2;
+          RP.copyTo(zone("Z1"), threat("Z1", "T3"), ["Z2"]);
+          ok(same(z2.threats[0].impactByCategory, { financial: "serious" }) && z2.threats[0].impact === "serious", "Copy to takes the impact by category with the unmitigated rating");
+          // A single impact that is not the worst of its categories (an older build edited it) is listed.
+          var t3 = threat("Z1", "T3"); t3.impact = "minor";
+          ok(has(texts(), /Z1 \(Control\) \/ T3: the impact \(not the worst of its categories\) no longer fits the risk criteria\./), "an impact that is not the worst of its categories is open", texts().filter(function (x) { return /T3/.test(x); }).join(" | "));
+          t3.impactByCategory = { gone: "serious" }; t3.impact = "serious";
+          ok(has(texts(), /T3: an impact by category no longer fits the risk criteria\./), "so is an impact on a category the criteria no longer have");
+          t3.impactByCategory = { financial: "serious" };
+
+          // ---- a ranked system: consequence by category and its source ----
+          RT.navigate("srs");
+          var rowA = main().querySelector('[data-hla-id="A1"]');
+          ok(rowA.querySelector('select[data-field="hla-consequence"]') && rowA.querySelector("details.hla-cats"), "a ranked system's impact: one level, or By category with its source");
+          change(rowA.querySelector('select[data-field="hla-cat-operational"]'), "severe");
+          a1 = P().srs.highLevelAssets[0];
+          rowA = main().querySelector('[data-hla-id="A1"]');
+          ok(a1.consequence === "severe" && a1.consequenceByCategory.operational === "severe" && rowA.querySelector('[data-derived="consequence"]') && rowA.querySelector("details.hla-cats").open, "a category's consequence sets the system's, shown as derived");
+          type(rowA.querySelector('input[data-field="hla-source"]'), "HAZOP");
+          ok(a1.consequenceSource === "HAZOP" && rowA.querySelector("datalist option[value='Business impact analysis']"), "the source is typed, with the usual ones offered");
+          var rkw = RX.buildWorkbook(P()).getWorksheet("Ranking");
+          var ra = rowWhere(rkw, "System", "DCS");
+          ok(col(rkw, "Consequence source") === 8 && ra.getCell(8).value === "HAZOP" && ra.getCell(col(rkw, "Consequence by category")).value === "Loss of production / essential function: Severe" && col(rkw, "Zone") === 6, "Excel: the Ranking sheet gains the source and the category columns at its end");
+          type(rowA.querySelector('input[data-field="hla-source"]'), "");
+          ok(!("consequenceSource" in a1), "cleared, the source goes");
+          a1.consequenceSource = "HAZOP";
+          return words(P(), { highLevelOnly: true }).then(function (px4) {
+            var ri = px4.indexOf("DCS", px4.indexOf("High-level risk ranking"));
+            ok(ri > 0 && px4[ri + 2] === "Severe" && px4[ri + 3] === "Loss of production / essential function: Severe" && px4[ri + 4] === "Source: HAZOP", "Word: the ranking's consequence gives its categories and source under the level", px4.slice(ri, ri + 6).join(" | "));
+
+            // ---- F. the client's criteria ----
+            load(fresh());
+            P().srs.clientMatrix = true; P().srs.clientMatrixNote = "Acme corporate matrix, revision 3";
+            ok(has(texts(), /^The client's risk criteria are marked in use, but step 1 still holds the house criteria\.$/), "the client's criteria marked in use with the house's still in step 1 is open");
+            var ci0 = RT.completeness().filter(function (i) { return /marked in use/.test(i.text); })[0];
+            ok(ci0.stage === "suc" && ci0.doc === "both" && ci0.target.kind === "criteria", "in step 1, for both reports");
+            RT.navigate("suc");
+            ok(!!crit().querySelector('[data-criteria-source="client"]') && /enter them here/.test(crit().textContent), "the panel asks for them");
+            change(crit().querySelector('select[data-field="crit-cell-serious:low"]'), "high");
+            ok(!has(texts(), /marked in use/) && RT.criteriaWords().source === "client", "entered, the item goes and they are the client's");
+            var wbc = RX.buildWorkbook(P());
+            ok(findRow(wbc.getWorksheet("Criteria"), "The client's risk criteria used in this assessment (Acme corporate matrix, revision 3).") && /^The client's risk matrix, with the SolutionsPT house risk-to-SL mapping\./.test(findRow(wbc.getWorksheet("Front"), "Method note").getCell(2).value), "Excel: the Criteria sheet and the Front sheet say they are the client's");
+            return words(P()).then(function (px5) {
+              var ap5 = px5.indexOf("Appendix: risk criteria");
+              ok(px5[ap5 + 1] === "The client's risk criteria used in this assessment (Acme corporate matrix, revision 3)." && !px5.some(function (x) { return /Consultant note: the client's own risk criteria are in use/.test(x); }), "Word: the appendix prints them as the client's, with no note to reconcile", px5[ap5 + 1]);
+              ok(px5.indexOf("IEC 62443-3-2, using the client's risk matrix and the SolutionsPT house risk-to-SL mapping") >= 0, "Word: the method row names the client's matrix");
+              var hi = px5.indexOf("Serious", ap5);
+              ok(px5[hi + 1] === "High (above)", "Word: the appendix prints the client's cell", px5.slice(hi, hi + 4).join(" | "));
+              RT.navigate("risk");
+              ok(/^The client's risk matrix; tolerable risk is medium/.test(main().querySelector(".framing-note").textContent), "step 5 names the client's matrix");
+
+              // ---- G. the migration tidies the new fields and changes no rating ----
+              var raw = fresh();
+              raw.criteria = { likelihood: [{ id: "a" }, { id: "b" }], impact: M.houseCriteria().impact, matrix: {} };
+              ok(!("criteria" in MG.normaliseProject(clone(raw))), "criteria that cannot be read go on load (the house's are read)");
+              var raw2 = fresh();
+              raw2.criteria = M.presetCriteria("3x3"); raw2.criteria.matrix.I1.L1 = "purple"; raw2.criteria.tolerableByCategory = { safety: "low", nothing: "high", financial: "red" };
+              raw2.zones[0].threats[0].impactByCategory = { safety: 3, financial: "minor" };
+              raw2.srs.highLevelAssets[0].consequenceSource = 5; raw2.srs.highLevelAssets[0].consequenceByCategory = "x";
+              var n2 = MG.normaliseProject(clone(raw2));
+              ok(!("L1" in n2.criteria.matrix.I1) && n2.criteria.matrix.I3.L3 === "very-high" && same(n2.criteria.tolerableByCategory, { safety: "low" }), "a cell that is not a band, and a tolerable risk for no category, are dropped");
+              ok(same(n2.zones[0].threats[0].impactByCategory, { financial: "minor" }) && !("consequenceSource" in n2.srs.highLevelAssets[0]) && !("consequenceByCategory" in n2.srs.highLevelAssets[0]), "a category map keeps only its text values; a source that is not text goes");
+              ok(n2.zones[0].threats[0].likelihood === "high" && n2.zones[0].threats[0].impact === "minor" && has(texts(n2), /T1: the likelihood, the impact and an impact by category no longer fit the risk criteria\./), "no rating is changed: one that no longer fits is listed", texts(n2).filter(function (x) { return /T1/.test(x); }).join(" | "));
+              ok(same(MG.normaliseProject(clone(n2)), n2), "normalising twice changes nothing more");
+              var demoSaved = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+              ok(same(demoSaved.zones[0].threats[0].impactByCategory, window.SPT_TOUR_PROJECT.zones[0].threats[0].impactByCategory), "the demo's impact by category comes through a load as it was");
+
+              try { if (keptSnap != null) w.localStorage.setItem(KEY, keptSnap); } catch (e) {}
+            });
+          });
+        });
+      });
+    });
+  }
+}());
+</script>
+</body>
+</html>
