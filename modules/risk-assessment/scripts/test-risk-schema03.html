@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool schema 0.3 tests</title></head>
+<body>
+<h1>risk-tool schema 0.3: links, three ratings, the plan fields and the 0.2 to 0.3 step</h1>
+<pre id="out">running…</pre>
+<!--
+  The 0.3 model (js/model.js), the 0.2 to 0.3 step, the shape fill and the
+  prune (js/migrate.js), the one coverage rule from links and the three
+  ratings (js/engine.js, js/view-model.js) and the risk context's residual,
+  on the frozen files in scripts/fixtures/: the tour as v0.7 saved it (phase
+  1), the tour as phase 3 saved it (0.2 with every phase 3 field) and the
+  hand-made 0.1 file.
+-->
+<iframe id="app" src="../index.html" style="width:10px;height:10px;visibility:hidden"></iframe>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script src="fixtures/v0.7-normaliser.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool) { if (++tries > 100) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  var T03 = ["entryPoint", "consequence", "assetIds", "vulnerabilityIds", "countermeasureIds", "suggestedCountermeasureIds", "likelihoodRationale", "currentLikelihood", "currentImpact", "acceptanceDetail"];
+  function strip03(x) {
+    var y = clone(x);
+    y.schema = "spt-risk-project/0.2";
+    if (y.counters) delete y.counters.asset;
+    (y.zones || []).concat(y.conduits || []).forEach(function (o) {
+      (o.assets || []).forEach(function (a) { delete a.id; });
+      (o.threats || []).forEach(function (t) { T03.forEach(function (k) { delete t[k]; }); });
+      (o.countermeasures || []).forEach(function (m) { ["owner", "priority", "dueDate", "status", "srRefs"].forEach(function (k) { delete m[k]; }); });
+      (o.vulnerabilities || []).forEach(function (v) { delete v.reference; });
+    });
+    return y;
+  }
+  // The coverage rule before 0.3, written out here on its own: a described
+  // countermeasure on a requirement the threat affects.
+  function oldMatch(o, th) {
+    return (o.countermeasures || []).filter(function (m) {
+      return String(m.description || "").trim() && (m.addressesFR || []).some(function (fr) { return (th.affectedFR || []).indexOf(fr) >= 0; });
+    }).map(function (m) { return m.id; });
+  }
+  function each(pj, fn) { pj.zones.concat(pj.conduits).forEach(function (o) { o.threats.forEach(function (th) { fn(o, th); }); }); }
+  function find(pj, oid, tid) { var r = null; each(pj, function (o, th) { if (o.id === oid && th.id === tid) r = { o: o, t: th }; }); return r; }
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, MG = w.RiskApp.Migrate, E = w.RiskApp.Engine, VM = w.RiskApp.ViewModel;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    var FX = window.RiskFixtures || {};
+    var TOUR = FX["tour-v0.7-saved"], P3 = FX["tour-phase3-0.2"], OLD = FX["hand-made-v0.1"];
+    var V07 = FX["v0.7-normaliser"](RT.FR_IDS, w.App.Data.sltRules.exposureModifiers, w.App.Data.sltRules.tolerableRisk["default"]);
+    ok(!!TOUR && !!P3 && !!OLD && P3.schema === "spt-risk-project/0.2" && !!P3.approvals, "the three frozen files are present, the phase 3 one a 0.2 file with approvals");
+    function norm(x) { return MG.normaliseProject(clone(x)); }
+
+    // ---- the model ----
+    ok(M.PROJECT_SCHEMA === "spt-risk-project/0.3" && same(M.ACCEPTED_PROJECT_SCHEMAS, ["spt-risk-project/0.1", "spt-risk-project/0.2", "spt-risk-project/0.3"]), "the schema is 0.3, and 0.1, 0.2 and 0.3 are accepted");
+    var et = M.emptyThreat(4);
+    ok(et.id === "T4" && same(et.assetIds, []) && same(et.vulnerabilityIds, []) && same(et.countermeasureIds, []) && et.entryPoint === "" && et.consequence === "" && et.likelihoodRationale === "" && et.currentLikelihood === "" && et.currentImpact === "" && same(et.acceptanceDetail, { by: "", role: "", date: "", reviewDate: "" }) && !("suggestedCountermeasureIds" in et),
+      "a new threat has the links, the scenario fields, the current rating and the acceptance detail, and no suggested links", JSON.stringify(et));
+    var ec = M.emptyCountermeasure(2);
+    ok(ec.owner === "" && ec.priority === "" && ec.dueDate === "" && ec.status === "" && same(ec.srRefs, []) && ec.reference === "" && same(ec.addressesFR, []) && ec.existing === false, "a new countermeasure has the plan fields (owner, priority, due date, status, SR references), and keeps reference and addressesFR");
+    ok(M.emptyVulnerability(3).reference === "" && M.emptyVulnerability(3).id === "V3", "a vulnerability has its source (reference)");
+    ok(same(M.CM_STATUSES, ["proposed", "agreed", "in-progress", "done"]) && same(M.CM_PRIORITIES, ["high", "medium", "low"]), "the plan's statuses and priorities");
+
+    // ---- the 0.2 to 0.3 step, on the tour as v0.7 saved it ----
+    var nT = norm(TOUR);
+    ok(nT.schema === "spt-risk-project/0.3" && same(strip03(nT), TOUR), "the v0.7 tour comes out as 0.3 with everything it held unchanged");
+    var linksNone = true, sugRight = true, why = [];
+    each(nT, function (o, th) {
+      if (!same(th.countermeasureIds, [])) linksNone = false;
+      var orig = find(TOUR, o.id, th.id), want = oldMatch(orig.o, orig.t);
+      var got = th.suggestedCountermeasureIds || [];
+      if (!same(got, want) || (!want.length && "suggestedCountermeasureIds" in th)) { sugRight = false; why.push(o.id + "/" + th.id + " " + JSON.stringify(got) + " vs " + JSON.stringify(want)); }
+    });
+    ok(linksNone, "no link is invented: every threat has no countermeasure linked");
+    ok(sugRight, "what the old requirement match covered is each threat's suggested links, and a threat with none has no list", why.join("; "));
+    var t1 = find(nT, "Z1", "T1").t, t9 = find(nT, "C2", "T9").t;
+    ok(same(t1.suggestedCountermeasureIds, ["M1", "M3"]) && t1.currentLikelihood === "" && t1.currentImpact === "" && t1.residualLikelihood === "low" && t1.residualImpact === "serious",
+      "T1's matched countermeasures include a planned one (M3): its residual pair is kept as the planned rating and not copied to current", JSON.stringify([t1.currentLikelihood, t1.residualLikelihood]));
+    ok(same(t9.suggestedCountermeasureIds, ["M7"]) && t9.currentLikelihood === "low" && t9.currentImpact === "serious" && t9.residualLikelihood === "low",
+      "T9's one matched countermeasure (M7) is in place: its residual pair is copied to current too");
+    var copyRule = true;
+    each(nT, function (o, th) {
+      var orig = find(TOUR, o.id, th.id), m = oldMatch(orig.o, orig.t);
+      var all = m.length > 0 && m.every(function (id) { return orig.o.countermeasures.filter(function (c) { return c.id === id; })[0].existing === true; });
+      var had = !!(orig.t.residualLikelihood || orig.t.residualImpact);
+      if (!!(th.currentLikelihood || th.currentImpact) !== (had && all)) copyRule = false;
+    });
+    ok(copyRule, "across the tour: current is copied from the residual pair exactly when there is one and every matched countermeasure is existing");
+    ok(same(norm(nT), nT), "the step runs once: normalising again changes nothing");
+
+    // Through the engine: suggestions are not coverage.
+    var z1 = nT.zones[0], T1 = E.threatTreatment(z1, t1, nT);
+    ok(!T1.covered && T1.disposition === null && T1.label === "Reduce with countermeasures (none recorded)" && /no countermeasure is linked to it \(a suggested link is waiting to be confirmed\)/.test(T1.gap) && T1.linkSuggested.map(function (m) { return m.id; }).join() === "M1,M3",
+      "a confirmed reduce resting only on suggested links is not a treatment yet, and says a suggestion is waiting", T1.gap);
+    ok(E.completeness(nT).some(function (i) { return /Z1.*\/ T1: no countermeasure is linked/.test(i.text) && i.target.kind === "threat" && i.stage === "risk"; }), "and the completeness list says so, with the threat to go to");
+    var vmT = VM.build(nT);
+    ok(vmT.counts.linkSuggested === nT.zones.concat(nT.conduits).reduce(function (a, o) { return a + o.threats.filter(function (th) { return (th.suggestedCountermeasureIds || []).length; }).length; }, 0) && vmT.owners[0].linkSuggested.length === 2,
+      "the view model counts the threats with suggested links, per zone too");
+    // Confirming them.
+    var c1 = E.confirmLinkSuggestions(z1, t1);
+    ok(c1 === 2 && same(t1.countermeasureIds, ["M1", "M3"]) && !("suggestedCountermeasureIds" in t1), "Confirm makes the suggested links links, and the suggestion goes");
+    var T1b = E.threatTreatment(z1, t1, nT);
+    ok(T1b.covered && T1b.existingLinked.length === 1 && T1b.plannedLinked.length === 1 && T1b.disposition === "countermeasure" && T1b.label === "Reduce with countermeasures",
+      "T1, with M3 still planned and no current rating: being reduced, not reduced", T1b.label);
+    var c2 = nT.conduits[1], T9a = E.threatTreatment(c2, t9, nT);
+    ok(T9a.disposition === null, "T9 before its link is confirmed: no treatment");
+    E.confirmLinkSuggestions(c2, t9);
+    var T9 = E.threatTreatment(c2, t9, nT);
+    ok(T9.current === "medium" && T9.currentWithin && T9.disposition === "mitigated" && T9.label === "Reduced to within tolerable risk", "T9, its existing countermeasure linked and its current rating tolerable: reduced", T9.label);
+    var saved = JSON.stringify(nT);
+    ok(same(norm(JSON.parse(saved)), JSON.parse(saved)), "confirmed links survive a save and a load as they are");
+
+    // ---- the phase 3 file (0.2 with every phase 3 field) ----
+    ok(V07.accepts(P3.schema) && same(V07.normaliseProject(clone(P3)), P3), "the phase 3 file is one v0.7 opens and leaves as it is");
+    var n3 = norm(P3);
+    ok(n3.schema === "spt-risk-project/0.3" && same(strip03(n3), P3), "it comes out as 0.3 with every phase 3 field kept");
+    ok(!V07.accepts(n3.schema), "once saved by this build, v0.7 refuses it (the 0.3 schema)");
+    ok(same(norm(n3), n3), "and normalising twice changes nothing");
+    ok(n3.approvals.length === 2 && n3.zones[3].separation.temporary.answer === "not-separated" && n3.srs.tolerableConfirmed === "medium", "its approvals, separation answers and confirmed tolerable risk are as phase 3 saved them");
+
+    // ---- the 0.1 file ----
+    var nO = norm(OLD);
+    ok(nO.schema === "spt-risk-project/0.3" && same(norm(nO), nO), "the 0.1 file climbs to 0.3, and a second pass changes nothing");
+    var linksO = true; each(nO, function (o, th) { if (th.countermeasureIds.length) linksO = false; });
+    ok(linksO && nO.zones[0].threats[0].suggestedCountermeasureIds && nO.zones[0].threats[0].suggestedCountermeasureIds.length > 0, "and its old coverage is suggested links, never links", JSON.stringify(nO.zones[0].threats[0].suggestedCountermeasureIds));
+
+    // ---- asset ids ----
+    var ids = [];
+    nT.zones.forEach(function (z) { z.assets.forEach(function (a) { ids.push(a.id); }); });
+    ok(ids.length > 0 && ids.every(function (id) { return /^AS\d+$/.test(id); }) && ids.filter(function (x, i) { return ids.indexOf(x) === i; }).length === ids.length && nT.counters.asset === ids.length,
+      "every asset gets an id of its own, and the counter follows", ids.join(","));
+    ok(same(norm(nT).zones.map(function (z) { return z.assets.map(function (a) { return a.id; }); }), nT.zones.map(function (z) { return z.assets.map(function (a) { return a.id; }); })), "and ids, once given, never change");
+    var dupe = clone(nT); dupe.zones[1].assets[0].id = dupe.zones[0].assets[0].id; dupe.counters.asset = 1;
+    var nDup = norm(dupe), all2 = [];
+    nDup.zones.forEach(function (z) { z.assets.forEach(function (a) { all2.push(a.id); }); });
+    ok(all2.filter(function (x, i) { return all2.indexOf(x) === i; }).length === all2.length && nDup.counters.asset > ids.length, "a repeated asset id is replaced, and the counter starts above any id in the file");
+    var na = M.newAsset(nT, { name: "New PLC", type: "plc" });
+    ok(na.id === "AS" + (ids.length + 1) && na.name === "New PLC", "a new asset takes the next id");
+
+    // ---- the prune ----
+    var dg = clone(nT);
+    var zz = dg.zones[0], tt = zz.threats[0];
+    tt.assetIds = [zz.assets[0].id, "AS999", zz.assets[0].id];
+    tt.vulnerabilityIds = ["V1", "V99", "V1"];
+    tt.countermeasureIds = ["M1", "M99"];
+    tt.suggestedCountermeasureIds = ["M1", "M2", "M98"];
+    var nG = norm(dg), tg = nG.zones[0].threats[0];
+    ok(same(tg.assetIds, [zz.assets[0].id]) && same(tg.vulnerabilityIds, ["V1"]) && same(tg.countermeasureIds, ["M1"]) && same(tg.suggestedCountermeasureIds, ["M2"]),
+      "links lose ids not in the file and repeats; a suggestion already linked, or pointing at nothing, goes", JSON.stringify([tg.assetIds, tg.vulnerabilityIds, tg.countermeasureIds, tg.suggestedCountermeasureIds]));
+    tg.suggestedCountermeasureIds = ["M77"];
+    ok(!("suggestedCountermeasureIds" in MG.pruneDangling(nG).zones[0].threats[0]), "and an empty suggestion list is removed");
+    var cd = clone(nT), cc = cd.conduits[1], ct = cc.threats[0];
+    var endAsset = cd.zones.filter(function (z) { return z.id === cc.fromZone; })[0].assets[0].id;
+    ct.assetIds = [endAsset, cd.zones[3].assets[0].id];
+    var nC = norm(cd);
+    ok(same(nC.conduits[1].threats[0].assetIds, [endAsset]), "a conduit's threat may link the assets of the zones it joins, and no others");
+    cd.zones.forEach(function (z) { if (z.id === cc.fromZone) z.assets.shift(); });
+    ok(same(norm(cd).conduits[1].threats[0].assetIds, []), "an asset taken out of its zone leaves no link behind");
+
+    // ---- odd values ----
+    var od = clone(nT), ot = od.zones[0].threats[0], om = od.zones[0].countermeasures[0];
+    ot.currentLikelihood = 5; ot.entryPoint = null; ot.acceptanceDetail = "x"; ot.assetIds = "AS1"; ot.countermeasureIds = [3, "M1", ""];
+    om.priority = "urgent"; om.status = "finished"; om.srRefs = "SR 1.1"; om.owner = 4;
+    od.zones[0].vulnerabilities[0].reference = 7;
+    var nOd = norm(od), tOd = nOd.zones[0].threats[0], mOd = nOd.zones[0].countermeasures[0];
+    ok(tOd.currentLikelihood === "" && tOd.entryPoint === "" && same(tOd.acceptanceDetail, { by: "", role: "", date: "", reviewDate: "" }) && same(tOd.assetIds, []) && same(tOd.countermeasureIds, ["M1"]),
+      "odd threat values are made strings and lists of ids", JSON.stringify([tOd.currentLikelihood, tOd.acceptanceDetail, tOd.countermeasureIds]));
+    ok(mOd.priority === "" && mOd.status === "" && same(mOd.srRefs, []) && mOd.owner === "" && nOd.zones[0].vulnerabilities[0].reference === "", "and odd plan fields are cleared");
+    ok(same(norm(nOd), nOd), "and a second pass changes nothing");
+
+    // ---- a 0.3 file does not take the 0.2 to 0.3 step again ----
+    var f3 = { schema: "spt-risk-project/0.3", suc: { name: "Three", description: "", scopeStatement: "", assumptions: [] }, zones: [{ id: "Z1", name: "", threats: [
+      { id: "T1", statement: "s", affectedFR: ["UC"], likelihood: "high", impact: "serious", residualLikelihood: "low", residualImpact: "serious", treatment: { decision: "reduce", confirmed: true, reason: "" } }],
+      countermeasures: [{ id: "M1", description: "c", addressesFR: ["UC"], reference: "", existing: true }] }], conduits: [] };
+    var n3f = norm(f3), t3f = n3f.zones[0].threats[0];
+    ok(!("suggestedCountermeasureIds" in t3f) && same(t3f.countermeasureIds, []) && t3f.currentLikelihood === "", "a 0.3 file with no links gets no suggestions and no current rating: its links are the record", JSON.stringify(t3f));
+
+    // ---- the three ratings ----
+    var x = M.emptyThreat(1); x.likelihood = "high"; x.impact = "serious";
+    ok(E.threatRisk(x) === "high" && E.currentRisk(x) === null && E.residualRisk(x) === null && E.operativeRisk(x) === "high", "unmitigated only: no current, no planned, the unmitigated rating stands");
+    x.currentLikelihood = "low";
+    ok(E.currentRisk(x) === "medium" && E.residualRisk(x) === null && E.operativeRisk(x) === "medium", "a current likelihood alone takes the unmitigated impact (serious x low = medium), and stands");
+    x.residualImpact = "minor";
+    ok(E.residualRisk(x) === E.riskFor("minor", "low") && E.operativeRisk(x) === E.riskFor("minor", "low"), "the planned rating falls back to the current likelihood, not the unmitigated one", E.residualRisk(x));
+    var zs = M.emptyZone(1), pj = M.emptyProject(); pj.zones.push(zs); zs.threats.push(x); x.affectedFR = ["UC"];
+    ok(E.suggestZone(zs, pj).byFR.UC.sl === 3 && E.suggestZone(zs, pj).byFR.UC.risk === "high", "the SL-T suggestion reads the unmitigated rating: credit for countermeasures does not lower it");
+    var row = VM.build(pj).threats[0];
+    ok(row.risk === "high" && row.current === "medium" && row.planned === E.riskFor("minor", "low") && row.operative === row.planned && row.currentExceeds === false, "the view model carries the three states");
+    ok(VM.build(pj).owners[0].worstCurrent === "medium" && VM.build(pj).owners[0].worstPlanned === row.planned && VM.build(pj).owners[0].worstOperative === row.planned, "and each zone's worst current and planned rating");
+    // When the treatment is reduced.
+    zs.countermeasures.push({ id: "M1", description: "In place", addressesFR: ["UC"], reference: "", existing: true }, { id: "M2", description: "Planned", addressesFR: ["UC"], reference: "", existing: false });
+    x.treatment = { decision: "reduce", confirmed: true, reason: "" };
+    x.countermeasureIds = ["M1", "M2"];
+    ok(E.threatTreatment(zs, x, pj).disposition === "mitigated", "reduced: a linked existing countermeasure and a tolerable current rating, though one is still planned");
+    x.currentLikelihood = ""; x.currentImpact = ""; x.residualImpact = ""; x.residualLikelihood = "low";
+    ok(E.threatTreatment(zs, x, pj).disposition === "countermeasure", "being reduced: a tolerable planned rating while a linked countermeasure is still planned");
+    x.countermeasureIds = ["M1"];
+    ok(E.threatTreatment(zs, x, pj).disposition === "mitigated", "reduced: a tolerable planned rating with every linked countermeasure in place");
+    x.countermeasureIds = ["M2"];
+    ok(E.threatTreatment(zs, x, pj).disposition === "countermeasure" && E.threatTreatment(zs, x, pj).existingLinked.length === 0, "being reduced: only planned ones linked");
+    zs.countermeasures[1].description = "  ";
+    ok(E.threatTreatment(zs, x, pj).covered === false && E.threatTreatment(zs, x, pj).label === "Reduce with countermeasures (none recorded)", "a link to a countermeasure with no description covers nothing");
+
+    // ---- the risk context's residual: planned, else current ----
+    pj.srs.tolerableRisk = "medium";
+    var y = M.emptyThreat(2); y.affectedFR = ["UC"]; y.likelihood = "high"; y.impact = "serious"; y.currentLikelihood = "low"; zs.threats.push(y);
+    var ctx = RT.buildRiskContext(pj), cy = ctx.zones[0].threats[1], cx = ctx.zones[0].threats[0];
+    // Phase 4 review (logic 3): the pair is the one residualRisk was worked out from, a side not given taking
+    // the rating before it (was: the side not given exported as null).
+    ok(cy.residualRisk === "medium" && cy.residualLikelihood === "low" && cy.residualImpact === "serious", "a threat with only a current rating exports it as residualRisk, with the pair it came from", JSON.stringify([cy.residualRisk, cy.residualLikelihood, cy.residualImpact]));
+    ok(cx.residualRisk === E.residualRisk(x) && cx.residualLikelihood === "low", "a planned rating, when there is one, is the residual exported");
+    ok(E.riskFor(cy.residualImpact, cy.residualLikelihood) === cy.residualRisk && E.riskFor(cx.residualImpact, cx.residualLikelihood) === cx.residualRisk, "and for each threat the exported pair rates to the exported residualRisk", JSON.stringify([cx.residualLikelihood, cx.residualImpact, cx.residualRisk]));
+    var zq = M.emptyThreat(3); zq.affectedFR = ["UC"]; zq.likelihood = "high"; zq.impact = "serious"; zq.currentImpact = "minor"; zq.residualLikelihood = "low"; zs.threats.push(zq);
+    var cq = RT.buildRiskContext(pj).zones[0].threats[2];
+    ok(cq.residualLikelihood === "low" && cq.residualImpact === "minor" && cq.residualRisk === E.riskFor("minor", "low"), "a planned pair with one side not given takes it from the current rating, as the planned rating does", JSON.stringify([cq.residualLikelihood, cq.residualImpact, cq.residualRisk]));
+    zs.threats.pop();
+
+    // ---- phase 4 review (logic 1): the one rule for the rating that stands today ----
+    // today = the current rating if rated; else the planned rating when no planned countermeasure is linked;
+    // else the unmitigated rating. "Reduced to within tolerable risk" needs a linked existing countermeasure and
+    // today within tolerable risk. Every output reads it through the view model.
+    var zt = M.emptyZone(9), pt = M.emptyProject(); pt.srs.tolerableRisk = "medium"; pt.zones.push(zt);
+    zt.countermeasures.push({ id: "M1", description: "In place", addressesFR: ["UC"], reference: "", existing: true, owner: "", priority: "", dueDate: "", status: "", srRefs: [] },
+      { id: "M2", description: "Planned", addressesFR: ["UC"], reference: "", existing: false, owner: "", priority: "", dueDate: "", status: "", srRefs: [] });
+    var ta = M.emptyThreat(1); ta.affectedFR = ["UC"]; ta.likelihood = "high"; ta.impact = "serious"; ta.residualLikelihood = "low"; ta.countermeasureIds = ["M1"];
+    ta.treatment = { decision: "reduce", confirmed: true, reason: "" }; zt.threats.push(ta);
+    var TA = E.threatTreatment(zt, ta, pt), ra = VM.build(pt).threats[0];
+    ok(TA.today === "medium" && TA.todayWithin && TA.disposition === "mitigated" && ra.today === "medium" && !ra.todayExceeds && VM.build(pt).counts.withinToday === 1,
+      "case A: no current rating, a tolerable planned one and only an existing countermeasure linked: the planned rating is today's, so reduced, and counted within today", JSON.stringify([TA.today, TA.disposition]));
+    ta.currentLikelihood = "high";
+    TA = E.threatTreatment(zt, ta, pt); ra = VM.build(pt).threats[0];
+    ok(TA.today === "high" && !TA.todayWithin && TA.disposition === "countermeasure" && TA.label === "Reduce with countermeasures" && ra.todayExceeds && VM.build(pt).counts.withinToday === 0,
+      "case B: a current rating above tolerable risk is today's, so the threat is being reduced, not reduced", JSON.stringify([TA.today, TA.disposition]));
+    ok(TA.afterPlan === "high" && !TA.afterPlanWithin && VM.build(pt).counts.withinAfterPlan === 0, "and with no planned countermeasure linked, the plan changes nothing: its tolerable planned rating is not counted as once the plan is complete");
+    ta.countermeasureIds = ["M1", "M2"];
+    TA = E.threatTreatment(zt, ta, pt);
+    ok(TA.today === "high" && TA.afterPlan === "medium" && TA.afterPlanWithin && VM.build(pt).counts.withinAfterPlan === 1, "with one linked, it is: the planned rating once the plan is complete");
+    ta.currentLikelihood = "";
+    TA = E.threatTreatment(zt, ta, pt);
+    ok(TA.today === "high" && TA.disposition === "countermeasure", "with no current rating and a planned countermeasure still to come, today is the unmitigated rating");
+    var cA = RT.buildRiskContext(pt).zones[0].threats[0];
+    ok(cA.residualRisk === "medium" && cA.disposition === "countermeasure", "the risk context's residualRisk keeps its meaning (planned, else current) beside the disposition today's rating decides", JSON.stringify([cA.residualRisk, cA.disposition]));
+    ok(ctx.schema === "spt-risk-context/1.4", "and the context stays 1.4");
+
+    // ---- through the app: Load and Save ----
+    ok(RT.loadProjectText(JSON.stringify(TOUR)) === true && RT.state.project.schema === "spt-risk-project/0.3" && same(RT.state.project, norm(TOUR)), "the v0.7 file loads in the app as the step makes it");
+    return new Promise(function (resolve) {
+      var text = null;
+      w.showSaveFilePicker = function () {
+        return Promise.resolve({ name: "x.json", queryPermission: function () { return Promise.resolve("granted"); },
+          createWritable: function () { return Promise.resolve({ write: function (s) { text = s; return Promise.resolve(); }, close: function () { return Promise.resolve(); } }); } });
+      };
+      RT.forgetProjectFile();
+      RT.saveProject({ shiftKey: true }, function () { delete w.showSaveFilePicker; resolve(text); });
+    }).then(function (text) {
+      var s = null; try { s = JSON.parse(text); } catch (e) {}
+      ok(s && s.schema === "spt-risk-project/0.3" && !!s.zones[0].threats[0].suggestedCountermeasureIds && same(s.zones[0].threats[0].countermeasureIds, []), "and saves as 0.3, the suggestions still waiting", s && s.schema);
+      ok(!V07.accepts(s.schema), "which v0.7 refuses, as decided");
+      ok(RT.loadProjectText(text) === true && same(MG.normaliseProject(clone(RT.state.project)), RT.state.project), "the saved file loads again, already in shape");
+    });
+  }
+}());
+</script>
+</body>
+</html>

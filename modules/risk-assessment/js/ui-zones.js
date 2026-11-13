@@ -136,13 +136,13 @@
         selectOf(a.link || "", LINK_OPTS, function (v) { if (v) a.link = v; else delete a.link; touched(); rerender(); }, { "aria-label": "Connection", class: "asset-link" }),
         h("button", { type: "button", class: "btn sm danger", "aria-label": "Remove " + (a.name || "asset " + (ai + 1)), text: "Remove", onClick: function () {
           if (!confirmRemove(!!a.name, "asset")) return;
-          z.assets.splice(ai, 1); touched(); rerender();
+          z.assets.splice(ai, 1); R.Migrate.pruneDangling(state.project); touched(); rerender();
           focusAsset(Math.min(ai, z.assets.length - 1));
         } })
       ]));
     });
     var row = h("div", { class: "btn-row" }, [
-      h("button", { type: "button", class: "btn sm", "data-action": "add-asset", text: "+ Add asset", onClick: function () { z.assets.push({ name: "", type: "plc" }); touched(); rerender(); focusAsset(z.assets.length - 1); } }),
+      h("button", { type: "button", class: "btn sm", "data-action": "add-asset", text: "+ Add asset", onClick: function () { z.assets.push(M.newAsset(state.project)); touched(); rerender(); focusAsset(z.assets.length - 1); } }),
       sel.paste ? null : h("button", { type: "button", class: "btn sm", "data-action": "paste-open", text: "Paste several", onClick: function () { sel.paste = true; rerender(); A.focusAfter('[data-action="paste-text"]'); } })
     ]);
     box.appendChild(row);
@@ -156,7 +156,7 @@
         h("div", { class: "btn-row", style: "margin-top:6px" }, [
           h("button", { type: "button", class: "btn sm primary", "data-action": "paste-add", text: "Add", onClick: function () {
             var list = E.parseAssets(sel.pasteText), first = z.assets.length;
-            list.forEach(function (a) { z.assets.push(a); });
+            list.forEach(function (a) { z.assets.push(M.newAsset(state.project, a)); });
             sel.paste = false; sel.pasteText = "";
             if (list.length) touched();
             rerender();
@@ -248,6 +248,7 @@
         if (!confirm("Remove zone " + z.id + (z.name ? " (" + z.name + ")" : "") + "? Conduits referencing it will also be removed.")) return;
         p.zones.splice(p.zones.indexOf(z), 1);
         p.conduits = p.conduits.filter(function (c) { return c.fromZone !== z.id && c.toZone !== z.id; });
+        R.Migrate.pruneDangling(p);
         sel.kind = null; sel.id = null;
         touched(); rerender();
       } }), { "data-owner-id": z.id, "data-detail": "zone" });

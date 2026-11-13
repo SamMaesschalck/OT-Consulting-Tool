@@ -127,13 +127,21 @@ window.RiskReview = (function () {
   // What the review tool calls each item field in a risk pack (contract
   // spt-review-pack, engagement.fieldLabels). null: a threat has no such field,
   // so the row is not shown, nor offered for suggested wording. Likelihood,
-  // impact, affected FRs, the residual rating and an SL-T's justification and
-  // suggestion are read-only rows (items[].details).
+  // impact, affected FRs, the current and planned ratings, the plan behind a
+  // decision, who accepted a risk, and an SL-T's justification and suggestion
+  // are read-only rows (items[].details).
   var FIELD_LABELS = { answer: "Risk", expected: "Tolerable risk", evidence: "Threat source", notes: "Risk acceptance",
     action: "Countermeasures addressing this threat", impact: null, priority: "Treatment decision", owner: null };
   function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
   function bandName(id) { return id ? RX().bandName(id) : ""; }
   function rating(l, i) { return (l ? cap(l) : "Not rated") + " × " + (i ? cap(i) : "Not rated"); }
+  // A planned countermeasure's plan in words: "M3: owner J. Whitmore, high
+  // priority, due 2027-03-31, agreed"; what is not given says so.
+  function planWords(m) {
+    var R = RT(), st = (R.CM_STATUS_LABEL || {})[m.status], pr = (R.CM_PRIORITY_LABEL || {})[m.priority];
+    return m.id + ": " + [norm(m.owner) ? "owner " + norm(m.owner) : "no owner", pr ? pr.toLowerCase() + " priority" : "no priority",
+      norm(m.dueDate) ? "due " + norm(m.dueDate) : "no due date", st ? st.toLowerCase() : "no status"].join(", ");
+  }
   function slVector(v) {
     var ids = RT().FR_IDS.filter(function (fr) { return v && v[fr] != null; });
     return ids.map(function (fr) { return fr + " SL" + v[fr]; }).join(", ");
@@ -149,7 +157,9 @@ window.RiskReview = (function () {
       var fact = { targetName: ownerName(o), targetId: o.id, roadmapEntries: 0, findings: 0, met: 0, recorded: 0, toAssess: 0, unanswered: 0, na: 0, groups: [] };
       var field = { finding: "findings", met: "met", recorded: "recorded", "to-assess": "toAssess", unanswered: "unanswered", na: "na" };
       row.threats.forEach(function (x) {
-        var t = x.t, band = x.risk, resid = x.residual;
+        // The residual, as the risk context exports it (the view model's
+        // residualRisk): the planned rating, else the current one.
+        var t = x.t, band = x.risk, resid = x.residualRisk;
         var over = x.operativeExceeds;
         // The tool's one treatment state (RiskTool.threatTreatment). A threat
         // above tolerable risk with no confirmed decision, or with one that
@@ -157,18 +167,29 @@ window.RiskReview = (function () {
         // whatever its residual rating, so the review tool raises it.
         var T = x.treatment;
         var status = !band ? "unanswered" : (over || (T.required && !T.complete) ? "finding" : "met");
-        // Only the countermeasures on a requirement this threat affects.
+        // Only the countermeasures linked to this threat (the one coverage rule).
         var affected = t.affectedFR || [];
         var linked = T.covering;
         var details = [["Likelihood × impact", rating(t.likelihood, t.impact)], ["Affected FRs", affected.length ? affected.join(", ") : "None marked"]];
-        if (t.residualLikelihood || t.residualImpact) details.push(["Residual likelihood × impact", rating(t.residualLikelihood || t.likelihood, t.residualImpact || t.impact)]);
+        // Schema 0.3: the rating with the countermeasures in place today, and
+        // after the planned ones; a rating not given takes the one before it.
+        if (x.current) details.push(["Current likelihood × impact", rating(t.currentLikelihood || t.likelihood, t.currentImpact || t.impact)]);
+        if (x.planned) details.push(["Planned likelihood × impact", rating(t.residualLikelihood || t.currentLikelihood || t.likelihood, t.residualImpact || t.currentImpact || t.impact)]);
         if (T.confirmed && T.decision === "slt" && T.reason) details.push(["Reason for treating through the SL-T", T.reason]);
+        // The plan behind a confirmed decision that rests on countermeasures
+        // still to come: each one's owner, priority, due date and status.
+        if (T.confirmed && T.plannedLinked.length) details.push(["Treatment plan", T.plannedLinked.map(planWords).join("; ")]);
+        // Who accepted a risk, and when it is to be reviewed.
+        if (T.complete && T.decision === "accept") {
+          var ad = t.acceptanceDetail || {}, by = norm(ad.by);
+          details.push(["Accepted by", (by || "Not recorded") + (norm(ad.role) ? " (" + norm(ad.role) + ")" : "") + (norm(ad.date) ? ", " + norm(ad.date) : "") + (norm(ad.reviewDate) ? ", review by " + norm(ad.reviewDate) : "")]);
+        }
         // A decision recorded without what it rests on: the reviewer sees what
         // was chosen and what is missing, and the decision field stays empty.
         if (T.confirmed && !T.complete) details.push(["Decision still to complete", T.label]);
         items.push({
           targetName: ownerName(o), targetId: o.id, itemId: o.id + ":" + t.id, code: t.id, title: t.statement || "(no statement)", groupName: groupName,
-          answer: band ? bandName(band) + (resid ? ", residual " + bandName(resid).toLowerCase() : "") : "Not rated",
+          answer: band ? bandName(band) + (resid ? ", " + bandName(resid).toLowerCase() + " after countermeasures" : "") : "Not rated",
           expected: bandName(tolerable),
           // The acceptance text is not printed against another decision.
           evidence: t.source || "", notes: (T.confirmed && T.decision !== "accept") ? "" : (t.acceptance || ""),
@@ -574,7 +595,10 @@ window.RiskReview = (function () {
     var a = t.comment.anchor || {}, s = RT().state;
     if (a.kind === "item") {
       var id = String(a.itemId || ""), cut = id.lastIndexOf(":"), owner = cut > 0 ? id.slice(0, cut) : id, sub = cut > 0 ? id.slice(cut + 1) : "";
-      s.stage = sub === "slt" ? "slt" : "risk"; RT().render();
+      s.stage = sub === "slt" ? "slt" : "risk";
+      // Step 5 shows one zone or conduit at a time: open the one named, at the threat.
+      if (s.stage === "risk" && window.RiskApp && window.RiskApp.RiskPage) window.RiskApp.RiskPage.select(owner, sub || null);
+      RT().render();
       var main = document.getElementById("main"), el = main && main.querySelector(attrSel("data-owner-id", owner));
       if (el && sub && sub !== "slt") el = el.querySelector(attrSel("data-threat-id", sub)) || el;
       if (!el) { RT().toast("That zone or threat is no longer in the risk assessment.", "warn"); return; }

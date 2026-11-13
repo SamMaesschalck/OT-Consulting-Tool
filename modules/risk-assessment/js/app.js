@@ -434,6 +434,9 @@ window.RiskApp.App = (function () {
     var t = (item && item.target) || {};
     // Step 3 shows one zone or conduit at a time: the one named is opened.
     if (item.stage === "zones" && R.ZonesPage) R.ZonesPage.select(t.kind, t.id);
+    // Step 5 works one zone or conduit at a time: the one named, and the
+    // scenario, are opened.
+    if (item.stage === "risk" && R.RiskPage) R.RiskPage.select(t.kind === "threat" ? t.ownerId : t.id, t.kind === "threat" ? t.id : null);
     navigate(item.stage);
     var main = $("main"), el = null;
     if (t.kind === "zone" || t.kind === "conduit") el = main.querySelector(attrSel("data-owner-id", t.id));
@@ -464,7 +467,8 @@ window.RiskApp.App = (function () {
     // The owner: a zone or conduit, or a ranked system's row (data-hla-id).
     var key = el.closest("[data-owner-id]") ? "data-owner-id" : "data-hla-id";
     var own = el.closest("[" + key + "]"), thr = el.closest("[data-threat-id]"), sel = null, index = 0;
-    ["data-decision", "data-detailed", "data-reason", "data-action", "data-assessment-type", "data-view", "data-doc", "data-separation", "data-marker", "data-end", "data-approval-field", "data-flag", "data-asset-name"].forEach(function (a) {
+    ["data-decision", "data-detailed", "data-reason", "data-action", "data-assessment-type", "data-view", "data-doc", "data-separation", "data-marker", "data-end", "data-approval-field", "data-flag", "data-asset-name",
+      "data-field", "data-chip", "data-cm-field", "data-slt-fr", "data-rail-id", "data-tab", "data-heat", "data-cell", "data-filter"].forEach(function (a) {
       if (!sel && el.getAttribute(a)) sel = "[" + a + '="' + el.getAttribute(a) + '"]';
     });
     if (!sel && el.tagName === "SELECT") { sel = "select"; index = Array.prototype.indexOf.call((thr || own || main).querySelectorAll("select"), el); }
@@ -506,13 +510,35 @@ window.RiskApp.App = (function () {
   // the keyboard has reached the next control, which the redraw then keeps.
   var soonTimer = null;
   function rerenderSoon() { clearTimeout(soonTimer); soonTimer = setTimeout(function () { soonTimer = null; rerender(); }, 0); }
+  // A press of the mouse or a finger that has not been let go yet. A field
+  // left by that press (its change fires on mousedown) must not redraw the
+  // page under it, or the click it was going to be is lost: the redraw waits
+  // until the press is over and its click has run.
+  var pressing = false, afterPress = false;
+  document.addEventListener("pointerdown", function () { pressing = true; }, true);
+  document.addEventListener("mousedown", function () { pressing = true; }, true);
+  function pressOver() {
+    if (!pressing) return;
+    pressing = false;
+    if (afterPress) { afterPress = false; setTimeout(function () { rerenderSoon(); }, 0); }
+  }
+  document.addEventListener("pointerup", pressOver, true);
+  document.addEventListener("mouseup", pressOver, true);
+  document.addEventListener("pointercancel", pressOver, true);
   // A field that redraws the page when it changes. Left with Tab, the redraw
-  // waits for the focus to arrive; otherwise (Enter, a script) it is at once,
-  // and the field keeps the focus.
+  // waits for the focus to arrive; left by a click, it waits for the click;
+  // otherwise (Enter, a script) it is at once, and the field keeps the focus.
   function changeRedraw(el) {
     var tab = false;
     el.addEventListener("keydown", function (e) { tab = e.key === "Tab"; });
-    el.addEventListener("change", function () { if (tab) { tab = false; rerenderSoon(); } else rerender(); });
+    el.addEventListener("change", function () {
+      if (tab) { tab = false; rerenderSoon(); }
+      else if (pressing) {
+        afterPress = true;
+        // A press whose release never reaches the page (let go outside it).
+        setTimeout(function () { if (afterPress) { afterPress = false; pressing = false; rerenderSoon(); } }, 1500);
+      } else rerender();
+    });
     return el;
   }
   // The step status in the sidebar, after an edit that does not redraw the
@@ -739,7 +765,12 @@ window.RiskApp.App = (function () {
       approvalFingerprint: function (project) { return E.approvalFingerprint(project || state.project); },
       approvalStates: function (project) { return E.approvalStates(project || state.project); },
       approvalChangedFor: E.approvalChangedFor, approvalPartWords: E.approvalPartWords,
-      zcrSpecBlocks: M.ZCR.specBlocks || null
+      zcrSpecBlocks: M.ZCR.specBlocks || null,
+      // Phase 4b: what the deliverables need of the schema 0.3 links and plan.
+      threatAssets: function (owner, project) { return E.threatAssets(owner, project || state.project); },
+      // What sets each requirement's suggested SL-T: the driving threats, the safety floor or a zone a conduit joins.
+      sltDrivers: function (owner, project) { return E.sltDrivers(owner, project || state.project); },
+      CM_STATUS_LABEL: M.CM_STATUS_LABEL, CM_PRIORITY_LABEL: M.CM_PRIORITY_LABEL
     };
   }
 

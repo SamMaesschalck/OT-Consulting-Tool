@@ -76,7 +76,10 @@
     ok(RT.threatRisk(z1.threats[0]) === "high", "Z1 T1 vendor-path risk is High");
     ok(RT.threatDisposition(z1, z1.threats[0]) === "mitigated", "Z1 T1 mitigated: countermeasures bring residual to Medium (tolerable)", RT.threatDisposition(z1, z1.threats[0]));
     ok(RT.threatDisposition(z1, z1.threats[1]) === "countermeasure", "Z1 T2 covered by existing allow-listing", RT.threatDisposition(z1, z1.threats[1]));
-    ok(RT.threatDisposition(z2, z2.threats[0]) === "countermeasure", "Z2 T4 covered by the hardwired keyswitch", RT.threatDisposition(z2, z2.threats[0]));
+    // Phase 4b: T4's consequence stays severe whatever is added, so the demo treats it through the
+    // SL-T programme, with the hardwired keyswitch in place (was: reduce, covered by the keyswitch).
+    ok(RT.threatDisposition(z2, z2.threats[0]) === "sl-t" && RT.threatTreatment(z2, z2.threats[0]).existingLinked.map(function (m) { return m.id; }).join() === "M4",
+      "Z2 T4 treated through the SL-T programme, with the hardwired keyswitch in place", RT.threatDisposition(z2, z2.threats[0]));
     ok(RT.threatDisposition(z4, z4.threats[1]) === "accepted", "Z4 T8 carries a recorded risk acceptance", RT.threatDisposition(z4, z4.threats[1]));
     ok(RT.threatDisposition(p.conduits[1], p.conduits[1].threats[0]) === "mitigated", "C2 T9 mitigated by the session controls");
     var undecided = [], gaps = [], within = 0, decisions = {};
@@ -90,8 +93,55 @@
     });
     ok(undecided.length === 0, "every above-tolerable threat has a confirmed treatment decision", undecided.join(","));
     ok(gaps.length === 0, "and each decision has what it needs: a covering countermeasure, or its reason", gaps.join(" | "));
-    ok(within === 2 && decisions.reduce === 6 && decisions.accept === 1, "6 reduced with countermeasures, 1 accepted, 2 within tolerable risk needing no decision", JSON.stringify(decisions) + " within " + within);
-    ok(RT.threatTreatment(z4, z4.threats[1]).reason.indexOf("Accepted by R. Calder") === 0, "the acceptance carries its reason");
+    // Phase 4b: one decision of each kind (was: 6 reduce, 1 accept).
+    ok(within === 2 && decisions.reduce === 5 && decisions.slt === 1 && decisions.accept === 1, "5 reduced with countermeasures, 1 through the SL-T programme, 1 accepted, 2 within tolerable risk needing no decision", JSON.stringify(decisions) + " within " + within);
+    // Phase 4b: who accepted it is acceptanceDetail now, so the reason is the reason alone (was: it began "Accepted by R. Calder").
+    ok(RT.threatTreatment(z4, z4.threats[1]).reason.indexOf("The tool is retired at the Q2-2027 turnaround") === 0 && z4.threats[1].acceptanceDetail.by === "R. Calder", "the acceptance carries its reason");
+
+    // ---- phase 4b: a believable workshop, with zero completeness problems ----
+    var owners = p.zones.concat(p.conduits), all = [];
+    owners.forEach(function (o) { o.threats.forEach(function (th) { all.push({ o: o, t: th, T: RT.threatTreatment(o, th) }); }); });
+    ok(RT.completeness(p).length === 0, "the demo has no completeness problem at all", RT.completeness(p).map(function (i) { return i.text; }).join(" | "));
+    ok(all.map(function (x) { return x.t.id; }).join() === "T1,T2,T3,T4,T5,T6,T7,T8,T9" && owners.map(function (o) { return o.id; }).join() === "Z1,Z2,Z3,Z4,C1,C2,C3", "its ids are the ones it always had");
+    ok(all.every(function (x) { return x.t.assetIds.length > 0 && RT.threatAssets(x.o, p).filter(function (a) { return x.t.assetIds.indexOf(a.id) >= 0; }).length === x.t.assetIds.length; }), "every threat links the assets it reaches, each one there");
+    ok(all.filter(function (x) { return x.t.vulnerabilityIds.length; }).length >= 8 && owners.every(function (o) { return (o.vulnerabilities || []).every(function (v) { return v.reference && all.some(function (x) { return x.o === o && x.t.vulnerabilityIds.indexOf(v.id) >= 0; }); }); }), "every vulnerability has a source and is linked to a threat");
+    ok(all.every(function (x) { return x.t.entryPoint && x.t.consequence && x.t.likelihoodRationale; }), "every threat has its entry point, consequence and likelihood rationale");
+    ok(all.filter(function (x) { return x.T.required && x.T.decision !== "accept"; }).every(function (x) { return x.T.covering.length > 0; }), "every threat above tolerable risk not accepted links its countermeasures");
+    var cms = []; owners.forEach(function (o) { (o.countermeasures || []).forEach(function (m) { cms.push(m); }); });
+    ok(cms.length === 9 && cms.every(function (m) { return m.srRefs.length > 0; }), "every countermeasure has its SR references", String(cms.length));
+    var planned = cms.filter(function (m) { return !m.existing; });
+    ok(planned.length === 4 && planned.every(function (m) { return m.owner && m.priority && /^\d{4}-\d{2}-\d{2}$/.test(m.dueDate) && m.status; }), "every additional countermeasure has an owner, a priority, a due date and a status", planned.map(function (m) { return m.id; }).join());
+    ok(["T1", "T7", "T9"].every(function (id) { var x = all.filter(function (y) { return y.t.id === id; })[0]; return x.T.current === "medium" && x.T.existingLinked.length && x.T.disposition === "mitigated"; }), "the existing countermeasures bring T1, T7 and T9 within tolerable risk today, as their current ratings say");
+    ok(["T2", "T5"].every(function (id) { var x = all.filter(function (y) { return y.t.id === id; })[0]; return x.T.planned === "medium" && x.T.plannedLinked.length && x.T.disposition === "countermeasure"; }), "T2 and T5 reach tolerable risk only once the planned countermeasures are done");
+    var acc = all.filter(function (x) { return x.T.disposition === "accepted"; });
+    ok(acc.length === 1 && ["by", "role", "date", "reviewDate"].every(function (k) { return !!acc[0].t.acceptanceDetail[k]; }), "one accepted risk, with who accepted it, their role, the date and a review date");
+    ok(all.every(function (x) { return !x.t.suggestedCountermeasureIds && !x.T.linkSuggested.length; }), "and no suggested link left waiting");
+    var c2 = p.conduits[1];
+    ok(c2.direction === "both" && /started from the recorded jump host in Z3/.test(c2.notes), "C2 vendor remote access is two-way, sessions started from Z3 (was: one way, Z3 to Z1)", c2.direction);
+    ok(RT.approvalStates(p).every(function (s) { return s.signed && !s.changed; }), "and both approvals stand against what it holds");
+    // ---- phase 4 review: the demo as the client reads it ----
+    // A current or planned rating is recorded only where it differs from the rating before it (wording 13).
+    var same = all.filter(function (x) { return (x.T.current && x.T.current === RT.threatRisk(x.t)) || (x.T.planned && x.T.planned === (x.T.current || RT.threatRisk(x.t))); }).map(function (x) { return x.t.id; });
+    ok(same.length === 0, "the demo records a current or planned rating only where it differs from the one before it", same.join(","));
+    var t2 = z1.threats[1];
+    ok(!t2.currentLikelihood && !t2.currentImpact && /allow-listing \(M2\)[^.]*does not lower the likelihood/.test(t2.likelihoodRationale), "T2's rationale says why its existing allow-listing does not lower its likelihood");
+    ok(!z2.threats[0].currentLikelihood && !z2.threats[0].currentImpact, "T4 records no current rating: its likelihood is already the lowest on the house scale");
+    // Each countermeasure's SR references sit under the FRs it addresses (wording 12): SR n.x is FR n.
+    var FRN = { "1": "IAC", "2": "UC", "3": "SI", "4": "DC", "5": "RDF", "6": "TRE", "7": "RA" };
+    var off = cms.filter(function (m) { return m.srRefs.some(function (s) { var n = (/^SR (\d)\./.exec(s) || [])[1]; return !n || m.addressesFR.indexOf(FRN[n]) < 0; }); }).map(function (m) { return m.id + " " + m.srRefs.join("/") + " vs " + m.addressesFR.join("/"); });
+    ok(off.length === 0, "every SR reference of a countermeasure is on a foundational requirement it addresses", off.join(" | "));
+    ok(z4.vulnerabilities[1].reference === "Interview I2, lead control systems engineer" && /^Corporate clients request read-only reports over HTTPS; process data flows one way, Z3 to corporate\. /.test(p.conduits[2].notes), "V6 cites the interview it came from, and C3's notes say which way the data flows");
+    ok(/^The consequence stays severe whatever is added[^.]*\. The zone is held at SL3 on every foundational requirement/.test(z2.threats[0].treatment.reason) && /T4 is treated through this SL-T programme, with the hardwired keyswitch \(M4\) in place and a dedicated SIS engineering workstation \(M8\) planned\./.test(z2.justification),
+      "T4's reason and Z2's justification say the SL-T programme once, in the report's words");
+    // Who accepted T8 is part of the approval: the demo's approvals were taken with it, and still stand.
+    RT.navigate("approval");
+    var stat = [].map.call(w.document.querySelectorAll("#main [data-approval-status]"), function (e) { return e.textContent; });
+    ok(stat.length === 2 && stat.every(function (s) { return /Unchanged since approval/.test(s); }), "both approvals read Unchanged since approval", stat.join(" | "));
+    var by = z4.threats[1].acceptanceDetail.by;
+    z4.threats[1].acceptanceDetail.by = "Someone else";
+    ok(RT.approvalStates(p).every(function (s) { return s.changed && s.parts.join() === "accepted"; }), "and a change to who accepted T8 is a change to the accepted risks they approved");
+    z4.threats[1].acceptanceDetail.by = by;
+    ok(RT.approvalStates(p).every(function (s) { return !s.changed; }), "put back, the approvals stand again");
 
     // ---- SL-T vectors ----
     ok(RT.suggestZone(z2, p).byFR.RA.sl === 3, "SIS floor suggests SL3 on Z2");

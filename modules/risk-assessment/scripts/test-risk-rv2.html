@@ -105,14 +105,18 @@
       ok(fl.owner === null && fl.impact === null, "and has no owner or impact field per threat");
       ok(pack.items.every(function (i) { return i.targetId && pack.items.length && i.itemId.indexOf(i.targetId + ":") === 0; }), "every item carries its zone or conduit's id (targetId)");
       var t1 = item(pack, "Z1:T1"), t2 = item(pack, "Z1:T2");
-      ok(/^(Low|Medium|High|Very high)(, residual (low|medium|high|very high))?$/.test(t1.answer) && t1.expected === "Medium", "risk and tolerable risk are band names, not ids", t1.answer + " / " + t1.expected);
+      ok(/^(Low|Medium|High|Very high)(, (low|medium|high|very high) after countermeasures)?$/.test(t1.answer) && t1.expected === "Medium", "risk and tolerable risk are band names, not ids", t1.answer + " / " + t1.expected);
       // The words of a confirmed decision, from the tool's one treatment state.
       var TL = w.RiskTool.TREATMENT_LABEL, labels = [TL.reduced, TL.reduce, TL.reduceNone, TL.accept, TL.slt];
       ok(pack.items.filter(function (i) { return i.code !== "SL-T"; }).every(function (i) { return !i.priority || labels.indexOf(i.priority) >= 0; }) && t1.priority === TL.reduced && t2.priority === TL.reduce && item(pack, "Z4:T8").priority === TL.accept && item(pack, "Z1:T3").priority === "",
         "the treatment decision is in the words the report prints, and a threat within tolerable risk has none", t1.priority + " / " + t2.priority);
       ok(/M2 /.test(t2.action) && /M3 /.test(t2.action) && !/M1 /.test(t2.action), "a threat on SI lists only the countermeasures that address SI (not M1, which covers IAC, UC and RDF)", t2.action);
       ok(/\[existing\]|\[planned\]/.test(t2.action), "each marked existing or planned");
-      ok(detail(t1, "Likelihood × impact") === "High × Serious" && detail(t1, "Affected FRs") === "IAC, RDF" && detail(t1, "Residual likelihood × impact") === "Low × Serious", "likelihood, impact, FRs and the residual rating are detail rows", JSON.stringify(t1.details));
+      // Phase 4b: the residual row is the current and the planned rating, each in its own row; T1 has a
+      // current rating (its existing countermeasure) and no planned one (was: Residual likelihood × impact).
+      ok(detail(t1, "Likelihood × impact") === "High × Serious" && detail(t1, "Affected FRs") === "IAC, RDF" && detail(t1, "Current likelihood × impact") === "Low × Serious" && detail(t1, "Planned likelihood × impact") === null && detail(t2, "Planned likelihood × impact") === "Low × Serious" && detail(t2, "Current likelihood × impact") === null && detail(item(pack, "Z4:T7"), "Current likelihood × impact") === "Low × Serious", "likelihood, impact, FRs and the residual rating are detail rows", JSON.stringify(t1.details));
+      // Phase 4 review (wording 13): the demo's T2 records no current rating now (it equalled the unmitigated one),
+      // so it has no such row, and T7's is the current rating read beside T1's (was: T2's "Medium × Serious").
       ok(t1.owner === "" && t1.impact === "", "and nothing is put under owner or impact");
       var s1 = item(pack, "Z1:slt");
       ok(s1.evidence === "" && detail(s1, "Justification") === zone("Z1").justification.trim() && /^IAC SL\d/.test(detail(s1, "Suggested SL-T")), "an SL-T item shows the suggestion and the justification as details, not as a threat source", JSON.stringify(s1.details));

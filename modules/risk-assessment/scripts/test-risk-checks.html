@@ -105,7 +105,8 @@
         var p = fresh();
         p.zones[0].countermeasures = [];
         p.zones[3].threats[1].acceptance = "";
-        ok(noDisposition(p) === "" && RT.threatTreatment(p.zones[0], p.zones[0].threats[0], p).residualWithin, "every decision is still confirmed, and T1 has a residual rating within tolerable risk");
+        // Phase 4b: the demo's T1 has a current rating (its existing countermeasure), not a planned one (was: residualWithin alone).
+        ok(noDisposition(p) === "" && (function (T) { return T.residualWithin || T.currentWithin; })(RT.threatTreatment(p.zones[0], p.zones[0].threats[0], p)), "every decision is still confirmed, and T1 has a residual rating within tolerable risk");
         return pack();
       }).then(function (P) {
         var nd = of(RK.run(P, {}), "risk-no-disposition");
@@ -129,7 +130,9 @@
 
         // ---- an unrated threat, and a blank threat source --------------------------------
         var p = fresh();
-        function over(t) { var b = RT.threatRisk(t), r = RT.residualRisk(t); return !!b && RT.exceedsTolerable(r || b, tol(p)); }
+        // The rating that stands (schema 0.3): planned, else current, else unmitigated (was: residual, else unmitigated).
+        function cur(t) { return (t.currentLikelihood || t.currentImpact) ? RT.riskFor(t.currentImpact || t.impact, t.currentLikelihood || t.likelihood) : null; }
+        function over(t) { var b = RT.threatRisk(t), r = RT.residualRisk(t) || cur(t); return !!b && RT.exceedsTolerable(r || b, tol(p)); }
         var o = owners(p).filter(function (x) { return x.threats.length > 1 && x.threats.some(over); })[0];
         var t2 = o.threats.filter(over)[0], t = o.threats.filter(function (x) { return x !== t2; })[0];
         t.likelihood = ""; t2.source = "";

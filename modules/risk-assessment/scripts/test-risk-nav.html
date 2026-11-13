@@ -16,6 +16,7 @@
 <iframe id="app" src="../index.html" style="width:1280px;height:800px;visibility:hidden"></iframe>
 <script src="../data/tour-project.js"></script>
 <script src="fixtures/v0.7-normaliser.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
 <script>
 (function () {
   "use strict";
@@ -232,6 +233,9 @@
     z2.justification = "Utilities only; corporate SL2 floor.";
     ok(!has(texts("detailed"), /^Z2 /), "and with it, nothing is open for that zone");
     RT.navigate("risk");
+    // Phase 4: step 5 shows one zone at a time; its rail marks the zone too.
+    ok(/Not required/.test(main().querySelector('[data-rail-id="Z2"]').textContent), "step 5's rail marks the zone Not required");
+    main().querySelector('[data-rail-id="Z2"]').click();
     var z2card = main().querySelector('[data-owner-id="Z2"]');
     ok(active() === "risk" && /Not required/.test(z2card.querySelector(".card-h").textContent) && /No detailed assessment needed \(step 4\)/.test(z2card.textContent), "step 5 marks it, and says what it needs");
     main().querySelector('.step-tabs [data-tab="slt"]').click();
@@ -383,7 +387,7 @@
     RT.navigate("compare");
     return new Promise(function (res) { RT.saveProject(null, res); }).then(function (r) {
       var s = JSON.parse(written[written.length - 1]);
-      ok(r.ok && s.lastStage === "compare" && s.schema === "spt-risk-project/0.2" && s.assessmentType === "full", "Save records the step in use (lastStage), and the schema stays 0.2");
+      ok(r.ok && s.lastStage === "compare" && s.schema === "spt-risk-project/0.3" && s.assessmentType === "full", "Save records the step in use (lastStage), and the schema is the current one (0.3)");
       RT.navigate("home");
       ok(RT.loadProjectText(written[written.length - 1]) === true && RT.state.stage === "compare" && active() === "compare", "Load reopens it");
       // Phase 3b: "spec" is now a step, so a later step this build lacks is named instead.
@@ -437,21 +441,23 @@
     }).then(function () {
       // ---- a file using the new fields, through the released v0.7 normaliser -----------------
       var V07 = window.RiskFixtures["v0.7-normaliser"](RT.FR_IDS, RULES.exposureModifiers, RULES.tolerableRisk["default"]);
-      var tour = clone(window.SPT_TOUR_PROJECT);
+      // Phase 4: this build saves 0.3, which v0.7 refuses; the file here is the
+      // 0.2 file phase 3 saved (scripts/fixtures/tour-phase3-0.2.js), with the new fields.
+      var tour = clone(window.RiskFixtures["tour-phase3-0.2"]);
       tour.lastStage = "compare";
       tour.zones[2].hlaIds = ["A3", "A5"];
       tour.conduits[2].initialRisk = "high";
       tour.srs.highLevelAssets[4].detailed = { required: false, reason: "Monitored at high level only." };
-      var ours = MG.normaliseProject(clone(tour));
-      var saved = JSON.stringify(ours);
-      var fileNow = JSON.parse(saved);
+      var saved = JSON.stringify(tour);
+      var fileNow = JSON.parse(saved), ours = MG.normaliseProject(clone(fileNow));
       ok(V07.accepts(fileNow.schema) && fileNow.schema === "spt-risk-project/0.2", "a file using the new fields is one v0.7 accepts: the schema is unchanged");
+      ok(ours.schema === "spt-risk-project/0.3" && !V07.accepts(ours.schema), "and once this build saves it, it is 0.3, which v0.7 refuses");
       var old = V07.normaliseProject(JSON.parse(saved));
       ok(same(old, fileNow), "v0.7's normaliser changes nothing in it: every new field is additive", JSON.stringify(old).length + " vs " + saved.length);
       ok(old.assessmentType === "full" && old.lastStage === "compare" && same(old.zones[2].hlaIds, ["A3", "A5"]) && old.zones[2].fromHLA === "A3" && old.conduits[2].initialRisk === "high" && old.conduits[0].detailed.required === false && old.srs.highLevelAssets[4].detailed.required === false,
         "and keeps them, with fromHLA the first assigned system for v0.7 and the risk context");
-      ok(same(MG.normaliseProject(clone(old)), fileNow), "a file v0.7 loaded and saved again reads back here as this build saved it");
-      ok(RT.buildRiskContext(fileNow).zones[2].fromHighLevelAsset === "A3" && RT.buildRiskContext(fileNow).schema === "spt-risk-context/1.4", "the risk context keeps fromHighLevelAsset (the first system) and stays 1.4");
+      ok(same(MG.normaliseProject(clone(old)), ours), "a file v0.7 loaded and saved again reads back here as this build reads the file");
+      ok(RT.buildRiskContext(ours).zones[2].fromHighLevelAsset === "A3" && RT.buildRiskContext(ours).schema === "spt-risk-context/1.4", "the risk context keeps fromHighLevelAsset (the first system) and stays 1.4");
       // An older build edits the file: it takes a ranked system out without
       // touching the zones. The prune clears the link and fromHLA follows.
       var edited = clone(old);

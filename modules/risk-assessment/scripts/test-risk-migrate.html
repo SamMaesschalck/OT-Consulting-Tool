@@ -28,6 +28,22 @@
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  // A normalised file without what the 0.3 schema adds (the threat, countermeasure
+  // and vulnerability fields, asset ids, the asset counter), labelled 0.2 again:
+  // what is left must be the file as it was saved.
+  var T03 = ["entryPoint", "consequence", "assetIds", "vulnerabilityIds", "countermeasureIds", "suggestedCountermeasureIds", "likelihoodRationale", "currentLikelihood", "currentImpact", "acceptanceDetail"];
+  function strip03(x) {
+    var y = clone(x);
+    y.schema = "spt-risk-project/0.2";
+    if (y.counters) delete y.counters.asset;
+    (y.zones || []).concat(y.conduits || []).forEach(function (o) {
+      (o.assets || []).forEach(function (a) { delete a.id; });
+      (o.threats || []).forEach(function (t) { T03.forEach(function (k) { delete t[k]; }); });
+      (o.countermeasures || []).forEach(function (m) { ["owner", "priority", "dueDate", "status", "srRefs"].forEach(function (k) { delete m[k]; }); });
+      (o.vulnerabilities || []).forEach(function (v) { delete v.reference; });
+    });
+    return y;
+  }
 
   function run(w) {
     var RT = w.RiskTool, MG = w.RiskApp.Migrate, E = w.RiskApp.Engine;
@@ -46,14 +62,15 @@
     // ---- the v0.7 tour file: the new normaliser leaves a v0.7 save exactly as it was ----
     ok(TOUR.schema === "spt-risk-project/0.2" && /^Acme Petrochemicals/.test(TOUR.suc.name), "the tour fixture is a 0.2 file saved by v0.7");
     var nT = norm(TOUR);
-    ok(same(nT, TOUR), "a file saved by v0.7 comes through the ladder, the shape fill and the prune unchanged");
+    // Phase 4: the 0.2 to 0.3 step adds the 0.3 fields; everything the file held is kept as it was.
+    ok(nT.schema === "spt-risk-project/0.3" && same(strip03(nT), TOUR), "a file saved by v0.7 comes through the ladder, the shape fill and the prune unchanged, but for what 0.3 adds");
     ok(same(norm(nT), nT), "normalising the tour file twice changes nothing the first pass did not");
     ok(decisions(nT) === decisions(TOUR), "every recorded treatment decision is kept as saved", decisions(nT));
 
     // ---- the hand-made 0.1 file ----
     var nO = norm(OLD);
     ok(same(norm(nO), nO), "normalising the 0.1 file twice changes nothing the first pass did not");
-    ok(nO.schema === "spt-risk-project/0.2", "the 0.1 file comes out as 0.2", nO.schema);
+    ok(nO.schema === "spt-risk-project/0.3", "the 0.1 file comes out as 0.3, through 0.2", nO.schema);
     ok(!("initialRisk" in nO) && nO.srs.adversaryClass === 2 && /chlorine dosing/.test(nO.srs.essentialFunctions) && /Overdosing/.test(nO.srs.worstCase) && nO.srs.clientMatrix === true && /5x5/.test(nO.srs.clientMatrixNote),
       "0.1 -> 0.2: the requirements move from initialRisk to srs", JSON.stringify(nO.srs));
     ok(nO.srs.tolerableRisk === "medium" && Array.isArray(nO.srs.highLevelAssets) && nO.srs.highLevelAssets.length === 0 && Array.isArray(nO.srs.knownThreats), "and srs gains the default tolerable risk and empty lists");
@@ -112,16 +129,17 @@
     ok(nD.zones[1].fromHLA === keptHLA && keptHLA && nD.conduits[1].fromZone === keptEnd && nD.conduits[2].toZone === "EXT", "links that resolve, and EXT, are left alone");
     ok(same(nD.zones[2].hlaIds, [dang.zones[2].fromHLA]) && same(nD.zones[0].threats[0].countermeasureIds, [dang.zones[0].countermeasures[0].id]) && same(nD.zones[0].threats[0].vulnerabilityIds, []),
       "link lists a later build writes lose only the ids that are not in the file", JSON.stringify([nD.zones[2].hlaIds, nD.zones[0].threats[0].countermeasureIds]));
-    ok(!("hlaIds" in nT.zones[0]) && !("countermeasureIds" in nT.zones[0].threats[0]), "and are never added to a file that has none");
+    // Phase 4: link lists are filled on load, empty: a link is never invented.
+    ok(!("hlaIds" in nT.zones[0]) && same(nT.zones[0].threats[0].countermeasureIds, []) && same(nT.zones[0].threats[0].vulnerabilityIds, []) && same(nT.zones[0].threats[0].assetIds, []), "and are never invented for a file that has none");
     ok(same(norm(nD), nD), "pruning twice changes nothing the first pass did not");
 
     // ---- through the app: Load, the refusal of other schemas, and Save ----
     var before = RT.state.project;
-    ok(RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.3", suc: { name: "Later" }, zones: [], conduits: [] })) === false && RT.state.project === before, "Load refuses a schema it does not know (0.3)");
+    ok(RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.4", suc: { name: "Later" }, zones: [], conduits: [] })) === false && RT.state.project === before, "Load refuses a schema it does not know (0.4)");
     var KEY = RT.AUTOSAVE_KEY, old = null;
     try { old = w.localStorage.getItem(KEY); } catch (e) {}
     var bar0 = w.document.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
-    try { w.localStorage.setItem(KEY, JSON.stringify({ savedOn: new Date().toISOString(), stage: "suc", project: { schema: "spt-risk-project/0.3", suc: { name: "Later build" }, srs: {}, zones: [], conduits: [] } })); } catch (e) {}
+    try { w.localStorage.setItem(KEY, JSON.stringify({ savedOn: new Date().toISOString(), stage: "suc", project: { schema: "spt-risk-project/0.4", suc: { name: "Later build" }, srs: {}, zones: [], conduits: [] } })); } catch (e) {}
     RT.offerRestore();
     ok(!w.document.querySelector(".autosave-bar"), "and the autosave restore does not offer one");
     try { if (old == null) w.localStorage.removeItem(KEY); else w.localStorage.setItem(KEY, old); } catch (e) {}
@@ -142,17 +160,18 @@
     ok(decisions(RT.state.project) === decisions(nO) && same(RT.state.project.srs, nO.srs), "as the normaliser makes it");
     return saveText().then(function (text) {
       var s = null; try { s = JSON.parse(text); } catch (e) {}
-      ok(s && s.schema === "spt-risk-project/0.2" && s.zones[0].slTargetByFR.UC === 2 && !("initialRisk" in s), "and saves again as 0.2", s && s.schema);
+      ok(s && s.schema === "spt-risk-project/0.3" && s.zones[0].slTargetByFR.UC === 2 && !("initialRisk" in s), "and saves again as 0.3", s && s.schema);
       ok(s && s["x-reviewer-note"] === OLD["x-reviewer-note"] && s.zones[0]["x-site-tag"] === "RW-PC-01" && s.zones[0].threats[0]["x-ref"] === "HAZOP node 4", "with the unknown keys still in it");
       ok(RT.loadProjectText(text) === true && same(MG.normaliseProject(clone(RT.state.project)), RT.state.project), "the re-saved file loads, already in shape");
 
-      ok(RT.loadProjectText(JSON.stringify(TOUR)) === true && same(RT.state.project, TOUR), "the tour file loads in the app exactly as saved");
+      // Phase 4: as the 0.2 to 0.3 step makes it (was: exactly as saved, 0.2 being current).
+      ok(RT.loadProjectText(JSON.stringify(TOUR)) === true && same(RT.state.project, nT) && same(strip03(RT.state.project), TOUR), "the tour file loads in the app exactly as saved, with what 0.3 adds");
       return saveText();
     }).then(function (text) {
       var s = null; try { s = JSON.parse(text); } catch (e) {}
       var a = clone(TOUR), b = s ? clone(s) : null;
       if (b) { delete a.savedOn; delete b.savedOn; }
-      ok(s && s.schema === "spt-risk-project/0.2" && same(a, b), "and saves again as 0.2 with nothing changed but the time it was saved");
+      ok(s && s.schema === "spt-risk-project/0.3" && same(a, strip03(b)), "and saves again as 0.3 with nothing changed but the time it was saved and what 0.3 adds");
     });
   }
 }());

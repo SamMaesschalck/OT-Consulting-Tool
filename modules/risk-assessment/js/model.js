@@ -23,8 +23,11 @@ window.RiskApp.Model = (function () {
   // the risk-context file; never put in the Word or Excel deliverables.
   var VERSION = window.App.Version;
   var TOOL_ID = "spt-risk-tool/" + VERSION.number;
-  var PROJECT_SCHEMA = "spt-risk-project/0.2";
-  var ACCEPTED_PROJECT_SCHEMAS = ["spt-risk-project/0.1", "spt-risk-project/0.2"];
+  // 0.3 (phase 4): links between a threat and its assets, vulnerabilities and
+  // countermeasures are the record of coverage, and a threat carries three
+  // ratings (unmitigated, current, planned). v0.7 and earlier refuse 0.3 files.
+  var PROJECT_SCHEMA = "spt-risk-project/0.3";
+  var ACCEPTED_PROJECT_SCHEMAS = ["spt-risk-project/0.1", "spt-risk-project/0.2", "spt-risk-project/0.3"];
 
   var FRS = RULES.foundationalRequirements;           // [{id,fr,name}]
   var FR_IDS = FRS.map(function (f) { return f.id; });
@@ -109,9 +112,10 @@ window.RiskApp.Model = (function () {
       approval: { name: "", role: "", date: "", statement: "", approved: false },
       zones: [],
       conduits: [],
-      counters: { zone: 0, conduit: 0, threat: 0, vuln: 0, cm: 0, hla: 0, interview: 0, document: 0, observation: 0 }
+      counters: { zone: 0, conduit: 0, threat: 0, vuln: 0, cm: 0, hla: 0, interview: 0, document: 0, observation: 0, asset: 0 }
     };
   }
+  var COUNTER_KEYS = ["zone", "conduit", "threat", "vuln", "cm", "hla", "interview", "document", "observation", "asset"];
 
   function emptyHLA(n) { return { id: "A" + n, name: "", functionLocation: "", consequence: "", likelihood: "", note: "" }; }
   function emptyInterview(n) { return { id: "I" + n, name: "", role: "", date: "", notes: "" }; }
@@ -141,9 +145,31 @@ window.RiskApp.Model = (function () {
     };
   }
 
+  // A threat scenario (schema 0.3). The minimum is the statement, the affected
+  // requirements, likelihood and impact; everything else is optional.
+  //   assetIds, vulnerabilityIds, countermeasureIds  explicit links to the
+  //       owner's records (a conduit's assets are those of the zones it joins).
+  //       countermeasureIds is the record of coverage: nothing is inferred.
+  //   suggestedCountermeasureIds  links a file from before 0.3 implied (the old
+  //       requirement match), unconfirmed until the consultant confirms them;
+  //       absent when there are none.
+  //   likelihood, impact          the unmitigated rating (before any countermeasure)
+  //   currentLikelihood/Impact    the rating with the linked existing countermeasures
+  //   residualLikelihood/Impact   the rating after the planned measures as well
+  //   acceptance                  the reason a risk is accepted; acceptanceDetail
+  //                               who accepted it, their role, when, and when to review
   function emptyThreat(n) {
-    return { id: "T" + n, statement: "", source: "", affectedFR: [], likelihood: "", impact: "", residualLikelihood: "", residualImpact: "", acceptance: "", treatment: emptyTreatment() };
+    return { id: "T" + n, statement: "", source: "", entryPoint: "", consequence: "",
+      assetIds: [], vulnerabilityIds: [], countermeasureIds: [],
+      affectedFR: [], likelihood: "", impact: "", likelihoodRationale: "",
+      currentLikelihood: "", currentImpact: "",
+      residualLikelihood: "", residualImpact: "", acceptance: "", acceptanceDetail: emptyAcceptanceDetail(), treatment: emptyTreatment() };
   }
+  var THREAT_TEXT_FIELDS = ["statement", "source", "entryPoint", "consequence", "likelihood", "impact", "likelihoodRationale",
+    "currentLikelihood", "currentImpact", "residualLikelihood", "residualImpact", "acceptance"];
+  var THREAT_LINK_FIELDS = ["assetIds", "vulnerabilityIds", "countermeasureIds"];
+  var ACCEPTANCE_FIELDS = ["by", "role", "date", "reviewDate"];
+  function emptyAcceptanceDetail() { return { by: "", role: "", date: "", reviewDate: "" }; }
   // The consultant's treatment decision for a threat above tolerable risk.
   // decision: "reduce" | "accept" | "slt" | null. An unconfirmed decision is
   // only a suggestion and is never printed or exported as fact. The reason
@@ -269,8 +295,23 @@ window.RiskApp.Model = (function () {
     pj.approval = Object.assign(pj.approval || {}, m);
   }
 
-  function emptyVulnerability(n) { return { id: "V" + n, description: "" }; }
-  function emptyCountermeasure(n) { return { id: "M" + n, description: "", addressesFR: [], reference: "", existing: false }; }
+  // reference: where the vulnerability is known from (a scan, an advisory, an observation).
+  function emptyVulnerability(n) { return { id: "V" + n, description: "", reference: "" }; }
+  // existing: in place when assessed. The plan fields (owner, priority, due
+  // date, status) are for the additional ones; srRefs lists the 62443-3-3
+  // system requirements it meets (reference stays free text).
+  var CM_PRIORITIES = ["high", "medium", "low"];
+  var CM_STATUSES = ["proposed", "agreed", "in-progress", "done"];
+  var CM_STATUS_LABEL = { "proposed": "Proposed", "agreed": "Agreed", "in-progress": "In progress", "done": "Done" };
+  var CM_PRIORITY_LABEL = { "high": "High", "medium": "Medium", "low": "Low" };
+  function emptyCountermeasure(n) { return { id: "M" + n, description: "", addressesFR: [], reference: "", existing: false, owner: "", priority: "", dueDate: "", status: "", srRefs: [] }; }
+  // An asset's id, for the threats that link it. Assets had none before 0.3.
+  function nextAssetId(pj) {
+    if (!pj.counters) pj.counters = {};
+    pj.counters.asset = (typeof pj.counters.asset === "number" ? pj.counters.asset : 0) + 1;
+    return "AS" + pj.counters.asset;
+  }
+  function newAsset(pj, a) { return Object.assign({ id: nextAssetId(pj) }, a || { name: "", type: "plc" }); }
 
   // True when the consultant has entered anything worth protecting — gates the
   // Load confirm so an untouched session opens a file without a needless nag.
@@ -312,6 +353,10 @@ window.RiskApp.Model = (function () {
     emptyZone: emptyZone, emptyConduit: emptyConduit, emptyThreat: emptyThreat,
     TREATMENT_DECISIONS: TREATMENT_DECISIONS, emptyTreatment: emptyTreatment,
     emptyVulnerability: emptyVulnerability, emptyCountermeasure: emptyCountermeasure,
+    COUNTER_KEYS: COUNTER_KEYS, THREAT_TEXT_FIELDS: THREAT_TEXT_FIELDS, THREAT_LINK_FIELDS: THREAT_LINK_FIELDS,
+    ACCEPTANCE_FIELDS: ACCEPTANCE_FIELDS, emptyAcceptanceDetail: emptyAcceptanceDetail,
+    CM_PRIORITIES: CM_PRIORITIES, CM_STATUSES: CM_STATUSES, CM_STATUS_LABEL: CM_STATUS_LABEL, CM_PRIORITY_LABEL: CM_PRIORITY_LABEL,
+    nextAssetId: nextAssetId, newAsset: newAsset,
     ASSESSMENT_TYPES: ASSESSMENT_TYPES, assessmentType: assessmentType, emptyDetailed: emptyDetailed,
     hlaIdsOf: hlaIdsOf, setHlaIds: setHlaIds,
     projectHasContent: projectHasContent

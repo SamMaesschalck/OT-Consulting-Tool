@@ -131,15 +131,18 @@
         return docs();
       }).then(function (again) {
         // A run of several: only the paragraph commented on changes.
-        var ps = again[0].blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey === "what-we-found"; });
+        // Phase 4 review: "What we found" opens with one paragraph now (the accepted risk is in the residual
+        // position's table), so the detailed report's "Why this assessment" is the run of several (was: what-we-found).
+        var ps = again[0].blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey === "why-this-assessment"; });
         ok(ps.length >= 2, "a section with several opening paragraphs (" + ps.length + ")");
+        var replaced = ps[1] ? ps[1].text.slice(0, 40) : "";
         var t = thread(0, ps[1], "A plainer sentence about treatment.");
         return accept(t).then(function (res) {
           ok(res.ok, "Accept on the second paragraph", res.message);
           return xml({}).then(function (x) {
             ok(x.indexOf("A plainer sentence about treatment.") !== -1, "Word: it prints");
-            ok(x.indexOf("threats were registered") !== -1, "Word: the paragraph before it stays");
-            ok(x.indexOf("Of the threats above tolerable risk") === -1, "Word: the one it replaced goes");
+            ok(x.indexOf("Regulators and insurers increasingly expect") !== -1, "Word: the paragraph before it stays");
+            ok(replaced.length === 40 && x.indexOf(replaced) === -1, "Word: the one it replaced goes", replaced);
           });
         });
       }).then(function () {

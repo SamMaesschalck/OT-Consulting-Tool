@@ -222,11 +222,13 @@ window.RiskApp.Reports = (function () {
 
     // Zones table, from the view model (js/view-model.js)
     var vm = R.ViewModel.build(p);
-    var anyResidual = vm.zones.some(function (row) { return row.threats.some(function (x) { return x.residual != null; }); });
+    // The arrow is shown where a zone's rating that stands differs from its
+    // unmitigated one, and the header names it only when a row has one.
+    var anyResidual = vm.zones.some(function (row) { return row.worstOperative && row.worstOperative !== row.worstRisk; });
     var zt = h("table", { class: "tbl" }, [h("thead", null, [h("tr", null, [
-      h("th", { text: "Zone" }), h("th", { text: anyResidual ? "Worst risk (unmitigated → residual)" : "Worst risk", class: "center" }),
-      h("th", { text: "Threats", class: "center" }), h("th", { text: "Suggested (" + FR_IDS.join("/") + ")" }),
-      h("th", { text: "SL-T (" + FR_IDS.join("/") + ")" }), h("th", { text: "Justification" })
+      h("th", { text: "Zone" }), h("th", { text: anyResidual ? "Worst risk (unmitigated → rating that stands)" : "Worst risk", class: "center" }),
+      h("th", { text: "Threats", class: "center" }), h("th", { text: "Suggested SL-T" }),
+      h("th", { text: "SL-T" }), h("th", { text: "Justification" })
     ])])]);
     var ztb = h("tbody");
     vm.zones.forEach(function (row) {
@@ -237,29 +239,29 @@ window.RiskApp.Reports = (function () {
         h("td", null, [document.createTextNode(z.id + (z.name ? ": " + z.name : "")), s.safetyRelated ? h("span", { class: "pill flag", style: "margin-left:6px", text: "SIS" }) : null]),
         h("td", { class: "center" }, [riskPill(s.worstRisk), (wres && wres !== s.worstRisk) ? h("span", null, [document.createTextNode(" → "), riskPill(wres)]) : null]),
         h("td", { class: "center", text: String(z.threats.length) }),
-        h("td", { text: vecStr(frSug(s)) }),
-        h("td", null, [h("strong", { text: vecStr(z.slTargetByFR) })]),
+        h("td", { text: E.vecWords(frSug(s)) }),
+        h("td", null, [h("strong", { text: E.vecWords(z.slTargetByFR) })]),
         h("td", { text: z.justification || "" })
       ]));
     });
     zt.appendChild(ztb);
     main.appendChild(card("Zones", p.zones.length + " zone" + (p.zones.length === 1 ? "" : "s"), [
       p.zones.length ? zt : h("p", { class: "muted", text: "No zones defined." }),
-      anyResidual ? h("p", { class: "hint", style: "margin-top:8px", text: "Unmitigated → residual where countermeasures reduce the risk." }) : null
+      anyResidual ? h("p", { class: "hint", style: "margin-top:8px", text: "Unmitigated → rating that stands, where countermeasures change it." }) : null
     ]));
 
     if (p.conduits.length) {
       var ct = h("table", { class: "tbl" }, [h("thead", null, [h("tr", null, [
         h("th", { text: "Conduit" }), h("th", { text: "Path" }), h("th", { text: "Channels and protocols" }),
-        h("th", { text: "SL-T (" + FR_IDS.join("/") + ")" }), h("th", { text: "Justification" })
+        h("th", { text: "SL-T" }), h("th", { text: "Justification" })
       ])])]);
       var ctb = h("tbody");
       p.conduits.forEach(function (c) {
         ctb.appendChild(h("tr", null, [
           h("td", { text: c.id + (c.name ? ": " + c.name : "") }),
-          h("td", { text: (c.fromZone || "?") + " ↔ " + (c.toZone || "?") }),
+          h("td", { text: (c.fromZone || "not set") + " ↔ " + (c.toZone || "not set") }),
           h("td", { text: c.channels.join(", ") }),
-          h("td", null, [h("strong", { text: vecStr(c.slTargetByFR) })]),
+          h("td", null, [h("strong", { text: E.vecWords(c.slTargetByFR) })]),
           h("td", { text: c.justification || "" })
         ]));
       });

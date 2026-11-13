@@ -5,12 +5,10 @@
  * demo), 1 Scope and risk criteria (suc, with the risk criteria read-only
  * beside the form and the tolerable risk's confirmed marker), 2 High-level
  * risk (srs, with Assign to zone on the ranking, and the comparison column on
- * a high-level-only assessment), 4 Risk comparison (compare) and 5 Detailed
- * risk, in two tabs: the threats with the treatment decision per threat
- * (risk) and the SL-T (slt); plus Engagement and evidence (basis). Step 3 is
- * js/ui-zones.js; steps 6 and 7 are js/ui-spec.js.
- * Each page registers itself in RiskApp.Pages for js/app.js to draw. The
- * detailed risk page reads its per-threat facts from js/view-model.js.
+ * a high-level-only assessment) and 4 Risk comparison (compare); plus
+ * Engagement and evidence (basis). Step 3 is js/ui-zones.js, step 5
+ * (Detailed risk: risk and slt) js/ui-risk.js, steps 6 and 7 js/ui-spec.js.
+ * Each page registers itself in RiskApp.Pages for js/app.js to draw.
  */
 (function () {
   "use strict";
@@ -107,7 +105,7 @@
       z = M.emptyZone(p.counters.zone);
       z.name = asset.name || ("System " + asset.id);
       z.fn = asset.functionLocation || "";
-      if (asset.name) z.assets.push({ name: asset.name, type: "other" });
+      if (asset.name) z.assets.push(M.newAsset(p, { name: asset.name, type: "other" }));
       p.zones.push(z);
     } else z = E.findZone(p, value);
     if (!z) return;
@@ -313,291 +311,6 @@
 
   // Step 3, Zones and conduits, is js/ui-zones.js.
 
-  // ---------- Stage 4: detailed risk assessment ----------
-
-  // The treatment decision for a threat above tolerable risk: three choices,
-  // one click each. A suggestion carried over from an older file shows dashed
-  // and worded as such until the consultant clicks it (or Confirm suggested).
-  var TREATMENT_CHOICES = [
-    { id: "reduce", text: "Reduce with countermeasures" },
-    { id: "accept", text: "Accept" },
-    { id: "slt", text: "Treat through the SL-T" }
-  ];
-  function setTreatment(t, decision) {
-    if (!t.treatment) t.treatment = M.emptyTreatment();
-    // Clicking the confirmed choice again takes the decision back.
-    if (t.treatment.decision === decision && t.treatment.confirmed) { t.treatment.decision = null; t.treatment.confirmed = false; }
-    else { t.treatment.decision = decision; t.treatment.confirmed = true; }
-  }
-  // x: the threat's row in the view model (js/view-model.js).
-  function treatmentChoice(x) {
-    var t = x.t, T = x.treatment;
-    var status = null;
-    if (T.state === "none") status = h("span", { class: "val-warn treat-status", text: "No decision yet." });
-    else if (T.state === "suggested") status = h("span", { class: "treat-status", text: "Suggested, not confirmed." });
-    else if (T.gap) status = h("span", { class: "val-warn treat-status", text: T.gap.charAt(0).toUpperCase() + T.gap.slice(1) + "." });
-    else if (T.decision === "reduce") status = h("span", { class: "muted treat-status", text: "Addressed by " + T.covering.map(function (m) { return m.id; }).join(", ") + "." + (T.residual && !T.residualWithin ? " Residual risk is still above tolerable." : "") });
-    // One reason field, worded for what the SL-T lacks.
-    var sltWhy = [];
-    if (T.sltUnset.length) sltWhy.push("no SL-T is set" + (t.affectedFR.length ? " (" + T.sltUnset.join(", ") + ")" : ""));
-    if (T.sltBelow.length) sltWhy.push("the SL-T is below the suggestion (" + T.sltBelow.join(", ") + ")");
-    var kids = [h("div", { class: "treat-row" }, [
-      h("div", { class: "treat-opts", role: "group", "aria-label": "Treatment decision" }, TREATMENT_CHOICES.map(function (c) {
-        var on = T.decision === c.id;
-        return h("button", {
-          type: "button", "data-decision": c.id,
-          class: "treat-opt" + (on ? (T.confirmed ? " on" : " suggested") : ""),
-          "aria-pressed": on && T.confirmed ? "true" : "false",
-          text: (on ? (T.confirmed ? "✓ " : "? ") : "") + c.text,
-          onClick: function () { setTreatment(t, c.id); touched(); rerender(); }
-        });
-      })),
-      status
-    ])];
-    if (T.decision === "accept" || (t.acceptance || "").trim()) {
-      kids.push(h("div", { class: "field", style: "margin:8px 0 0" }, [
-        h("label", { text: "Reason for acceptance" }),
-        A.changeRedraw(h("input", { type: "text", "data-reason": "accept", value: t.acceptance, placeholder: "e.g. Accepted by J. Smith (Operations Director), 2026-07: production constraint; revisit at next assessment.", onInput: function (e) { t.acceptance = e.target.value; touched(); } }))
-      ]));
-    }
-    if (T.decision === "slt" && (T.sltShortfall.length || T.reason)) {
-      kids.push(h("div", { class: "field", style: "margin:8px 0 0" }, [
-        h("label", { text: sltWhy.length ? "Reason " + sltWhy.join(" and ") : "Reason for treating through the SL-T" }),
-        A.changeRedraw(h("input", { type: "text", "data-reason": "slt", value: t.treatment.reason, placeholder: "e.g. Raised in phase 2 of the programme, agreed with the asset owner.", onInput: function (e) { t.treatment.reason = e.target.value; touched(); } }))
-      ]));
-    }
-    return h("div", { class: "treat", "data-treatment-state": T.state }, kids);
-  }
-
-  // Residual-risk capture for an over-tolerable threat. Optional: leaving
-  // both blank means the threat is untreated and the unmitigated risk stands.
-  function residualEditor(t, tolerable) {
-    var rb = residualRisk(t);
-    var status = rb
-      ? h("div", { style: "margin-top:4px;font-size:13px" }, [
-          h("strong", { text: "Residual risk: " }), riskPill(rb),
-          exceedsTolerable(rb, tolerable)
-            ? h("span", { class: "val-warn", text: "  still above tolerable risk (" + BAND_NAME[tolerable].toLowerCase() + ")." })
-            : h("span", { class: "muted", text: "  within tolerable risk (" + BAND_NAME[tolerable].toLowerCase() + ")." })
-        ])
-      : h("div", { class: "hint", style: "margin-top:2px", text: "Rate it once the countermeasures are implemented." });
-    return h("div", { class: "field", style: "margin:8px 0 0" }, [
-      h("label", { text: "Residual risk with countermeasures in place (optional)" }),
-      h("div", { class: "threat-grid" }, [
-        selectField("Residual likelihood", t.residualLikelihood, LIK.map(function (l) { return { value: l.id, text: l.name }; }), function (v) { t.residualLikelihood = v; touched(); rerender(); }, { placeholderText: "Unchanged" }),
-        selectField("Residual impact", t.residualImpact, SEV.map(function (sv) { return { value: sv.id, text: sv.name }; }), function (v) { t.residualImpact = v; touched(); rerender(); }, { placeholderText: "Unchanged" })
-      ]),
-      status
-    ]);
-  }
-
-  // row: the zone's or conduit's row in the view model.
-  function threatEditor(row, project, tolerable) {
-    var owner = row.o;
-    var box = h("div", null, []);
-    row.threats.forEach(function (x, ti) {
-      var t = x.t, band = x.risk, exceeds = x.exceeds;
-      box.appendChild(h("div", { class: "threat-card", "data-threat-id": t.id }, [
-        h("div", { class: "threat-head" }, [
-          h("span", { class: "tid", text: t.id }),
-          h("span", null, [riskPill(band), exceeds ? h("span", { class: "pill flag", style: "margin-left:6px", text: "exceeds tolerable" }) : null]),
-          h("button", { class: "btn sm danger", text: "Remove", onClick: function () {
-            var filled = !!(t.statement || t.source || t.likelihood || t.impact || (t.affectedFR && t.affectedFR.length));
-            if (!confirmRemove(filled, "threat " + t.id)) return;
-            owner.threats.splice(ti, 1); touched(); rerender();
-            if (filled) toast("Threat " + t.id + " removed.");
-          } })
-        ]),
-        h("div", { class: "field", style: "margin-bottom:8px" }, [
-          h("label", { text: "Threat statement (source → asset → entry point → means → outcome)" }),
-          h("textarea", { value: t.statement, placeholder: "e.g. An external attacker reuses the standing vendor VPN to reach the PLCs and manipulate control.", onInput: function (e) { t.statement = e.target.value; touched(); } })
-        ]),
-        h("div", { class: "threat-grid" }, [
-          h("div", { class: "field", style: "margin:0" }, [h("label", { text: "Threat source" }), h("input", { type: "text", value: t.source, placeholder: "e.g. External attacker via vendor tunnel", onInput: function (e) { t.source = e.target.value; touched(); } })]),
-          h("div", { class: "field", style: "margin:0" }, [h("label", { text: "Affected foundational requirements" }), frChips(t.affectedFR, function (fr) { var i = t.affectedFR.indexOf(fr); if (i >= 0) t.affectedFR.splice(i, 1); else t.affectedFR.push(fr); touched(); rerender(); })])
-        ]),
-        h("div", { class: "threat-grid", style: "margin-top:8px" }, [
-          selectField("Unmitigated likelihood", t.likelihood, LIK.map(function (l) { return { value: l.id, text: l.name }; }), function (v) { t.likelihood = v; touched(); rerender(); }, { hint: t.likelihood ? (LIK.filter(function (l) { return l.id === t.likelihood; })[0] || {}).note : "How likely the threat is to be realised before any countermeasure is counted." }),
-          selectField("Impact of the worst credible consequence", t.impact, SEV.map(function (sv) { return { value: sv.id, text: sv.name }; }), function (v) { t.impact = v; touched(); rerender(); }, { hint: t.impact ? (SEV.filter(function (sv) { return sv.id === t.impact; })[0] || {}).note : "Worst credible consequence across safety / environment / operations / financial / regulatory." })
-        ]),
-        h("div", { style: "margin-top:6px;font-size:13px" }, [
-          h("strong", { text: "Unmitigated risk: " }), riskPill(band),
-          band ? h("span", { class: "muted", text: "  = impact × likelihood" }) : h("span", { class: "muted", text: "  (set likelihood and impact)" })
-        ]),
-        exceeds ? treatmentChoice(x) : null,
-        (exceeds || t.residualLikelihood || t.residualImpact) ? residualEditor(t, tolerable) : null
-      ]));
-    });
-    box.appendChild(h("button", { class: "btn sm", text: "+ Add threat", onClick: function () { project.counters.threat += 1; owner.threats.push(M.emptyThreat(project.counters.threat)); touched(); rerender(); } }));
-    return box;
-  }
-
-  function vulnEditor(owner, project) {
-    var box = h("div", null, []);
-    owner.vulnerabilities.forEach(function (v, vi) {
-      box.appendChild(h("div", { class: "line-row" }, [
-        h("span", { class: "muted", style: "min-width:28px", text: v.id }),
-        h("input", { type: "text", value: v.description, placeholder: "Known vulnerability in an access point or contained asset", onInput: function (e) { v.description = e.target.value; touched(); } }),
-        h("button", { class: "btn sm danger", text: "×", onClick: function () {
-          if (!confirmRemove(!!v.description, "vulnerability")) return;
-          owner.vulnerabilities.splice(vi, 1); touched(); rerender();
-        } })
-      ]));
-    });
-    box.appendChild(h("button", { class: "btn sm", text: "+ Add vulnerability", onClick: function () { project.counters.vuln += 1; owner.vulnerabilities.push(M.emptyVulnerability(project.counters.vuln)); touched(); rerender(); } }));
-    return box;
-  }
-
-  function cmEditor(owner, project) {
-    var box = h("div", null, []);
-    owner.countermeasures.forEach(function (m, mi) {
-      box.appendChild(h("div", { class: "threat-card" }, [
-        h("div", { class: "threat-head" }, [h("span", { class: "tid", text: m.id }), h("button", { class: "btn sm danger", text: "Remove", onClick: function () {
-          var filled = !!(m.description || (m.addressesFR && m.addressesFR.length) || m.reference);
-          if (!confirmRemove(filled, "countermeasure " + m.id)) return;
-          owner.countermeasures.splice(mi, 1); touched(); rerender();
-          if (filled) toast("Countermeasure " + m.id + " removed.");
-        } })]),
-        h("div", { class: "field", style: "margin-bottom:8px" }, [h("label", { text: "Countermeasure" }), h("input", { type: "text", value: m.description, placeholder: "e.g. Broker vendor access via a DMZ jump host; remove the standing tunnel.", onInput: function (e) { m.description = e.target.value; touched(); } })]),
-        h("label", { style: "display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:8px" }, [
-          h("input", { type: "checkbox", checked: !!m.existing, onChange: function (e) { m.existing = e.target.checked; touched(); rerender(); } }),
-          h("span", { text: "Existing countermeasure (already in place)" })
-        ]),
-        h("div", { class: "threat-grid" }, [
-          h("div", { class: "field", style: "margin:0" }, [h("label", { text: "Addresses foundational requirements" }), frChips(m.addressesFR, function (fr) { var i = m.addressesFR.indexOf(fr); if (i >= 0) m.addressesFR.splice(i, 1); else m.addressesFR.push(fr); touched(); rerender(); })]),
-          h("div", { class: "field", style: "margin:0" }, [h("label", { text: "62443-3-3 reference" }), h("input", { type: "text", value: m.reference, placeholder: "e.g. SR 1.13, SR 5.1", onInput: function (e) { m.reference = e.target.value; touched(); } })])
-        ])
-      ]));
-    });
-    box.appendChild(h("button", { class: "btn sm", text: "+ Add countermeasure", onClick: function () { project.counters.cm += 1; owner.countermeasures.push(M.emptyCountermeasure(project.counters.cm)); touched(); rerender(); } }));
-    return box;
-  }
-
-  function detailedRiskCard(row, project, tolerable, label) {
-    var owner = row.o;
-    var worst = row.worstRisk;
-    var exceeding = row.exceeding, open = row.open, suggested = row.suggested;
-    var skip = E.comparison(owner, project).skip;
-    var head = [];
-    if (skip) head.push(h("span", { class: "pill neutral", text: "Not required" }));
-    if (worst) head.push(riskPill(worst));
-    if (exceeding.length) head.push(h("span", { class: "pill flag", style: "margin-left:6px", text: exceeding.length + " over tolerable" }));
-    return card(label, null, [
-      skip ? h("p", { class: "hint no-print", style: "margin-top:0", text: "No detailed assessment needed (step 4): set its SL-T and give the basis in the justification." }) : null,
-      h("div", { class: "field" }, [
-        h("label", { text: "Threats: likelihood × impact = unmitigated risk" }),
-        exceeding.length ? h("div", { class: "hint treat-summary" + (open.length ? " val-warn" : ""), style: "margin-bottom:6px" }, [
-          h("span", { text: open.length
-            ? open.length + " of " + exceeding.length + " threat" + (exceeding.length === 1 ? "" : "s") + " above tolerable risk need" + (open.length === 1 ? "s" : "") + " a treatment decision."
-            : "Every threat above tolerable risk has a treatment decision." }),
-          suggested.length ? h("button", { type: "button", class: "btn sm", style: "margin-left:8px", "data-action": "confirm-suggested", text: "Confirm suggested (" + suggested.length + ")", onClick: function () {
-            suggested.forEach(function (x) { x.t.treatment.confirmed = true; });
-            touched(); rerender();
-          } }) : null
-        ]) : null,
-        threatEditor(row, project, tolerable)
-      ]),
-      h("div", { class: "field" }, [h("label", { text: "Vulnerabilities" }), vulnEditor(owner, project)]),
-      h("div", { class: "field" }, [
-        h("label", { text: "Countermeasures" }),
-        h("div", { class: "hint no-print", style: "margin-bottom:6px", text: "Tick Existing countermeasure for those already in place." }),
-        cmEditor(owner, project)
-      ])
-    ], head.length ? h("span", null, head) : null, { "data-owner-id": owner.id });
-  }
-
-  // Step 5's two tabs: the threats (risk) and the SL-T (slt), each with its count.
-  function stepTabs(active) {
-    var p = state.project, threats = p.zones.concat(p.conduits).reduce(function (a, o) { return a + o.threats.length; }, 0), slt = A.sltCount();
-    function tab(id, text, badge) {
-      var on = active === id;
-      return h("button", { type: "button", class: "sl-btn step-tab" + (on ? " active" : ""), "data-tab": id, "aria-pressed": on ? "true" : "false",
-        onClick: function () { if (!on) A.navigate(id, '.step-tabs [data-tab="' + id + '"]'); } }, [text, badge ? h("span", { class: "badge", text: badge }) : null]);
-    }
-    return h("div", { class: "step-tabs no-print", role: "group", "aria-label": "Detailed risk" }, [
-      tab("risk", "Threats", threats ? String(threats) : null),
-      tab("slt", "SL-T", slt)
-    ]);
-  }
-
-  function renderRisk(main) {
-    var p = state.project;
-    main.appendChild(h("h1", { class: "page-title", text: "Detailed risk assessment" }));
-    main.appendChild(pageSub("risk", "Rate the threats to each zone and conduit, compare with tolerable risk and record a treatment decision where it is exceeded."));
-    main.appendChild(stepTabs("risk"));
-    main.appendChild(h("div", { class: "framing-note", text: "SolutionsPT house risk matrix, not the standard's; tolerable risk is " + (p.srs.tolerableRisk || "medium") + " (step 1)." }));
-
-    if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
-
-    var vm = R.ViewModel.build(p);
-    vm.zones.forEach(function (row) { var z = row.o; main.appendChild(detailedRiskCard(row, p, vm.tolerable, z.id + (z.name ? ": " + z.name : ""))); });
-
-    if (p.conduits.length) {
-      main.appendChild(h("h1", { class: "page-title", style: "font-size:18px;margin-top:24px", text: "Conduits" }));
-      main.appendChild(h("p", { class: "page-sub", text: "A conduit's SL-T suggestion is the higher of its own threats and its connected zones." }));
-      vm.conduits.forEach(function (row) { var c = row.o; main.appendChild(detailedRiskCard(row, p, vm.tolerable, c.id + (c.name ? ": " + c.name : "") + " (" + (c.fromZone || "?") + " ↔ " + (c.toZone || "?") + ")")); });
-    }
-  }
-
-  // ---------- Stage 5: SL-T assignment (per FR) ----------
-
-  function sltVectorCard(owner, sug, project, label, safety) {
-    var tbl = h("table", { class: "tbl fr-slt-table" }, [h("thead", null, [h("tr", null, [
-      h("th", { text: "FR", style: "width:52px" }), h("th", { text: "Foundational requirement" }),
-      h("th", { text: "Risk", class: "center", style: "width:90px" }), h("th", { text: "Suggested", class: "center", style: "width:90px" }),
-      h("th", { text: "Final SL-T", style: "width:320px" })
-    ])])]);
-    var tb = h("tbody");
-    FRS.forEach(function (f) {
-      var cell = sug.byFR[f.id];
-      tb.appendChild(h("tr", null, [
-        h("td", null, [h("strong", { text: f.id })]),
-        h("td", null, [f.name, traceDetails(cell.trace)]),
-        h("td", { class: "center" }, [riskPill(cell.risk)]),
-        h("td", { class: "center", text: cell.sl != null ? "SL" + cell.sl : "None" }),
-        h("td", null, [slButtonsFR(owner.slTargetByFR[f.id], function (n) { owner.slTargetByFR[f.id] = n; touched(); rerender(); })])
-      ]));
-    });
-    tbl.appendChild(tb);
-
-    var body = [];
-    if (E.comparison(owner, project).skip) body.push(h("p", { class: "hint no-print", style: "margin-top:0", text: "No detailed assessment needed (step 4): give the basis for this SL-T in the justification." }));
-    if (safety && SIS_RULE) body.push(h("div", { class: "sis-box" }, [h("strong", { text: "SIS handling: " }), SIS_RULE.actions[0] + " An SL" + SIS_RULE.floorSL + " floor is applied to every FR."]));
-    body.push(tbl);
-    var tgt = maxDefined(owner.slTargetByFR);
-    var needsJust = tgt != null && !(owner.justification || "").trim();
-    body.push(h("div", { class: "field", style: "margin-top:12px" }, [
-      h("label", null, [document.createTextNode("Justification "), h("span", { class: "req-star", text: "*" })]),
-      A.changeRedraw(h("textarea", { value: owner.justification, placeholder: "Why this SL-T is right, including any FR held below its suggestion.", onInput: function (e) { owner.justification = e.target.value; touched(); } })),
-      needsJust
-        ? h("div", { class: "hint val-warn", text: "SL-T set but not justified: say why, especially for any FR below its suggestion." })
-        : h("div", { class: "hint", text: "Required." })
-    ]));
-
-    var headPill = tgt == null
-      ? h("span", { class: "pill neutral", text: "SL-T not set" })
-      : (needsJust ? h("span", { class: "pill flag", text: "SL-T≤" + tgt + " · needs justification" })
-                   : h("span", { class: "pill exceeds", text: "SL-T≤" + tgt }));
-    return card(label, null, body, headPill, { "data-owner-id": owner.id });
-  }
-
-  function renderSlt(main) {
-    var p = state.project;
-    main.appendChild(h("h1", { class: "page-title", text: "SL-T assignment" }));
-    main.appendChild(pageSub("slt", "Set one target security level per foundational requirement, and justify it."));
-    main.appendChild(stepTabs("slt"));
-    main.appendChild(h("div", { class: "framing-note", text: "Suggestions are a SolutionsPT house heuristic, not the standard's; an SL-T below one is fine if justified." }));
-
-    if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
-
-    p.zones.forEach(function (z) { var s = E.suggestZone(z, p); main.appendChild(sltVectorCard(z, s, p, z.id + (z.name ? ": " + z.name : ""), s.safetyRelated)); });
-
-    if (p.conduits.length) {
-      main.appendChild(h("h1", { class: "page-title", style: "font-size:18px;margin-top:24px", text: "Conduits" }));
-      p.conduits.forEach(function (c) { var s = E.suggestConduit(c, p); main.appendChild(sltVectorCard(c, s, p, c.id + (c.name ? ": " + c.name : "") + " (" + (c.fromZone || "?") + " ↔ " + (c.toZone || "?") + ")", false)); });
-    }
-  }
-
   // ---------- Stage 4: risk comparison ----------
   //
   // One table: each zone's and conduit's initial risk against tolerable risk,
@@ -724,5 +437,6 @@
   var P = R.Pages;
   P.home = renderHome;
   P.suc = renderSuc; P.srs = renderSrs; P.basis = renderBasis;
-  P.compare = renderCompare; P.risk = renderRisk; P.slt = renderSlt;
+  P.compare = renderCompare;
+  // Step 5 (risk, slt) is js/ui-risk.js.
 }());

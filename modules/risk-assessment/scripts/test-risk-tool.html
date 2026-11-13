@@ -34,6 +34,7 @@
     // guard; individual tests override w.confirm to exercise the guard both ways.
     w.confirm = function () { return true; };
     w.alert = function () {};
+    function same0(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 
     // --- risk matrix (house) ---
     ok(RT.riskFor("negligible", "high") === "low", "negligible×high -> low");
@@ -106,6 +107,8 @@
     w.RiskTool.FR_IDS.forEach(function (fr) { c.slTargetByFR[fr] = 3; }); c.justification = "Carries safety signals.";
     // add a countermeasure so the exceed-tolerable threat is covered (existing control)
     z.countermeasures.push({ id: "M1", description: "Broker vendor access via DMZ.", addressesFR: ["IAC", "RDF"], reference: "SR 1.13", existing: true });
+    // (Schema 0.3: a countermeasure covers a threat only once it is linked to it.)
+    th.countermeasureIds = ["M1"];
     proj.approval = { name: "A. Approver", role: "Plant Manager", date: "2026-07-01", statement: "Tolerable risk and SL-T targets approved.", approved: true };
     proj.suc.name = "Test Works"; proj.suc.assumptions = ["assumption 1"];
     proj.srs.tolerableRisk = "medium"; proj.srs.knownThreats = ["Capable criminal adversary"];
@@ -255,8 +258,12 @@
     ok(RT.threatTreatment(zd, td).covered === false, "reduce: an untagged countermeasure covers nothing");
     ok(RT.suggestTreatment(zd, td, "medium") === "reduce", "(it can only suggest)");
     zd.countermeasures[0].addressesFR = ["UC"];
+    // Schema 0.3: the requirement match is only a suggestion; a link is the record.
+    ok(RT.threatTreatment(zd, td).covered === false && w.RiskApp.Engine.suggestLinks(zd, td).join() === "M9" && /no countermeasure is linked/.test(RT.threatTreatment(zd, td).gap),
+      "reduce: an FR-overlapping countermeasure that is not linked covers nothing, it is only suggested", RT.threatTreatment(zd, td).gap);
+    td.countermeasureIds = ["M9"];
     var tRed = RT.threatTreatment(zd, td);
-    ok(tRed.covered && tRed.covering[0].id === "M9" && tRed.disposition === "countermeasure" && tRed.gap === "" && tRed.label === "Reduce with countermeasures", "reduce: an FR-overlapping countermeasure covers the threat");
+    ok(tRed.covered && tRed.covering[0].id === "M9" && tRed.disposition === "countermeasure" && tRed.gap === "" && tRed.label === "Reduce with countermeasures", "reduce: a linked countermeasure covers the threat (was: an FR-overlapping one)");
     // Residual risk: countermeasures that bring it within tolerable = mitigated.
     td.residualLikelihood = "low"; td.residualImpact = "serious"; // serious×low = medium = tolerable
     ok(RT.residualRisk(td) === "medium", "residual risk computed from residual likelihood/impact", "got " + RT.residualRisk(td));
@@ -296,7 +303,9 @@
     ok(mm.existing === false, "pre-1.4 countermeasure gains an existing=false flag");
     ok(mt.treatment && mt.treatment.decision === "reduce" && mt.treatment.confirmed === false && mt.treatment.reason === "", "a file from before treatment decisions loads with the old inference as an unconfirmed suggestion", JSON.stringify(mt.treatment));
     ok(RT.threatTreatment(RT.state.project.zones[0], mt).state === "suggested" && RT.buildRiskContext().zones[0].threats[0].disposition === null, "which is open, and exports as null, until confirmed");
-    ok(RT.state.project.schema === "spt-risk-project/0.2", "the project schema string is unchanged");
+    // Phase 4: a 0.2 file is brought to 0.3 on load (was: the schema string stayed 0.2).
+    ok(RT.state.project.schema === "spt-risk-project/0.3", "the project schema string is the current one (0.3)", RT.state.project.schema);
+    ok(same0(mt.countermeasureIds, []) && same0(mt.suggestedCountermeasureIds, ["M1"]), "and its old requirement match is a suggested link, never a link", JSON.stringify([mt.countermeasureIds, mt.suggestedCountermeasureIds]));
     // The other old inferences, and nothing to infer.
     RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "Acc2", description: "", scopeStatement: "", assumptions: [] }, zones: [{ id: "Z1", name: "", slTargetByFR: { UC: 2 },
       threats: [{ id: "T1", statement: "s", affectedFR: ["UC"], likelihood: "high", impact: "serious" },
@@ -393,8 +402,21 @@
     ok(doc.body.textContent.indexOf("Unmitigated risk") >= 0, "stage 4 shows unmitigated risk");
     // --- the three-way treatment choice ---
     // By position, zones first: the promoted zone takes its id from a counter this test never advanced, so ids can repeat here.
-    function ownerCard(id) { var all = doc.querySelectorAll('[data-owner-id]'), zs = RT.state.project.zones; for (var i = 0; i < zs.length; i++) if (zs[i] === id || (typeof id === "string" && zs[i].id === id)) return all[i]; return null; }
-    function threatCard(oid, tid) { return ownerCard(oid).querySelector('[data-threat-id="' + tid + '"]'); }
+    // Phase 4: step 5 shows one zone at a time, picked in its rail, with one scenario's editor open.
+    function ownerCard(id) {
+      var zs = RT.state.project.zones;
+      for (var i = 0; i < zs.length; i++) if (zs[i] === id || (typeof id === "string" && zs[i].id === id)) {
+        var item = doc.querySelectorAll("#main .risk-rail .rail-item")[i];
+        if (item && !item.classList.contains("on")) item.click();
+        return doc.querySelector("#main [data-owner-id]");
+      }
+      return null;
+    }
+    function threatCard(oid, tid) {
+      var tb = ownerCard(oid).querySelector('[data-threat-id="' + tid + '"]');
+      if (tb && !tb.classList.contains("open")) { tb.querySelector('[data-action="open-scenario"]').click(); tb = ownerCard(oid).querySelector('[data-threat-id="' + tid + '"]'); }
+      return tb;
+    }
     function opt(oid, tid, d) { return threatCard(oid, tid).querySelector('.treat-opt[data-decision="' + d + '"]'); }
     var pz = RT.state.project.zones[RT.state.project.zones.length - 1], pt = pz.threats[0];
     ok(threatCard("Z1", "T1").querySelectorAll(".treat-opt").length === 3 && /Reduce with countermeasures/.test(opt("Z1", "T1", "reduce").textContent) && /^Accept$/.test(opt(pz, pt.id, "accept").textContent) && /Treat through the SL-T/.test(opt("Z1", "T1", "slt").textContent),
@@ -419,7 +441,9 @@
     // A reason typed into the field keeps the focus when the page is redrawn on change.
     var rIn = threatCard(pz, pt.id).querySelector('input[data-reason="slt"]');
     rIn.focus(); rIn.value = "Set at the design workshop."; rIn.dispatchEvent(new w.Event("input", { bubbles: true })); rIn.dispatchEvent(new w.Event("change", { bubbles: true }));
-    ok(doc.activeElement === threatCard(pz, pt.id).querySelector('input[data-reason="slt"]') && doc.activeElement !== rIn && pt.treatment.reason === "Set at the design workshop." && RT.threatTreatment(pz, pt).disposition === "sl-t", "the reason field keeps the focus too, and the reason settles the decision");
+    // Phase 4: the field is edited in place, not redrawn (was: redrawn on change, the focus put back).
+    ok(doc.activeElement === threatCard(pz, pt.id).querySelector('input[data-reason="slt"]') && doc.activeElement === rIn && rIn.isConnected && pt.treatment.reason === "Set at the design workshop." && RT.threatTreatment(pz, pt).disposition === "sl-t" && !/No SL-T is set/.test(threatCard(pz, pt.id).querySelector(".treat").textContent),
+      "the reason field keeps the focus too, and the reason settles the decision, shown in place");
     pt.treatment.reason = ""; RT.render();
     opt(pz, pt.id, "slt").click();
     ok(pt.treatment.decision === null && pt.treatment.confirmed === false, "clicking the confirmed choice again takes the decision back");
@@ -428,22 +452,32 @@
     var sOpt = opt(pz, pt.id, "reduce");
     ok(/suggested/.test(sOpt.className) && /^\? /.test(sOpt.textContent) && sOpt.getAttribute("aria-pressed") === "false" && /Suggested, not confirmed/.test(threatCard(pz, pt.id).textContent),
       "a suggestion shows as one, in shape and in words, and not as pressed");
+    // (Phase 4: one zone at a time, so the zone without one is looked at first.)
+    var z1NoConfirm = !ownerCard("Z1").querySelector('[data-action="confirm-suggested"]');
+    threatCard(pz, pt.id);
     var confirmBtn = ownerCard(pz).querySelector('[data-action="confirm-suggested"]');
-    ok(!!confirmBtn && /Confirm suggested \(1\)/.test(confirmBtn.textContent) && !ownerCard("Z1").querySelector('[data-action="confirm-suggested"]'), "the zone with a suggestion offers Confirm suggested, and a zone without does not");
+    ok(!!confirmBtn && /Confirm suggested \(1\)/.test(confirmBtn.textContent) && z1NoConfirm, "the zone with a suggestion offers Confirm suggested, and a zone without does not");
     confirmBtn.focus();
     confirmBtn.click();
     ok(doc.activeElement === opt(pz, pt.id, "reduce"), "Confirm suggested goes once pressed, and the focus moves to the card's first treatment choice");
     ok(pt.treatment.decision === "reduce" && pt.treatment.confirmed === true && !ownerCard(pz).querySelector('[data-action="confirm-suggested"]'), "Confirm suggested confirms the zone's suggestions");
     pt.treatment = { decision: null, confirmed: false, reason: "" }; RT.render();
-    ok(doc.querySelectorAll("[data-threat-id]").length >= 3 && !!ownerCard("Z1"), "threat cards and owner cards keep their id attributes");
+    // Phase 4: one zone at a time, so Z1's own scenarios (T1, T2) are counted (was: every threat on the page).
+    var z1card = ownerCard("Z1");
+    ok(z1card && z1card.getAttribute("data-owner-id") === "Z1" && z1card.querySelectorAll("[data-threat-id]").length === 2 && !!z1card.querySelector('[data-threat-id="T1"]'), "threat cards and owner cards keep their id attributes");
+    threatCard("Z1", "T1");
     ok(doc.body.textContent.indexOf("countermeasure required") < 0, "the old hard 'countermeasure required' wording is gone");
-    ok(doc.body.textContent.indexOf("Residual risk with countermeasures in place") >= 0, "over-tolerable threats offer a residual-risk capture");
+    // Phase 4: the residual pair is the planned rating, after the additional countermeasures.
+    ok(doc.body.textContent.indexOf("Planned likelihood") >= 0 && doc.body.textContent.indexOf("Planned impact") >= 0, "over-tolerable threats offer a residual (planned) rating capture");
     ok(doc.body.textContent.indexOf("Unmitigated likelihood") >= 0, "the likelihood asked for is the unmitigated one");
     ok(doc.body.textContent.indexOf("Existing countermeasure") >= 0 && doc.body.textContent.indexOf("Existing control") < 0, "countermeasures can be flagged as existing, and are not called controls");
     clickNav("risk"); clickTab("slt");
     ok(doc.querySelectorAll(".fr-slt-table").length >= 1, "stage 5 renders per-FR SL-T table");
-    ok(doc.querySelectorAll(".trace details").length >= 7, "stage 5 shows a trace per FR");
     ok(doc.querySelector(".sis-box") != null, "SIS handling box shown for safety zone");
+    // Phase 4: the trace is the zone's SL-T strip's Why, one per FR (was: a Why per FR on the SL-T page).
+    clickTab("risk"); ownerCard("Z1");
+    ok(doc.querySelectorAll("#main [data-slt-strip] details.strip-why").length === 1 && doc.querySelectorAll("#main [data-slt-strip] [data-why]").length === 7, "stage 5 shows a trace per FR");
+    clickTab("slt");
     // The hand-built summaries are the Report page's Summary view (phase 3a).
     ok(clickNav("report") && clickView("summary") && clickDoc("highLevel"), "the sidebar has the high-level report");
     ok(doc.body.textContent.indexOf("High-level risk assessment report") >= 0, "standalone high-level report renders");
@@ -479,14 +513,17 @@
 
     // --- #2 destructive-delete guard: a filled threat confirms before vanishing ---
     clickNav("risk");
-    function threatCards() { return [].slice.call(doc.querySelectorAll(".threat-card")).filter(function (c) { return c.querySelector("textarea"); }); }
+    // Phase 4: the open scenario's editor holds Remove; scenarios are counted by their rows.
+    ownerCard("Z1"); threatCard("Z1", "T1");
+    function threatCards() { return [].slice.call(doc.querySelectorAll("#main [data-owner-id] [data-threat-id]")); }
+    function openRemove() { return doc.querySelector('#main .threat-card [data-action="remove-scenario"]'); }
     var nThreats = threatCards().length;
-    ok(nThreats >= 1, "detailed stage has at least one filled threat to test", "got " + nThreats);
+    ok(nThreats >= 1 && !!openRemove() && !!doc.querySelector("#main .threat-card textarea").value, "detailed stage has at least one filled threat to test", "got " + nThreats);
     w.confirm = function () { return false; };
-    threatCards()[0].querySelector(".btn.danger").click();
+    openRemove().click();
     ok(threatCards().length === nThreats, "declining the confirm keeps a filled threat");
     w.confirm = function () { return true; };
-    threatCards()[0].querySelector(".btn.danger").click();
+    openRemove().click();
     ok(threatCards().length === nThreats - 1, "confirming removes a filled threat");
     // content-gating: a blank row bypasses the prompt entirely; a filled one honours the answer
     w.confirm = function () { return false; };

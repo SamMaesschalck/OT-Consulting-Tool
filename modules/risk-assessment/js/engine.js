@@ -1,8 +1,9 @@
 /* Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. */
 /* engine.js — the risk maths, read from the rules file (no thresholds here).
  *
- * The house matrix, tolerable risk, residual risk, the one coverage rule
- * (a countermeasure on a requirement the threat affects), the treatment
+ * The house matrix, tolerable risk, a threat's three ratings (unmitigated,
+ * current, planned), the one coverage rule (the countermeasures linked to the
+ * threat; the requirement match is only a suggestion), the treatment
  * state of a threat, the per-requirement SL-T suggestion with its trace, the
  * completeness list and the risk-context file. Every function that needs the
  * project takes it as an argument: nothing here reads page state, so the
@@ -37,21 +38,31 @@ window.RiskApp.Engine = (function () {
   function threatRisk(t) { return riskFor(t.impact, t.likelihood); }
   function exceedsTolerable(band, tolerable) { return band ? (BAND_RANK[band] > BAND_RANK[tolerable]) : false; }
 
-  // Residual risk: the risk remaining with countermeasures in place. Exists only
-  // once the consultant has entered a residual likelihood and/or impact
-  // (either alone falls back to the unmitigated value for the other); a
-  // first-pass or immature assessment leaves both blank and the unmitigated
-  // risk stands.
+  // A threat's three ratings (schema 0.3):
+  //   unmitigated  likelihood x impact, before any countermeasure, existing
+  //                ones included, is counted (threatRisk)
+  //   current      with the linked existing countermeasures (currentRisk)
+  //   planned      after the planned measures as well (residualRisk; the
+  //                residual pair, which meant "with countermeasures" before 0.3)
+  // Current and planned are optional and exist only once one of their pair is
+  // entered; the other falls back to the rating before it.
+  function currentRisk(t) {
+    if (!t.currentLikelihood && !t.currentImpact) return null;
+    return riskFor(t.currentImpact || t.impact, t.currentLikelihood || t.likelihood);
+  }
   function residualRisk(t) {
     if (!t.residualLikelihood && !t.residualImpact) return null;
-    return riskFor(t.residualImpact || t.impact, t.residualLikelihood || t.likelihood);
+    return riskFor(t.residualImpact || t.currentImpact || t.impact, t.residualLikelihood || t.currentLikelihood || t.likelihood);
   }
-  // Worst operative risk across a set of threats: residual where recorded,
-  // otherwise unmitigated. Used to keep the report from reading as alarmist
-  // when controls are already in place.
+  // The rating that stands once everything recorded is done: planned where
+  // rated, else current, else unmitigated. The rating that stands today
+  // depends on the links too, so it is threatTreatment's (today).
+  function operativeRisk(t) { return residualRisk(t) || currentRisk(t) || threatRisk(t); }
+  // Worst operative risk across a set of threats. Used to keep the report
+  // from reading as alarmist when countermeasures are already in place.
   function worstResidualOf(items) {
     var worst = null;
-    items.forEach(function (t) { var r = residualRisk(t) || threatRisk(t); if (r && (worst == null || BAND_RANK[r] > BAND_RANK[worst])) worst = r; });
+    items.forEach(function (t) { var r = operativeRisk(t); if (r && (worst == null || BAND_RANK[r] > BAND_RANK[worst])) worst = r; });
     return worst;
   }
   function worstRiskOf(items) {
@@ -60,12 +71,39 @@ window.RiskApp.Engine = (function () {
     return worst;
   }
 
-  // The one coverage rule: countermeasures recorded against a requirement the
-  // threat affects.
-  function coveringCountermeasures(owner, t) {
-    return owner.countermeasures.filter(function (m) {
-      return (m.description || "").trim() && m.addressesFR.some(function (fr) { return t.affectedFR.indexOf(fr) >= 0; });
-    });
+  // The one coverage rule (schema 0.3): the countermeasures the consultant
+  // linked to the threat, in the owner's order. A link to one with no
+  // description yet covers nothing.
+  function described(m) { return !!m && !!String(m.description || "").trim(); }
+  function linkedCountermeasures(owner, t) {
+    var ids = Array.isArray(t.countermeasureIds) ? t.countermeasureIds : [];
+    return (owner.countermeasures || []).filter(function (m) { return ids.indexOf(m.id) >= 0 && described(m); });
+  }
+  function coveringCountermeasures(owner, t) { return linkedCountermeasures(owner, t); }
+  // The requirement match: countermeasures on a requirement the threat
+  // affects. Before 0.3 this was the coverage rule; now it is only ever a
+  // suggestion (what the 0.2 to 0.3 step offers to link, and a hint in the
+  // link picker).
+  function suggestLinks(owner, t) {
+    var fr = t.affectedFR || [];
+    return (owner.countermeasures || []).filter(function (m) {
+      return described(m) && (m.addressesFR || []).some(function (x) { return fr.indexOf(x) >= 0; });
+    }).map(function (m) { return m.id; });
+  }
+  // The suggested links still waiting: stored by the 0.2 to 0.3 step, not yet
+  // linked, and pointing at a countermeasure that is there.
+  function linkSuggestions(owner, t) {
+    var ids = Array.isArray(t.suggestedCountermeasureIds) ? t.suggestedCountermeasureIds : [];
+    var linked = Array.isArray(t.countermeasureIds) ? t.countermeasureIds : [];
+    return (owner.countermeasures || []).filter(function (m) { return ids.indexOf(m.id) >= 0 && linked.indexOf(m.id) < 0 && described(m); });
+  }
+  // Confirms the suggested links of a threat: each becomes a link.
+  function confirmLinkSuggestions(owner, t) {
+    var add = linkSuggestions(owner, t).map(function (m) { return m.id; });
+    if (!Array.isArray(t.countermeasureIds)) t.countermeasureIds = [];
+    add.forEach(function (id) { if (t.countermeasureIds.indexOf(id) < 0) t.countermeasureIds.push(id); });
+    delete t.suggestedCountermeasureIds;
+    return add.length;
   }
 
   // What the build before recorded decisions inferred for a threat above
@@ -133,9 +171,25 @@ window.RiskApp.Engine = (function () {
   //   reason          the reason this decision carries: the acceptance text for
   //                   "accept", the SL-T reason for "slt", none for "reduce"
   //   reasonNeeded    this decision needs a reason; reasonMissing: it has none
-  //   covering        countermeasures on a requirement the threat affects
+  //   covering        the countermeasures linked to the threat (the one coverage rule)
   //   covered         covering is not empty
-  //   residual        residual risk band or null; residualWithin: it is tolerable
+  //   existingLinked  the linked ones already in place; plannedLinked the others
+  //   linkSuggested   suggested links waiting to be confirmed (from a 0.2 file)
+  //   current         the rating with the existing countermeasures, or null;
+  //                   currentWithin: it is tolerable
+  //   residual        the planned rating (after the planned measures), or null;
+  //                   residualWithin: it is tolerable. planned/plannedWithin: the same
+  //   today           the rating that stands today (the one rule every output
+  //                   reads): the current rating where rated; else the planned
+  //                   rating when no planned countermeasure is linked (nothing
+  //                   is still to come, so it is today's); else the unmitigated
+  //                   rating. todayWithin: it is tolerable
+  //   operative       the rating that stands once everything recorded is done:
+  //                   planned, else current, else unmitigated
+  //   afterPlan       the rating once the planned countermeasures are complete:
+  //                   operative when a planned countermeasure is linked, else
+  //                   today (nothing is planned, so nothing changes).
+  //                   afterPlanWithin: it is tolerable
   //   sltUnset        for "slt", affected requirements with no SL-T set
   //   sltBelow        for "slt", affected requirements set below the suggestion
   //   sltShortfall    the two together
@@ -146,19 +200,31 @@ window.RiskApp.Engine = (function () {
   // A decision with a gap is never stated as a treatment: its label says what
   // is missing and its disposition is null, so the report, the workbook, the
   // risk context and the review pack cannot print it as fact. "Reduced to
-  // within tolerable risk" needs a tolerable residual rating and a covering
-  // countermeasure already in place; with only planned ones the threat is
+  // within tolerable risk" needs a linked countermeasure already in place and
+  // the rating that stands today tolerable (see today above). With a planned
+  // one still to come and today's rating above tolerable risk, the threat is
   // still "reduce with countermeasures".
   function threatTreatment(owner, t, project) {
     var tolerable = tolerableOf(project);
     var tr = t.treatment || {};
-    var required = exceedsTolerable(threatRisk(t), tolerable);
+    var unmit = threatRisk(t);
+    var required = exceedsTolerable(unmit, tolerable);
     var decision = required && TREATMENT_DECISIONS.indexOf(tr.decision) >= 0 ? tr.decision : null;
     var confirmed = !!(decision && tr.confirmed);
-    var resid = residualRisk(t);
+    var resid = residualRisk(t), cur = currentRisk(t);
     var residualWithin = resid != null && !exceedsTolerable(resid, tolerable);
+    var currentWithin = cur != null && !exceedsTolerable(cur, tolerable);
     var covering = coveringCountermeasures(owner, t);
-    var inPlace = covering.some(function (m) { return !!m.existing; });
+    var existingLinked = covering.filter(function (m) { return !!m.existing; });
+    var plannedLinked = covering.filter(function (m) { return !m.existing; });
+    var linkSuggested = linkSuggestions(owner, t);
+    // The one "today" rule, and what follows from it.
+    var today = cur || (resid && !plannedLinked.length ? resid : null) || unmit || null;
+    var todayWithin = today != null && !exceedsTolerable(today, tolerable);
+    var operative = resid || cur || unmit || null;
+    var afterPlan = plannedLinked.length ? operative : today;
+    var afterPlanWithin = afterPlan != null && !exceedsTolerable(afterPlan, tolerable);
+    var inPlace = existingLinked.length > 0 && todayWithin;
     var sf = decision === "slt" ? sltShortfall(owner, t, project) : { unset: [], below: [] };
     var shortfall = sf.unset.concat(sf.below);
     var reason = String((decision === "accept" ? t.acceptance : decision === "slt" ? tr.reason : "") || "").trim();
@@ -167,8 +233,8 @@ window.RiskApp.Engine = (function () {
     var gap = "", label = TREATMENT_LABEL.within, disposition = null;
     if (required && !confirmed) label = TREATMENT_LABEL.none;
     else if (decision === "reduce") {
-      if (!covering.length) { gap = "no countermeasure addresses a requirement it affects"; label = TREATMENT_LABEL.reduceNone; }
-      else if (residualWithin && inPlace) { label = TREATMENT_LABEL.reduced; disposition = "mitigated"; }
+      if (!covering.length) { gap = "no countermeasure is linked to it" + (linkSuggested.length ? " (a suggested link is waiting to be confirmed)" : ""); label = TREATMENT_LABEL.reduceNone; }
+      else if (inPlace) { label = TREATMENT_LABEL.reduced; disposition = "mitigated"; }
       else { label = TREATMENT_LABEL.reduce; disposition = "countermeasure"; }
     } else if (decision === "accept") {
       if (reasonMissing) { gap = "accepted with no reason recorded"; label = TREATMENT_LABEL.acceptNoReason; }
@@ -185,7 +251,10 @@ window.RiskApp.Engine = (function () {
       complete: confirmed && !gap,
       reason: reason, reasonNeeded: reasonNeeded, reasonMissing: reasonMissing,
       covering: covering, covered: covering.length > 0,
-      residual: resid, residualWithin: residualWithin,
+      existingLinked: existingLinked, plannedLinked: plannedLinked, linkSuggested: linkSuggested,
+      current: cur, currentWithin: currentWithin,
+      residual: resid, residualWithin: residualWithin, planned: resid, plannedWithin: residualWithin,
+      today: today, todayWithin: todayWithin, operative: operative, afterPlan: afterPlan, afterPlanWithin: afterPlanWithin,
       sltUnset: sf.unset, sltBelow: sf.below, sltShortfall: shortfall, gap: gap,
       disposition: disposition,
       label: label
@@ -288,9 +357,51 @@ window.RiskApp.Engine = (function () {
     return result;
   }
 
+  // What sets each foundational requirement's suggested SL-T for a zone or
+  // conduit: [{ fr, sl, band, drivers: [threat ids with the worst unmitigated
+  // risk on it], mapped (the SL the house mapping gives that band), raisedBy:
+  // null | "floor" | "inherited", from: [zone ids it is inherited from] }].
+  // The drivers set the suggestion only when their mapped SL reaches it; above
+  // it, a zone's suggestion comes from the safety floor and a conduit's from
+  // the zones it joins. A requirement with no driver and no suggestion is left out.
+  function sltDrivers(owner, project) {
+    var isCond = "fromZone" in owner, sug = isCond ? suggestConduit(owner, project) : suggestZone(owner, project);
+    var ends = isCond ? [owner.fromZone, owner.toZone].filter(function (id, i, a) { return id && id !== "EXT" && a.indexOf(id) === i; })
+      .map(function (id) { var z = findZone(project, id); return z ? { id: id, sug: suggestZone(z, project) } : null; }).filter(Boolean) : [];
+    var out = [];
+    FR_IDS.forEach(function (fr) {
+      var band = null;
+      owner.threats.forEach(function (t) { var r = threatRisk(t); if (r && (t.affectedFR || []).indexOf(fr) >= 0 && (band == null || BAND_RANK[r] > BAND_RANK[band])) band = r; });
+      var drivers = band ? owner.threats.filter(function (t) { return threatRisk(t) === band && (t.affectedFR || []).indexOf(fr) >= 0; }).map(function (t) { return t.id; }) : [];
+      var mapped = band && RULES.riskToSL[band] ? RULES.riskToSL[band].suggest : null;
+      var sl = sug.byFR[fr] ? sug.byFR[fr].sl : null;
+      var raisedBy = null, from = [];
+      if (sl != null && (mapped == null || mapped < sl)) {
+        if (isCond) { from = ends.filter(function (e) { return e.sug.byFR[fr] && e.sug.byFR[fr].sl === sl; }).map(function (e) { return e.id; }); raisedBy = from.length ? "inherited" : null; }
+        else if (zoneSafety(owner)) raisedBy = "floor";
+      }
+      if (!drivers.length && !raisedBy) return;
+      out.push({ fr: fr, sl: sl, band: band, drivers: drivers, mapped: mapped, raisedBy: raisedBy, from: from });
+    });
+    return out;
+  }
+
   function maxDefined(obj) { var best = null; Object.keys(obj).forEach(function (k) { if (typeof obj[k] === "number" && (best == null || obj[k] > best)) best = obj[k]; }); return best; }
   function frSug(sug) { var o = {}; FR_IDS.forEach(function (fr) { o[fr] = sug.byFR[fr].sl; }); return o; }
   function vecStr(vec) { return FR_IDS.map(function (fr) { return vec[fr] != null ? vec[fr] : "-"; }).join("/"); }
+  // The same in words for the screen: each FR set, or "Not set" (no dash placeholders).
+  function vecWords(vec) {
+    var set = FR_IDS.filter(function (fr) { return vec && vec[fr] != null; });
+    return set.length ? set.map(function (fr) { return fr + " SL" + vec[fr]; }).join(", ") : "Not set";
+  }
+  // The assets a threat on this zone or conduit can name: a zone's own, or for
+  // a conduit those of the zones it joins. [{ id, name, type, zoneId }]
+  function threatAssets(owner, project) {
+    var zones = ("fromZone" in owner) ? [owner.fromZone, owner.toZone].map(function (id) { return findZone(project, id); }).filter(function (z, i, a) { return z && a.indexOf(z) === i; }) : [owner];
+    var out = [];
+    zones.forEach(function (z) { (z.assets || []).forEach(function (a) { if (a && a.id) out.push({ id: a.id, name: a.name || "", type: a.type, zoneId: z.id }); }); });
+    return out;
+  }
 
   function VM() { return window.RiskApp.ViewModel; }
 
@@ -523,9 +634,16 @@ window.RiskApp.Engine = (function () {
         return a.id + ":" + (a.consequence || "-") + "/" + (a.likelihood || "-") + (hlOnly ? "/" + (d === true ? "required" : d === false ? "not-required" : "-") : "");
       }),
       slt: vm.owners.map(function (row) { return row.o.id + ":" + FR_IDS.map(function (fr) { var v = row.o.slTargetByFR[fr]; return v == null ? "-" : v; }).join(""); }),
-      accepted: vm.threats.filter(function (x) { return x.disposition === "accepted"; }).map(function (x) { return x.owner.id + "/" + x.t.id + ":" + (x.treatment.reason || ""); })
+      accepted: vm.threats.filter(function (x) { return x.disposition === "accepted"; }).map(function (x) {
+        // Who accepted it, their role, when, and when it is to be reviewed are
+        // part of what was approved. Added only when one is given, so an
+        // approval taken before they were recorded still matches.
+        var ad = x.t.acceptanceDetail || {}, d = ACCEPT_DETAIL.map(function (k) { return String(ad[k] || "").trim(); });
+        return x.owner.id + "/" + x.t.id + ":" + (x.treatment.reason || "") + (d.some(Boolean) ? "|" + d.join("|") : "");
+      })
     };
   }
+  var ACCEPT_DETAIL = ["by", "role", "date", "reviewDate"];
   function hash8(s) {
     var h = 5381;
     for (var i = 0; i < s.length; i++) { h = (h * 33) ^ s.charCodeAt(i); h |= 0; }
@@ -736,7 +854,18 @@ window.RiskApp.Engine = (function () {
   function buildRiskContext(project) {
     var p = project, tolerable = tolerableOf(p);
     var vm = VM().build(p);
-    function mapThreats(row) { return row.threats.map(function (x) { var t = x.t; return { id: t.id, statement: t.statement, source: t.source, affectedFR: t.affectedFR.slice(), likelihood: t.likelihood, impact: t.impact, unmitigatedRisk: x.risk, residualLikelihood: t.residualLikelihood || null, residualImpact: t.residualImpact || null, residualRisk: x.residual, exceedsTolerable: x.exceeds, disposition: x.disposition, acceptance: t.acceptance || "" }; }); }
+    // residualRisk is the planned rating, else the current one (schema 0.3:
+    // the residual pair means after planned measures; the view model's
+    // residualRisk), with the pair it was worked out from: a side not given
+    // takes the rating before it, as the rating itself does.
+    function mapThreats(row) { return row.threats.map(function (x) {
+      var t = x.t, planned = x.planned != null, current = x.current != null;
+      var L = planned ? (t.residualLikelihood || t.currentLikelihood || t.likelihood) : current ? (t.currentLikelihood || t.likelihood) : null;
+      var I = planned ? (t.residualImpact || t.currentImpact || t.impact) : current ? (t.currentImpact || t.impact) : null;
+      return { id: t.id, statement: t.statement, source: t.source, affectedFR: t.affectedFR.slice(), likelihood: t.likelihood, impact: t.impact, unmitigatedRisk: x.risk,
+        residualLikelihood: L || null, residualImpact: I || null,
+        residualRisk: x.residualRisk, exceedsTolerable: x.exceeds, disposition: x.disposition, acceptance: t.acceptance || "" };
+    }); }
     function vecFrom(sug) { var o = {}; FR_IDS.forEach(function (fr) { o[fr] = sug.byFR[fr].sl; }); return o; }
     function tgtVec(owner) { var o = {}; FR_IDS.forEach(function (fr) { o[fr] = owner.slTargetByFR[fr] != null ? owner.slTargetByFR[fr] : null; }); return o; }
     // The consultant's own SL-T only: null when none is set, never the
@@ -794,8 +923,11 @@ window.RiskApp.Engine = (function () {
   return {
     todayISO: todayISO, tolerableOf: tolerableOf, findZone: findZone,
     riskFor: riskFor, threatRisk: threatRisk, exceedsTolerable: exceedsTolerable,
-    residualRisk: residualRisk, worstResidualOf: worstResidualOf, worstRiskOf: worstRiskOf,
-    coveringCountermeasures: coveringCountermeasures, suggestTreatment: suggestTreatment, sltShortfall: sltShortfall,
+    residualRisk: residualRisk, currentRisk: currentRisk, operativeRisk: operativeRisk, worstResidualOf: worstResidualOf, worstRiskOf: worstRiskOf,
+    coveringCountermeasures: coveringCountermeasures, linkedCountermeasures: linkedCountermeasures,
+    suggestLinks: suggestLinks, linkSuggestions: linkSuggestions, confirmLinkSuggestions: confirmLinkSuggestions,
+    threatAssets: threatAssets, vecWords: vecWords,
+    suggestTreatment: suggestTreatment, sltShortfall: sltShortfall,
     TREATMENT_LABEL: TREATMENT_LABEL, threatTreatment: threatTreatment, threatDisposition: threatDisposition,
     assetTypeLabel: assetTypeLabel, assetLinkLabel: assetLinkLabel, flagLabel: flagLabel, scaleName: scaleName,
     conduitExternal: conduitExternal, conduitsOf: conduitsOf, separationRows: separationRows,
@@ -804,7 +936,7 @@ window.RiskApp.Engine = (function () {
     approvalBasis: approvalBasis, approvalFingerprint: approvalFingerprint, approvalStates: approvalStates,
     APPROVAL_DOC_PARTS: APPROVAL_DOC_PARTS, approvalChangedFor: approvalChangedFor, approvalPartWords: approvalPartWords,
     likelihoodName: likelihoodName, impactName: impactName, zoneSafety: zoneSafety,
-    suggestZone: suggestZone, suggestConduit: suggestConduit,
+    suggestZone: suggestZone, suggestConduit: suggestConduit, sltDrivers: sltDrivers,
     maxDefined: maxDefined, frSug: frSug, vecStr: vecStr,
     CONDUIT_RULE: CONDUIT_RULE, isBand: isBand, worstBand: worstBand, hlaById: hlaById, hlaRisk: hlaRisk, zonesOfHLA: zonesOfHLA,
     initialRiskOf: initialRiskOf, comparison: comparison, hlaComparison: hlaComparison,

@@ -432,7 +432,8 @@
         RP.setSection("detailed", "executive-summary", { title: "Saved detailed title" });
         RP.setSection("highLevel", "method-and-limitations", { hidden: true });
         var saved = JSON.stringify(P());
-        ok(JSON.parse(saved).schema === "spt-risk-project/0.2", "the file format's schema has not moved: the field is optional");
+        // Phase 4 moved the schema to 0.3 (links and three ratings); the overrides themselves still add none.
+        ok(JSON.parse(saved).schema === "spt-risk-project/0.3", "the file format's schema has not moved for them: the field is optional");
         ok(RT.loadProjectText(saved), "a project with overrides loads");
         ok(RP.sectionOf("detailed", "executive-summary").title === "Saved detailed title" && RP.sectionOf("highLevel", "method-and-limitations").hidden === true, "and they come back, per report");
         return wordBlocks({}).then(function (bl) {

@@ -11,9 +11,11 @@
  *
  * Word (vendor/docx.umd.js, the rPr-patched copy) is the readable
  * deliverable; {highLevelOnly:true} builds the high-level risk assessment variant.
- * Excel (vendor/exceljs.min.js) is the engineers' working artefact: a
- * living threat tracker (status dropdown + tracking columns), the ranking,
- * zone/conduit registers, countermeasures, the SL-T matrix and the basis.
+ * Excel (vendor/exceljs.min.js) is the register and treatment plan issued
+ * from the tool, one way (a new issue replaces the old): a summary with heat
+ * maps, the ranking, the threat register with its three ratings, the
+ * treatment plan, accepted risks, vulnerabilities, zone/conduit registers,
+ * countermeasures, the SL-T matrix, the risk criteria and the basis.
  *
  * Both builders are pure (project in → docx Document / ExcelJS Workbook out)
  * so the headless tests can inspect the output; download wrappers live here.
@@ -103,14 +105,20 @@ window.RiskExports = (function () {
       "For approval by the people below. " + COVERS.highLevel
     ].concat([].concat.apply([], states.map(function (s) { return [changedText(s, "detailed"), changedText(s, "highLevel")]; })).filter(Boolean));
   }
-  // "This assessment was signed off by R. Calder (Asset Owner) on 2026-07-04,
-  // for “…”; and by …".
+  // "This assessment was signed off by R. Calder (Asset Owner) and S. Adeyemi
+  // (Process Safety Engineer) on 2026-07-04; the scope of each approval is
+  // under Sign-off." One date when they share it, else each its own. The
+  // scope itself is in the signature table, not repeated here.
   function signedSentence(signed) {
-    var bits = signed.map(function (s, i) {
-      var e = s.entry, scope = noStop(e.scope);
-      return (i ? "by " : "") + (e.name || "an approver not named") + (e.role ? " (" + e.role + ")" : "") + (e.date ? " on " + e.date : "") + (scope ? ", for “" + scope + "”" : "");
+    var dates = signed.map(function (s) { return s.entry.date || ""; }).filter(function (d, i, a) { return a.indexOf(d) === i; });
+    var oneDate = dates.length === 1 ? dates[0] : "";
+    var bits = signed.map(function (s) {
+      var e = s.entry;
+      return (e.name || "an approver not named") + (e.role ? " (" + e.role + ")" : "") + (!oneDate && e.date ? " on " + e.date : "");
     });
-    return "This assessment was signed off by " + (bits.length > 1 ? bits.slice(0, -1).join("; ") + "; and " + bits[bits.length - 1] : bits[0]) + ".";
+    var anyScope = signed.some(function (s) { return !!noStop(s.entry.scope); });
+    return "This assessment was signed off by " + (bits.length > 1 ? bits.slice(0, -1).join(", ") + " and " + bits[bits.length - 1] : bits[0]) + (oneDate ? " on " + oneDate : "") +
+      (anyScope ? "; the scope of " + (signed.length > 1 ? "each approval" : "the approval") + " is under Sign-off" : "") + ".";
   }
   // The note one report prints for an approval older than a change to what
   // that report says it covers, or null when nothing it covers moved.
@@ -160,6 +168,50 @@ window.RiskExports = (function () {
     });
   }
 
+  // The threats of a zone or conduit linked to one of its countermeasures
+  // or vulnerabilities (ids).
+  function linkedThreats(o, id) {
+    return (o.threats || []).filter(function (t) { return (t.countermeasureIds || []).indexOf(id) >= 0 || (t.vulnerabilityIds || []).indexOf(id) >= 0; }).map(function (t) { return t.id; });
+  }
+  // A scenario's likelihood and impact in a state; a state not rated takes
+  // the rating before it (as step 5's heat map reads it).
+  function stateLI(t, st) {
+    var L = t.likelihood, I = t.impact;
+    if (st === "current" || st === "planned") { L = t.currentLikelihood || L; I = t.currentImpact || I; }
+    if (st === "planned") { L = t.residualLikelihood || L; I = t.residualImpact || I; }
+    return { L: L, I: I };
+  }
+  // The additional (planned) countermeasures across every zone and conduit,
+  // in the order a plan is read: priority, then due date, then as entered.
+  // [{ m, owner, threats: [threat ids linked to it] }]
+  function plannedCountermeasures(S) {
+    var rank = { high: 0, medium: 1, low: 2 }, out = [];
+    S.owners.forEach(function (row) {
+      (row.o.countermeasures || []).forEach(function (m) {
+        if (m.existing || !String(m.description || "").trim()) return;
+        out.push({ m: m, owner: row.o, threats: linkedThreats(row.o, m.id), n: out.length });
+      });
+    });
+    return out.sort(function (a, b8) {
+      var pa = rank[a.m.priority] != null ? rank[a.m.priority] : 3, pb = rank[b8.m.priority] != null ? rank[b8.m.priority] : 3;
+      if (pa !== pb) return pa - pb;
+      var da = a.m.dueDate || "9999", db = b8.m.dueDate || "9999";
+      if (da !== db) return da < db ? -1 : 1;
+      return a.n - b8.n;
+    });
+  }
+  // A countermeasure's plan fields in words; "" when not given.
+  function cmStatus(m) { return (RT().CM_STATUS_LABEL || {})[m.status] || ""; }
+  function cmPriority(m) { return (RT().CM_PRIORITY_LABEL || {})[m.priority] || ""; }
+  // The names of the assets a threat links (a conduit's threat names its
+  // zones' assets, with the zone).
+  function assetNames(owner, t, p) {
+    var isConduit = "fromZone" in owner;
+    var all = RT().threatAssets(owner, p);
+    return (t.assetIds || []).map(function (id) { return all.filter(function (a) { return a.id === id; })[0]; }).filter(Boolean)
+      .map(function (a) { return (a.name || a.id) + (isConduit ? " (" + a.zoneId + ")" : ""); });
+  }
+
   /* ===================== WORD ===================== */
 
   function buildWordDoc(p, opts) {
@@ -180,6 +232,10 @@ window.RiskExports = (function () {
     function orderOf(title) { var c = custom[RS.sectionKey(title)]; return c ? c.order : null; }
     // What a ranked list printed, by id, for the preview's drag and arrows.
     function noteList(title, ids) { if (opts.listProbe) opts.listProbe[RS.sectionKey(title)] = ids; }
+    // The sections printed on landscape pages (see the end of this builder).
+    // A table there is 14438 wide: A4 landscape less the margins.
+    var LAND_KEYS = {};
+    ["Risk register", "Treatment plan", "Accepted risks"].forEach(function (t) { LAND_KEYS[RS.sectionKey(t)] = true; });
 
     // ---- primitives (this app's copy of the Assessments idiom) ----
     // The __tags are read back by the section pass (shared/report-sections.js):
@@ -364,6 +420,21 @@ window.RiskExports = (function () {
     function bandCell(bandId, width) {
       var st = bandStyle(bandId);
       return textCell(st.name, width, { fill: st.fill, color: st.text, bold: true, valign: "center" });
+    }
+    // One of a threat's three ratings (schema 0.3): the band, and under it the
+    // likelihood and impact when they are given. A current or planned rating
+    // not given prints blank (the one before it stands); an unmitigated one
+    // not given says so.
+    function ratingCell(band, li, width, blankIfNone) {
+      if (!band && blankIfNone) return textCell("", width);
+      // Rated on one side only: the side given, and the other in words. A dash
+      // beside a rating reads as a typo, and the review tool's dash check
+      // would report it as one.
+      if (!band && li && (li.L || li.I)) return textCell((li.L ? likName(li.L) : "Not rated") + " × " + (li.I ? sevName(li.I) : "Not rated"), width, { color: COLOR.muted });
+      if (!band) return textCell("Not rated", width, { color: COLOR.muted });
+      var st = bandStyle(band), kids = [para([run(st.name, { bold: true, color: st.text })], { spacing: { after: 0 } })];
+      if (li && li.L && li.I) kids.push(para([run(likName(li.L) + " × " + sevName(li.I), { color: st.text, size: 16 })], { spacing: { after: 0 } }));
+      return cellDxa(kids, width, { fill: st.fill, valign: "center" });
     }
     // The recorded decision on a detailed assessment; none recorded is a
     // prompt, in red.
@@ -579,18 +650,21 @@ window.RiskExports = (function () {
         var v = S.sltMax[f.id];
         return { t: v == null ? "Not set" : "SL" + v, color: v != null ? COLOR.navy : COLOR.soft, label: f.id, fill: COLOR.subBg, size: v == null ? 18 : 28 };
       })));
-      // Focus cards: above tolerable with no decision first, then worst risks.
+      // Focus cards: the threats still above tolerable risk today, ranked on
+      // the rating that stands today (worst first; of equals, one with no
+      // complete decision first, then as registered).
       function focusId(x) { return x.owner.id + ":" + x.t.id; }
-      var focus = RS.applyOrder(S.threats.filter(function (x) { return x.exceeds && !x.decided; })
-        .concat(S.threats.filter(function (x) { return x.exceeds && x.decided; })
-          .sort(function (a, b6) { return (S.bandRank[b6.risk] || 0) - (S.bandRank[a.risk] || 0); })),
+      var focus = RS.applyOrder(S.threats.filter(function (x) { return x.todayExceeds; })
+        .map(function (x, i) { return { x: x, i: i }; })
+        .sort(function (a, b6) { return ((S.bandRank[b6.x.today] || 0) - (S.bandRank[a.x.today] || 0)) || ((a.x.decided ? 1 : 0) - (b6.x.decided ? 1 : 0)) || (a.i - b6.i); })
+        .map(function (e) { return e.x; }),
         orderOf("Where to focus first"), focusId)
         .slice(0, 3);
       noteList("Where to focus first", focus.map(focusId));
       if (focus.length) {
         out.push(h2("Where to focus first"));
         focus.forEach(function (x, i) {
-          out.push(sbFocusCard(i + 1, x.t.id + "  " + x.t.statement, x.owner.id + " · " + bandStyle(x.risk).name + (x.decided ? "" : x.incomplete ? " · decision incomplete" : " · no decision recorded")));
+          out.push(sbFocusCard(i + 1, x.t.id + "  " + x.t.statement, x.owner.id + " · " + bandStyle(x.today).name + " today" + (x.decided ? "" : x.incomplete ? " · decision incomplete" : " · no decision recorded")));
           out.push(sbSpacer());
         });
       }
@@ -701,21 +775,118 @@ window.RiskExports = (function () {
       children.push(body("Next, the systems are grouped into security zones and conduits, and the initial risk of each zone and conduit is compared with the tolerable risk to decide where a detailed assessment is needed. There, threats are registered and treated, and target security levels are set to scope the engineering work. Systems below the threshold should be re-ranked if their connectivity, criticality or threat exposure changes."));
     } else {
       var exceed = S.threats.filter(function (x) { return x.exceeds; });
+      function nOf(n, one, many) { return n + " " + (n === 1 ? one : many); }
+      function isAre(n) { return n + (n === 1 ? " is" : " are"); }
+      function lower(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
+      function andList(list) { return list.length > 1 ? list.slice(0, -1).join(", ") + " and " + list[list.length - 1] : (list[0] || ""); }
+      var accepted = exceed.filter(function (x) { return x.disposition === "accepted"; });
+      var undecided = exceed.filter(function (x) { return !x.decided && !x.incomplete; });
+      var incomplete = exceed.filter(function (x) { return x.incomplete; });
+
+      // ---- the residual position leads (phase 4): where today's
+      // countermeasures and the planned ones take the threats above
+      // tolerable risk, the decisions that stand, and the top risks today.
+      // Today is the engine's one rule (threatTreatment), read through the
+      // view model, as the scorecard, the register and the workbook read it ----
+      children.push(h2("Risk position"));
+      var inTop = [];
+      if (exceed.length) {
+        var c = S.dispositionCounts;
+        var cmEx = S.counts.countermeasuresExisting, cmPl = S.counts.countermeasuresPlanned;
+        // Once the plan is done counts only the threats a planned
+        // countermeasure is linked to: with nothing planned, nothing changes.
+        var withinToday = S.counts.withinToday, withinPlanned = S.counts.withinAfterPlan;
+        children.push(body("Of the " + nOf(exceed.length, "threat", "threats") + " above tolerable risk before any countermeasure, " + (withinToday ? isAre(withinToday) : "none is") + " within it with today's countermeasures" +
+          (withinPlanned > withinToday ? " and " + withinPlanned + " will be once the planned countermeasures are complete" : "") + "."));
+        // Only decisions that stand are counted: dispositionCounts leaves out
+        // an unconfirmed decision and one recorded without what it rests on.
+        // A count of none is left out.
+        var bits = [], nDec = c.mitigated + c.countermeasure + c["sl-t"] + c.accepted;
+        if (c.mitigated) bits.push(c.mitigated + " reduced to within tolerable risk");
+        if (c.countermeasure) bits.push(c.countermeasure + " being reduced with countermeasures");
+        if (c["sl-t"]) bits.push(c["sl-t"] + " treated through the SL-T programme");
+        if (c.accepted) bits.push(c.accepted + " accepted by the asset owner");
+        var cmBits = [];
+        if (cmEx) cmBits.push(String(cmEx) + " existing");
+        if (cmPl) cmBits.push(String(cmPl) + " planned");
+        var tally = (bits.length ? (nDec === 1 ? "The treatment decision is: " : "The treatment decisions are: ") + andList(bits) + "." : "") +
+          (cmBits.length ? (bits.length ? " " : "") + "The register holds " + andList(cmBits) + " countermeasure" + (cmEx + cmPl === 1 ? "" : "s") + "." : "");
+        if (tally) children.push(body(tally));
+        // The rating that stands is carried into a column not rated, so no
+        // cell of this short table is blank.
+        var top = S.threats.filter(function (x) { return x.todayExceeds; })
+          .map(function (x, i) { return { x: x, i: i }; })
+          .sort(function (a, b7) { return ((S.bandRank[b7.x.today] || 0) - (S.bandRank[a.x.today] || 0)) || (a.i - b7.i); })
+          .slice(0, 5).map(function (e) { return e.x; });
+        inTop = top;
+        if (top.length) {
+          children.push(body(top.length === 1 ? "The threat above tolerable risk today:" : "The threats above tolerable risk today:"));
+          var kw = [2706, 1200, 1200, 1200, 1200, 2000];
+          children.push(fixedTable([headerRow(["Threat", "Zone or conduit", "Unmitigated", "Current", "Planned", "Treatment decision"], kw)].concat(top.map(function (x) {
+            return new docx.TableRow({ children: [
+              textCell(x.t.id + "  " + (x.t.statement || "No statement"), kw[0]),
+              textCell(x.owner.id, kw[1]),
+              ratingCell(x.risk, null, kw[2], false),
+              ratingCell(x.current || x.risk, null, kw[3], false),
+              ratingCell(x.planned || x.current || x.risk, null, kw[4], false),
+              textCell(x.label, kw[5], x.decided ? {} : { bold: true })
+            ] });
+          })), kw));
+        }
+      } else if (S.threats.length) {
+        children.push(body("No registered threat exceeds the tolerable risk of " + tolName + ", so no treatment decision is needed."));
+      } else {
+        children.push(body("No threats are registered yet."));
+      }
+
+      // ---- what is waiting on a decision: open treatment decisions (red,
+      // the consultant's to complete), accepted risks the asset owner has not
+      // approved, and planned countermeasures with no owner or due date ----
+      children.push(h2("Decisions required"));
+      var planned = plannedCountermeasures(S);
+      var unplanned = planned.filter(function (e) { return !String(e.m.owner || "").trim() || !String(e.m.dueDate || "").trim(); });
+      var acceptApproved = rt.approvalStates(p).some(function (s) { return s.signed && rt.approvalChangedFor(s, "detailed").indexOf("accepted") < 0; });
+      var awaiting = acceptApproved ? [] : accepted;
+      if (undecided.length) {
+        children.push(body(undecided.length + " threat" + (undecided.length > 1 ? "s" : "") + " above tolerable risk " + (undecided.length > 1 ? "have" : "has") + " no treatment decision recorded: " + undecided.map(function (x) { return x.t.id + " (" + x.owner.id + ")"; }).join(", ") + ".", { bold: true, color: COLOR.note }));
+      }
+      if (incomplete.length) {
+        children.push(body(nOf(incomplete.length, "treatment decision is", "treatment decisions are") + " incomplete: " + incomplete.map(function (x) { return x.t.id + " (" + x.owner.id + "), " + lower(x.label); }).join("; ") + ".", { bold: true, color: COLOR.note }));
+      }
+      if (awaiting.length) {
+        children.push(body("The asset owner has not yet approved the accepted risk" + (awaiting.length > 1 ? "s " : " ") + andList(awaiting.map(function (x) { return x.t.id + " (" + x.owner.id + ")"; })) + "."));
+      }
+      if (unplanned.length) {
+        children.push(body(nOf(unplanned.length, "planned countermeasure has", "planned countermeasures have") + " no owner or due date agreed: " + andList(unplanned.map(function (e) { return e.m.id + " (" + e.owner.id + ")"; })) + "."));
+      }
+      // A planned countermeasure only proposed is still the asset owner's to agree.
+      var proposed = planned.filter(function (e) { return e.m.status === "proposed"; });
+      if (proposed.length) {
+        children.push(body(nOf(proposed.length, "planned countermeasure is", "planned countermeasures are") + " proposed and not yet agreed: " + andList(proposed.map(function (e) { return e.m.id + " (" + e.owner.id + ")"; })) + "."));
+      }
+      if (!undecided.length && !incomplete.length && !awaiting.length && !unplanned.length && !proposed.length) {
+        var settled = [];
+        if (exceed.length) settled.push("every threat above tolerable risk has a treatment decision");
+        if (accepted.length) settled.push(accepted.length === 1 ? "the accepted risk is approved" : "the accepted risks are approved");
+        if (planned.length) settled.push("each planned countermeasure has an owner and a due date");
+        children.push(body(settled.length ? "Nothing is waiting on a decision: " + andList(settled) + "." : "Nothing is waiting on a decision."));
+      }
+
       children.push(h2("Why this assessment"));
       children.push(body("A cyber incident on a plant can stop production, damage equipment and put people at risk. Regulators and insurers increasingly expect an asset owner to show where that risk sits and that the protection in place is proportionate to it. " + notSet(eng.client) + " commissioned this assessment of " + (p.suc.name || "the system under consideration") + (eng.assessmentDate ? " (" + eng.assessmentDate + ")" : "") + " to establish that."));
       children = children.concat(stakesKids());
       children.push(h2("What this report is"));
-      function nOf(n, one, many) { return n + " " + (n === 1 ? one : many); }
       // The method used: each zone and conduit is compared with tolerable
       // risk first (the risk comparison), and only those recorded as needing
       // a detailed assessment have their threats rated.
       function ratedSentence() {
         var skip = p.zones.concat(p.conduits).filter(function (o) { return rt.comparison(o, p).required === false; }).map(function (o) { return o.id; });
-        if (!skip.length) return "Threats to each zone and conduit were rated for likelihood and impact against the tolerable risk of " + tolName + ", and every threat above that level needs a recorded treatment decision.";
+        // What a decision is needed for is the residual position's to say, so it is not said here too.
+        if (!skip.length) return "Threats to each zone and conduit were rated for likelihood and impact and compared with the tolerable risk of " + tolName + ".";
         var list = skip.length > 1 ? skip.slice(0, -1).join(", ") + " and " + skip[skip.length - 1] : skip[0];
-        return "The initial risk of each zone and conduit was first compared with the tolerable risk of " + tolName + ". " + list + (skip.length === 1 ? " was" : " were") + " found not to need a detailed assessment, and " + (skip.length === 1 ? "its" : "their") + " SL-T rests on the written justification. Threats to the others were rated for likelihood and impact, and every threat above the tolerable risk needs a recorded treatment decision.";
+        return "The initial risk of each zone and conduit was compared with the tolerable risk of " + tolName + ". " + list + (skip.length === 1 ? " was" : " were") + " found not to need a detailed assessment, and " + (skip.length === 1 ? "its" : "their") + " SL-T rests on the written justification. Threats to the others were rated for likelihood and impact.";
       }
-      children.push(body("The assessment follows IEC 62443-3-2. " + (ranked.length ? nOf(ranked.length, "system was", "systems were") + " first ranked for relative risk. The system under consideration was then" : "The system under consideration was") + " divided into " + nOf(p.zones.length, "security zone", "security zones") + " and " + nOf(p.conduits.length, "conduit", "conduits") + ". A zone groups assets with the same security requirements, and a conduit is a communication path between zones. " + ratedSentence() + " Each zone and conduit then has a target security level (SL-T), the protection it must be engineered and maintained to."));
+      children.push(body("The assessment follows IEC 62443-3-2. " + (ranked.length ? nOf(ranked.length, "system was", "systems were") + " first ranked for relative risk, and the system under consideration was" : "The system under consideration was") + " divided into " + nOf(p.zones.length, "security zone", "security zones") + " (each a group of assets with the same security requirements) and " + nOf(p.conduits.length, "conduit", "conduits") + " (the communication paths between them). " + ratedSentence() + " Each zone and conduit then has a target security level (SL-T), the protection it must be engineered and maintained to."));
       var bSent = basisSentence();
       if (bSent) children.push(body(bSent));
       children.push(h2("What we found"));
@@ -725,10 +896,10 @@ window.RiskExports = (function () {
         var n2 = row.exceeding.length;
         if (n2 > hotCount) { hotCount = n2; hottest = row; }
       });
+      // How many are above tolerable risk is the position's opening sentence,
+      // so it is not said again here.
       var findRuns = [
-        run(S.threats.length + " threats were registered; "),
-        run(String(exceed.length), { bold: true, color: exceed.length ? COLOR.gap : COLOR.met }),
-        run(" exceed the tolerable risk of " + tolName + " before treatment.")
+        run(nOf(S.threats.length, "threat was", "threats were") + " registered.")
       ];
       if (hottest && hotCount > 1) {
         findRuns.push(run(" The most affected is " + hottest.o.id + (hottest.o.name ? " " + hottest.o.name : "") + flagsPhrase(hottest.o) + ", with " + hotCount + "."));
@@ -739,41 +910,19 @@ window.RiskExports = (function () {
         findRuns.push(run(": " + noStop(S.worst.t.statement) + " (" + S.worst.owner.id + (S.worst.owner.name ? " " + S.worst.owner.name : "") + ")."));
       }
       children.push(asBody(para(findRuns), findRuns.map(function (r) { return r.__text; }).join("")));
-      // The treatment position.
-      if (exceed.length) {
-        var c = S.dispositionCounts;
-        var cmEx = S.counts.countermeasuresExisting, cmPl = S.counts.countermeasuresPlanned;
-        var accepted = exceed.filter(function (x) { return x.disposition === "accepted"; });
-        var undecided = exceed.filter(function (x) { return !x.decided && !x.incomplete; });
-        var incomplete = exceed.filter(function (x) { return x.incomplete; });
-        function isAre(n) { return n + (n === 1 ? " is" : " are"); }
-        function lower(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
-        // Only decisions that stand are counted: dispositionCounts leaves out
-        // an unconfirmed decision and one recorded without what it rests on.
-        var bits = [];
-        if (c.mitigated || c.countermeasure || c["sl-t"] || c.accepted) {
-          if (c.mitigated) bits.push(isAre(c.mitigated) + " reduced to within tolerable risk by countermeasures");
-          if (c.countermeasure) bits.push(isAre(c.countermeasure) + " being reduced with countermeasures");
-          if (c["sl-t"]) bits.push(isAre(c["sl-t"]) + " treated through the target security level programme");
-          if (c.accepted) bits.push(isAre(c.accepted) + " formally accepted by the asset owner");
-          children.push(body("Of the " + nOf(exceed.length, "threat", "threats") + " above tolerable risk, " +(bits.length > 1 ? bits.slice(0, -1).join(", ") + " and " + bits[bits.length - 1] : bits[0]) + ". The register holds " + cmEx + " existing and " + cmPl + " planned countermeasures."));
-        }
-        if (accepted.length) {
-          children.push(body((accepted.length > 1 ? "Accepted risks: " : "Accepted risk ") + accepted.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + noStop(x.t.statement); }).join("; ") + ". The rationale is recorded in the threat register and should be revisited at the next assessment."));
-        }
-        if (incomplete.length) {
-          children.push(body(nOf(incomplete.length, "treatment decision is", "treatment decisions are") + " incomplete: " + incomplete.map(function (x) { return x.t.id + " (" + x.owner.id + "), " + lower(x.label); }).join("; ") + ".", { bold: true, color: COLOR.note }));
-        }
-        if (undecided.length) {
-          children.push(body(undecided.length + " threat" + (undecided.length > 1 ? "s" : "") + " above tolerable risk " + (undecided.length > 1 ? "have" : "has") + " no treatment decision recorded: " + undecided.map(function (x) { return x.t.id + " (" + x.owner.id + ")"; }).join(", ") + ".", { bold: true, color: COLOR.note }));
-        }
-      } else if (S.threats.length) {
-        children.push(body("No registered threat exceeds the tolerable risk of " + tolName + ", so no treatment decision is needed."));
+      // The treatment position is the section above; an accepted risk not
+      // already in its table of the threats above tolerable risk today is
+      // named here, with its detail in a section of its own.
+      var accNamed = accepted.filter(function (x) { return inTop.indexOf(x) < 0; });
+      if (accNamed.length) {
+        children.push(body((accNamed.length > 1 ? "Accepted risks: " : "Accepted risk ") + accNamed.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + noStop(x.t.statement); }).join("; ") + ". The reason, who accepted " + (accNamed.length > 1 ? "each" : "it") + " and when " + (accNamed.length > 1 ? "each is" : "it is") + " to be reviewed are under Accepted risks."));
       }
       // The outcome: the SL-T vector and what happens next.
       children.push(h2("What happens next"));
       var sltBits = FRS().map(function (f) { return f.id + (S.sltMax[f.id] == null ? " not set" : " SL" + S.sltMax[f.id]); }).join(", ");
       var overallMax = FRS().map(function (f) { return S.sltMax[f.id]; }).reduce(function (m, v) { return v != null && (m === null || v > m) ? v : m; }, null);
+      // The same level on every requirement is said once.
+      var sameAll = overallMax != null && FRS().every(function (f) { return S.sltMax[f.id] === overallMax; });
       var drivers = [];
       if (overallMax != null) {
         S.owners.forEach(function (row) {
@@ -781,7 +930,7 @@ window.RiskExports = (function () {
           if (hit) drivers.push(row.o.id + (row.o.name ? " " + row.o.name : ""));
         });
       }
-      children.push(body("The highest target security levels across the system are " + sltBits + "." + (overallMax != null && drivers.length ? " The SL" + overallMax + " ceiling is set by " + (drivers.length > 3 ? drivers.slice(0, 3).join(", ") + " and " + (drivers.length - 3) + " more" : drivers.join(", ")) + "." : "") + " An IEC 62443-3-3 assessment against these targets will measure what the system can withstand today, and the gaps it finds become the security improvement programme."));
+      children.push(body((sameAll ? "The highest target security level across the system is SL" + overallMax + " on every foundational requirement." : "The highest target security levels across the system are " + sltBits + ".") + (overallMax != null && drivers.length ? " The SL" + overallMax + " ceiling is set by " + (drivers.length > 3 ? drivers.slice(0, 3).join(", ") + " and " + (drivers.length - 3) + " more" : drivers.join(", ")) + "." : "") + " An IEC 62443-3-3 assessment against these targets will measure what the system can withstand today, and the gaps it finds become the security improvement programme."));
       children.push(body("Repeat this assessment after a significant change to the system or its connectivity, after a security incident, and otherwise at regular intervals."));
     }
     if (rt.approvalStates(p).some(function (s) { return s.signed; })) {
@@ -931,9 +1080,75 @@ window.RiskExports = (function () {
     }
 
     if (!opts.highLevelOnly) {
-      // ---- zones & conduits + threat registers ----
+      // ---- the risk register (phase 4): every scenario with its three
+      // ratings and its treatment decision, on a landscape page, with the
+      // treatment plan and the accepted risks after it ----
+      children.push(h1("Risk register"));
+      children.push(body("Each threat scenario is rated before any countermeasure (unmitigated), with the countermeasures in place today (current) and after the planned ones (planned). Under each risk is its likelihood × impact. A blank current or planned rating means the rating before it stands. The tolerable risk is " + tolName + "."));
+      if (!S.threats.length) {
+        children.push(body("No threats registered.", { color: COLOR.muted, italics: true }));
+      } else {
+        var rgw = [2000, 4638, 1700, 1700, 1700, 2700];
+        children.push(fixedTable([headerRow(["Zone or conduit", "Threat scenario", "Unmitigated", "Current", "Planned", "Treatment decision"], rgw)].concat(S.threats.map(function (x) {
+          return new docx.TableRow({ children: [
+            textCell(x.owner.id + (x.owner.name ? " " + x.owner.name : ""), rgw[0]),
+            textCell(x.t.id + "  " + (x.t.statement || "No statement"), rgw[1]),
+            ratingCell(x.risk, stateLI(x.t, "unmitigated"), rgw[2], false),
+            ratingCell(x.current, stateLI(x.t, "current"), rgw[3], true),
+            ratingCell(x.planned, stateLI(x.t, "planned"), rgw[4], true),
+            // No decision, or an incomplete one, prints in the red of a prompt left to complete.
+            textCell(x.label, rgw[5], x.exceeds && !x.decided ? { bold: true, color: COLOR.note } : {})
+          ] });
+        })), rgw));
+      }
+
+      // ---- the treatment plan: the additional countermeasures ----
+      children.push(h1("Treatment plan"));
+      var plan = plannedCountermeasures(S);
+      if (!plan.length) {
+        children.push(body("No additional countermeasure is planned."));
+      } else {
+        children.push(body("Each additional countermeasure has an owner, a priority, a due date and a status. Countermeasures already in place are listed under each zone and conduit."));
+        var pw = [4538, 1700, 1300, 1700, 1100, 1300, 1300, 1500];
+        children.push(fixedTable([headerRow(["Countermeasure", "Zone or conduit", "Threat scenarios", "Owner", "Priority", "Due date", "Status", "SR references"], pw)].concat(plan.map(function (e) {
+          var m = e.m;
+          return new docx.TableRow({ children: [
+            textCell(m.id + "  " + m.description, pw[0]),
+            textCell(e.owner.id + (e.owner.name ? " " + e.owner.name : ""), pw[1]),
+            e.threats.length ? textCell(e.threats.join(", "), pw[2]) : textCell("None linked", pw[2], { color: COLOR.muted }),
+            String(m.owner || "").trim() ? textCell(m.owner, pw[3]) : textCell("Not assigned", pw[3], { color: COLOR.muted }),
+            cmPriority(m) ? textCell(cmPriority(m), pw[4]) : textCell("Not set", pw[4], { color: COLOR.muted }),
+            String(m.dueDate || "").trim() ? textCell(m.dueDate, pw[5]) : textCell("Not set", pw[5], { color: COLOR.muted }),
+            cmStatus(m) ? textCell(cmStatus(m), pw[6]) : textCell("Not set", pw[6], { color: COLOR.muted }),
+            textCell((m.srRefs || []).join(", "), pw[7])
+          ] });
+        })), pw));
+      }
+
+      // ---- accepted risks, with who accepted each and when to review it ----
+      children.push(h1("Accepted risks"));
+      var acc = S.threats.filter(function (x) { return x.disposition === "accepted"; });
+      if (!acc.length) {
+        children.push(body("No risk has been accepted."));
+      } else {
+        children.push(body("Each risk above tolerable risk that has been accepted, with the rating that stands, the reason, who accepted it and when it is to be reviewed."));
+        var aw = [3000, 1300, 1150, 3488, 1400, 1500, 1300, 1300];
+        children.push(fixedTable([headerRow(["Threat scenario", "Zone or conduit", "Rating", "Reason", "Accepted by", "Role", "Date", "Review date"], aw)].concat(acc.map(function (x) {
+          var ad = x.t.acceptanceDetail || {};
+          function said(v, wd) { return String(v || "").trim() ? textCell(v, wd) : textCell("Not recorded", wd, { color: COLOR.muted }); }
+          return new docx.TableRow({ children: [
+            textCell(x.t.id + "  " + (x.t.statement || "No statement"), aw[0]),
+            textCell(x.owner.id + (x.owner.name ? " " + x.owner.name : ""), aw[1]),
+            ratingCell(x.operative, stateLI(x.t, x.planned ? "planned" : x.current ? "current" : "unmitigated"), aw[2], false),
+            textCell(x.treatment.reason, aw[3]),
+            said(ad.by, aw[4]), said(ad.role, aw[5]), said(ad.date, aw[6]), said(ad.reviewDate, aw[7])
+          ] });
+        })), aw));
+      }
+
+      // ---- zones & conduits: each threat's scenario in detail ----
       children.push(h1("Zones, conduits and the detailed risk assessment"));
-      children.push(body("Each threat is rated for likelihood and impact on the SolutionsPT house risk matrix and compared with the tolerable risk of " + tolName + ". The drawing and each zone's and conduit's characteristics are under System under consideration and requirements."));
+      children.push(body("Each threat is rated for likelihood and impact on the SolutionsPT house risk matrix and compared with the tolerable risk of " + tolName + ". The ratings and treatment decisions are in the risk register. The drawing and each zone's and conduit's characteristics are under System under consideration and requirements."));
       S.owners.forEach(function (row) {
         var o = row.o;
         // A zone's own heading is its name, not a section title: it closes the
@@ -941,41 +1156,39 @@ window.RiskExports = (function () {
         var ownerHead = h2(o.id + ": " + (o.name || "(unnamed " + row.kind.toLowerCase() + ")") + (row.kind === "Conduit" ? "  (" + (o.fromZone || "not set") + " → " + (!o.toZone ? "not set" : o.toZone !== "EXT" ? o.toZone : "external") + ")" : ""));
         ownerHead.__boundaryOnly = true;
         children.push(ownerHead);
-        if (o.vulnerabilities && o.vulnerabilities.length) {
-          children.push(body("Vulnerabilities: " + o.vulnerabilities.map(function (v) { return v.description; }).join(" · "), { color: COLOR.muted }));
+        var vulns = (o.vulnerabilities || []).filter(function (v) { return String(v.description || "").trim(); });
+        if (vulns.length) {
+          children.push(body("Vulnerabilities: " + vulns.map(function (v) { return v.id + " " + noStop(v.description) + (String(v.reference || "").trim() ? " (source: " + noStop(v.reference) + ")" : ""); }).join(" · "), { color: COLOR.muted }));
         }
         var oThreats = row.threats;
         if (!oThreats.length) {
           children.push(body("No threats registered.", { color: COLOR.muted, italics: true }));
         } else {
-          var tw = [3400, 1150, 1150, 1100, 2200];
-          var trows = [headerRow(["Threat", "L × I", "Risk", "Residual", "Treatment"], tw)];
           oThreats.forEach(function (x) {
-            trows.push(new docx.TableRow({ children: [
-              textCell(x.t.id + "  " + x.t.statement + (x.t.source ? "  (" + x.t.source + ")" : "") + (x.t.affectedFR.length ? "  [" + x.t.affectedFR.join(", ") + "]" : ""), tw[0]),
-              // An unrated threat says so in words: a dash beside a rating reads as
-              // a typo, and the review tool's dash check would report it as one.
-              textCell((x.t.likelihood || x.t.impact) ? (x.t.likelihood ? likName(x.t.likelihood) : "Not rated") + " × " + (x.t.impact ? sevName(x.t.impact) : "Not rated") : "Not rated",
-                tw[1], (x.t.likelihood && x.t.impact) ? {} : { color: COLOR.muted }),
-              bandCell(x.risk, tw[2]),
-              x.residual ? bandCell(x.residual, tw[3]) : textCell("Not rated", tw[3], { color: COLOR.muted }),
-              // No decision, or an incomplete one, prints in the red of a prompt left to complete.
-              textCell(x.label, tw[4], x.exceeds && !x.decided ? { bold: true, color: COLOR.note } : {})
-            ] }));
-          });
-          children.push(fixedTable(trows, tw));
-          oThreats.forEach(function (x) {
-            if (x.disposition === "accepted" && x.treatment.reason) {
-              children.push(body(x.t.id + " risk acceptance: " + x.treatment.reason, { italics: true }));
-            } else if (x.disposition === "sl-t" && x.treatment.reason) {
-              children.push(body(x.t.id + " treated through the SL-T programme: " + x.treatment.reason, { italics: true }));
+            var t = x.t, T = x.treatment;
+            children.push(para([run(t.id + "  " + (t.statement || "No statement"), { bold: true })], { spacing: { before: 160, after: 60 } }));
+            var vIds = (t.vulnerabilityIds || []).filter(function (id) { return vulns.some(function (v) { return v.id === id; }); });
+            var cms = T.existingLinked.map(function (m) { return m.id + " in place"; }).concat(T.plannedLinked.map(function (m) { return m.id + " planned"; }));
+            // Only what was captured: an empty field is not printed.
+            var rows = [
+              ["Source", t.source], ["Entry point", t.entryPoint],
+              ["Assets", assetNames(o, t, p).join("; ")], ["Vulnerabilities", vIds.join(", ")],
+              ["Consequence", t.consequence], ["Affected FRs", (t.affectedFR || []).join(", ")],
+              ["Likelihood rationale", t.likelihoodRationale], ["Countermeasures", cms.join(", ")]
+            ].filter(function (kv) { return kv[1] && String(kv[1]).trim(); });
+            if (rows.length) children.push(kvTable(rows));
+            if (x.disposition === "sl-t" && x.treatment.reason) {
+              children.push(body(t.id + " is treated through the SL-T programme. " + x.treatment.reason, { italics: true }));
             }
           });
         }
-        if (o.countermeasures && o.countermeasures.length) {
-          children.push(body("Countermeasures: " + o.countermeasures.map(function (m) {
-            return m.id + " " + m.description + (m.existing ? " [existing]" : " [planned]") + (m.addressesFR.length ? " (" + m.addressesFR.join(", ") + ")" : "");
-          }).join(" · "), { color: COLOR.muted }));
+        // The countermeasures in place; the planned ones are in the treatment
+        // plan, so they are pointed to, not listed again.
+        var inPlaceCms = (o.countermeasures || []).filter(function (m) { return m.existing && String(m.description || "").trim(); });
+        var plannedCms = (o.countermeasures || []).filter(function (m) { return !m.existing && String(m.description || "").trim(); });
+        if (inPlaceCms.length || plannedCms.length) {
+          children.push(body("Countermeasures: " + (inPlaceCms.length ? inPlaceCms.map(function (m) { return m.id + " " + noStop(m.description) + " (in place)"; }).join(" · ") : "none in place") +
+            (plannedCms.length ? "; planned: see the treatment plan." : "."), { color: COLOR.muted }));
         }
       });
 
@@ -985,18 +1198,55 @@ window.RiskExports = (function () {
       var frs = FRS();
       var mw = [2200].concat(frs.map(function () { return 940; }));
       var mrows = [headerRow(["Zone / conduit"].concat(frs.map(function (f) { return f.id; })), mw)];
+      var anySafety = false;
       S.owners.forEach(function (row) {
-        var o = row.o;
-        mrows.push(new docx.TableRow({ children: [textCell(o.id + " " + (o.name || ""), mw[0], { bold: true })].concat(frs.map(function (f, i) {
+        var o = row.o, safety = row.isZone && rt.zoneSafety(o);
+        if (safety) anySafety = true;
+        var nameKids = [para([run(o.id + " " + (o.name || ""), { bold: true })], { spacing: { after: 0 } })];
+        if (safety) nameKids.push(para([run("Safety related", { color: COLOR.gap, size: 16, bold: true })], { spacing: { after: 0 } }));
+        mrows.push(new docx.TableRow({ children: [cellDxa(nameKids, mw[0])].concat(frs.map(function (f, i) {
           var v = o.slTargetByFR[f.id];
           return textCell(v == null ? "Not set" : "SL" + v, mw[i + 1], v != null ? { bold: true } : { color: COLOR.muted });
         })) }));
       });
-      mrows.push(new docx.TableRow({ children: [textCell("Worst case", mw[0], { bold: true, fill: COLOR.subBg })].concat(frs.map(function (f, i) {
-        var v = S.sltMax[f.id];
-        return textCell(v == null ? "Not set" : "SL" + v, mw[i + 1], { bold: true, fill: COLOR.subBg });
-      })) }));
       children.push(fixedTable(mrows, mw));
+      if (anySafety) {
+        var sis = (RULES().specialRules || []).filter(function (r) { return r.id === "sis-present"; })[0];
+        children.push(pinned(body("A zone marked safety related holds safety functions. The house method sets a floor of SL" + ((sis && sis.floorSL) || 3) + " on every foundational requirement for it.", { color: COLOR.muted })));
+      }
+      // What drives each target: per zone and conduit, the threats with the
+      // worst unmitigated risk on each requirement (the engine's sltDrivers),
+      // the requirements that share the same drivers grouped on one row.
+      // Where a suggestion is above what those threats map to, it says where
+      // it comes from: the safety floor, or the zone a conduit inherits it from.
+      children.push(h2("Driving scenarios"));
+      children.push(body("For each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. On the house mapping these set the suggested SL-T; the justifications follow."));
+      var dw = [2800, 2200, 4506];
+      var drows = [headerRow(["Zone or conduit", "Foundational requirements", "Driving scenarios"], dw)];
+      S.owners.forEach(function (row) {
+        var o = row.o, groups = [], bySig = {};
+        var skip = rt.comparison(o, p).skip;
+        rt.sltDrivers(o, p).forEach(function (d) {
+          // A zone or conduit not assessed in detail has no driving scenario.
+          if (skip) return;
+          var bits = d.drivers.map(function (id) { return id + " (" + bandStyle(d.band).name + ")"; });
+          var why = d.raisedBy === "floor" ? "SL" + d.sl + " from the safety floor"
+            : d.raisedBy === "inherited" ? "SL" + d.sl + " inherited from " + (d.from.length > 1 ? d.from.slice(0, -1).join(", ") + " and " + d.from[d.from.length - 1] : d.from[0]) : "";
+          var text = bits.length ? bits.join(", ") + (why ? "; " + why : "") : cap(why);
+          if (!bySig[text]) { bySig[text] = { frs: [], text: text }; groups.push(bySig[text]); }
+          bySig[text].frs.push(d.fr);
+        });
+        var label = o.id + (o.name ? " " + o.name : "");
+        if (!groups.length) {
+          drows.push(new docx.TableRow({ children: [textCell(label, dw[0], { bold: true }), textCell("None", dw[1], { color: COLOR.muted }),
+            textCell(skip ? "Not assessed in detail. The SL-T rests on the justification." : "No rated threat. The SL-T rests on the justification.", dw[2], { color: COLOR.muted })] }));
+          return;
+        }
+        groups.forEach(function (g, i) {
+          drows.push(new docx.TableRow({ children: [textCell(i ? "" : label, dw[0], { bold: true }), textCell(g.frs.join(", "), dw[1]), textCell(g.text, dw[2])] }));
+        });
+      });
+      children.push(fixedTable(drows, dw));
       S.owners.forEach(function (row) {
         var o = row.o;
         if ((o.justification || "").trim()) {
@@ -1062,22 +1312,36 @@ window.RiskExports = (function () {
     });
     if (opts.sectionProbe) RS.probeSections(children, keyOf, opts.sectionProbe);
 
+    // The body in Word sections: portrait, with the risk register, the
+    // treatment plan and the accepted risks on landscape pages of their own.
+    // Read after the overrides, by the key of each level 1 heading (a renamed
+    // one keeps its key), so a renamed or hidden section still lands right.
+    // Each new section starts a page, so no page break is needed around them.
+    // docx-js swaps the page's width and height itself for landscape, so the
+    // portrait size is given either way.
     var PO = (docx.PageOrientation) || { PORTRAIT: "portrait" };
     var A4_W = 11906, A4_H = 16838;
-    var bodySection = { properties: { page: { size: { width: A4_W, height: A4_H, orientation: PO.PORTRAIT }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } } }, children: children };
+    function pageProps(isLand) { return { page: { size: { width: A4_W, height: A4_H, orientation: isLand ? (PO.LANDSCAPE || "landscape") : PO.PORTRAIT }, margin: { top: 1200, right: 1200, bottom: 1200, left: 1200 } } }; }
+    var segs = [], seg = null, isLand = false;
+    children.forEach(function (n) {
+      if (n && n.__headingLevel === 1 && !n.__boundaryOnly) isLand = !!LAND_KEYS[n.__sectionKey || keyOf(n)];
+      if (!seg || seg.land !== isLand) { seg = { land: isLand, children: [] }; segs.push(seg); }
+      seg.children.push(n);
+    });
+    var bodySections = segs.map(function (s) { return { properties: pageProps(s.land), children: s.children }; });
+    if (!bodySections.length) bodySections = [{ properties: pageProps(false), children: [] }];
     // The Report page rebuilds after every edit and reads only the body, so it
     // leaves out the cover art and the logo header, the slow part to pack.
-    if (opts.preview) return new docx.Document({ sections: [bodySection] });
-    bodySection.headers = brandHeaders();
-    bodySection.footers = brandFootersDoc();
+    if (opts.preview) return new docx.Document({ sections: bodySections });
+    var hdrs = brandHeaders(), ftrs = brandFootersDoc();
+    bodySections.forEach(function (s) { s.headers = hdrs; s.footers = ftrs; });
     return new docx.Document({
       creator: eng.consultant || "OT Cyber Risk Assessment Tool",
       title: (opts.highLevelOnly ? "High-Level OT Cyber Risk Assessment" : "OT Cyber Risk Assessment") + " - " + (p.suc.name || "SUC"),
       description: subLine,
       sections: [
-        { properties: { page: { size: { width: A4_W, height: A4_H, orientation: PO.PORTRAIT }, margin: { top: 0, right: 0, bottom: 0, left: 0, header: 0, footer: 0, gutter: 0 } } }, children: coverChildren },
-        bodySection
-      ]
+        { properties: { page: { size: { width: A4_W, height: A4_H, orientation: PO.PORTRAIT }, margin: { top: 0, right: 0, bottom: 0, left: 0, header: 0, footer: 0, gutter: 0 } } }, children: coverChildren }
+      ].concat(bodySections)
     });
   }
 
@@ -1127,10 +1391,55 @@ window.RiskExports = (function () {
      ["Threats registered", String(S.threats.length)],
      ["Above tolerable", String(S.counts.exceeding)],
      ["Sign-off", signOffLine(p, "Not signed off")],
-     ["Method note", "SolutionsPT house risk matrix and risk-to-SL mapping. SL-T values are set by the consultant, with written justification."]
+     ["Method note", "SolutionsPT house risk matrix and risk-to-SL mapping. SL-T values are set by the consultant, with written justification."],
+     // The workbook is issued from the tool and never read back (phase 4, decision 9).
+     ["About this workbook", "Issued from the risk assessment tool. A new issue replaces this workbook in full, so make changes in the tool, not here."]
     ].forEach(function (kv) { front.addRow(kv); });
     front.getCell("A1").font = { bold: true, size: 14, color: { argb: argb(COLOR.headBg) } };
-    for (var fr2 = 2; fr2 <= 14; fr2++) front.getCell("A" + fr2).font = { bold: true, size: 10 };
+    for (var fr2 = 2; fr2 <= front.rowCount; fr2++) { front.getCell("A" + fr2).font = { bold: true, size: 10 }; front.getCell("B" + fr2).alignment = { wrapText: true, vertical: "top" }; }
+
+    // ---- Summary: the position in numbers, and a heat map per rating ----
+    var R0 = RULES(), SEVS = R0.severityScale, LIKS = R0.likelihoodScale;
+    var exceedX = S.threats.filter(function (x) { return x.exceeds; });
+    var plan = plannedCountermeasures(S);
+    var su = wb.addWorksheet("Summary", { properties: { tabColor: { argb: argb(COLOR.navy) } } });
+    su.columns = [{ width: 52 }, { width: 14 }, { width: 14 }, { width: 14 }];
+    su.addRow(["Summary"]).getCell(1).font = { bold: true, size: 14, color: { argb: argb(COLOR.headBg) } };
+    [["Tolerable risk", bandStyle(S.tolerable).name],
+     ["Threats registered", S.threats.length],
+     ["Above tolerable risk before any countermeasure", exceedX.length],
+     ["Of those, with a treatment decision", S.counts.decided],
+     // Today and once the plan is complete: the engine's one rule, as the Word summary counts them.
+     ["Of those, within tolerable risk with today's countermeasures", S.counts.withinToday],
+     ["Of those, within tolerable risk once the plan is complete", S.counts.withinAfterPlan],
+     ["Accepted risks", S.dispositionCounts.accepted],
+     ["Additional countermeasures planned", plan.length]
+    ].forEach(function (kv) { var r = su.addRow(kv); r.getCell(1).font = { bold: true, size: 10 }; r.getCell(2).alignment = { horizontal: "left" }; });
+    var heavy = { style: "medium", color: { argb: "FF" + COLOR.text } };
+    [["unmitigated", "Unmitigated"], ["current", "Current"], ["planned", "Planned"]].forEach(function (st) {
+      su.addRow([]);
+      su.addRow(["Heat map: " + st[1].toLowerCase() + " rating"]).getCell(1).font = { bold: true, size: 11, color: { argb: argb(COLOR.headBg) } };
+      var head = su.addRow(["Impact, by likelihood"].concat(LIKS.map(function (l) { return l.name; })));
+      styleHeader(su, head.number, LIKS.length + 1);
+      var counts = {};
+      S.threats.forEach(function (x) { var li = stateLI(x.t, st[0]); if (li.L && li.I) { var k = li.I + ":" + li.L; counts[k] = (counts[k] || 0) + 1; } });
+      SEVS.slice().reverse().forEach(function (sv) {
+        var r = su.addRow([sv.name].concat(LIKS.map(function (l) { return counts[sv.id + ":" + l.id] || null; })));
+        r.getCell(1).font = { bold: true, size: 10 };
+        LIKS.forEach(function (l, i) {
+          var b = R0.riskMatrix[sv.id][l.id], bs = bandStyle(b), cell = r.getCell(i + 2);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(bs.fill) } };
+          cell.font = { bold: true, color: { argb: argb(bs.text) }, size: 11 };
+          cell.alignment = { horizontal: "center" };
+          if (rt.exceedsTolerable(b, S.tolerable)) cell.border = { top: heavy, bottom: heavy, left: heavy, right: heavy };
+        });
+      });
+    });
+    su.addRow([]);
+    var suNote = su.addRow(["Each cell counts the threat scenarios rated there. Cells with a heavy border are above the tolerable risk of " + bandStyle(S.tolerable).name + ". A current or planned rating not given takes the rating before it."]);
+    suNote.getCell(1).alignment = { wrapText: true, vertical: "top" };
+    su.mergeCells(suNote.number, 1, suNote.number, LIKS.length + 1);
+    suNote.height = 32;
 
     // ---- Ranking ----
     var rk = wb.addWorksheet("Ranking", { properties: { tabColor: { argb: argb(COLOR.near) } } });
@@ -1150,30 +1459,87 @@ window.RiskExports = (function () {
     rk.autoFilter = { from: "A1", to: hlDecide ? "I1" : "G1" };
     freezeTop(rk);
 
-    // ---- Threat register (living tracker) ----
+    // ---- Threat register: the three ratings, the decision, and the owner
+    // and target date of the planned countermeasures linked to each threat ----
     var tr = wb.addWorksheet("Threat register", { properties: { tabColor: { argb: argb(COLOR.gap) } } });
+    var TR_HEAD = ["Zone/Conduit", "ID", "Threat statement", "Source", "Affected FRs", "Likelihood", "Impact", "Risk",
+      "Current likelihood", "Current impact", "Current risk", "Planned likelihood", "Planned impact", "Planned risk",
+      "Above tolerable?", "Treatment decision", "Rating that stands", "Reason / notes", "Status", "Owner", "Target date", "Progress notes"];
+    function trCol(name) { return TR_HEAD.indexOf(name) + 1; }
     tr.columns = [
       { width: 12 }, { width: 8 }, { width: 60 }, { width: 24 }, { width: 14 },
-      { width: 12 }, { width: 12 }, { width: 12 }, { width: 10 }, { width: 26 },
-      { width: 12 }, { width: 50 }, { width: 14 }, { width: 18 }, { width: 14 }, { width: 40 }
+      { width: 12 }, { width: 12 }, { width: 12 },
+      { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 },
+      { width: 10 }, { width: 26 }, { width: 12 }, { width: 50 }, { width: 14 }, { width: 18 }, { width: 14 }, { width: 40 }
     ];
-    tr.addRow(["Zone/Conduit", "ID", "Threat statement", "Source", "Affected FRs", "Likelihood", "Impact", "Risk", "Above tolerable?", "Treatment decision", "Residual", "Reason / notes", "Status", "Owner", "Target date", "Progress notes"]);
-    styleHeader(tr, 1, 16);
+    tr.addRow(TR_HEAD);
+    styleHeader(tr, 1, TR_HEAD.length);
     S.threats.forEach(function (x) {
+      var cur = x.current ? stateLI(x.t, "current") : { L: "", I: "" }, pl = x.planned ? stateLI(x.t, "planned") : { L: "", I: "" };
+      var pm = x.treatment.plannedLinked || [];
+      var owners = pm.map(function (m) { return String(m.owner || "").trim(); }).filter(function (s, i, a) { return s && a.indexOf(s) === i; });
+      var due = pm.map(function (m) { return String(m.dueDate || "").trim(); }).filter(Boolean).sort().pop() || "";
       var r = tr.addRow([
         x.owner.id + (x.owner.name ? " " + x.owner.name : ""), x.t.id, x.t.statement, x.t.source || "",
-        x.t.affectedFR.join(", "), likName(x.t.likelihood), sevName(x.t.impact), "", x.exceeds ? "Yes" : "No",
-        x.label,
-        "", x.decided ? x.treatment.reason : "", x.decided ? "Decided" : (x.exceeds ? "Open" : "Monitor"), "", "", ""
+        x.t.affectedFR.join(", "), likName(x.t.likelihood), sevName(x.t.impact), "",
+        likName(cur.L), sevName(cur.I), "", likName(pl.L), sevName(pl.I), "",
+        x.exceeds ? "Yes" : "No", x.label,
+        "", x.decided ? x.treatment.reason : "", x.decided ? "Decided" : (x.exceeds ? "Open" : "Monitor"), owners.join("; "), due, ""
       ]);
-      bandFillCell(r.getCell(8), x.risk);
-      if (x.residual) bandFillCell(r.getCell(11), x.residual);
-      if (x.exceeds && !x.decided) r.getCell(10).font = { bold: true, color: { argb: argb(COLOR.gap) } };
-      r.getCell(13).dataValidation = { type: "list", allowBlank: true, formulae: ['"Open,In progress,Decided,Monitor,Closed"'] };
+      bandFillCell(r.getCell(trCol("Risk")), x.risk);
+      bandFillCell(r.getCell(trCol("Current risk")), x.current);
+      bandFillCell(r.getCell(trCol("Planned risk")), x.planned);
+      // The rating that stands: planned, else current, else unmitigated, so never blank once rated.
+      // ("Residual" in the standard's sense is the current rating; the risk context's residualRisk is unchanged.)
+      bandFillCell(r.getCell(trCol("Rating that stands")), x.operative);
+      if (x.exceeds && !x.decided) r.getCell(trCol("Treatment decision")).font = { bold: true, color: { argb: argb(COLOR.gap) } };
+      r.getCell(trCol("Status")).dataValidation = { type: "list", allowBlank: true, formulae: ['"Open,In progress,Decided,Monitor,Closed"'] };
       r.alignment = { vertical: "top", wrapText: true };
     });
-    tr.autoFilter = { from: "A1", to: "P1" };
+    tr.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: TR_HEAD.length } };
     freezeTop(tr);
+
+    // ---- Treatment plan: the additional countermeasures ----
+    var tp = wb.addWorksheet("Treatment plan", { properties: { tabColor: { argb: argb(COLOR.near) } } });
+    tp.columns = [{ width: 14 }, { width: 8 }, { width: 60 }, { width: 16 }, { width: 20 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 16 }];
+    tp.addRow(["Zone/Conduit", "ID", "Countermeasure", "Threat scenarios", "Owner", "Priority", "Due date", "Status", "SR references", "Addresses FRs"]);
+    styleHeader(tp, 1, 10);
+    plan.forEach(function (e) {
+      var m = e.m;
+      var r = tp.addRow([e.owner.id + (e.owner.name ? " " + e.owner.name : ""), m.id, m.description, e.threats.join(", "), m.owner || "", cmPriority(m), m.dueDate || "", cmStatus(m),
+        (m.srRefs || []).join(", "), (m.addressesFR || []).join(", ")]);
+      r.alignment = { vertical: "top", wrapText: true };
+    });
+    tp.autoFilter = { from: "A1", to: "J1" };
+    freezeTop(tp);
+
+    // ---- Accepted risks ----
+    var ar = wb.addWorksheet("Accepted risks", { properties: { tabColor: { argb: argb(COLOR.deep) } } });
+    ar.columns = [{ width: 14 }, { width: 8 }, { width: 60 }, { width: 12 }, { width: 60 }, { width: 18 }, { width: 24 }, { width: 12 }, { width: 12 }];
+    ar.addRow(["Zone/Conduit", "ID", "Threat statement", "Rating", "Reason", "Accepted by", "Role", "Date", "Review date"]);
+    styleHeader(ar, 1, 9);
+    S.threats.filter(function (x) { return x.disposition === "accepted"; }).forEach(function (x) {
+      var ad = x.t.acceptanceDetail || {};
+      var r = ar.addRow([x.owner.id + (x.owner.name ? " " + x.owner.name : ""), x.t.id, x.t.statement, "", x.treatment.reason, ad.by || "", ad.role || "", ad.date || "", ad.reviewDate || ""]);
+      bandFillCell(r.getCell(4), x.operative);
+      r.alignment = { vertical: "top", wrapText: true };
+    });
+    freezeTop(ar);
+
+    // ---- Vulnerabilities, with where each is known from and the threats that link it ----
+    var vs = wb.addWorksheet("Vulnerabilities", { properties: { tabColor: { argb: argb(COLOR.gap) } } });
+    vs.columns = [{ width: 14 }, { width: 8 }, { width: 70 }, { width: 40 }, { width: 18 }];
+    vs.addRow(["Zone/Conduit", "ID", "Vulnerability", "Source", "Threat scenarios"]);
+    styleHeader(vs, 1, 5);
+    S.owners.forEach(function (row) {
+      (row.o.vulnerabilities || []).forEach(function (v) {
+        if (!String(v.description || "").trim()) return;
+        var r = vs.addRow([row.o.id + (row.o.name ? " " + row.o.name : ""), v.id, v.description, v.reference || "", linkedThreats(row.o, v.id).join(", ")]);
+        r.alignment = { vertical: "top", wrapText: true };
+      });
+    });
+    vs.autoFilter = { from: "A1", to: "E1" };
+    freezeTop(vs);
 
     // ---- Zones / Conduits ----
     // The risk comparison's decision, as the report prints it.
@@ -1218,16 +1584,17 @@ window.RiskExports = (function () {
 
     // ---- Countermeasures ----
     var cm = wb.addWorksheet("Countermeasures", { properties: { tabColor: { argb: argb(COLOR.blueDark) } } });
-    cm.columns = [{ width: 12 }, { width: 8 }, { width: 64 }, { width: 16 }, { width: 12 }, { width: 20 }];
-    cm.addRow(["Zone/Conduit", "ID", "Countermeasure", "Addresses FRs", "Existing?", "Reference"]);
-    styleHeader(cm, 1, 6);
+    cm.columns = [{ width: 12 }, { width: 8 }, { width: 64 }, { width: 16 }, { width: 12 }, { width: 20 }, { width: 18 }, { width: 16 }];
+    cm.addRow(["Zone/Conduit", "ID", "Countermeasure", "Addresses FRs", "Existing?", "Reference", "SR references", "Threat scenarios"]);
+    styleHeader(cm, 1, 8);
     S.owners.forEach(function (row) {
       (row.o.countermeasures || []).forEach(function (m) {
-        var r = cm.addRow([row.o.id, m.id, m.description, m.addressesFR.join(", "), m.existing ? "existing" : "planned", m.reference || ""]);
+        var r = cm.addRow([row.o.id, m.id, m.description, m.addressesFR.join(", "), m.existing ? "existing" : "planned", m.reference || "", (m.srRefs || []).join(", "), linkedThreats(row.o, m.id).join(", ")]);
         if (m.existing) r.getCell(5).font = { bold: true, color: { argb: argb(COLOR.met) } };
+        r.alignment = { vertical: "top", wrapText: true };
       });
     });
-    cm.autoFilter = { from: "A1", to: "F1" };
+    cm.autoFilter = { from: "A1", to: "H1" };
     freezeTop(cm);
 
     // ---- SL-T matrix ----
@@ -1248,6 +1615,45 @@ window.RiskExports = (function () {
     var worst = sl.addRow(["Worst case"].concat(frs.map(function (f) { return S.sltMax[f.id] == null ? "Not set" : "SL" + S.sltMax[f.id]; })).concat([""]));
     worst.eachCell(function (c) { c.font = { bold: true }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(COLOR.subBg) } }; });
     freezeTop(sl);
+
+    // ---- Criteria: the risk criteria every rating rests on, as the Word
+    // appendix prints them ----
+    var cr = wb.addWorksheet("Criteria", { properties: { tabColor: { argb: argb(COLOR.soft) } } });
+    cr.columns = [{ width: 24 }].concat(LIKS.map(function () { return { width: 18 }; })).concat([{ width: 40 }]);
+    function crTitle(t) { var r = cr.addRow([t]); r.getCell(1).font = { bold: true, size: 11, color: { argb: argb(COLOR.headBg) } }; return r; }
+    function plainNote(s) { s = String(s || "").replace(/^House default:\s*/i, ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+    cr.addRow(["Risk criteria"]).getCell(1).font = { bold: true, size: 14, color: { argb: argb(COLOR.headBg) } };
+    var crLead = cr.addRow([p.srs.clientMatrix ? "The SolutionsPT house risk criteria, shown for reference. The client's own risk criteria are in use." : "The SolutionsPT house risk criteria used in this assessment."]);
+    cr.mergeCells(crLead.number, 1, crLead.number, LIKS.length + 2);
+    var crTol = cr.addRow(["Tolerable risk", bandStyle(S.tolerable).name]); crTol.getCell(1).font = { bold: true, size: 10 };
+    cr.addRow([]);
+    crTitle("Risk matrix");
+    var mh = cr.addRow(["Impact, by likelihood"].concat(LIKS.map(function (l) { return l.name; })));
+    styleHeader(cr, mh.number, LIKS.length + 1);
+    SEVS.slice().reverse().forEach(function (sv) {
+      var r = cr.addRow([sv.name].concat(LIKS.map(function (l) { var b = R0.riskMatrix[sv.id][l.id]; return bandStyle(b).name + (rt.exceedsTolerable(b, S.tolerable) ? " (above)" : ""); })));
+      r.getCell(1).font = { bold: true, size: 10 };
+      LIKS.forEach(function (l, i) {
+        var b = R0.riskMatrix[sv.id][l.id], bs = bandStyle(b), cell = r.getCell(i + 2);
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(bs.fill) } };
+        cell.font = { bold: true, color: { argb: argb(bs.text) }, size: 10 };
+        if (rt.exceedsTolerable(b, S.tolerable)) cell.border = { top: heavy, bottom: heavy, left: heavy, right: heavy };
+      });
+    });
+    cr.addRow(["Cells marked above, with a heavy border, are above the tolerable risk."]);
+    function crScale(title, head, list) {
+      cr.addRow([]);
+      crTitle(title);
+      var hr = cr.addRow(head); styleHeader(cr, hr.number, 2);
+      list.forEach(function (x) { var r = cr.addRow([x[0], x[1]]); r.getCell(1).font = { bold: true, size: 10 }; r.getCell(2).alignment = { wrapText: true, vertical: "top" }; cr.mergeCells(r.number, 2, r.number, LIKS.length + 2); });
+    }
+    crScale("Impact scale", ["Impact", "Meaning"], SEVS.slice().reverse().map(function (x) { return [x.name, plainNote(x.note)]; }));
+    crScale("Likelihood scale", ["Likelihood", "Meaning"], LIKS.slice().reverse().map(function (x) { return [x.name, plainNote(x.note)]; }));
+    var defs = R0.slDefinitions || {};
+    crScale("Security levels", ["Security level", "Protects against"], ["1", "2", "3", "4"].filter(function (k) { return defs[k]; }).map(function (k) { return ["SL" + k, defs[k]]; }));
+    var r2sl = R0.riskToSL || {};
+    crScale("Suggested SL-T", ["Unmitigated risk", "Suggested SL-T"], R0.riskBands.filter(function (b) { return r2sl[b.id]; }).map(function (b) { return [b.name, "SL" + r2sl[b.id].suggest]; }));
+    crScale("Foundational requirements", ["Short form", "Foundational requirement"], frs.map(function (f) { return [f.id, f.fr + " " + String(f.name).replace(/ & /g, " and ")]; }));
 
     // ---- Basis ----
     var ba = wb.addWorksheet("Basis", { properties: { tabColor: { argb: argb(COLOR.soft) } } });

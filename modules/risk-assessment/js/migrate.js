@@ -4,10 +4,13 @@
  * normaliseProject(data) runs three passes, in place, and returns data:
  *
  *  1. The ladder: one step per file format, oldest first, each taking a file
- *     from one schema to the next (today the one step is 0.1 -> 0.2). A file
+ *     from one schema to the next (0.1 -> 0.2, then 0.2 -> 0.3). A file
  *     labelled 0.2 that still carries a 0.1 field (initialRisk, a scalar
  *     slTarget, a zone's consequences table) gets the 0.1 step too, as the
- *     single normaliser before it did.
+ *     single normaliser before it did. The 0.2 -> 0.3 step turns what the old
+ *     requirement match covered into suggested links (never links), and
+ *     copies the residual pair to the current rating only when every matched
+ *     countermeasure is already in place.
  *  2. The shape fill: every field this build reads is there and of the right
  *     kind, and a threat saved before treatment decisions were recorded gets
  *     what the old build inferred, as an unconfirmed suggestion. Fields this
@@ -20,15 +23,18 @@
  *     zone and conduit characteristics, separation answers, an asset's
  *     connection, approvals). Where approvals[] is present, approval stays its
  *     first entry's mirror; one an older build edited wins for that entry.
+ *     The 0.3 fields of threats, countermeasures and vulnerabilities are
+ *     filled (empty strings and lists), and every asset gets an id.
  *  3. The dangling-id prune: a reference to a record that is not in the file
- *     (a zone's ranked systems, a conduit's end) is cleared, never invented.
+ *     (a zone's ranked systems, a conduit's end, a threat's linked assets,
+ *     vulnerabilities and countermeasures) is cleared, never invented.
  *     An older build edits a file without maintaining the links a newer one
  *     added, so a link can outlive what it pointed at. A zone's fromHLA is
  *     kept the first of its hlaIds; one an older build wrote goes first.
  *
  * Running it twice changes nothing the first run did not
  * (scripts/test-risk-migrate.html, on the frozen files in scripts/fixtures/).
- * The schema written stays spt-risk-project/0.2. Which schemas Load and the
+ * The schema written is spt-risk-project/0.3. Which schemas Load and the
  * autosave restore accept is Model.ACCEPTED_PROJECT_SCHEMAS; anything else is
  * refused before this runs.
  */
@@ -38,7 +44,7 @@ window.RiskApp.Migrate = (function () {
 
   var M = window.RiskApp.Model, E = window.RiskApp.Engine;
   var FR_IDS = M.FR_IDS, RULES = M.RULES, TREATMENT_DECISIONS = M.TREATMENT_DECISIONS;
-  var V01 = "spt-risk-project/0.1", V02 = "spt-risk-project/0.2";
+  var V01 = "spt-risk-project/0.1", V02 = "spt-risk-project/0.2", V03 = "spt-risk-project/0.3";
 
   function isObj(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
 
@@ -71,8 +77,46 @@ window.RiskApp.Migrate = (function () {
     data.schema = V02;
   }
 
+  // 0.2 -> 0.3: links become the record of coverage, and a threat has three
+  // ratings. Links are never invented: what the old requirement match covered
+  // becomes suggested links (suggestedCountermeasureIds), unconfirmed until
+  // the consultant confirms them. The residual pair now means "after planned
+  // measures"; it is copied to the current rating only when every matched
+  // countermeasure is already in place (with one still planned, what it rated
+  // is not today's position). With nothing matched it is not copied: nothing
+  // is invented, and with no planned countermeasure linked the planned rating
+  // is already the one that stands today (engine.js threatTreatment, today),
+  // so the report does not promise planned countermeasures that do not exist.
+  function up02to03(data) {
+    (data.zones || []).concat(data.conduits || []).forEach(function (o) {
+      if (!o || !Array.isArray(o.threats)) return;
+      if (!Array.isArray(o.countermeasures)) o.countermeasures = [];
+      o.threats.forEach(function (t) {
+        if (!isObj(t)) return;
+        if (!Array.isArray(t.affectedFR)) t.affectedFR = [];
+        o.countermeasures.forEach(function (m) { if (m && !Array.isArray(m.addressesFR)) m.addressesFR = []; });
+        var matched = E.suggestLinks(o, t);
+        var linked = Array.isArray(t.countermeasureIds) ? t.countermeasureIds : [];
+        var sug = matched.filter(function (id) { return linked.indexOf(id) < 0; });
+        if (sug.length) t.suggestedCountermeasureIds = sug;
+        var hasResidual = isStr(t.residualLikelihood) && t.residualLikelihood || isStr(t.residualImpact) && t.residualImpact;
+        var hasCurrent = t.currentLikelihood || t.currentImpact;
+        var allInPlace = matched.length > 0 && matched.every(function (id) {
+          var m = o.countermeasures.filter(function (x) { return x && x.id === id; })[0];
+          return !!(m && m.existing === true);
+        });
+        if (hasResidual && !hasCurrent && allInPlace) {
+          t.currentLikelihood = t.residualLikelihood || "";
+          t.currentImpact = t.residualImpact || "";
+        }
+      });
+    });
+    data.schema = V03;
+  }
+
   var LADDER = [
-    { from: V01, to: V02, up: up01to02 }
+    { from: V01, to: V02, up: up01to02 },
+    { from: V02, to: V03, up: up02to03 }
   ];
 
   function hasLegacyShape(data) {
@@ -84,7 +128,12 @@ window.RiskApp.Migrate = (function () {
 
   function climb(data) {
     var at = data.schema;
-    if (at !== V01 && hasLegacyShape(data)) at = V01;
+    // A file that still carries a 0.1 field takes the 0.1 step; a 0.3 file
+    // only that step (it does not go through 0.2 to 0.3 again).
+    if (at !== V01 && hasLegacyShape(data)) {
+      if (at === V03) { up01to02(data); data.schema = V03; return data; }
+      at = V01;
+    }
     LADDER.forEach(function (step) { if (at === step.from) { step.up(data); at = step.to; } });
     return data;
   }
@@ -94,9 +143,19 @@ window.RiskApp.Migrate = (function () {
   // Normalise one threat / countermeasure in place. A threat saved before
   // treatment decisions were recorded gets what the old build inferred, as a
   // suggestion for the consultant to confirm.
+  function strList(v) { return Array.isArray(v) ? v.filter(function (x) { return typeof x === "string" && x; }) : []; }
   function normThreat(t, owner, tolerable) {
     if (!Array.isArray(t.affectedFR)) t.affectedFR = [];
-    ["acceptance", "residualLikelihood", "residualImpact"].forEach(function (k) { if (typeof t[k] !== "string") t[k] = ""; });
+    // The 0.3 fields: every text field a string, every link list a list of ids.
+    M.THREAT_TEXT_FIELDS.forEach(function (k) { if (typeof t[k] !== "string") t[k] = ""; });
+    M.THREAT_LINK_FIELDS.forEach(function (k) { t[k] = strList(t[k]); });
+    if ("suggestedCountermeasureIds" in t) {
+      t.suggestedCountermeasureIds = strList(t.suggestedCountermeasureIds);
+      if (!t.suggestedCountermeasureIds.length) delete t.suggestedCountermeasureIds;
+    }
+    var ad = isObj(t.acceptanceDetail) ? t.acceptanceDetail : {};
+    M.ACCEPTANCE_FIELDS.forEach(function (k) { if (typeof ad[k] !== "string") ad[k] = ""; });
+    t.acceptanceDetail = ad;
     var tr = t.treatment;
     if (!tr || typeof tr !== "object" || Array.isArray(tr)) {
       t.treatment = M.emptyTreatment();
@@ -110,6 +169,14 @@ window.RiskApp.Migrate = (function () {
   function normCM(m) {
     if (!Array.isArray(m.addressesFR)) m.addressesFR = [];
     if (typeof m.existing !== "boolean") m.existing = false;
+    ["owner", "dueDate", "reference"].forEach(function (k) { if (typeof m[k] !== "string") m[k] = ""; });
+    if (M.CM_PRIORITIES.indexOf(m.priority) < 0) m.priority = "";
+    if (M.CM_STATUSES.indexOf(m.status) < 0) m.status = "";
+    m.srRefs = strList(m.srRefs);
+  }
+  function normVuln(v) {
+    if (typeof v.description !== "string") v.description = "";
+    if (typeof v.reference !== "string") v.reference = "";
   }
 
   // The fields phase 3a added (js/model.js), tidied when present and never
@@ -199,12 +266,13 @@ window.RiskApp.Migrate = (function () {
     data.approval.approved = !!data.approval.approved;
     if (!data.counters) data.counters = base.counters;
     var loadTolerable = data.srs.tolerableRisk || RULES.tolerableRisk.default;
-    ["zone", "conduit", "threat", "vuln", "cm", "hla", "interview", "document", "observation"].forEach(function (k) { if (typeof data.counters[k] !== "number") data.counters[k] = 0; });
+    M.COUNTER_KEYS.forEach(function (k) { if (typeof data.counters[k] !== "number") data.counters[k] = 0; });
     (data.zones || []).forEach(function (z) {
       var ez = M.emptyZone(0);
       Object.keys(ez).forEach(function (k) { if (z[k] == null) z[k] = ez[k]; });
       fixVector(z);
       z.countermeasures.forEach(normCM);
+      z.vulnerabilities.forEach(normVuln);
       z.threats.forEach(function (t) { normThreat(t, z, loadTolerable); });
     });
     (data.conduits || []).forEach(function (c) {
@@ -212,7 +280,24 @@ window.RiskApp.Migrate = (function () {
       Object.keys(ec).forEach(function (k) { if (c[k] == null) c[k] = ec[k]; });
       fixVector(c);
       c.countermeasures.forEach(normCM);
+      c.vulnerabilities.forEach(normVuln);
       c.threats.forEach(function (t) { normThreat(t, c, loadTolerable); });
+    });
+    // Assets had no ids before 0.3; a threat links one by its id. The counter
+    // starts above any id already in the file, and ids, once given, never change.
+    var seenAsset = {};
+    (data.zones || []).forEach(function (z) {
+      (z.assets || []).forEach(function (a) {
+        var m = a && typeof a.id === "string" ? /^AS(\d+)$/.exec(a.id) : null;
+        if (m && Number(m[1]) > data.counters.asset) data.counters.asset = Number(m[1]);
+      });
+    });
+    (data.zones || []).forEach(function (z) {
+      (z.assets || []).forEach(function (a) {
+        if (!isObj(a)) return;
+        if (typeof a.id !== "string" || !a.id || seenAsset[a.id]) a.id = M.nextAssetId(data);
+        seenAsset[a.id] = true;
+      });
     });
     // The consultant's section overrides, one set per report (js/report-page.js).
     // Optional and additive, so the file format stays at this schema: a file
@@ -261,11 +346,21 @@ window.RiskApp.Migrate = (function () {
       // A conduit's ends: a zone in the file, or EXT (outside the SUC).
       ["fromZone", "toZone"].forEach(function (k) { if (c[k] && c[k] !== "EXT" && !zones[c[k]]) c[k] = ""; });
     });
+    // A threat's links: to its owner's countermeasures and vulnerabilities, and
+    // to the assets of its zone (or of the zones a conduit joins). A suggested
+    // link that is now a link, or points at nothing, goes.
+    function uniq(arr) { var s = {}; return arr.filter(function (id) { if (s[id]) return false; s[id] = true; return true; }); }
     data.zones.concat(data.conduits).forEach(function (o) {
-      var cms = idsOf(o.countermeasures), vulns = idsOf(o.vulnerabilities);
+      var cms = idsOf(o.countermeasures), vulns = idsOf(o.vulnerabilities), assets = idsOf(E.threatAssets(o, data));
       o.threats.forEach(function (t) {
-        if (Array.isArray(t.countermeasureIds)) t.countermeasureIds = keepKnown(t.countermeasureIds, cms);
-        if (Array.isArray(t.vulnerabilityIds)) t.vulnerabilityIds = keepKnown(t.vulnerabilityIds, vulns);
+        if (Array.isArray(t.countermeasureIds)) t.countermeasureIds = uniq(keepKnown(t.countermeasureIds, cms));
+        if (Array.isArray(t.vulnerabilityIds)) t.vulnerabilityIds = uniq(keepKnown(t.vulnerabilityIds, vulns));
+        if (Array.isArray(t.assetIds)) t.assetIds = uniq(keepKnown(t.assetIds, assets));
+        if (Array.isArray(t.suggestedCountermeasureIds)) {
+          var linked = t.countermeasureIds || [];
+          t.suggestedCountermeasureIds = uniq(keepKnown(t.suggestedCountermeasureIds, cms)).filter(function (id) { return linked.indexOf(id) < 0; });
+          if (!t.suggestedCountermeasureIds.length) delete t.suggestedCountermeasureIds;
+        }
       });
     });
     return data;

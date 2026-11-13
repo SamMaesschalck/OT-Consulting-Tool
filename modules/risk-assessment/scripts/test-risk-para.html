@@ -76,7 +76,9 @@
     }
     function row(key) { return main.querySelector('[data-check-anchor="reworded"] [data-reworded-row="' + key + '"]'); }
     function reset() { delete P().reportCustom; RT.touched(); }
-    var KEY = "what-we-found", x = {};
+    // Phase 4b: the tally of decisions and countermeasures moved from What we found to the
+    // Risk position that now leads the summary; it is still that section's second paragraph.
+    var KEY = "risk-position", x = {};
 
     poll(function () { return w.RiskTool && w.RiskReview && w.RiskReportPage && w.RiskExports && w.docx && w.RiskTool.state.project.zones.length; }).then(function () {
       RT = w.RiskTool; RR = w.RiskReview; RP = w.RiskReportPage; RX = w.RiskExports; RC = w.App.ReviewCore; DB = w.App.DocxBlocks; RS = w.App.ReportSections; main = w.document.getElementById("main");

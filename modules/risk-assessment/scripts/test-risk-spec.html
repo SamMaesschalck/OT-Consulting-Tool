@@ -19,6 +19,7 @@
 <iframe id="app" src="../index.html" style="width:1280px;height:900px;visibility:hidden"></iframe>
 <script src="../data/tour-project.js"></script>
 <script src="fixtures/v0.7-normaliser.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
 <script>
 (function () {
   "use strict";
@@ -317,6 +318,11 @@
       var keys = {}; bl.forEach(function (b) { if (b.type === "heading") keys[b.text] = b.sectionKey; });
       ok(keys["System under consideration and requirements"] === "system-under-consideration-and-requirements" && keys["Sign-off"] === "sign-off" && keys["Security functions that must be kept"] === "security-functions-that-must-be-kept" && keys["Regulatory requirements"] === "regulatory-requirements", "Word: existing headings keep their section keys");
       ok(keys["Risk comparison"] === "risk-comparison" && keys["Appendix: risk criteria"] === "appendix-risk-criteria" && keys["Zone and conduit characteristics"] === "zone-and-conduit-characteristics" && keys["Organisational security policies"] === "organisational-security-policies", "Word: new headings get keys of their own", JSON.stringify([keys["Risk comparison"], keys["Appendix: risk criteria"]]));
+      // Phase 4b: its new headings get keys of their own, and the headings it kept keep theirs.
+      ok(keys["Risk position"] === "risk-position" && keys["Decisions required"] === "decisions-required" && keys["Risk register"] === "risk-register" && keys["Treatment plan"] === "treatment-plan" && keys["Accepted risks"] === "accepted-risks" && keys["Driving scenarios"] === "driving-scenarios",
+        "Word: phase 4's new headings get keys of their own", JSON.stringify([keys["Risk position"], keys["Risk register"], keys["Driving scenarios"]]));
+      ok(keys["Executive summary"] === "executive-summary" && keys["What we found"] === "what-we-found" && keys["Zones, conduits and the detailed risk assessment"] === "zones-conduits-and-the-detailed-risk-assessment" && keys["Target security levels (SL-T, per foundational requirement)"] === "target-security-levels-sl-t-per-foundational-requirement",
+        "Word: and the headings phase 4 kept keep theirs", JSON.stringify([keys["Zones, conduits and the detailed risk assessment"], keys["Target security levels (SL-T, per foundational requirement)"]]));
       // ---- the review hash leaves the approvers out ----
       return RR.buildDocuments();
     }).then(function (docs0) {
@@ -344,12 +350,15 @@
     }).then(function () {
       // ---- Excel: the decision and the characteristics, in columns that fit ----
       var wb = RX.buildWorkbook(P());
-      ok(wb.worksheets.map(function (s) { return s.name; }).join() === "Front,Ranking,Threat register,Zones,Conduits,Countermeasures,SL-T,Basis", "Excel: no new sheets");
+      // Phase 4b adds sheets on purpose (Summary, Treatment plan, Accepted risks, Vulnerabilities, Criteria); phase 3b added
+      // none. What is pinned here is that every sheet phase 3b had is still there, by name, in the same order.
+      var was3b = "Front,Ranking,Threat register,Zones,Conduits,Countermeasures,SL-T,Basis".split(",");
+      ok(wb.worksheets.map(function (s) { return s.name; }).filter(function (n) { return was3b.indexOf(n) >= 0; }).join() === was3b.join(), "Excel: no sheet of phase 3b's is renamed, dropped or moved (phase 4b adds its own)");
       var zs = wb.getWorksheet("Zones"), cs = wb.getWorksheet("Conduits");
       function col(ws, name) { var n = 0; ws.getRow(1).eachCell(function (c, i) { if (c.value === name) n = i; }); return n; }
       ok(col(zs, "Accountable organisation") && col(zs, "Detailed assessment") && zs.getCell(2, col(zs, "Detailed assessment")).value === "Required" && zs.getCell(2, col(zs, "Accountable organisation")).value === "Acme Petrochemicals, Unit 300 operations", "Excel: the Zones sheet carries the decision and the characteristics");
       ok(/Temporarily connected devices: Vendor laptops/.test(String(zs.getCell(5, col(zs, "Separation not in place")).value)), "and the separation not in place, with its reason");
-      ok(cs.getCell(2, col(cs, "Detailed assessment")).value === "Not required" && /^One-way replication/.test(cs.getCell(2, col(cs, "Reason")).value) && cs.getCell(3, col(cs, "Connection")).value === "external network" && cs.getCell(3, col(cs, "Direction")).value === "One way, Z3 to Z1", "Excel: the Conduits sheet carries the decision, its reason, the connection and the direction");
+      ok(cs.getCell(2, col(cs, "Detailed assessment")).value === "Not required" && /^One-way replication/.test(cs.getCell(2, col(cs, "Reason")).value) && cs.getCell(3, col(cs, "Connection")).value === "external network" && cs.getCell(3, col(cs, "Direction")).value === "Both ways" && cs.getCell(2, col(cs, "Direction")).value === "One way, Z1 to Z3", "Excel: the Conduits sheet carries the decision, its reason, the connection and the direction");
       var q = clone(P()); q.assessmentType = "high-level"; q.srs.highLevelAssets[0].detailed = { required: true, reason: "" };
       var rk = RX.buildWorkbook(q).getWorksheet("Ranking");
       ok(col(rk, "Detailed assessment") === 8 && !col(RX.buildWorkbook(P()).getWorksheet("Ranking"), "Detailed assessment"), "Excel: a high-level-only job's ranking has the decision column, a full one's does not");
@@ -361,11 +370,13 @@
     }).then(function () {
       // ---- the new fields through the migration and the released v0.7 normaliser ----
       var V07 = window.RiskFixtures["v0.7-normaliser"](RT.FR_IDS, RULES.exposureModifiers, RULES.tolerableRisk["default"]);
-      var tour = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
+      // Phase 4: this build saves 0.3, which v0.7 refuses; the file here is the 0.2
+      // file phase 3 saved (scripts/fixtures/tour-phase3-0.2.js).
+      var tour = clone(window.RiskFixtures["tour-phase3-0.2"]);
       var saved = JSON.stringify(tour), old = V07.normaliseProject(JSON.parse(saved));
       ok(same(old, JSON.parse(saved)), "v0.7's normaliser changes nothing in a file using phase 3b's fields");
       ok(old.srs.tolerableConfirmed === "medium" && old.approvals.length === 2 && old.zones[3].separation.temporary.answer === "not-separated" && old.zones[3].assets[2].link === "temporary" && old.conduits[1].external === true && old.suc.policies.length === 3 && old.zones[0].accountableOrg, "and keeps every one of them");
-      ok(same(MG.normaliseProject(clone(old)), JSON.parse(saved)), "so a file v0.7 loaded and saved again reads back as this build saved it");
+      ok(same(MG.normaliseProject(clone(old)), MG.normaliseProject(JSON.parse(saved))), "so a file v0.7 loaded and saved again reads back as this build reads the file");
       var odd = clone(tour);
       odd.srs.tolerableConfirmed = "maybe"; odd.suc.policies = "one"; odd.zones[0].dataFlows = ["ok", 5, ""]; odd.zones[0].accountableOrg = 7;
       odd.zones[0].separation = { external: { answer: "yes" }, safety: { answer: "met", reason: 3 }, odd: "x" };
@@ -405,7 +416,14 @@
       // ---- every approver, not only the first, is read for the sign-off ----
       p.approvals[0].approved = false; p.approvals[0].fingerprint = ""; p.approval.approved = false;
       var so = RX.signOffTexts(p);
-      ok(so[0] === "This assessment was signed off by S. Adeyemi (Process Safety Engineer) on 2026-07-04, for “The SL-T of the Safety Instrumented System zone (Z2)”.", "the summary's sign-off names the approver who signed, with the scope of their approval", so[0]);
+      // Phase 4 review (wording 1): the summary names who signed and points to the scope under Sign-off, where the
+      // signature table holds it (was: the scope quoted in the sentence).
+      ok(so[0] === "This assessment was signed off by S. Adeyemi (Process Safety Engineer) on 2026-07-04; the scope of the approval is under Sign-off.", "the summary's sign-off names the approver who signed, and where the scope of their approval is", so[0]);
+      // Two approvers on one date share it; each scope is in the signature table.
+      var p2 = w.RiskApp.Migrate.normaliseProject(JSON.parse(JSON.stringify(window.SPT_TOUR_PROJECT)));
+      ok(RX.signOffTexts(p2)[0] === "This assessment was signed off by R. Calder (Asset Owner - Unit 300) and S. Adeyemi (Process Safety Engineer) on 2026-07-04; the scope of each approval is under Sign-off.", "two approvers on the same date are named together, with one date", RX.signOffTexts(p2)[0]);
+      p2.approvals[1].date = "2026-07-05";
+      ok(RX.signOffTexts(p2)[0] === "This assessment was signed off by R. Calder (Asset Owner - Unit 300) on 2026-07-04 and S. Adeyemi (Process Safety Engineer) on 2026-07-05; the scope of each approval is under Sign-off.", "and on different dates each with their own", RX.signOffTexts(p2)[0]);
       ok(frontValue(RX.buildWorkbook(p), "Sign-off") === "S. Adeyemi (Process Safety Engineer), 2026-07-04", "and the Excel Front sheet names them", String(frontValue(RX.buildWorkbook(p), "Sign-off")));
       var px;
       return docXml({}).then(function (xml) {

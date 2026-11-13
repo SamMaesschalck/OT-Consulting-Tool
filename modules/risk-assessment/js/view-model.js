@@ -19,12 +19,19 @@
  *   worst              the threatRow with the highest unmitigated risk (the first of equals), or null
  *   sltMax             FR id -> the highest SL-T set on any zone or conduit, or null
  *   counts             threats, exceeding, decided, incomplete, open, suggested,
- *                      countermeasuresExisting, countermeasuresPlanned
+ *                      linkSuggested, countermeasuresExisting, countermeasuresPlanned
+ *                      (described ones only), and of the threats exceeding,
+ *                      withinToday, withinAfterPlan and aboveToday
  * ownerRow:  kind ("Zone" | "Conduit"), isZone, o (the zone or conduit), threats [threatRow],
- *            exceeding, open, suggested ([threatRow] each), worstRisk (unmitigated),
- *            worstOperative (residual where rated, else unmitigated), sltSet (any FR set)
- * threatRow: ownerKind, owner, t, risk (unmitigated band), exceeds, residual,
- *            operative (residual, else unmitigated), operativeExceeds, treatment (the
+ *            exceeding, open, suggested, linkSuggested ([threatRow] each), worstRisk
+ *            (unmitigated), worstCurrent, worstPlanned (null when none is rated),
+ *            worstOperative (planned, else current, else unmitigated), sltSet (any FR set)
+ * threatRow: ownerKind, owner, t, risk (unmitigated band), exceeds, current and planned
+ *            (bands or null), currentExceeds, plannedExceeds, residual (the planned band),
+ *            operative (planned, else current, else unmitigated), operativeExceeds, today and
+ *            todayExceeds (the rating that stands today: the engine's one rule), afterPlan and
+ *            afterPlanExceeds (once the planned countermeasures are complete), residualRisk
+ *            (the risk context's: planned, else current, else null), treatment (the
  *            full threatTreatment), decided (complete), incomplete (confirmed, not
  *            complete), label, disposition
  *
@@ -46,12 +53,23 @@ window.RiskApp.ViewModel = (function () {
       var rows = o.threats.map(function (t) {
         var risk = E.threatRisk(t);
         var T = E.threatTreatment(o, t, p);
-        var operative = T.residual || risk;
+        var operative = T.operative;
         var x = {
           ownerKind: kind, owner: o, t: t,
           risk: risk, exceeds: T.required,
           residual: T.residual,
+          // The three states: unmitigated (risk), current (with the linked
+          // existing countermeasures) and planned (after the planned measures).
+          current: T.current, planned: T.planned,
+          currentExceeds: E.exceedsTolerable(T.current, tolerable), plannedExceeds: E.exceedsTolerable(T.planned, tolerable),
           operative: operative, operativeExceeds: E.exceedsTolerable(operative, tolerable),
+          // The rating that stands today and once the plan is complete (the
+          // engine's one rule; see threatTreatment).
+          today: T.today, todayExceeds: !!T.today && !T.todayWithin,
+          afterPlan: T.afterPlan, afterPlanExceeds: !!T.afterPlan && !T.afterPlanWithin,
+          // The risk context's residualRisk, which keeps its meaning: the
+          // planned rating, else the current one, else none.
+          residualRisk: T.planned || T.current || null,
           // decided: a confirmed decision with nothing missing. One the
           // consultant has not confirmed prints as no decision, and a confirmed
           // one that lacks what it rests on (incomplete) prints as a prompt.
@@ -68,7 +86,11 @@ window.RiskApp.ViewModel = (function () {
         exceeding: exceeding,
         open: exceeding.filter(function (x) { return x.treatment.open; }),
         suggested: exceeding.filter(function (x) { return x.treatment.state === "suggested"; }),
+        // Threats with suggested countermeasure links waiting (from a 0.2 file).
+        linkSuggested: rows.filter(function (x) { return x.treatment.linkSuggested.length > 0; }),
         worstRisk: E.worstRiskOf(o.threats),
+        worstCurrent: E.worstBand(rows.map(function (x) { return x.current; })),
+        worstPlanned: E.worstBand(rows.map(function (x) { return x.planned; })),
         worstOperative: E.worstResidualOf(o.threats),
         sltSet: M.FR_IDS.some(function (fr) { return o.slTargetByFR[fr] != null; })
       };
@@ -88,8 +110,9 @@ window.RiskApp.ViewModel = (function () {
       owners.forEach(function (row) { var v = row.o.slTargetByFR[f.id]; if (v != null && (m === null || v > m)) m = v; });
       sltMax[f.id] = m;
     });
+    // Only a countermeasure with a description is counted, as only one covers anything.
     var cmEx = 0, cmPl = 0;
-    owners.forEach(function (row) { (row.o.countermeasures || []).forEach(function (m) { if (m.existing) cmEx++; else cmPl++; }); });
+    owners.forEach(function (row) { (row.o.countermeasures || []).forEach(function (m) { if (!String(m.description || "").trim()) return; if (m.existing) cmEx++; else cmPl++; }); });
     var exceeding = threats.filter(function (x) { return x.exceeds; });
 
     return {
@@ -104,8 +127,14 @@ window.RiskApp.ViewModel = (function () {
         incomplete: exceeding.filter(function (x) { return x.incomplete; }).length,
         open: exceeding.filter(function (x) { return x.treatment.open; }).length,
         suggested: exceeding.filter(function (x) { return x.treatment.state === "suggested"; }).length,
+        linkSuggested: threats.filter(function (x) { return x.treatment.linkSuggested.length > 0; }).length,
         countermeasuresExisting: cmEx,
-        countermeasuresPlanned: cmPl
+        countermeasuresPlanned: cmPl,
+        // Of the threats above tolerable risk before any countermeasure, those
+        // within it today and once the planned countermeasures are complete.
+        withinToday: exceeding.filter(function (x) { return !x.todayExceeds; }).length,
+        withinAfterPlan: exceeding.filter(function (x) { return !x.afterPlanExceeds; }).length,
+        aboveToday: exceeding.filter(function (x) { return x.todayExceeds; }).length
       }
     };
   }

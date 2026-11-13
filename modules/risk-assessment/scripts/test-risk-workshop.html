@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool step 5 workshop tests</title></head>
+<body>
+<h1>risk-tool step 5: the zone workshop, register, heat map and SL-T grid</h1>
+<pre id="out">running…</pre>
+<!--
+  Step 5 (js/ui-risk.js) on the demo: the rail, one zone or conduit at a
+  time, the compact scenario table with one editor open, the editor's order,
+  links, the current rating hidden until an existing countermeasure is
+  linked, the scales, duplicate, copy and move, the SL-T strip, the register
+  and its filters, the heat map and its cells, the SL-T grid's bulk accept,
+  and the keyboard: focus kept after an edit, Tab out of a reason field, and
+  a click straight after typing.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool) { if (++tries > 100) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var p = null;
+    try { p = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (p && typeof p.then === "function") p.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+    else done();
+  }, 50);
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  function run(w) {
+    var RT = w.RiskTool, d = w.document, M = w.RiskApp.Model, E = w.RiskApp.Engine;
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    function P() { return RT.state.project; }
+    function main() { return d.getElementById("main"); }
+    function panel() { return main().querySelector("[data-owner-id]"); }
+    function rail(id) { return main().querySelector('[data-rail-id="' + id + '"]'); }
+    function pick(id) { var r = rail(id); if (r && !r.classList.contains("on")) r.click(); return panel(); }
+    function scen(id) { return panel().querySelector('[data-threat-id="' + id + '"]'); }
+    function openScen(id) { var tb = scen(id); if (tb && !tb.classList.contains("open")) tb.querySelector('[data-action="open-scenario"]').click(); return scen(id); }
+    function editor() { return panel().querySelector(".scen-editor"); }
+    function owner(id) { return P().zones.concat(P().conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threat(oid, tid) { return owner(oid).threats.filter(function (x) { return x.id === tid; })[0]; }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    function change(sel, v) { sel.focus(); sel.value = v; sel.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function texts(sel, root) { return [].map.call((root || main()).querySelectorAll(sel), function (e) { return e.textContent.trim(); }); }
+    function wait(ms) { return new Promise(function (res) { w.setTimeout(res, ms || 30); }); }
+    function demo() { RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT)); RT.navigate("risk"); }
+
+    demo();
+    ok(RT.completeness().length === 0 && P().schema === "spt-risk-project/0.3", "the demo is a 0.3 file with nothing open");
+
+    // ---- the rail ----
+    var items = [].slice.call(main().querySelectorAll(".risk-rail [data-rail-id]"));
+    var ownersAll = P().zones.concat(P().conduits);
+    ok(items.length === ownersAll.length && items.map(function (x) { return x.getAttribute("data-rail-id"); }).join() === ownersAll.map(function (o) { return o.id; }).join(), "the rail lists every zone, then every conduit", items.map(function (x) { return x.getAttribute("data-rail-id"); }).join());
+    ok(/3 scenarios/.test(rail("Z1").textContent) && /1 scenario(?!s)/.test(rail("Z2").textContent) && /0 scenarios/.test(rail("C1").textContent), "each with its scenario count");
+    ok(!!rail("Z1").querySelector(".risk-pill.risk-high") && !rail("C1").querySelector(".risk-pill"), "a worst-risk pill where there are scenarios");
+    ok(/Not required/.test(rail("C1").textContent) && /Not required/.test(rail("C3").textContent) && !/Not required/.test(rail("Z1").textContent), "the zones and conduits step 4 found need no detailed assessment are marked");
+    ok(!/open/.test(rail("Z1").textContent), "with nothing open, no count");
+    var zx = M.emptyThreat(80); zx.statement = "Unrated."; P().counters.threat = 80; owner("Z3").threats.push(zx); RT.render();
+    ok(/\d+ open/.test(rail("Z3").textContent) && !/open/.test(rail("Z1").textContent), "a zone with something open says how many", rail("Z3").textContent);
+    owner("Z3").threats.pop(); RT.render();
+    ok(!/open/.test(rail("C1").textContent) && owner("C1").threats.length === 0, "a conduit not needing a detailed assessment has no scenarios and nothing open");
+
+    // ---- one zone or conduit at a time ----
+    ok(main().querySelectorAll("[data-owner-id]").length === 1 && panel().getAttribute("data-owner-id") === "Z1" && rail("Z1").getAttribute("aria-current") === "true", "one zone at a time, the first to start with, marked in the rail");
+    rail("Z3").focus(); rail("Z3").click();
+    ok(panel().getAttribute("data-owner-id") === "Z3" && rail("Z3").classList.contains("on") && d.activeElement === rail("Z3"), "a rail item opens its zone, and keeps the keyboard");
+    pick("C2");
+    ok(panel().getAttribute("data-owner-id") === "C2" && /C2: Vendor remote access \(Z3 ↔ Z1\)/.test(panel().querySelector(".card-h").textContent), "a conduit opens with its ends");
+
+    // ---- the compact table, one editor open ----
+    pick("Z1");
+    var rows = panel().querySelectorAll("table.scen-table tbody[data-threat-id]");
+    ok(rows.length === 3 && texts("thead th", panel().querySelector("table.scen-table")).join("|") === "ID|Scenario|FRs|Unmitigated|Current|Planned|Decision|Open", "a compact table of the zone's scenarios", texts("thead th", panel().querySelector("table.scen-table")).join("|"));
+    ok(panel().querySelectorAll(".scen-editor").length === 1 && scen("T1").classList.contains("open") && !!scen("T1").querySelector(".scen-editor"), "with one editor open, on the first");
+    // Phase 4b: the demo's T1 has no planned rating now (its existing countermeasure is enough), so T2 shows all three.
+    // Phase 4 review (wording 13): the demo's T2 has no current rating now either (it equalled the unmitigated one),
+    // so it is given one here to show the three.
+    threat("Z1", "T2").currentLikelihood = "medium"; threat("Z1", "T2").currentImpact = "serious"; RT.render();
+    ok(!!scen("T1").querySelector(".risk-pill.risk-high") && /Reduced to within tolerable risk/.test(scen("T1").querySelector(".scen-row").textContent) && scen("T2").querySelectorAll(".scen-row .risk-pill").length === 3 && /Reduce with countermeasures/.test(scen("T2").querySelector(".scen-row").textContent), "a row shows the three ratings and the decision");
+    threat("Z1", "T2").currentLikelihood = ""; threat("Z1", "T2").currentImpact = ""; RT.render();
+    ok(scen("T2").querySelectorAll(".scen-row .risk-pill").length === 2 && scen("T2").querySelectorAll(".scen-row td")[4].textContent === "", "and a rating not given leaves its cell empty");
+    var ob =scen("T2").querySelector('[data-action="open-scenario"]'); ob.focus(); ob.click();
+    ok(panel().querySelectorAll(".scen-editor").length === 1 && !!scen("T2").querySelector(".scen-editor") && !scen("T1").querySelector(".scen-editor"), "opening another closes the first");
+    ok(d.activeElement === scen("T2").querySelector('[data-action="open-scenario"]') && scen("T2").querySelector('[data-action="open-scenario"]').getAttribute("aria-expanded") === "true", "the keyboard stays on the scenario opened, which says it is open");
+
+    // ---- the editor's order ----
+    openScen("T1");
+    var heads = texts(".ed-section > .ed-h", editor());
+    ok(heads.join("|") === "Scenario|Unmitigated risk|Existing countermeasures|Treatment decision|Additional countermeasures", "the editor follows the work: scenario, unmitigated rating, existing countermeasures, decision, additional countermeasures", heads.join("|"));
+    var sc = editor().querySelector(".ed-section");
+    ["Threat statement", "Threat source", "Entry point", "Assets", "Vulnerabilities", "Consequence", "Affected foundational requirements"].forEach(function (k) { if (sc.textContent.indexOf(k) < 0) ok(false, "the scenario section has " + k); });
+    ok(true, "the scenario section has the statement, source, entry point, assets, vulnerabilities, consequence and affected requirements");
+    ok(!!editor().querySelector('[data-field="likelihoodRationale"]') && editor().querySelectorAll(".ed-section")[1].textContent.indexOf("Likelihood rationale") >= 0, "the unmitigated rating has a one-line likelihood rationale");
+    ok(/Before any countermeasure, existing ones included/.test(editor().querySelector('select[data-field="likelihood"]').parentNode.querySelector(".hint").textContent), "and the unmitigated likelihood is worded to set existing countermeasures aside");
+    var add = editor().querySelector('[data-part="additional"]');
+    // Phase 4b: T1 has no planned rating in the demo now, so the section shows the prompt to rate it in place of the rating line.
+    ok(!!add.querySelector('[data-field="residualLikelihood"]') && (/Planned risk/.test(add.textContent) || /Rate it for when the additional countermeasures are in place\./.test(add.textContent)), "the planned rating sits after the additional countermeasures");
+    openScen("T3");
+    ok(texts(".ed-section > .ed-h", editor()).indexOf("Treatment decision") < 0, "a scenario within tolerable risk asks for no decision");
+
+    // ---- the minimum scenario ----
+    var nBefore = owner("Z1").threats.length;
+    panel().querySelector('[data-action="add-scenario"]').click();
+    var nt = owner("Z1").threats[nBefore];
+    ok(owner("Z1").threats.length === nBefore + 1 && scen(nt.id).classList.contains("open") && d.activeElement === scen(nt.id).querySelector('[data-field="statement"]'), "+ Add scenario opens it with the keyboard in the statement");
+    var its = RT.completeness().filter(function (i) { return i.target && i.target.id === nt.id; }).map(function (i) { return i.text.replace(/^.* \/ /, ""); });
+    ok(its.length === 2 && /likelihood or impact not set/.test(its[0]) && /no affected foundational requirements/.test(its[1]), "an empty scenario asks only for the minimum: likelihood, impact and affected requirements", its.join(" | "));
+    type(scen(nt.id).querySelector('[data-field="statement"]'), "Rogue device on the control LAN.");
+    change(scen(nt.id).querySelector('select[data-field="likelihood"]'), "low");
+    ok(d.activeElement === scen(nt.id).querySelector('select[data-field="likelihood"]'), "a rating chosen keeps the keyboard on its select after the redraw");
+    change(scen(nt.id).querySelector('select[data-field="impact"]'), "minor");
+    var fr = scen(nt.id).querySelector('[data-chip="fr-UC"]'); fr.focus(); fr.click();
+    ok(same(nt.affectedFR, ["UC"]) && d.activeElement === scen(nt.id).querySelector('[data-chip="fr-UC"]') && scen(nt.id).querySelector('[data-chip="fr-UC"]').getAttribute("aria-pressed") === "true", "a requirement chip is a button, and keeps the keyboard when pressed");
+    ok(!RT.completeness().some(function (i) { return i.target && i.target.id === nt.id; }), "with the statement, a requirement, likelihood and impact the scenario is complete");
+
+    // ---- links: assets, vulnerabilities, countermeasures ----
+    // Phase 4b: the demo links T2's assets and vulnerabilities; start it with none, to link from scratch.
+    threat("Z1", "T2").assetIds = []; threat("Z1", "T2").vulnerabilityIds = [];
+    openScen("T2");
+    var t2 = threat("Z1", "T2"), aId = owner("Z1").assets[0].id;
+    scen("T2").querySelector('[data-chip="asset-' + aId + '"]').click();
+    ok(same(t2.assetIds, [aId]) && scen("T2").querySelector('[data-chip="asset-' + aId + '"]').getAttribute("aria-pressed") === "true", "an asset is linked with one click");
+    scen("T2").querySelector('[data-chip="vuln-V2"]').click();
+    ok(same(t2.vulnerabilityIds, ["V2"]), "and a vulnerability");
+    var nv = scen("T2").querySelector('[data-field="new-vuln"]'); nv.value = "Shared engineering account";
+    scen("T2").querySelector('[data-action="add-vuln"]').click();
+    var vNew = owner("Z1").vulnerabilities[owner("Z1").vulnerabilities.length - 1];
+    ok(vNew.description === "Shared engineering account" && t2.vulnerabilityIds.indexOf(vNew.id) >= 0 && d.activeElement === scen("T2").querySelector('[data-field="new-vuln"]'), "a new vulnerability is added to the zone and linked, the keyboard ready for another");
+    ok(same(t2.countermeasureIds, ["M2", "M3"]) && !!scen("T2").querySelector('[data-part="existing"] [data-cm-id="M2"]') && !!scen("T2").querySelector('[data-part="additional"] [data-cm-id="M3"]'), "linked countermeasures are listed where they belong: existing M2, additional M3");
+    var m1chip = scen("T2").querySelector('[data-part="existing"] [data-chip="cm-M1"]');
+    ok(!!m1chip && /^\+ M1/.test(m1chip.textContent), "an existing countermeasure not linked is offered to link");
+    m1chip.click();
+    ok(same(t2.countermeasureIds, ["M2", "M3", "M1"]), "and one click links it");
+    scen("T2").querySelector('[data-action="unlink-M1"]').click();
+    ok(same(t2.countermeasureIds, ["M2", "M3"]), "Unlink takes it back");
+    // The plan of an additional countermeasure.
+    var pl = scen("T2").querySelector('[data-cm-id="M3"]');
+    type(pl.querySelector('[data-cm-field="M3-owner"]'), "OT lead");
+    ok(owner("Z1").countermeasures[2].owner === "OT lead" && d.activeElement === pl.querySelector('[data-cm-field="M3-owner"]') && pl.isConnected, "an additional countermeasure takes an owner, typed in place");
+    change(scen("T2").querySelector('select[data-cm-field="M3-priority"]'), "high");
+    change(scen("T2").querySelector('select[data-cm-field="M3-status"]'), "agreed");
+    type(scen("T2").querySelector('[data-cm-field="M3-due"]'), "2027-03-31");
+    var m3 = owner("Z1").countermeasures[2];
+    ok(m3.priority === "high" && m3.status === "agreed" && m3.dueDate === "2027-03-31", "and a priority, a status and a due date");
+    var nCm = owner("Z1").countermeasures.length;
+    scen("T2").querySelector('[data-action="new-planned"]').click();
+    var mNew = owner("Z1").countermeasures[nCm];
+    ok(owner("Z1").countermeasures.length === nCm + 1 && mNew.existing === false && t2.countermeasureIds.indexOf(mNew.id) >= 0 && d.activeElement === scen("T2").querySelector('[data-cm-field="' + mNew.id + '-description"]'), "+ New countermeasure adds a planned one, linked, with the keyboard in its description");
+
+    // ---- the current rating is hidden until an existing countermeasure is linked ----
+    openScen(nt.id);
+    ok(!scen(nt.id).querySelector('[data-part="current"]'), "a scenario with no existing countermeasure linked shows no current rating");
+    scen(nt.id).querySelector('[data-chip="cm-M1"]').click();
+    ok(!!scen(nt.id).querySelector('[data-part="current"]') && !!scen(nt.id).querySelector('select[data-field="currentLikelihood"]'), "linking one shows it");
+    scen(nt.id).querySelector('[data-action="unlink-M1"]').click();
+    ok(!scen(nt.id).querySelector('[data-part="current"]'), "and unlinking hides it again");
+
+    // ---- the scales ----
+    var sp = panel().querySelector(".scales-pop");
+    ok(!!sp && sp.querySelector("summary").textContent === "Scales", "a Scales popover beside the scenarios");
+    var defs = M.SEV.concat(M.LIK).every(function (x) { return sp.textContent.indexOf(x.name + ": ") >= 0 && sp.textContent.indexOf(String(x.note || "").replace(/^House default:\s*/i, "").slice(1, 30)) >= 0; });
+    ok(defs, "with every impact and likelihood definition");
+    sp.open = true; sp.dispatchEvent(new w.Event("toggle"));
+    RT.render();
+    ok(panel().querySelector(".scales-pop").open === true, "and it stays open through a redraw");
+    panel().querySelector(".scales-pop").open = false; panel().querySelector(".scales-pop").dispatchEvent(new w.Event("toggle"));
+
+    // ---- duplicate, copy, move ----
+    openScen("T1");
+    var cnt = P().counters.threat, n1 = owner("Z1").threats.length;
+    scen("T1").querySelector('[data-action="duplicate"]').click();
+    var dup = owner("Z1").threats[1];
+    ok(owner("Z1").threats.length === n1 + 1 && dup.id === "T" + (cnt + 1) && dup.statement === threat("Z1", "T1").statement && same(dup.countermeasureIds, threat("Z1", "T1").countermeasureIds) && scen(dup.id).classList.contains("open"),
+      "Duplicate puts a copy with a new id after it, open", dup.id);
+    ok(d.activeElement === scen(dup.id).querySelector('[data-field="statement"]') && /duplicated as/.test(d.getElementById("toast").textContent), "with the keyboard in its statement, and says so");
+    var cs = scen(dup.id).querySelector('select[data-action="copy-targets"]');
+    [].forEach.call(cs.options, function (o) { o.selected = o.value === "Z2" || o.value === "C2"; });
+    var z2n = owner("Z2").threats.length, c2n = owner("C2").threats.length;
+    scen(dup.id).querySelector('[data-action="copy-to"]').click();
+    var cz = owner("Z2").threats[z2n], cc = owner("C2").threats[c2n];
+    ok(owner("Z2").threats.length === z2n + 1 && owner("C2").threats.length === c2n + 1 && cz.statement === dup.statement && cc.statement === dup.statement && cz.id !== cc.id && cz.id !== dup.id,
+      "Copy to puts a copy in each zone or conduit chosen, each with an id of its own");
+    ok(same(cz.countermeasureIds, []) && same(cz.assetIds, []) && cz.treatment.decision === null && cz.currentLikelihood === "" && cz.residualLikelihood === "" && cz.likelihood === dup.likelihood && same(cz.affectedFR, dup.affectedFR),
+      "a copy takes the scenario and its unmitigated rating, not the zone's links, ratings with countermeasures or decision");
+    ok(/copied/.test(d.getElementById("toast").textContent) && panel().getAttribute("data-owner-id") === "Z1", "and the page stays on the zone");
+    var mv = scen(dup.id).querySelector('select[data-action="move-target"]');
+    mv.value = "Z4";
+    var dupId = dup.id;
+    scen(dup.id).querySelector('[data-action="move-to"]').click();
+    ok(!owner("Z1").threats.some(function (x) { return x.id === dupId; }) && owner("Z4").threats[owner("Z4").threats.length - 1] === dup && dup.id === dupId, "Move takes the scenario itself to the zone chosen, its id kept");
+    ok(same(dup.countermeasureIds, []) && panel().getAttribute("data-owner-id") === "Z4" && scen(dupId).classList.contains("open") && rail("Z4").classList.contains("on"), "its links to the zone it left go, and the page follows it");
+    ok(d.activeElement === scen(dupId).querySelector('[data-action="open-scenario"]'), "with the keyboard on it");
+
+    // ---- the SL-T strip ----
+    demo(); pick("C2");
+    var c2o = owner("C2"), strip = panel().querySelector("[data-slt-strip]");
+    ok(!!strip && panel().querySelector("[data-slt-strip]").compareDocumentPosition(panel().querySelector("table.scen-table")) & 4, "the zone's SL-T strip sits above the scenario table");
+    var sugC = E.suggestConduit(c2o, P());
+    ok(strip.querySelectorAll("[data-why]").length === 7 && !!strip.querySelector("details.strip-why summary") && strip.querySelector("details.strip-why summary").textContent === "Why", "with the Why trace for each requirement");
+    ok(c2o.slTargetByFR.SI === null && sugC.byFR.SI.sl === 3 && !!strip.querySelector('[data-action="use-suggestion-SI"]'), "an unset requirement with a suggestion offers Use");
+    strip.querySelector('[data-action="use-suggestion-SI"]').click();
+    ok(c2o.slTargetByFR.SI === 3 && !panel().querySelector('[data-slt-strip] [data-action="use-suggestion-SI"]'), "Use sets it to the suggestion");
+    c2o.slTargetByFR.RDF = 2; RT.render();
+    var acc = panel().querySelector('[data-action="accept-all-suggested"]');
+    var unsetWithSug = RT.FR_IDS.filter(function (fr) { return c2o.slTargetByFR[fr] == null && sugC.byFR[fr].sl != null; });
+    ok(/Accept all suggested \(\d\)/.test(acc.textContent) && acc.textContent.indexOf("(" + unsetWithSug.length + ")") >= 0, "Accept all suggested says how many it will set", acc.textContent);
+    acc.click();
+    ok(unsetWithSug.every(function (fr) { return c2o.slTargetByFR[fr] === sugC.byFR[fr].sl; }) && c2o.slTargetByFR.RDF === 2, "it sets every unset requirement to its suggestion, and leaves one chosen below it alone");
+    var sel = panel().querySelector('[data-slt-strip] select[data-slt-fr="TRE"]');
+    change(sel, "4");
+    ok(c2o.slTargetByFR.TRE === 4 && d.activeElement === panel().querySelector('[data-slt-strip] select[data-slt-fr="TRE"]'), "an SL-T chosen in the strip keeps the keyboard on its select");
+    var cf = panel().querySelector('select[data-action="copy-slt-from"]'); cf.value = "Z2";
+    panel().querySelector('[data-action="copy-slt"]').click();
+    ok(same(c2o.slTargetByFR, owner("Z2").slTargetByFR) && /copied from Z2/.test(d.getElementById("toast").textContent), "Copy from takes another zone's SL-T");
+    var j = panel().querySelector('[data-slt-strip] [data-field="justification"]');
+    var jHint = j.parentNode.querySelector(".hint");
+    type(j, "");
+    ok(/not justified/.test(jHint.textContent) && j.isConnected && d.activeElement === j, "emptying the justification warns in place");
+    type(j, "Matches Z2.");
+    ok(jHint.textContent === "Required." && c2o.justification === "Matches Z2." && d.activeElement === j, "and writing it clears the warning, the keyboard staying in it");
+
+    // ---- the register ----
+    demo();
+    main().querySelector('.step-tabs [data-tab="register"]').click();
+    ok(RT.state.stage === "risk" && !!main().querySelector('[data-view="register"]') && main().querySelector('.step-tabs [data-tab="register"]').classList.contains("active"), "Register is a tab of step 5");
+    function regRows() { return [].map.call(main().querySelectorAll("[data-reg-row]"), function (r) { return r.getAttribute("data-reg-row"); }); }
+    var allIds = []; P().zones.concat(P().conduits).forEach(function (o) { o.threats.forEach(function (x) { allIds.push(o.id + "/" + x.id); }); });
+    ok(same(regRows(), allIds), "it lists every scenario across the zones and conduits", regRows().join(","));
+    change(main().querySelector('select[data-filter="owner"]'), "Z1");
+    ok(same(regRows(), ["Z1/T1", "Z1/T2", "Z1/T3"]) && d.activeElement === main().querySelector('select[data-filter="owner"]'), "filtered by zone, the keyboard kept on the filter");
+    change(main().querySelector('select[data-filter="owner"]'), "");
+    change(main().querySelector('select[data-filter="band"]'), "medium");
+    ok(regRows().length === 2 && regRows().every(function (r) { return /T3|T6/.test(r); }), "by unmitigated risk", regRows().join(","));
+    change(main().querySelector('select[data-filter="band"]'), "");
+    change(main().querySelector('select[data-filter="decision"]'), "accept");
+    ok(same(regRows(), ["Z4/T8"]), "by decision");
+    change(main().querySelector('select[data-filter="decision"]'), "within");
+    ok(same(regRows(), ["Z1/T3", "Z3/T6"]), "within tolerable risk");
+    change(main().querySelector('select[data-filter="decision"]'), "");
+    threat("Z3", "T5").treatment.confirmed = false; RT.render();
+    var oc = main().querySelector('input[data-filter="open"]'); oc.click();
+    ok(same(regRows(), ["Z3/T5"]) && main().querySelector('input[data-filter="open"]').checked, "and to what is open");
+    main().querySelector('input[data-filter="open"]').click();
+    main().querySelector('[data-reg-row="Z3/T5"] [data-action="reg-open"]').click();
+    ok(main().querySelector('.step-tabs [data-tab="risk"]').classList.contains("active") && panel().getAttribute("data-owner-id") === "Z3" && scen("T5").classList.contains("open"), "a scenario's id opens it in its zone");
+
+    // ---- the heat map ----
+    main().querySelector('.step-tabs [data-tab="heatmap"]').click();
+    function cell(k) { return main().querySelector('[data-cell="' + k + '"]'); }
+    function heatN(k) { var b = cell(k); return b ? Number(b.querySelector(".heat-n").textContent || 0) : -1; }
+    ok(!!main().querySelector('[data-view="heatmap"]') && main().querySelector('[data-heat="unmitigated"]').getAttribute("aria-pressed") === "true", "Heat map is a tab, unmitigated to start with");
+    ok(heatN("serious:high") === 1 && heatN("serious:medium") === 5 && heatN("severe:low") === 1 && heatN("serious:low") === 2, "each cell counts the scenarios rated there", ["serious:high", "serious:medium", "severe:low", "serious:low"].map(heatN).join(","));
+    ok(cell("negligible:low").disabled && /0 scenarios/.test(cell("negligible:low").getAttribute("aria-label")), "an empty cell is not a button to press");
+    main().querySelector('[data-heat="current"]').focus(); main().querySelector('[data-heat="current"]').click();
+    ok(main().querySelector('[data-heat="current"]').getAttribute("aria-pressed") === "true" && heatN("serious:high") === 0 && heatN("serious:low") === 5 && heatN("serious:medium") === 3 && d.activeElement === main().querySelector('[data-heat="current"]'),
+      "Current moves T1, T7 and T9 to their current rating, and keeps the keyboard on the toggle (phase 4b demo: T7 has one too)", ["serious:high", "serious:low", "serious:medium"].map(heatN).join(","));
+    main().querySelector('[data-heat="planned"]').click();
+    // Phase 4b demo: T2 and T5 reach low likelihood once planned, and the rest keep the rating before it (was: 4).
+    ok(heatN("serious:low") === 7 && heatN("serious:high") === 0 && heatN("serious:medium") === 1, "Planned too");
+    main().querySelector('[data-heat="current"]').click();
+    cell("serious:low").click();
+    ok(!!main().querySelector('[data-view="register"]') && same(regRows().sort(), ["C2/T9", "Z1/T1", "Z1/T3", "Z3/T6", "Z4/T7"].sort()) && /Current: Serious impact, low likelihood/.test(main().querySelector("[data-cell-filter]").textContent),
+      "a cell opens the register filtered to it, and says so", regRows().join(","));
+    main().querySelector('[data-action="clear-cell"]').click();
+    ok(regRows().length === allIds.length && !main().querySelector("[data-cell-filter]"), "and the filter clears");
+
+    // ---- the SL-T grid ----
+    demo();
+    main().querySelector('.step-tabs [data-tab="slt"]').click();
+    var grid = main().querySelector("table.slt-grid");
+    ok(RT.state.stage === "slt" && !!grid && grid.querySelectorAll("tbody tr[data-owner-id]").length === ownersAll.length && grid.querySelectorAll('tbody select[data-slt-fr]').length === ownersAll.length * 7, "the SL-T grid has every zone and conduit by FR");
+    var fillN = 0; P().zones.concat(P().conduits).forEach(function (o) { var s = o.fromZone !== undefined ? E.suggestConduit(o, P()) : E.suggestZone(o, P()); RT.FR_IDS.forEach(function (fr) { if (o.slTargetByFR[fr] == null && s.byFR[fr].sl != null) fillN++; }); });
+    var ga = main().querySelector('[data-action="accept-all-grid"]');
+    ok(fillN > 0 && ga.textContent.indexOf("(" + fillN + ")") >= 0, "Accept all suggested counts the unset cells with a suggestion", ga.textContent);
+    var before = JSON.stringify(P().zones.concat(P().conduits).map(function (o) { return o.slTargetByFR; }));
+    ga.click();
+    var after = P().zones.concat(P().conduits);
+    var allSet = after.every(function (o) { var s = o.fromZone !== undefined ? E.suggestConduit(o, P()) : E.suggestZone(o, P()); return RT.FR_IDS.every(function (fr) { return s.byFR[fr].sl == null || o.slTargetByFR[fr] != null; }); });
+    var keptSet = JSON.parse(before).every(function (v, i) { return RT.FR_IDS.every(function (fr) { return v[fr] == null || v[fr] === after[i].slTargetByFR[fr]; }); });
+    ok(allSet && keptSet && /accepted/.test(d.getElementById("toast").textContent), "bulk accept fills every unset cell from its suggestion and changes none already set");
+    ok(main().querySelector('[data-action="accept-all-grid"]').disabled, "and then has nothing left to do");
+    var gsel = main().querySelector('tr[data-owner-id="Z3"] select[data-slt-fr="UC"]');
+    change(gsel, "3");
+    ok(owner("Z3").slTargetByFR.UC === 3 && d.activeElement === main().querySelector('tr[data-owner-id="Z3"] select[data-slt-fr="UC"]'), "a cell set in the grid keeps the keyboard");
+    owner("C1").slTargetByFR.DC = null; RT.render();
+    var ra = main().querySelector('tr[data-owner-id="C1"] [data-action="accept-row"]');
+    ok(!ra || /Accept \(\d\)/.test(ra.textContent), "a row with unset suggestions offers its own Accept");
+    owner("Z3").justification = ""; RT.render();
+    ok(/needs justification/.test(main().querySelector('tr[data-owner-id="Z3"]').textContent), "a row with an SL-T and no justification says so");
+    main().querySelector('tr[data-owner-id="Z3"] [data-action="open-zone"]').click();
+    ok(RT.state.stage === "risk" && panel().getAttribute("data-owner-id") === "Z3" && d.activeElement === panel().querySelector('[data-slt-strip] [data-field="justification"]'), "Open takes the zone's justification, with the keyboard in it");
+
+    // ---- Go to ----
+    demo();
+    var tg = M.emptyThreat(90); tg.statement = "Unrated."; owner("Z4").threats.push(tg);
+    RT.navigate("review");
+    var item = RT.completeness().filter(function (i) { return i.target && i.target.id === "T90"; })[0];
+    RT.goToItem(item);
+    ok(RT.state.stage === "risk" && panel().getAttribute("data-owner-id") === "Z4" && scen("T90").classList.contains("open") && scen("T90").classList.contains("check-flash") && d.activeElement === scen("T90"), "Go to on a scenario opens its zone and its editor, flashed, with the keyboard on it");
+
+    // ---- confirm suggested links, on a file from v0.7 ----
+    RT.loadProjectText(JSON.stringify(window.RiskFixtures["tour-v0.7-saved"]));
+    RT.navigate("risk"); pick("Z1");
+    var cl = panel().querySelector('[data-action="confirm-links"]');
+    ok(!!cl && /Confirm suggested links \(2\)/.test(cl.textContent), "a zone from an older file offers Confirm suggested links");
+    ok(/Suggested links from an earlier file: M1, M3\./.test(scen("T1").querySelector('[data-part="existing"]').textContent) && !!scen("T1").querySelector('[data-chip="cm-M1"].suggested'), "the editor shows each scenario's suggested links, dashed");
+    scen("T1").querySelector('[data-action="confirm-links-T1"]').click();
+    ok(same(threat("Z1", "T1").countermeasureIds, ["M1", "M3"]) && !("suggestedCountermeasureIds" in threat("Z1", "T1")), "Confirm on one scenario links its suggestions");
+    panel().querySelector('[data-action="confirm-links"]').click();
+    ok(same(threat("Z1", "T2").countermeasureIds, ["M2", "M3"]) && !panel().querySelector('[data-action="confirm-links"]'), "Confirm suggested links does the rest of the zone");
+
+    // ---- the keyboard: a reason field edited in place, Tab, a click after typing ----
+    demo(); pick("Z4"); openScen("T8");
+    var rIn = scen("T8").querySelector('input[data-reason="accept"]');
+    var status = scen("T8").querySelector(".treat-status");
+    type(rIn, "");
+    ok(/Accepted with no reason recorded/.test(status.textContent) && status.isConnected && d.activeElement === rIn, "emptying the reason says what is missing in place, the field kept");
+    ok(/1 open/.test(rail("Z4").textContent), "and the rail counts it at once");
+    var all = [].slice.call(main().querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]"));
+    var nextEl = all[all.indexOf(rIn) + 1];
+    rIn.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    rIn.value = "Retired at the Q2-2027 turnaround."; rIn.dispatchEvent(new w.Event("input", { bubbles: true }));
+    rIn.dispatchEvent(new w.Event("change", { bubbles: true }));
+    nextEl.focus();   // where the browser's Tab goes
+    return wait(60).then(function () {
+      ok(rIn.isConnected && d.activeElement === nextEl && nextEl.isConnected && threat("Z4", "T8").acceptance === "Retired at the Q2-2027 turnaround." && !/no reason/.test(status.textContent), "Tab out of a reason field: no redraw, and the keyboard is where Tab took it");
+      ok(!/open/.test(rail("Z4").textContent), "the reason settles it, and the rail says so");
+      ok(/Accepted by/.test(scen("T8").textContent) && !!scen("T8").querySelector('[data-field="acc-by"]') && !!scen("T8").querySelector('[data-field="acc-review"]'), "an acceptance records who, their role, when and when to review it");
+      type(scen("T8").querySelector('[data-field="acc-by"]'), "R. Calder");
+      ok(threat("Z4", "T8").acceptanceDetail.by === "R. Calder", "typed in place");
+
+      // A click straight after typing: the field's change must not redraw the page under the click.
+      openScen("T7");
+      var st = scen("T7").querySelector('[data-field="statement"]'), btn = scen("T7").querySelector('[data-decision="accept"]');
+      type(st, "Malware carried on removable media executes on an engineering workstation.");
+      btn.dispatchEvent(new w.PointerEvent("pointerdown", { bubbles: true }));
+      btn.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true }));
+      st.dispatchEvent(new w.Event("change", { bubbles: true }));
+      var stillThere = btn.isConnected;
+      btn.dispatchEvent(new w.PointerEvent("pointerup", { bubbles: true }));
+      btn.dispatchEvent(new w.MouseEvent("mouseup", { bubbles: true }));
+      btn.click();
+      ok(stillThere && threat("Z4", "T7").treatment.decision === "accept" && /removable media executes/.test(threat("Z4", "T7").statement), "a click straight after typing lands: the typed text is kept and the choice is made");
+      // The same on a field that does redraw on change (step 4's reason): the redraw waits for the click.
+      threat("Z4", "T7").treatment = { decision: "reduce", confirmed: true, reason: "" };
+      RT.navigate("compare");
+      var c1 = P().conduits[0];
+      var reason = main().querySelector('[data-owner-id="' + c1.id + '"] input[data-reason="detailed"]');
+      var other = main().querySelector('[data-owner-id="Z1"] [data-detailed="required"]');
+      reason.focus(); reason.value = c1.detailed.reason + " Checked."; reason.dispatchEvent(new w.Event("input", { bubbles: true }));
+      other.dispatchEvent(new w.PointerEvent("pointerdown", { bubbles: true }));
+      reason.dispatchEvent(new w.Event("change", { bubbles: true }));
+      var otherThere = other.isConnected;
+      other.dispatchEvent(new w.PointerEvent("pointerup", { bubbles: true }));
+      other.click();
+      ok(otherThere && P().zones[0].detailed.required === null, "on step 4 too, a click right after typing a reason is not lost to the redraw");
+      return wait(60);
+    }).then(function () {
+      ok(!main().querySelector('[data-owner-id="Z1"] [data-detailed="required"]').classList.contains("on") && /Checked\.$/.test(P().conduits[0].detailed.reason), "and the page is redrawn once the click has run");
+      P().zones[0].detailed.required = true;
+
+      // ---- names and words ----
+      demo(); pick("Z1"); openScen("T1");
+      function unnamed() {
+        return [].filter.call(main().querySelectorAll("input, select, textarea"), function (e) {
+          if (e.type === "hidden") return false;
+          return !(e.getAttribute("aria-label") || (e.id && d.querySelector('label[for="' + e.id + '"]')) || e.closest("label"));
+        });
+      }
+      ok(unnamed().length === 0, "every field in the workshop has a name a screen reader reads", unnamed().map(function (e) { return e.outerHTML.slice(0, 90); }).join(" | "));
+      var dashed = [];
+      [["risk", "risk"], ["register", "risk"], ["heatmap", "risk"], ["slt", "slt"]].forEach(function (v) {
+        if (v[0] === "slt") RT.navigate("slt"); else { RT.navigate("risk"); main().querySelector('.step-tabs [data-tab="' + v[0] + '"]').click(); }
+        if (/[—–]/.test(main().textContent)) dashed.push(v[0]);
+        var ph = [].map.call(main().querySelectorAll("[placeholder]"), function (e) { return e.getAttribute("placeholder"); }).join(" ");
+        if (/[—–]/.test(ph)) dashed.push(v[0] + " placeholder");
+        if ([].some.call(main().querySelectorAll("td, .pill, .risk-pill, option"), function (e) { return /^\s*-\s*$/.test(e.textContent); })) dashed.push(v[0] + " dash cell");
+      });
+      ok(dashed.length === 0, "no em or en dash, and no dash standing for nothing, on any view of step 5", dashed.join(", "));
+      RT.navigate("slt");
+      ok([].every.call(main().querySelectorAll("select[data-slt-fr]"), function (s) { return s.options[0].text === "Not set"; }) && [].every.call(main().querySelectorAll(".sug-word"), function (e) { return /^(Suggested SL\d|No suggestion)$/.test(e.textContent); }), "the grid says Not set and No suggestion in words");
+      RT.navigate("report");
+      var sum = main().querySelector('.rp-views [data-view="summary"]'); if (sum) sum.click();
+      var dt = main().querySelector('.rp-viewbar .rp-tab[data-doc="detailed"]'); if (dt) dt.click();
+      ok(!/\d\/-|-\/\d|^-\//m.test(main().textContent) && /IAC SL3/.test(main().textContent), "the report summary prints SL-T vectors in words, with no dash for a level not set");
+    });
+  }
+}());
+</script>
+</body>
+</html>

@@ -74,7 +74,9 @@
     }
     function row(key) { return main.querySelector('[data-check-anchor="reworded"] [data-reworded-row="' + key + '"]'); }
     function reset() { delete P().reportCustom; RT.touched(); }
-    var KEY = "what-we-found", x = {};
+    // Phase 4 review: "What we found" opens with one paragraph now (the accepted risk is named in the residual
+    // position's table, not again there), so a section that still opens with several is used (was: what-we-found).
+    var KEY = "why-this-assessment", x = {};
 
     poll(function () { return w.RiskTool && w.RiskReview && w.RiskReportPage && w.RiskExports && w.docx && w.RiskTool.state.project.zones.length; }).then(function () {
       RT = w.RiskTool; RR = w.RiskReview; RP = w.RiskReportPage; RX = w.RiskExports; RC = w.App.ReviewCore; DB = w.App.DocxBlocks; RS = w.App.ReportSections; main = w.document.getElementById("main");
