@@ -296,7 +296,7 @@ window.RiskZoneMap = (function () {
     var items = [];
     if (boxes.some(function (b) { return b.safety; })) items.push({ kind: "safety", text: "Safety related" });
     ["low", "medium", "high", "very-high"].forEach(function (band) {
-      if (boxes.some(function (b) { return !b.safety && !b.ext && b.band === band; })) items.push({ kind: "band", band: band, text: "Worst risk " + RISK_NAME[band].toLowerCase() });
+      if (boxes.some(function (b) { return !b.safety && !b.ext && b.band === band; })) items.push({ kind: "band", band: band, text: "Worst unmitigated risk " + RISK_NAME[band].toLowerCase() });
     });
     if (hasExt) items.push({ kind: "ext", text: "Outside the SUC" });
     if (shows.slt || notes.some(function (n) { return /SL-T/.test(n.text); })) items.push({ kind: "text", term: "SL-T", text: "SL-T: highest on any foundational requirement" });

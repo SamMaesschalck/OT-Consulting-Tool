@@ -109,6 +109,18 @@ H.test(function (ok, done) {
       var rc = E.getRiskContext();
       ok(rc && rc.schema === ctx.schema && rc.fileName === "example-risk-context.json",
          "the risk context is stored on the assessment with its file name", JSON.stringify(rc && [rc.schema, rc.fileName]));
+      // The contract's example carries the provenance added on 1.4 (phase 6
+      // of the risk tool): the import keeps the approvals list and the zones'
+      // and conduits' extra fields, and shows nothing new for them.
+      ok(Array.isArray(ctx.approvals) && rc && JSON.stringify(rc.approvals) === JSON.stringify(ctx.approvals),
+         "the approvals list is kept through the real import path", JSON.stringify(rc && rc.approvals));
+      ok(rc && JSON.stringify(rc.zones) === JSON.stringify(ctx.zones) && JSON.stringify(rc.conduits) === JSON.stringify(ctx.conduits) &&
+         !!rc.zones[0].riskComparison && !!rc.zones[0].initialRisk && !!rc.zones[0].assets[0].id,
+         "and the zones' risk comparison, initial risk and asset ids with the zones");
+      var mainText = document.getElementById("main").textContent || "";
+      ok(ctx.approvals.every(function (a) { return mainText.indexOf(a.organisation) < 0 && mainText.indexOf(a.scope) < 0; }) &&
+         mainText.indexOf(ctx.zones[0].assets[0].vendor) < 0,
+         "none of it is shown");
       var targets = E.state.engagement.targets;
       ok(targets.length === zones.length,
          "no responses were captured, so the zones replace the default site", targets.length + " targets");

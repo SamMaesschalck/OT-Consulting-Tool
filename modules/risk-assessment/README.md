@@ -27,7 +27,7 @@ parity check find pages by it, never by label text):
 | Engagement and evidence | `basis` | |
 | 1 Scope and risk criteria | `suc` | ZCR 1 |
 | 2 High-level risk | `srs` | ZCR 2 |
-| 3 Zones and conduits | `zones` | ZCR 3 |
+| 3 Zones and conduits (tabs: Zones and conduits, Asset register) | `zones` | ZCR 3 |
 | 4 Risk comparison | `compare` | ZCR 4 |
 | 5 Detailed risk (tabs: By zone, Register, Heat map, SL-T grid) | `risk`, `slt` | ZCR 5, ZCR 5.6 |
 | 6 Requirements specification | `spec` | ZCR 6 |
@@ -86,7 +86,8 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
   for impact alone is listed as having nothing to compare.
 - **Check and issue** lists what is open in each report, each line with Go to
   (the page, scrolled to the item, which flashes and takes the keyboard
-  focus), and every download. The approvals are step 7's. Before a download
+  focus), what has changed since a previous assessment (phase 6a), and every
+  download. The approvals are step 7's. Before a download
   with something open, or with the peer review's warnings, an in-page panel
   asks (Generate anyway, or Export anyway for the risk context, or Cancel;
   Escape cancels); the browser's confirm is not used. What it lists is worked
@@ -134,7 +135,8 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
   adds house scenarios as unrated drafts (see phase 5b). Go to and the peer review open the zone
   and the scenario (`RiskApp.RiskPage.select`).
 
-- **Zones and conduits (step 3)** has the drawing on top (a zone's box opens
+- **Zones and conduits (step 3)** has two tabs, Zones and conduits and Asset
+  register (phase 6a, below). The first has the drawing on top (a zone's box opens
   the zone), compact tables of the zones and the conduits, and one selected
   zone or conduit in a detail panel (`js/ui-zones.js`). A zone's panel holds
   its name, function, logical boundary, safety designation (the `sis-present`
@@ -469,10 +471,205 @@ so a file without them behaves exactly as before.
   it, and a question about where ratings go (step 1) is closed.
   `scripts/test-risk-undo.html` covers each action.
 
+### Asset register and previous assessment (phase 6a, built Nov 2026)
+
+Each item stands on its own. The schema stays `spt-risk-project/0.3`; every
+new field is optional, tidied by the migration when present and never added,
+so a file without them behaves and prints exactly as before.
+
+- **Asset register.** Step 3 has two tabs, Zones and conduits (as before) and
+  Asset register (`js/ui-assets.js`, over `js/assets.js`). Assets still live
+  in their zone (`zone.assets`, ids `AS1`...); the register lists every one
+  with its id, name, zone, type, connection and the register's own optional
+  attributes: `tag` (tag or hostname), `vendor`, `model`, `version` (firmware
+  or software), `location`, `criticality` (`high`, `medium`, `low`), `owner`
+  and `notes`, each written only when set. A search, filters by zone, type
+  and criticality, and a sort on any column (numbers inside ids, names and
+  tags sort by value, case ignored). The ID and Name columns stay at the
+  left and the header at the top as the register scrolls; its count is a
+  polite live region. Fields edit in place; notes are a box that grows with
+  their lines. To stay quick at a few hundred assets the search and the
+  filters hide rows in place, an edit redraws the table only when it is
+  sorted on what was edited, the paste panel is drawn on its own, and each
+  row's selects are cloned from one built per draw. After a change the
+  keyboard is back on the same field of the same asset, wherever it now
+  sorts (`js/app.js` focusMark finds a register row by `data-asset-id`).
+  Choosing another zone moves the asset there (id kept) on a deliberate
+  choice: a click, Enter, or leaving the field; an arrow press in a closed
+  list, which fires change, waits. A threat's links to it then follow the
+  prune (a zone's threats lose the link, a conduit's keep it while the
+  conduit still joins the new zone), the toast says "AS1 moved to Z3 and
+  taken off 2 threats.", and Undo puts it all back. The search, filters and
+  paste box start afresh when another project is opened (Load, the demo,
+  Restore, New: `js/app.js` projectReplaced), and a zone filter left from a
+  zone removed is dropped.
+- **Paste from Excel** (on the register). Tab-separated rows as a
+  spreadsheet copies them: Excel's quoting (a cell holding a tab, a line
+  break or a quote), CRLF, LF or CR line endings, a byte order mark. A cell
+  that opens a quote and never closes it is read with the quote as a plain
+  character, so it cannot swallow the rows after it. A first row is the
+  header when it holds the name's heading or two known headings (English
+  names: Name, Asset, Device; Zone; Type; Connection; Tag, Hostname; Vendor,
+  Manufacturer, Make; Model; Version, Firmware; Location, Site, Room;
+  Criticality; Owner; Notes, Comments). Without one, or with a heading not
+  known, the panel asks what each column holds (no header: name, type and
+  connection, as Paste several reads them), and after Read the keyboard is
+  on the first column to choose. A field chosen for two columns is marked
+  there, and only the first of them is read ("Two columns are read as tag or
+  hostname; the first is used."). A status line (role status) says what the
+  preview comes to ("6 rows: 4 to add, 2 left out; 3 with a problem."). The
+  preview shows what each row does (Action: Add to a zone, Update an asset,
+  Left out) and its problems: a zone not found (the row goes to the zone
+  chosen for rows without one; an update row is updated in place), a type
+  not known (set to Other), a connection or criticality not known, a tag
+  repeated in the paste (the repeat is left out; a row left out for another
+  reason does not take the tag), a tag an asset already has (left out unless
+  Update existing is ticked; an update writes only the fields the paste
+  gives, so a row with no name keeps the asset's own, says when it renames
+  one, and never moves the asset), no name (a new asset takes its tag as its
+  name). The paste is one undo step and puts the keyboard back on Paste from
+  Excel. Paste several on a zone works as before (`Engine.parseAssets`).
+- **Word.** Where any asset has one of the register's attributes, the
+  characteristics no longer list the assets and say where they are; an
+  Asset register sub-section follows them: one table per zone with only the
+  columns something is recorded in (Name and Type always, a type of Other
+  blank as in the characteristics row, Connection where an asset is not
+  fixed, the version headed Firmware or software version). More than six
+  columns in any zone puts the sub-section on a landscape page of its own
+  (cut out like the drawing's). The high-level report has none. **Excel:** an
+  Assets sheet after Conduits, every asset with its zone, one way like every
+  sheet. The review pack and the risk context are unchanged.
+- **Previous assessment.** Check and issue has a Since the previous
+  assessment card: Load previous assessment reads a risk project file (any
+  schema Load reads, on a copy) and stores it as `project.baseline`: the
+  file's name, its date (`savedOn`, `assessmentDate`, `revision`), its
+  approval date (`approvedOn`, the latest approved entry), `loadedOn`, and
+  `facts`, a frozen copy of what is compared (`js/compare.js` freeze: each
+  zone and conduit with its SL-T and a conduit's ends, each threat with its
+  three ratings worked out on that file's own criteria, the treatment
+  decision recorded and whether it is accepted, each countermeasure with its
+  status, each ranked system with its rating, its impact by category and,
+  on a high-level-only assessment, its decision on a detailed assessment,
+  the tolerable risk and a key of the criteria). The comparison stands
+  without the old file and never changes anything else in the project;
+  Replace and Remove are on the card, and both undo. A frozen copy that is
+  not well formed loses, on load, what is not an object, and the comparison
+  reads it defensively, so it never breaks a build.
+- **What is compared.** Matched by id with a name fallback for anything
+  numbered again: the same id and name, then the same name (a conduit also
+  by its ends), then the same id; ranked systems by id, then by name;
+  threats and countermeasures across zones, so a move is seen. Each change
+  is said once, with its direction in words: ranked systems added, removed,
+  renumbered, renamed, their risk raised or lowered, their impact by
+  category changed, the decision on a detailed assessment changed; zones and
+  conduits added (with what they hold, not listed again), removed,
+  renumbered ("Z1 Unit 300 BPCS was numbered Z2."), renamed ("C3 had no
+  name; now Corporate reporting."), a conduit that now joins other zones
+  ("C1 now joins Z1 and Z2; was Z1 and Z3."); the SL-T per FR ("IAC raised
+  from SL2 to SL3", "DC set to SL1", "DC no longer set (was SL2)"); threats
+  added, removed, moved or renumbered; ratings per state (unmitigated,
+  current, planned; a state not rated in either is not said again): "current
+  risk lowered from High (High × Serious) to Medium (Low × Serious)", "now
+  rated", "no longer rated (was ...)", "changed from" for the same band, with
+  likelihood and impact on the same criteria and by band only when the
+  criteria changed ("The risk criteria changed, so ratings are compared by
+  band only."); a treatment decision only when the decision recorded changed
+  ("T4 (Z2): was reduce with countermeasures; now treated through the SL-T
+  programme."; a threat now within tolerable risk needs none, which its
+  rating says); countermeasures added, removed, moved to another zone ("M5
+  moved from Z3 to Z1."), now in place or with their status changed ("M5
+  (Z3): moved from in progress to done.", "M3 (Z1): now agreed."); accepted
+  risks added or no longer accepted ("T8 (Z4) no longer accepted; the
+  decision is now reduce with countermeasures.", said there, not again with
+  the decisions); a change of tolerable risk or of a category's tolerable
+  risk. A review date that has passed is a fact about today, not a change:
+  the full report says it under Decisions required, baseline or not ("The
+  review date of the accepted risk T8 (Z4), 2026-10-31, has passed.").
+- **Deliverables.** The full Word report has Progress since the previous
+  assessment after the risk position, only with a baseline: one sentence
+  naming the previous assessment (by date, revision and approval, not its
+  file name), then each group with its lines, or "Nothing recorded has
+  changed since." The high-level report has the same section after What we
+  found, with the risk criteria and the ranked systems only (the ranking
+  rests on the criteria; it holds no zones). Excel has a Changes sheet after
+  the Summary, only with a baseline, one row per change (area, zone or
+  conduit, item, change, previous, now), in the same words: Raised, Lowered,
+  Set, No longer set, Rated, Renumbered, Moved, Ends changed, Status changed,
+  with a countermeasure's state as printed elsewhere (In place, Planned,
+  Proposed, Agreed, In progress, Done) and a blank where there was none. The
+  demo carries no baseline (`scripts/test-risk-compare.html` builds its
+  previous assessments from the demo and the frozen files).
+
+### The requirements specification as a file of its own (phase 6b, built Nov 2026)
+
+The full report keeps the cyber security requirements specification as it
+was (one report stays the owner's decision); for a client who issues the
+specification on its own, it is also a third Word document,
+`<name>-cyber-security-requirements-specification.docx`, from the same
+builder (`buildWordDoc(p, { spec: true })`) and the same section functions,
+so no text is written twice. The schema does not move.
+
+- **What it holds.** The house cover, kicker OT CYBER SECURITY ("Cyber
+  Security / Requirements Specification"; the Report Review Tool reads the
+  cover by its kicker, and with no front matter a specification's title
+  gives it), document control, a short opening on the same page as what
+  follows (About this specification: what it is, what it sets out, where the
+  criteria and the approvals are), then the detailed report's System under
+  consideration and requirements section as it is (the eight blocks in step
+  6's order, the drawing's page and the asset register included), its SL-T
+  table with the safety floor sentence and each justification (not the
+  driving scenarios, which name threats it does not hold), the sign-off with
+  the signature table ("An approval covers the tolerable risk and the target
+  security levels in this specification"), method and limitations (its
+  ratings sentence says the targets rest on risk ratings), and the risk
+  criteria appendix (its tolerable line says only where the line is; a risk,
+  not a threat or system, takes the worst of its categories). None of the
+  reports' own sections: summary, scorecard, basis, ranking, comparison,
+  register, treatment plan, accepted risks, threat detail. The footer reads
+  "Cyber Security Requirements Specification".
+- **Readiness.** Check and issue has a third card, Cyber security
+  requirements specification, and a third download (its toast:
+  "Requirements specification downloaded."). Its items come from the one
+  completeness list: each item that concerns what it prints is marked
+  (`spec: true`): the SUC and the risk criteria, step 3 (zones, conduits,
+  separations), step 6's blocks, the SL-T and their justifications, and the
+  sign-off once there are zones (an approval older than a change only when
+  the tolerable risk or the SL-T moved: `APPROVAL_DOC_PARTS.spec`). One item
+  is the specification's alone (`doc` null): a justification that names a
+  threat or countermeasure of the project by its id, which the
+  specification does not list ("Z1 Unit 300 BPCS: the justification names
+  T1, T2, which the specification does not list."). `Engine.readiness(p,
+  "spec")` reads them; the download asks the same question as the reports.
+  On a high-level-only assessment the card is set aside like the detailed
+  report's. The demo's justifications name no id, so it stays at nothing open.
+- **Report page.** A third tab, Specification, in Sections and Word pages
+  (the Summary view stays the two reports'; the document chosen is kept
+  apart from the summary shown, so the specification is still chosen after
+  a visit to Summary). Its overrides are a store of their own,
+  `reportCustom.spec`, which the migration keeps: the same section key in
+  the detailed report and the specification is two sections, one per
+  document, as review anchors carry the document too.
+- **Review pack.** The specification is the third document, after the two
+  reports, whenever the detailed report is packed (so not with no zones or
+  conduits). A comment on it goes to its tab and accepts into its store.
+  Packs and review files of two documents still import (a comment finds its
+  report by title, else by place). A round of two documents approved before
+  the specification was packed is lined up with today's documents by title,
+  and the specification, which it did not hold, is not read as a change; any
+  other difference still is. Once the specification's own sections are
+  edited (`reportCustom.spec`) with no approved round holding it, Peer
+  review and Check and issue say so plainly: "The cyber security
+  requirements specification has not been reviewed in an approved round."
+- **Word baseline.** `scripts/risk-word-baseline.js` has a third array,
+  `spec`; `scripts/test-risk-sections.html` pins it and checks that its
+  requirements section and justifications are the detailed report's line for
+  line. `scripts/test-risk-specfile.html` covers the rest.
+
 ## Report page
 
 The Report page has three views, Sections, Word pages and Summary, over both
-reports, Detailed and High level; the report chosen stays chosen when the view
+reports, Detailed and High level, and in Sections and Word pages the
+requirements specification as well (phase 6b); the report chosen stays chosen when the view
 changes. Summary is the hand-built one-page summary of each report, kept for
 printing (Print one-page summary, Print high-level report). The plan retires
 it; keeping it is an open decision for the owner (`docs/risk-tool-redesign.md`,
@@ -495,7 +692,7 @@ The Report page's Word pages view shows the Detailed or High level Word report a
 
 The pack's threat items carry, as read-only detail rows, the current and planned likelihood × impact where rated, the plan of each planned countermeasure a confirmed decision rests on (owner, priority, due date, status) and who accepted a risk (with role, date and review date); the answer's "residual" is the planned rating, else the current one. The item fields, the status words and the priority convention (the confirmed, complete decision in the words the report prints, else empty, which the Report Review Tool's risk-no-disposition check reads) are unchanged.
 
-The Peer review page sends both Word reports for review as a pack, and imports the review files that come back: comments with severity, status and replies, on a page of their own. A suggestion on a section's heading or opening wording can be accepted into that report's overrides, rebuilt to check it is really in Word, and undone if not; other text is Copy and Go to, with the reason, and Go to reaches the section on the Report page. See `docs/report-review.md` at the repository root. An accepted change can be undone from the comment. Go to on a threat, or on a zone's target levels, scrolls to it and highlights it. With no zones or conduits the pack holds only the high-level report. Send for review can carry a note and a needed-by date for the reviewers. The review is saved in the project file (`project.review`) and never reaches the Word report, the Excel workbook or the risk context file.
+The Peer review page sends both Word reports (and, since phase 6b, the requirements specification) for review as a pack, and imports the review files that come back: comments with severity, status and replies, on a page of their own. A suggestion on a section's heading or opening wording can be accepted into that report's overrides, rebuilt to check it is really in Word, and undone if not; other text is Copy and Go to, with the reason, and Go to reaches the section on the Report page. See `docs/report-review.md` at the repository root. An accepted change can be undone from the comment. Go to on a threat, or on a zone's target levels, scrolls to it and highlights it. With no zones or conduits the pack holds only the high-level report. Send for review can carry a note and a needed-by date for the reviewers. The review is saved in the project file (`project.review`) and never reaches the Word report, the Excel workbook or the risk context file.
 
 Once a review has started, the Word downloads (detailed and high level) and the Excel download ask once, in the page, when changes are requested, must-fix comments are open, a sent round has had no review back, or the report has changed since approval; they never stop the download. The Report page and Check and issue show the same warnings in a Peer review card. The Engagement details card has a QA review by field (printed in document control in both Word reports), which an approval offers to fill in with the reviewer's name. Recording the asset owner's sign-off, or an approver in step 7, does not count as a change since approval: the content hash leaves out the Sign-off section, the signature table wherever it sits, the document control row and the summary's sign-off sentence.
 
@@ -592,7 +789,8 @@ remains with countermeasures in place.
 There are two reports. The *High-level report* is the standalone high-level risk assessment
 (system under consideration, basis of assessment, ranked systems). The
 *Detailed report* covers the per-FR SL-T vectors, zones, threats and the
-drawing. Both are on the Report page; Check and issue holds their readiness
+drawing. The cyber security requirements specification can also be issued
+as a file of its own (phase 6b, above). All are on the Report page; Check and issue holds their readiness
 lists and every download, the risk-context JSON export among them. The basis of assessment
 (on the Engagement and evidence page) records the people interviewed, documents reviewed and
 systems observed, plus the engagement details (client, consultant, date,
@@ -679,8 +877,9 @@ The Excel workbook is the register and treatment plan issued from the tool,
 one way: the tool holds the owner, date and status, and the Front sheet's
 last row says a new issue replaces the workbook and changes are made in the
 tool. Its sheets are Front, Summary, Ranking, Threat register, Treatment
-plan, Accepted risks, Vulnerabilities, Zones, Conduits, Countermeasures,
-SL-T, Criteria and Basis (the eight it had keep their names and order). The
+plan, Accepted risks, Vulnerabilities, Zones, Conduits, Assets, Countermeasures,
+SL-T, Criteria and Basis (the eight it had keep their names and order), with
+Changes after the Summary when a previous assessment is set (phase 6a). The
 Summary gives the position in numbers and a heat map grid per rating
 (unmitigated, current, planned; a rating not given takes the one before it,
 cells above tolerable risk carry a heavy border). The threat register has
@@ -766,6 +965,11 @@ js/migrate.js                      Load and autosave restore: the schema ladder
 js/view-model.js                   the one view model: per-threat and per-zone facts
                                    and counts that the pages, Word, Excel, the review
                                    pack and the risk context all read
+js/assets.js                       the asset register without the page: every asset with
+                                   its zone, a move, and a paste read (Excel quoting,
+                                   headers, mapping, preview, apply)
+js/compare.js                      a previous assessment frozen as the baseline, and
+                                   what changed since, in words and as rows
 js/ui-kit.js                       h(), toast, theme, cards, fields, register table
 js/app.js                          state, autosave, Save/Load, the sidebar (page ids,
                                    status per step), the render loop and the old page
@@ -779,11 +983,13 @@ js/ui-library.js                   step 5's Add from library picker over the hou
                                    scenario library, and step 2's Send to step 5
 js/ui-risk.js                      step 5: the zone workshop (rail, SL-T strip, scenario
                                    table and editor), Register, Heat map, SL-T grid
-js/ui-zones.js                     step 3: drawing, tables, detail panel, paste,
+js/ui-zones.js                     step 3: its tabs, drawing, tables, detail panel, paste,
                                    separation rows
+js/ui-assets.js                    step 3's Asset register tab and its Paste from Excel
 js/ui-spec.js                      steps 6 and 7: the specification and the approvals
 js/ui-reports.js                   the Report page's views and summaries, Check and
-                                   issue, the Generate anyway panel, downloads
+                                   issue (with Since the previous assessment), the
+                                   Generate anyway panel, downloads
 js/ui-about.js                     the About page
 js/boot.js                         starts the app once every page has registered
 js/exports.js                      Word + Excel deliverable builders/downloads
@@ -843,6 +1049,16 @@ scripts/test-risk-floor.html       phase 5b: the safety floor list, old files un
                                    narrowing in every output, the chips
 scripts/test-risk-library.html     phase 5b: the library's data, Add from library, what
                                    prints, Send to step 5
+scripts/test-risk-assets.html      phase 6a: the paste read (quoting, line endings, headers,
+                                   mapping), the preview's problems, Update existing, one
+                                   undo; the register's sort, filters, edits and moves; Word's
+                                   asset tables and the Assets sheet
+scripts/test-risk-compare.html     phase 6a: the baseline from the demo and the frozen files,
+                                   every kind of change, numbered again, criteria changed, an
+                                   empty baseline, the card, the Word section, the Changes sheet
+scripts/test-risk-specfile.html    phase 6b: the requirements specification as a file of its
+                                   own: its readiness from the one list, its download, its
+                                   tab and store, the pack's third document, a round of two
 scripts/test-risk-undo.html        phase 5b: undo of each destructive and bulk action,
                                    Ctrl+Z and text fields, one level, focus, autosave, Load, New
 scripts/test-risk-p5fix.html       the phase 5 review's fixes: Leave as it is, the cap at
@@ -911,6 +1127,22 @@ fails loudly.
   ready for the 3-3 tool to use per FR later.
 - The threat, vulnerability and countermeasure register travels as context only
   and never scores the 3-3 assessment: the import sets targets, never results.
+- Phase 6 adds provenance on the same `spt-risk-context/1.4` string (the
+  released v0.7 Assessment Tool refuses any schema it does not list, so the
+  string stays): each zone and conduit carries `riskComparison` `{ required,
+  reason }` and `initialRisk` `{ risk, source }` (`systems`, `entered`, or
+  `zones` for a conduit under the house rule); each asset carries `id`, `tag`,
+  `vendor`, `model`, `version` and `criticality` beside `name` and `type`; and
+  a top-level `approvals` list (`name`, `role`, `organisation`, `date`,
+  `scope`, given approvals only) sits beside the single `approval` mirror.
+  Each field is written only when it holds something. The Assessment Tool
+  keeps `approvals` with the zones and conduits it already kept, and shows
+  none of it. `scripts/test-risk-interchange.html` checks the demo export
+  against the contract and against the Assessment Tool's copy of it
+  (`modules/assessments/scripts/fixtures/risk-context-demo.js`; regenerate
+  that copy when the demo or the export changes on purpose), and the
+  Assessment Tool's `test-risk-context-phase6.html` imports it, the v0.7
+  export, and runs the frozen v0.7 importer on it.
 
 ## Tests
 
@@ -922,7 +1154,12 @@ From the repository root:
 
 That runs every `scripts/test-*.html` page in headless Edge (each loads
 index.html in an iframe and prints PASS/FAIL lines plus `ALL TESTS PASSED`)
-and writes each page's output to `test-results\risk-assessment\`. To run one
+and writes each page's output to `test-results\risk-assessment\`. Each page
+pins today (`RiskTool.setToday("2026-11-14")`) as soon as it has the app, so
+what it builds from the demo (Word, Excel, the screen, the risk context) does
+not change with the real date: the demo's accepted risk T8 has a review date,
+and a date past it adds a line under Decisions required. The Word builder's
+`opts.today` still wins over the pin; `setToday(null)` is the clock again. To run one
 page by hand:
 
 ```

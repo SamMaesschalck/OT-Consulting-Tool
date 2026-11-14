@@ -65,15 +65,18 @@
 
   function run(w) {
     var DP = w.App.DocPreview, RX = w.RiskExports, RT = w.RiskTool, downloads = 0;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     ok(!!DP && !!w.App.DocxImport && !!w.RiskWordPreview, "the preview's reader, renderer and page are loaded");
     var chain = Promise.resolve();
-    [{ id: "detailed", opts: {} }, { id: "highLevel", opts: { highLevelOnly: true } }].forEach(function (d) {
+    // Phase 6b: the requirements specification as well.
+    [{ id: "detailed", opts: {} }, { id: "highLevel", opts: { highLevelOnly: true } }, { id: "spec", opts: { spec: true } }].forEach(function (d) {
       chain = chain.then(function () {
         return w.docx.Packer.toBlob(RX.buildWordDoc(RT.state.project, d.opts)).then(function (blob) {
           return Promise.all([documentXml(w, blob), DP.fromDocx(blob, { name: d.id + ".docx" })]);
         }).then(function (got) {
           var want = fromXml(got[0]), read = got[1];
-          ok(!!read.cover && /RISK ASSESSMENT/.test(read.cover.kicker) && read.cover.titleLines.length > 0 && read.cover.strip.length >= 2,
+          // Phase 6 review: the specification's kicker is OT CYBER SECURITY (the reports' still say RISK ASSESSMENT).
+          ok(!!read.cover && (d.id === "spec" ? read.cover.kicker === "OT CYBER SECURITY" : /RISK ASSESSMENT/.test(read.cover.kicker)) && read.cover.titleLines.length > 0 && read.cover.strip.length >= 2,
             d.id + ": the house cover is recognised", JSON.stringify(read.cover && { k: read.cover.kicker, t: read.cover.titleLines }));
           var paper = w.document.createElement("div");
           w.document.body.appendChild(paper);
@@ -137,6 +140,13 @@
         hl.click();
         return wait(function () { var c = w.document.querySelector("#wp-paper .cover-title"); return !!c && /High-Level OT Cyber/i.test(c.textContent) && n1 > 1; }, 600000).then(function (d2) {
           ok(d2, "the page draws the high-level report");
+          // Phase 6b: and the requirements specification, from its own tab.
+          var sp = w.document.querySelector('#wp-docs [data-doc="spec"]');
+          ok(!!sp && sp.textContent === "Specification", "the requirements specification can be chosen");
+          if (sp) sp.click();
+          return wait(function () { var c = w.document.querySelector("#wp-paper .cover-title"); return !!c && /Requirements Specification/i.test(c.textContent); }, 600000);
+        }).then(function (d3) {
+          ok(d3, "the page draws the requirements specification");
           ok(downloads === 0, "a preview downloads nothing");
           ok(!/[–—]/.test(w.document.querySelector(".page-sub").textContent), "no en or em dashes in the page's own words");
           w.HTMLAnchorElement.prototype.click = origClick;

@@ -69,6 +69,7 @@
 
   function run(w) {
     var RT = w.RiskTool, RX = w.RiskExports;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     // A register cell by its column's header (phase 4b: the current and planned ratings are columns
     // between the risk and the decision, so the letters moved; each assertion keeps its row and its header).
     // Phase 4 review: a header that is not there fails, by name (was: it fell back to column 99, whose empty
@@ -375,8 +376,8 @@
     var wb = RX.buildWorkbook(p);
     phase4bExcel(wb);
     var names = wb.worksheets.map(function (ws) { return ws.name; }).join(",");
-    // Phase 4b: five new sheets; the eight it had keep their names and their order.
-    ok(names === "Front,Summary,Ranking,Threat register,Treatment plan,Accepted risks,Vulnerabilities,Zones,Conduits,Countermeasures,SL-T,Criteria,Basis", "workbook has the eight sheets it had, by name and in order, and the five new ones", names);
+    // Phase 4b: five new sheets; the eight it had keep their names and their order. Phase 6a: Assets after Conduits.
+    ok(names === "Front,Summary,Ranking,Threat register,Treatment plan,Accepted risks,Vulnerabilities,Zones,Conduits,Assets,Countermeasures,SL-T,Criteria,Basis", "workbook has the eight sheets it had, by name and in order, the five new ones, and Assets (phase 6a)", names);
     var front = wb.getWorksheet("Front");
     ok(front.getCell("B2").value === "Acme Petrochemicals Ltd", "Front carries the client");
     ok(/R\. Calder/.test(String(front.getCell("B13").value)), "Front carries the sign-off");
@@ -422,7 +423,7 @@
     ok(!!emptyDoc && docText(emptyDoc).indexOf("not yet signed off") !== -1, "Word builder handles an empty project");
     w.docx = realDocx;
     var emptyWb = RX.buildWorkbook(emptyP);
-    ok(emptyWb.worksheets.length === 13, "Excel builder handles an empty project, every sheet built");
+    ok(emptyWb.worksheets.length === 14, "Excel builder handles an empty project, every sheet built (Assets with phase 6a; Changes only with a previous assessment)");
 
     return Promise.all([packPromise, xlsxPromise]);
 
@@ -587,7 +588,8 @@
         && text.indexOf("\nCountermeasures: none in place; planned: see the treatment plan.\n", zd) > zd && text.indexOf("[existing]", zd) < 0 && text.indexOf("[planned]", zd) < 0,
         "review: a zone's countermeasure line lists those in place and points to the treatment plan for the planned ones");
       ok(text.indexOf("\nT4 is treated through the SL-T programme. The consequence stays severe whatever is added") > 0 && text.indexOf("on every foundational requirement, and the 62443-3-3 programme") > 0, "review: the SL-T decision's reason reads as a sentence of its own");
-      ok(text.indexOf("T4 is treated through this SL-T programme, with the hardwired keyswitch (M4) in place and a dedicated SIS engineering workstation (M8) planned.") > 0, "review: and the Z2 justification says it once");
+      // Phase 6 review: the demo's justifications name no threat or countermeasure by id (the specification lists neither).
+      ok(text.indexOf("An unauthorised change to the safety logic is treated through these targets, with the hardwired keyswitch for program mode in place and a dedicated SIS engineering workstation planned.") > 0, "review: and the Z2 justification says it once");
       // Wording 1: the summary says each thing once. It was 881 words on the demo before the review and is 727 now
       // (the third the review aimed for would mean cutting the method or the stakes, which is the owner's call), and
       // this pins it there so repetition does not grow back.

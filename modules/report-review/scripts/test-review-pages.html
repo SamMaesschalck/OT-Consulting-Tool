@@ -288,6 +288,26 @@
     var img = q('#rr-paper [data-block-id="d0-b3"] img');
     ok(img && img.style.width === "420px" && Math.abs(img.getBoundingClientRect().width - 420) < 1, "a picture narrower than the page is shown at its own size");
     R.state.dirty = false;
+    // ---- the risk tool's requirements specification (phase 6 review): its cover's kicker is OT CYBER SECURITY ----
+    var sp = plainPack(); sp.packId = "rp-spec"; sp.documents[0].title = "Cyber security requirements specification";
+    function front(id, t) { return { id: id, type: "paragraph", text: t, runs: [{ t: t }], red: false, front: true, sectionKey: "", sectionTitle: "" }; }
+    sp.documents[0].blocks = [front("s-k", "OT CYBER SECURITY"), front("s-t1", "Cyber Security"), front("s-t2", "Requirements Specification"), front("s-c", "Northfield Water"),
+      front("s-s", "Ashby treatment works"), front("s-u", "IEC 62443-3-2: requirements, zones and conduits, and target security levels"),
+      front("s-i", "ISSUE   0.3  ·  2026-11-20        AUTHOR   R. Author        CLASSIFICATION   Commercial in confidence")].concat(sp.documents[0].blocks);
+    R.loadTexts([{ name: "spec.json", text: JSON.stringify(sp) }]);
+    return poll(function () { return R.state.pack && R.state.pack.packId === "rp-spec" && q("#rr-paper .rr-cover-page"); });
+  }).then(function () {
+    var ty = q(".rr-cover-page .rr-cv-type"), lines = all(".rr-cv-title > div").map(function (d) { return d.textContent; });
+    ok(ty && ty.textContent === "OT CYBER SECURITY" && ty.getAttribute("data-block-id") === "s-k", "a specification's cover is read by its kicker, OT CYBER SECURITY, as a block", ty && ty.textContent);
+    ok(lines.join("|") === "Cyber Security|Requirements Specification" && /Commercial in confidence/.test(q(".rr-cover-page").innerText), "with its title lines and its issue strip as printed", JSON.stringify(lines));
+    R.state.dirty = false;
+    var sp2 = plainPack(); sp2.packId = "rp-spec2"; sp2.documents[0].title = "Cyber security requirements specification";
+    R.loadTexts([{ name: "spec2.json", text: JSON.stringify(sp2) }]);
+    return poll(function () { return R.state.pack && R.state.pack.packId === "rp-spec2" && q("#rr-paper .rr-cover-page"); });
+  }).then(function () {
+    var ct = norm(q(".rr-cover-page").innerText);
+    ok(/OT CYBER SECURITY/.test(ct) && !/OT CYBER RISK ASSESSMENT/.test(ct), "and with no front matter a specification's cover still says OT CYBER SECURITY", ct.slice(0, 120));
+    R.state.dirty = false;
     ok(errors.length === 0, "no script errors", errors.join(" | "));
   }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {
     clean();

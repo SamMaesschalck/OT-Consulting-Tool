@@ -1,0 +1,270 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>Risk tool: the requirements specification as a file of its own</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Phase 6b: the cyber security requirements specification as a third Word
+  document, from the same builder and sections as the detailed report.
+  - its readiness on Check and issue is the part of the one completeness list
+    that concerns what it prints, and its download asks the same question;
+  - the Report page has it as a third tab, with its own section store, which
+    the migration keeps;
+  - the review pack carries it third; a comment on it goes to its tab and
+    accepts into its store; a round of two documents (before this phase)
+    approved and unchanged does not read as changed, and still does once the
+    detailed report changes.
+  The Word text itself is pinned in test-risk-sections.html (the baseline's
+  spec array), and the pack's documents in test-risk-review.html.
+  Needs --allow-file-access-from-files (tools/run-tests.ps1 passes it).
+-->
+<iframe id="f" style="width:1280px;height:800px;border:0"></iframe>
+<script>
+(function () {
+  var lines = [], fail = 0;
+  function ok(c, n, d) { lines.push((c ? "PASS " : "FAIL ") + n + (!c && d ? " - " + d : "")); if (!c) fail++; }
+  function finish() {
+    lines.push("", fail === 0 ? "ALL TESTS PASSED" : fail + " FAILED");
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function poll(test, ms) {
+    var end = Date.now() + (ms || 120000);
+    return new Promise(function (resolve, reject) {
+      (function go() {
+        var v; try { v = test(); } catch (e) { v = null; }
+        if (v) return resolve(v);
+        if (Date.now() > end) return reject(new Error("timed out: " + test.toString().slice(0, 140)));
+        setTimeout(go, 25);
+      })();
+    });
+  }
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, RT, RR, RX, RC, RP, MG, main, d;
+    w.confirm = function () { return true; }; w.alert = function () {};
+    function P() { return RT.state.project; }
+    function copy() { return MG.normaliseProject(JSON.parse(JSON.stringify(P()))); }
+    function texts(doc, pj) { return RT.readiness(doc, pj).map(function (i) { return i.text; }); }
+    function has(list, re) { return list.some(function (t) { return re.test(t); }); }
+    function owner(pj, id) { return pj.zones.concat(pj.conduits).filter(function (o) { return o.id === id; })[0]; }
+
+    poll(function () { return w.RiskTool && w.RiskReview && w.RiskReportPage && w.RiskExports && w.docx && w.RiskTool.state.project.zones.length; }).then(function () {
+      RT = w.RiskTool; RR = w.RiskReview; RX = w.RiskExports; RC = w.App.ReviewCore; RP = w.RiskReportPage; MG = w.RiskApp.Migrate; d = w.document; main = d.getElementById("main");
+      RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+
+      // ---- readiness: the one list, the part the specification prints ----------------
+      ok(RT.readiness("spec").length === 0, "the demo: nothing open in the specification");
+      var pj = copy();
+      pj.suc.name = "";
+      ok(has(texts("spec", pj), /^The SUC has no name\.$/) && has(texts("detailed", pj), /^The SUC has no name\.$/), "the SUC with no name is open in the specification and the detailed report");
+      pj = copy();
+      owner(pj, "Z1").threats[0].likelihood = "";
+      ok(has(texts("detailed", pj), /T1: likelihood or impact not set/) && !has(texts("spec", pj), /T1:/), "a threat not rated is the detailed report's only: the specification lists no threats");
+      pj = copy();
+      owner(pj, "Z3").justification = "";
+      ok(has(texts("spec", pj), /^Z3 .*: SL-T set but no justification\.$/), "an SL-T with no justification is open in the specification", texts("spec", pj).join(" | "));
+      pj = copy();
+      pj.srs.regulatory = [];
+      ok(has(texts("spec", pj), /^Requirements specification: /), "one of its blocks left empty is open in it", texts("spec", pj).join(" | "));
+      pj = copy();
+      pj.srs.highLevelAssets[0].consequence = "";
+      ok(has(texts("highLevel", pj), /impact not rated/) && !has(texts("spec", pj), /impact not rated/), "the ranking is not in it");
+      pj = copy();
+      pj.srs.tolerableConfirmed = "";
+      ok(has(texts("spec", pj), /Tolerable risk is not confirmed/), "the tolerable risk, not confirmed, is");
+      // An approval older than a change: the specification's when the SL-T or the tolerable risk moved, not the accepted risks.
+      pj = copy();
+      var acc = pj.zones.concat(pj.conduits).reduce(function (a, o) { return a.concat(o.threats.filter(function (t) { return t.treatment && t.treatment.decision === "accept"; })); }, [])[0];
+      ok(!!acc, "the demo has an accepted risk to change");
+      acc.acceptanceDetail = Object.assign({}, acc.acceptanceDetail || {}, { reviewDate: "2030-01-31" });
+      ok(has(texts("detailed", pj), /approved before the accepted risks changed/) && !has(texts("spec", pj), /approved before/), "an approval older than a change to the accepted risks is not the specification's", texts("spec", pj).join(" | "));
+      pj = copy();
+      owner(pj, "Z1").slTargetByFR.DC = 2;
+      ok(has(texts("spec", pj), /approved before the SL-T changed/), "one older than a change to the SL-T is", texts("spec", pj).join(" | "));
+      ok(JSON.stringify(RT.APPROVAL_DOC_PARTS ? RT.APPROVAL_DOC_PARTS.spec : w.RiskApp.Engine.APPROVAL_DOC_PARTS.spec) === '["tolerable","slt"]', "an approval of the specification covers the tolerable risk and the SL-T");
+      pj = copy();
+      pj.approvals.forEach(function (a) { a.approved = false; a.fingerprint = ""; }); pj.approval.approved = false;
+      ok(has(texts("spec", pj), /approval not yet recorded/), "and an approval not yet recorded is open in it");
+      // Every item it lists is one of the list's own, never a list of its own.
+      var all = RT.completeness(pj);
+      ok(RT.readiness("spec", pj).every(function (i) { return all.some(function (x) { return x.text === i.text && x.stage === i.stage; }); }), "every item is on the one completeness list");
+      // Phase 6 review: a justification that names a threat or countermeasure by id, which the specification does not list.
+      pj = copy();
+      owner(pj, "Z1").justification = "Set to SL3 for T1 and T2, with M1 in place; T99 and SR 1.13 are not ids of this project.";
+      owner(pj, "C2").justification = "Held at SL3 for T9.";
+      var jt = texts("spec", pj);
+      ok(has(jt, /^Z1 Unit 300 BPCS: the justification names T1, T2, M1, which the specification does not list\.$/) && has(jt, /^C2\b.*: the justification names T9, which the specification does not list\.$/),
+        "a justification naming a threat or countermeasure by id is open in the specification, each id once in the order named (an id the project lacks is not)", jt.join(" | "));
+      var jItems = RT.completeness(pj).filter(function (i) { return /the justification names/.test(i.text); });
+      ok(jItems.length === 2 && jItems.every(function (i) { return i.spec === true && i.stage === "slt" && !i.doc; }) && jItems[0].target.kind === "zone" && jItems[1].target.kind === "conduit" && jItems[1].target.id === "C2",
+        "on the one list, the specification's alone, going to the zone's or conduit's SL-T", JSON.stringify(jItems.map(function (i) { return [i.stage, i.doc, i.target]; })));
+      ok(!has(texts("detailed", pj), /the justification names/) && !has(texts("highLevel", pj), /the justification names/), "the reports list the threats and countermeasures, so it is not open in them");
+      ok(RT.completeness().filter(function (i) { return /the justification names/.test(i.text); }).length === 0, "the demo's justifications name no threat or countermeasure by id");
+
+      // ---- Check and issue -----------------------------------------------------------------
+      RT.navigate("review");
+      var c = main.querySelector('[data-readiness="spec"]');
+      // Phase 6 review: the card is titled with the document's full name (the button stays short).
+      ok(!!c && /^Cyber security requirements specification/.test(c.querySelector(".card-h h2").textContent) && /ready to issue/.test(c.textContent), "Check and issue has the specification's card, ready to issue on the demo", c && c.textContent.slice(0, 120));
+      var cards = [].map.call(main.querySelectorAll("[data-readiness]"), function (x) { return x.getAttribute("data-readiness"); }).join(",");
+      ok(cards === "detailed,highLevel,spec", "after the two reports", cards);
+      var btn = main.querySelector('[data-download="word-spec"]');
+      ok(!!btn && btn.textContent === "Requirements specification", "and its download", btn && btn.textContent);
+      var got = [];
+      window.__realWord = RX.downloadWord;
+      RX.downloadWord = function (opts, done) { got.push(opts || {}); if (done) done(null); };
+      btn.click();
+      return poll(function () { return got.length === 1; }, 5000).then(function () {
+        ok(got[0].spec === true && !d.getElementById("issue-guard"), "with nothing open it downloads the specification straight away");
+        // Phase 6 review: the toast names the document.
+        ok(/^Requirements specification downloaded\./.test(d.getElementById("toast").textContent), "and the toast says the requirements specification downloaded", d.getElementById("toast").textContent);
+        RX.downloadWord = function (opts, done) { if (done) done(new Error("disk full")); };
+        main.querySelector('[data-download="word-spec"]').click();
+        return poll(function () { return /failed/.test(d.getElementById("toast").textContent); }, 5000);
+      }).then(function () {
+        ok(/^Requirements specification failed: disk full/.test(d.getElementById("toast").textContent), "a failure says so, with why", d.getElementById("toast").textContent);
+      });
+    }).then(function () {
+      var got = [];
+      RX.downloadWord = function (opts, done) { got.push(opts || {}); if (done) done(null); };
+      var keep = P().srs.regulatory.slice();
+      P().srs.regulatory = []; RT.touched(); RT.render();
+      main.querySelector('[data-download="word-spec"]').click();
+      var g = d.getElementById("issue-guard");
+      ok(!!g && /Generate the requirements specification anyway\?/.test(g.textContent) && /Still open in the requirements specification:/.test(g.textContent) && /Requirements specification: /.test(g.textContent),
+        "with something open it asks first, in the page, listing the specification's items", g && g.textContent.slice(0, 200));
+      ok(got.length === 0, "and downloads nothing until asked");
+      g.querySelector('[data-action="generate-anyway"]').click();
+      return poll(function () { return got.length === 1; }, 5000).then(function () {
+        ok(got[0].spec === true && !got[0].highLevelOnly, "Generate anyway downloads the specification");
+        P().srs.regulatory = keep; RT.touched();
+      });
+    }).then(function () {
+      // The file's name, through the real download.
+      RX.downloadWord = window.__realWord;
+      var names = [], realClick = w.HTMLAnchorElement.prototype.click;
+      w.HTMLAnchorElement.prototype.click = function () { if (this.download) { names.push(this.download); return; } return realClick.apply(this, arguments); };
+      return new Promise(function (res) { w.RiskExports.downloadWord({ spec: true }, function (e) { res(e); }); }).then(function (e) {
+        w.HTMLAnchorElement.prototype.click = realClick;
+        ok(!e && names[0] === "acme-petrochemicals-unit-300-alkylation-control-system-cyber-security-requirements-specification.docx", "the file is named for what it is", names.join(", "));
+      });
+    }).then(function () {
+      // ---- high-level only: not part of it ---------------------------------------------------
+      var before = P().assessmentType;
+      P().assessmentType = "high-level"; RT.touched(); RT.navigate("review");
+      ok(/Not part of a high-level-only assessment/.test(main.querySelector('[data-readiness="spec"]').textContent), "on a high-level-only assessment its card is set aside, like the detailed report's");
+      if (before) P().assessmentType = before; else delete P().assessmentType;
+      RT.touched();
+
+      // ---- the Report page: a third tab, a store of its own ------------------------------------
+      RT.state.stage = "report"; RP.state.doc = 0; RP.state.open = null;
+      w.RiskApp.Reports.reportView("sections", 0); RT.render();
+      var tab = main.querySelector('.rp-toolbar .rp-tab[data-doc="spec"]');
+      ok(!!tab && tab.textContent === "Specification", "the Report page has a Specification tab");
+      tab.click();
+      return poll(function () { return RP.idle() && main.querySelector('.card[data-section="about-this-specification"]'); }, 120000);
+    }).then(function () {
+      ok(RP.state.doc === 2 && main.querySelector('.rp-toolbar .rp-tab[data-doc="spec"]').classList.contains("active"), "it opens the specification");
+      ok(!main.querySelector('.card[data-section="executive-summary"]') && !!main.querySelector('.card[data-section="target-security-levels-sl-t-per-foundational-requirement"]') && !!main.querySelector('.card[data-section="sign-off"]'),
+        "section by section: no executive summary; the SL-T and the sign-off");
+      RP.setSection("spec", "about-this-specification", { title: "Purpose" });
+      ok(P().reportCustom && P().reportCustom.spec && P().reportCustom.spec["about-this-specification"].title === "Purpose" && !P().reportCustom.detailed, "an edit on it is stored for it alone");
+      var saved = JSON.stringify(P());
+      ok(RT.loadProjectText(saved) && RP.sectionOf("spec", "about-this-specification").title === "Purpose", "the migration keeps its store through a save and a load");
+      var bad = JSON.parse(saved); bad.reportCustom.spec = [1, 2];
+      ok(RT.loadProjectText(JSON.stringify(bad)) && !(P().reportCustom && P().reportCustom.spec), "and drops one that is not a store");
+      delete P().reportCustom; RT.touched();
+      // The summaries are the two reports' only: the Summary view shows the detailed one.
+      RT.state.stage = "report"; w.RiskApp.Reports.reportView("summary"); RT.render();
+      ok(!!main.querySelector('.rp-viewbar .rp-tab[data-doc="detailed"].active') && !main.querySelector('.rp-viewbar .rp-tab[data-doc="spec"]'), "the Summary view has no specification, and shows the detailed summary");
+      w.RiskApp.Reports.reportView("sections", 2); RT.render();
+      ok(RP.state.doc === 2, "and Sections opens on it again when asked");
+      // Phase 6 review: chosen on Sections, it is still chosen after a visit to Summary, through the page's own view buttons.
+      main.querySelector('.rp-views [data-view="summary"]').click();
+      ok(!!main.querySelector('.rp-viewbar .rp-tab[data-doc="detailed"].active'), "Summary shows the detailed summary");
+      main.querySelector('.rp-views [data-view="sections"]').click();
+      ok(RP.state.doc === 2, "and back on Sections the specification is still the one open", String(RP.state.doc));
+      main.querySelector('.rp-views [data-view="summary"]').click();
+      main.querySelector('.rp-views [data-view="word"]').click();
+      ok(w.RiskWordPreview.state.doc === 2, "and so on Word pages", String(w.RiskWordPreview.state.doc));
+      main.querySelector('.rp-views [data-view="sections"]').click();
+
+      // ---- the review pack: third, and its comments find their way ------------------------------
+      return RR.buildDocuments();
+    }).then(function (docs) {
+      ok(docs.length === 3 && docs[2].reportId === "spec" && docs[2].title === "Cyber security requirements specification", "the pack's third document is the specification");
+      var sKeys = docs[2].blocks.filter(function (b) { return b.type === "heading" && b.sectionKey; }).map(function (b) { return b.sectionKey; });
+      ok(sKeys.indexOf("tolerable-risk") >= 0 && docs[0].blocks.some(function (b) { return b.sectionKey === "tolerable-risk"; }), "a section in both documents is keyed the same in each, its anchor carrying the document");
+      var intro = docs[2].blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey === "about-this-specification"; })[0];
+      ok(!!intro, "the specification's opening is a section of its own");
+      // A reviewer's comment on the specification: Go to opens its tab, Accept writes to its store.
+      var s = RR.ensureStore();
+      var at = new Date().toISOString();
+      var thread = { comment: { id: "sp1", reviewer: "J. Marsh", createdAt: at, updatedAt: at, severity: "suggestion", text: "Shorter.", suggestion: "This is the requirements specification for Unit 300.", relatesTo: null, check: null,
+        anchor: { documentIndex: 2, documentTitle: "Cyber security requirements specification", kind: "block", sectionKey: "about-this-specification", sectionTitle: "About this specification", blockId: intro.id, quote: intro.text, cell: null } },
+        status: "open", replies: [] };
+      s.threads.push(thread);
+      RR.goTo(thread);
+      ok(RT.state.stage === "report" && RP.state.doc === 2, "Go to from a comment on the specification opens its tab");
+      var plan = RR.acceptPlan(RR.store().threads.filter(function (t) { return t.comment.id === "sp1"; })[0]);
+      return new Promise(function (res) { RR.refreshDocs(res); }).then(function () {
+        plan = RR.acceptPlan(RR.store().threads.filter(function (t) { return t.comment.id === "sp1"; })[0]);
+        ok(plan.can === true && plan.kind === "paragraph", "its suggested wording can be accepted", plan.why);
+        return new Promise(function (res) { RR.accept(RR.store().threads.filter(function (t) { return t.comment.id === "sp1"; })[0], res); });
+      });
+    }).then(function (res) {
+      ok(res.ok && RP.sectionOf("spec", "about-this-specification").paragraphs && !RP.sectionOf("detailed", "about-this-specification").paragraphs, "and is, into the specification's own store, checked in the rebuilt document", res.message);
+      return new Promise(function (r) { RR.undoAccept(RR.store().threads.filter(function (t) { return t.comment.id === "sp1"; })[0], r); });
+    }).then(function (res) {
+      ok(res.ok && !P().reportCustom, "and Undo puts it back", res.message);
+      delete P().review; RT.touched();
+      // ---- a round of two documents, from before this phase ----------------------------------
+      return RR.buildDocuments();
+    }).then(function (docs) {
+      var s = RR.ensureStore(), at = new Date().toISOString();
+      s.rounds.push({ round: 1, packId: "rp-old", createdAt: at, documents: docs.slice(0, 2).map(function (x) { return { title: x.title, targetName: "", contentHash: x.contentHash }; }) });
+      s.files.push({ fileId: "f-old", packId: "rp-old", round: 1, reviewer: "J. Marsh", savedAt: at, verdict: { value: "approved", date: "2026-11-01", note: "" } });
+      RT.touched();
+      return new Promise(function (res) { RR.refreshDocs(res); });
+    }).then(function () {
+      var kinds = RR.exportWarnings().map(function (x) { return x.kind; });
+      ok(kinds.indexOf("changed-since-approval") < 0, "a round of the two reports, approved and unchanged, does not read as changed because the specification is packed now", kinds.join(", "));
+      // Phase 6 review: the specification's own sections edited since (its store), with no approved round holding it.
+      ok(kinds.indexOf("spec-not-reviewed") < 0, "with its own sections untouched, nothing is said about the specification");
+      RP.setSection("spec", "about-this-specification", { title: "Purpose" });
+      RT.touched();
+      return new Promise(function (res) { RR.refreshDocs(res); });
+    }).then(function () {
+      var ws = RR.exportWarnings(), kinds = ws.map(function (x) { return x.kind; });
+      ok(ws.some(function (x) { return x.kind === "spec-not-reviewed" && x.text === "The cyber security requirements specification has not been reviewed in an approved round."; }) && kinds.indexOf("changed-since-approval") < 0,
+        "edited on its own after that round, the specification warns plainly that no approved round holds it, and the reports do not read as changed", kinds.join(", "));
+      RT.navigate("review");
+      ok(/The cyber security requirements specification has not been reviewed in an approved round\./.test(main.textContent), "Check and issue shows it");
+      RT.navigate("peer");
+      ok(/The cyber security requirements specification has not been reviewed in an approved round\./.test(main.textContent), "and so does Peer review");
+      delete P().reportCustom; RT.touched();
+      return new Promise(function (res) { RR.refreshDocs(res); });
+    }).then(function () {
+      ok(RR.exportWarnings().every(function (x) { return x.kind !== "spec-not-reviewed"; }), "back to the generated wording, the warning goes");
+      P().suc.description = P().suc.description + " A later edit.";
+      RT.touched();
+      return new Promise(function (res) { RR.refreshDocs(res); });
+    }).then(function () {
+      var kinds = RR.exportWarnings().map(function (x) { return x.kind; });
+      ok(kinds.indexOf("changed-since-approval") >= 0, "and still does once the detailed report has changed", kinds.join(", "));
+      // A review file from that round still imports: its comments name the two reports.
+      var file = { schema: RC.fileSchema(), packId: "rp-old", reviewId: RR.store().reviewId, round: 1, fileId: "f-old2", reviewer: "A. Other", savedAt: new Date().toISOString(),
+        verdict: { value: "changes-requested", date: "2026-11-02", note: "" }, checklist: [], dismissedChecks: [], confirmations: [],
+        comments: [{ id: "o1", reviewer: "A. Other", createdAt: "2026-11-02T10:00:00Z", updatedAt: "2026-11-02T10:00:00Z", severity: "should-fix", text: "Old pack comment.", suggestion: null, relatesTo: null, check: null,
+          anchor: { documentIndex: 1, documentTitle: "High-level report", kind: "block", sectionKey: "method-and-limitations", sectionTitle: "Method and limitations", blockId: "d1-b9", quote: "", cell: null } }] };
+      var r = RR.importTexts([{ name: "old.json", text: JSON.stringify(file) }]);
+      ok(r.bad === 0 && RR.store().threads.some(function (t) { return t.comment.id === "o1"; }), "a review file for a pack of two documents still imports", r.lines.join(" | "));
+      RR.goTo(RR.store().threads.filter(function (t) { return t.comment.id === "o1"; })[0]);
+      ok(RT.state.stage === "report" && RP.state.doc === 1, "and its comment on the high-level report goes to that report");
+      delete P().review; RT.touched();
+    }).then(finish, function (e) { ok(false, "threw: " + (e && e.message), e && e.stack); finish(); });
+  };
+  frame.src = "../index.html?tour=1";
+})();
+</script>
+</body></html>

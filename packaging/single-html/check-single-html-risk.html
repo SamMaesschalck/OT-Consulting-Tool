@@ -105,6 +105,10 @@
       return w.docx.Packer.toBlob(RX.buildWordDoc(p, { highLevelOnly: true }));
     }).then(function (b) {
       r.wordHL = b.size;
+      // The cyber security requirements specification, a Word file of its own (phase 6b).
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, { spec: true }));
+    }).then(function (b) {
+      r.wordSpec = b.size;
       var wb = RX.buildWorkbook(p);
       r.sheets = wb.worksheets.map(function (s) { return s.name; }).join(",");
       return wb.xlsx.writeBuffer();
@@ -153,6 +157,7 @@
       ok(close(folder.word, single.word), "the Word report builds to the same size (" + single.word + " bytes)", folder.word + " vs " + single.word);
       ok(/^cover \d+ sheets [1-9]/.test(single.preview) && single.preview === folder.preview, "the Word preview reads the report back and draws it (" + single.preview + ")", folder.preview + " vs " + single.preview);
       ok(close(folder.wordHL, single.wordHL), "the high-level Word report builds to the same size (" + single.wordHL + " bytes)", folder.wordHL + " vs " + single.wordHL);
+      ok(close(folder.wordSpec, single.wordSpec), "the requirements specification builds to the same size (" + single.wordSpec + " bytes)", folder.wordSpec + " vs " + single.wordSpec);
       ok(single.sheets === folder.sheets && close(folder.excel, single.excel), "the Excel workbook has the same sheets and size (" + single.excel + " bytes)", folder.excel + " vs " + single.excel);
       ok(folder.errors.length === 0, "(the folder version ran with no script or console errors)", folder.errors.join(" | "));
       ok(single.errors.length === 0, "no script or console errors while every page rendered and the exports built", single.errors.join(" | "));

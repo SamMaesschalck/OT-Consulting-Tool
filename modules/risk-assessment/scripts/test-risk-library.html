@@ -53,6 +53,7 @@
 
   function run(w) {
     var RT = w.RiskTool, M = w.RiskApp.Model, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks, d = w.document, LU = w.RiskApp.LibraryUI;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     w.confirm = function () { return true; };
     w.alert = function () {};
     try { w.localStorage.removeItem(RT.AUTOSAVE_KEY); } catch (e) {}

@@ -42,6 +42,7 @@
 
   function run(w) {
     var RT = w.RiskTool, MG = w.RiskApp.Migrate, d = w.document, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks, RULES = w.App.Data.sltRules;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     w.confirm = function () { return true; };
     w.alert = function () {};
     var KEY = RT.AUTOSAVE_KEY, keptSnap = null;

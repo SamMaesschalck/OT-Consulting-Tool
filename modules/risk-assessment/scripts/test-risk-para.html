@@ -82,11 +82,13 @@
 
     poll(function () { return w.RiskTool && w.RiskReview && w.RiskReportPage && w.RiskExports && w.docx && w.RiskTool.state.project.zones.length; }).then(function () {
       RT = w.RiskTool; RR = w.RiskReview; RP = w.RiskReportPage; RX = w.RiskExports; RC = w.App.ReviewCore; DB = w.App.DocxBlocks; RS = w.App.ReportSections; main = w.document.getElementById("main");
+      RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
       RR.ensureStore().rounds.push({ round: 1, packId: "rp-test", createdAt: new Date().toISOString(), documents: [] });
       return docs();
     }).then(function (d) {
       // ---- a store without paragraphs: nothing new ------------------------------------
-      ok(d.length === 2 && d.every(function (doc) { return doc.probe.every(function (s) { return s.from.length === s.texts.length && s.from.every(function (f) { return f === null; }); }); }), "with nothing stored, every opening paragraph of both reports is marked as generated");
+      // Phase 6b: the requirements specification is the pack's third document, and is held to the same.
+      ok(d.length === 3 && d.every(function (doc) { return doc.probe.every(function (s) { return s.from.length === s.texts.length && s.from.every(function (f) { return f === null; }); }); }), "with nothing stored, every opening paragraph of both reports is marked as generated");
       ok(RR.paragraphChanges().length === 0 && lost().length === 0, "and there is nothing to list or warn about");
 
       // ---- one paragraph of several --------------------------------------------------

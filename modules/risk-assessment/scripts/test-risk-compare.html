@@ -1,0 +1,457 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool previous assessment</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 6a of docs/risk-tool-redesign.md, item 2: the comparison with a
+  previous assessment.
+  - A previous risk project file (0.1, 0.2 or 0.3: the frozen fixtures among
+    them) is the baseline: stored by reference (file name, date, approval
+    date) with a frozen copy of what is compared, never changing the current
+    project, surviving a save and a load, and undoable.
+  - Matching by id with a name fallback (zones, conduits, threats and
+    countermeasures numbered again), and every kind of change: zones and
+    conduits added, removed, renumbered, renamed; SL-T per FR; threats added,
+    removed, moved; ratings per state; treatment decisions; countermeasures
+    added, removed, status moved; accepted risks added and past their review
+    date; the tolerable risk and the criteria (ratings then by band only); an
+    empty baseline; the same file (no change).
+  - Check and issue's card, the Word section (full report only, after the
+    risk position, only with a baseline) and the Excel Changes sheet.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.docx || !w.ExcelJS) { if (++tries > 300) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var pr = null;
+    try { pr = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (pr && typeof pr.then === "function") pr.then(done, function (e) { failures++; lines.push("FAIL async: " + (e && e.message)); done(); });
+    else done();
+  }, 50);
+
+  function mockDocx() {
+    function TextRun(o) { if (typeof o === "string") o = { text: o }; this.__t = "run"; this.text = o.text != null ? o.text : ""; }
+    function Paragraph(o) { o = o || {}; this.__t = "p"; this.children = o.children || []; this.bullet = o.bullet || null; this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join(""); }
+    function TableCell(o) { this.__t = "cell"; this.children = (o && o.children) || []; }
+    function TableRow(o) { this.__t = "row"; this.children = (o && o.children) || []; }
+    function Table(o) { this.__t = "table"; this.rows = (o && o.rows) || []; }
+    function Header(o) { this.__t = "hdr"; this.children = (o && o.children) || []; }
+    function Footer(o) { this.__t = "ftr"; this.children = (o && o.children) || []; }
+    function PageBreak() { this.__t = "br"; this.text = ""; }
+    function ImageRun() { this.__t = "img"; }
+    function Document(o) { this.__t = "doc"; this.sections = (o && o.sections) || []; }
+    return {
+      Document: Document, Paragraph: Paragraph, TextRun: TextRun, Table: Table, TableRow: TableRow, TableCell: TableCell,
+      Header: Header, Footer: Footer, PageBreak: PageBreak, ImageRun: ImageRun,
+      HeadingLevel: { HEADING_1: "h1", HEADING_2: "h2", HEADING_3: "h3", TITLE: "t" },
+      WidthType: { DXA: "dxa", PERCENTAGE: "pct" }, ShadingType: { SOLID: "solid" }, TableLayoutType: { FIXED: "fixed" },
+      AlignmentType: { LEFT: "l", CENTER: "c", RIGHT: "r" }, HeightRule: { ATLEAST: "atLeast", EXACT: "exact" },
+      PageNumber: { CURRENT: "current" }, PageOrientation: { PORTRAIT: "portrait" },
+      Packer: { toBlob: function () { return Promise.resolve(new Blob(["x"])); } }
+    };
+  }
+  function docText(doc) {
+    var out = [];
+    (function walk(n) {
+      if (!n) return;
+      if (n.__t === "p") { out.push(n.text); return; }
+      if (n.__t === "table") { n.rows.forEach(walk); return; }
+      if (n.__t === "row" || n.__t === "cell") { n.children.forEach(walk); return; }
+      if (Array.isArray(n)) n.forEach(walk);
+    })(doc.sections.map(function (s) { return s.children; }));
+    return out.join("\n");
+  }
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, d = w.document, RX = w.RiskExports;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    try { w.localStorage.removeItem(RT.AUTOSAVE_KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function snap() { return JSON.stringify(P()); }
+    function without(k) { var o = clone(P()); delete o[k]; return JSON.stringify(o); }
+    function demo() { RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT)); }
+    function q(sel) { return main().querySelector(sel); }
+    function toastUndo() { return d.getElementById("toast").querySelector('[data-action="toast-undo"]'); }
+    function group(gs, key) { return (gs.filter(function (g) { return g.key === key; })[0] || { items: [] }).items; }
+    function has(gs, key, re) { return group(gs, key).some(function (s) { return re.test(s); }); }
+    function vs(o) { return clone(o); }
+    function owner(pj, id) { return pj.zones.concat(pj.conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threat(pj, id) { var hit = null; pj.zones.concat(pj.conduits).forEach(function (o) { o.threats.forEach(function (t) { if (t.id === id) hit = t; }); }); return hit; }
+    function cm(pj, id) { var hit = null; pj.zones.concat(pj.conduits).forEach(function (o) { o.countermeasures.forEach(function (m) { if (m.id === id) hit = m; }); }); return hit; }
+    // The previous assessment's frozen copy against the open project.
+    function against(prevProject, today) {
+      var r = RT.baselineFrom(JSON.stringify(prevProject), "prev.json");
+      var cp = clone(P()); cp.baseline = r.baseline;
+      return { b: r.baseline, d: RT.compareBaseline(cp, today) };
+    }
+    function dashFree(gs) { return gs.every(function (g) { return g.items.every(function (s) { return !/[–—]/.test(s) && !/(^| )- /.test(s); }); }); }
+
+    var DEMO = window.SPT_TOUR_PROJECT;
+
+    // ==== 1. The same file: nothing changed ====================================================
+
+    demo();
+    var same = against(DEMO);
+    ok(!!same.b && same.b.fileName === "prev.json" && same.b.savedOn === DEMO.savedOn && same.b.assessmentDate === "2026-07-01 to 2026-07-04" && same.b.revision === "1.0" && same.b.approvedOn === "2026-07-04",
+      "the baseline is stored by reference: file name, date, revision and approval date", JSON.stringify(same.b && { f: same.b.fileName, s: same.b.savedOn, a: same.b.assessmentDate, ap: same.b.approvedOn }));
+    ok(same.b.facts && same.b.facts.owners.length === 7 && same.b.facts.owners[0].threats.length === 3 && same.b.facts.owners[0].threats[0].states.current.band, "with a frozen copy of what is compared: each zone and conduit, its threats and their three ratings");
+    ok(same.d.empty && RT.comparisonLines(same.d).length === 0 && RT.comparisonRows(same.d).length === 0, "the same assessment again: nothing has changed");
+    ok(RT.baselineWords(same.b) === "the previous assessment of Unit 300 Alkylation Unit, 2026-07-01 to 2026-07-04, revision 1.0, approved on 2026-07-04" || /^the previous assessment of .+, 2026-07-01 to 2026-07-04, revision 1\.0, approved on 2026-07-04$/.test(RT.baselineWords(same.b)),
+      "the baseline in words names its date, revision and approval", RT.baselineWords(same.b));
+    ok(RT.baselineFrom("{ nope", "x").error === "Not a valid JSON file." && RT.baselineFrom(JSON.stringify({ schema: "spt-risk-project/9.9" }), "x").error === "Not a risk project file this tool reads.", "a file that is not a risk project file is refused, with why");
+
+    // ==== 2. Every kind of change ==============================================================
+
+    var prev = vs(DEMO);
+    prev.engagement.assessmentDate = "2024-06-10 to 2024-06-12"; prev.engagement.revision = "0.9";
+    prev.approvals.forEach(function (a) { a.date = "2024-06-20"; }); prev.approval.date = "2024-06-20";
+    // A zone since removed, with two threats and a countermeasure.
+    var z5 = M.emptyZone(5); z5.name = "Packaging line";
+    var t20 = M.emptyThreat(20); t20.statement = "Packaging PLC tampered with."; var t21 = M.emptyThreat(21); t21.statement = "Label printer misused.";
+    z5.threats = [t20, t21]; z5.countermeasures = [Object.assign(M.emptyCountermeasure(20), { description: "Lock the panel" })];
+    prev.zones.push(z5);
+    owner(prev, "Z1").threats = owner(prev, "Z1").threats.filter(function (t) { return t.id !== "T3"; });   // T3 is new since
+    threat(prev, "T2").likelihood = "high";                                                                 // T2 rated higher before
+    threat(prev, "T4").treatment = { decision: "reduce", confirmed: true, reason: "" };                      // T4 was reduce
+    cm(prev, "M5").status = "proposed";                                                                     // M5 has moved on
+    cm(prev, "M2").existing = false;                                                                        // M2 is now in place
+    owner(prev, "Z1").slTargetByFR.IAC = 2;                                                                 // Z1 IAC raised since
+    threat(prev, "T8").treatment = { decision: null, confirmed: false, reason: "" }; threat(prev, "T8").acceptance = "";   // T8 accepted since
+    owner(prev, "C3").name = "Corporate reporting (old name)";                                             // C3 renamed
+    owner(prev, "Z4").countermeasures = owner(prev, "Z4").countermeasures.filter(function (m) { return m.id !== "M9"; });   // M9 is new
+    threat(prev, "T7").countermeasureIds = threat(prev, "T7").countermeasureIds.filter(function (id) { return id !== "M9"; });
+    threat(prev, "T6").statement = "Process data is exfiltrated from the historian (recipe and throughput confidentiality).";
+    // T6 sat in Z1 then (same id and wording): it has moved since.
+    owner(prev, "Z1").threats.push(threat(prev, "T6")); owner(prev, "Z3").threats = owner(prev, "Z3").threats.filter(function (t) { return t.id !== "T6"; });
+
+    demo();
+    var before = snap();
+    var A = against(prev, "2026-11-13"), gs = RT.comparisonLines(A.d);
+    ok(snap() === before, "comparing changes nothing in the open project");
+    ok(A.b.approvedOn === "2024-06-20" && A.b.revision === "0.9", "the baseline's own approval date and revision");
+    ok(has(gs, "owners", /^Z5 Packaging line removed, with its 2 threats and 1 countermeasure\.$/), "a zone removed is said once, with what it held", group(gs, "owners").join(" | "));
+    ok(!has(gs, "threats", /T20|T21/) && !has(gs, "countermeasures", /M20/), "and its threats and countermeasures are not listed again");
+    ok(has(gs, "owners", /^C3 was named Corporate reporting \(old name\); now /), "a conduit renamed", group(gs, "owners").join(" | "));
+    // Phase 6 review: the direction in words (was "IAC SL2 to SL3")., group(gs, "slt").join(" | "));
+    ok(has(gs, "threats", /^T3 added to Z1: A flooding/) && has(gs, "threats", /^T6 moved from Z1 to Z3\.$/), "a threat added, and one moved to another zone", group(gs, "threats").join(" | "));
+    ok(has(gs, "ratings", /^T2 \(Z1\): unmitigated risk (lowered|changed) from [A-Z][a-z ]+ \(High × Serious\) to [A-Z][a-z ]+ \(Medium × Serious\)/), "a rating change names the state, and on the same criteria its likelihood and impact", group(gs, "ratings").join(" | "));
+    ok(!has(gs, "ratings", /T2 \(Z1\):.*current/), "a state not rated in either (T2's current) is not said again");
+    // Phase 6 review: the decision recorded, not its label (was "reduce with countermeasures to treated through the SL-T programme")., group(gs, "decisions").join(" | "));
+    ok(has(gs, "accepted", /^T8 \(Z4\) accepted since the previous assessment\.$/) && !has(gs, "decisions", /T8/), "an acceptance is said with the accepted risks, not again with the decisions", group(gs, "decisions").join(" | "));
+    ok(has(gs, "countermeasures", /^M9 added to Z4: A separate maintenance zone .* \(agreed\)\.$/), "a countermeasure added, with its status", group(gs, "countermeasures").join(" | "));
+    ok(has(gs, "countermeasures", /^M5 \(Z3\): moved from proposed to in progress\.$/) && has(gs, "countermeasures", /^M2 \(Z1\): now in place\.$/), "a countermeasure's status moved, and one now in place", group(gs, "countermeasures").join(" | "));
+    ok(!group(gs, "criteria").length, "the same criteria and tolerable risk: nothing said about them");
+    ok(gs.map(function (g) { return g.key; }).join() === "owners,slt,threats,ratings,decisions,countermeasures,accepted", "the groups in their order", gs.map(function (g) { return g.key; }).join());
+    ok(dashFree(gs), "no dash anywhere in the words");
+    // Phase 6 review: a passed review date is a fact about today, said under Decisions required (with or
+    // without a previous assessment), not in the progress section. Re-pointed from the comparison's lines.
+    var exP = clone(P()); exP.baseline = A.b; var ex = RT.comparisonLines(RT.compareBaseline(exP, "2099-01-01"));
+    ok(!ex.some(function (g) { return g.items.some(function (s) { return /review date|has passed/.test(s); }); }), "the comparison no longer says a review date has passed", JSON.stringify(group(ex, "accepted")));
+    var realDocx0 = w.docx; w.docx = mockDocx();
+    function decisionsText(pj, today) { var t = docText(RX.buildWordDoc(pj, { today: today })); return t.slice(t.indexOf("\nDecisions required\n"), t.indexOf("\nWhy this assessment\n")); }
+    var exLate = decisionsText(exP, "2099-01-01"), noBase = clone(P()); delete noBase.baseline;
+    ok(/\nThe review date of the accepted risk T8 \(Z4\), 2027-06-30, has passed\.\n/.test(exLate) && /\nThe review date of the accepted risk T8 \(Z4\), 2027-06-30, has passed\.\n/.test(decisionsText(noBase, "2099-01-01")),
+      "an accepted risk whose review date has passed is said under Decisions required, with or without a previous assessment", exLate.replace(/\n/g, " | "));
+    ok(!/has passed/.test(decisionsText(noBase, "2026-11-13")), "only once it has passed");
+    var settled = clone(noBase); settled.zones.concat(settled.conduits).forEach(function (o) { o.countermeasures.forEach(function (m) { if (m.status === "proposed") m.status = "agreed"; }); });
+    ok(/Nothing is waiting on a decision/.test(decisionsText(settled, "2026-11-13")) && !/Nothing is waiting on a decision/.test(decisionsText(settled, "2099-01-01")), "a passed review date is something waiting on a decision");
+    // The test clock: a pinned today is what every output reads when no today is passed, a today
+    // passed to the Word builder still wins, and unpinned it is the clock again.
+    function decisionsPinned(pj) { var t = docText(RX.buildWordDoc(pj, {})); return t.slice(t.indexOf("\nDecisions required\n"), t.indexOf("\nWhy this assessment\n")); }
+    RT.setToday("2027-07-01");
+    ok(RT.todayISO() === "2027-07-01" && /, 2027-06-30, has passed\./.test(decisionsPinned(noBase)), "a pinned today is the Word report's today", RT.todayISO());
+    ok(!/has passed/.test(decisionsText(noBase, "2026-11-13")), "a today passed to the builder wins over the pin");
+    ok(RT.buildRiskContext(noBase).generatedOn === "2027-07-01", "and the risk context's date reads it too");
+    RT.setToday("1 July 2027");
+    ok(RT.todayISO() !== "1 July 2027" && /^\d{4}-\d{2}-\d{2}$/.test(RT.todayISO()), "a pin that is not an ISO date is not taken", RT.todayISO());
+    RT.setToday(null);
+    var clock = new Date(), clockISO = clock.getFullYear() + "-" + String(clock.getMonth() + 1).padStart(2, "0") + "-" + String(clock.getDate()).padStart(2, "0");
+    ok(RT.todayISO() === clockISO, "unpinned, today is the clock", RT.todayISO() + " / " + clockISO);
+    RT.setToday("2026-11-14");
+    w.docx = realDocx0;
+    var rows = RT.comparisonRows(A.d);
+    ok(rows.some(function (r) { return r.area === "SL-T" && r.where === "Z1" && r.item === "IAC" && r.before === "SL2" && r.now === "SL3"; }) &&
+       rows.some(function (r) { return r.area === "Accepted risks" && r.item === "T8" && r.change === "Accepted"; }), "the workbook's rows say the same, a change per row");
+
+    // ==== 3. Numbered again: matched by name ===================================================
+
+    var ren = vs(DEMO);
+    // Z1 and Z2 swapped ids; Z3 was Z7; T5 was T25; M5 was M25.
+    function reid(pj, from, to) {
+      pj.zones.forEach(function (z) { if (z.id === from) z.id = to; });
+      pj.conduits.forEach(function (c) { if (c.fromZone === from) c.fromZone = to; if (c.toZone === from) c.toZone = to; });
+    }
+    reid(ren, "Z1", "ZX"); reid(ren, "Z2", "Z1"); reid(ren, "ZX", "Z2"); reid(ren, "Z3", "Z7");
+    threat(ren, "T5").id = "T25";
+    cm(ren, "M5").id = "M25"; threat(ren, "T25").countermeasureIds = ["M25"];
+    var Rn = against(ren), gr = RT.comparisonLines(Rn.d);
+    ok(has(gr, "owners", /^Z1 Unit 300 BPCS was numbered Z2\.$/) && has(gr, "owners", /^Z2 Safety Instrumented System was numbered Z1\.$/) && has(gr, "owners", /^Z3 Plant DMZ & historian was numbered Z7\.$/),
+      "zones numbered again are matched by name and said so", group(gr, "owners").join(" | "));
+    ok(has(gr, "threats", /^T5 was numbered T25\.$/) && !has(gr, "threats", /added|removed|moved/), "a threat numbered again is matched by its wording, not added and removed", group(gr, "threats").join(" | "));
+    ok(!group(gr, "countermeasures").length && !group(gr, "ratings").length && !group(gr, "decisions").length && !group(gr, "slt").length, "and nothing else reads as changed", JSON.stringify(gr));
+    ok(Rn.d.owners.added.length === 0 && Rn.d.owners.removed.length === 0, "no zone or conduit reads as added or removed");
+
+    // ==== 4. The criteria and the tolerable risk changed =======================================
+
+    var crit = vs(DEMO), hc = RT.presetCriteria("house");
+    // One cell moved: a serious impact at low likelihood was high before.
+    hc.matrix.serious.low = "high"; crit.criteria = hc;
+    var Cr = against(crit), gc = RT.comparisonLines(Cr.d);
+    ok(has(gc, "criteria", /^The risk criteria changed, so ratings are compared by band only\.$/), "a change of criteria is said plainly", group(gc, "criteria").join(" | "));
+    ok(group(gc, "ratings").length > 0 && group(gc, "ratings").every(function (s) { return s.indexOf(" × ") < 0; }) && has(gc, "ratings", /^T1 \(Z1\): current risk (raised|lowered|changed) from High to [A-Z]/),
+      "and the ratings are compared by band only, without likelihood and impact", group(gc, "ratings").join(" | "));
+    var tol = vs(DEMO); tol.srs.tolerableRisk = "low";
+    var gt = RT.comparisonLines(against(tol).d);
+    ok(has(gt, "criteria", /^The tolerable risk changed from Low to Medium\.$/) && !has(gt, "criteria", /criteria changed/), "a change of tolerable risk is said, and the criteria are the same", group(gt, "criteria").join(" | "));
+    var cat = vs(DEMO); cat.criteria = RT.presetCriteria("house"); cat.criteria.tolerableByCategory = { safety: "low" };
+    ok(has(RT.comparisonLines(against(cat).d), "criteria", /^The tolerable risk of a consequence category changed\.$/), "a tolerable risk per category set since is said");
+
+    // ==== 5. An empty baseline ================================================================
+
+    var Em = against(M.emptyProject()), ge = RT.comparisonLines(Em.d);
+    ok(group(ge, "owners").length === 7 && has(ge, "owners", /^Z1 Unit 300 BPCS added, with its 3 threats and 3 countermeasures\.$/), "against an empty assessment every zone and conduit is added, with what it holds", group(ge, "owners").join(" | "));
+    ok(!group(ge, "threats").length && !group(ge, "countermeasures").length && !group(ge, "ratings").length, "and nothing it holds is listed again");
+
+    // ==== 6. The frozen files as baselines ====================================================
+
+    demo();
+    before = snap();
+    ["tour-v0.7-saved", "tour-phase3-0.2", "hand-made-v0.1"].forEach(function (k) {
+      var raw = clone(window.RiskFixtures[k]);
+      var r = RT.baselineFrom(JSON.stringify(raw), k + ".json");
+      var ddP = clone(P()); ddP.baseline = r.baseline;
+      var dd = r.baseline ? RT.compareBaseline(ddP) : null;
+      var g = dd ? RT.comparisonLines(dd) : [];
+      ok(!!r.baseline && !!dd && JSON.stringify(window.RiskFixtures[k]) === JSON.stringify(raw) && snap() === before, k + ": reads as a baseline, the file and the open project untouched", r.error || "");
+      ok(g.length > 0 && dashFree(g), k + ": the changes since it are said, with no dash");
+      if (k === "tour-v0.7-saved") ok(has(g, "countermeasures", /^M8 added to Z2/) && has(g, "countermeasures", /^M9 added to Z4/) && has(g, "decisions", /^T4 \(Z2\): /), k + ": the demo's phase 4 changes show (M8, M9, T4's decision)", JSON.stringify(g));
+    });
+
+    // ==== 7. On the project: set, saved, loaded, undone =======================================
+
+    demo();
+    var base0 = without("baseline");
+    ok(RT.setBaseline(JSON.stringify(prev), "acme-2024.json") === true && P().baseline && P().baseline.fileName === "acme-2024.json", "setBaseline stores it on the project");
+    ok(without("baseline") === base0, "the baseline changes nothing else in the project");
+    ok(RT.isDirty(), "the project is marked changed");
+    var u = toastUndo(); ok(!!u, "the toast offers Undo");
+    if (u) u.click();
+    ok(!("baseline" in P()) && without("baseline") === base0, "Undo takes it off again");
+    RT.setBaseline(JSON.stringify(prev), "acme-2024.json");
+    var keep = JSON.stringify(P().baseline);
+    RT.loadProjectText(snap());
+    ok(JSON.stringify(P().baseline) === keep, "it survives a save and a load unchanged");
+    var bad = JSON.parse(snap()); bad.baseline = { fileName: "x.json" };
+    RT.loadProjectText(JSON.stringify(bad));
+    ok(!("baseline" in P()), "a baseline that does not read as one is dropped on load");
+    ok(RT.setBaseline("not json", "x") === false && !("baseline" in P()), "a file that cannot be read sets nothing");
+
+    // ==== 8. Check and issue ==================================================================
+
+    demo();
+    RT.navigate("review");
+    var cardEl = q('[data-check-anchor="baseline"]');
+    ok(!!cardEl && /Since the previous assessment/.test(cardEl.textContent) && q('[data-action="baseline-load"]').textContent === "Load previous assessment" && !q('[data-action="baseline-remove"]'),
+      "Check and issue has the card, with Load previous assessment");
+    RT.setBaseline(JSON.stringify(prev), "acme-2024.json");
+    cardEl = q('[data-check-anchor="baseline"]');
+    ok(/^The previous assessment of .+, 2024-06-10 to 2024-06-12, revision 0\.9, approved on 2024-06-20 \(acme-2024\.json\)\.$/.test(q("[data-baseline-meta]").textContent), "the card names the previous assessment", q("[data-baseline-meta]").textContent);
+    ok(!!q('[data-changes="slt"]') && /IAC raised from SL2 to SL3/.test(q('[data-changes="slt"]').textContent) && !!q('[data-changes="accepted"]'), "and lists what changed, by group");
+    var total = RT.comparisonLines(RT.compareBaseline()).reduce(function (n, g) { return n + g.items.length; }, 0);
+    ok(new RegExp(total + " changes").test(cardEl.querySelector(".card-h").textContent) && q('[data-action="baseline-load"]').textContent === "Replace", "its header counts them; Load becomes Replace");
+    before = snap();
+    q('[data-action="baseline-remove"]').click();
+    ok(!("baseline" in P()) && !q("[data-baseline-meta]"), "Remove takes the baseline off the project");
+    u = toastUndo(); if (u) u.click();
+    ok(snap() === before && !!q("[data-baseline-meta]"), "and its Undo puts it back");
+
+    // ==== 9. Word: the section, only with a baseline, in the full report =====================
+
+    var realDocx = w.docx;
+    w.docx = mockDocx();
+    var withB = docText(RX.buildWordDoc(P(), {}));
+    var iPos = withB.indexOf("\nRisk position\n"), iPr = withB.indexOf("\nProgress since the previous assessment\n"), iDec = withB.indexOf("\nDecisions required\n");
+    ok(iPos > 0 && iPr > iPos && iDec > iPr, "the full report has Progress since the previous assessment after the risk position");
+    var sec = withB.slice(iPr, iDec);
+    ok(/This assessment is compared with the previous assessment of .+, 2024-06-10 to 2024-06-12, revision 0\.9, approved on 2024-06-20\./.test(sec) && sec.indexOf("acme-2024.json") < 0,
+      "it names the previous assessment by its date, revision and approval, not its file", sec.slice(0, 300));
+    ok(/\nSL-T\nZ1 Unit 300 BPCS: IAC raised from SL2 to SL3\.\n/.test(sec) && /\nAccepted risks\nT8 \(Z4\) accepted since the previous assessment\.(\n|$)/.test(sec), "each group with its lines", sec.replace(/\n/g, " | ").slice(0, 600));
+    ok(!/[–—]/.test(sec), "no en or em dash in the section");
+    // Phase 6 review: the high-level report now has the section too, with the criteria and the ranking only
+    // (was: "the high-level report has no such section"). Re-pointed, same intent: it says nothing the
+    // high-level report does not hold (no zones, threats or countermeasures).
+    var hlB = docText(RX.buildWordDoc(P(), { highLevelOnly: true }));
+    var hFound = hlB.indexOf("\nWhat we found\n"), hPr = hlB.indexOf("\nProgress since the previous assessment\n"), hNext = hlB.indexOf("\nWhat happens next\n");
+    var hSec = hlB.slice(hPr, hNext);
+    ok(hFound > 0 && hPr > hFound && hNext > hPr && /Nothing recorded has changed since\./.test(hSec) && !/\nZones and conduits\n|\nSL-T\n|\nThreat scenarios\n|\nAccepted risks\n/.test(hSec),
+      "the high-level report's section, after What we found, holds no zone, SL-T, threat or accepted risk change", hSec.replace(/\n/g, " | ").slice(0, 300));
+    var sameP = clone(P()); sameP.baseline = RT.baselineFrom(JSON.stringify(DEMO), "d.json").baseline;
+    var sameT = docText(RX.buildWordDoc(sameP, {}));
+    ok(/This assessment is compared with the previous assessment of .+\. Nothing recorded has changed since\.\n/.test(sameT), "against the same assessment it says nothing has changed");
+    demo();
+    var noB = docText(RX.buildWordDoc(P(), {}));
+    ok(noB.indexOf("Progress since the previous assessment") < 0, "with no baseline the report has no such section");
+    w.docx = realDocx;
+
+    // ==== 10. Excel: the Changes sheet =========================================================
+
+    var names = RX.buildWorkbook(P()).worksheets.map(function (s) { return s.name; });
+    ok(names.indexOf("Changes") < 0, "no Changes sheet without a baseline");
+    RT.setBaseline(JSON.stringify(prev), "acme-2024.json");
+    var wb = RX.buildWorkbook(P()), names2 = wb.worksheets.map(function (s) { return s.name; });
+    ok(names2.indexOf("Changes") === names2.indexOf("Summary") + 1, "with one, the Changes sheet follows the Summary", names2.join());
+    var ch = wb.getWorksheet("Changes");
+    var head = []; ch.getRow(3).eachCell(function (c) { head.push(c.value); });
+    ok(/^Compared with the previous assessment of .+, approved on 2024-06-20\.$/.test(String(ch.getRow(1).getCell(1).value)) && head.join("|") === "Area|Zone or conduit|Item|Change|Previous|Now",
+      "it says what it is compared with, then its columns", String(ch.getRow(1).getCell(1).value) + " / " + head.join("|"));
+    ok(ch.rowCount === 3 + RT.comparisonRows(RT.compareBaseline()).length && !!ch.autoFilter, "one row per change, filtered", String(ch.rowCount));
+    // The real libraries pack both.
+    var packed = Promise.all([w.docx.Packer.toBlob(RX.buildWordDoc(P(), {})), wb.xlsx.writeBuffer()]).then(function (r) {
+      ok(r[0] && r[0].size > 20000 && r[1] && r[1].byteLength > 8000, "the real Word and Excel libraries build both files with the comparison in them");
+    });
+
+    // ==== 10b. Phase 6 review: the ranking, a conduit's ends, a move, the directions ==============
+
+    function rowsOf(dd) { return RT.comparisonRows(dd); }
+    // a. A high-level-only assessment: the ranking is compared.
+    var hP = vs(DEMO), hC = vs(DEMO);
+    hP.assessmentType = "high-level"; hC.assessmentType = "high-level";
+    hP.srs.highLevelAssets[0].likelihood = "low";                                   // A1 rated lower before: raised since
+    hP.srs.highLevelAssets[4].name = "Lab link (old name)";                          // A5 renamed since
+    hP.srs.highLevelAssets[2].consequenceByCategory = { safety: "minor" };           // A3's impact by category changed
+    hP.srs.highLevelAssets = hP.srs.highLevelAssets.filter(function (a) { return a.id !== "A6"; });   // A6 added since
+    hP.srs.highLevelAssets.push({ id: "A9", name: "Old badge system", consequence: "minor", likelihood: "low" });   // A9 removed since
+    hP.srs.highLevelAssets[1].detailed = { required: false, reason: "Out of scope then." };
+    hC.srs.highLevelAssets[1].detailed = { required: true, reason: "" };
+    RT.loadProjectText(JSON.stringify(hC));
+    var sameH = against(hC);
+    ok(sameH.d.empty && RT.comparisonLines(sameH.d).length === 0, "high-level only: the same ranking again reads as no change");
+    var Hd = against(hP), gh = RT.comparisonLines(Hd.d), rkL = group(gh, "ranked");
+    ok(!Hd.d.empty && gh[0] && gh[0].key === "ranked" && gh[0].title === "Ranked systems", "a ranking that moved is no longer \"nothing has changed\": its own group, Ranked systems", JSON.stringify(gh.map(function (g) { return g.key; })));
+    ok(rkL.indexOf("A1 Unit 300 BPCS (DCS servers, HMIs, unit PLCs): risk raised from Medium (Low × Serious) to High (Medium × Serious).") >= 0, "a ranked system's rating, with its direction", rkL.join(" | "));
+    ok(has(gh, "ranked", /^A6 CCTV & physical security systems added, rated [A-Z]/) && rkL.indexOf("A9 Old badge system removed.") >= 0 && rkL.indexOf("A5 was named Lab link (old name); now Laboratory information system link.") >= 0,
+      "a system added, removed and renamed", rkL.join(" | "));
+    ok(rkL.indexOf("A3 Plant DMZ & process historian: impact by consequence category changed.") >= 0, "a change to the impact by consequence category");
+    ok(rkL.indexOf("A2 Safety Instrumented System (SIS): detailed assessment now judged required (was not required).") >= 0, "and the decision on a detailed assessment, recorded per system", rkL.join(" | "));
+    ok(!group(gh, "owners").length && !group(gh, "threats").length && dashFree(gh), "nothing else reads as changed, with no dash");
+    var hRows = rowsOf(Hd.d);
+    ok(hRows.some(function (r) { return r.area === "Ranked systems" && /^A1 /.test(r.item) && r.change === "Raised" && r.before === "Medium (Low × Serious)" && r.now === "High (Medium × Serious)"; }) &&
+       hRows.some(function (r) { return r.area === "Ranked systems" && r.change === "Detailed assessment decision changed" && r.before === "Not required" && r.now === "Required"; }), "the workbook's rows say the same", JSON.stringify(hRows.slice(0, 3)));
+    var hp2 = clone(P()); hp2.baseline = Hd.b;
+    w.docx = mockDocx();
+    var hlT = docText(RX.buildWordDoc(hp2, { highLevelOnly: true })), hS = hlT.slice(hlT.indexOf("\nProgress since the previous assessment\n"), hlT.indexOf("\nWhat happens next\n"));
+    ok(/\nRanked systems\n/.test(hS) && /\nA1 Unit 300 BPCS \(DCS servers, HMIs, unit PLCs\): risk raised from Medium/.test(hS) && hS.indexOf("Nothing recorded has changed") < 0, "the high-level report's progress section lists the ranking's changes", hS.replace(/\n/g, " | ").slice(0, 300));
+    // The ranking with a change of tolerable risk: both groups in the high-level report.
+    var hTol = vs(hC); hTol.srs.tolerableRisk = "low"; var hp3 = clone(P()); hp3.baseline = against(hTol).b;
+    var hlT3 = docText(RX.buildWordDoc(hp3, { highLevelOnly: true }));
+    ok(/\nRisk criteria\nThe tolerable risk changed from Low to Medium\.\n/.test(hlT3), "and a change of tolerable risk, which the ranking rests on");
+    w.docx = realDocx;
+
+    // b. A conduit that now joins other zones.
+    demo();
+    var eP = vs(DEMO), c1 = owner(eP, "C1"), c1to = c1.toZone, wasTo = c1to === "Z4" ? "Z2" : "Z4";
+    c1.toZone = wasTo;
+    var Ed = against(eP), ge2 = RT.comparisonLines(Ed.d);
+    ok(!Ed.d.empty && group(ge2, "owners").join() === "C1 now joins " + c1.fromZone + " and " + c1to + "; was " + c1.fromZone + " and " + wasTo + ".", "a conduit's ends compared: what it joins now and before", group(ge2, "owners").join(" | "));
+    ok(rowsOf(Ed.d).some(function (r) { return r.where === "C1" && r.change === "Ends changed" && r.before === c1.fromZone + " and " + wasTo && r.now === c1.fromZone + " and " + c1to; }), "with a row of its own in the workbook");
+    // c. A countermeasure moved to another zone.
+    var mP = vs(DEMO), m5 = cm(mP, "M5");
+    owner(mP, "Z3").countermeasures = owner(mP, "Z3").countermeasures.filter(function (m) { return m.id !== "M5"; }); owner(mP, "Z1").countermeasures.push(m5);
+    var Md = against(mP), gm = RT.comparisonLines(Md.d);
+    ok(!Md.d.empty && group(gm, "countermeasures").join() === "M5 moved from Z1 to Z3.", "a countermeasure moved to another zone is said", group(gm, "countermeasures").join(" | "));
+    ok(rowsOf(Md.d).some(function (r) { return r.area === "Countermeasures" && r.change === "Moved" && r.before === "Z1" && r.now === "Z3"; }), "a Moved row in the workbook");
+    // d. The directions: an SL-T set, lowered and no longer set; a rating now rated and no longer rated.
+    var dP = vs(DEMO);
+    owner(dP, "Z1").slTargetByFR.DC = null; owner(dP, "Z1").slTargetByFR.RA = 3; owner(dP, "Z1").slTargetByFR.IAC = 2;
+    threat(dP, "T3").likelihood = "";
+    var keepTRE = owner(P(), "Z3").slTargetByFR.RA;
+    owner(P(), "Z3").slTargetByFR.RA = null; threat(P(), "T6").likelihood = "";
+    var Dd = against(dP), gd = RT.comparisonLines(Dd.d);
+    ok(has(gd, "slt", new RegExp("^Z1 Unit 300 BPCS: IAC raised from SL2 to SL3, DC set to SL" + owner(DEMO, "Z1").slTargetByFR.DC + ", RA lowered from SL3 to SL" + owner(DEMO, "Z1").slTargetByFR.RA + "\\.$")) &&
+       has(gd, "slt", new RegExp("^Z3 .*: RA no longer set \\(was SL" + keepTRE + "\\)\\.$")), "an SL-T raised, set, lowered and no longer set, in words", group(gd, "slt").join(" | "));
+    ok(has(gd, "ratings", /^T3 \(Z1\): unmitigated risk now rated Medium \(Low × Serious\)\.$/) && has(gd, "ratings", /^T6 \(Z3\): unmitigated risk no longer rated \(was Medium \(Low × Serious\)\)\.$/), "a rating now given, and one no longer given", group(gd, "ratings").join(" | "));
+    ok(rowsOf(Dd.d).some(function (r) { return r.area === "SL-T" && r.item === "DC" && r.change === "Set" && r.before === "" && /^SL\d$/.test(r.now); }) &&
+       rowsOf(Dd.d).some(function (r) { return r.area === "SL-T" && r.item === "RA" && r.where === "Z3" && r.change === "No longer set" && r.now === ""; }) &&
+       rowsOf(Dd.d).some(function (r) { return r.area === "Ratings" && /^T3 /.test(r.item) && r.change === "Rated" && r.before === "Not rated × Serious" && r.now === "Medium (Low × Serious)"; }), "the workbook says Set, No longer set and Rated, with a blank where there was none (a rating given on one side reads as such)", JSON.stringify(rowsOf(Dd.d)));
+    demo();
+    // e. An acceptance taken back: the decision now recorded, in words.
+    threat(P(), "T8").treatment = { decision: "reduce", confirmed: true, reason: "" };
+    var Ad = against(DEMO), ga = RT.comparisonLines(Ad.d);
+    ok(group(ga, "accepted").join() === "T8 (Z4) no longer accepted; the decision is now reduce with countermeasures." && !group(ga, "decisions").length, "an acceptance taken back says the decision now recorded, once", JSON.stringify(ga));
+    ok(rowsOf(Ad.d).some(function (r) { return r.change === "No longer accepted" && r.before === "Risk accepted" && r.now === "Reduce with countermeasures"; }), "and so does its row");
+    demo();
+    // A threat's decision only when the decision recorded changed: a confirmed reduce whose countermeasure
+    // link is gone is still reduce, not a change.
+    var lP = vs(DEMO); threat(lP, "T1").countermeasureIds = [];
+    ok(!group(RT.comparisonLines(against(lP).d), "decisions").length, "a label that moved with the same decision is not a decision changed");
+    // f. A name given since; the workbook's words.
+    var nP = vs(DEMO); owner(nP, "C3").name = "";
+    ok(group(RT.comparisonLines(against(nP).d), "owners").join() === "C3 had no name; now " + owner(P(), "C3").name + ".", "a name given since: had no name, now its name");
+    var aRows = rowsOf(A.d), rnRows = rowsOf(Rn.d);
+    ok(aRows.some(function (r) { return r.change === "Status changed" && /^M5 /.test(r.item) && r.before === "Proposed" && r.now === "In progress"; }) &&
+       aRows.some(function (r) { return r.change === "Status changed" && /^M2 /.test(r.item) && r.before === "Planned" && r.now === "In place"; }) &&
+       rnRows.some(function (r) { return r.change === "Renumbered"; }) && !rnRows.some(function (r) { return /Numbered again/.test(r.change); }),
+      "the workbook says Status changed and Renumbered, with the statuses as printed elsewhere (Proposed, In progress, Planned, In place)", JSON.stringify(aRows.filter(function (r) { return r.area === "Countermeasures"; })));
+    // g. A frozen copy that is not well formed never breaks a build.
+    demo();
+    var badB = { fileName: "odd.json", facts: { owners: [null, 5, "z", { kind: "zone", id: "Z1", name: "x", slt: {}, threats: [null, 3, { id: "T1", statement: "s", states: {} }], cms: "bad" }], ranked: [null, { id: "A1" }] } };
+    var rawP = clone(P()); rawP.baseline = clone(badB);
+    var threw = null;
+    try { RT.compareBaseline(rawP); w.docx = mockDocx(); RX.buildWordDoc(rawP, {}); RX.buildWordDoc(rawP, { highLevelOnly: true }); w.docx = realDocx; RX.buildWorkbook(rawP); } catch (e) { threw = e; w.docx = realDocx; }
+    ok(!threw, "a malformed previous assessment does not break the comparison, the reports or the workbook", threw && threw.message);
+    var lp = clone(P()); lp.baseline = clone(badB);
+    RT.loadProjectText(JSON.stringify(lp));
+    var fb = P().baseline && P().baseline.facts;
+    ok(!!fb && fb.owners.length === 1 && fb.owners[0].threats.length === 1 && Array.isArray(fb.owners[0].cms) && fb.owners[0].cms.length === 0 && fb.ranked.length === 1, "on load, what is not an object goes from it", JSON.stringify(fb));
+    // h. Replace, then Undo: the earlier baseline is back.
+    demo();
+    RT.setBaseline(JSON.stringify(prev), "first.json");
+    d.body.dispatchEvent(new w.MouseEvent("pointerdown", { bubbles: true }));   // a new action, as the Replace button's click is
+    RT.setBaseline(JSON.stringify(eP), "second.json");
+    ok(P().baseline.fileName === "second.json", "set-up: a second file replaces the first");
+    var u2 = toastUndo(); if (u2) u2.click();
+    ok(!!u2 && P().baseline && P().baseline.fileName === "first.json", "Undo of a replace puts the earlier one back", P().baseline && P().baseline.fileName);
+
+    // ==== 11. Loading the file through the page ================================================
+
+    demo();
+    RT.navigate("review");
+    var input = q('[data-action="baseline-file"]');
+    var dt = new w.DataTransfer();
+    dt.items.add(new w.File([JSON.stringify(prev)], "acme-2024.json", { type: "application/json" }));
+    input.files = dt.files;
+    input.dispatchEvent(new w.Event("change", { bubbles: true }));
+    return packed.then(function () { return new Promise(function (resolve) {
+      var n = 0;
+      (function wait() {
+        if (P().baseline || ++n > 100) {
+          ok(!!P().baseline && P().baseline.fileName === "acme-2024.json" && !!q("[data-baseline-meta]"), "Load previous assessment reads the file chosen and shows the changes");
+          resolve();
+        } else setTimeout(wait, 20);
+      })();
+    }); });
+  }
+}());
+</script>
+</body>
+</html>

@@ -35,6 +35,7 @@
 
   function run(w) {
     var RT = w.RiskTool;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     w.confirm = function () { return true; };
     w.alert = function () {};
     var p = RT.state.project;
@@ -131,7 +132,7 @@
     var off = cms.filter(function (m) { return m.srRefs.some(function (s) { var n = (/^SR (\d)\./.exec(s) || [])[1]; return !n || m.addressesFR.indexOf(FRN[n]) < 0; }); }).map(function (m) { return m.id + " " + m.srRefs.join("/") + " vs " + m.addressesFR.join("/"); });
     ok(off.length === 0, "every SR reference of a countermeasure is on a foundational requirement it addresses", off.join(" | "));
     ok(z4.vulnerabilities[1].reference === "Interview I2, lead control systems engineer" && /^Corporate clients request read-only reports over HTTPS; process data flows one way, Z3 to corporate\. /.test(p.conduits[2].notes), "V6 cites the interview it came from, and C3's notes say which way the data flows");
-    ok(/^The consequence stays severe whatever is added[^.]*\. The zone is held at SL3 on every foundational requirement/.test(z2.threats[0].treatment.reason) && /T4 is treated through this SL-T programme, with the hardwired keyswitch \(M4\) in place and a dedicated SIS engineering workstation \(M8\) planned\./.test(z2.justification),
+    ok(/^The consequence stays severe whatever is added[^.]*\. The zone is held at SL3 on every foundational requirement/.test(z2.threats[0].treatment.reason) && /An unauthorised change to the safety logic is treated through these targets, with the hardwired keyswitch for program mode in place and a dedicated SIS engineering workstation planned\./.test(z2.justification),
       "T4's reason and Z2's justification say the SL-T programme once, in the report's words");
     // Who accepted T8 is part of the approval: the demo's approvals were taken with it, and still stand.
     RT.navigate("approval");

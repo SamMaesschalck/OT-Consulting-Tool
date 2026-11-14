@@ -88,6 +88,7 @@
 
     poll(function () { return w.RiskTool && w.RiskReview && w.RiskReportPage && w.RiskExports && w.docx && w.RiskTool.state.project.zones.length; }).then(function () {
       RT = w.RiskTool; RR = w.RiskReview; RX = w.RiskExports; RC = w.App.ReviewCore; RP = w.RiskReportPage; main = w.document.getElementById("main");
+      RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
       w.RiskExports.downloadWord = function (opts, done) { downloads.push(opts && opts.highLevelOnly ? "word-hl" : "word"); if (done) done(null); };
       w.RiskExports.downloadExcel = function (done) { downloads.push("excel"); if (done) done(null); };
 

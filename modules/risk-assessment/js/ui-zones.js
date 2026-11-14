@@ -9,6 +9,7 @@
  * collapsed, its characteristics. A remove offers Undo. Registers itself in
  * RiskApp.Pages; js/app.js goToItem selects the item an entry of the
  * completeness list names (RiskApp.ZonesPage.select) before drawing it.
+ * Two tabs (phase 6a): this page, and the Asset register (js/ui-assets.js).
  */
 (function () {
   "use strict";
@@ -21,7 +22,8 @@
 
   // What the page has open: the selected zone or conduit, whether its
   // characteristics are expanded, and the paste box with what is typed in it.
-  var sel = { kind: null, id: null, chars: false, paste: false, pasteText: "" };
+  // view: the tab open, the zones and conduits or the asset register (js/ui-assets.js).
+  var sel = { kind: null, id: null, chars: false, paste: false, pasteText: "", view: "zones" };
   function select(kind, id) {
     if (sel.kind !== kind || sel.id !== id) { sel.chars = false; sel.paste = false; sel.pasteText = ""; }
     sel.kind = kind; sel.id = id;
@@ -360,10 +362,27 @@
 
   // ---------- The page ----------
 
+  // Step 3's tabs: the zones and conduits, and the asset register (phase 6a).
+  function stepTabs(p) {
+    var n = p.zones.reduce(function (a, z) { return a + z.assets.length; }, 0);
+    function tab(id, text, badge) {
+      var on = sel.view === id;
+      return h("button", { type: "button", class: "sl-btn step-tab" + (on ? " active" : ""), "data-tab": id, "aria-current": on ? "page" : null,
+        onClick: function () { if (on) return; sel.view = id; A.navigate("zones", '.step-tabs [data-tab="' + id + '"]'); } },
+        [text, badge ? h("span", { class: "badge", text: badge }) : null]);
+    }
+    return h("div", { class: "step-tabs no-print", role: "group", "aria-label": "Zones and conduits" }, [
+      tab("zones", "Zones and conduits", p.zones.length ? String(p.zones.length) : null),
+      tab("assets", "Asset register", n ? String(n) : null)
+    ]);
+  }
+
   function renderZones(main) {
     var p = state.project;
     main.appendChild(h("h1", { class: "page-title", text: "Zones and conduits" }));
     main.appendChild(pageSub("zones", "Partition the SUC into zones and conduits, and answer the separation rows raised."));
+    main.appendChild(stepTabs(p));
+    if (sel.view === "assets" && R.AssetsPage) { R.AssetsPage.render(main); return; }
     main.appendChild(card("Zone and conduit drawing", p.zones.length ? "select a zone to open it" : null, [renderZoneMap(p, function (id) { pick("zone", id); A.focusAfter('[data-detail="zone"] h2'); })], null, { "data-drawing": "" }));
     var o = selected(p);
     var detail = o ? (sel.kind === "zone" ? zoneDetail(p, o) : conduitDetail(p, o))
@@ -377,7 +396,9 @@
   R.Pages.zones = renderZones;
   R.ZonesPage = {
     // Opens a zone or conduit when the page next draws (Go to, Assign to zone).
-    select: function (kind, id) { if ((kind === "zone" || kind === "conduit") && id) select(kind, id); },
-    selection: function () { return { kind: sel.kind, id: sel.id, chars: sel.chars }; }
+    select: function (kind, id) { if ((kind === "zone" || kind === "conduit") && id) { select(kind, id); sel.view = "zones"; } },
+    selection: function () { return { kind: sel.kind, id: sel.id, chars: sel.chars, view: sel.view }; },
+    // The tab open next time the page draws: "zones" or "assets".
+    view: function (v) { sel.view = v === "assets" ? "assets" : "zones"; }
   };
 }());

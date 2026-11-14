@@ -2,7 +2,8 @@
 /* review.js
  *
  * The risk tool's side of a report review: Send for review writes both Word
- * reports (detailed and high level) as a pack (contract spt-review-pack), and
+ * reports (detailed and high level) and the cyber security requirements
+ * specification (phase 6b) as a pack (contract spt-review-pack), and
  * Import review files merges what reviewers send back (spt-review) into the
  * project. See docs/report-review.md. The comments list is the shared one
  * (js/review-author.js); this file only says how the risk tool builds its
@@ -55,10 +56,14 @@ window.RiskReview = (function () {
   // the detailed report, so only the high-level report (the zone-free
   // deliverable) is packed: a document's place in the pack is therefore not
   // which report it is, and docFor() finds it by title.
-  var HIGH_LEVEL_TITLE = "High-level report";
+  // The cyber security requirements specification (phase 6b) is the third
+  // document, packed with the detailed report: after the two, so a comment
+  // from a pack of two finds its report by title, or by its place as before.
+  var HIGH_LEVEL_TITLE = "High-level report", SPEC_TITLE = "Cyber security requirements specification";
   var DOCS = [
     { id: "detailed", title: "Detailed report", opts: {} },
-    { id: "highLevel", title: HIGH_LEVEL_TITLE, opts: { highLevelOnly: true } }
+    { id: "highLevel", title: HIGH_LEVEL_TITLE, opts: { highLevelOnly: true } },
+    { id: "spec", title: SPEC_TITLE, opts: { spec: true } }
   ];
   function docsToPack() {
     var p = project();
@@ -75,9 +80,11 @@ window.RiskReview = (function () {
   function reportIdFor(a, docs) {
     var d = docFor(a, docs);
     if (d && d.reportId) return d.reportId;
-    if (a.documentTitle) return a.documentTitle === HIGH_LEVEL_TITLE ? "highLevel" : "detailed";
-    return a.documentIndex === 1 ? "highLevel" : "detailed";
+    if (a.documentTitle) return a.documentTitle === HIGH_LEVEL_TITLE ? "highLevel" : a.documentTitle === SPEC_TITLE ? "spec" : "detailed";
+    return a.documentIndex === 1 ? "highLevel" : a.documentIndex === 2 ? "spec" : "detailed";
   }
+  // The Report page's tab for a report id.
+  var TAB_OF = { detailed: 0, highLevel: 1, spec: 2 };
 
   // The content hash leaves out the asset owner's sign-off, as document control
   // leaves out QA review by: signing off after the review approved it is the
@@ -621,7 +628,7 @@ window.RiskReview = (function () {
     }
     if (a.kind === "general") { s.stage = "basis"; RT().render(); return; }
     var d = docFor(a, cachedDocs());
-    var tab = d ? (d.reportId === "highLevel" ? 1 : 0) : (a.documentTitle ? (a.documentTitle === HIGH_LEVEL_TITLE ? 1 : 0) : a.documentIndex);
+    var tab = d ? (TAB_OF[d.reportId] || 0) : (a.documentTitle ? TAB_OF[reportIdFor(a, null)] : a.documentIndex);
     RP().goTo(tab, a.sectionKey, a.quote);
   }
 
@@ -670,9 +677,51 @@ window.RiskReview = (function () {
   // only ever a warning. "Changed since approval" needs the current reports, so
   // it waits for them; the pages that show the list build them.
   function currentHashes() { var d = cachedDocs(); return d ? d.map(function (x) { return x.contentHash; }) : null; }
+  // The review's warnings against the documents as they are now. A round
+  // sent before the requirements specification was packed (phase 6b) holds
+  // two documents: each round's are lined up with today's by title, and the
+  // specification, which that round did not hold, is not read as a change
+  // (its sections are the detailed report's). Any other document missing
+  // from a round, or no longer packed, still is.
+  function reviewWarnings(s) {
+    var docs = cachedDocs(), opts = { qaReviewBy: project().engagement.qaReviewBy };
+    if (!docs) return RC().warnings(s, null, opts);
+    var GONE = "\u0000not-packed", titles = docs.map(function (d) { return d.title; }), extra = [];
+    (s.rounds || []).forEach(function (r) { (r.documents || []).forEach(function (rd) { if (titles.indexOf(rd.title) < 0 && extra.indexOf(rd.title) < 0) extra.push(rd.title); }); });
+    var now = docs.map(function (d) { return d.contentHash; }).concat(extra.map(function () { return GONE; }));
+    var lined = Object.assign({}, s, { rounds: (s.rounds || []).map(function (r) {
+      function theirs(title) { return (r.documents || []).filter(function (rd) { return rd.title === title; })[0] || null; }
+      var list = docs.map(function (d) {
+        var rd = theirs(d.title);
+        return { title: d.title, targetName: d.targetName, contentHash: rd ? rd.contentHash : d.reportId === "spec" ? d.contentHash : GONE + "-" + d.title };
+      }).concat(extra.map(function (t) { var rd = theirs(t); return { title: t, targetName: "", contentHash: rd ? rd.contentHash : GONE }; }));
+      return Object.assign({}, r, { documents: list });
+    }) });
+    var out = RC().warnings(lined, now, opts);
+    // The specification's own sections reworded since, when the latest round
+    // approved did not hold it: its wording is in no approved round.
+    var sw = specUnreviewed(s, docs);
+    if (sw) out.push(sw);
+    return out;
+  }
+  function specEdited() {
+    var c = project().reportCustom && project().reportCustom.spec;
+    return !!c && typeof c === "object" && Object.keys(c).length > 0;
+  }
+  function specUnreviewed(s, docs) {
+    var spec = docs.filter(function (d) { return d.reportId === "spec"; })[0];
+    if (!spec || !specEdited()) return null;
+    var approved = (s.rounds || []).filter(function (r) {
+      return (s.files || []).some(function (f) { return !f.setAside && f.packId === r.packId && f.verdict && RC().isApproval(f.verdict.value); });
+    });
+    if (!approved.length) return null;
+    var top = approved.reduce(function (m, r) { return !m || r.round > m.round ? r : m; }, null);
+    if ((top.documents || []).some(function (rd) { return rd.title === spec.title; })) return null;
+    return { kind: "spec-not-reviewed", text: "The cyber security requirements specification has not been reviewed in an approved round." };
+  }
   function exportWarnings() {
     var s = store();
-    return (s ? RC().warnings(s, currentHashes(), { qaReviewBy: project().engagement.qaReviewBy }) : []).concat(rewordedWarnings());
+    return (s ? reviewWarnings(s) : []).concat(rewordedWarnings());
   }
   // An accepted rewording whose paragraph has changed since: the generated
   // text prints, and the author may believe the reviewer's wording is in. One
@@ -799,7 +848,7 @@ window.RiskReview = (function () {
     // Not through watchWarnings: on this page the list shows even before a
     // review starts ("Not reviewed yet"), as the assessment tool's Issue check does.
     function fill() {
-      var ws = RC().warnings(store() || RC().emptyStore(), currentHashes(), { qaReviewBy: project().engagement.qaReviewBy }).concat(rewordedWarnings());
+      var ws = reviewWarnings(store() || RC().emptyStore()).concat(rewordedWarnings());
       warnBox.innerHTML = "";
       warnBox.style.display = ws.length ? "" : "none";
       ws.forEach(function (w) { warnBox.appendChild(h("li", { "data-review-warning": w.kind, text: w.text })); });

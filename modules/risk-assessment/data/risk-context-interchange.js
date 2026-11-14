@@ -4,7 +4,7 @@ window.App = window.App || {};
 window.App.Data = window.App.Data || {};
 window.App.Data.interchange = {
   "schema": "spt-risk-context/1.4",
-  "_note": "Interchange format between the risk tool and the assessment tool. The risk tool EXPORTS this; the 3-3 instrument IMPORTS it to scope assessment per zone. v1.1 added the 62443-3-2 detailed risk assessment outputs: a per-foundational-requirement SL-T vector (slTargetByFR), the threat/vulnerability/countermeasure register, and unmitigated-vs-tolerable risk. v1.2 adds provenance: the high-level asset/system risk ranking (highLevelAssets) and the basis of assessment (basisOfAssessment: interviews/documents/observations). v1.3 adds the per-threat risk disposition: threats[].disposition ('countermeasure' | 'sl-t' | 'accepted' | 'mitigated' | null, set only where exceedsTolerable AND the consultant has confirmed a treatment decision that has what it rests on: a countermeasure linked to the threat for 'countermeasure' and 'mitigated', a recorded reason for 'accepted', and for 'sl-t' an SL-T at or above the suggestion on the affected requirements or a recorded reason; a decision the tool only suggests, or a confirmed one still missing that, is exported as null, never as fact. The decision maps as: reduce with countermeasures = 'mitigated' when a linked countermeasure is already in place and the rating that stands today (the rating with today's countermeasures, else the planned one when no planned countermeasure is linked) is within tolerable risk, otherwise 'countermeasure'; accepted = 'accepted'; treated through the SL-T programme = 'sl-t', where capability is built through the 3-3 programme, so an empty countermeasure register is a legitimate position) and threats[].acceptance (free-text recorded risk acceptance). v1.4 adds the residual-risk iteration: threats[].residualLikelihood / residualImpact / residualRisk (the risk remaining after countermeasures: the rating after the planned countermeasures where the risk tool has one, else the rating with the countermeasures in place today, with the likelihood and impact it came from; null where neither is rated; 'mitigated' disposition means a linked countermeasure already in place brings the risk within tolerable risk), countermeasures[].existing (true = a countermeasure already in place vs a planned remediation), and a top-level approval object (asset-owner sign-off of the tolerable risk and outcome). These are context only and never scope or score the 3-3 assessment. countermeasures[].existing is exported for conduits as it is for zones. A scalar slTarget (the max across the FRs the consultant has set) is retained so an importer that only understands per-zone SL-T still works; it is null when the consultant has set no SL-T, and the tool's suggestion (slSuggestedByFR) never stands in for it. Both tools carry their own copy of this contract; bump the schema string in BOTH when a consumed field changes shape or meaning, so drift fails loudly. Additive provenance fields, and an exporter being stricter about what it states as fact, stay on the same string. Importers must ACCEPT the listed schemas and reject unknown ones.",
+  "_note": "Interchange format between the risk tool and the assessment tool. The risk tool EXPORTS this; the 3-3 instrument IMPORTS it to scope assessment per zone. v1.1 added the 62443-3-2 detailed risk assessment outputs: a per-foundational-requirement SL-T vector (slTargetByFR), the threat/vulnerability/countermeasure register, and unmitigated-vs-tolerable risk. v1.2 adds provenance: the high-level asset/system risk ranking (highLevelAssets) and the basis of assessment (basisOfAssessment: interviews/documents/observations). v1.3 adds the per-threat risk disposition: threats[].disposition ('countermeasure' | 'sl-t' | 'accepted' | 'mitigated' | null, set only where exceedsTolerable AND the consultant has confirmed a treatment decision that has what it rests on: a countermeasure linked to the threat for 'countermeasure' and 'mitigated', a recorded reason for 'accepted', and for 'sl-t' an SL-T at or above the suggestion on the affected requirements or a recorded reason; a decision the tool only suggests, or a confirmed one still missing that, is exported as null, never as fact. The decision maps as: reduce with countermeasures = 'mitigated' when a linked countermeasure is already in place and the rating that stands today (the rating with today's countermeasures, else the planned one when no planned countermeasure is linked) is within tolerable risk, otherwise 'countermeasure'; accepted = 'accepted'; treated through the SL-T programme = 'sl-t', where capability is built through the 3-3 programme, so an empty countermeasure register is a legitimate position) and threats[].acceptance (free-text recorded risk acceptance). v1.4 adds the residual-risk iteration: threats[].residualLikelihood / residualImpact / residualRisk (the risk remaining after countermeasures: the rating after the planned countermeasures where the risk tool has one, else the rating with the countermeasures in place today, with the likelihood and impact it came from; null where neither is rated; 'mitigated' disposition means a linked countermeasure already in place brings the risk within tolerable risk), countermeasures[].existing (true = a countermeasure already in place vs a planned remediation), and a top-level approval object (asset-owner sign-off of the tolerable risk and outcome). These are context only and never scope or score the 3-3 assessment. Later 1.4 files add provenance on the same string, each field written only when it holds something (absent otherwise, so an earlier 1.4 file reads the same): zones[] and conduits[] carry riskComparison { required, reason } (the consultant's recorded decision on whether a detailed risk assessment is required, with its reason where one is recorded; absent while no decision is recorded) and initialRisk { risk, source } (the initial risk the comparison was set against; source 'systems' = the worst of the ranked systems assigned to the zone, 'entered' = entered directly, 'zones' = a conduit taking the higher initial risk of the zones it joins, a house rule); zones[].assets[] carry id, tag, vendor, model, version and criticality ('high' | 'medium' | 'low') beside name and type, which are unchanged; and a top-level approvals array [{ name, role, organisation, date, scope }] lists every recorded approval that is given, in order, beside the single approval object, which still mirrors the first entry. These are context only too, as are zones[].fromHighLevelAsset (the first ranked system assigned to the zone, or null) and conduits[].slSuggestedByFR (the tool's suggestion, never a target). countermeasures[].existing is exported for conduits as it is for zones. A scalar slTarget (the max across the FRs the consultant has set) is retained so an importer that only understands per-zone SL-T still works; it is null when the consultant has set no SL-T, and the tool's suggestion (slSuggestedByFR) never stands in for it. Both tools carry their own copy of this contract; bump the schema string in BOTH when a consumed field changes shape or meaning, so drift fails loudly. Additive provenance fields, and an exporter being stricter about what it states as fact, stay on the same string. Importers must ACCEPT the listed schemas and reject unknown ones.",
   "acceptedSchemas": ["spt-risk-context/1.0", "spt-risk-context/1.1", "spt-risk-context/1.2", "spt-risk-context/1.3", "spt-risk-context/1.4"],
   "example": {
     "schema": "spt-risk-context/1.4",
@@ -47,18 +47,25 @@ window.App.Data.interchange = {
       "statement": "Tolerable risk of Medium and the per-zone SL-T targets in this assessment approved; residual risks accepted as recorded.",
       "approved": true
     },
+    "approvals": [
+      { "name": "A. Patel", "role": "Plant Manager (asset owner)", "organisation": "Example Water Ltd", "date": "2026-07-01", "scope": "Tolerable risk of Medium and the per-zone SL-T targets in this assessment approved; residual risks accepted as recorded." },
+      { "name": "R. Singh", "role": "Process Safety Engineer", "organisation": "Example Water Ltd", "date": "2026-07-01", "scope": "The SL-T of the Safety systems zone (Z1)." }
+    ],
     "zones": [
       {
         "id": "Z1",
         "name": "Safety systems",
         "safetyRelated": true,
+        "fromHighLevelAsset": "A1",
         "slSuggestedByFR": { "IAC": 3, "UC": 3, "SI": 3, "DC": 3, "RDF": 3, "TRE": 3, "RA": 3 },
         "slTargetByFR": { "IAC": 3, "UC": 3, "SI": 3, "DC": 3, "RDF": 3, "TRE": 3, "RA": 3 },
         "slTarget": 3,
         "worstUnmitigatedRisk": "very-high",
         "justification": "Contains SIS for chlorine dosing. Worst-case consequence severe (safety), likelihood medium -> very-high unmitigated risk. SL3 floor per house rule across all FRs; client risk criteria concur.",
+        "riskComparison": { "required": true },
+        "initialRisk": { "risk": "very-high", "source": "systems" },
         "assets": [
-          { "name": "SIS controller", "type": "safety-plc" }
+          { "id": "AS1", "name": "SIS controller", "type": "safety-plc", "tag": "SIS-LS-01", "vendor": "Example Safety Systems", "model": "LS-200", "version": "4.2.1", "criticality": "high" }
         ],
         "accessPoints": ["Hard-wired link to BPCS (C1)"],
         "externalDependencies": [],
@@ -91,14 +98,17 @@ window.App.Data.interchange = {
         "id": "Z2",
         "name": "Basic process control",
         "safetyRelated": false,
+        "fromHighLevelAsset": "A2",
         "slSuggestedByFR": { "IAC": 3, "UC": 2, "SI": 3, "DC": 1, "RDF": 3, "TRE": 2, "RA": 2 },
         "slTargetByFR": { "IAC": 3, "UC": 2, "SI": 2, "DC": 1, "RDF": 3, "TRE": 2, "RA": 2 },
         "slTarget": 3,
         "worstUnmitigatedRisk": "high",
         "justification": "Vendor remote access raises IAC/RDF likelihood to high; consultant holds SI at SL2 pending the brokered-access rework (see conduit C2). Revisit at next review.",
+        "riskComparison": { "required": true },
+        "initialRisk": { "risk": "high", "source": "systems" },
         "assets": [
-          { "name": "PLC cluster", "type": "plc" },
-          { "name": "HMIs", "type": "hmi" }
+          { "id": "AS2", "name": "PLC cluster", "type": "plc" },
+          { "id": "AS3", "name": "HMIs", "type": "hmi" }
         ],
         "accessPoints": ["Vendor VPN (C2)", "Historian replication (C3)"],
         "externalDependencies": ["Vendor support contract"],
@@ -146,9 +156,12 @@ window.App.Data.interchange = {
         "toZone": "EXT",
         "name": "Vendor remote access",
         "channels": ["vpn"],
+        "slSuggestedByFR": { "IAC": 3, "UC": 2, "SI": 3, "DC": 1, "RDF": 3, "TRE": 2, "RA": 2 },
         "slTargetByFR": { "IAC": 3, "UC": 2, "SI": 2, "DC": 2, "RDF": 3, "TRE": 2, "RA": 2 },
         "slTarget": 3,
         "justification": "To be brokered via jump host; standing tunnel to be removed.",
+        "riskComparison": { "required": true },
+        "initialRisk": { "risk": "high", "source": "zones" },
         "threats": [],
         "vulnerabilities": [],
         "countermeasures": [
@@ -164,6 +177,8 @@ window.App.Data.interchange = {
         "slTargetByFR": { "IAC": null, "UC": null, "SI": null, "DC": null, "RDF": null, "TRE": null, "RA": null },
         "slTarget": null,
         "justification": "",
+        "riskComparison": { "required": false, "reason": "Read-only replication; its exposure is assessed at the Basic process control zone." },
+        "initialRisk": { "risk": "high", "source": "zones" },
         "threats": [],
         "vulnerabilities": [],
         "countermeasures": []
@@ -172,8 +187,8 @@ window.App.Data.interchange = {
   },
   "importContract": {
     "consumedByAssessment": "zones[].{id,name,slTarget,slTargetByFR,justification,safetyRelated} and conduits[].{id,fromZone,toZone,slTarget,slTargetByFR}",
-    "behaviour": "On import, the 3-3 assessment offers per-zone assessment scoping with each zone's SL-T pre-set from slTarget (a scalar) or, where the importer supports it, per-foundational-requirement from slTargetByFR (overridable, as now). A zone or conduit whose slTarget is null and whose slTargetByFR holds no number arrives with no pre-set target. Zone justifications display read-only as target provenance. The threats/vulnerabilities/countermeasures register (including per-threat residual risk and disposition, and the existing-vs-planned countermeasure flag), highLevelAssets, basisOfAssessment, and approval are provenance/context only and never scope or auto-score the 3-3 assessment. Absence of an import file leaves current behaviour unchanged (flat default, hand-set targets).",
+    "behaviour": "On import, the 3-3 assessment offers per-zone assessment scoping with each zone's SL-T pre-set from slTarget (a scalar) or, where the importer supports it, per-foundational-requirement from slTargetByFR (overridable, as now). A zone or conduit whose slTarget is null and whose slTargetByFR holds no number arrives with no pre-set target. Zone justifications display read-only as target provenance. The threats/vulnerabilities/countermeasures register (including per-threat residual risk and disposition, and the existing-vs-planned countermeasure flag), highLevelAssets, basisOfAssessment, approval and approvals, and each zone's and conduit's riskComparison and initialRisk are provenance/context only and never scope or auto-score the 3-3 assessment. Absence of an import file leaves current behaviour unchanged (flat default, hand-set targets).",
     "frKeys": ["IAC", "UC", "SI", "DC", "RDF", "TRE", "RA"],
-    "provenanceOnly": ["highLevelAssets", "basisOfAssessment", "approval", "zones[].threats", "zones[].vulnerabilities", "zones[].countermeasures"]
+    "provenanceOnly": ["highLevelAssets", "basisOfAssessment", "approval", "approvals", "zones[].threats", "zones[].vulnerabilities", "zones[].countermeasures", "zones[].assets", "zones[].riskComparison", "zones[].initialRisk", "conduits[].riskComparison", "conduits[].initialRisk"]
   }
 };

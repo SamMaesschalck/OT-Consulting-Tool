@@ -18,7 +18,9 @@ window.RiskWordPreview = (function () {
   function RX() { return window.RiskExports; }
   var DOCS = [
     { id: "detailed", label: "Detailed", opts: {} },
-    { id: "highLevel", label: "High level", opts: { highLevelOnly: true } }
+    { id: "highLevel", label: "High level", opts: { highLevelOnly: true } },
+    // Phase 6b: the cyber security requirements specification.
+    { id: "spec", label: "Specification", opts: { spec: true } }
   ];
   var ui = { doc: 0, key: null, read: null, error: null, seq: 0 };
 

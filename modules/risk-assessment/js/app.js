@@ -306,7 +306,7 @@ window.RiskApp.App = (function () {
     state.project = MG.normaliseProject(data);
     state.stage = knownStage(state.project.lastStage) ? state.project.lastStage : "home";
     openedAt = state.stage;
-    clearGuard();
+    projectReplaced();
     render(); undoReset(); if (!leftDemo) writeAutosave(); markClean();
     toast(opts.demo ? "The demo is open. Autosave is off." : "Risk project loaded.");
     if (leftDemo) offerRestore({ forgetFile: true });
@@ -314,6 +314,10 @@ window.RiskApp.App = (function () {
   }
   // A question waiting before a download belongs to the project it was asked about.
   function clearGuard() { if (R.Reports && R.Reports.clearGuard) R.Reports.clearGuard(); }
+  // Another project is open (Load, the demo, Restore, New): the question
+  // waiting goes, and so does the page state that was the old project's (the
+  // asset register's search, filters and paste box).
+  function projectReplaced() { clearGuard(); if (R.AssetsPage && R.AssetsPage.reset) R.AssetsPage.reset(); }
   function knownStage(id) { return typeof id === "string" && (STAGE_IDS.indexOf(id) >= 0 || STAGE_ALIASES.indexOf(id) >= 0) && !!(R.Pages[id] || STAGE_ALIASES.indexOf(id) >= 0); }
 
   // Home's Open the demo: the completed demo project, in tour mode, in this
@@ -465,11 +469,13 @@ window.RiskApp.App = (function () {
   function focusMark() {
     var el = document.activeElement, main = $("main");
     if (!el || !main || el === main || !main.contains(el) || !el.getAttribute) return null;
-    // The owner: a zone or conduit, or a ranked system's row (data-hla-id).
-    var key = el.closest("[data-owner-id]") ? "data-owner-id" : "data-hla-id";
+    // The owner: a zone or conduit, a ranked system's row (data-hla-id) or
+    // an asset register row (data-asset-id).
+    var key = el.closest("[data-owner-id]") ? "data-owner-id" : el.closest("[data-asset-id]") ? "data-asset-id" : "data-hla-id";
     var own = el.closest("[" + key + "]"), thr = el.closest("[data-threat-id]"), sel = null, index = 0;
     ["data-decision", "data-detailed", "data-reason", "data-action", "data-assessment-type", "data-view", "data-doc", "data-separation", "data-marker", "data-end", "data-approval-field", "data-flag", "data-asset-name",
-      "data-field", "data-chip", "data-cm-field", "data-slt-fr", "data-rail-id", "data-tab", "data-heat", "data-cell", "data-filter"].forEach(function (a) {
+      "data-field", "data-chip", "data-cm-field", "data-slt-fr", "data-rail-id", "data-tab", "data-heat", "data-cell", "data-filter",
+      "data-asset-field", "data-sort", "data-map-col"].forEach(function (a) {
       if (!sel && el.getAttribute(a)) sel = "[" + a + '="' + el.getAttribute(a) + '"]';
     });
     if (!sel && el.tagName === "SELECT") { sel = "select"; index = Array.prototype.indexOf.call((thr || own || main).querySelectorAll("select"), el); }
@@ -491,8 +497,11 @@ window.RiskApp.App = (function () {
     }
     var own = $("main");
     if (mark.owner != null) {
+      var main0 = own;
       own = own.querySelectorAll("[" + mark.key + "]")[mark.ownerAt] || null;
       if (own && own.getAttribute(mark.key) !== mark.owner) own = null;
+      // An asset register row moves when the register sorts again: found by its id.
+      if (!own && mark.key === "data-asset-id") own = main0.querySelector(attrSel("data-asset-id", mark.owner));
     }
     var scope = within(own, "data-threat-id", mark.threat);
     var el = scope ? scope.querySelectorAll(mark.sel)[mark.index] : null;
@@ -684,7 +693,7 @@ window.RiskApp.App = (function () {
       h("button", { class: "btn sm primary", text: "Restore", onClick: function () {
         state.project = MG.normaliseProject(pj); state.stage = knownStage(snap.stage) ? snap.stage : "home"; openedAt = state.stage;
         if (opts.forgetFile) forgetProjectFile();
-        clearGuard();
+        projectReplaced();
         document.body.removeChild(bar); render(); undoReset(); markDirty(); toast("Autosaved work restored.");
       } }),
       h("button", { class: "btn sm", text: "Discard", onClick: function () { try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {} document.body.removeChild(bar); } })
@@ -698,7 +707,7 @@ window.RiskApp.App = (function () {
     $("btn-new").addEventListener("click", function () {
       if (dirty && projectHasContent(state.project) && !confirm("Start a new risk assessment? Unsaved changes will be lost. Save first if you want to keep them.")) return;
       state.project = M.emptyProject(); state.stage = "home"; openedAt = "home";
-      clearGuard();
+      projectReplaced();
       // In tour mode the snapshot belongs to the consultant's real session.
       var leftDemo = tourOpenedHere;
       if (!TOUR_MODE) { try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {} }
@@ -834,6 +843,8 @@ window.RiskApp.App = (function () {
       criteriaMisfits: function (project) { return E.criteriaMisfits(project || state.project); },
       presetCriteria: M.presetCriteria, CRITERIA_PRESETS: M.PRESETS,
       buildRiskContext: function (project) { return E.buildRiskContext(project || state.project); },
+      // Pins the date every output reads as today (an ISO date; null for the clock). For tests.
+      setToday: E.setToday, todayISO: E.todayISO,
       exportProblems: function (project) { return E.exportProblems(project || state.project); },
       // Everything the outputs print per threat and per zone or conduit
       // (js/view-model.js), for the open project unless one is given.
@@ -893,7 +904,20 @@ window.RiskApp.App = (function () {
       // Phase 5b: one-level undo of the last change (Ctrl+Z, the toast's Undo).
       undo: function () { return doUndo(); }, canUndo: function () { return !!undo.entry; }, undoMark: undoMark,
       ZONE_LEVELS: M.ZONE_LEVELS,
-      CM_STATUS_LABEL: M.CM_STATUS_LABEL, CM_PRIORITY_LABEL: M.CM_PRIORITY_LABEL
+      CM_STATUS_LABEL: M.CM_STATUS_LABEL, CM_PRIORITY_LABEL: M.CM_PRIORITY_LABEL,
+      // Phase 6a: the project-wide asset register (js/assets.js) and the
+      // comparison with a previous assessment (js/compare.js).
+      ASSET_CRITICALITY_LABEL: M.ASSET_CRITICALITY_LABEL, assetExtended: M.assetExtended,
+      assetRegister: function (project) { return R.Assets.all(project || state.project); },
+      moveAsset: function (id, zoneId, project) { return R.Assets.move(project || state.project, id, zoneId); },
+      parseAssetTable: R.Assets.parseTable, readAssetPaste: R.Assets.read,
+      previewAssetPaste: function (parsed, mapping, opts, project) { return R.Assets.preview(project || state.project, parsed, mapping, opts); },
+      applyAssetPaste: function (rows, project) { return R.Assets.apply(project || state.project, rows); },
+      freezeAssessment: R.Compare.freeze, baselineFrom: R.Compare.baselineFrom,
+      setBaseline: function (text, fileName) { return R.Reports.setBaseline(text, fileName); },
+      clearBaseline: function () { return R.Reports.clearBaseline(); },
+      compareBaseline: function (project, today) { return R.Compare.compare(project || state.project, today); },
+      comparisonLines: R.Compare.lines, comparisonRows: R.Compare.rows, baselineWords: R.Compare.baselineWords
     };
   }
 

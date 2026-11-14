@@ -30,7 +30,8 @@
  *     consequence source) are tidied when present and never added: a file
  *     without criteria reads the house criteria, as before. So are phase
  *     5b's (the project's safety floor list, a zone's drawing level and place
- *     in its band, a threat's library id).
+ *     in its band, a threat's library id), and phase 6a's (an asset's
+ *     register attributes, the previous assessment compared with).
  *  3. The dangling-id prune: a reference to a record that is not in the file
  *     (a zone's ranked systems, a conduit's end, a threat's linked assets,
  *     vulnerabilities and countermeasures) is cleared, never invented.
@@ -357,12 +358,13 @@ window.RiskApp.Migrate = (function () {
         seenAsset[a.id] = true;
       });
     });
-    // The consultant's section overrides, one set per report (js/report-page.js).
+    // The consultant's section overrides, one set per report (js/report-page.js),
+    // and one for the requirements specification (phase 6b).
     // Optional and additive, so the file format stays at this schema: a file
     // without them loads as before, and an older copy of the tool keeps them.
     if (data.reportCustom != null) {
       if (typeof data.reportCustom !== "object" || Array.isArray(data.reportCustom)) delete data.reportCustom;
-      else ["detailed", "highLevel"].forEach(function (k) {
+      else ["detailed", "highLevel", "spec"].forEach(function (k) {
         var c = data.reportCustom[k];
         if (c != null && (typeof c !== "object" || Array.isArray(c))) { delete data.reportCustom[k]; return; }
         // A section whose heading has been reworded since the file was saved.
@@ -376,7 +378,35 @@ window.RiskApp.Migrate = (function () {
     }
     normNew(data);
     normNew5b(data);
+    normNew6(data);
     return data;
+  }
+
+  // The fields phase 6a added (js/model.js), tidied when present and never
+  // added: an asset's register attributes are text (criticality one of its
+  // three words), and the previous assessment is kept only when it reads as
+  // one (an object with its frozen facts); of its facts only what is not an
+  // object (an owner, a threat, a countermeasure, a ranked system) is dropped.
+  function normNew6(data) {
+    (data.zones || []).forEach(function (z) {
+      (isObj(z) && Array.isArray(z.assets) ? z.assets : []).forEach(function (a) {
+        if (!isObj(a)) return;
+        M.ASSET_TEXT_FIELDS.forEach(function (k) { normText(a, k); });
+        if ("criticality" in a && M.ASSET_CRITICALITY.indexOf(a.criticality) < 0) delete a.criticality;
+      });
+    });
+    if ("baseline" in data) {
+      var b = data.baseline;
+      if (!isObj(b) || !isObj(b.facts) || !Array.isArray(b.facts.owners)) { delete data.baseline; return; }
+      ["fileName", "savedOn", "assessmentDate", "revision", "approvedOn", "sucName", "loadedOn"].forEach(function (k) { if (!isStr(b[k])) b[k] = ""; });
+      // A frozen copy edited by hand: what is not an object goes, so a build
+      // never trips on it. What is left is as frozen.
+      b.facts.owners = b.facts.owners.filter(isObj);
+      b.facts.owners.forEach(function (o) {
+        ["threats", "cms"].forEach(function (k) { o[k] = Array.isArray(o[k]) ? o[k].filter(isObj) : []; });
+      });
+      if ("ranked" in b.facts) b.facts.ranked = Array.isArray(b.facts.ranked) ? b.facts.ranked.filter(isObj) : [];
+    }
   }
 
   // The fields phase 5b added (js/model.js), tidied when present and never

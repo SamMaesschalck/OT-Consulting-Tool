@@ -60,6 +60,7 @@
 
   function run(w) {
     var A = w.App, V = A.Version, RT = w.RiskTool, RX = w.RiskExports, doc = w.document;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     w.confirm = function () { return true; };
     w.alert = function () {};
 
@@ -116,6 +117,8 @@
 
     return viaDownload("Word (full report)", function (cb) { RX.downloadWord({}, cb); })
       .then(function () { return viaDownload("Word (high-level report)", function (cb) { RX.downloadWord({ highLevelOnly: true }, cb); }); })
+      // Phase 6b: the requirements specification is a Word file of its own.
+      .then(function () { return viaDownload("Word (requirements specification)", function (cb) { RX.downloadWord({ spec: true }, cb); }); })
       .then(function () { return viaDownload("Excel workbook", function (cb) { RX.downloadExcel(cb); }); })
       .then(function () {
         w.URL.createObjectURL = realCreate;

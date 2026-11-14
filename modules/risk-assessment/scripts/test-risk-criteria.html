@@ -60,6 +60,7 @@
 
   function run(w) {
     var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     var RULES = w.App.Data.sltRules, d = w.document, RP = w.RiskApp.RiskPage;
     w.confirm = function () { return true; };
     w.alert = function () {};

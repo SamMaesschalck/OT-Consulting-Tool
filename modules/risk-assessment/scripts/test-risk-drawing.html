@@ -51,6 +51,7 @@
 
   function run(w) {
     var RT = w.RiskTool, M = w.RiskApp.Model, MG = w.RiskApp.Migrate, ZM = w.RiskZoneMap, Z0 = window.RiskZoneMapPhase5a, d = w.document, RX = w.RiskExports, DB = w.App.DocxBlocks;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     w.confirm = function () { return true; };
     w.alert = function () {};
     var KEY = RT.AUTOSAVE_KEY;
@@ -185,7 +186,7 @@
     // ---- D. the legend ----------------------------------------------------------------
     function legendTexts(L6) { return L6.legend.map(function (x) { return x.text; }); }
     var lt = legendTexts(Ld);
-    ok(lt.indexOf("Safety related") >= 0 && lt.indexOf("Outside the SUC") >= 0 && lt.some(function (x) { return /^Worst risk (low|medium|high|very high)$/.test(x); }) && lt.indexOf("SL-T: highest on any foundational requirement") >= 0, "the demo's legend: safety, worst risk borders, outside the SUC and SL-T", lt.join(" | "));
+    ok(lt.indexOf("Safety related") >= 0 && lt.indexOf("Outside the SUC") >= 0 && lt.some(function (x) { return /^Worst unmitigated risk (low|medium|high|very high)$/.test(x); }) && lt.indexOf("SL-T: highest on any foundational requirement") >= 0, "the demo's legend: safety, worst risk borders, outside the SUC and SL-T", lt.join(" | "));
     ok(lt.indexOf("Shaded rows: SolutionsPT house layering") < 0 && legendTexts(L).indexOf("Shaded rows: SolutionsPT house layering") >= 0, "the bands are in the legend only when drawn, named as the house layering");
     ok(legendTexts(L).concat(L.bands.map(function (b) { return b.label; })).every(function (x) { return !/[–—]|62443|IEC/.test(x); }), "no dash, and no claim the layering comes from a standard");
     var bare = M.emptyProject(); bare.zones.push(M.emptyZone(1));
@@ -266,7 +267,8 @@
       ok(!!pic && pic.width === Lw.W && pic.height === Lw.drawH && Lw.drawH < Lw.H, "for Word the picture is the drawing alone, without its key and legend", pic ? pic.width + " x " + pic.height + " of " + Lw.W + " x " + Lw.H : "none");
       var tx = textOf(s.body);
       ok(Lw.conduits.every(function (c) { return tx.indexOf(c.id + " " + (c.name ? c.name + " " : "") + c.from + " to " + c.to) >= 0; }), "the key prints each conduit's id, name and ends as a table", tx.slice(0, 200));
-      ok(/Safety related/.test(tx) && /Worst risk high/.test(tx) && /Outside the SUC/.test(tx) && /SL-T Highest on any foundational requirement/.test(tx), "and the legend each mark and what it means", tx.slice(-260));
+      // Phase 6 review: the risk mark says it is the unmitigated risk (was "Worst risk high").
+      ok(/Safety related/.test(tx) && /Worst unmitigated risk high/.test(tx) && /Outside the SUC/.test(tx) && /SL-T Highest on any foundational requirement/.test(tx), "and the legend each mark and what it means", tx.slice(-260));
       var tbls = s.body.split("<w:tbl>").length - 1, between = s.body.slice(s.body.indexOf("</w:tbl>"), s.body.lastIndexOf("<w:tbl>"));
       ok(tbls === 2 && /<w:p[ >]/.test(between), "the key and the legend are two tables, a paragraph between them so Word keeps them apart", tbls + " tables");
       ok(!!ext && Number(ext[1]) / 9525 / Lw.W >= 0.95, "the demo prints at full size", ext ? String(Number(ext[1]) / 9525 / Lw.W) : "no extent");

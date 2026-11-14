@@ -91,6 +91,7 @@
 
     poll(function () { return w.RiskTool && w.RiskReportPage && w.RiskExports && w.docx && w.ExcelJS && w.RiskTool.state.project.zones.length; }).then(function () {
       RT = w.RiskTool; RP = w.RiskReportPage; RX = w.RiskExports; DB = w.App.DocxBlocks; RS = w.App.ReportSections; d = w.document; main = d.getElementById("main");
+      RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
 
       // ---- with no overrides, Word has not moved --------------------------------
       ok(!P().reportCustom, "a project has no overrides until one is made");
@@ -103,6 +104,40 @@
         var now = paragraphsOf(xml), was = window.RISK_WORD_BASELINE.highLevel;
         var at = -1; for (var i = 0; i < Math.max(now.length, was.length); i++) { if (now[i] !== was[i]) { at = i; break; } }
         ok(at === -1, "and the high-level report's (" + now.length + " paragraphs)", at === -1 ? "" : "line " + at + ": " + String(now[at]).slice(0, 120) + " / " + String(was[at]).slice(0, 120));
+        return wordXml({ spec: true });
+      }).then(function (xml) {
+        // Phase 6b: the requirements specification as a file of its own.
+        var now = paragraphsOf(xml), was = window.RISK_WORD_BASELINE.spec || [];
+        var at = -1; for (var i = 0; i < Math.max(now.length, was.length); i++) { if (now[i] !== was[i]) { at = i; break; } }
+        ok(was.length > 100 && at === -1, "and the requirements specification's (" + now.length + " paragraphs)", at === -1 ? "" : "line " + at + ": " + String(now[at]).slice(0, 120) + " / " + String(was[at]).slice(0, 120));
+        var det = window.RISK_WORD_BASELINE.detailed;
+        // Built from the same sections: every line of its requirements, from the SUC to the regulatory
+        // requirements, is the detailed report's, in the same order; and the justifications are too.
+        function run(list, from, to) { var a = list.indexOf(from), b = list.indexOf(to, a); return a >= 0 && b > a ? list.slice(a, b) : null; }
+        var mine = run(now, "System under consideration and requirements", "Target security levels (SL-T, per foundational requirement)");
+        var theirs = run(det, "System under consideration and requirements", "Basis of assessment");
+        ok(!!mine && !!theirs && mine.join("\n") === theirs.join("\n"), "its requirements section is the detailed report's, line for line (" + (mine ? mine.length : 0) + " lines)");
+        var jm = now.filter(function (t) { return /^Justification for /.test(t); }), jd = det.filter(function (t) { return /^Justification for /.test(t); });
+        ok(jm.length > 0 && jm.join("|") === jd.join("|") && jm.every(function (t) { return det[det.indexOf(t) + 1] === now[now.indexOf(t) + 1]; }), "and so is each justification");
+        // It stands alone: none of the reports' sections, and nothing points to them.
+        ["Executive summary", "Risk at a glance", "Basis of assessment", "High-level risk ranking", "Risk comparison", "Risk register", "Treatment plan", "Accepted risks", "Zones, conduits and the detailed risk assessment", "Driving scenarios"].forEach(function (hd) {
+          ok(now.indexOf(hd) === -1, "the specification has no " + hd + " section");
+        });
+        var pointers = now.filter(function (t) { return /\b(this|the) report\b|risk register|see section|under Accepted risks|under Treatment plan/i.test(t); });
+        var own = now.filter(function (t) { return det.indexOf(t) < 0 && /treatment plan|\breport\b/i.test(t); });
+        ok(pointers.length === 0 && own.length === 0, "and no line sends the reader to the report", pointers.concat(own).join(" | "));
+        ok(now.indexOf("About this specification") > now.indexOf("Document control") && now.indexOf("Sign-off") > now.indexOf("Justification for Z1 Unit 300 BPCS") && now.indexOf("Appendix: risk criteria") > now.indexOf("Sign-off"),
+          "it opens with what it is, after document control, and closes with the sign-off, the method and the criteria appendix");
+        ok(now.indexOf("Signed off as below. An approval covers the tolerable risk and the target security levels in this specification, within the scope given for it.") > now.indexOf("Sign-off"), "its sign-off says what an approval of it covers");
+        // Phase 6 review: its own kicker, method sentence and categories sentence; its opening shares a page with what follows.
+        ok(now[0] === "OT CYBER SECURITY" && window.RISK_WORD_BASELINE.detailed[0] === "OT CYBER RISK ASSESSMENT" && window.RISK_WORD_BASELINE.highLevel[0] === "OT CYBER RISK ASSESSMENT", "its cover's kicker is OT CYBER SECURITY; the reports keep theirs");
+        ok(now.indexOf("The targets rest on risk ratings made with the evidence available at the time of the engagement. The assessment sets targets and does not test security capability, which is measured against the SL-T in an IEC 62443-3-3 assessment.") > now.indexOf("Method and limitations") &&
+           now.some(function (t) { return /\. A risk rated per category takes the worst of its categories as its impact\.$/.test(t); }) && !now.some(function (t) { return /A threat or system rated per category/.test(t); }),
+          "its method and categories sentences speak of risks, not of the threats and systems it does not list");
+        var aboutAt = xml.indexOf(">About this specification<"), sucAt = xml.indexOf(">System under consideration and requirements<", aboutAt);
+        ok(aboutAt > 0 && sucAt > aboutAt && xml.slice(aboutAt, sucAt).indexOf('w:type="page"') < 0, "no forced page break after its three-paragraph opening");
+        ok(now.indexOf("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. It states the tolerable risk and the target security level (SL-T) of each zone and conduit: the protection it is to be engineered and maintained to.") > 0 &&
+           now.indexOf("The risk criteria behind the tolerable risk and the targets are in the appendix. Sign-off records who approves them and the scope of each approval.") > 0, "its opening, as reworded in the phase 6 review");
 
         // ---- the page ---------------------------------------------------------------
         var nav = d.querySelector('#sidebar .nav-item[data-stage="report"]');
@@ -115,7 +150,8 @@
       }).then(function () {
         ok(main.querySelector(".rp-status").textContent === "", "and stops saying so when it has");
         var tabs = [].slice.call(main.querySelectorAll(".rp-tab")).map(function (b) { return b.textContent; });
-        ok(tabs.join("|") === "Detailed|High level", "with both reports to choose from", tabs.join("|"));
+        // Phase 6b: and the requirements specification, third.
+        ok(tabs.join("|") === "Detailed|High level|Specification", "with both reports to choose from", tabs.join("|"));
         ok(!main.querySelector(".mode-toggle") && main.textContent.indexOf("Customise report") === -1, "and no mode to switch into");
         // The scorecard draws, as Word does: tiles, bars and the key to them.
         ok(main.querySelectorAll(".rp-tile").length >= 11, "the scorecard's tiles are drawn (" + main.querySelectorAll(".rp-tile").length + ")");
@@ -127,7 +163,8 @@
         // Each report, in turn: what is on screen is what Word prints, and every
         // section is keyed and offers Edit.
         var chain = Promise.resolve();
-        [0, 1].forEach(function (i) {
+        // Phase 6b: the requirements specification (2) as well.
+        [0, 1, 2].forEach(function (i) {
           var tag = RP.DOCS[i].label + ": ";
           chain = chain.then(function () { return openReport(i); }).then(function () {
             return wordBlocks(RP.DOCS[i].opts);
@@ -154,7 +191,9 @@
         var chain = Promise.resolve();
         var CASES = [
           { i: 0, opts: {}, rename: "system-under-consideration-and-requirements", hide: "method-and-limitations" },
-          { i: 1, opts: { highLevelOnly: true }, rename: "why-this-assessment", hide: "what-happens-next" }
+          { i: 1, opts: { highLevelOnly: true }, rename: "why-this-assessment", hide: "what-happens-next" },
+          // Phase 6b: the requirements specification, with its own store.
+          { i: 2, opts: { spec: true }, rename: "about-this-specification", hide: "method-and-limitations" }
         ];
         CASES.forEach(function (c) {
           var id = RP.DOCS[c.i].id, tag = RP.DOCS[c.i].label + ": ", generatedTitle, generatedProse, firstLine;
@@ -376,6 +415,22 @@
         ok(heads(both[1]).indexOf("High-level summary") !== -1 && heads(both[1]).indexOf("Detailed summary") === -1, "the high-level report takes its own");
         ok(all(both[0]).indexOf("Detailed reason.") !== -1 && all(both[1]).indexOf("Detailed reason.") === -1, "a rewrite in one does not reach the other");
         ok(heads(both[0]).indexOf("Method and limitations") !== -1 && heads(both[1]).indexOf("Method and limitations") === -1, "and nor does a hide");
+        // Phase 6b: the requirements specification has a store of its own. The same key in it and
+        // in the detailed report is two sections, one per document.
+        reset();
+        RP.setSection("spec", "tolerable-risk", { title: "Tolerable risk agreed" });
+        RP.setSection("detailed", "tolerable-risk", { hidden: true });
+        ok(Object.keys(P().reportCustom).join() === "spec,detailed", "a third store, for the specification (phase 6b)", Object.keys(P().reportCustom).join());
+        return Promise.all([wordBlocks({}), wordBlocks({ spec: true })]);
+      }).then(function (both) {
+        function heads(b) { return b.filter(function (x) { return x.type === "heading"; }).map(function (x) { return x.text; }); }
+        ok(heads(both[1]).indexOf("Tolerable risk agreed") !== -1 && heads(both[0]).indexOf("Tolerable risk agreed") === -1 && heads(both[0]).indexOf("Tolerable risk") === -1,
+          "the specification takes its own title for a section the detailed report hides, and the detailed report does not");
+        ok(both[1].filter(function (b) { return b.sectionKey === "tolerable-risk"; }).length > 1 && both[1].some(function (b) { return b.type === "heading" && b.sectionKey === "tolerable-risk"; }),
+          "the specification's section keeps its key, so its anchors stay its own");
+        var keys = {}, dup = [];
+        both[1].filter(function (b) { return b.type === "heading" && b.sectionKey && !/^justification-for/.test(b.sectionKey); }).forEach(function (b) { if (keys[b.sectionKey]) dup.push(b.sectionKey); keys[b.sectionKey] = 1; });
+        ok(dup.length === 0, "and within the specification every section key is one section", dup.join(", "));
         reset();
         return openReport(0);
       }).then(function () {

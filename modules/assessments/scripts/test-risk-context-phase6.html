@@ -1,0 +1,199 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/><title>Risk context with phase 6 provenance</title></head>
+<body>
+<!--
+  The risk tool (phase 6 of docs/risk-tool-redesign.md) adds provenance to the
+  risk-context file on the same spt-risk-context/1.4 string: each zone's and
+  conduit's risk comparison decision and initial risk, each asset's id and
+  register attributes, and a top-level approvals list. This page shows:
+  - the file the risk tool exports for its demo (fixtures/risk-context-demo.js,
+    checked against the live export by the risk tool's
+    test-risk-interchange.html) conforms to the contract and keeps the six
+    consumed zone fields;
+  - this build imports it, keeps the zones' extra fields and the approvals
+    (and nothing else new) through save and load, and scopes it as before;
+  - a file the released v0.7 risk tool wrote still imports
+    (fixtures/risk-context-v0.7-demo.js);
+  - the released v0.7 Assessment Tool would accept the new file
+    (fixtures/v0.7-risk-import.js: its accepted list, file checks, modal reads
+    and setRiskContext, frozen from commit b2605e9).
+-->
+<pre id="out" style="font:12px monospace; white-space:pre-wrap">running...</pre>
+
+<script src="harness.js"></script>
+<script>H.app();</script>
+<script src="fixtures/risk-context-demo.js"></script>
+<script src="fixtures/risk-context-v0.7-demo.js"></script>
+<script src="fixtures/v0.7-risk-import.js"></script>
+<script>
+H.test(function (ok) {
+  var A = window.App, E = A.Engine, FX = window.RiskContextFixtures || {};
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  var FR = ["IAC", "UC", "SI", "DC", "RDF", "TRE", "RA"];
+  var contract = A.Data.shared && A.Data.shared.riskContextInterchange;
+  var demo = FX.demo, old = FX["v0.7-demo"], V07 = FX["v0.7-import"];
+  ok(!!contract && !!demo && !!old && typeof V07 === "function", "the contract copy and the three fixtures are present");
+  E.loadCatalog();
+
+  // ---- A light schema check, from the contract's own example ----
+  // (the same check as the risk tool's test-risk-interchange.html)
+  function typeOf(v) { return v === null ? "null" : Array.isArray(v) ? "array" : typeof v; }
+  function add(t, v) {
+    var ty = typeOf(v); t.types[ty] = true;
+    if (ty === "object") { t.keys = t.keys || {}; Object.keys(v).forEach(function (k) { if (!t.keys[k]) t.keys[k] = { types: {} }; add(t.keys[k], v[k]); }); }
+    if (ty === "array") { t.item = t.item || { types: {} }; v.forEach(function (x) { add(t.item, x); }); }
+    return t;
+  }
+  function templateOf(example) {
+    var t = add({ types: {} }, example), ct = t.keys.conduits.item;
+    ["threats", "vulnerabilities", "countermeasures"].forEach(function (k) {
+      if (!ct.keys[k]) ct.keys[k] = { types: { array: true } };
+      example.zones.forEach(function (z) { if (z[k]) add(ct.keys[k], z[k]); });
+    });
+    return t;
+  }
+  function conform(v, t, path, out) {
+    var ty = typeOf(v);
+    if (!t) { out.push(path + " is not in the contract"); return out; }
+    var plain = t.types.string || t.types.number || t.types.boolean;
+    if (!t.types[ty] && !(ty === "null" && plain)) { out.push(path + " is " + ty + ", the contract has " + Object.keys(t.types).join("/")); return out; }
+    if (ty === "object") Object.keys(v).forEach(function (k) { conform(v[k], t.keys && t.keys[k], path + "." + k, out); });
+    if (ty === "array") v.forEach(function (x, i) { conform(x, t.item, path + "[" + i + "]", out); });
+    return out;
+  }
+  // The six consumed zone fields and the conduit ones, as the importer reads them.
+  function consumedOk(f) {
+    return f.zones.every(function (z) {
+      return typeof z.id === "string" && typeof z.name === "string" && typeof z.safetyRelated === "boolean" &&
+        typeof z.justification === "string" && (z.slTarget === null || typeof z.slTarget === "number") &&
+        same(Object.keys(z.slTargetByFR), FR) && FR.every(function (k) { var v = z.slTargetByFR[k]; return v === null || typeof v === "number"; });
+    }) && f.conduits.every(function (c) {
+      return typeof c.id === "string" && typeof c.fromZone === "string" && typeof c.toZone === "string" &&
+        (c.slTarget === null || typeof c.slTarget === "number") && same(Object.keys(c.slTargetByFR), FR);
+    });
+  }
+
+  // ---- A. the contract copy: same string, same list ----
+  ok(contract.schema === "spt-risk-context/1.4", "the bundled contract stays at spt-risk-context/1.4", contract.schema);
+  var v07 = V07({ instrument: null }, function () { return null; }, E.SHARED_TARGET_ID, function () {});
+  ok(same(contract.acceptedSchemas, v07.ACCEPTED_SCHEMAS), "and accepts exactly the schemas v0.7 accepts", JSON.stringify(contract.acceptedSchemas));
+  ok(same(contract.importContract.frKeys, v07.FR_KEYS), "with the FR keys v0.7 reads");
+
+  // ---- B. the phase 6 file ----
+  var tpl = templateOf(contract.example);
+  ok(demo.schema === "spt-risk-context/1.4", "the risk tool's demo export is at spt-risk-context/1.4", demo.schema);
+  var probs = conform(demo, tpl, "file", []);
+  ok(probs.length === 0, "and conforms to the contract", probs.slice(0, 6).join(" | "));
+  ok(conform(old, tpl, "file", []).length === 0, "as does the file v0.7 wrote");
+  ok(Array.isArray(demo.approvals) && demo.approvals.length === 2 && demo.approvals.every(function (a) { return !!a.name && !!a.role && !!a.organisation && !!a.date && !!a.scope; }),
+    "it carries the approvals list", JSON.stringify(demo.approvals));
+  ok(demo.zones.every(function (z) { return z.riskComparison && typeof z.riskComparison.required === "boolean" && z.initialRisk && !!z.initialRisk.risk && !!z.initialRisk.source; }) &&
+     demo.conduits.every(function (c) { return c.riskComparison && c.initialRisk; }),
+    "each zone and conduit carries its risk comparison decision and initial risk");
+  ok(demo.zones.every(function (z) { return z.assets.every(function (a) { return /^AS\d+$/.test(a.id) && typeof a.name === "string" && typeof a.type === "string"; }); }),
+    "each asset carries its id beside name and type");
+  ok(consumedOk(demo), "the six consumed zone fields and the conduit fields are there, with their types");
+  ok(consumedOk(old), "as they were in the file v0.7 wrote");
+  ok(demo.conduits.some(function (c) { return c.toZone === "EXT" || c.fromZone === "EXT"; }), "and the outside is still EXT");
+  var NEW = ["approvals", "riskComparison", "initialRisk"];
+  function without(o) { return Object.keys(o).filter(function (k) { return NEW.indexOf(k) < 0; }); }
+  ok(same(without(demo), Object.keys(old)) && same(without(demo.zones[0]), Object.keys(old.zones[0])) && same(without(demo.conduits[0]), Object.keys(old.conduits[0])),
+    "apart from the new fields, its keys are the ones v0.7 wrote");
+
+  // ---- C. this build imports it, and keeps the approvals and the zones' extra fields ----
+  function importInto(file, name) {
+    E.newProject();
+    E.activateInstrument("iec-62443-3-3");
+    var threw = null;
+    try { E.setRiskContext(clone(file), { scope: true, zoneIds: file.zones.map(function (z) { return z.id; }), fileName: name }); } catch (e) { threw = e.message; }
+    return threw;
+  }
+  // Each zone's target as the scorer sees it, by zone id.
+  function targetsByZone() {
+    var tp = E.state.engagement.targetProfile, out = {};
+    E.state.engagement.targets.forEach(function (t) {
+      out[t.zoneId] = { name: t.name, target: A.Scoring.normaliseZoneTarget(tp.perZone[t.id]) };
+    });
+    return out;
+  }
+  var KEYS_V07 = ["schema", "generatedBy", "generatedOn", "importedOn", "fileName", "suc", "zones", "conduits"];
+  ok(importInto(demo, "acme-risk-context.json") === null, "the phase 6 file imports without error");
+  var rc = E.getRiskContext();
+  ok(rc && rc.schema === "spt-risk-context/1.4" && rc.fileName === "acme-risk-context.json", "and is stored on the assessment");
+  ok(same(Object.keys(rc), KEYS_V07.concat(["approvals"])), "it keeps what it kept before, plus the approvals, and nothing else new", Object.keys(rc).join(","));
+  ok(same(rc.approvals, demo.approvals), "the approvals are kept as the file has them");
+  ok(same(rc.zones, demo.zones) && same(rc.conduits, demo.conduits), "the zones and conduits are kept whole, the new fields with them");
+  ok(rc.zones[0].riskComparison.required === true && rc.zones[0].initialRisk.risk === demo.zones[0].initialRisk.risk && rc.zones[0].assets[0].id === "AS1", "for example the first zone's decision, initial risk and asset id");
+  var scopedNew = targetsByZone();
+  ok(E.state.engagement.targets.length === demo.zones.length, "one target per zone", String(E.state.engagement.targets.length));
+  ok(demo.zones.every(function (z) {
+    var t = scopedNew[z.id], frIds = {};
+    (E.state.taxonomy.frs || []).forEach(function (fr) { if (fr.abbr) frIds[fr.abbr] = fr.id; });
+    return t && t.name === z.name && FR.every(function (k) { return z.slTargetByFR[k] == null || t.target.perFR[frIds[k]] === z.slTargetByFR[k]; });
+  }), "each carries the zone's SL-T vector, as before");
+
+  var file = E.getProjectFile();
+  E.newProject();
+  E.loadProjectFile(JSON.parse(JSON.stringify(file)));
+  E.activateInstrument("iec-62443-3-3");
+  var rc2 = E.getRiskContext();
+  ok(rc2 && same(rc2.approvals, demo.approvals), "the approvals survive save and load");
+  ok(rc2 && same(rc2.zones, demo.zones) && same(rc2.conduits, demo.conduits), "and so do the zones' and conduits' extra fields");
+  ok(same(targetsByZone(), scopedNew), "and the scoped targets");
+
+  // An approvals value that is not a list is not kept.
+  var odd = clone(demo); odd.approvals = { name: "x" };
+  importInto(odd, "odd.json");
+  ok(!("approvals" in E.getRiskContext()), "an approvals value that is not a list is not kept");
+
+  // ---- D. a file the v0.7 risk tool wrote still imports ----
+  ok(old.schema === "spt-risk-context/1.4" && old.generatedBy === "spt-risk-tool/0.7.0" && !("approvals" in old), "the v0.7 file is a 1.4 file with no approvals list");
+  ok(importInto(old, "acme-v07.json") === null, "it imports without error");
+  var rcOld = E.getRiskContext();
+  ok(same(Object.keys(rcOld), KEYS_V07), "and is stored exactly as before, with no approvals key", Object.keys(rcOld).join(","));
+  ok(E.state.engagement.targets.length === old.zones.length && old.zones.every(function (z) { var t = targetsByZone()[z.id]; return t && t.name === z.name; }), "one target per zone, as before");
+
+  // ---- E. the released v0.7 Assessment Tool accepts the new file ----
+  // The frozen importer runs on an assessment of its own, against the live
+  // 3-3 instrument and taxonomy.
+  E.newProject();
+  E.activateInstrument("iec-62443-3-3");
+  function frozen() {
+    var ass = { targets: [{ id: "t-site", name: "Site 1" }], responses: [], targetProfile: { defaultTargetSL: 2, perFR: {} } };
+    var st = { instrument: E.state.instrument, taxonomy: E.state.taxonomy, engagement: { targetProfile: ass.targetProfile }, activeTargetId: "t-site" };
+    var events = [];
+    var api = V07(st, function () { return ass; }, E.SHARED_TARGET_ID, function (n) { events.push(n); });
+    return { ass: ass, api: api, events: events };
+  }
+  function frozenTargets(r) {
+    var out = {};
+    r.ass.targets.forEach(function (t) { out[t.zoneId] = { name: t.name, target: A.Scoring.normaliseZoneTarget(r.ass.targetProfile.perZone[t.id]) }; });
+    return out;
+  }
+  var f = frozen();
+  ok(f.api.accepts(clone(demo)) === null, "v0.7's file checks accept the phase 6 file");
+  var future = clone(demo); future.schema = "spt-risk-context/1.5";
+  ok(/rejected/.test(f.api.accepts(future) || "") && /1\.5/.test(f.api.accepts(future) || ""), "while they refuse a 1.5 file (the check is real)", f.api.accepts(future));
+  var rowsNew = null, rowsOld = null, rowErr = null;
+  try { rowsNew = demo.zones.map(f.api.modalRow); rowsOld = old.zones.map(f.api.modalRow); } catch (e) { rowErr = e.message; }
+  ok(rowErr === null && rowsNew.every(function (r) { return r.name && /^SL \d$/.test(r.slTarget) && r.frLine && r.frLine.indexOf(FR.join("/") + " = ") === 0; }),
+    "v0.7's import modal reads every zone of it", rowErr || JSON.stringify(rowsNew));
+  var threw = null;
+  try { f.api.setRiskContext(clone(demo), { scope: true, zoneIds: demo.zones.map(function (z) { return z.id; }), fileName: "acme-risk-context.json" }); } catch (e) { threw = e.message; }
+  ok(threw === null, "v0.7's setRiskContext takes it without error", threw);
+  ok(f.events.indexOf("targets-changed") >= 0, "and finishes, as it always did");
+  var frc = f.api.getRiskContext();
+  ok(frc && same(Object.keys(frc), KEYS_V07), "v0.7 stores what it always stored (it leaves the approvals list behind)", frc && Object.keys(frc).join(","));
+  ok(frc && same(frc.zones, demo.zones) && same(frc.conduits, demo.conduits), "with the zones and conduits whole, the new fields with them");
+  ok(same(frozenTargets(f), scopedNew), "and scopes the same targets this build does", JSON.stringify(frozenTargets(f)));
+  var g = frozen();
+  g.api.setRiskContext(clone(old), { scope: true, zoneIds: old.zones.map(function (z) { return z.id; }), fileName: "acme-v07.json" });
+  ok(same(Object.keys(g.api.getRiskContext()), KEYS_V07) && g.ass.targets.length === old.zones.length, "v0.7 takes its own era's file as before (the fixture is sound)");
+  // What this build keeps, set beside what v0.7 keeps: the approvals alone.
+  var mine = clone(rc), theirs = clone(frc);
+  delete mine.approvals; delete mine.importedOn; delete theirs.importedOn;
+  ok(same(mine, theirs), "this build keeps what v0.7 keeps, plus the approvals list");
+});
+</script>
+</body></html>

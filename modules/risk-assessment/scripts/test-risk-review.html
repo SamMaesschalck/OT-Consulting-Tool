@@ -51,6 +51,7 @@
     poll(function () { return w.RiskTool && w.RiskReview && w.RiskExports && w.RiskTool.state.project.zones.length; }).then(function () {
       d = w.document;
       var RT = w.RiskTool, RR = w.RiskReview, RC = w.App.ReviewCore, DB = w.App.DocxBlocks, main = d.getElementById("main");
+      RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
       var p = RT.state.project;
       ok(!p.review, "a project has no review until one starts");
       var nav = d.querySelector('#sidebar .nav-item[data-stage="peer"]');
@@ -63,7 +64,8 @@
         var pack = JSON.parse(saved.text);
         ok(pack.schema === "spt-review-pack/1.0" && pack.round === 1 && pack.sourceTool.product === "OT Cyber Risk Assessment Tool", "the pack is spt-review-pack/1.0, from the risk tool");
         ok(/review-pack-round-1\.json$/.test(saved.name), "under a plain name (" + saved.name + ")");
-        ok(pack.documents.length === 2 && pack.documents[0].title === "Detailed report" && pack.documents[1].title === "High-level report", "both Word reports are in it as documents");
+        // Phase 6b: the requirements specification is the third document; the two reports keep their places.
+        ok(pack.documents.length === 3 && pack.documents[0].title === "Detailed report" && pack.documents[1].title === "High-level report" && pack.documents[2].title === "Cyber security requirements specification", "both Word reports are in it as documents, and the requirements specification after them (phase 6b)", pack.documents.map(function (x) { return x.title; }).join(", "));
         ok(pack.documents.every(function (x) { return x.blocks.length > 20 && /^h1:/.test(x.contentHash); }) && pack.documents[0].contentHash !== pack.documents[1].contentHash, "each with its own blocks and hash");
         var heads = pack.documents[0].blocks.filter(function (b) { return b.type === "heading"; });
         ok(heads.length > 3 && heads.every(function (h) { return !h.sub; }) && heads[0].sectionKey === "document-control", "sections are keyed by their headings (" + heads[0].sectionKey + ")");
@@ -138,7 +140,11 @@
             poll(function () { return rw.ReviewTool; }).then(function () {
               rw.ReviewTool.loadTexts([{ name: "risk-pack.json", text: window.__riskPack }]);
               var dd = rw.document, sel = dd.getElementById("rr-doc");
-              ok(rw.ReviewTool.state.pack && sel && sel.options.length === 2, "the review tool opens the risk pack, with a chooser for its two reports");
+              // Phase 6b: three documents, the requirements specification third.
+              ok(rw.ReviewTool.state.pack && sel && sel.options.length === 3, "the review tool opens the risk pack, with a chooser for its two reports and the requirements specification (phase 6b)", sel && String(sel.options.length));
+              sel.value = "2"; sel.dispatchEvent(new rw.Event("change", { bubbles: true }));
+              ok(dd.querySelectorAll("#rr-paper [data-block-id]").length === rw.ReviewTool.state.pack.documents[2].blocks.length, "and draws the requirements specification (phase 6b)");
+              sel.value = "0"; sel.dispatchEvent(new rw.Event("change", { bubbles: true }));
               ok(dd.querySelectorAll("#rr-paper [data-block-id]").length === rw.ReviewTool.state.pack.documents[0].blocks.length, "and draws it");
               sel.value = "1"; sel.dispatchEvent(new rw.Event("change", { bubbles: true }));
               ok(dd.querySelectorAll("#rr-paper [data-block-id]").length === rw.ReviewTool.state.pack.documents[1].blocks.length, "and the high-level report");

@@ -1,0 +1,505 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool asset register</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Phase 6a of docs/risk-tool-redesign.md, item 1: the asset register.
+  - Paste from Excel: tab-separated cells, Excel's quoting (a tab, a line
+    break or a quote inside a cell) and line endings (CRLF, LF, CR), a header
+    row read by its English names, the mapping step when there is none or a
+    heading is not known, the preview's problems (unknown zone, repeated tag,
+    a tag already on an asset, a type not known set to Other), the zone for
+    rows without one, Update existing, and one undo for the whole paste.
+  - The register on step 3: every asset with its zone, sorted and filtered,
+    edited in place, moved to another zone (a threat's links follow the
+    prune, and the move undoes).
+  - Files without the new fields load and print as before; Word prints the
+    assets as tables only where the new attributes are captured (no empty
+    column, landscape when wide); Excel has an Assets sheet. Paste several on
+    a zone still works.
+-->
+<iframe id="app" src="../index.html" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    if (!w || !w.RiskTool || !w.RiskExports || !w.docx || !w.ExcelJS) { if (++tries > 300) { clearInterval(t); lines.push("FAIL app did not expose RiskTool"); failures++; done(); } return; }
+    clearInterval(t);
+    var pr = null;
+    try { pr = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    if (pr && typeof pr.then === "function") { pr.then(done, function (e) { failures++; lines.push("FAIL async: " + (e && e.message)); done(); }); return; }
+    done();
+  }, 50);
+
+  // The docx mock the report tests use: the tree can be walked.
+  function mockDocx() {
+    function TextRun(o) { if (typeof o === "string") o = { text: o }; this.__t = "run"; this.text = o.text != null ? o.text : ""; this.bold = !!o.bold; this.color = o.color || null; }
+    function Paragraph(o) { o = o || {}; this.__t = "p"; this.children = o.children || []; this.heading = o.heading || null; this.text = this.children.map(function (r) { return r && r.text != null ? r.text : ""; }).join(""); }
+    function TableCell(o) { this.__t = "cell"; this.children = (o && o.children) || []; }
+    function TableRow(o) { this.__t = "row"; this.children = (o && o.children) || []; }
+    function Table(o) { this.__t = "table"; this.rows = (o && o.rows) || []; this.widths = (o && o.columnWidths) || []; }
+    function Header(o) { this.__t = "hdr"; this.children = (o && o.children) || []; }
+    function Footer(o) { this.__t = "ftr"; this.children = (o && o.children) || []; }
+    function PageBreak() { this.__t = "br"; this.text = ""; }
+    function ImageRun(o) { this.__t = "img"; }
+    function Document(o) { this.__t = "doc"; this.sections = (o && o.sections) || []; }
+    return {
+      Document: Document, Paragraph: Paragraph, TextRun: TextRun, Table: Table, TableRow: TableRow, TableCell: TableCell,
+      Header: Header, Footer: Footer, PageBreak: PageBreak, ImageRun: ImageRun,
+      HeadingLevel: { HEADING_1: "h1", HEADING_2: "h2", HEADING_3: "h3", TITLE: "t" },
+      WidthType: { DXA: "dxa", PERCENTAGE: "pct" }, ShadingType: { SOLID: "solid" }, TableLayoutType: { FIXED: "fixed" },
+      AlignmentType: { LEFT: "l", CENTER: "c", RIGHT: "r" }, HeightRule: { ATLEAST: "atLeast", EXACT: "exact" },
+      PageNumber: { CURRENT: "current" }, PageOrientation: { PORTRAIT: "portrait" },
+      Packer: { toBlob: function () { return Promise.resolve(new Blob(["x"])); } }
+    };
+  }
+  function walkText(nodes) {
+    var out = [];
+    (function walk(n) {
+      if (!n) return;
+      if (n.__t === "p") { out.push(n.text); return; }
+      if (n.__t === "table") { n.rows.forEach(walk); return; }
+      if (n.__t === "row" || n.__t === "cell") { n.children.forEach(walk); return; }
+      if (Array.isArray(n)) n.forEach(walk);
+    })(nodes);
+    return out.join("\n");
+  }
+  function docText(doc) { return walkText(doc.sections.map(function (s) { return s.children; })); }
+  function orientations(doc) { return doc.sections.map(function (s) { return s.properties.page.size.orientation; }).join(); }
+  // The table that follows a paragraph reading text, in document order.
+  function tableAfter(doc, text) {
+    var seen = false, hit = null;
+    doc.sections.forEach(function (s) { s.children.forEach(function (n) {
+      if (hit) return;
+      if (n.__t === "p" && n.text === text) seen = true;
+      else if (seen && n.__t === "table") hit = n;
+    }); });
+    return hit;
+  }
+  function headRow(tbl) { return tbl ? tbl.rows[0].children.map(function (c) { return walkText(c.children); }) : []; }
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, AS = w.RiskApp.Assets, d = w.document, RX = w.RiskExports;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    w.confirm = function () { return true; };
+    w.alert = function () {};
+    try { w.localStorage.removeItem(RT.AUTOSAVE_KEY); } catch (e) {}
+    var bar0 = d.querySelector(".autosave-bar"); if (bar0) bar0.parentNode.removeChild(bar0);
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function snap() { return JSON.stringify(P()); }
+    function demo() { RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT)); }
+    function zone(id) { return P().zones.filter(function (z) { return z.id === id; })[0]; }
+    function asset(id) { var r = RT.assetRegister().filter(function (x) { return x.a.id === id; })[0]; return r || null; }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    function toastUndo() { return d.getElementById("toast").querySelector('[data-action="toast-undo"]'); }
+    function q(sel) { return main().querySelector(sel); }
+    function qa(sel) { return [].slice.call(main().querySelectorAll(sel)); }
+    function openRegister() { RT.navigate("zones"); q('.step-tabs [data-tab="assets"]').click(); }
+
+    // ==== 1. Reading a paste ==================================================================
+
+    var tbl = RT.parseAssetTable("Name\tTag\r\nPLC-101\tPLC101\r\n\"HMI, \"\"north\"\"\"\t\"HMI\t01\"\r\n\"Two\nline\"\tX2\r\n\r\n");
+    ok(tbl.length === 4 && tbl[1].join("|") === "PLC-101|PLC101" && tbl[2][0] === 'HMI, "north"' && tbl[2][1] === "HMI\t01" && tbl[3][0] === "Two\nline",
+      "Excel copy (CRLF): quoted cells keep their tab, line break and doubled quote; the empty last line goes", JSON.stringify(tbl));
+    ok(RT.parseAssetTable("A\tB\nC\tD").length === 2 && RT.parseAssetTable("A\tB\rC\tD\r").length === 2 && RT.parseAssetTable("﻿A\tB\r\nC\tD")[0][0] === "A",
+      "LF and CR line endings and a byte order mark read the same");
+    ok(RT.parseAssetTable("  PLC-1 \t PLC \n\t\t\n").length === 1 && RT.parseAssetTable("  PLC-1 \t PLC \n")[0].join("|") === "PLC-1|PLC", "cells are trimmed and empty rows dropped");
+
+    var rd = RT.readAssetPaste("Asset Name\tSecurity zone\tHostname\tManufacturer\tFirmware version\tLocation\tCriticality\tOwner\tRemarks\tColour\nPLC-101\tZ1\tplc101\tSiemens\tV4.5\tRack 2\tHigh\tJ. Whitmore\tSpare\tGrey");
+    ok(!!rd.header && rd.rows.length === 1 && rd.mapping.join() === "name,zone,tag,vendor,version,location,criticality,owner,notes," && rd.unknown.join() === "9" && rd.needsMapping,
+      "a header row is read by its English names; a heading not known (Colour) asks for its mapping", rd.mapping.join() + " / " + rd.unknown.join());
+    var rd2 = RT.readAssetPaste("PLC-101\tPLC\tTemporary\nHMI-1\tHMI\t");
+    ok(!rd2.header && rd2.rows.length === 2 && rd2.mapping.join() === "name,type,link" && rd2.needsMapping, "no header row: the columns read as name, type and connection until mapped, and the mapping step is offered");
+    var rd3 = RT.readAssetPaste("PLC-101\nHMI-1");
+    ok(!rd3.header && rd3.rows.length === 2 && !rd3.needsMapping, "a single column with no header is the names, with nothing to map");
+    var rd4 = RT.readAssetPaste("Name\tType\tModel\nPLC-1\tPLC\tS7-1500");
+    ok(!!rd4.header && !rd4.needsMapping && rd4.mapping.join() === "name,type,model", "every heading known: no mapping step");
+
+    // ==== 2. The preview ======================================================================
+
+    demo();
+    var before = snap();
+    var parsed = RT.readAssetPaste([
+      "Name\tZone\tTag\tType\tCriticality\tVendor",
+      "New PLC\tZ1\tPLC-NEW\tPLC\tHigh\tSiemens",
+      "Unknown zone PLC\tZ9\tPLC-NEW2\tPLC\tmed\t",
+      "No zone HMI\t\tHMI-NEW\tWidget\tLow\t",
+      "Repeat\tZ1\tPLC-NEW\tPLC\t\t",
+      "By zone name\tplant dmz & historian\t\tFirewall\tsuper\t",
+      "\tZ1\t\t\t\t"
+    ].join("\r\n"));
+    var pv = RT.previewAssetPaste(parsed, parsed.mapping, { zoneId: "Z4" });
+    ok(snap() === before, "a preview changes nothing");
+    ok(pv.length === 6, "one preview row per data row", String(pv.length));
+    ok(pv[0].action === "add" && pv[0].zoneId === "Z1" && !pv[0].problems.length, "a row with a known zone is added there, with no problem");
+    ok(pv[1].action === "add" && pv[1].zoneId === "Z4" && /Zone “Z9” not found; goes to Z4\./.test(pv[1].problems.join(" ")), "an unknown zone is a problem, and the row goes to the zone chosen for rows without one", pv[1].problems.join(" "));
+    ok(pv[2].action === "add" && pv[2].zoneId === "Z4" && /Type “Widget” not known; set to Other\./.test(pv[2].problems.join(" ")) && pv[2].values.typeId === "other", "no zone: the chosen one; a type not known is set to Other and said", pv[2].problems.join(" "));
+    ok(pv[3].action === "skip" && /Repeats the tag of row 1; left out\./.test(pv[3].problems.join(" ")), "a tag repeated in the paste is a problem and the repeat is left out", pv[3].problems.join(" "));
+    ok(pv[4].zoneId === zone("Z3").id && pv[4].values.typeId === "network" && /Criticality “super” not known; left blank\./.test(pv[4].problems.join(" ")), "a zone named rather than numbered is found; a criticality not known is left blank and said", pv[4].problems.join(" "));
+    ok(pv[5].action === "skip" && /No name/.test(pv[5].problems.join(" ")), "a row with no name is left out");
+    ok(pv[1].values.criticalityId === "medium" && pv[2].values.criticalityId === "low", "criticality words are read (med, Low)");
+
+    // ==== 3. Apply, and the tag already on an asset ===========================================
+
+    var counter = P().counters.asset;
+    var res = RT.applyAssetPaste(pv);
+    var added = RT.assetRegister().filter(function (r) { return Number(r.a.id.slice(2)) > counter; });
+    ok(res.added === 4 && res.updated === 0 && res.skipped === 2 && added.length === 4 && added[0].a.id === "AS" + (counter + 1), "apply adds the rows the preview adds, each with a new id after the last", JSON.stringify(res));
+    var np = added.filter(function (r) { return r.a.name === "New PLC"; })[0];
+    ok(np && np.zone.id === "Z1" && np.a.tag === "PLC-NEW" && np.a.type === "plc" && np.a.criticality === "high" && np.a.vendor === "Siemens" && !("model" in np.a) && !("link" in np.a),
+      "an added asset carries what the paste gave, and no field it did not", JSON.stringify(np && np.a));
+    var exParsed = RT.readAssetPaste("Tag\tName\tModel\tZone\nplc-new\tRenamed PLC\tS7-1518\tZ3\nFRESH-1\tFresh\t\t");
+    var pvSkip = RT.previewAssetPaste(exParsed, exParsed.mapping, { zoneId: "Z1" });
+    ok(pvSkip[0].action === "skip" && pvSkip[0].target && pvSkip[0].target.a === np.a && /Tag already on AS\d+ in Z1; left out unless Update existing is ticked\./.test(pvSkip[0].problems.join(" ")),
+      "a tag an asset already has (any case) is left out unless Update existing is ticked", pvSkip[0].problems.join(" "));
+    var pvUpd = RT.previewAssetPaste(exParsed, exParsed.mapping, { zoneId: "Z1", updateExisting: true });
+    ok(pvUpd[0].action === "update" && /updated there, not moved/.test(pvUpd[0].problems.join(" ")), "ticked, it updates that asset where it is and says it is not moved");
+    RT.applyAssetPaste(pvUpd);
+    ok(np.a.name === "Renamed PLC" && np.a.model === "S7-1518" && np.a.vendor === "Siemens" && np.a.criticality === "high" && asset(np.a.id).zone.id === "Z1",
+      "an update writes only the fields the paste gives, and leaves the zone", JSON.stringify(np.a));
+
+    // ==== 3b. Phase 6 review: what an update, a left-out row and the columns do ===============
+
+    // Update existing with no Name column: the asset keeps its name (it was renamed to its tag).
+    var noName = RT.readAssetPaste("Tag\tVendor\nplc-new\tABB");
+    var pvN = RT.previewAssetPaste(noName, noName.mapping, { zoneId: "Z1", updateExisting: true });
+    ok(pvN[0].action === "update" && !("name" in pvN[0].values) && !pvN[0].problems.some(function (s) { return /Renames/.test(s); }), "an update with no name column gives no name, and says no rename", JSON.stringify(pvN[0].values));
+    RT.applyAssetPaste(pvN);
+    ok(np.a.name === "Renamed PLC" && np.a.vendor === "ABB", "applied, the asset keeps its own name and takes the vendor", JSON.stringify(np.a));
+    var blankName = RT.readAssetPaste("Name\tTag\tModel\n\tPLC-NEW\tS7-1515");
+    RT.applyAssetPaste(RT.previewAssetPaste(blankName, blankName.mapping, { zoneId: "Z1", updateExisting: true }));
+    ok(np.a.name === "Renamed PLC" && np.a.model === "S7-1515", "and so does an update whose name cell is empty");
+    var ren2 = RT.readAssetPaste("Tag\tName\nPLC-NEW\tPLC 101 renamed");
+    var pvR = RT.previewAssetPaste(ren2, ren2.mapping, { zoneId: "Z1", updateExisting: true });
+    ok(pvR[0].problems.indexOf("Renames " + np.a.id + " from Renamed PLC.") >= 0, "an update that renames says so in the preview", pvR[0].problems.join(" "));
+    // An update row whose zone is not found: updated in place, not sent elsewhere.
+    var z99 = RT.readAssetPaste("Tag\tZone\tModel\nPLC-NEW\tZ99\tS7-1516");
+    var pvZ = RT.previewAssetPaste(z99, z99.mapping, { zoneId: "Z4", updateExisting: true });
+    ok(pvZ[0].action === "update" && pvZ[0].problems.join(" ") === "Zone “Z99” not found; updated in place.", "an update row naming a zone not found says it is updated in place", pvZ[0].problems.join(" "));
+    // A row left out does not take its tag from a later row.
+    var lo = RT.readAssetPaste("Name\tTag\tZone\nA\tT-LO\tZ99\nB\tT-LO\tZ1");
+    var pvL = RT.previewAssetPaste(lo, lo.mapping, { zoneId: "" });
+    ok(pvL[0].action === "skip" && /No zone to add it to\./.test(pvL[0].problems.join(" ")) && pvL[1].action === "add" && !pvL[1].problems.length,
+      "a row left out (no zone) does not block a later row with the same tag", JSON.stringify(pvL.map(function (r) { return [r.action, r.problems.join(" ")]; })));
+    // Two columns mapped to the same field: the first is read, and the row says so.
+    var dupP = RT.readAssetPaste("Name\tTag\tHost\nPLC-D\tTAG-1\tHOST-1");
+    var dupMap = ["name", "tag", "tag"];
+    var pvD = RT.previewAssetPaste(dupP, dupMap, { zoneId: "Z1" });
+    ok(pvD[0].values.tag === "TAG-1" && pvD[0].problems.indexOf("Two columns are read as tag or hostname; the first is used.") >= 0, "two columns read as one field: the first is used, and the row says so", JSON.stringify(pvD[0]));
+    ok(JSON.stringify(AS.duplicates(dupMap)) === '{"2":1}', "the mapping knows which column repeats which");
+    // An opening quote with no closing one is read as a plain character, not as the rest of the paste.
+    var uq = RT.parseAssetTable('Name\tNotes\nPLC-1\t"6 inch display\nPLC-2\tok\n');
+    ok(uq.length === 3 && uq[1].join("|") === 'PLC-1|"6 inch display' && uq[2].join("|") === "PLC-2|ok", "an unmatched quote does not swallow the rows after it", JSON.stringify(uq));
+    var uq2 = RT.parseAssetTable('A\t"B\nC\tD');
+    ok(uq2.length === 2 && uq2[0][1] === '"B' && uq2[1].join("|") === "C|D", "nor at the end of a cell that opens one", JSON.stringify(uq2));
+    ok(RT.parseAssetTable('"x\ty"\t"a""b"').length === 1 && RT.parseAssetTable('"x\ty"\t"a""b"')[0].join("|") === 'x\ty|a"b', "a closed quote still reads as before");
+
+    // ==== 4. The page: paste from Excel, the mapping step, one undo ============================
+
+    demo();
+    openRegister();
+    ok(!!q('[data-view="assets"]') && qa("tr[data-asset-id]").length === 11 && !q("[data-drawing]"), "step 3's Asset register tab lists every asset of every zone, without the drawing", String(qa("tr[data-asset-id]").length));
+    ok(q('.step-tabs [data-tab="assets"]').getAttribute("aria-current") === "page" && /11/.test(q('.step-tabs [data-tab="assets"]').textContent), "the tab is marked current and counts the assets");
+    before = snap();
+    var tblOpen = q("table.asset-register");
+    q('[data-action="asset-paste-open"]').click();
+    var ta = q('[data-action="asset-paste-text"]');
+    ok(!!ta && d.activeElement === ta, "Paste from Excel opens a box with the keyboard in it");
+    ok(q("table.asset-register") === tblOpen && !q('[data-action="asset-paste-open"]'), "opening it does not draw the table again (phase 6 review)");
+    type(ta, "Gateway 1\tgw-01\tNorth rack\r\nGateway 2\tgw-02\tSouth rack\r\n");
+    q('[data-action="asset-paste-read"]').click();
+    ok(q("[data-paste-header]").getAttribute("data-paste-header") === "none" && qa("[data-map-col]").length === 3, "with no header the page asks what each column holds", String(qa("[data-map-col]").length));
+    ok(d.activeElement === q('[data-map-col="0"]'), "after Read the keyboard is on the first column to choose");
+    var tbl0 = q("table.asset-register");
+    change(q('[data-map-col="1"]'), "tag");
+    ok(d.activeElement === q('[data-map-col="1"]') && q("table.asset-register") === tbl0, "a mapping chosen redraws the panel only, the keyboard back on that column");
+    // Phase 6 review: a field chosen for two columns is marked, and the preview says the first is read.
+    change(q('[data-map-col="2"]'), "tag");
+    ok(q('[data-map-col="2"]').hasAttribute("data-map-dup") && !q('[data-map-col="1"]').hasAttribute("data-map-dup") && /Also chosen for Column 2 \(gw-01\); that column is read\./.test(q('[data-map-col="2"]').parentNode.textContent) &&
+       /Two columns are read as tag or hostname; the first is used\./.test(q('tr[data-preview-row="1"]').textContent), "two columns mapped to the same field: the second is marked, and the preview says so", q('[data-map-col="2"]').parentNode.textContent);
+    change(q('[data-map-col="2"]'), "location");
+    ok(!q("[data-map-dup]"), "mapped apart again, the mark goes");
+    var sum0 = q("[data-paste-summary]");
+    ok(sum0 && sum0.getAttribute("role") === "status" && sum0.textContent === "2 rows: 2 to add.", "a status line above the preview says what it comes to", sum0 && sum0.textContent);
+    ok(qa(".paste-preview th").map(function (th) { return th.textContent; }).join("|") === "Row|Name|Tag|Type|Action|Problems", "the preview's columns (Action, was Does)");
+    ok(qa("tr[data-preview-row]").length === 2 && /gw-01/.test(q('tr[data-preview-row="1"]').textContent) && /Add to Z1/.test(q('tr[data-preview-row="1"]').textContent),
+      "the preview follows the mapping chosen and names the zone each row goes to", q('tr[data-preview-row="1"]').textContent);
+    change(q('[data-action="asset-paste-zone"]'), "Z3");
+    ok(/Add to Z3/.test(q('tr[data-preview-row="2"]').textContent) && /Add 2/.test(q('[data-action="asset-paste-apply"]').textContent), "the zone for rows without one is chosen in the panel");
+    ok(snap() === before, "nothing changes until the paste is added");
+    q('[data-action="asset-paste-apply"]').click();
+    var g1 = RT.assetRegister().filter(function (r) { return r.a.name === "Gateway 1"; })[0];
+    ok(g1 && g1.zone.id === "Z3" && g1.a.tag === "gw-01" && g1.a.location === "North rack" && g1.a.type === "other" && !q('[data-action="asset-paste-text"]'),
+      "added: the panel closes and the assets are in the zone chosen", JSON.stringify(g1 && g1.a));
+    ok(qa("tr[data-asset-id]").length === 13 && /2 assets added\./.test(d.getElementById("toast").textContent), "the register shows them and the toast says how many");
+    ok(d.activeElement === q('[data-action="asset-paste-open"]'), "after Apply the keyboard is back on Paste from Excel");
+    var u = toastUndo();
+    ok(!!u, "the toast offers Undo");
+    if (u) u.click();
+    ok(snap() === before && !RT.canUndo(), "Undo takes the whole paste back in one step");
+    ok(!!q('[data-view="assets"]'), "and the register is open again");
+
+    // ==== 5. The register: sort, filter, edit, move ==========================================
+
+    demo();
+    openRegister();
+    // The rows shown: phase 6 review, the filters hide rows in place rather than drawing the table again.
+    function ids() { return qa("tr[data-asset-id]").filter(function (tr) { return !tr.hidden; }).map(function (tr) { return tr.getAttribute("data-asset-id"); }); }
+    ok(ids().join() === "AS1,AS2,AS3,AS4,AS5,AS6,AS7,AS8,AS9,AS10,AS11", "by default the assets are in zone order", ids().join());
+    q('[data-sort="name"]').click();
+    var names = qa("tr[data-asset-id] [data-asset-field=\"name\"]").map(function (i) { return i.value.toLowerCase(); });
+    ok(names.slice().sort().join("|") === names.join("|") && q('[data-sort="name"]').closest("th").getAttribute("aria-sort") === "ascending", "a column header sorts by it", names.join("|"));
+    q('[data-sort="name"]').click();
+    var names2 = qa("tr[data-asset-id] [data-asset-field=\"name\"]").map(function (i) { return i.value.toLowerCase(); });
+    ok(names2.join("|") === names.slice().reverse().join("|") && q('[data-sort="name"]').closest("th").getAttribute("aria-sort") === "descending", "a second click sorts the other way");
+    q('[data-sort="id"]').click();
+    ok(ids()[1] === "AS2" && ids()[9] === "AS10", "ids sort by their number (AS2 before AS10)", ids().join());
+    change(q('[data-filter="asset-zone"]'), "Z3");
+    ok(ids().join() === "AS6,AS7,AS8" && /3 of 11 assets/.test(q('[data-view="assets"] .card-h').textContent), "the zone filter keeps that zone's assets, and the count says so", ids().join());
+    change(q('[data-filter="asset-zone"]'), "");
+    change(q('[data-filter="asset-type"]'), "server");
+    ok(ids().join() === "AS1,AS7,AS10", "the type filter", ids().join());
+    change(q('[data-filter="asset-type"]'), "");
+    var search = q('[data-filter="asset-text"]');
+    type(search, "vendor");
+    ok(ids().join() === "AS7,AS11" && d.activeElement === q('[data-filter="asset-text"]'), "the search finds by name, and the keyboard stays in it", ids().join());
+    type(q('[data-filter="asset-text"]'), "");
+    change(q('[data-filter="asset-crit"]'), "none");
+    ok(ids().length === 11, "Criticality not set: every demo asset");
+
+    // Edit in place.
+    change(q('[data-filter="asset-crit"]'), "");
+    before = snap();
+    var tagIn = q('tr[data-asset-id="AS3"] [data-asset-field="tag"]');
+    type(tagIn, "U300-PLC");
+    ok(asset("AS3").a.tag === "U300-PLC" && d.activeElement === tagIn && tagIn.isConnected, "typing a tag updates the asset in place, with no redraw", String(asset("AS3").a.tag));
+    type(tagIn, "");
+    ok(!("tag" in asset("AS3").a), "a field cleared goes from the file");
+    change(q('tr[data-asset-id="AS3"] [data-asset-field="criticality"]'), "high");
+    ok(asset("AS3").a.criticality === "high" && q('tr[data-asset-id="AS3"] [data-asset-field="criticality"]').value === "high", "criticality is chosen in place");
+    change(q('tr[data-asset-id="AS3"] [data-asset-field="type"]'), "safety-plc");
+    ok(asset("AS3").a.type === "safety-plc", "the type is changed in place");
+    change(q('tr[data-asset-id="AS3"] [data-asset-field="type"]'), "plc");
+    change(q('tr[data-asset-id="AS3"] [data-asset-field="criticality"]'), "");
+    ok(!("criticality" in asset("AS3").a) && snap() === before, "criticality set back to Not set goes from the file, so the asset is as it was");
+
+    // Move: AS1 is linked by Z1's threats and by C2's T9 (C2 joins Z1 and Z3).
+    demo(); openRegister();
+    before = snap();
+    var t1 = zone("Z1").threats.filter(function (x) { return x.id === "T1"; })[0];
+    var c2t9 = P().conduits.filter(function (c) { return c.id === "C2"; })[0].threats[0];
+    ok(t1.assetIds.indexOf("AS1") >= 0 && c2t9.assetIds.indexOf("AS1") >= 0, "set-up: T1 (Z1) and T9 (C2) link AS1");
+    change(q('tr[data-asset-id="AS1"] [data-asset-field="zone"]'), "Z3");
+    ok(asset("AS1").zone.id === "Z3" && zone("Z1").assets.every(function (a) { return a.id !== "AS1"; }), "choosing another zone moves the asset there, id kept");
+    ok(t1.assetIds.indexOf("AS1") < 0 && zone("Z1").threats.filter(function (x) { return x.id === "T2"; })[0].assetIds.indexOf("AS1") < 0, "Z1's threats lose the link to it (the prune)");
+    ok(c2t9.assetIds.indexOf("AS1") >= 0, "a conduit's threat keeps it while the conduit still joins its new zone");
+    // Phase 6 review: the toast reads "moved to Z3 and taken off 2 threats" (was "; 2 threat links dropped").
+    ok(/AS1 moved to Z3 and taken off 2 threats\./.test(d.getElementById("toast").textContent), "the toast says where it went and how many links were dropped", d.getElementById("toast").textContent);
+    u = toastUndo();
+    if (u) u.click();
+    ok(snap() === before && !!q('[data-view="assets"]'), "Undo puts the asset and its links back exactly, on the register");
+    ok(RT.moveAsset("AS1", "Z1") === null && RT.moveAsset("AS99", "Z2") === null && RT.moveAsset("AS1", "Z9") === null && snap() === before, "a move to its own zone, of an unknown asset or to an unknown zone does nothing");
+
+    // ==== 5b. Phase 6 review: focus, a deliberate move, notes, sort, the count, reset =========
+
+    // An edit in a register sorted on what was edited: the table sorts again, and the keyboard stays on that field of that asset.
+    demo(); openRegister();
+    q('[data-sort="criticality"]').click();
+    ok(d.activeElement === q('[data-sort="criticality"]'), "a sort keeps the keyboard on its header");
+    var crit9 = q('tr[data-asset-id="AS9"] [data-asset-field="criticality"]');
+    crit9.focus(); change(crit9, "high");
+    ok(ids()[0] === "AS9" && d.activeElement === q('tr[data-asset-id="AS9"] [data-asset-field="criticality"]'), "an edit that re-sorts the register keeps the keyboard on that asset's field", ids().slice(0, 3).join() + " / " + (d.activeElement && d.activeElement.closest("tr") ? d.activeElement.closest("tr").getAttribute("data-asset-id") : "none"));
+    // An edit the sort does not depend on redraws nothing.
+    var tblE = q("table.asset-register"), type9 = q('tr[data-asset-id="AS9"] [data-asset-field="type"]');
+    type9.focus(); change(type9, "server");
+    ok(q("table.asset-register") === tblE && P().zones.some(function (z) { return z.assets.some(function (a) { return a.id === "AS9" && a.type === "server"; }); }) && d.activeElement === type9, "an edit the sort does not use changes the asset in place, with no redraw");
+    // A move, sorted by zone: the asset's new row has the keyboard.
+    demo(); openRegister();
+    var zs = q('tr[data-asset-id="AS2"] [data-asset-field="zone"]');
+    zs.focus(); change(zs, "Z4");
+    ok(asset("AS2").zone.id === "Z4" && d.activeElement === q('tr[data-asset-id="AS2"] [data-asset-field="zone"]') && ids().indexOf("AS2") > ids().indexOf("AS8"), "after a move the keyboard is on that asset's zone, where it now sorts", ids().join());
+    // An arrow key in a closed zone list is not a move: Enter, or leaving the field, is.
+    demo(); openRegister();
+    var zk = q('tr[data-asset-id="AS3"] [data-asset-field="zone"]');
+    zk.focus();
+    zk.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    change(zk, "Z2");
+    ok(asset("AS3").zone.id === "Z1" && q('tr[data-asset-id="AS3"] [data-asset-field="zone"]') === zk, "an arrow press in the zone list moves nothing yet");
+    zk.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    change(zk, "Z3");
+    zk.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    ok(asset("AS3").zone.id === "Z3" && d.activeElement === q('tr[data-asset-id="AS3"] [data-asset-field="zone"]'), "Enter moves it to the zone chosen, once");
+
+    // Notes keep their line breaks: a box that grows with what it holds.
+    demo(); openRegister();
+    var nt = q('tr[data-asset-id="AS5"] [data-asset-field="notes"]');
+    ok(nt.tagName === "TEXTAREA", "notes are a text box of their own");
+    type(nt, "Line one\nLine two\nLine three");
+    ok(asset("AS5").a.notes === "Line one\nLine two\nLine three", "a note with line breaks is kept as typed");
+    q('[data-sort="name"]').click();
+    var nt2 = q('tr[data-asset-id="AS5"] [data-asset-field="notes"]');
+    ok(nt2.value === "Line one\nLine two\nLine three" && Number(nt2.rows) >= 3, "and drawn again with them, tall enough for each line", nt2.value + " / " + nt2.rows);
+    // Name and tag sort by the numbers in them.
+    P().zones[0].assets[0].tag = "PLC-10"; P().zones[0].assets[1].tag = "PLC-9"; P().zones[0].assets[2].tag = "plc-2";
+    w.RiskApp.App.rerender();
+    q('[data-sort="tag"]').click();
+    var tags = qa('tr[data-asset-id] [data-asset-field="tag"]').map(function (i) { return i.value; }).filter(Boolean);
+    ok(tags.join() === "plc-2,PLC-9,PLC-10", "the tag sorts by the number in it, whatever the case", tags.join());
+    // The count is a polite live region; the ID and Name columns stay at the left.
+    ok(q('[data-view="assets"] .card-h .sub').getAttribute("aria-live") === "polite", "the register's count is announced as the filter changes");
+    ok(!!q("th.reg-id") && !!q("td.reg-id") && !!q("th.reg-name") && !!q("td.reg-name") && !!q(".reg-scroll"), "the ID and Name columns are marked to stay at the left, in a register that scrolls");
+    // Another project: the search, the filters and the paste box are not carried over.
+    change(q('[data-filter="asset-zone"]'), "Z3"); type(q('[data-filter="asset-text"]'), "hmi");
+    q('[data-action="asset-paste-open"]').click(); type(q('[data-action="asset-paste-text"]'), "Name\nX");
+    demo(); openRegister();
+    ok(q('[data-filter="asset-text"]').value === "" && q('[data-filter="asset-zone"]').value === "" && !q('[data-action="asset-paste-text"]') && ids().length === 11, "loading another project starts the register afresh");
+    change(q('[data-filter="asset-type"]'), "server");
+    d.getElementById("btn-new").click();
+    var st = w.RiskApp.AssetsPage.state;
+    ok(st.type === "" && st.text === "" && st.zone === "" && !st.paste.open && st.paste.text === "", "and so does New", JSON.stringify(st));
+    // A zone filter for a zone that has gone is dropped.
+    demo(); openRegister();
+    change(q('[data-filter="asset-zone"]'), "Z4");
+    P().zones = P().zones.filter(function (z) { return z.id !== "Z4"; }); w.RiskApp.App.rerender();
+    ok(q('[data-filter="asset-zone"]').value === "" && ids().length === RT.assetRegister().length && ids().length > 0, "a zone filter left from a zone removed is dropped", String(ids().length));
+
+    // ==== 6. Paste several on a zone still works ==============================================
+
+    demo(); RT.navigate("zones");
+    q('[data-tab="zones"]').click();
+    w.RiskApp.ZonesPage.select("zone", "Z2"); RT.navigate("zones");
+    q('[data-detail="zone"] [data-action="paste-open"]').click();
+    var pt = q('[data-action="paste-text"]');
+    type(pt, "Name\tType\nSIS HMI\tHMI\nSIS laptop\tEngineering workstation\tTemporary");
+    q('[data-action="paste-add"]').click();
+    ok(zone("Z2").assets.length === 4 && zone("Z2").assets[3].link === "temporary" && /2 assets added, header row skipped\./.test(d.getElementById("toast").textContent), "Paste several on a zone works as before", d.getElementById("toast").textContent);
+
+    // ==== 7. Files without the new fields, and the migration ==================================
+
+    ["tour-v0.7-saved", "tour-phase3-0.2", "hand-made-v0.1"].forEach(function (k) {
+      RT.loadProjectText(JSON.stringify(window.RiskFixtures[k]));
+      var any = P().zones.some(function (z) { return z.assets.some(function (a) { return M.ASSET_TEXT_FIELDS.some(function (f) { return f in a; }) || "criticality" in a; }); });
+      ok(!any && !("baseline" in P()), k + ": loads with no register field and no previous assessment added");
+    });
+    var odd = clone(window.SPT_TOUR_PROJECT);
+    odd.zones[0].assets[0].tag = 12; odd.zones[0].assets[0].vendor = "ABB"; odd.zones[0].assets[0].criticality = "extreme"; odd.zones[0].assets[1].criticality = "low";
+    RT.loadProjectText(JSON.stringify(odd));
+    ok(!("tag" in zone("Z1").assets[0]) && zone("Z1").assets[0].vendor === "ABB" && !("criticality" in zone("Z1").assets[0]) && zone("Z1").assets[1].criticality === "low",
+      "the migration keeps text fields and known criticality words, and drops the rest");
+    var once = snap(); RT.loadProjectText(once);
+    ok(snap().replace(/"savedOn":"[^"]*"/, "") === once.replace(/"savedOn":"[^"]*"/, ""), "running it again changes nothing");
+
+    // ==== 8. Word: the assets as tables, only where captured ==================================
+
+    var realDocx = w.docx;
+    w.docx = mockDocx();
+    demo();
+    var d0 = RX.buildWordDoc(P(), {}), t0 = docText(d0);
+    ok(t0.indexOf("\nAsset register\n") < 0 && t0.indexOf("DCS server pair (redundant) (Server); Operator HMIs x4 (HMI)") >= 0 && orientations(d0) === "portrait,portrait,landscape,portrait,landscape,portrait",
+      "the demo (no register field captured) prints its assets in the characteristics as before, with no asset table");
+    zone("Z1").assets[0].tag = "DCS-SRV-A/B"; zone("Z1").assets[0].vendor = "Honeywell"; zone("Z1").assets[2].criticality = "high";
+    var d1 = RX.buildWordDoc(P(), {}), t1t = docText(d1);
+    ok(t1t.indexOf("\nAsset register\n") > t1t.indexOf("\nZone and conduit characteristics\n") && t1t.indexOf("\nAsset register\n") < t1t.indexOf("\nOperating environment assumptions\n"),
+      "with a register field captured, an Asset register follows the characteristics");
+    // Phase 6 review: "Each zone's assets are listed under Asset register, after the conduits." (was "The assets of each zone are listed after them.").
+    ok(t1t.indexOf("DCS server pair (redundant) (Server); Operator HMIs x4 (HMI)") < 0 && /Each zone's assets are listed under Asset register, after the conduits\./.test(t1t), "the characteristics then no longer list the assets, and say where they are");
+    var z1t = tableAfter(d1, "Z1 " + zone("Z1").name);
+    ok(headRow(z1t).join("|") === "Name|Type|Tag or hostname|Vendor|Criticality", "a zone's table has only the columns something is recorded in", headRow(z1t).join("|"));
+    var z4t = tableAfter(d1, "Z4 " + zone("Z4").name);
+    ok(headRow(z4t).join("|") === "Name|Type|Connection" && /Temporarily connected/.test(walkText(z4t.rows)) && /Fixed/.test(walkText(z4t.rows)), "a zone with a temporarily connected asset has the Connection column", headRow(z4t).join("|"));
+    ok(orientations(d1) === "portrait,portrait,landscape,portrait,landscape,portrait" && z1t.widths.reduce(function (a, b) { return a + b; }, 0) === 9506, "six columns or fewer stay on the portrait page, at its width");
+    zone("Z1").assets[0].model = "C300"; zone("Z1").assets[0].version = "R520"; zone("Z1").assets[1].location = "CCR";
+    var d2 = RX.buildWordDoc(P(), {});
+    ok(orientations(d2) === "portrait,portrait,landscape,portrait,landscape,portrait,landscape,portrait,landscape,portrait" || orientations(d2) === "portrait,portrait,landscape,portrait,landscape,portrait,landscape,portrait",
+      "wider than six columns, the asset register is a landscape page of its own", orientations(d2));
+    var z1w = tableAfter(d2, "Z1 " + zone("Z1").name);
+    ok(headRow(z1w).length === 8 && z1w.widths.reduce(function (a, b) { return a + b; }, 0) === 14438, "at the landscape page's width", headRow(z1w).join("|"));
+    // Phase 6 review: the version column says what it holds, and a type of Other prints blank, as the characteristics row leaves it out.
+    ok(headRow(z1w).indexOf("Firmware or software version") >= 0 && headRow(z1w).indexOf("Version") < 0, "the version column is headed Firmware or software version", headRow(z1w).join("|"));
+    var keepType = zone("Z1").assets[1].type; zone("Z1").assets[1].type = "other";
+    var z1o = tableAfter(RX.buildWordDoc(P(), {}), "Z1 " + zone("Z1").name);
+    var typeAt = headRow(z1o).indexOf("Type"), oRow = z1o.rows[2];
+    ok(typeAt === 1 && walkText(oRow.children[typeAt].children) === "" && walkText(z1o.rows[1].children[typeAt].children) === "Server", "a type of Other prints blank in the register, a known one by name", walkText(oRow.children[typeAt].children));
+    zone("Z1").assets[1].type = keepType;
+    var hl = docText(RX.buildWordDoc(P(), { highLevelOnly: true }));
+    ok(hl.indexOf("\nAsset register\n") < 0, "the high-level report has no asset register");
+    ok(!/[–—]/.test(docText(d2)), "no en or em dash in the report");
+    w.docx = realDocx;
+
+    // ==== 9. Excel: the Assets sheet ==========================================================
+
+    var wb = RX.buildWorkbook(P());
+    var names3 = wb.worksheets.map(function (s) { return s.name; });
+    ok(names3.indexOf("Assets") === names3.indexOf("Conduits") + 1, "the Assets sheet follows Conduits", names3.join());
+    var ws = wb.getWorksheet("Assets");
+    var head = []; ws.getRow(1).eachCell(function (c) { head.push(c.value); });
+    ok(head.join("|") === "Zone|ID|Name|Type|Connection|Tag or hostname|Vendor|Model|Firmware or software version|Location|Criticality|Owner|Notes", "its columns", head.join("|"));
+    ok(ws.rowCount === 12 && ws.getRow(2).getCell(2).value === "AS1" && ws.getRow(2).getCell(6).value === "DCS-SRV-A/B" && ws.getRow(2).getCell(7).value === "Honeywell" && ws.getRow(2).getCell(5).value === "Fixed",
+      "one row per asset, with its zone and what is recorded");
+    ok(ws.getRow(4).getCell(11).value === "High" && ws.getRow(12).getCell(5).value === "Temporarily connected" && !ws.getRow(3).getCell(8).value, "criticality and connection in words, blank where nothing is recorded");
+    ok(!!ws.autoFilter, "the sheet is filtered");
+    // The real libraries pack the wide asset register and the sheet.
+    return Promise.all([w.docx.Packer.toBlob(RX.buildWordDoc(P(), {})), wb.xlsx.writeBuffer()]).then(function (r) {
+      ok(r[0] && r[0].size > 20000 && r[1] && r[1].byteLength > 8000, "the real Word and Excel libraries build both files with the asset register in them");
+    }).then(function () {
+      // ==== 10. Phase 6 review: leaving the zone list moves the asset ======================
+      demo(); openRegister();
+      var zb = q('tr[data-asset-id="AS4"] [data-asset-field="zone"]');
+      zb.focus();
+      zb.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      change(zb, "Z3");
+      ok(asset("AS4").zone.id === "Z2", "set-up: an arrow press waits");
+      q('tr[data-asset-id="AS4"] [data-asset-field="type"]').focus();
+      return new Promise(function (res) { setTimeout(res, 60); });
+    }).then(function () {
+      var f = d.activeElement;
+      ok(asset("AS4").zone.id === "Z3" && f && f.getAttribute("data-asset-field") === "type" && f.closest("tr").getAttribute("data-asset-id") === "AS4",
+        "leaving the field moves it, and the keyboard stays on the field it went to, on that asset", asset("AS4").zone.id + " / " + (f && f.getAttribute("data-asset-field")));
+      ok(/AS4 moved to Z3/.test(d.getElementById("toast").textContent), "with the same toast as any move");
+
+      // ==== 11. Phase 6 review: quick enough at 300 assets ===================================
+      demo(); RT.navigate("zones");
+      w.RiskApp.ZonesPage.view("zones"); RT.navigate("zones");
+      var rowsT = ["Name\tZone\tTag\tVendor\tModel\tFirmware\tLocation\tCriticality\tOwner\tNotes\tType"], types = ["PLC", "HMI", "Server", "Engineering workstation", "Firewall", "Switch"];
+      for (var k = 0; k < 289; k++) rowsT.push(["Asset " + k, P().zones[k % 4].id, "TAG-" + k, "Vendor " + (k % 5), "M" + k, "1." + k, "Room " + (k % 9), ["High", "Medium", "Low"][k % 3], "J. Smith", "note " + k, types[k % 6]].join("\t"));
+      var big = RT.readAssetPaste(rowsT.join("\n"));
+      RT.applyAssetPaste(RT.previewAssetPaste(big, big.mapping, { zoneId: "Z1" }));
+      openRegister();
+      function ms(fn) { var t0 = w.performance.now(); fn(); return w.performance.now() - t0; }
+      var n300 = qa("tr[data-asset-id]").length, tbl300 = q("table.asset-register");
+      var tSearch = Math.max.apply(null, ["a", "as", "ass", "asset 1"].map(function (s) { return ms(function () { type(q('[data-filter="asset-text"]'), s); }); }));
+      type(q('[data-filter="asset-text"]'), "");
+      var tFilter = ms(function () { change(q('[data-filter="asset-type"]'), "plc"); });
+      change(q('[data-filter="asset-type"]'), "");
+      var tEdit = ms(function () { change(qa('tr[data-asset-id] [data-asset-field="criticality"]')[5], "low"); });
+      var tType = ms(function () { type(qa('tr[data-asset-id] [data-asset-field="tag"]')[5], "XYZ"); });
+      var tOpen = ms(function () { q('[data-action="asset-paste-open"]').click(); });
+      lines.push("timings at " + n300 + " assets (ms): search " + tSearch.toFixed(1) + ", filter " + tFilter.toFixed(1) + ", edit " + tEdit.toFixed(1) + ", typing " + tType.toFixed(1) + ", open paste " + tOpen.toFixed(1));
+      ok(n300 === 300, "set-up: 300 assets in the register", String(n300));
+      // What keeps it quick: none of these draws the 300 rows again.
+      ok(q("table.asset-register") === tbl300 && tbl300.isConnected, "none of them draws the table again");
+      // A generous bound: the aim is under 100 ms, and a loaded test machine is slower. (Under the
+      // runner's virtual time the clock does not move while a script runs; run it without to read the times.)
+      ok(tSearch < 250 && tFilter < 250 && tEdit < 250 && tType < 250 && tOpen < 250, "a search keystroke, a filter, an edit and opening the paste box each stay quick at 300 assets",
+        [tSearch, tFilter, tEdit, tType, tOpen].map(function (x) { return x.toFixed(0); }).join(", "));
+    });
+  }
+}());
+</script>
+</body>
+</html>

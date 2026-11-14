@@ -96,6 +96,7 @@
 
     poll(function () { return w.RiskTool && w.RiskReportPage && w.RiskReview && w.RiskExports && w.docx && w.ExcelJS && w.RiskTool.state.project.zones.length; }).then(function () {
       RT = w.RiskTool; RX = w.RiskExports; RP = w.RiskReportPage; RR = w.RiskReview; DB = w.App.DocxBlocks; d = w.document; main = d.getElementById("main");
+      RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
 
       // ---- the lookup -----------------------------------------------------------------
       var Z = w.App.Data.zcrMap;
@@ -220,7 +221,8 @@
         // A document's title is what the reviewer and the comments list show,
         // so it is checked with everything else in the pack.
         var pack = JSON.parse(JSON.stringify(r.pack));
-        ok(pack.documents.length === 2 && pack.documents[0].title === "Detailed report" && pack.documents[1].title === "High-level report", "the pack names its documents as the tool does", pack.documents.map(function (x) { return x.title; }).join(", "));
+        // Phase 6b: the requirements specification is the third document.
+        ok(pack.documents.length === 3 && pack.documents[0].title === "Detailed report" && pack.documents[1].title === "High-level report" && pack.documents[2].title === "Cyber security requirements specification", "the pack names its documents as the tool does", pack.documents.map(function (x) { return x.title; }).join(", "));
         pack.documents.forEach(function (doc) { delete doc.media; });
         var pk = JSON.stringify(pack);
         ok(banned(pk).length === 0 && !/ZCR/.test(pk), "review pack: no draft citation or term in its document titles, items, fields or report text", banned(pk).slice(0, 4).join(" | "));

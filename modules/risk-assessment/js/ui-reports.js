@@ -10,7 +10,8 @@
  * anyway). Registers its pages in RiskApp.Pages, Peer review (peer,
  * js/review.js) among them, and the old page ids hlreport and wordpreview in
  * RiskApp.StageAliases. RiskApp.Reports holds what the header buttons and
- * window.RiskTool call.
+ * window.RiskTool call. Check and issue also holds Since the previous
+ * assessment (phase 6a, js/compare.js): load, replace or remove the baseline.
  */
 window.RiskApp = window.RiskApp || {};
 window.RiskApp.Reports = (function () {
@@ -296,10 +297,11 @@ window.RiskApp.Reports = (function () {
   // has started. Calls go() straight away when there is nothing to ask.
   function reportGuard(opts, go, what) {
     opts = opts || {};
+    var doc = opts.highLevelOnly ? "highLevel" : opts.spec ? "spec" : "detailed";
     function groups() {
       return [
-        { title: opts.highLevelOnly ? "Still open in the high-level report:" : "Still open in the detailed report:",
-          lines: E.readiness(state.project, opts.highLevelOnly ? "highLevel" : "detailed").map(function (i) { return i.text; }) },
+        { title: { highLevel: "Still open in the high-level report:", spec: "Still open in the requirements specification:", detailed: "Still open in the detailed report:" }[doc],
+          lines: E.readiness(state.project, doc).map(function (i) { return i.text; }) },
         { title: "Peer review:", lines: window.RiskReview ? window.RiskReview.exportWarningTexts() : [] }
       ];
     }
@@ -318,9 +320,10 @@ window.RiskApp.Reports = (function () {
     reviewChecked(function () {
       reportGuard(opts, function () {
         window.RiskExports.downloadWord(opts, function (err) {
-          toast(err ? ("Word report failed: " + (err && err.message)) : "Word report downloaded.", err ? "err" : undefined);
+          var what = opts.spec && !opts.highLevelOnly ? "Requirements specification" : "Word report";
+          toast(err ? (what + " failed: " + (err && err.message)) : what + " downloaded.", err ? "err" : undefined);
         });
-      }, opts.highLevelOnly ? "high-level Word report" : "Word report");
+      }, opts.highLevelOnly ? "high-level Word report" : opts.spec ? "requirements specification" : "Word report");
     });
   }
   function downloadExcelReport() {
@@ -340,7 +343,7 @@ window.RiskApp.Reports = (function () {
   // fixed (js/engine.js completeness), the peer review's warnings, every
   // download, and the asset owner's sign-off.
 
-  var DOC_TITLES = { detailed: "Detailed report", highLevel: "High-level report" };
+  var DOC_TITLES = { detailed: "Detailed report", highLevel: "High-level report", spec: "Cyber security requirements specification" };
   function readinessCard(p, doc, outOfScope) {
     var items = E.readiness(p, doc);
     var list = items.length
@@ -362,13 +365,17 @@ window.RiskApp.Reports = (function () {
     main.appendChild(h("p", { class: "page-sub", text: (p.suc.name ? p.suc.name + ": what" : "What") + " is still open in each report, and the downloads." }));
     var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
     if (rvCard) main.appendChild(rvCard);
-    (hlOnly ? ["highLevel", "detailed"] : ["detailed", "highLevel"]).forEach(function (doc) {
-      main.appendChild(readinessCard(p, doc, hlOnly && doc === "detailed"));
+    // The requirements specification (phase 6b) last: an extra, for a client
+    // who issues it on its own; its content is in the detailed report too.
+    (hlOnly ? ["highLevel", "detailed", "spec"] : ["detailed", "highLevel", "spec"]).forEach(function (doc) {
+      main.appendChild(readinessCard(p, doc, hlOnly && doc !== "highLevel"));
     });
+    main.appendChild(baselineCard(p));
     main.appendChild(card("Downloads", null, [
       h("div", { class: "btn-row" }, [
         h("button", { class: "btn primary", "data-download": "word", text: "Detailed Word report", onClick: function () { downloadWordReport({}); } }),
         h("button", { class: "btn primary", "data-download": "word-hl", text: "High-level Word report", onClick: function () { downloadWordReport({ highLevelOnly: true }); } }),
+        h("button", { class: "btn", "data-download": "word-spec", text: "Requirements specification", title: "Cyber security requirements specification, as a Word file of its own", onClick: function () { downloadWordReport({ spec: true }); } }),
         h("button", { class: "btn", "data-download": "excel", text: "Excel workbook", onClick: downloadExcelReport }),
         h("button", { class: "btn", "data-download": "risk-context", text: "Risk context (" + INTERCHANGE.schema + ")", onClick: exportRiskContext })
       ]),
@@ -376,9 +383,63 @@ window.RiskApp.Reports = (function () {
     ]));
   }
 
+  // ---------- Since the previous assessment (phase 6a) ----------
+  //
+  // A previous risk project file is loaded as the baseline (js/compare.js):
+  // stored in the project by reference with a frozen copy of what is
+  // compared, never changing anything else. The card lists what changed;
+  // the full Word report and the workbook carry the same.
+  function setBaseline(text, fileName) {
+    var CP = R.Compare, res = CP.baselineFrom(text, fileName);
+    if (res.error) { toast(res.error, "err"); return false; }
+    var mk = A.undoMark();
+    state.project.baseline = res.baseline;
+    touched(); rerender();
+    A.offerUndo("Previous assessment loaded.", null, mk);
+    return true;
+  }
+  function clearBaseline() {
+    if (!state.project.baseline) return false;
+    var mk = A.undoMark();
+    delete state.project.baseline;
+    touched(); rerender();
+    A.offerUndo("Previous assessment removed.", function () { return '[data-action="baseline-remove"]'; }, mk);
+    A.focusAfter('[data-action="baseline-load"]');
+    return true;
+  }
+  function baselineCard(p) {
+    var b = p.baseline && p.baseline.facts ? p.baseline : null, CP = R.Compare, kids = [], count = 0;
+    var input = h("input", { type: "file", accept: ".json,application/json", hidden: "hidden", "data-action": "baseline-file", "aria-hidden": "true", tabindex: "-1",
+      onChange: function (ev) {
+        var f = ev.target.files && ev.target.files[0]; if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function () { setBaseline(String(rd.result), f.name); };
+        rd.onerror = function () { toast("Could not read the file.", "err"); };
+        rd.readAsText(f); ev.target.value = "";
+      } });
+    if (!b) kids.push(h("p", { class: "muted", text: "Load the previous risk project file to see what has changed." }));
+    else {
+      var groups = CP.lines(CP.compare(p));
+      kids.push(h("p", { "data-baseline-meta": "", text: cap(CP.baselineWords(b)) + (b.fileName ? " (" + b.fileName + ")" : "") + "." }));
+      if (!groups.length) kids.push(h("p", { class: "muted", text: "Nothing recorded has changed." }));
+      groups.forEach(function (g) {
+        count += g.items.length;
+        kids.push(h("h3", { class: "changes-head", text: g.title }));
+        kids.push(h("ul", { "data-changes": g.key }, g.items.map(function (t) { return h("li", { text: t }); })));
+      });
+    }
+    kids.push(h("div", { class: "btn-row", style: "margin-top:8px" }, [
+      input,
+      h("button", { type: "button", class: "btn sm", "data-action": "baseline-load", text: b ? "Replace" : "Load previous assessment", onClick: function () { input.click(); } }),
+      b ? h("button", { type: "button", class: "btn sm danger", "data-action": "baseline-remove", text: "Remove", onClick: clearBaseline }) : null
+    ]));
+    return card("Since the previous assessment", b ? (count ? count + " change" + (count === 1 ? "" : "s") : "no changes") : null, kids, null, { "data-check-anchor": "baseline" });
+  }
+
   // ---------- The Report page (report) ----------
   //
-  // One page for both reports, Detailed and High level, in three views:
+  // One page for both reports, Detailed and High level, and the requirements
+  // specification (phase 6b, Sections and Word pages only), in three views:
   // Sections (js/report-page.js, read and edited section by section), Word
   // pages (js/word-preview.js, the file itself) and Summary (the hand-built
   // one-page summaries, kept for printing). The report chosen stays chosen
@@ -386,18 +447,22 @@ window.RiskApp.Reports = (function () {
   // high-level summary, wordpreview on the Word pages.
 
   var VIEWS = [{ id: "sections", text: "Sections" }, { id: "word", text: "Word pages" }, { id: "summary", text: "Summary" }];
-  var view = { name: "sections", last: "sections", summaryDoc: 0 };
+  // chosen: the document chosen, kept apart from the summary shown, so the
+  // specification is still chosen after a visit to Summary.
+  var view = { name: "sections", last: "sections", summaryDoc: 0, chosen: 0 };
   function RPg() { return window.RiskReportPage; }
   function WPv() { return window.RiskWordPreview; }
   function docOf(name) {
     if (name === "word") return WPv() ? WPv().state.doc : 0;
-    if (name === "summary") return view.summaryDoc;
+    if (name === "summary") return view.chosen;
     return RPg() ? RPg().state.doc : 0;
   }
+  // 2 is the requirements specification (phase 6b), in Sections and Word
+  // pages; the summaries are the two reports' only, so it shows the detailed one.
   function setDoc(name, d) {
-    d = d === 1 ? 1 : 0;
+    d = d === 1 || d === 2 ? d : 0;
     if (name === "word") { if (WPv()) WPv().state.doc = d; return; }
-    if (name === "summary") { view.summaryDoc = d; return; }
+    if (name === "summary") { view.chosen = d; view.summaryDoc = d === 1 ? 1 : 0; return; }
     if (RPg() && RPg().state.doc !== d) { RPg().state.doc = d; RPg().state.open = null; }
   }
   // Show a view (and a report) next time the page draws.
@@ -423,7 +488,7 @@ window.RiskApp.Reports = (function () {
     if (view.name === "summary") kids.push(h("div", { class: "rp-tabs", role: "group", "aria-label": "Which report" }, ["Detailed", "High level"].map(function (t, i) {
       var on = view.summaryDoc === i;
       return h("button", { type: "button", class: "sl-btn rp-tab" + (on ? " active" : ""), "data-doc": i ? "highLevel" : "detailed", "aria-pressed": on ? "true" : "false",
-        onClick: function () { if (!on) { view.summaryDoc = i; render(); A.focusAfter('.rp-viewbar .rp-tab[data-doc="' + (i ? "highLevel" : "detailed") + '"]'); } }, text: t });
+        onClick: function () { if (!on) { view.summaryDoc = i; view.chosen = i; render(); A.focusAfter('.rp-viewbar .rp-tab[data-doc="' + (i ? "highLevel" : "detailed") + '"]'); } }, text: t });
     })));
     var row = h("div", { class: "rp-viewbar no-print" }, kids);
     var subs = main.querySelectorAll(".page-sub"), after = null;
@@ -443,6 +508,7 @@ window.RiskApp.Reports = (function () {
   return {
     exportRiskContext: exportRiskContext,
     downloadWordReport: downloadWordReport, downloadExcelReport: downloadExcelReport,
-    drawGuard: drawGuard, clearGuard: clearGuard, reportView: reportView, view: view
+    drawGuard: drawGuard, clearGuard: clearGuard, reportView: reportView, view: view,
+    setBaseline: setBaseline, clearBaseline: clearBaseline
   };
 }());

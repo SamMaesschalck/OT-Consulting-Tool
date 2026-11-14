@@ -2088,7 +2088,9 @@
     var longest = title.reduce(function (x, l) { return Math.max(x, l.t.length); }, 0);
     return {
       logo: front.filter(function (b) { return b.type === "image"; })[0] || null,
-      type: kind >= 0 ? head[kind] : { t: e.scoringFamily === "risk-assessment" ? "OT CYBER RISK ASSESSMENT" : "OT CYBER SECURITY ASSESSMENT", b: null },
+      // Without the Word cover's own words: the risk tool's requirements
+      // specification says OT CYBER SECURITY, its reports OT CYBER RISK ASSESSMENT.
+      type: kind >= 0 ? head[kind] : { t: e.scoringFamily === "risk-assessment" ? (/requirements specification/i.test(String(doc.title || "")) ? "OT CYBER SECURITY" : "OT CYBER RISK ASSESSMENT") : "OT CYBER SECURITY ASSESSMENT", b: null },
       title: title, titlePx: longest <= 30 ? 35 : longest <= 38 ? 29 : 24,
       client: at >= 0 ? head[at] : (client ? { t: client, b: null } : null), site: siteLine, sub: after[0] || null,
       // The strip as the Word file printed it, where it has one.

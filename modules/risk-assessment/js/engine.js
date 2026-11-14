@@ -20,10 +20,17 @@ window.RiskApp.Engine = (function () {
   var BAND_RANK = M.BAND_RANK, BAND_NAME = M.BAND_NAME, TREATMENT_DECISIONS = M.TREATMENT_DECISIONS;
 
   function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  // The date "today" means for every output. A test pins it (setToday) so
+  // what it builds from the demo reads the same whatever the real date is;
+  // unpinned, it is the clock.
+  var pinnedToday = null;
   function todayISO() {
+    if (pinnedToday) return pinnedToday;
     var d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
+  function setToday(iso) { pinnedToday = typeof iso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null; }
+  function todayPinned() { return pinnedToday; }
 
   // The project's tolerable risk, or the house default when none is set.
   function tolerableOf(project) { return project.srs.tolerableRisk || RULES.tolerableRisk.default; }
@@ -761,7 +768,8 @@ window.RiskApp.Engine = (function () {
   // moved and which report it concerns. It only warns.
   var APPROVAL_PARTS = ["tolerable", "ranking", "slt", "accepted"];
   var APPROVAL_PART_WORDS = { tolerable: "the tolerable risk or the risk criteria", ranking: "the ranking", slt: "the SL-T", accepted: "the accepted risks" };
-  var APPROVAL_DOC_PARTS = { detailed: ["tolerable", "slt", "accepted"], highLevel: ["tolerable", "ranking"] };
+  // The requirements specification (phase 6b) holds the tolerable risk and the SL-T.
+  var APPROVAL_DOC_PARTS = { detailed: ["tolerable", "slt", "accepted"], highLevel: ["tolerable", "ranking"], spec: ["tolerable", "slt"] };
   function approvalBasis(project) {
     var vm = VM().build(project), hlOnly = M.assessmentType(project) === "high-level";
     // The tolerable risk an approval covers includes the criteria it rests
@@ -1101,27 +1109,65 @@ window.RiskApp.Engine = (function () {
     specBlocks(p, items).forEach(function (b) {
       if (!b.done && SPEC_GAPS[b.id]) add("spec", "detailed", "Requirements specification: " + SPEC_GAPS[b.id], { kind: "spec", id: b.id });
     });
+    // A justification that names a threat or a countermeasure by its id: the
+    // specification issued on its own lists neither, so the reader cannot
+    // look them up. The specification's alone (doc null, spec: true).
+    justificationIds(p).forEach(function (j) {
+      items.push({ stage: "slt", doc: null, spec: true, target: { kind: "fromZone" in j.o ? "conduit" : "zone", id: j.o.id },
+        text: j.o.id + (j.o.name ? " " + j.o.name : "") + ": the justification names " + j.ids.join(", ") + ", which the specification does not list." });
+    });
     // Approval (step 7): for the detailed report once there are zones, for
     // the high-level report once there is a ranking.
     var states = approvalStates(p);
     var signDoc = docOf(p.zones.length > 0, p.srs.highLevelAssets.length > 0);
     var named = states.filter(function (s) { return (s.entry.name || "").trim(); });
+    // The specification (phase 6b) is signed off with the detailed report.
+    var signSpec = p.zones.length > 0;
     if (signDoc && !named.length) add("approval", signDoc, "No asset-owner sign-off recorded.", { kind: "approval" });
     else if (signDoc && !states.some(function (s) { return s.signed; })) named.forEach(function (s) {
       add("approval", signDoc, s.entry.name.trim() + ": approval not yet recorded.", { kind: "approval", id: String(s.index) });
     });
+    if (signDoc) items.forEach(function (i) { if (i.stage === "approval" && signSpec) i.spec = true; });
     states.forEach(function (s) {
       if (!s.changed) return;
       var doc = docOf(approvalChangedFor(s, "detailed").length > 0, approvalChangedFor(s, "highLevel").length > 0) || "both";
       add("approval", doc, (s.entry.name || "Approver " + (s.index + 1)) + ": approved before " + approvalPartWords(s.parts, s.legacy) + " changed.", { kind: "approval", id: String(s.index) });
+      if (approvalChangedFor(s, "spec").length) items[items.length - 1].spec = true;
+    });
+    // What the requirements specification prints (phase 6b): the SUC and
+    // the risk criteria, the zones and conduits with their separations, its
+    // own blocks and the SL-T with their justifications. Marked here, on the
+    // one list, so its readiness reads the same items as the reports'.
+    items.forEach(function (i) {
+      if (i.stage === "zones" || i.stage === "spec" || i.stage === "slt" || (i.stage === "suc" && i.doc !== "highLevel")) i.spec = true;
     });
     return items;
+  }
+  // The zones and conduits whose justification names a threat or a
+  // countermeasure of this project by its id: [{ o, ids }], the ids in the
+  // order the text names them.
+  function justificationIds(project) {
+    var known = {};
+    project.zones.concat(project.conduits).forEach(function (o) {
+      (o.threats || []).forEach(function (t) { if (t && t.id) known[t.id] = true; });
+      (o.countermeasures || []).forEach(function (m) { if (m && m.id) known[m.id] = true; });
+    });
+    var out = [];
+    project.zones.concat(project.conduits).forEach(function (o) {
+      var ids = [];
+      (String(o.justification || "").match(/\b[A-Z]+\d+\b/g) || []).forEach(function (w) { if (known[w] && ids.indexOf(w) < 0) ids.push(w); });
+      if (ids.length) out.push({ o: o, ids: ids });
+    });
+    return out;
   }
   // The report an item concerns, from whether it concerns each.
   function docOf(detailed, highLevel) { return detailed && highLevel ? "both" : detailed ? "detailed" : highLevel ? "highLevel" : null; }
 
   // The items one report is checked against: its own and those for both.
+  // "spec", the requirements specification (phase 6b): the items marked as
+  // concerning what it prints.
   function readiness(project, doc) {
+    if (doc === "spec") return completeness(project).filter(function (i) { return i.spec === true; });
     return completeness(project).filter(function (i) { return i.doc === doc || i.doc === "both"; });
   }
   function exportProblems(project) {
@@ -1182,8 +1228,32 @@ window.RiskApp.Engine = (function () {
     // The consultant's own SL-T only: null when none is set, never the
     // tool's suggestion standing in for a decision that was not made.
     function scalar(tgt) { var m = maxDefined(tgt); return m != null ? m : null; }
+    // Provenance added on the same 1.4 string (additive, context only): each
+    // field is written only when it holds something, so a file from before
+    // phase 6 and one with nothing recorded read the same.
+    function filled(v) { return typeof v === "string" && v.trim() !== ""; }
+    function pickText(src, keys, out) { keys.forEach(function (k) { if (filled(src[k])) out[k] = src[k].trim(); }); return out; }
+    // The risk comparison decision and the initial risk it was set against.
+    function addComparison(out, owner) {
+      var c = comparison(owner, p);
+      if (c.required !== null) { out.riskComparison = { required: c.required }; if (c.reason) out.riskComparison.reason = c.reason; }
+      if (c.initial) out.initialRisk = { risk: c.initial, source: c.source };
+      return out;
+    }
+    // name and type exactly as before; the register's own attributes when set.
+    function mapAsset(a) {
+      var o = {};
+      if (filled(a.id)) o.id = a.id;
+      o.name = a.name; o.type = a.type;
+      pickText(a, ["tag", "vendor", "model", "version"], o);
+      if (M.ASSET_CRITICALITY.indexOf(a.criticality) >= 0) o.criticality = a.criticality;
+      return o;
+    }
+    // Every recorded approval, in order; an entry not approved is not stated.
+    var approvals = M.approvalsOf(p).filter(function (e) { return e.approved === true; })
+      .map(function (e) { return pickText(e, ["name", "role", "organisation", "date", "scope"], {}); });
 
-    return {
+    var ctx = {
       schema: M.INTERCHANGE.schema,
       generatedBy: M.TOOL_ID,
       generatedOn: todayISO(),
@@ -1204,35 +1274,42 @@ window.RiskApp.Engine = (function () {
       approval: { name: p.approval.name, role: p.approval.role, date: p.approval.date, statement: p.approval.statement, approved: !!p.approval.approved },
       zones: vm.zones.map(function (row) {
         var z = row.o, s = suggestZone(z, p), tgt = tgtVec(z);
-        return {
+        return addComparison({
           id: z.id, name: z.name, safetyRelated: s.safetyRelated,
           fromHighLevelAsset: z.fromHLA || null,
           slSuggestedByFR: vecFrom(s), slTargetByFR: tgt, slTarget: scalar(tgt),
           worstUnmitigatedRisk: s.worstRisk,
           justification: z.justification,
-          assets: z.assets.map(function (a) { return { name: a.name, type: a.type }; }),
+          assets: z.assets.map(mapAsset),
           accessPoints: z.accessPoints.slice(), externalDependencies: z.externalDependencies.slice(), securityPolicies: z.securityPolicies.slice(),
           threats: mapThreats(row),
           vulnerabilities: z.vulnerabilities.map(function (v) { return { id: v.id, description: v.description }; }),
           countermeasures: z.countermeasures.map(function (m) { return { id: m.id, description: m.description, addressesFR: m.addressesFR.slice(), reference: m.reference, existing: !!m.existing }; })
-        };
+        }, z);
       }),
       conduits: vm.conduits.map(function (row) {
         var c = row.o, s = suggestConduit(c, p), tgt = tgtVec(c);
-        return {
+        return addComparison({
           id: c.id, fromZone: c.fromZone, toZone: c.toZone, name: c.name, channels: c.channels.slice(),
           slSuggestedByFR: vecFrom(s), slTargetByFR: tgt, slTarget: scalar(tgt),
           justification: c.justification,
           threats: mapThreats(row),
           vulnerabilities: c.vulnerabilities.map(function (v) { return { id: v.id, description: v.description }; }),
           countermeasures: c.countermeasures.map(function (m) { return { id: m.id, description: m.description, addressesFR: m.addressesFR.slice(), reference: m.reference, existing: !!m.existing }; })
-        };
+        }, c);
       })
     };
+    // Beside the single approval mirror, which stays as it was.
+    if (approvals.length) {
+      var ordered = {};
+      Object.keys(ctx).forEach(function (k) { ordered[k] = ctx[k]; if (k === "approval") ordered.approvals = approvals; });
+      ctx = ordered;
+    }
+    return ctx;
   }
 
   return {
-    todayISO: todayISO, tolerableOf: tolerableOf, findZone: findZone,
+    todayISO: todayISO, setToday: setToday, todayPinned: todayPinned, tolerableOf: tolerableOf, findZone: findZone,
     riskFor: riskFor, threatRisk: threatRisk, exceedsTolerable: exceedsTolerable,
     residualRisk: residualRisk, currentRisk: currentRisk, operativeRisk: operativeRisk, worstResidualOf: worstResidualOf, worstRiskOf: worstRiskOf,
     coveringCountermeasures: coveringCountermeasures, linkedCountermeasures: linkedCountermeasures,
@@ -1242,7 +1319,7 @@ window.RiskApp.Engine = (function () {
     TREATMENT_LABEL: TREATMENT_LABEL, threatTreatment: threatTreatment, threatDisposition: threatDisposition,
     assetTypeLabel: assetTypeLabel, assetLinkLabel: assetLinkLabel, flagLabel: flagLabel, scaleName: scaleName,
     conduitExternal: conduitExternal, conduitsOf: conduitsOf, separationRows: separationRows,
-    assetTypeFrom: assetTypeFrom, parseAssets: parseAssets,
+    assetTypeFrom: assetTypeFrom, assetLinkFrom: assetLinkFrom, parseAssets: parseAssets,
     SPEC_TITLES: SPEC_TITLES, specBlocks: specBlocks,
     approvalBasis: approvalBasis, approvalFingerprint: approvalFingerprint, approvalStates: approvalStates,
     APPROVAL_DOC_PARTS: APPROVAL_DOC_PARTS, approvalChangedFor: approvalChangedFor, approvalPartWords: approvalPartWords,

@@ -835,6 +835,9 @@ window.App.Engine = (function () {
       zones: ctx.zones || [],
       conduits: ctx.conduits || []
     };
+    // Every recorded approval (a later 1.4 file), kept as provenance with the
+    // rest; nothing here reads it. Absent from older files, so absent here.
+    if (Array.isArray(ctx.approvals)) ass.riskContext.approvals = ctx.approvals;
     if (!ass.targetProfile.perZone) ass.targetProfile.perZone = {};
 
     if (opts.scope && opts.zoneIds && opts.zoneIds.length > 0) {

@@ -506,6 +506,29 @@ window.RiskApp.Model = (function () {
   }
   function newAsset(pj, a) { return Object.assign({ id: nextAssetId(pj) }, a || { name: "", type: "plc" }); }
 
+  // ---------- Phase 6a: the asset register and the previous assessment ----------
+  // Optional and written only once set, like the fields above.
+  //
+  //   asset.tag, vendor, model, version, location, owner, notes   text
+  //   asset.criticality      "high" | "medium" | "low"
+  //   project.baseline       the previous assessment this one is compared with
+  //                          (js/compare.js): { fileName, savedOn, assessmentDate,
+  //                          revision, approvedOn, sucName, loadedOn, facts }, facts
+  //                          being the frozen copy of what is compared. It never
+  //                          changes anything else in the project.
+  var ASSET_TEXT_FIELDS = ["tag", "vendor", "model", "version", "location", "owner", "notes"];
+  var ASSET_CRITICALITY = ["high", "medium", "low"];
+  var ASSET_CRITICALITY_LABEL = { high: "High", medium: "Medium", low: "Low" };
+  // The register's columns, in the order the register and Word print them.
+  var ASSET_FIELD_LABEL = {
+    zone: "Zone", name: "Name", type: "Type", link: "Connection", tag: "Tag or hostname", vendor: "Vendor", model: "Model",
+    version: "Firmware or software version", location: "Location", criticality: "Criticality", owner: "Owner", notes: "Notes"
+  };
+  // Whether an asset has any of the register's own attributes.
+  function assetExtended(a) {
+    return !!a && (ASSET_TEXT_FIELDS.some(function (k) { return typeof a[k] === "string" && a[k].trim(); }) || ASSET_CRITICALITY.indexOf(a.criticality) >= 0);
+  }
+
   // True when the consultant has entered anything worth protecting — gates the
   // Load confirm so an untouched session opens a file without a needless nag.
   function projectHasContent(pj) {
@@ -522,7 +545,8 @@ window.RiskApp.Model = (function () {
       any(pj.zones) || any(pj.conduits) ||
       any(s.policies) || r.tolerableConfirmed || any(approvalsOf(pj)) ||
       pj.assessmentType || sectionEdits(pj.reportCustom) || (pj.review && any(pj.review.rounds)) ||
-      criteriaUsable(pj.criteria) || Array.isArray(pj.safetyFloorFR)
+      criteriaUsable(pj.criteria) || Array.isArray(pj.safetyFloorFR) ||
+      !!(pj.baseline && typeof pj.baseline === "object")
     );
   }
   // A report section edited in either report.
@@ -559,6 +583,8 @@ window.RiskApp.Model = (function () {
     criteriaContent: criteriaContent, genericPresetOf: genericPresetOf,
     houseFloorFR: houseFloorFR, safetyFloorFR: safetyFloorFR, setSafetyFloorFR: setSafetyFloorFR,
     ZONE_LEVELS: ZONE_LEVELS, zoneLevel: zoneLevel, LIBRARY: LIBRARY,
+    ASSET_TEXT_FIELDS: ASSET_TEXT_FIELDS, ASSET_CRITICALITY: ASSET_CRITICALITY, ASSET_CRITICALITY_LABEL: ASSET_CRITICALITY_LABEL,
+    ASSET_FIELD_LABEL: ASSET_FIELD_LABEL, assetExtended: assetExtended,
     projectHasContent: projectHasContent
   };
 }());

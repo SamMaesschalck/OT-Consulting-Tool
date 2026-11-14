@@ -13,7 +13,8 @@
  * paragraphs } }. paragraphs holds single paragraphs reworded by an accepted review
  * suggestion (js/review.js); this page lists them above the report, each with
  * whether it still applies and the way back.
- * Two sets, because same-named sections say different things in the two reports.
+ * Two sets, because same-named sections say different things in the two reports,
+ * and a third, spec, for the cyber security requirements specification (phase 6b).
  * It is absent until something is changed, and empties are removed again, so a
  * project with no overrides saves as it always did. See shared/report-sections.js
  * for the key and the pass that applies it to Word.
@@ -28,9 +29,12 @@ window.RiskReportPage = (function () {
   function project() { return RT().state.project; }
   function norm(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim(); }
 
+  // The cyber security requirements specification is the third (phase 6b),
+  // built from the same sections as the detailed report, with its own store.
   var DOCS = [
     { id: "detailed", label: "Detailed", title: "Detailed report", opts: {} },
-    { id: "highLevel", label: "High level", title: "High-level report", opts: { highLevelOnly: true } }
+    { id: "highLevel", label: "High level", title: "High-level report", opts: { highLevelOnly: true } },
+    { id: "spec", label: "Specification", title: "Cyber security requirements specification", opts: { spec: true } }
   ];
 
   // ---- the store -------------------------------------------------------------
@@ -63,7 +67,7 @@ window.RiskReportPage = (function () {
   }
 
   // ---- the build ---------------------------------------------------------------
-  var ui = { doc: 0, open: null, models: [null, null], building: false, error: null, errorSig: null, holder: null, status: null, reveal: null, h: null };
+  var ui = { doc: 0, open: null, models: [null, null, null], building: false, error: null, errorSig: null, holder: null, status: null, reveal: null, h: null };
 
   function signature() {
     var c = Object.assign({}, project());
@@ -582,7 +586,7 @@ window.RiskReportPage = (function () {
     main.appendChild(h("h1", { class: "page-title", text: "Report" }));
     main.appendChild(h("p", { class: "page-sub", text: "The Word report, section by section; use Edit to rename, rewrite or hide one." }));
     ui.tabs = h("div", { class: "rp-tabs", role: "group", "aria-label": "Which report" }, DOCS.map(function (d, i) {
-      return h("button", { class: "sl-btn rp-tab", text: d.label, onClick: function () { openDoc(i); } });
+      return h("button", { class: "sl-btn rp-tab", "data-doc": d.id, text: d.label, onClick: function () { openDoc(i); } });
     }));
     ui.status = h("span", { class: "rp-status", role: "status" });
     main.appendChild(h("div", { class: "rp-toolbar no-print" }, [
@@ -600,7 +604,7 @@ window.RiskReportPage = (function () {
   }
   // Go to, from a review comment: this report, this section.
   function goTo(docIndex, key, quote) {
-    ui.doc = docIndex === 1 ? 1 : 0;
+    ui.doc = docIndex === 1 || docIndex === 2 ? docIndex : 0;
     ui.open = null;
     ui.reveal = { key: key || "", quote: quote || "" };
     // The Report page shows the sections, on this report (js/ui-reports.js).

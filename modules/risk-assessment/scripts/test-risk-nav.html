@@ -50,6 +50,7 @@
 
   function run(w) {
     var RT = w.RiskTool, MG = w.RiskApp.Migrate, d = w.document, RULES = w.App.Data.sltRules;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
     var confirms = 0;
     w.confirm = function () { confirms++; return true; };
     w.alert = function () {};
@@ -141,8 +142,10 @@
     // Check and issue, high-level only: the high-level report first, the detailed one set aside.
     RT.navigate("review");
     var cards = [].map.call(main().querySelectorAll("[data-readiness]"), function (c) { return c.getAttribute("data-readiness"); }).join(",");
-    ok(cards === "highLevel,detailed" && /Not part of a high-level-only assessment/.test(main().querySelector('[data-readiness="detailed"]').textContent) && !/Not part of/.test(main().querySelector('[data-readiness="highLevel"]').textContent),
+    // Phase 6b: the requirements specification's card comes last, set aside like the detailed one.
+    ok(cards === "highLevel,detailed,spec" && /Not part of a high-level-only assessment/.test(main().querySelector('[data-readiness="detailed"]').textContent) && !/Not part of/.test(main().querySelector('[data-readiness="highLevel"]').textContent),
       "high-level only: Check and issue puts the high-level report first, and marks the detailed one as not part of it", cards);
+    ok(/Not part of a high-level-only assessment/.test(main().querySelector('[data-readiness="spec"]').textContent), "and the requirements specification too (phase 6b)");
     RT.navigate("home");
     main().querySelector('[data-assessment-type="full"]').click();
     ok(P().assessmentType === "full" && navStatus("zones") === "Not started" && !RT.completeness().some(function (i) { return /decision on a detailed assessment/.test(i.text); }), "a full assessment asks for no decision on the ranking: it is made per zone and conduit");

@@ -43,6 +43,7 @@
     w.confirm = function () { return true; }; w.alert = function () {};
     poll(function () { return w.RiskTool && w.RiskReview && w.RiskTool.state.project.zones.length; }).then(function () {
       var RT = w.RiskTool, RR = w.RiskReview, demo = JSON.stringify(RT.state.project);
+      RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
       function fresh() { RT.loadProjectText(demo); return RT.state.project; }
       function pack() { return RR.buildPack().then(function (r) { return JSON.parse(JSON.stringify(r.pack)); }); }
       function owners(p) { return p.zones.concat(p.conduits); }

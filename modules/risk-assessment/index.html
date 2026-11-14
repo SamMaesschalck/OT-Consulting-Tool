@@ -361,6 +361,23 @@
     .slt-grid .btn.xs { white-space: nowrap; }
     .slt-grid td:first-child { min-width: 170px; }
     .grid-scroll { overflow-x: auto; }
+    /* Step 3 Asset register (phase 6a) */
+    .asset-register td input, .asset-register td select, .asset-register td textarea { min-width: 110px; }
+    .asset-register td input[data-asset-field="name"] { min-width: 180px; }
+    .asset-register th .sort-btn { font-weight: 600; white-space: nowrap; }
+    /* The register scrolls inside its card: the header row stays at the top,
+       and the ID and Name columns stay at the left on a wide scroll. */
+    .reg-scroll { max-height: 70vh; overflow: auto; }
+    .asset-register thead th { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+    .asset-register .reg-id { position: sticky; left: 0; z-index: 1; background: var(--surface); min-width: 56px; width: 56px; }
+    .asset-register .reg-name { position: sticky; left: 56px; z-index: 1; background: var(--surface); box-shadow: 1px 0 0 var(--border); }
+    .asset-register thead th.reg-id, .asset-register thead th.reg-name { z-index: 3; }
+    .asset-register textarea.reg-notes { resize: vertical; min-height: 0; overflow: hidden; line-height: 1.35; }
+    .paste-summary { margin: 8px 0 4px; font-size: 13px; }
+    .reg-filters input[type="search"] { width: 200px; }
+    .paste-map { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+    .paste-map .field { min-width: 160px; }
+    .changes-head { margin: 10px 0 4px; font-size: 13px; color: var(--text-muted); }
     .sug-word { font-size: 11px; margin-top: 2px; }
 
     .print-only { display: none; }
@@ -417,12 +434,15 @@
   <!-- The app itself, as classic scripts in this order (no modules, so it
        runs from file:// and the single-HTML build inlines each one): the
        project's shape, the risk maths, the file migration, the view model
-       every output reads, the page kit, the running app, the pages, then
+       every output reads, the asset register and the comparison with a
+       previous assessment (js/assets.js, js/compare.js), the page kit, the running app, the pages, then
        boot.js, which starts it and publishes window.RiskTool. -->
   <script src="js/model.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/migrate.js"></script>
   <script src="js/view-model.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/compare.js"></script>
   <script src="js/ui-kit.js"></script>
   <script src="js/app.js"></script>
   <script src="js/ui-stages.js"></script>
@@ -430,6 +450,7 @@
   <script src="js/ui-library.js"></script>
   <script src="js/ui-risk.js"></script>
   <script src="js/ui-zones.js"></script>
+  <script src="js/ui-assets.js"></script>
   <script src="js/ui-spec.js"></script>
   <script src="js/ui-reports.js"></script>
   <script src="js/ui-about.js"></script>

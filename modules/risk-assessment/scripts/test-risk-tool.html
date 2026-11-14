@@ -28,6 +28,7 @@
 
   function run(w) {
     var RT = w.RiskTool, RULES = w.App.Data.sltRules, proj = RT.state.project;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
 
     // Headless Edge blocks on native confirm()/alert(); stub them. Default to
     // "yes" so the loadProjectText round-trips below proceed past the new Load

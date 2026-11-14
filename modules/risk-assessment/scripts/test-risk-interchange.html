@@ -1,0 +1,200 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool risk context provenance</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  Phase 6 of docs/risk-tool-redesign.md, owner's option A for the interchange:
+  provenance added to the risk-context file on the same spt-risk-context/1.4
+  string, because the released v0.7 Assessment Tool refuses any schema not in
+  its accepted list.
+  - The demo export conforms to the contract: every field it writes is in the
+    contract's example, with the example's type (null allowed where a value is
+    optional).
+  - It carries the new fields: each zone's and conduit's risk comparison
+    decision and initial risk (with its source), each asset's id and register
+    attributes, and a top-level approvals list beside the single mirror.
+  - Only fields that hold something are written.
+  - The six consumed zone fields, the conduit fields, the FR keys and EXT are
+    as before, and the rest of a zone's, conduit's and asset's keys are those
+    the v0.7 build wrote.
+  - The export is the file the Assessment Tool's tests import
+    (modules/assessments/scripts/fixtures/risk-context-demo.js).
+-->
+<iframe id="app" src="../index.html?tour=1" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../../assessments/scripts/fixtures/risk-context-demo.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " - " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  var tries = 0;
+  var t = setInterval(function () {
+    var w = document.getElementById("app").contentWindow;
+    var ready = w && w.RiskTool && w.RiskTool.state && w.RiskTool.state.project && w.RiskTool.state.project.zones.length >= 4;
+    if (!ready) { if (++tries > 300) { clearInterval(t); lines.push("FAIL the demo did not load"); failures++; done(); } return; }
+    clearInterval(t);
+    try { run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+    done();
+  }, 50);
+
+  // ---- A light schema check, from the contract's own example ----
+  // Every example value adds to a template (the types seen, an object's keys,
+  // an array's items). A value conforms when each key it carries is in the
+  // template with one of its types; null stands for "not set" on any plain
+  // value. A conduit's register has the zones' shape.
+  function typeOf(v) { return v === null ? "null" : Array.isArray(v) ? "array" : typeof v; }
+  function add(t, v) {
+    var ty = typeOf(v); t.types[ty] = true;
+    if (ty === "object") { t.keys = t.keys || {}; Object.keys(v).forEach(function (k) { if (!t.keys[k]) t.keys[k] = { types: {} }; add(t.keys[k], v[k]); }); }
+    if (ty === "array") { t.item = t.item || { types: {} }; v.forEach(function (x) { add(t.item, x); }); }
+    return t;
+  }
+  function templateOf(example) {
+    var t = add({ types: {} }, example), ct = t.keys.conduits.item;
+    ["threats", "vulnerabilities", "countermeasures"].forEach(function (k) {
+      if (!ct.keys[k]) ct.keys[k] = { types: { array: true } };
+      example.zones.forEach(function (z) { if (z[k]) add(ct.keys[k], z[k]); });
+    });
+    return t;
+  }
+  function conform(v, t, path, out) {
+    var ty = typeOf(v);
+    if (!t) { out.push(path + " is not in the contract"); return out; }
+    var plain = t.types.string || t.types.number || t.types.boolean;
+    if (!t.types[ty] && !(ty === "null" && plain)) { out.push(path + " is " + ty + ", the contract has " + Object.keys(t.types).join("/")); return out; }
+    if (ty === "object") Object.keys(v).forEach(function (k) { conform(v[k], t.keys && t.keys[k], path + "." + k, out); });
+    if (ty === "array") v.forEach(function (x, i) { conform(x, t.item, path + "[" + i + "]", out); });
+    return out;
+  }
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    var contract = w.App.Data.interchange, p = RT.state.project;
+    var FR = ["IAC", "UC", "SI", "DC", "RDF", "TRE", "RA"];
+
+    // ---- A. the contract: same string, same accepted list ----
+    ok(contract && contract.schema === "spt-risk-context/1.4" && contract.example.schema === "spt-risk-context/1.4", "the contract stays at spt-risk-context/1.4", contract && contract.schema);
+    ok(same(contract.acceptedSchemas, ["spt-risk-context/1.0", "spt-risk-context/1.1", "spt-risk-context/1.2", "spt-risk-context/1.3", "spt-risk-context/1.4"]), "and accepts the five schemas v0.7 accepts", JSON.stringify(contract.acceptedSchemas));
+    ok(same(contract.importContract.frKeys, FR), "the FR keys are frozen");
+    ok(contract.importContract.consumedByAssessment === "zones[].{id,name,slTarget,slTargetByFR,justification,safetyRelated} and conduits[].{id,fromZone,toZone,slTarget,slTargetByFR}", "the consumed fields are frozen");
+    ["riskComparison", "initialRisk", "approvals", "organisation", "criticality", "vendor"].forEach(function (k) {
+      ok(contract._note.indexOf(k) >= 0, "the contract note describes " + k);
+    });
+    var ex = contract.example, exZ = ex.zones[0], exC = ex.conduits[2];
+    ok(Array.isArray(ex.approvals) && ex.approvals.length >= 1 && !!exZ.riskComparison && !!exZ.initialRisk && !!exZ.assets[0].id && !!exZ.assets[0].criticality && !!exC.riskComparison && !!exC.initialRisk,
+      "and the example carries every new field");
+    var exProbs = conform(ex, templateOf(ex), "example", []);
+    ok(exProbs.length === 0, "the example conforms to itself (the check is sound)", exProbs.join(" | "));
+
+    // ---- B. the demo export conforms ----
+    var ctx = RT.buildRiskContext(p), tpl = templateOf(ex);
+    ok(ctx.schema === contract.schema, "the demo exports spt-risk-context/1.4", ctx.schema);
+    var probs = conform(ctx, tpl, "ctx", []);
+    ok(probs.length === 0, "the demo export conforms to the contract", probs.slice(0, 6).join(" | "));
+    var wrong = clone(ctx); wrong.zones[0].riskComparison.decidedBy = "x"; wrong.approvals[0].approved = "yes";
+    ok(conform(wrong, tpl, "ctx", []).length === 2, "and the check finds a field the contract does not describe");
+
+    // ---- C. the new fields ----
+    var dz = p.zones, dc = p.conduits;
+    ok(ctx.zones.length === 4 && ctx.zones.every(function (z, i) {
+      var c = RT.comparison(dz[i], p);
+      return z.riskComparison && z.riskComparison.required === c.required && !("reason" in z.riskComparison) &&
+        z.initialRisk && z.initialRisk.risk === c.initial && z.initialRisk.source === "systems";
+    }), "each zone carries its risk comparison decision and its initial risk from the ranked systems", JSON.stringify(ctx.zones.map(function (z) { return [z.riskComparison, z.initialRisk]; })));
+    ok(ctx.conduits.length === 3 && ctx.conduits.every(function (c, i) {
+      var d = dc[i].detailed || {};
+      return c.riskComparison && c.riskComparison.required === d.required &&
+        (d.reason ? c.riskComparison.reason === d.reason.trim() : !("reason" in c.riskComparison)) &&
+        c.initialRisk && c.initialRisk.source === "zones" && c.initialRisk.risk === RT.comparison(dc[i], p).initial;
+    }), "each conduit carries its decision, with the reason where one is recorded, and its initial risk from the zones it joins", JSON.stringify(ctx.conduits.map(function (c) { return [c.riskComparison, c.initialRisk]; })));
+    ok(ctx.conduits.filter(function (c) { return c.riskComparison.required === false; }).length === 2, "the two conduits found not to need a detailed assessment say so");
+    var allAssets = [].concat.apply([], ctx.zones.map(function (z) { return z.assets; }));
+    ok(allAssets.length === 11 && allAssets.every(function (a) { return /^AS\d+$/.test(a.id); }), "every asset carries its id", JSON.stringify(allAssets.map(function (a) { return a.id; })));
+    ok(Array.isArray(ctx.approvals) && ctx.approvals.length === 2, "the approvals list carries both recorded approvals", JSON.stringify(ctx.approvals));
+    var ap = M.approvalsOf(p);
+    ok(ctx.approvals.every(function (a, i) {
+      return same(Object.keys(a), ["name", "role", "organisation", "date", "scope"]) &&
+        a.name === ap[i].name && a.role === ap[i].role && a.organisation === ap[i].organisation && a.date === ap[i].date && a.scope === ap[i].scope;
+    }), "each with name, role, organisation, date and scope, in order");
+    ok(!/fingerprint|revision|"approved"/.test(JSON.stringify(ctx.approvals)), "and nothing the risk tool keeps for itself (fingerprint, revision)");
+    ok(same(ctx.approval, { name: ap[0].name, role: ap[0].role, date: ap[0].date, statement: ap[0].scope, approved: true }), "the single approval mirror is as it was, the first entry");
+    var keys = Object.keys(ctx);
+    ok(keys.indexOf("approvals") === keys.indexOf("approval") + 1, "and the list sits beside it", keys.join(","));
+
+    // ---- D. the consumed fields and the rest of the shape are as before ----
+    // The keys the released v0.7 build wrote (its export of the demo:
+    // modules/assessments/scripts/fixtures/risk-context-v0.7-demo.js).
+    var V07_TOP = ["schema", "generatedBy", "generatedOn", "suc", "securityRequirements", "highLevelAssets", "basisOfAssessment", "assumptions", "approval", "zones", "conduits"];
+    var V07_ZONE = ["id", "name", "safetyRelated", "fromHighLevelAsset", "slSuggestedByFR", "slTargetByFR", "slTarget", "worstUnmitigatedRisk", "justification", "assets", "accessPoints", "externalDependencies", "securityPolicies", "threats", "vulnerabilities", "countermeasures"];
+    var V07_CONDUIT = ["id", "fromZone", "toZone", "name", "channels", "slSuggestedByFR", "slTargetByFR", "slTarget", "justification", "threats", "vulnerabilities", "countermeasures"];
+    var NEW = ["approvals", "riskComparison", "initialRisk"];
+    function without(o) { return Object.keys(o).filter(function (k) { return NEW.indexOf(k) < 0; }); }
+    ok(same(without(ctx), V07_TOP), "the top-level keys are v0.7's, plus approvals", keys.join(","));
+    ok(ctx.zones.every(function (z) { return same(without(z), V07_ZONE); }), "each zone's keys are v0.7's, plus the two new ones", Object.keys(ctx.zones[0]).join(","));
+    ok(ctx.conduits.every(function (c) { return same(without(c), V07_CONDUIT); }), "each conduit's keys are v0.7's, plus the two new ones", Object.keys(ctx.conduits[0]).join(","));
+    ok(allAssets.every(function (a) { var k = Object.keys(a); return k[1] === "name" && k[2] === "type"; }), "an asset's name and type are as before");
+    ok(ctx.zones.every(function (z, i) {
+      var o = dz[i];
+      return typeof z.id === "string" && z.id === o.id && z.name === o.name && typeof z.safetyRelated === "boolean" &&
+        typeof z.justification === "string" && z.justification === o.justification &&
+        same(Object.keys(z.slTargetByFR), FR) && FR.every(function (fr) { return z.slTargetByFR[fr] === (o.slTargetByFR[fr] != null ? o.slTargetByFR[fr] : null); }) &&
+        z.slTarget === E.maxDefined(z.slTargetByFR);
+    }), "the six consumed zone fields carry what they did (id, name, slTarget, slTargetByFR, justification, safetyRelated)");
+    ok(ctx.conduits.every(function (c, i) {
+      var o = dc[i];
+      return c.id === o.id && c.fromZone === o.fromZone && c.toZone === o.toZone && same(Object.keys(c.slTargetByFR), FR) && (c.slTarget === null || typeof c.slTarget === "number");
+    }) && ctx.conduits.some(function (c) { return c.fromZone === "EXT" || c.toZone === "EXT"; }), "and the conduit fields, with EXT for the outside");
+
+    // ---- E. only fields that hold something ----
+    var q = clone(p);
+    var qa = q.zones[0].assets[0];
+    qa.tag = "  DCS-SRV-A "; qa.vendor = "Example Controls"; qa.model = ""; qa.version = "   "; qa.criticality = "high"; qa.location = "Control room"; qa.owner = "J. Whitmore"; qa.notes = "Redundant pair";
+    q.zones[0].assets[1].criticality = "urgent";
+    q.conduits[1].detailed = {};
+    q.conduits[0].detailed = { required: false, reason: "   " };
+    var cq = RT.buildRiskContext(q), a0 = cq.zones[0].assets[0], a1 = cq.zones[0].assets[1];
+    ok(same(a0, { id: qa.id, name: qa.name, type: qa.type, tag: "DCS-SRV-A", vendor: "Example Controls", criticality: "high" }), "an asset writes the attributes it has, trimmed, and leaves out the blank ones", JSON.stringify(a0));
+    ok(!("location" in a0) && !("owner" in a0) && !("notes" in a0), "location, owner and notes stay in the risk tool");
+    ok(!("criticality" in a1), "a criticality that is not high, medium or low is not written", JSON.stringify(a1));
+    ok(!("riskComparison" in cq.conduits[1]) && "initialRisk" in cq.conduits[1], "with no decision recorded there is no riskComparison, and the initial risk still shows");
+    ok(same(cq.conduits[0].riskComparison, { required: false }), "a blank reason is not written", JSON.stringify(cq.conduits[0].riskComparison));
+    // A zone with no ranked system: the initial risk entered for it, else none.
+    var z5 = RT.emptyZone(5); z5.name = "Entered risk"; z5.hlaIds = []; z5.initialRisk = "low"; q.zones.push(z5);
+    var z6 = RT.emptyZone(6); z6.name = "No risk yet"; z6.hlaIds = []; q.zones.push(z6);
+    var cq2 = RT.buildRiskContext(q), e5 = cq2.zones[4], e6 = cq2.zones[5];
+    ok(same(e5.initialRisk, { risk: "low", source: "entered" }), "an initial risk entered directly says so", JSON.stringify(e5.initialRisk));
+    ok(!("initialRisk" in e6) && !("riskComparison" in e6), "a zone with neither writes neither", JSON.stringify(Object.keys(e6)));
+    ok(e5.assets.length === 0 && same(without(e6), V07_ZONE), "and keeps the v0.7 keys");
+    // Approvals: only those given, and no list when none is.
+    q.approvals[1].approved = false;
+    var cq3 = RT.buildRiskContext(q);
+    ok(cq3.approvals.length === 1 && cq3.approvals[0].name === ap[0].name, "an approval not given is not listed", JSON.stringify(cq3.approvals));
+    q.approvals[0].organisation = "";
+    ok(!("organisation" in RT.buildRiskContext(q).approvals[0]), "nor a blank field of one");
+    q.approvals.forEach(function (e) { e.approved = false; }); q.approval.approved = false;
+    var cq4 = RT.buildRiskContext(q);
+    ok(!("approvals" in cq4) && cq4.approval.approved === false && same(Object.keys(cq4), V07_TOP), "with none given there is no list, and the file has v0.7's keys", Object.keys(cq4).join(","));
+    var empty = RT.buildRiskContext(M.emptyProject());
+    ok(!("approvals" in empty) && empty.zones.length === 0, "an empty project writes no approvals list");
+    ok(conform(cq2, tpl, "ctx", []).length === 0, "the variants conform too");
+
+    // ---- F. the file the Assessment Tool's tests import ----
+    var fx = (window.RiskContextFixtures || {}).demo;
+    ok(!!fx, "the Assessment Tool's copy of the demo export is present");
+    function core(o) { o = clone(o); delete o.generatedOn; delete o.generatedBy; return JSON.stringify(o, null, 2); }
+    var a = core(ctx), b = fx ? core(fx) : "";
+    var at = 0; while (at < a.length && a[at] === b[at]) at++;
+    ok(a === b, "it is this export (regenerate modules/assessments/scripts/fixtures/risk-context-demo.js when the demo or the export changes on purpose)",
+      a === b ? "" : "first difference near: " + a.slice(Math.max(0, at - 80), at + 80));
+  }
+})();
+</script>
+</body>
+</html>

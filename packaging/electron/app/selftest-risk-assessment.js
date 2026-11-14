@@ -152,13 +152,17 @@ module.exports = function selfTest(win) {
       await run(`(function () {
         RiskExports.downloadWord({}, function () {});
         RiskExports.downloadExcel(function () {});
+        // The cyber security requirements specification, a Word file of its own (phase 6b).
+        RiskExports.downloadWord({ spec: true }, function () {});
         return 0;
       })()`);
-      for (let i = 0; i < 300 && !(downloads.filter((d) => d.state !== "pending").length >= 2); i++) await sleep(100);
+      for (let i = 0; i < 300 && !(downloads.filter((d) => d.state !== "pending").length >= 3); i++) await sleep(100);
       const xl = downloads.find((d) => /\.xlsx$/i.test(d.name));
-      const wd = downloads.find((d) => /\.docx$/i.test(d.name));
+      const wd = downloads.find((d) => /\.docx$/i.test(d.name) && !/requirements-specification/i.test(d.name));
+      const sp = downloads.find((d) => /-cyber-security-requirements-specification\.docx$/i.test(d.name));
       ok(xl && xl.state === "completed" && xl.bytes > 8000 && xl.zip, "an Excel export downloads to disk", xl && JSON.stringify(xl));
       ok(wd && wd.state === "completed" && wd.bytes > 5000 && wd.zip, "a Word export downloads to disk", wd && JSON.stringify(wd));
+      ok(sp && sp.state === "completed" && sp.bytes > 5000 && sp.zip, "and the requirements specification downloads to disk", sp && JSON.stringify(sp));
       downloads.forEach((d) => { try { if (d.path) fs.unlinkSync(d.path); } catch (err) {} });
 
       // Unsaved work, then close: the app's guard must fire, and the window
