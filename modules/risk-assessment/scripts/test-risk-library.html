@@ -71,7 +71,7 @@
     var LIB = RT.scenarioLibrary, file = window.App && window.App.Data && window.App.Data.scenarioLibrary;
     ok(!!LIB && !!file && same(LIB, file), "the library is loaded from data/scenario-library.js");
     ok(/^\d+\.\d+$/.test(LIB.version) && /^\d{4}-\d{2}-\d{2}$/.test(LIB.date), "it carries a version and a date", LIB.version + " " + LIB.date);
-    ok(typeof LIB._note === "string" && /name an owner/.test(LIB._note) && /SolutionsPT/.test(LIB._note), "and a note that SolutionsPT must name an owner for the wording");
+    ok(typeof LIB._note === "string" && LIB.owner === "Sam Maesschalck" && /owned by Sam Maesschalck/.test(LIB._note) && /SolutionsPT/.test(LIB._note), "and a note naming the SolutionsPT owner of the wording");
     var S = LIB.scenarios;
     ok(Array.isArray(S) && S.length === 33 && S[S.length - 1].id === "HS33", "thirty-three scenarios, HS01 to HS33", String(S && S.length));
     var ids = S.map(function (s) { return s.id; });

@@ -5,8 +5,9 @@ window.App.Data = window.App.Data || {};
 window.App.Data.scenarioLibrary = {
   "schema": "spt-scenario-library/1.0",
   "version": "1.1",
-  "date": "2026-11-13",
-  "_note": "HOUSE scenario library for step 5 of the risk tool. SolutionsPT must name an owner for the wording of these scenarios before they are relied on in client work; until then the wording is a working draft. Every scenario is written in SolutionsPT's own words for this tool and is not taken from any standard, threat framework or vendor document. The SR ids are references to IEC 62443-3-3 system requirements by id only; no requirement text is reproduced. The library holds no ratings: the consultant rates every scenario added from it. Nothing in this note is shown in the tool or printed in a deliverable.",
+  "date": "2026-11-14",
+  "owner": "Sam Maesschalck",
+  "_note": "HOUSE scenario library for step 5 of the risk tool. The wording is owned by Sam Maesschalck (SolutionsPT, named 14 Nov 2026), who approves any change to it. Every scenario is written in SolutionsPT's own words for this tool and is not taken from any standard, threat framework or vendor document. The SR ids are references to IEC 62443-3-3 system requirements by id only; no requirement text is reproduced. The library holds no ratings: the consultant rates every scenario added from it. Nothing in this note is shown in the tool or printed in a deliverable.",
   "tags": {
     "remote-access": "Remote access",
     "removable-media": "Removable media",
