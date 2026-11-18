@@ -5,8 +5,9 @@
   "entry": "index.html",
   "tests": {
     "pages": "scripts/test-*.html",
-    "virtualTimeMs": 300000,
+    "virtualTimeMs": 900000,
     "timeoutSec": 300,
+    "_virtualTime": "900000: the review and Word pages build several reports each and ran out of 300000 in a sequential run (test-risk-accept stopped short).",
     "_alone": "Pages tools/run-tests.ps1 -Parallel runs on their own: test-risk-sections measures a text box grown to its text.",
     "alone": ["test-risk-sections.html"]
   },
