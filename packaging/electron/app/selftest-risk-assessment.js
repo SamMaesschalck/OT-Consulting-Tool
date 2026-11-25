@@ -136,9 +136,16 @@ module.exports = function selfTest(win) {
           document.querySelectorAll("#sidebar .nav-item")[i].click();
           pages.push(document.getElementById("main").textContent.length);
         }
+        // Step 5's By consequence tab: a card per consequence (by data-tab and data-consequence-id).
+        var kCards = -1, risk = document.querySelector('#sidebar .nav-item[data-stage="risk"]');
+        if (risk) {
+          risk.click();
+          var ktab = document.querySelector('#main .step-tabs [data-tab="consequence"]');
+          if (ktab) { ktab.click(); kCards = document.querySelectorAll("#main [data-consequence-id]").length; }
+        }
         var review = document.querySelector('#sidebar .nav-item[data-stage="review"]');   // Check and issue
         if (review) review.click();
-        return { inline: true, loaded: loaded !== false, name: p.suc.name, zones: p.zones.length, conduits: p.conduits.length, threats: threats,
+        return { inline: true, loaded: loaded !== false, name: p.suc.name, zones: p.zones.length, conduits: p.conduits.length, threats: threats, kCards: kCards,
                  pages: pages, shows: document.getElementById("main").textContent.indexOf("Acme Petrochemicals") !== -1,
                  problems: RiskTool.exportProblems(p).length };
       })()`);
@@ -146,6 +153,7 @@ module.exports = function selfTest(win) {
       ok(demo.loaded && /^Acme Petrochemicals/.test(demo.name || "") && demo.zones === 4 && demo.conduits === 3 && demo.threats === 9,
          "it loads: 4 zones, 3 conduits, 9 threats", JSON.stringify(demo));
       ok(demo.pages && demo.pages.length >= 8 && demo.pages.every((n) => n > 150), "every page renders (" + (demo.pages || []).length + " pages)", JSON.stringify(demo.pages));
+      ok(demo.kCards === 3, "step 5's By consequence shows the demo's three consequences", JSON.stringify(demo.kCards));
       ok(demo.shows && demo.problems === 0, "the Check and issue page shows it, complete enough to export", JSON.stringify(demo));
 
       // Real downloads through the app's own export path, onto disk.

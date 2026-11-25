@@ -31,10 +31,14 @@
  *     without criteria reads the house criteria, as before. So are phase
  *     5b's (the project's safety floor list, a zone's drawing level and place
  *     in its band, a threat's library id), and phase 6a's (an asset's
- *     register attributes, the previous assessment compared with).
+ *     register attributes, the previous assessment compared with), and the
+ *     consequence-first fields (the consequences, a threat's consequenceId
+ *     and via; the consequence counter kept above every K id).
  *  3. The dangling-id prune: a reference to a record that is not in the file
  *     (a zone's ranked systems, a conduit's end, a threat's linked assets,
- *     vulnerabilities and countermeasures) is cleared, never invented.
+ *     vulnerabilities and countermeasures, its consequence and the zones and
+ *     conduits its path passes through, a consequence's ranked systems) is
+ *     cleared, never invented.
  *     An older build edits a file without maintaining the links a newer one
  *     added, so a link can outlive what it pointed at. A zone's fromHLA is
  *     kept the first of its hlaIds; one an older build wrote goes first.
@@ -379,7 +383,44 @@ window.RiskApp.Migrate = (function () {
     normNew(data);
     normNew5b(data);
     normNew6(data);
+    normConsequences(data);
     return data;
+  }
+
+  // The consequence-first fields (js/model.js), tidied when present and never
+  // added: the consequences keep what reads as one (an object), each with its
+  // text fields as text, its ranked systems as a list of ids and its impact by
+  // category as a category map; one with no id, or an id taken, gets the next
+  // K id. The counter is kept above every K id in the file. A threat's
+  // consequenceId is text, its via a list of ids (an empty one goes).
+  function normConsequences(data) {
+    if ("consequences" in data) {
+      if (!Array.isArray(data.consequences)) delete data.consequences;
+      else {
+        data.consequences = data.consequences.filter(isObj);
+        var seen = {}, top = typeof data.counters.consequence === "number" ? data.counters.consequence : 0;
+        data.consequences.forEach(function (k) {
+          var m = isStr(k.id) ? /^K(\d+)$/.exec(k.id) : null;
+          if (m && Number(m[1]) > top) top = Number(m[1]);
+        });
+        data.counters.consequence = top;
+        data.consequences.forEach(function (k) {
+          if (!isStr(k.id) || !k.id || seen[k.id]) k.id = M.nextConsequenceId(data);
+          seen[k.id] = true;
+          M.CONSEQUENCE_TEXT_FIELDS.forEach(function (f) { if (!isStr(k[f])) k[f] = ""; });
+          k.hlaIds = strList(k.hlaIds);
+          normCategoryMap(k, "impactByCategory");
+        });
+      }
+    }
+    if ("consequence" in data.counters && typeof data.counters.consequence !== "number") delete data.counters.consequence;
+    (data.zones || []).concat(data.conduits || []).forEach(function (o) {
+      (isObj(o) && Array.isArray(o.threats) ? o.threats : []).forEach(function (t) {
+        if (!isObj(t)) return;
+        if ("consequenceId" in t && (!isStr(t.consequenceId) || !t.consequenceId)) delete t.consequenceId;
+        if ("via" in t) { if (Array.isArray(t.via)) M.setVia(t, t.via); else delete t.via; }
+      });
+    });
   }
 
   // The fields phase 6a added (js/model.js), tidied when present and never
@@ -471,6 +512,19 @@ window.RiskApp.Migrate = (function () {
         }
       });
     });
+    // A path's consequence and the zones and conduits it passes through (a
+    // build that does not know them edits the file without them): one that
+    // is not there goes, and a path never passes through where it acts.
+    var ks = idsOf(M.consequencesOf(data)), owners = idsOf(data.zones.concat(data.conduits));
+    data.zones.concat(data.conduits).forEach(function (o) {
+      o.threats.forEach(function (t) {
+        if (t.consequenceId && !ks[t.consequenceId]) delete t.consequenceId;
+        if (Array.isArray(t.via)) M.setVia(t, t.via.filter(function (id) { return owners[id] && id !== o.id; }));
+      });
+    });
+    var known = {};
+    data.srs.highLevelAssets.forEach(function (a) { if (a && a.id) known[a.id] = true; });
+    M.consequencesOf(data).forEach(function (k) { if (Array.isArray(k.hlaIds)) k.hlaIds = uniq(keepKnown(k.hlaIds, known)); });
     return data;
   }
 

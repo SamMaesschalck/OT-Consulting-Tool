@@ -1,0 +1,707 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool consequence first</title></head>
+<body>
+<pre id="out">running…</pre>
+<!--
+  Consequence first (docs/risk-tool-redesign.md, "Consequence-first"):
+  - The data: project.consequences, counters.consequence, threat.consequenceId
+    and threat.via; the migration tidies them when present and never adds
+    them, the prune drops what points at nothing, the counter stays above
+    every K id; the released v0.7.0 normaliser (frozen) keeps them.
+  - Step 5's By consequence tab: the bow-tie, add a consequence, add a path,
+    link a threat, a path from the library, unlink and remove with Undo, the
+    offer to update paths when the consequence's impact changes; step 2's
+    Start from this consequence; Leads to and Via in the By zone editor; the
+    register's Consequence filter and column; where the keyboard lands.
+  - Stepping stones: the flag on the rail and step 3's tables, and the house
+    SL-T method for a zone or conduit on a path; files without via give the
+    v0.7.0 suggestions exactly (frozen), and the demo without its
+    consequences prints the v0.7.0 Word text exactly (frozen).
+  - Completeness (warns only), Word, Excel, the review pack, the risk
+    context, the comparison with a previous assessment, and no dashes.
+-->
+<iframe id="f" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script src="fixtures/v0.7.0-migrate.js"></script>
+<script src="fixtures/slt-suggestions-v0.7.0.js"></script>
+<script src="fixtures/word-v0.7.0.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  var DASH = /[–—]/;
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var t = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+      if (t.replace(/\s+/g, "")) out.push(t);
+    }
+    return out;
+  }
+  function firstDiff(a, b) { for (var i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) return i; return -1; }
+  // The demo as the released v0.7.0 build had it: no consequences, no paths.
+  function stripped(p) {
+    var q = clone(p);
+    delete q.consequences;
+    if (q.counters) delete q.counters.consequence;
+    q.zones.concat(q.conduits).forEach(function (o) { o.threats.forEach(function (t) { delete t.consequenceId; delete t.via; }); });
+    // The demo's Z3 and Z4 justifications say why IAC is held below what the paths through
+    // them suggest, and Z4 notes the engineering connections that are not conduits;
+    // T4 copies K1's impact by category. Each is put back as v0.7.0 had it.
+    q.zones.forEach(function (z) {
+      z.justification = String(z.justification || "")
+        .replace(/ IAC is held at SL2 though the vendor remote access paths[^.]*\./, "")
+        .replace(/ IAC is held at SL2 although the engineering path to the SIS[^.]*\. The other FRs sit at SL1 or SL2,/, " Remaining FRs sit at SL1 or SL2,");
+      if (Array.isArray(z.assumptions)) z.assumptions = z.assumptions.filter(function (a) { return !/not modelled as conduits/.test(a); });
+      z.threats.forEach(function (t) { if (t.id === "T4") t.impactByCategory = { safety: "severe", environmental: "serious", regulatory: "serious" }; });
+    });
+    return q;
+  }
+
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, tries = 0;
+    var t = setInterval(function () {
+      if (!w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks || !w.RiskTool.state.project.zones.length) { if (++tries > 400) { clearInterval(t); ok(false, "the app exposed RiskTool with the demo"); done(); } return; }
+      clearInterval(t);
+      var r = null;
+      try { r = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+      if (r && typeof r.then === "function") r.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+      else done();
+    }, 50);
+  };
+  frame.src = "../index.html?tour=1";
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks;
+    var RP = w.RiskApp.RiskPage, CU = w.RiskApp.ConsequenceUI, d = w.document;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    w.confirm = function () { return true; }; w.alert = function () {};
+    var DEMO = window.SPT_TOUR_PROJECT, FX = window.RiskFixtures;
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function load(p) { RT.loadProjectText(JSON.stringify(p)); }
+    function owner(id) { return P().zones.concat(P().conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threat(oid, tid) { return owner(oid).threats.filter(function (x) { return x.id === tid; })[0]; }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    function kCard(id) { return main().querySelector('[data-consequence-id="' + id + '"]'); }
+    function toastText() { return d.getElementById("toast").textContent; }
+    function toastUndo() { return d.getElementById("toast").querySelector('[data-action="toast-undo"]'); }
+    function openConsequences() { RP.showConsequence(null); RT.navigate("risk"); }
+
+    // ---- A. the data and the migration --------------------------------------------------------
+    var k0 = M.emptyConsequence("K1");
+    ok(same(Object.keys(k0), ["id", "title", "description", "impact", "source", "hlaIds", "notes"]), "an empty consequence has its fields", Object.keys(k0).join());
+    var pc = { counters: { consequence: 1 }, consequences: [{ id: "K4" }, { id: "K2" }] };
+    ok(M.nextConsequenceId(pc) === "K5" && pc.counters.consequence === 5, "a new K id is above the counter and every id in the file");
+    var e0 = M.emptyProject();
+    ok(!("consequence" in e0.counters) && !("consequences" in e0), "a new project has neither consequences nor their counter");
+    e0.consequences = [M.emptyConsequence("K1")];
+    ok(M.projectHasContent(e0), "a consequence counts as content worth protecting");
+
+    // Files without the fields: nothing added.
+    ["tour-v0.7-saved", "tour-phase3-0.2", "hand-made-v0.1"].forEach(function (k) {
+      var n = MG.normaliseProject(clone(FX[k]));
+      var any = "consequences" in n || "consequence" in n.counters || n.zones.concat(n.conduits).some(function (o) { return o.threats.some(function (x) { return "consequenceId" in x || "via" in x; }); });
+      ok(!any, "the frozen " + k + " file gains no consequence field");
+    });
+    var nd = MG.normaliseProject(clone(DEMO));
+    ok(nd.consequences.length === 3 && nd.counters.consequence === 3 && same(threatOf(nd, "Z1", "T1").via, ["Z3", "C2"]) && threatOf(nd, "Z1", "T1").consequenceId === "K1", "the demo keeps its consequences, paths and counter");
+    ok(same(MG.normaliseProject(clone(nd)), nd), "normalising it again changes nothing");
+    function threatOf(p, oid, tid) { return p.zones.concat(p.conduits).filter(function (o) { return o.id === oid; })[0].threats.filter(function (x) { return x.id === tid; })[0]; }
+
+    // Tidying when present.
+    var raw = clone(DEMO);
+    raw.consequences.push("not one", { id: "K2", title: 7, hlaIds: "A1", impactByCategory: {} }, { title: "No id" });
+    raw.counters.consequence = 1;
+    threatOf(raw, "Z1", "T2").consequenceId = 5;
+    threatOf(raw, "Z1", "T3").via = "Z4";
+    threatOf(raw, "Z4", "T7").via = ["Z1", "Z1", "", 3, "EXT", "Z4", "Z9"];
+    threatOf(raw, "Z3", "T5").consequenceId = "K9";
+    raw.consequences[0].hlaIds = ["A1", "A99", "A1"];
+    var n1 = MG.normaliseProject(clone(raw));
+    var ids = n1.consequences.map(function (k) { return k.id; });
+    ok(n1.consequences.length === 5 && same(ids, ["K1", "K2", "K3", "K4", "K5"]), "a consequence that is not an object goes; a repeated or missing id takes the next one", ids.join());
+    ok(n1.consequences[3].title === "" && same(n1.consequences[3].hlaIds, []) && !("impactByCategory" in n1.consequences[3]), "its text fields are text, its ranked systems a list, an empty category map goes");
+    ok(n1.counters.consequence === 5, "the counter is kept above every K id", String(n1.counters.consequence));
+    ok(!("consequenceId" in threatOf(n1, "Z1", "T2")) && !("via" in threatOf(n1, "Z1", "T3")), "a consequenceId that is not text and a via that is not a list go");
+    ok(same(threatOf(n1, "Z4", "T7").via, ["Z1"]), "a via keeps zones and conduits there once each, never EXT nor where the path acts", JSON.stringify(threatOf(n1, "Z4", "T7").via));
+    ok(!("consequenceId" in threatOf(n1, "Z3", "T5")), "the prune drops a consequenceId pointing at nothing");
+    ok(same(n1.consequences[0].hlaIds, ["A1"]), "and a ranked system that is not there", JSON.stringify(n1.consequences[0].hlaIds));
+    ok(same(MG.normaliseProject(clone(n1)), n1), "running the migration again changes nothing");
+    var bad = clone(DEMO); bad.consequences = { K1: {} }; bad.counters.consequence = "3";
+    var n2 = MG.normaliseProject(bad);
+    ok(!("consequences" in n2) && !("consequence" in n2.counters) && n2.zones.every(function (z) { return z.threats.every(function (x) { return !("consequenceId" in x); }); }),
+      "consequences that are not a list go, and with them every path's link");
+    var dz = clone(DEMO); dz.zones = dz.zones.filter(function (z) { return z.id !== "Z4"; }); dz.conduits = dz.conduits;
+    var n3 = MG.normaliseProject(dz);
+    ok(!("via" in threatOf(n3, "Z1", "T2")) && same(threatOf(n3, "Z1", "T1").via, ["Z3", "C2"]), "a zone removed leaves no path passing through it");
+
+    // ---- B. the released v0.7.0 normaliser keeps them ------------------------------------------
+    var OLD = FX["v0.7.0-migrate"](M, E);
+    ok(OLD && typeof OLD.normaliseProject === "function", "the frozen v0.7.0 normaliser loads");
+    var viaOld = OLD.normaliseProject(clone(DEMO));
+    ok(viaOld.consequences.length === 3 && viaOld.counters.consequence === 3 && same(threatOf(viaOld, "C2", "T9").via, ["Z3"]) && threatOf(viaOld, "Z2", "T4").consequenceId === "K1",
+      "a file with consequences opens in v0.7.0 with them kept, unchanged in meaning");
+    ok(OLD.accepts(DEMO.schema), "on the schema v0.7.0 accepts", DEMO.schema);
+    ok(same(MG.normaliseProject(clone(viaOld)), nd), "and saved from there, this build reads it as before");
+
+    // ---- C. SL-T: the house method for a zone or conduit on a path -------------------------------
+    var REF = FX["slt-suggestions-v0.7.0"];
+    function suggestions(p) {
+      var o = {};
+      p.zones.concat(p.conduits).forEach(function (x) { o[x.id] = { sug: ("fromZone" in x) ? E.suggestConduit(x, p) : E.suggestZone(x, p), drivers: E.sltDrivers(x, p) }; });
+      return o;
+    }
+    ["tour-v0.7-saved", "tour-phase3-0.2", "hand-made-v0.1"].forEach(function (k) {
+      var s = suggestions(MG.normaliseProject(clone(FX[k])));
+      var bad = Object.keys(REF[k]).filter(function (id) { return !same(s[id], REF[k][id]); });
+      ok(!bad.length && same(Object.keys(s), Object.keys(REF[k])), "the frozen " + k + " file: every suggestion, trace and driver as v0.7.0 gave it", bad.join());
+    });
+    var sd = suggestions(MG.normaliseProject(stripped(DEMO)));
+    var badD = Object.keys(REF.demo).filter(function (id) { return !same(sd[id], REF.demo[id]); });
+    ok(!badD.length, "the demo without its paths: the same as v0.7.0", badD.join());
+    var withVia = suggestions(nd);
+    ok(withVia.Z3.sug.byFR.IAC.sl === 3 && REF.demo.Z3.sug.byFR.IAC.sl == null, "a path through Z3 suggests SL3 on IAC there (it had none)", String(withVia.Z3.sug.byFR.IAC.sl));
+    ok(withVia.Z3.sug.byFR.IAC.trace.some(function (x) { return /^House method for a scenario that passes through this zone \(its via\): T1 via Z3 and C2 to K1 \(acting in Z1\) and T9 via Z3 to K1 \(acting in C2\) have a high unmitigated risk on IAC, which maps to SL3\.$/.test(x); }),
+      "the Why trace says it is the house method and names the paths", withVia.Z3.sug.byFR.IAC.trace.join(" | "));
+    ok(withVia.Z3.sug.byFR.IAC.risk == null, "the zone's own unmitigated risk on it is still none");
+    var dz3 = withVia.Z3.drivers.filter(function (x) { return x.fr === "IAC"; })[0];
+    ok(dz3 && dz3.raisedBy === "via" && same(dz3.via.map(function (v) { return v.words; }), ["T1 via Z3 and C2 to K1", "T9 via Z3 to K1"]), "its driving scenarios name the paths", JSON.stringify(dz3));
+    ok(withVia.Z4.sug.byFR.IAC.sl === 3 && withVia.Z1.sug.byFR.IAC.sl === REF.demo.Z1.sug.byFR.IAC.sl, "Z4 too (T4 and T2 pass through it); a zone where a path acts is unchanged");
+    ok(P().zones.every(function (z) { return same(z.slTargetByFR, DEMO.zones.filter(function (y) { return y.id === z.id; })[0].slTargetByFR); }), "nothing is filled: the SL-T stay as set");
+    // Wording 1 and 3: the demo's Z3 and Z4 say why IAC is held at SL2 below the paths' SL3, and the
+    // zones those paths reach do hold SL3 on IAC (RDF in Z3 was already suggested SL3 by its own threats).
+    var jz3 = threatOwnerJ(nd, "Z3"), jz4 = threatOwnerJ(nd, "Z4");
+    function threatOwnerJ(p, id) { return p.zones.concat(p.conduits).filter(function (o) { return o.id === id; })[0]; }
+    ok(/IAC is held at SL2 though the vendor remote access paths to the BPCS pass through this zone, because C2 and Z1, which those paths reach, hold SL3 on IAC\.$/.test(jz3.justification) &&
+      jz3.slTargetByFR.IAC === 2 && threatOwnerJ(nd, "C2").slTargetByFR.IAC === 3 && threatOwnerJ(nd, "Z1").slTargetByFR.IAC === 3 && REF.demo.Z3.sug.byFR.RDF.sl === 3, "Z3's justification matches its SL-T and the paths' ends");
+    ok(/IAC is held at SL2 although the engineering path to the SIS passes through this zone and suggests SL3, because the SIS zone holds SL3 on IAC itself\. The other FRs sit at SL1 or SL2, consistent with no external paths into this zone\.$/.test(jz4.justification) &&
+      jz4.slTargetByFR.IAC === 2 && withVia.Z4.sug.byFR.IAC.sl === 3 && threatOwnerJ(nd, "Z2").slTargetByFR.IAC === 3, "Z4's justification matches its SL-T and the SIS zone's");
+    ok(jz4.assumptions.indexOf("The engineering VLAN to the BPCS and the keyed engineering connection to the SIS are not modelled as conduits") >= 0, "Z4 notes the engineering connections that are not modelled as conduits (wording 10)");
+    ok(nd.consequences[1].source === "Interview with the asset owner" && same(nd.consequences[0].impactByCategory, { safety: "severe", environmental: "severe", operational: "severe", regulatory: "serious" }) &&
+      same(threatOf(nd, "Z2", "T4").impactByCategory, nd.consequences[0].impactByCategory), "the demo's K1 (and T4) and K2 as the review asked (wording 8 and 9)");
+
+    // A stepping stone: a conduit with no threat of its own on a path.
+    var ps = clone(nd);
+    threatOf(ps, "Z3", "T5").consequenceId = "K1"; threatOf(ps, "Z3", "T5").via = ["C3"];
+    ok(same(E.steppingStones(ps), { C3: ["K1"] }), "a conduit a path passes through with no threat of its own is a stepping stone", JSON.stringify(E.steppingStones(ps)));
+    ok(same(E.steppingStones(nd), {}), "the demo's paths pass only through zones and conduits with threats of their own");
+    var c3 = E.suggestConduit(ps.conduits[2], ps);
+    ok(c3.byFR.RDF.sl === 3 && c3.byFR.RDF.trace.some(function (x) { return /^House method for a scenario that passes through this conduit \(its via\): T5 via C3 to K1 \(acting in Z3\) has a high unmitigated risk on RDF, which maps to SL3\.$/.test(x); }), "its suggestion takes the path's mapped SL, said as the house method (one path: has)", c3.byFR.RDF.trace.join(" | "));
+    // Logic 6: any via counts, with or without a consequence.
+    var pn = clone(ps); delete threatOf(pn, "Z3", "T5").consequenceId;
+    ok(E.suggestConduit(pn.conduits[2], pn).byFR.RDF.sl === 3 && same(E.steppingStones(pn), { C3: [] }), "a via with no consequence counts the same, its stepping stone on a path");
+    // Logic 9: a very high path gets the same escalation note as a threat of its own.
+    var pv = clone(nd); threatOf(pv, "Z1", "T1").impact = "severe"; delete threatOf(pv, "Z1", "T1").impactByCategory; threatOf(pv, "Z1", "T1").likelihood = "high";
+    var vb = E.threatRisk(threatOf(pv, "Z1", "T1"), pv);
+    var z3v = E.suggestZone(pv.zones[2], pv).byFR.IAC.trace;
+    ok(vb === "very-high" && z3v.some(function (x) { return /^Escalation to SL4 available for IAC only if a nation-state-grade adversary is in scope\.$/.test(x); }), "a very high path through a zone carries the SL4 escalation note", vb + " | " + z3v.join(" | "));
+
+    // ---- D. completeness (warns only) ---------------------------------------------------------
+    ok(RT.completeness(nd).length === 0, "the demo has nothing open", RT.completeness(nd).map(function (i) { return i.text; }).join(" | "));
+    var pk = clone(nd);
+    pk.consequences.push({ id: "K4", title: "Loss of the historian record", description: "", impact: "minor", source: "", hlaIds: [], notes: "" });
+    threatOf(pk, "Z1", "T1").source = ""; threatOf(pk, "Z3", "T6").entryPoint = "";
+    var items = RT.completeness(pk).map(function (i) { return i.text; });
+    ok(items.indexOf("K4 (Loss of the historian record): no path leads to it.") >= 0, "a consequence with no path is open", items.join(" | "));
+    ok(items.indexOf("Z1 (Unit 300 BPCS) / T1: a path to K1 with no threat source.") >= 0, "a path with no threat source is open");
+    ok(!items.some(function (x) { return /T6/.test(x); }), "a threat that leads to no consequence keeps today's minimum");
+    var kItem = RT.completeness(pk).filter(function (i) { return /K4/.test(i.text); })[0];
+    ok(kItem.stage === "risk" && kItem.doc === "detailed" && kItem.target.kind === "consequence" && kItem.target.id === "K4", "on step 5, for the detailed report, aimed at the consequence");
+    // Wording 2: a consequence with no title is open, named by its id.
+    var pt = clone(nd); pt.consequences[2].title = "  ";
+    var tItems = RT.completeness(pt).map(function (i) { return i.text; });
+    ok(tItems.indexOf("K3: no title.") >= 0 && tItems.length === 1, "a consequence with no title is open, by its id", tItems.join(" | "));
+
+    // ---- E. step 5: By consequence ------------------------------------------------------------
+    load(DEMO);
+    RT.navigate("risk");
+    var tabs = [].map.call(main().querySelectorAll(".step-tabs [data-tab]"), function (b) { return b.getAttribute("data-tab"); });
+    ok(same(tabs, ["risk", "consequence", "register", "heatmap", "slt"]) && same(RP.TAB_ORDER, tabs), "a By consequence tab beside By zone, which stays first", tabs.join());
+    var tab = main().querySelector('.step-tabs [data-tab="consequence"]');
+    ok(/By consequence/.test(tab.textContent) && tab.querySelector(".badge").textContent === "3", "it counts the consequences");
+    tab.focus(); tab.click();
+    ok(RP.ui.view === "consequence" && d.activeElement === main().querySelector('.step-tabs [data-tab="consequence"]'), "it opens, the keyboard kept on the tab");
+    ok(main().querySelectorAll("[data-consequence-id]").length === 3, "one bow-tie per consequence");
+    var k1 = kCard("K1");
+    var pathIds = [].map.call(k1.querySelectorAll("tr[data-threat-id]"), function (r) { return r.getAttribute("data-threat-id"); });
+    ok(same(pathIds, ["T1", "T4", "T9"]), "K1's paths on the left: T1, T4 and T9", pathIds.join());
+    var t1row = k1.querySelector('tr[data-threat-id="T1"]').textContent;
+    // UX 12: the parentheses escaped, and the treatment column asserted on its own cell.
+    var t1cells = [].map.call(k1.querySelectorAll('tr[data-threat-id="T1"] td'), function (c) { return c.textContent; });
+    ok(/Z1 Unit 300 BPCS/.test(t1row) && /Z3 and C2/.test(t1row) && /External attacker via vendor access/.test(t1row) && /Vendor VPN and jump host \(C2\)/.test(t1row) && /High/.test(t1row),
+      "each path: where it acts, its via, threat source, entry point and unmitigated risk", t1row);
+    ok(t1cells[6] === "Reduced to within tolerable risk", "and its treatment decision, in its own column", JSON.stringify(t1cells));
+    ok(/Impact lower than K1 \(Severe\)/.test(t1row) && !/Impact (lower|higher) than/.test(k1.querySelector('tr[data-threat-id="T4"]').textContent), "a path rated below the consequence says so plainly");
+    // UX 8: the path table is named and its last column has a hidden header.
+    var ptab = k1.querySelector("table.path-table");
+    ok(ptab && ptab.getAttribute("aria-label") === "Paths to K1" && ptab.querySelector("thead th:last-child .vh").textContent === "Actions", "the path table is named Paths to K1, its last column Actions (visually hidden)");
+    ok(!!k1.querySelector(".path-scroll > table.path-table"), "it scrolls sideways in a narrow window (UX 9)");
+    // Wording 20 / UX 7: the card heading names the consequence; the panel's title line shows only while editing.
+    ok(k1.querySelector(".card-h h2").textContent === "K1 Loss of containment of HF acid from an unsafe process state" && !k1.querySelector(".bowtie-k .k-title"), "the title is said once, in the card heading");
+    var kp = k1.querySelector(".bowtie-k").textContent;
+    // Wording 20: the title is in the card heading now (asserted above), not repeated in the panel.
+    ok(/Loss of containment of HF acid/.test(k1.querySelector(".card-h h2").textContent) && /Impact: Severe/.test(kp) && /Safety \(injury \/ loss of life\): Severe/.test(kp) && /Source: HAZOP revalidation, 2025/.test(kp) && /A1 Unit 300 BPCS/.test(kp) && /A2 Safety Instrumented System/.test(kp),
+      "the consequence on the right: title, impact per category, source, ranked systems", kp);
+    ok(!DASH.test(main().textContent), "no dashes on the tab");
+
+    // Add a consequence.
+    main().querySelector('[data-action="add-consequence"]').click();
+    var K4 = P().consequences[3];
+    ok(K4 && K4.id === "K4" && P().counters.consequence === 4 && d.activeElement === kCard("K4").querySelector('[data-k-field="title"]'), "+ Add consequence makes K4, the keyboard in its title");
+    var title = kCard("K4").querySelector('[data-k-field="title"]');
+    type(title, "Loss of the historian record");
+    ok(K4.title === "Loss of the historian record" && d.activeElement === title && /Loss of the historian record/.test(kCard("K4").querySelector(".k-title").textContent), "typing updates it in place, the keyboard kept");
+    ok(kCard("K4").querySelector(".card-h h2").textContent === "K4 Loss of the historian record", "and the card heading with it (UX 7)", kCard("K4").querySelector(".card-h h2").textContent);
+    change(kCard("K4").querySelector('[data-k-field="impact"]'), "minor");
+    ok(K4.impact === "minor", "its impact is chosen");
+    // Add a path.
+    var addPath = kCard("K4").querySelector('[data-action="add-path"]');
+    addPath.focus(); addPath.click();
+    ok(!!kCard("K4").querySelector("[data-path-form]") && d.activeElement === kCard("K4").querySelector('[data-k-field="path-owner"]'), "+ Add path opens its form, the keyboard on where it acts");
+    change(kCard("K4").querySelector('[data-k-field="path-owner"]'), "Z3");
+    kCard("K4").querySelector('[data-chip="pvia-C3"]').click();
+    type(kCard("K4").querySelector('[data-k-field="path-statement"]'), "An attacker on the corporate network deletes historian records.");
+    type(kCard("K4").querySelector('[data-k-field="path-source"]'), "Attacker on corporate network");
+    type(kCard("K4").querySelector('[data-k-field="path-entry"]'), "Historian web interface");
+    kCard("K4").querySelector('[data-chip="passet-AS6"]').click();
+    kCard("K4").querySelector('[data-chip="pvuln-V4"]').click();
+    var c0 = P().counters.threat;
+    kCard("K4").querySelector('[data-action="path-add"]').click();
+    var T10 = threat("Z3", "T" + (c0 + 1));
+    ok(!!T10 && T10.consequenceId === "K4" && same(T10.via, ["C3"]) && T10.source === "Attacker on corporate network" && T10.entryPoint === "Historian web interface" && same(T10.assetIds, ["AS6"]) && same(T10.vulnerabilityIds, ["V4"]),
+      "Add path makes a threat where it acts, leading to K4 via C3, with its source, entry point, assets and vulnerabilities");
+    ok(T10.impact === "minor" && same(T10.affectedFR, []) && !T10.likelihood, "its impact copied from the consequence, its requirements left to pick");
+    ok(d.activeElement === kCard("K4").querySelector('[data-threat-id="' + T10.id + '"] [data-action="open-path"]'), "the keyboard on the new path's open button");
+    ok(/added to Z3 as a path to K4/.test(toastText()) && !!toastUndo(), "the toast says so, with Undo");
+    RT.undo();
+    ok(!threat("Z3", T10.id) && RP.ui.view === "consequence" && RT.state.stage === "risk", "Undo takes it back, on By consequence");
+    kCard("K4").querySelector('[data-action="add-path"]').click();
+    change(kCard("K4").querySelector('[data-k-field="path-owner"]'), "Z3");
+    kCard("K4").querySelector('[data-action="path-add"]').click();
+    var T11 = P().zones[2].threats[P().zones[2].threats.length - 1];
+    ok(T11.consequenceId === "K4" && !("via" in T11), "a path with no via has none");
+    // The editor opens it.
+    kCard("K4").querySelector('[data-threat-id="' + T11.id + '"] [data-action="open-path"]').click();
+    ok(RP.ui.view === "zone" && RP.ui.sel === "Z3" && d.activeElement === main().querySelector('[data-owner-id="Z3"] [data-threat-id="' + T11.id + '"] [data-action="open-scenario"]'), "Open takes it to the By zone editor");
+    var lt = main().querySelector('[data-threat-id="' + T11.id + '"] [data-field="leads-to"]');
+    ok(!!lt && lt.value === "K4" && lt.options.length === 5, "the editor shows Leads to, with every consequence and None");
+    ok(!/Impact (lower|higher) than/.test(main().querySelector('[data-threat-id="' + T11.id + '"]').textContent), "a path rated as its consequence has no note");
+    ok(T11.consequence === "", "Add path leaves the threat's own consequence text empty (wording 11)", JSON.stringify(T11.consequence));
+    // UX 3: back on By consequence, the path opened from there is in view, the keyboard on its row.
+    main().querySelector('.step-tabs [data-tab="consequence"]').click();
+    ok(RP.ui.view === "consequence" && d.activeElement === kCard("K4").querySelector('[data-threat-id="' + T11.id + '"] [data-action="open-path"]'), "returning to the tab puts the keyboard on the path opened from it");
+    main().querySelector('.step-tabs [data-tab="risk"]').click();
+    main().querySelector('.step-tabs [data-tab="consequence"]').click();
+    ok(d.activeElement === main().querySelector('.step-tabs [data-tab="consequence"]'), "only once: the next time the keyboard stays on the tab");
+    RP.select("Z3", T11.id); RT.navigate("risk");
+    // Leads to and via in the editor.
+    RP.select("Z1", "T1"); RT.navigate("risk");
+    var ed = main().querySelector('[data-threat-id="T1"]');
+    ok(ed.querySelector('[data-field="leads-to"]').value === "K1" && /Via: Z3 and C2/.test(ed.querySelector('[data-part="path"]').textContent), "T1 leads to K1, via Z3 and C2");
+    ok(/Impact lower than K1 \(Severe\)\./.test(ed.textContent), "and its impact is said to be lower than K1's worst case");
+    // UX 5: a Via chip names the zone or conduit, a long name cut short.
+    var chipZ3 = ed.querySelector('[data-chip="via-Z3"]');
+    ok(chipZ3 && /Z3 Plant DMZ/.test(chipZ3.textContent) && chipZ3.getAttribute("title") === "Plant DMZ & historian" && chipZ3.textContent.replace(/^✓ /, "").length <= 22, "a Via chip says Z3 Plant DMZ…, the whole name its title", chipZ3 && chipZ3.textContent);
+    // UX 3: Open K1 beside Leads to goes back to the path's row on By consequence.
+    var openK = ed.querySelector('[data-action="open-consequence"]');
+    ok(openK && openK.textContent === "Open K1", "an Open K1 link sits beside Leads to");
+    openK.click();
+    ok(RP.ui.view === "consequence" && d.activeElement === kCard("K1").querySelector('[data-threat-id="T1"] [data-action="open-path"]'), "it opens By consequence at T1's row in K1");
+    RP.select("Z1", "T1"); RT.navigate("risk"); ed = main().querySelector('[data-threat-id="T1"]');
+    var ltSel = ed.querySelector('[data-field="leads-to"]'); ltSel.focus(); change(ltSel, "");
+    ok(!("consequenceId" in threat("Z1", "T1")) && d.activeElement === main().querySelector('[data-threat-id="T1"] [data-field="leads-to"]'), "None clears it, the keyboard kept");
+    RT.undo();
+    ok(threat("Z1", "T1").consequenceId === "K1", "Ctrl+Z puts it back");
+    var vz = main().querySelector('[data-threat-id="T1"] [data-chip="via-Z4"]'); vz.focus(); vz.click();
+    ok(same(threat("Z1", "T1").via, ["Z3", "C2", "Z4"]) && d.activeElement === main().querySelector('[data-threat-id="T1"] [data-chip="via-Z4"]'), "a Via chip adds to the end of the path, the keyboard kept");
+    var vz = main().querySelector('[data-threat-id="T1"] [data-chip="via-Z4"]'); vz.focus(); vz.click();
+    ok(same(threat("Z1", "T1").via, ["Z3", "C2"]), "and takes it off again");
+    ok(!main().querySelector('[data-threat-id="T1"] [data-chip="via-Z1"]'), "a path never passes through where it acts");
+
+    // Link and unlink.
+    openConsequences();
+    var lk = kCard("K4").querySelector('[data-k-field="link-threat"]');
+    ok(!!lk && [].some.call(lk.options, function (o) { return o.value === "Z1/T1" && /leads to K1/.test(o.textContent); }), "Link lists the other threats, saying which lead elsewhere");
+    change(lk, "Z3/T5");
+    kCard("K4").querySelector('[data-action="link-threat"]').click();
+    ok(threat("Z3", "T5").consequenceId === "K4" && d.activeElement === kCard("K4").querySelector('[data-threat-id="T5"] [data-action="open-path"]'), "Link makes T5 a path to K4, the keyboard on it");
+    ok(threat("Z3", "T5").impact === "serious", "a linked threat keeps its own rating");
+    ok(/Impact higher than K4 \(Minor\)/.test(kCard("K4").querySelector('tr[data-threat-id="T5"]').textContent), "rated above the consequence, it says so");
+    ok(/^T5 now leads to K4\.$/.test(toastText().replace(/Undo$/, "").trim()), "the toast says it now leads to K4", toastText());
+    kCard("K4").querySelector('[data-threat-id="T5"] [data-action="unlink-path"]').click();
+    ok(!("consequenceId" in threat("Z3", "T5")) && d.activeElement === kCard("K4").querySelector('[data-k-field="link-threat"]') && !!toastUndo(), "Unlink takes it off, the keyboard on Link, with Undo");
+    RT.undo();
+    ok(threat("Z3", "T5").consequenceId === "K4", "and Undo links it again");
+
+    // A path from the library.
+    kCard("K4").querySelector('[data-action="add-path"]').click();
+    change(kCard("K4").querySelector('[data-k-field="path-owner"]'), "Z4");
+    kCard("K4").querySelector('[data-chip="pvia-Z3"]').click();
+    kCard("K4").querySelector('[data-action="path-library"]').click();
+    var pick = kCard("K4").querySelector("[data-library-picker]");
+    ok(!!pick && d.activeElement === pick.querySelector('[data-field="lib-search"]'), "From library opens the scenario picker for where the path acts");
+    var box = pick.querySelector('[data-lib-pick="HS03"]') || pick.querySelector("[data-lib-pick]");
+    var libId = box.getAttribute("data-lib-pick");
+    box.checked = true; box.dispatchEvent(new w.Event("change", { bubbles: true }));
+    pick.querySelector('[data-action="lib-add"]').click();
+    var z4 = owner("Z4"), lib = z4.threats[z4.threats.length - 1];
+    ok(lib.libraryId === libId && lib.consequenceId === "K4" && same(lib.via, ["Z3"]) && lib.impact === "minor" && !!lib.statement, "the scenario becomes a path to K4, via Z3, its impact from K4");
+    ok(d.activeElement === kCard("K4").querySelector('[data-threat-id="' + lib.id + '"] [data-action="open-path"]') && /added from the library/.test(toastText()) && !!toastUndo(), "the keyboard on it, with Undo");
+    RT.undo();
+    ok(!threat("Z4", lib.id), "Undo takes it back");
+
+    // The consequence's impact changes: the paths on the old value are offered the new one.
+    openConsequences();
+    kCard("K1").querySelector('[data-action="edit-consequence"]').click();
+    ok(d.activeElement === kCard("K1").querySelector('[data-k-field="title"]'), "Edit opens the consequence, the keyboard in its title");
+    // The demo's K1 is Severe on three categories (wording 8), so all three come down to move its impact.
+    function k1Serious() { ["safety", "environmental", "operational"].forEach(function (c) { change(kCard("K1").querySelector('[data-k-field="kcat-' + c + '"]'), "serious"); }); }
+    k1Serious();
+    var K1 = M.consequenceById(P(), "K1");
+    ok(K1.impact === "serious" && threat("Z2", "T4").impact === "severe", "K1's impact follows its worst category; no path changes unasked");
+    var offer = kCard("K1").querySelector(".k-offer");
+    // Logic 4: T1 rates on categories of its own and T9 is not on Severe, so only T4 (K1's old ratings) is offered.
+    ok(!!offer && offer.querySelector("[data-offer-text]").textContent === "T4 is still rated Severe." && /Update to Serious/.test(offer.textContent), "the paths still on the old value are offered the new one", offer ? offer.textContent : "none");
+    // UX 2: the offer is announced politely and sits after the impact controls.
+    var ot = offer.querySelector("[data-offer-text]");
+    ok(ot.getAttribute("role") === "status" && ot.getAttribute("aria-live") === "polite", "the offer is a polite status");
+    ok(!!(kCard("K1").querySelector(".cat-grid").compareDocumentPosition(offer) & w.Node.DOCUMENT_POSITION_FOLLOWING), "after the impact by category");
+    offer.querySelector('[data-action="offer-leave"]').click();
+    ok(!kCard("K1").querySelector(".k-offer") && threat("Z2", "T4").impact === "severe" && d.activeElement === kCard("K1").querySelector('[data-action="edit-consequence"]'), "Leave as they are changes nothing, the keyboard on Done");
+    // UX 1 / logic 5: an offer is dropped by Ctrl+Z and never applies stale.
+    load(DEMO); openConsequences();
+    kCard("K1").querySelector('[data-action="edit-consequence"]').click();
+    k1Serious();
+    ok(!!kCard("K1").querySelector('[data-action="offer-update"]'), "the offer again");
+    var staleBtn = kCard("K1").querySelector('[data-action="offer-update"]');
+    RT.undo();
+    ok(M.consequenceById(P(), "K1").impact === "severe" && !kCard("K1").querySelector(".k-offer") && RT.state.stage === "risk", "after Ctrl+Z the consequence is Severe again and the offer is gone");
+    ok(w.RiskApp.ConsequenceUI.state().offer === null, "and is not kept to apply later");
+    staleBtn.click();
+    ok(threat("Z2", "T4").impact === "severe" && same(threat("Z2", "T4").impactByCategory, DEMO.zones[1].threats[0].impactByCategory), "a stale Update button changes nothing");
+    // Leaving the page drops it too.
+    load(DEMO); openConsequences();
+    kCard("K1").querySelector('[data-action="edit-consequence"]').click();
+    k1Serious();
+    RT.navigate("srs"); openConsequences();
+    ok(!main().querySelector(".k-offer"), "leaving the page drops the offer");
+    // Update.
+    load(DEMO); openConsequences();
+    kCard("K1").querySelector('[data-action="edit-consequence"]').click();
+    k1Serious(); K1 = M.consequenceById(P(), "K1");
+    kCard("K1").querySelector('[data-action="offer-update"]').click();
+    ok(threat("Z2", "T4").impact === "serious" && same(threat("Z2", "T4").impactByCategory, K1.impactByCategory) && threat("Z1", "T1").impact === "serious" && same(threat("Z1", "T1").impactByCategory, DEMO.zones[0].threats[0].impactByCategory), "Update sets them, categories and all; T1's own ratings are left", JSON.stringify(threat("Z2", "T4").impactByCategory));
+    ok(/1 path updated to Serious\./.test(toastText()) && !!toastUndo() && d.activeElement === kCard("K1").querySelector('[data-action="edit-consequence"]'), "said in the toast, with Undo, the keyboard on Done");
+    RT.undo();
+    ok(threat("Z2", "T4").impact === "severe" && RP.ui.view === "consequence" && d.activeElement === kCard("K1").querySelector('[data-action="edit-consequence"]'), "Undo puts the path back, the keyboard on the consequence");
+    // The offer from the plain Impact select (a consequence with no categories), and none to un-rate (logic 3).
+    var pk2 = clone(DEMO); pk2.consequences.push({ id: "K4", title: "Loss of the historian record", description: "", impact: "minor", source: "", hlaIds: [], notes: "" });
+    pk2.zones[2].threats[0].consequenceId = "K4"; pk2.zones[2].threats[0].impact = "minor";
+    load(pk2); openConsequences();
+    kCard("K4").querySelector('[data-action="edit-consequence"]').click();
+    change(kCard("K4").querySelector('[data-k-field="impact"]'), "serious");
+    var o4 = kCard("K4").querySelector("[data-offer-text]");
+    ok(o4 && o4.textContent === "T5 is still rated Minor." && /Update to Serious/.test(kCard("K4").querySelector(".k-offer").textContent), "the plain Impact select offers too", o4 && o4.textContent);
+    change(kCard("K4").querySelector('[data-k-field="impact"]'), "");
+    ok(!kCard("K4").querySelector(".k-offer") && threat("Z3", "T5").impact === "minor", "set to Not rated, nothing is offered and no path is un-rated");
+
+    // Remove a consequence: its paths stay as threats.
+    load(DEMO); openConsequences();
+    kCard("K3").querySelector('[data-action="remove-consequence"]').click();
+    ok(!M.consequenceById(P(), "K3") && !!threat("Z1", "T3") && !("consequenceId" in threat("Z1", "T3")) && d.activeElement === main().querySelector('[data-action="add-consequence"]'),
+      "Remove takes the consequence away, keeps T3 as a threat, the keyboard on + Add consequence");
+    ok(/K3 removed; its paths stay as threats\./.test(toastText()) && !!toastUndo(), "with Undo");
+    RT.undo();
+    ok(M.consequenceById(P(), "K3") && threat("Z1", "T3").consequenceId === "K3" && RP.ui.view === "consequence", "Undo brings both back");
+    // The last one removed takes the list with it.
+    var one = clone(DEMO); one.consequences = [one.consequences[2]]; load(one); openConsequences();
+    kCard("K3").querySelector('[data-action="remove-consequence"]').click();
+    ok(!("consequences" in P()) && /No consequences yet\./.test(main().textContent), "removing the last leaves a file with no consequences field");
+
+    // Step 2: Start from this consequence.
+    load(DEMO); RT.navigate("srs");
+    var start = main().querySelector('[data-hla-id="A3"] [data-action="start-consequence"]');
+    // Wording 15: "In K1, K2 and K3" (was "Consequence K1, K2, K3").
+    ok(!!start && main().querySelector('[data-hla-consequences="A1"]').textContent.trim() === "In K1, K2 and K3", "a ranked system offers Start from this consequence, and names the consequences that concern it");
+    start.click();
+    var K4b = M.consequenceById(P(), "K4");
+    // Wording 2: the title and description are left for the consultant (was: filled with the system's name).
+    ok(K4b && K4b.impact === "serious" && same(K4b.hlaIds, ["A3"]) && K4b.title === "" && K4b.description === "" && RT.state.stage === "risk" && RP.ui.view === "consequence", "it starts K4 from A3's worst credible consequence, on By consequence, title and description left empty", JSON.stringify(K4b));
+    ok(d.activeElement === kCard("K4").querySelector('[data-k-field="title"]'), "the keyboard in its title");
+    ok(RT.completeness().some(function (i) { return i.text === "K4: no title."; }), "and until it has one, completeness says so");
+    RT.undo();
+    ok(!M.consequenceById(P(), "K4") && RT.state.stage === "srs" && d.activeElement === main().querySelector('[data-hla-id="A3"] [data-action="start-consequence"]'), "Undo takes it back, the keyboard on step 2's button");
+    start = main().querySelector('[data-hla-id="A3"] [data-action="start-consequence"]'); start.click();
+    RT.navigate("srs");
+    main().querySelector('[data-hla-id="A1"] [data-action="start-consequence"]').click();
+    var K5 = M.consequenceById(P(), "K5");
+    ok(K5.source === "HAZOP revalidation, 2025" && K5.impact === "serious", "with the system's source", JSON.stringify(K5));
+
+    // The register: a Consequence filter and column.
+    load(DEMO); RT.navigate("risk"); RP.ui.view = "register"; RT.render();
+    var heads = [].map.call(main().querySelectorAll(".reg-table thead th"), function (x) { return x.textContent; });
+    // Wording 4: the column is Leads to (was Consequence); the filter keeps its name.
+    ok(heads[heads.length - 1] === "Leads to", "the register has a Leads to column", heads.join());
+    var kf = main().querySelector('[data-filter="consequence"]');
+    kf.focus(); change(kf, "K1");
+    var rows = [].map.call(main().querySelectorAll("tr[data-reg-row]"), function (x) { return x.getAttribute("data-reg-row"); });
+    ok(same(rows, ["Z1/T1", "Z2/T4", "C2/T9"]) && d.activeElement === main().querySelector('[data-filter="consequence"]'), "filtered to K1, the keyboard kept", rows.join());
+    ok(main().querySelector('tr[data-reg-row="Z1/T1"] [data-reg-consequence]').textContent === "K1 via Z3 and C2", "the column says the consequence and the via");
+    change(main().querySelector('[data-filter="consequence"]'), "none");
+    rows = [].map.call(main().querySelectorAll("tr[data-reg-row]"), function (x) { return x.getAttribute("data-reg-row"); });
+    ok(same(rows, ["Z3/T5", "Z3/T6", "Z4/T8"]), "No consequence shows the others", rows.join());
+    load(stripped(DEMO)); RT.navigate("risk"); RP.ui.view = "register"; RT.render();
+    ok(!main().querySelector('[data-filter="consequence"]') && !main().querySelector("[data-reg-consequence]"), "a file with no consequence has neither");
+    // Logic 7: a via with no consequence still shows, on its own.
+    var vonly = stripped(DEMO); vonly.zones[0].threats[0].via = ["Z3", "C2"];
+    load(vonly); RT.navigate("risk"); RP.ui.view = "register"; RT.render();
+    ok(!main().querySelector('[data-filter="consequence"]') && main().querySelector('tr[data-reg-row="Z1/T1"] [data-reg-consequence]').textContent === "Via Z3 and C2", "a route with no consequence shows on its own in the Leads to column");
+    // A heat map cell click clears the consequence filter.
+    load(DEMO); RT.navigate("risk"); RP.ui.view = "register"; RT.render();
+    change(main().querySelector('[data-filter="consequence"]'), "K3");
+    RP.ui.view = "heatmap"; RT.render();
+    var cellBtn = main().querySelector(".heat-btn:not([disabled])"); cellBtn.click();
+    ok(RP.ui.view === "register" && RP.ui.filter.consequence === "" && main().querySelector('[data-filter="consequence"]').value === "", "a heat map cell clears the consequence filter");
+
+    // Stepping stones on the rail and step 3.
+    load(ps); RP.select("Z1"); RT.navigate("risk");
+    var stone = main().querySelector('[data-rail-id="C3"] [data-stone]');
+    // Wording 16: the pill is capitalised (was "on the path to K1").
+    ok(!!stone && stone.textContent === "On the path to K1" && !main().querySelector('[data-rail-id="Z3"] [data-stone]'), "the rail flags a stepping stone: On the path to K1");
+    RT.navigate("zones");
+    var st3 = main().querySelector('[data-conduit-row="C3"] [data-stone]');
+    ok(!!st3 && st3.textContent === "On the path to K1", "and so does step 3's conduit table");
+    RP.select("C3"); RT.navigate("risk");
+    var why = main().querySelector('[data-owner-id="C3"] [data-why="RDF"]');
+    ok(!!why && /House method for a scenario that passes through this conduit \(its via\): T5 via C3 to K1/.test(why.textContent), "its Why trace names the path and the method");
+    // UX 4: the stepping stone shows as a small pill on a path's Via.
+    RP.showConsequence("K1"); RT.navigate("risk");
+    var sn = kCard("K1").querySelector('tr[data-threat-id="T5"] [data-stone-note]');
+    ok(sn && /pill/.test(sn.className) && sn.textContent === "No threats of its own: C3", "a path's stepping stone shows as a pill", sn && sn.textContent);
+    // Logic 6 and 8 / wording 6: About states the method as the house's, any via, the route as recorded.
+    RT.navigate("about");
+    ok(/House method: where a path passes through a zone or conduit \(its via\), its unmitigated risk also suggests an SL-T there, on the FRs the path affects\. The route is as recorded; the tool does not check it against the conduits\./.test(main().textContent), "About says it is the house method");
+
+    // Go to a consequence from the completeness list.
+    var gk = clone(DEMO); gk.consequences.push({ id: "K4", title: "Loss of the historian record", description: "", impact: "minor", source: "", hlaIds: [], notes: "" });
+    load(gk); RT.navigate("home");
+    var item = RT.completeness().filter(function (i) { return i.target && i.target.kind === "consequence"; })[0];
+    var el = w.RiskApp.App.goToItem(item);
+    ok(!!el && el.getAttribute("data-consequence-id") === "K4" && RP.ui.view === "consequence" && d.activeElement === el, "Go to opens By consequence at the consequence, the keyboard on it");
+
+    // ---- G. the review's follow-ups ----------------------------------------------------------------
+    // Logic 1: removing a conduit takes it out of every via, and Undo puts it back.
+    load(DEMO); w.RiskApp.ZonesPage.select("conduit", "C2"); RT.navigate("zones");
+    var rmC = [].filter.call(main().querySelectorAll('[data-detail="conduit"] button'), function (b) { return b.textContent === "Remove conduit"; })[0];
+    rmC.click();
+    ok(!owner("C2") && same(threat("Z1", "T1").via, ["Z3"]), "removing C2 leaves no path passing through it", JSON.stringify(threat("Z1", "T1").via));
+    RT.undo();
+    ok(!!owner("C2") && same(threat("Z1", "T1").via, ["Z3", "C2"]), "and Undo puts both back");
+    // Logic 2: a category rated only by a consequence is counted, so its removal is confirmed.
+    var pc2 = clone(DEMO);
+    pc2.srs.highLevelAssets.forEach(function (a) { if (a && a.consequenceByCategory) delete a.consequenceByCategory.financial; });
+    pc2.zones.concat(pc2.conduits).forEach(function (o) { o.threats.forEach(function (t) { if (t.impactByCategory) delete t.impactByCategory.financial; }); });
+    load(pc2); RT.navigate("suc");
+    var finRow = main().querySelector('[data-category="financial"]');
+    ok(finRow && finRow.querySelectorAll("td")[2].textContent === "1", "a category rated only by K2 counts K2", finRow && finRow.querySelectorAll("td")[2].textContent);
+    var asked = 0; w.confirm = function () { asked++; return false; };
+    main().querySelector('[data-action="remove-category-financial"]').click();
+    ok(asked === 1 && M.criteriaOf(P()).categories.some(function (c) { return c.id === "financial"; }), "removing it asks first, and No keeps it");
+    w.confirm = function () { return true; };
+    // UX 11: duplicate, copy and move keep the consequence and the route where it fits.
+    load(DEMO);
+    var dup = RP.duplicate(owner("Z1"), threat("Z1", "T1"));
+    ok(dup.consequenceId === "K1" && same(dup.via, ["Z3", "C2"]), "Duplicate keeps the consequence and the via");
+    load(DEMO);
+    var made = RP.copyTo(owner("Z1"), threat("Z1", "T1"), ["Z4", "Z3"]);
+    var cz4 = owner("Z4").threats[owner("Z4").threats.length - 1], cz3 = owner("Z3").threats[owner("Z3").threats.length - 1];
+    ok(made.length === 2 && cz4.consequenceId === "K1" && same(cz4.via, ["Z3", "C2"]), "Copy to keeps the via where it fits (Z4)", JSON.stringify(cz4.via));
+    ok(cz3.consequenceId === "K1" && !("via" in cz3), "and drops it where the copy would pass through itself (Z3)");
+    load(DEMO);
+    ok(RP.moveTo(owner("C2"), threat("C2", "T9"), "Z3") && threat("Z3", "T9").consequenceId === "K1" && !("via" in threat("Z3", "T9")), "Move keeps the consequence and drops a via through where it now acts");
+    // By consequence with no zones.
+    var nz = M.emptyProject(); nz.consequences = [{ id: "K1", title: "Loss of view", description: "", impact: "serious", source: "", hlaIds: [], notes: "" }]; nz.counters.consequence = 1;
+    load(nz); openConsequences();
+    ok(!!kCard("K1") && kCard("K1").querySelector('[data-action="add-path"]').disabled && /Define zones in step 3 to add a path\./.test(kCard("K1").textContent) && !kCard("K1").querySelector('[data-k-field="link-threat"]'), "By consequence works with no zones: Add path is off and says why");
+    // Link with nothing chosen; the toast when the threat led elsewhere; the list cut at a word (wording 14, 18).
+    load(DEMO); openConsequences();
+    var lk1 = kCard("K1").querySelector('[data-k-field="link-threat"]');
+    var before = JSON.stringify(P());
+    kCard("K1").querySelector('[data-action="link-threat"]').click();
+    ok(JSON.stringify(P()) === before && /Choose a threat to link\./.test(toastText()), "Link with nothing chosen changes nothing and says so");
+    var t2opt = [].filter.call(lk1.options, function (o) { return o.value === "Z1/T2"; })[0];
+    ok(t2opt && t2opt.textContent === "T2 (Z1) Malware introduced through an engineering connection… [leads to K2]", "a long statement is cut at the last word before 60 characters, with …", t2opt && t2opt.textContent);
+    change(lk1, "Z1/T2"); kCard("K1").querySelector('[data-action="link-threat"]').click();
+    ok(threat("Z1", "T2").consequenceId === "K1" && /T2 now leads to K1, not K2\./.test(toastText()), "linking a path from K2 says it no longer leads there", toastText());
+    // Ranked systems chips.
+    kCard("K1").querySelector('[data-action="edit-consequence"]').click();
+    var chA3 = kCard("K1").querySelector('[data-chip="khla-A3"]');
+    ok(chA3 && chA3.getAttribute("aria-pressed") === "false", "a chip per ranked system");
+    chA3.click();
+    ok(same(M.consequenceById(P(), "K1").hlaIds, ["A1", "A2", "A3"]) && kCard("K1").querySelector('[data-chip="khla-A3"]').getAttribute("aria-pressed") === "true", "a ranked system chip links it");
+    // Focus after Undo: Remove, Unlink, Add path, the library.
+    load(DEMO); openConsequences();
+    kCard("K3").querySelector('[data-action="remove-consequence"]').click(); RT.undo();
+    ok(d.activeElement === kCard("K3").querySelector('[data-action="edit-consequence"]'), "after Undo of Remove, the keyboard on the consequence's Edit");
+    kCard("K1").querySelector('[data-threat-id="T9"] [data-action="unlink-path"]').click(); RT.undo();
+    ok(d.activeElement === kCard("K1").querySelector('[data-threat-id="T9"] [data-action="unlink-path"]'), "after Undo of Unlink, the keyboard on the row's Unlink");
+    kCard("K3").querySelector('[data-action="add-path"]').click(); kCard("K3").querySelector('[data-action="path-add"]').click(); RT.undo();
+    ok(d.activeElement === kCard("K3").querySelector('[data-action="add-path"]'), "after Undo of Add path, the keyboard on + Add path");
+    kCard("K3").querySelector('[data-action="add-path"]').click(); kCard("K3").querySelector('[data-action="path-library"]').click();
+    var pk3 = kCard("K3").querySelector("[data-library-picker]"), bx = pk3.querySelector("[data-lib-pick]");
+    bx.checked = true; bx.dispatchEvent(new w.Event("change", { bubbles: true })); pk3.querySelector('[data-action="lib-add"]').click(); RT.undo();
+    ok(d.activeElement === kCard("K3").querySelector('[data-action="add-path"]'), "after Undo of a library path, the keyboard on + Add path");
+    // The path form: Escape, Cancel and the library's Cancel.
+    kCard("K3").querySelector('[data-action="add-path"]').click();
+    kCard("K3").querySelector('[data-k-field="path-statement"]').dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    ok(!kCard("K3").querySelector("[data-path-form]") && d.activeElement === kCard("K3").querySelector('[data-action="add-path"]'), "Escape closes the path form, the keyboard on + Add path");
+    kCard("K3").querySelector('[data-action="add-path"]').click(); kCard("K3").querySelector('[data-action="path-cancel"]').click();
+    ok(!kCard("K3").querySelector("[data-path-form]") && d.activeElement === kCard("K3").querySelector('[data-action="add-path"]'), "Cancel too");
+    kCard("K3").querySelector('[data-action="add-path"]').click(); kCard("K3").querySelector('[data-action="path-library"]').click();
+    kCard("K3").querySelector('[data-library-picker] [data-action="lib-cancel"]').click();
+    ok(!kCard("K3").querySelector("[data-library-picker]") && !!kCard("K3").querySelector("[data-path-form]") && d.activeElement === kCard("K3").querySelector('[data-action="path-library"]'), "the library's Cancel closes it, the form kept, the keyboard on From library");
+
+    // ---- F. what prints -----------------------------------------------------------------------
+    function wordParas(p, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    function cells(wb, name) {
+      var out = [], ws = wb.getWorksheet(name);
+      if (!ws) return null;
+      ws.eachRow(function (r) { var row = []; r.eachCell({ includeEmpty: true }, function (c) { row.push(String(c.value == null ? "" : c.value)); }); out.push(row); });
+      return out;
+    }
+    var demo = MG.normaliseProject(clone(DEMO)), plain = MG.normaliseProject(stripped(DEMO));
+    var WOLD = FX["word-v0.7.0"];
+    return wordParas(plain, {}).then(function (now) {
+      var at = firstDiff(now, WOLD.detailed);
+      ok(at === -1, "the demo without consequences prints the v0.7.0 detailed report exactly (" + now.length + " paragraphs)", at < 0 ? "" : "line " + at + ": " + now[at] + " / " + WOLD.detailed[at]);
+      return wordParas(plain, { highLevelOnly: true });
+    }).then(function (now) {
+      ok(firstDiff(now, WOLD.highLevel) === -1, "and the high-level report");
+      return wordParas(plain, { spec: true });
+    }).then(function (now) {
+      ok(firstDiff(now, WOLD.spec) === -1, "and the requirements specification");
+      return wordParas(demo, {});
+    }).then(function (wt) {
+      var s = wt.indexOf("Consequences and how they could arise"), reg = wt.indexOf("Risk register"), plan = wt.indexOf("Treatment plan");
+      ok(s > reg && s < plan, "the full report has Consequences and how they could arise, after the risk register", s + " " + reg + " " + plan);
+      ok(wt.indexOf("K1 Loss of containment of HF acid from an unsafe process state", s) > s, "a heading per consequence");
+      // Wording 5 and 8: "Impact: Severe. By category: ..." with no colon after each category; K1 is Severe on three.
+      var imp = wt.filter(function (x) { return /^Impact: Severe\. By category: Safety \(injury \/ loss of life\) Severe; Environmental release \/ damage Severe; Loss of production \/ essential function Severe; Regulatory \/ legal exposure Serious\. Source: HAZOP revalidation, 2025; LOPA and SIL determination\. Ranked systems: Unit 300 BPCS \(DCS servers, HMIs, unit PLCs\); Safety Instrumented System \(SIS\)\.$/.test(x); });
+      ok(imp.length === 1, "its impact by category, source and ranked systems", wt[s + 3]);
+      // Wording 22 / UX 10: the lead-in says what Risk today is, the column is Risk today as in Excel, via an "and" list.
+      ok(wt[s + 1] === "Each consequence was worked back to the paths that could lead to it. A path is a threat scenario in the zone or conduit where it acts, rated and decided as in the risk register; via names the zones and conduits it passes through first. Risk today is the current rating; where none is given, it is the planned rating if nothing planned is still to come, else the unmitigated one.", "the lead-in says what Risk today is", wt[s + 1]);
+      var hdr = wt.slice(s).join("|");
+      ok(/Path\|Acts in\|Via\|Threat source\|Entry point\|Unmitigated\|Risk today\|Decision\|T1\|Z1 Unit 300 BPCS\|Z3 and C2\|External attacker via vendor access\|Vendor VPN and jump host \(C2\)\|High\|Medium\|Reduced to within tolerable risk\|T4\|/.test(hdr),
+        "then a table of its paths", hdr.slice(0, 400));
+      // Wording 21 / logic 7: "T1 and T9 are rated below this consequence's worst case." (above is said too).
+      ok(wt.indexOf("T1 and T9 are rated below this consequence&apos;s worst case.") > s, "with the paths rated below its worst case named");
+      var rh = wt.slice(reg, reg + 12).join("|");
+      ok(/Treatment decision\|Leads to\|/.test(rh), "the register gains a Leads to column", rh);
+      ok(wt.some(function (x) { return x === "T1 via Z3 and C2 to K1 (High), T9 via Z3 to K1 (High)"; }), "Driving scenarios name the paths for a zone they pass through");
+      ok(wt.some(function (x) { return /A scenario written with via passes through that zone or conduit on its way to where it acts; by the house method it sets the suggestion there\.$/.test(x); }), "and their lead-in says how (wording 7)");
+      ok(wt.indexOf("Leads to") > 0 && wt.some(function (x) { return x === "K1 Loss of containment of HF acid from an unsafe process state"; }) && wt.some(function (x) { return x === "Z3 and C2"; }), "a threat's detail says what it leads to, and its via as an and list");
+      ok(wt.some(function (x) { return x.indexOf("Where a threat acting in one zone or conduit is reached through another (its via), the house method also suggests for the one it passes through the SL-T that the threat&apos;s unmitigated risk maps to, on the foundational requirements the threat affects. The route is as recorded; it is not checked against the conduits.") >= 0; }), "the appendix names the house method, any via, the route as recorded");
+      var kids = wt.slice(s, plan).join("\n");
+      ok(!DASH.test(kids), "no dashes in the section");
+      var used = (kids.match(/\b(?:[KTZCA]\d+)\b/g) || []).filter(function (id, i, a) { return a.indexOf(id) === i; });
+      var defined = used.filter(function (id) { return wt.slice(0, s).concat(wt.slice(s)).some(function (x) { return x.indexOf(id + " ") === 0 || x.indexOf(id + "  ") === 0 || x === id || x.indexOf(id + ":") === 0; }); });
+      ok(same(used.sort(), defined.sort()), "every id it uses is defined in the report", used.filter(function (id) { return defined.indexOf(id) < 0; }).join());
+      return wordParas(demo, { spec: true });
+    }).then(function (sp) {
+      ok(sp.indexOf("Consequences and how they could arise") < 0 && !sp.some(function (x) { return /\bK\d\b/.test(x); }), "the specification has no consequences section and names no K id");
+      // Wording 6: the specification shows no suggestion and no threat, so it leaves the via method out.
+      ok(!sp.some(function (x) { return /reached through another \(its via\)/.test(x); }), "nor the house method for a route (it prints no suggestion)");
+      return wordParas(demo, { highLevelOnly: true });
+    }).then(function (hl) {
+      ok(hl.indexOf("Consequences and how they could arise") < 0, "nor does the high-level report");
+      // Excel.
+      var wb = RX.buildWorkbook(demo), names = []; wb.eachSheet(function (ws) { names.push(ws.name); });
+      ok(names.indexOf("Consequences") === names.indexOf("Threat register") + 1, "Excel has a Consequences sheet after the threat register", names.join());
+      var ks = cells(wb, "Consequences");
+      ok(same(ks[0].slice(0, 7), ["Consequence", "Title", "Impact", "Impact by category", "Source", "Ranked systems", "Path"]) && ks.length === 7, "one row per path, with its consequence", ks.length + " rows");
+      var r1 = ks.filter(function (r) { return r[6] === "T1"; })[0];
+      ok(r1 && r1[0] === "K1" && r1[2] === "Severe" && r1[7] === "Z1 Unit 300 BPCS" && r1[8] === "Z3 and C2" && r1[11] === "High" && r1[12] === "Medium", "T1's row", JSON.stringify(r1));
+      ok(ks[0][12] === "Risk today", "the rating that stands is Risk today, as in Word");
+      var tr = cells(wb, "Threat register");
+      ok(tr[0][tr[0].length - 1] === "Leads to" && tr.filter(function (r) { return r[1] === "T3"; })[0].slice(-1)[0] === "K3 Loss of view of the unit at the control room", "the threat register gains a Leads to column");
+      // Wording 19: a consequence with no path says so in the Path column.
+      var pnp = clone(demo); pnp.consequences.push({ id: "K4", title: "Loss of the historian record", description: "", impact: "minor", source: "", hlaIds: [], notes: "" });
+      var k4row = cells(RX.buildWorkbook(pnp), "Consequences").filter(function (r) { return r[0] === "K4"; })[0];
+      ok(k4row && k4row[6] === "No path recorded" && !k4row[13], "a consequence with no path says No path recorded in the Path column", JSON.stringify(k4row));
+      ok(!ks.concat(tr).some(function (r) { return r.some(function (c) { return DASH.test(c); }); }), "no dashes in either");
+      var wb0 = RX.buildWorkbook(plain), n0 = []; wb0.eachSheet(function (ws) { n0.push(ws.name); });
+      var tr0 = cells(wb0, "Threat register");
+      ok(n0.indexOf("Consequences") < 0 && tr0[0].indexOf("Consequence") < 0, "without consequences, neither");
+      // The review pack.
+      load(DEMO);
+      var pack = RR.packItems().items, it = pack.filter(function (i) { return i.code === "T1"; })[0];
+      var lead = it.details.filter(function (x) { return x[0] === "Leads to"; })[0];
+      // Logic 7 / UX 10: Leads to and Via each on their own row, the route an "and" list (was one row, "via Z3, C2").
+      var viaRow = it.details.filter(function (x) { return x[0] === "Via"; })[0];
+      ok(lead && lead[1] === "K1 Loss of containment of HF acid from an unsafe process state" && viaRow && viaRow[1] === "Z3 and C2", "the review pack's T1 has a Leads to row and a Via row", JSON.stringify(lead) + JSON.stringify(viaRow));
+      ok(!pack.filter(function (i) { return i.code === "T5"; })[0].details.some(function (x) { return x[0] === "Leads to" || x[0] === "Via"; }), "a threat leading nowhere has none");
+      var vp = stripped(DEMO); vp.zones[0].threats[0].via = ["Z3", "C2"]; load(vp);
+      var vit = RR.packItems().items.filter(function (i) { return i.code === "T1"; })[0];
+      ok(vit.details.some(function (x) { return x[0] === "Via" && x[1] === "Z3 and C2"; }) && !vit.details.some(function (x) { return x[0] === "Leads to"; }), "a via with no consequence shows on its own");
+      // Logic 1: the risk context names only zones and conduits still there.
+      var gone = clone(demo); threatOf(gone, "Z1", "T1").via = ["Z3", "C9"];
+      ok(same(RT.buildRiskContext(gone).zones[0].threats[0].via, ["Z3"]), "the risk context leaves out a via id that points at nothing");
+      load(DEMO);
+      // The risk context.
+      var ctx = RT.buildRiskContext(demo);
+      var ct1 = ctx.zones[0].threats.filter(function (x) { return x.id === "T1"; })[0], ct5 = ctx.zones[2].threats.filter(function (x) { return x.id === "T5"; })[0];
+      ok(ctx.schema === "spt-risk-context/1.4" && ct1.consequenceId === "K1" && same(ct1.via, ["Z3", "C2"]) && !("consequenceId" in ct5) && !("via" in ct5), "the risk context carries consequenceId and via where recorded, on 1.4");
+      ok(same(ctx.consequences, [{ id: "K1", title: "Loss of containment of HF acid from an unsafe process state", impact: "severe" },
+        { id: "K2", title: "Unplanned shutdown of the unit and lost production", impact: "serious" }, { id: "K3", title: "Loss of view of the unit at the control room", impact: "serious" }]), "and the consequences, id, title and impact");
+      var c0x = RT.buildRiskContext(plain);
+      ok(!("consequences" in c0x) && !JSON.stringify(c0x).match(/consequenceId|"via"/), "without them, none of it");
+      // The comparison with a previous assessment.
+      var bl = RT.baselineFrom(JSON.stringify(stripped(DEMO)), "previous.json").baseline;
+      var dd = w.RiskApp.Compare.diff(bl.facts, w.RiskApp.Compare.freeze(demo));
+      var g = RT.comparisonLines(dd).filter(function (x) { return x.key === "consequences"; })[0];
+      ok(g && g.title === "Consequences" && g.items.indexOf("K1 Loss of containment of HF acid from an unsafe process state added, impact Severe.") >= 0 && g.items.indexOf("T1 (Z1) now leads to K1.") >= 0,
+        "since a previous assessment without them: the consequences added and the paths now leading to them", g ? g.items.join(" | ") : "none");
+      var later = clone(DEMO); later.consequences[1].impact = "severe"; delete later.consequences[1].impactByCategory;
+      threatOf(later, "Z1", "T3").consequenceId = "K2"; later.consequences.splice(2, 1);
+      later.consequences[0].title = "Release of HF acid";
+      var bl2 = RT.baselineFrom(JSON.stringify(DEMO), "previous.json").baseline;
+      var d2 = w.RiskApp.Compare.diff(bl2.facts, w.RiskApp.Compare.freeze(MG.normaliseProject(later)));
+      var g2 = RT.comparisonLines(d2).filter(function (x) { return x.key === "consequences"; })[0];
+      ok(g2 && g2.items.indexOf("K2: impact changed from Serious to Severe.") >= 0 && g2.items.indexOf("K3 Loss of view of the unit at the control room removed.") >= 0 &&
+        g2.items.indexOf("K1 was Loss of containment of HF acid from an unsafe process state; now Release of HF acid.") >= 0 && g2.items.indexOf("T3 (Z1) now leads to K2; was K3.") >= 0,
+        "consequences removed, renamed, their impact changed, and a path's consequence changed", g2 ? g2.items.join(" | ") : "none");
+      var rows2 = RT.comparisonRows(d2).filter(function (x) { return x.area === "Consequences"; });
+      ok(rows2.some(function (x) { return x.change === "Impact changed" && x.before === "Serious" && x.now === "Severe"; }) && rows2.some(function (x) { return x.item === "T3" && x.before === "K3" && x.now === "K2"; }), "and as rows for the Changes sheet");
+      ok(!g2.items.concat(g.items).some(function (x) { return DASH.test(x); }), "no dashes in the lines");
+      // Logic 10: a path's previous consequence is said in today's numbering (K3 is now K4, and a new K3 is another one).
+      var later3 = clone(DEMO); later3.consequences[2].id = "K4";
+      later3.consequences.push({ id: "K3", title: "Loss of the historian record", description: "", impact: "minor", source: "", hlaIds: [], notes: "" });
+      threatOf(later3, "Z1", "T3").consequenceId = "K2";
+      var d4 = w.RiskApp.Compare.diff(bl2.facts, w.RiskApp.Compare.freeze(MG.normaliseProject(later3)));
+      var g4 = RT.comparisonLines(d4).filter(function (x) { return x.key === "consequences"; })[0];
+      ok(g4 && g4.items.indexOf("T3 (Z1) now leads to K2; was K4.") >= 0 && g4.items.indexOf("K4 Loss of view of the unit at the control room was numbered K3.") >= 0, "a path's previous consequence in today's numbering", g4 ? g4.items.join(" | ") : "none");
+      ok(RT.comparisonRows(d4).some(function (x) { return x.item === "T3" && x.before === "K4" && x.now === "K2"; }), "and in the Changes sheet's row");
+      var d3 = w.RiskApp.Compare.diff(bl2.facts, w.RiskApp.Compare.freeze(MG.normaliseProject(clone(DEMO))));
+      ok(d3.empty, "the demo against itself: nothing changed");
+    });
+  }
+}());
+</script>
+</body>
+</html>

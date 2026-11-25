@@ -252,6 +252,8 @@
     function count(map) { if (map && typeof map === "object") Object.keys(map).forEach(function (k) { use[k] = (use[k] || 0) + 1; }); }
     p.srs.highLevelAssets.forEach(function (a) { if (a) count(a.consequenceByCategory); });
     p.zones.concat(p.conduits).forEach(function (o) { o.threats.forEach(function (t) { count(t.impactByCategory); }); });
+    // A consequence's impact by category counts too (consequence first).
+    M.consequencesOf(p).forEach(function (k) { count(k.impactByCategory); });
     var rows = c.categories.map(function (cat) {
       var name = A.changeRedraw(h("input", { type: "text", value: cat.name, "data-field": "crit-cat-name-" + cat.id, "aria-label": "Consequence category name",
         onInput: function (e) { var cc = edit(p), x = cc.categories.filter(function (y) { return y.id === cat.id; })[0]; if (x) x.name = e.target.value; settle(p); touched(); } }));

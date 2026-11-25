@@ -2,7 +2,9 @@
 /* Fixture: the risk-context file the current risk tool exports for its demo
  * project (modules/risk-assessment, index.html?tour=1), as Export risk context
  * writes it, with the provenance added in phase 6 of
- * docs/risk-tool-redesign.md on the same spt-risk-context/1.4 string.
+ * docs/risk-tool-redesign.md and the consequence-first provenance (each
+ * threat's consequenceId and via, the consequences list), on the same
+ * spt-risk-context/1.4 string.
  * modules/risk-assessment/scripts/test-risk-interchange.html fails when the
  * export and this copy part (generatedOn and generatedBy aside); regenerate
  * it only when the demo or the export changes on purpose. Used by
@@ -279,7 +281,12 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": "medium",
           "exceedsTolerable": true,
           "disposition": "mitigated",
-          "acceptance": ""
+          "acceptance": "",
+          "consequenceId": "K1",
+          "via": [
+            "Z3",
+            "C2"
+          ]
         },
         {
           "id": "T2",
@@ -296,7 +303,11 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": "medium",
           "exceedsTolerable": true,
           "disposition": "countermeasure",
-          "acceptance": ""
+          "acceptance": "",
+          "consequenceId": "K2",
+          "via": [
+            "Z4"
+          ]
         },
         {
           "id": "T3",
@@ -313,7 +324,8 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": null,
           "exceedsTolerable": false,
           "disposition": null,
-          "acceptance": ""
+          "acceptance": "",
+          "consequenceId": "K3"
         }
       ],
       "vulnerabilities": [
@@ -433,7 +445,11 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": null,
           "exceedsTolerable": true,
           "disposition": "sl-t",
-          "acceptance": ""
+          "acceptance": "",
+          "consequenceId": "K1",
+          "via": [
+            "Z4"
+          ]
         }
       ],
       "vulnerabilities": [
@@ -480,7 +496,7 @@ window.RiskContextFixtures["demo"] =
       "safetyRelated": false,
       "fromHighLevelAsset": "A3",
       "slSuggestedByFR": {
-        "IAC": null,
+        "IAC": 3,
         "UC": null,
         "SI": 3,
         "DC": 2,
@@ -499,7 +515,7 @@ window.RiskContextFixtures["demo"] =
       },
       "slTarget": 2,
       "worstUnmitigatedRisk": "high",
-      "justification": "The zone's worst unmitigated risk is High (a compromised corporate client using the historian as a pivot toward the BPCS), with internet adjacency and exposure through many conduits bearing on RDF and SI, but the DMZ exists precisely to absorb that exposure, and the planned restriction of historian web access to the reporting subnet addresses the driving vulnerability. SL2 across the access, integrity and data-flow FRs reflects the brokerage role; RA stays at SL1 because loss of the DMZ does not remove operator view or control (a security function that must be kept: the unit runs through a DMZ outage). Exfiltration of process data from the historian sits within tolerable risk and needs no treatment decision.",
+      "justification": "The zone's worst unmitigated risk is High (a compromised corporate client using the historian as a pivot toward the BPCS), with internet adjacency and exposure through many conduits bearing on RDF and SI, but the DMZ exists precisely to absorb that exposure, and the planned restriction of historian web access to the reporting subnet addresses the driving vulnerability. SL2 across the access, integrity and data-flow FRs reflects the brokerage role; RA stays at SL1 because loss of the DMZ does not remove operator view or control (a security function that must be kept: the unit runs through a DMZ outage). Exfiltration of process data from the historian sits within tolerable risk and needs no treatment decision. IAC is held at SL2 though the vendor remote access paths to the BPCS pass through this zone, because C2 and Z1, which those paths reach, hold SL3 on IAC.",
       "assets": [
         {
           "id": "AS6",
@@ -599,7 +615,7 @@ window.RiskContextFixtures["demo"] =
       "safetyRelated": false,
       "fromHighLevelAsset": "A4",
       "slSuggestedByFR": {
-        "IAC": null,
+        "IAC": 3,
         "UC": 3,
         "SI": 3,
         "DC": null,
@@ -618,7 +634,7 @@ window.RiskContextFixtures["demo"] =
       },
       "slTarget": 3,
       "worstUnmitigatedRisk": "high",
-      "justification": "SI is set to SL3: the engineering zone is the integrity chokepoint for every controller, and malware carried on removable media or a vendor laptop is a High risk, held in day-to-day terms by the existing media kiosk and workstation allow-listing. Misuse of the legacy configuration tool's shared account exceeds tolerable risk, and the asset owner accepts it until its review at the end of June 2027 rather than raising the SL-T: a compensating procedure covers the risk until the shared account is retired. Remaining FRs sit at SL1 or SL2, consistent with no external paths into this zone.",
+      "justification": "SI is set to SL3: the engineering zone is the integrity chokepoint for every controller, and malware carried on removable media or a vendor laptop is a High risk, held in day-to-day terms by the existing media kiosk and workstation allow-listing. Misuse of the legacy configuration tool's shared account exceeds tolerable risk, and the asset owner accepts it until its review at the end of June 2027 rather than raising the SL-T: a compensating procedure covers the risk until the shared account is retired. IAC is held at SL2 although the engineering path to the SIS passes through this zone and suggests SL3, because the SIS zone holds SL3 on IAC itself. The other FRs sit at SL1 or SL2, consistent with no external paths into this zone.",
       "assets": [
         {
           "id": "AS9",
@@ -664,7 +680,8 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": "medium",
           "exceedsTolerable": true,
           "disposition": "mitigated",
-          "acceptance": ""
+          "acceptance": "",
+          "consequenceId": "K2"
         },
         {
           "id": "T8",
@@ -812,7 +829,11 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": "medium",
           "exceedsTolerable": true,
           "disposition": "mitigated",
-          "acceptance": ""
+          "acceptance": "",
+          "consequenceId": "K1",
+          "via": [
+            "Z3"
+          ]
         }
       ],
       "vulnerabilities": [
@@ -851,7 +872,7 @@ window.RiskContextFixtures["demo"] =
         "HTTPS"
       ],
       "slSuggestedByFR": {
-        "IAC": null,
+        "IAC": 3,
         "UC": null,
         "SI": 3,
         "DC": 2,
@@ -881,6 +902,23 @@ window.RiskContextFixtures["demo"] =
         "risk": "high",
         "source": "zones"
       }
+    }
+  ],
+  "consequences": [
+    {
+      "id": "K1",
+      "title": "Loss of containment of HF acid from an unsafe process state",
+      "impact": "severe"
+    },
+    {
+      "id": "K2",
+      "title": "Unplanned shutdown of the unit and lost production",
+      "impact": "serious"
+    },
+    {
+      "id": "K3",
+      "title": "Loss of view of the unit at the control room",
+      "impact": "serious"
     }
   ]
 };

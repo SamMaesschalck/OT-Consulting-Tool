@@ -180,13 +180,25 @@ window.RiskExports = (function () {
     var rt = RT();
     if (rt.criteriaOf(p).hasCategoryTolerable) return true;
     return p.srs.highLevelAssets.some(function (a) { return a && rt.categoryRatings(a.consequenceByCategory, p).length > 0; }) ||
-      (!systemsOnly && p.zones.concat(p.conduits).some(function (o) { return o.threats.some(function (t) { return rt.categoryRatings(t.impactByCategory, p).length > 0; }); }));
+      (!systemsOnly && p.zones.concat(p.conduits).some(function (o) { return o.threats.some(function (t) { return rt.categoryRatings(t.impactByCategory, p).length > 0; }); })) ||
+      (!systemsOnly && rt.consequencesOf(p).some(function (k) { return rt.categoryRatings(k.impactByCategory, p).length > 0; }));
   }
+  // Consequence first: whether any path passes through a zone or conduit
+  // (the house method for its SL-T is then said), and whether any threat
+  // leads to a consequence (the register then has a column for it).
+  function anyVia(p) { return p.zones.concat(p.conduits).some(function (o) { return o.threats.some(function (t) { return RT().viaOf(t).length > 0; }); }); }
+  function anyPath(p) { var rt = RT(); return p.zones.concat(p.conduits).some(function (o) { return o.threats.some(function (t) { return !!rt.consequenceById(t.consequenceId, p); }); }); }
+  // Any via counts, with or without a consequence (the engine's rule).
+  var VIA_METHOD = "Where a threat acting in one zone or conduit is reached through another (its via), the house method also suggests for the one it passes through the SL-T that the threat's unmitigated risk maps to, on the foundational requirements the threat affects. The route is as recorded; it is not checked against the conduits.";
   // An impact per category in words, "Safety: Serious; Financial loss: Minor",
-  // or "" where none is given.
-  function categoryWords(map, p) {
-    return RT().categoryRatings(map, p).map(function (r) { return r.name + ": " + r.levelName; }).join("; ");
+  // or "" where none is given. sep: between a category and its level.
+  function categoryWords(map, p, sep) {
+    return RT().categoryRatings(map, p).map(function (r) { return r.name + (sep == null ? ": " : sep) + r.levelName; }).join("; ");
   }
+  // A route in order, "Z3 and C2".
+  function viaList(via) { return via.length > 1 ? via.slice(0, -1).join(", ") + " and " + via[via.length - 1] : (via[0] || ""); }
+  // "T1 and T9 are", "T5 is".
+  function idsAre(ids) { return viaList(ids) + (ids.length === 1 ? " is" : " are"); }
 
   // The ranked systems the recorded decisions take to a detailed assessment:
   // on a high-level-only assessment each system's own decision, otherwise a
@@ -281,7 +293,7 @@ window.RiskExports = (function () {
     // The sections printed on landscape pages (see the end of this builder).
     // A table there is 14438 wide: A4 landscape less the margins.
     var LAND_KEYS = {};
-    ["Risk register", "Treatment plan", "Accepted risks"].forEach(function (t) { LAND_KEYS[RS.sectionKey(t)] = true; });
+    ["Risk register", "Consequences and how they could arise", "Treatment plan", "Accepted risks"].forEach(function (t) { LAND_KEYS[RS.sectionKey(t)] = true; });
 
     // ---- primitives (this app's copy of the Assessments idiom) ----
     // The __tags are read back by the section pass (shared/report-sections.js):
@@ -530,7 +542,10 @@ window.RiskExports = (function () {
       })), lw));
       if (!opts.highLevelOnly) {
         var m = R0.riskToSL || {};
-        out.push(pinned(body("The house mapping suggests an SL-T from the unmitigated risk: " + R0.riskBands.map(function (b) { var x = m[b.id]; return x ? b.name + " SL" + x.suggest : null; }).filter(Boolean).join(", ") + ". SL4 is considered only where a nation-state-grade adversary is in scope.")));
+        out.push(pinned(body("The house mapping suggests an SL-T from the unmitigated risk: " + R0.riskBands.map(function (b) { var x = m[b.id]; return x ? b.name + " SL" + x.suggest : null; }).filter(Boolean).join(", ") + ". SL4 is considered only where a nation-state-grade adversary is in scope." +
+          // The specification prints no suggestion and no threat, so the
+          // method for a route through a zone is said only in the report.
+          (anyVia(p) && !isSpec ? " " + VIA_METHOD : ""))));
         out.push(h2("Foundational requirements"));
         var fw = [2000, 7000];
         out.push(fixedTable([headerRow(["Short form", "Foundational requirement"], fw)].concat(FRS().map(function (f) {
@@ -1302,8 +1317,10 @@ window.RiskExports = (function () {
       if (!S.threats.length) {
         children.push(body("No threats registered.", { color: COLOR.muted, italics: true }));
       } else {
-        var rgw = [2000, 4638, 1700, 1700, 1700, 2700];
-        children.push(fixedTable([headerRow(["Zone or conduit", "Threat scenario", "Unmitigated", "Current", "Planned", "Treatment decision"], rgw)].concat(S.threats.map(function (x) {
+        // A Leads to column only once a threat leads to a consequence (consequence first).
+        var regK = anyPath(p);
+        var rgw = regK ? [1800, 3838, 1500, 1500, 1500, 2500, 1800] : [2000, 4638, 1700, 1700, 1700, 2700];
+        children.push(fixedTable([headerRow(["Zone or conduit", "Threat scenario", "Unmitigated", "Current", "Planned", "Treatment decision"].concat(regK ? ["Leads to"] : []), rgw)].concat(S.threats.map(function (x) {
           return new docx.TableRow({ children: [
             textCell(x.owner.id + (x.owner.name ? " " + x.owner.name : ""), rgw[0]),
             textCell(x.t.id + "  " + (x.t.statement || "No statement"), rgw[1]),
@@ -1312,8 +1329,52 @@ window.RiskExports = (function () {
             ratingCell(x.planned, stateLI(x.t, "planned"), rgw[4], true),
             // No decision, or an incomplete one, prints in the red of a prompt left to complete.
             textCell(x.label, rgw[5], x.exceeds && !x.decided ? { bold: true, color: COLOR.note } : {})
-          ] });
+          ].concat(regK ? [textCell(x.consequence ? x.consequence.id + (x.consequence.title ? " " + x.consequence.title : "") : "", rgw[6])] : []) });
         })), rgw));
+      }
+
+      // ---- consequence first: each consequence and the paths that lead to
+      // it, after the register they come from (a landscape page of its own,
+      // for its eight columns); only when there are consequences ----
+      var KS = rt.consequencesOf(p);
+      if (KS.length) {
+        children.push(h1("Consequences and how they could arise"));
+        children.push(body("Each consequence was worked back to the paths that could lead to it. A path is a threat scenario in the zone or conduit where it acts, rated and decided as in the risk register; via names the zones and conduits it passes through first. Risk today is the current rating; where none is given, it is the planned rating if nothing planned is still to come, else the unmitigated one."));
+        var kw = [900, 1900, 1700, 2300, 2700, 1500, 1500, 1938];
+        KS.forEach(function (k) {
+          var kHead = h2(k.id + " " + (k.title || "Untitled consequence"));
+          kHead.__boundaryOnly = true;
+          children.push(kHead);
+          // "Impact: Severe. By category: Safety (injury / loss of life) Severe; ..."
+          var cw0 = categoryWords(k.impactByCategory, p, " ");
+          children.push(body("Impact: " + (k.impact ? sevName(k.impact, p) : "Not rated") + "." + (cw0 ? " By category: " + cw0 + "." : "") +
+            (String(k.source || "").trim() ? " Source: " + noStop(k.source) + "." : "") +
+            // The ranked systems by name: the ranking in Word prints no A id.
+            (function () {
+              var names = (k.hlaIds || []).map(function (id) { var s = p.srs.highLevelAssets.filter(function (z) { return z && z.id === id; })[0]; return s && String(s.name || "").trim() ? noStop(s.name) : ""; }).filter(Boolean);
+              return names.length ? " Ranked systems: " + names.join("; ") + "." : "";
+            }())));
+          if (String(k.description || "").trim()) children.push(body(k.description));
+          var kp = S.threats.filter(function (x) { return x.consequence === k; });
+          if (!kp.length) { children.push(body("No path is recorded yet.", { color: COLOR.muted, italics: true })); return; }
+          children.push(fixedTable([headerRow(["Path", "Acts in", "Via", "Threat source", "Entry point", "Unmitigated", "Risk today", "Decision"], kw)].concat(kp.map(function (x) {
+            return new docx.TableRow({ children: [
+              textCell(x.t.id, kw[0], { bold: true }),
+              textCell(x.owner.id + (x.owner.name ? " " + x.owner.name : ""), kw[1]),
+              textCell(x.via.length ? viaList(x.via) : "Direct", kw[2]),
+              String(x.t.source || "").trim() ? textCell(x.t.source, kw[3]) : textCell("Not recorded", kw[3], { color: COLOR.muted }),
+              String(x.t.entryPoint || "").trim() ? textCell(x.t.entryPoint, kw[4]) : textCell("Not recorded", kw[4], { color: COLOR.muted }),
+              ratingCell(x.risk, null, kw[5], false),
+              ratingCell(x.today, null, kw[6], false),
+              textCell(x.label, kw[7], x.exceeds && !x.decided ? { bold: true, color: COLOR.note } : {})
+            ] });
+          })), kw));
+          // A path rated below or above this consequence's worst case, as the screen says.
+          ["lower", "higher"].forEach(function (vs) {
+            var ids = kp.filter(function (x) { return rt.pathImpactVs(x.t, k, p) === vs; }).map(function (x) { return x.t.id; });
+            if (ids.length) children.push(body(idsAre(ids) + " rated " + (vs === "lower" ? "below" : "above") + " this consequence's worst case.", { color: COLOR.muted }));
+          });
+        });
       }
 
       // ---- the treatment plan: the additional countermeasures ----
@@ -1387,7 +1448,9 @@ window.RiskExports = (function () {
             var rows = [
               ["Source", t.source], ["Entry point", t.entryPoint],
               ["Assets", assetNames(o, t, p).join("; ")], ["Vulnerabilities", vIds.join(", ")],
-              ["Consequence", t.consequence], ["Impact by category", categoryWords(t.impactByCategory, p)], ["Affected FRs", (t.affectedFR || []).join(", ")],
+              ["Consequence", t.consequence],
+              ["Leads to", x.consequence ? x.consequence.id + (x.consequence.title ? " " + x.consequence.title : "") : ""], ["Via", viaList(x.via)],
+              ["Impact by category", categoryWords(t.impactByCategory, p)], ["Affected FRs", (t.affectedFR || []).join(", ")],
               ["Likelihood rationale", t.likelihoodRationale], ["Countermeasures", cms.join(", ")]
             ].filter(function (kv) { return kv[1] && String(kv[1]).trim(); });
             if (rows.length) children.push(kvTable(rows));
@@ -1447,7 +1510,8 @@ window.RiskExports = (function () {
         // Where a suggestion is above what those threats map to, it says where
         // it comes from: the safety floor, or the zone a conduit inherits it from.
         children.push(h2("Driving scenarios"));
-        children.push(body("For each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. On the house mapping these set the suggested SL-T; the justifications follow."));
+        children.push(body("For each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. On the house mapping these set the suggested SL-T; the justifications follow." +
+          (anyVia(p) ? " A scenario written with via passes through that zone or conduit on its way to where it acts; by the house method it sets the suggestion there." : "")));
         var dw = [2800, 2200, 4506];
         var drows = [headerRow(["Zone or conduit", "Foundational requirements", "Driving scenarios"], dw)];
         S.owners.forEach(function (row) {
@@ -1457,6 +1521,8 @@ window.RiskExports = (function () {
             // A zone or conduit not assessed in detail has no driving scenario.
             if (skip) return;
             var bits = d.drivers.map(function (id) { return id + " (" + bandStyle(d.band).name + ")"; });
+            // A path through the zone or conduit sets it (house method): the path named.
+            if (d.raisedBy === "via") bits = bits.concat((d.via || []).map(function (v) { return v.words + " (" + bandStyle(v.band).name + ")"; }));
             var why = d.raisedBy === "floor" ? "SL" + d.sl + " from the safety floor"
               : d.raisedBy === "inherited" ? "SL" + d.sl + " inherited from " + (d.from.length > 1 ? d.from.slice(0, -1).join(", ") + " and " + d.from[d.from.length - 1] : d.from[0]) : "";
             var text = bits.length ? bits.join(", ") + (why ? "; " + why : "") : cap(why);
@@ -1739,13 +1805,16 @@ window.RiskExports = (function () {
     // a threat has one (the columns before it keep their letters).
     var trCat = S.threats.some(function (x) { return x.categories && x.categories.length; });
     if (trCat) TR_HEAD.push("Impact by category");
+    // The consequence a threat leads to, last, only once one does.
+    var trK = anyPath(p);
+    if (trK) TR_HEAD.push("Leads to");
     function trCol(name) { return TR_HEAD.indexOf(name) + 1; }
     tr.columns = [
       { width: 12 }, { width: 8 }, { width: 60 }, { width: 24 }, { width: 14 },
       { width: 12 }, { width: 12 }, { width: 12 },
       { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 },
       { width: 10 }, { width: 26 }, { width: 12 }, { width: 50 }, { width: 14 }, { width: 18 }, { width: 14 }, { width: 40 }
-    ].concat(trCat ? [{ width: 50 }] : []);
+    ].concat(trCat ? [{ width: 50 }] : []).concat(trK ? [{ width: 40 }] : []);
     tr.addRow(TR_HEAD);
     styleHeader(tr, 1, TR_HEAD.length);
     S.threats.forEach(function (x) {
@@ -1759,7 +1828,8 @@ window.RiskExports = (function () {
         likName(cur.L, p), sevName(cur.I, p), "", likName(pl.L, p), sevName(pl.I, p), "",
         x.exceeds ? "Yes" : "No", x.label,
         "", x.decided ? x.treatment.reason : "", x.decided ? "Decided" : (x.exceeds ? "Open" : "Monitor"), owners.join("; "), due, ""
-      ].concat(trCat ? [categoryWords(x.t.impactByCategory, p)] : []));
+      ].concat(trCat ? [categoryWords(x.t.impactByCategory, p)] : [])
+        .concat(trK ? [x.consequence ? x.consequence.id + (x.consequence.title ? " " + x.consequence.title : "") : ""] : []));
       bandFillCell(r.getCell(trCol("Risk")), x.risk);
       bandFillCell(r.getCell(trCol("Current risk")), x.current);
       bandFillCell(r.getCell(trCol("Planned risk")), x.planned);
@@ -1772,6 +1842,34 @@ window.RiskExports = (function () {
     });
     tr.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: TR_HEAD.length } };
     freezeTop(tr);
+
+    // ---- Consequences: one row per path, with its consequence (consequence
+    // first), after the register its paths come from; only when used ----
+    var KX = rt.consequencesOf(p);
+    if (KX.length) {
+      var ksx = wb.addWorksheet("Consequences", { properties: { tabColor: { argb: argb(COLOR.gap) } } });
+      var KH = ["Consequence", "Title", "Impact", "Impact by category", "Source", "Ranked systems", "Path", "Acts in", "Via", "Threat source", "Entry point", "Unmitigated risk", "Risk today", "Treatment decision"];
+      ksx.columns = [{ width: 12 }, { width: 40 }, { width: 12 }, { width: 40 }, { width: 28 }, { width: 18 }, { width: 8 }, { width: 22 }, { width: 14 }, { width: 26 }, { width: 34 }, { width: 14 }, { width: 14 }, { width: 30 }];
+      ksx.addRow(KH);
+      styleHeader(ksx, 1, KH.length);
+      KX.forEach(function (k) {
+        // The ranked systems by name, as the Ranking sheet lists them.
+        var sysNames = (k.hlaIds || []).map(function (id) { var s = p.srs.highLevelAssets.filter(function (z) { return z && z.id === id; })[0]; return s ? String(s.name || "").trim() : ""; }).filter(Boolean);
+        var head = [k.id, k.title || "", k.impact ? sevName(k.impact, p) : "", categoryWords(k.impactByCategory, p), k.source || "", sysNames.join("; ")];
+        var kp = S.threats.filter(function (x) { return x.consequence === k; });
+        if (!kp.length) { var r0 = ksx.addRow(head.concat(["No path recorded", "", "", "", "", "", "", ""])); r0.alignment = { vertical: "top", wrapText: true }; return; }
+        kp.forEach(function (x) {
+          var r = ksx.addRow(head.concat([x.t.id, x.owner.id + (x.owner.name ? " " + x.owner.name : ""), x.via.length ? viaList(x.via) : "Direct",
+            x.t.source || "", x.t.entryPoint || "", "", "", x.label]));
+          bandFillCell(r.getCell(KH.indexOf("Unmitigated risk") + 1), x.risk);
+          bandFillCell(r.getCell(KH.indexOf("Risk today") + 1), x.today);
+          if (x.exceeds && !x.decided) r.getCell(KH.length).font = { bold: true, color: { argb: argb(COLOR.gap) } };
+          r.alignment = { vertical: "top", wrapText: true };
+        });
+      });
+      ksx.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: KH.length } };
+      freezeTop(ksx);
+    }
 
     // ---- Treatment plan: the additional countermeasures ----
     var tp = wb.addWorksheet("Treatment plan", { properties: { tabColor: { argb: argb(COLOR.near) } } });
@@ -1952,6 +2050,8 @@ window.RiskExports = (function () {
     crScale("Security levels (SolutionsPT house summary)", ["Security level", "Protects against"], ["1", "2", "3", "4"].filter(function (k) { return defs[k]; }).map(function (k) { return ["SL" + k, defs[k]]; }));
     var r2sl = R0.riskToSL || {};
     crScale("Suggested SL-T (SolutionsPT house mapping)", ["Unmitigated risk", "Suggested SL-T"], R0.riskBands.filter(function (b) { return r2sl[b.id]; }).map(function (b) { return [b.name, "SL" + r2sl[b.id].suggest]; }));
+    // Consequence first: the house method for a zone or conduit on a path, once one is.
+    if (anyVia(p)) { var crVia = cr.addRow([VIA_METHOD]); crVia.getCell(1).alignment = { wrapText: true, vertical: "top" }; cr.mergeCells(crVia.number, 1, crVia.number, LIKS.length + 2); }
     crScale("Foundational requirements", ["Short form", "Foundational requirement"], frs.map(function (f) { return [f.id, f.fr + " " + String(f.name).replace(/ & /g, " and ")]; }));
 
     // ---- Basis ----

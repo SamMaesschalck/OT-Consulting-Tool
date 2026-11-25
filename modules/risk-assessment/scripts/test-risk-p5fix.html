@@ -104,7 +104,8 @@
     // ---- 1. Leave as it is never lowers an impact that mirrors its categories ----
     load(window.SPT_TOUR_PROJECT);
     var t4 = threat("Z2", "T4");
-    ok(same(t4.impactByCategory, { safety: "severe", environmental: "serious", regulatory: "serious" }) && t4.impact === "severe", "the demo's T4: severe for safety, serious for the others, impact severe");
+    // Consequence first (wording 8): T4 copies K1's ratings, now severe on safety, environment and production (was safety alone).
+    ok(same(t4.impactByCategory, { safety: "severe", environmental: "severe", operational: "severe", regulatory: "serious" }) && t4.impact === "severe", "the demo's T4: severe for safety, environment and production, serious for regulatory, impact severe");
     RT.navigate("suc");
     crit().querySelector('[data-action="remove-level-impact-severe"]').click();
     var mapSel = crit().querySelector('select[data-field="crit-map-impact-severe"]');

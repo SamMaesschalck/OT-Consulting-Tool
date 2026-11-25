@@ -123,6 +123,14 @@
     sel.appendChild(h("option", { value: "new", text: "New zone" }));
     box.appendChild(sel);
     box.appendChild(btn);
+    // Consequence first: a consequence for step 5 from this system's worst
+    // credible consequence, and the consequences that already name it.
+    var ks = M.consequencesOf(p).filter(function (k) { return (k.hlaIds || []).indexOf(asset.id) >= 0; });
+    box.appendChild(h("div", { class: "assign-k" }, [
+      ks.length ? h("span", { class: "muted", "data-hla-consequences": asset.id, text: "In " + E.andList(ks.map(function (k) { return k.id; })) + " " }) : null,
+      h("button", { type: "button", class: "btn xs", "data-action": "start-consequence", text: "Start from this consequence",
+        "aria-label": "Start a consequence from " + asset.id, onClick: function () { R.ConsequenceUI.startFrom(asset); } })
+    ]));
     return box;
   }
 

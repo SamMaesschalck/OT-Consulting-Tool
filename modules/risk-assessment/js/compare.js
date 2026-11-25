@@ -64,9 +64,12 @@ window.RiskApp.Compare = (function () {
       f.threats = row.threats.map(function (x) {
         var t = x.t, st = {};
         STATES.forEach(function (s) { st[s] = stateOf(t, s, p); });
-        return { id: t.id, statement: t.statement || "", states: st, required: !!x.exceeds,
+        var ft = { id: t.id, statement: t.statement || "", states: st, required: !!x.exceeds,
           decision: x.treatment.confirmed ? x.treatment.decision : null, label: x.label,
           accepted: x.disposition === "accepted", reviewDate: str((t.acceptanceDetail || {}).reviewDate) };
+        // The consequence it is a path to, only when it has one.
+        if (x.consequence) ft.consequenceId = x.consequence.id;
+        return ft;
       });
       f.cms = (o.countermeasures || []).filter(function (m) { return m && String(m.description || "").trim(); }).map(function (m) {
         return { id: m.id, description: m.description, existing: !!m.existing, status: M.CM_STATUSES.indexOf(m.status) >= 0 ? m.status : "" };
@@ -81,8 +84,13 @@ window.RiskApp.Compare = (function () {
       if (hlOnly) { var d = E.hlaComparison(a, p).required; f.decision = d === true || d === false ? d : null; }
       return f;
     });
-    return { v: 1, tolerable: vm.tolerable, criteriaKey: hash(M.criteriaContent(crit)),
+    var out = { v: 1, tolerable: vm.tolerable, criteriaKey: hash(M.criteriaContent(crit)),
       tolerableByCategory: crit.tolerableByCategory || {}, owners: owners, ranked: ranked, highLevelOnly: hlOnly };
+    // Consequence first: each consequence and its impact, only when there
+    // are any (a copy without them had none).
+    var ks = M.consequencesOf(p);
+    if (ks.length) out.consequences = ks.map(function (k) { return { id: k.id, title: k.title || "", impact: k.impact || "", In: k.impact ? E.impactName(k.impact, p) : "" }; });
+    return out;
   }
 
   // The latest date among the approvals given (or "").
@@ -180,8 +188,23 @@ window.RiskApp.Compare = (function () {
       owners: { added: [], removed: [], renumbered: [], renamed: [], ends: [] },
       slt: [], threats: { added: [], removed: [], moved: [], renumbered: [] },
       ratings: [], decisions: [], cms: { added: [], removed: [], moved: [], status: [] },
-      accepted: { added: [], removed: [] }
+      accepted: { added: [], removed: [] },
+      consequences: { added: [], removed: [], renumbered: [], renamed: [], impact: [], paths: [] }
     };
+
+    // Consequence first: by id and title, then title, then id. A copy with
+    // none had none (consequences came later than the file format).
+    var km = match(list(prev.consequences), list(cur.consequences), byIdName("title"));
+    var kNow = {};
+    km.pairs.forEach(function (pr) {
+      var a = pr.prev, b = pr.cur;
+      kNow[a.id] = b.id;
+      if (a.id !== b.id) out.consequences.renumbered.push({ prev: a, cur: b });
+      else if (norm(a.title) !== norm(b.title)) out.consequences.renamed.push({ prev: a, cur: b });
+      var moved = sameCriteria ? str(a.impact) !== str(b.impact) : norm(a.In) !== norm(b.In);
+      if (moved) out.consequences.impact.push({ prev: a, cur: b });
+    });
+    out.consequences.added = km.added; out.consequences.removed = km.removed;
 
     // The ranked systems: by id, then by name. A copy frozen before the
     // ranking was compared has none to compare.
@@ -247,6 +270,13 @@ window.RiskApp.Compare = (function () {
         return !sameRating((a.t.states || {})[s], (b.t.states || {})[s], sameCriteria);
       });
       if (changed.length) out.ratings.push({ cur: b, changes: changed.map(function (s) { return { state: s, from: (a.t.states || {})[s] || {}, to: (b.t.states || {})[s] || {} }; }) });
+      // The consequence a path leads to (the previous one read in today's numbering).
+      var kWas = a.t.consequenceId ? (kNow[a.t.consequenceId] || a.t.consequenceId) : "", kIs = str(b.t.consequenceId);
+      // A path whose consequence was removed is said with the consequence.
+      var kGone = !kIs && out.consequences.removed.some(function (k) { return k.id === a.t.consequenceId; });
+      // The previous one is said in today's numbering too, so a renumbered
+      // consequence keeps one name (as it was where it is gone).
+      if (kWas !== kIs && !kGone) out.consequences.paths.push({ prev: a, cur: b, from: kWas, to: kIs });
       // An acceptance given or taken back is said with the accepted risks.
       if (!!a.t.accepted !== !!b.t.accepted) { (b.t.accepted ? out.accepted.added : out.accepted.removed).push({ prev: a, cur: b }); return; }
       // A decision only when the one recorded changed: a threat now within
@@ -275,7 +305,8 @@ window.RiskApp.Compare = (function () {
       !out.owners.added.length && !out.owners.removed.length && !out.owners.renumbered.length && !out.owners.renamed.length && !out.owners.ends.length &&
       !out.slt.length && !out.threats.added.length && !out.threats.removed.length && !out.threats.moved.length && !out.threats.renumbered.length &&
       !out.ratings.length && !out.decisions.length && !out.cms.added.length && !out.cms.removed.length && !out.cms.moved.length && !out.cms.status.length &&
-      !out.accepted.added.length && !out.accepted.removed.length;
+      !out.accepted.added.length && !out.accepted.removed.length &&
+      !Object.keys(out.consequences).some(function (k) { return out.consequences[k].length; });
     return out;
   }
 
@@ -426,7 +457,26 @@ window.RiskApp.Compare = (function () {
     d.accepted.added.forEach(function (x) { ac.push(x.cur.t.id + " (" + x.cur.owner.id + ") accepted since the previous assessment."); });
     d.accepted.removed.forEach(function (x) { ac.push(noLongerAccepted(x)); });
     group("accepted", "Accepted risks", ac);
+    group("consequences", "Consequences", consequenceLines(d));
     return g;
+  }
+  // Consequence first, in words: "K3 Loss of view added, impact Serious.",
+  // "K1: impact changed from Serious to Severe.", "T5 (Z3) now leads to K1;
+  // was K2.", "T5 (Z3) no longer leads to K2."
+  function kWho(k) { return k.id + (k.title ? " " + k.title : ""); }
+  function consequenceLines(d) {
+    var c = d.consequences || {}, out = [];
+    (c.added || []).forEach(function (k) { out.push(kWho(k) + " added" + (k.In ? ", impact " + k.In : "") + "."); });
+    (c.removed || []).forEach(function (k) { out.push(kWho(k) + " removed."); });
+    (c.renumbered || []).forEach(function (x) { out.push(kWho(x.cur) + " was numbered " + x.prev.id + "."); });
+    (c.renamed || []).forEach(function (x) { out.push(x.cur.id + " was " + (x.prev.title || "untitled") + "; now " + (x.cur.title || "untitled") + "."); });
+    (c.impact || []).forEach(function (x) { out.push(x.cur.id + ": impact " + (x.prev.In ? "changed from " + x.prev.In : "set") + (x.cur.In ? " to " + x.cur.In : ", no longer rated") + "."); });
+    (c.paths || []).forEach(function (x) {
+      var id = x.cur.t.id + " (" + x.cur.owner.id + ")";
+      if (!x.to) out.push(id + " no longer leads to " + x.from + ".");
+      else out.push(id + " now leads to " + x.to + (x.from ? "; was " + x.from : "") + ".");
+    });
+    return out;
   }
 
   // The baseline in one sentence: "the previous assessment of Unit 300,
@@ -478,6 +528,13 @@ window.RiskApp.Compare = (function () {
     (d.cms.status || []).forEach(function (x) { add("Countermeasures", x.cur.owner.id, x.cur.m.id + " " + x.cur.m.description, "Status changed", cmCell(x.prev.m), cmCell(x.cur.m)); });
     d.accepted.added.forEach(function (x) { add("Accepted risks", x.cur.owner.id, x.cur.t.id, "Accepted", cap(DECISION_WORDS[decisionOf(x.prev.t)]), cap(DECISION_WORDS.accept)); });
     d.accepted.removed.forEach(function (x) { add("Accepted risks", x.cur.owner.id, x.cur.t.id, "No longer accepted", cap(DECISION_WORDS.accept), cap(DECISION_WORDS[decisionOf(x.cur.t)])); });
+    var kc = d.consequences || {};
+    (kc.added || []).forEach(function (k) { add("Consequences", "", kWho(k), "Added", "", k.In || ""); });
+    (kc.removed || []).forEach(function (k) { add("Consequences", "", kWho(k), "Removed", k.In || "", ""); });
+    (kc.renumbered || []).forEach(function (x) { add("Consequences", "", kWho(x.cur), "Renumbered", x.prev.id, x.cur.id); });
+    (kc.renamed || []).forEach(function (x) { add("Consequences", "", x.cur.id, "Renamed", x.prev.title, x.cur.title); });
+    (kc.impact || []).forEach(function (x) { add("Consequences", "", kWho(x.cur), "Impact changed", x.prev.In || "", x.cur.In || ""); });
+    (kc.paths || []).forEach(function (x) { add("Consequences", x.cur.owner.id, x.cur.t.id, x.to ? (x.from ? "Leads to another consequence" : "Now leads to a consequence") : "No longer leads to a consequence", x.from, x.to); });
     return out;
   }
 

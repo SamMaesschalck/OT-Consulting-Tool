@@ -134,7 +134,8 @@
     var V07_TOP = ["schema", "generatedBy", "generatedOn", "suc", "securityRequirements", "highLevelAssets", "basisOfAssessment", "assumptions", "approval", "zones", "conduits"];
     var V07_ZONE = ["id", "name", "safetyRelated", "fromHighLevelAsset", "slSuggestedByFR", "slTargetByFR", "slTarget", "worstUnmitigatedRisk", "justification", "assets", "accessPoints", "externalDependencies", "securityPolicies", "threats", "vulnerabilities", "countermeasures"];
     var V07_CONDUIT = ["id", "fromZone", "toZone", "name", "channels", "slSuggestedByFR", "slTargetByFR", "slTarget", "justification", "threats", "vulnerabilities", "countermeasures"];
-    var NEW = ["approvals", "riskComparison", "initialRisk"];
+    // Consequence first adds the consequences list beside them (provenance only, written when there are any).
+    var NEW = ["approvals", "riskComparison", "initialRisk", "consequences"];
     function without(o) { return Object.keys(o).filter(function (k) { return NEW.indexOf(k) < 0; }); }
     ok(same(without(ctx), V07_TOP), "the top-level keys are v0.7's, plus approvals", keys.join(","));
     ok(ctx.zones.every(function (z) { return same(without(z), V07_ZONE); }), "each zone's keys are v0.7's, plus the two new ones", Object.keys(ctx.zones[0]).join(","));
@@ -180,7 +181,7 @@
     ok(!("organisation" in RT.buildRiskContext(q).approvals[0]), "nor a blank field of one");
     q.approvals.forEach(function (e) { e.approved = false; }); q.approval.approved = false;
     var cq4 = RT.buildRiskContext(q);
-    ok(!("approvals" in cq4) && cq4.approval.approved === false && same(Object.keys(cq4), V07_TOP), "with none given there is no list, and the file has v0.7's keys", Object.keys(cq4).join(","));
+    ok(!("approvals" in cq4) && cq4.approval.approved === false && same(Object.keys(cq4).filter(function (k) { return k !== "consequences"; }), V07_TOP), "with none given there is no list, and the file has v0.7's keys", Object.keys(cq4).join(","));
     var empty = RT.buildRiskContext(M.emptyProject());
     ok(!("approvals" in empty) && empty.zones.length === 0, "an empty project writes no approvals list");
     ok(conform(cq2, tpl, "ctx", []).length === 0, "the variants conform too");

@@ -31,7 +31,8 @@
  *            operative (planned, else current, else unmitigated), operativeExceeds, today and
  *            todayExceeds (the rating that stands today: the engine's one rule), afterPlan and
  *            afterPlanExceeds (once the planned countermeasures are complete), categories (the
- *            impact per consequence category, where given: engine categoryRatings), residualRisk
+ *            impact per consequence category, where given: engine categoryRatings), consequence
+ *            (the consequence the threat is a path to, or null), via (the ids it passes through), residualRisk
  *            (the risk context's: planned, else current, else null), treatment (the
  *            full threatTreatment), decided (complete), incomplete (confirmed, not
  *            complete), label, disposition
@@ -75,6 +76,9 @@ window.RiskApp.ViewModel = (function () {
           // The risk context's residualRisk, which keeps its meaning: the
           // planned rating, else the current one, else none.
           residualRisk: T.planned || T.current || null,
+          // Consequence first: the consequence the threat is a path to (or
+          // null) and the zones and conduits it passes through.
+          consequence: M.consequenceById(p, t.consequenceId), via: M.viaOf(t),
           // decided: a confirmed decision with nothing missing. One the
           // consultant has not confirmed prints as no decision, and a confirmed
           // one that lacks what it rests on (incomplete) prints as a prompt.

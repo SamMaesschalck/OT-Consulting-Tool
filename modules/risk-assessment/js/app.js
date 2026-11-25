@@ -441,10 +441,13 @@ window.RiskApp.App = (function () {
     if (item.stage === "zones" && R.ZonesPage) R.ZonesPage.select(t.kind, t.id);
     // Step 5 works one zone or conduit at a time: the one named, and the
     // scenario, are opened.
-    if (item.stage === "risk" && R.RiskPage) R.RiskPage.select(t.kind === "threat" ? t.ownerId : t.id, t.kind === "threat" ? t.id : null);
+    // A consequence opens on By consequence.
+    if (item.stage === "risk" && R.RiskPage && t.kind === "consequence") R.RiskPage.showConsequence(t.id);
+    else if (item.stage === "risk" && R.RiskPage) R.RiskPage.select(t.kind === "threat" ? t.ownerId : t.id, t.kind === "threat" ? t.id : null);
     navigate(item.stage);
     var main = $("main"), el = null;
     if (t.kind === "zone" || t.kind === "conduit") el = main.querySelector(attrSel("data-owner-id", t.id));
+    else if (t.kind === "consequence") el = main.querySelector(attrSel("data-consequence-id", t.id));
     else if (t.kind === "threat") {
       var own = main.querySelector(attrSel("data-owner-id", t.ownerId));
       el = own ? (own.querySelector(attrSel("data-threat-id", t.id)) || own) : null;
@@ -471,10 +474,10 @@ window.RiskApp.App = (function () {
     if (!el || !main || el === main || !main.contains(el) || !el.getAttribute) return null;
     // The owner: a zone or conduit, a ranked system's row (data-hla-id) or
     // an asset register row (data-asset-id).
-    var key = el.closest("[data-owner-id]") ? "data-owner-id" : el.closest("[data-asset-id]") ? "data-asset-id" : "data-hla-id";
+    var key = el.closest("[data-owner-id]") ? "data-owner-id" : el.closest("[data-consequence-id]") ? "data-consequence-id" : el.closest("[data-asset-id]") ? "data-asset-id" : "data-hla-id";
     var own = el.closest("[" + key + "]"), thr = el.closest("[data-threat-id]"), sel = null, index = 0;
     ["data-decision", "data-detailed", "data-reason", "data-action", "data-assessment-type", "data-view", "data-doc", "data-separation", "data-marker", "data-end", "data-approval-field", "data-flag", "data-asset-name",
-      "data-field", "data-chip", "data-cm-field", "data-slt-fr", "data-rail-id", "data-tab", "data-heat", "data-cell", "data-filter",
+      "data-field", "data-chip", "data-cm-field", "data-slt-fr", "data-rail-id", "data-tab", "data-heat", "data-cell", "data-filter", "data-k-field",
       "data-asset-field", "data-sort", "data-map-col"].forEach(function (a) {
       if (!sel && el.getAttribute(a)) sel = "[" + a + '="' + el.getAttribute(a) + '"]';
     });
@@ -629,6 +632,8 @@ window.RiskApp.App = (function () {
     undo.entry = null; undo.base = e.json; undo.stale = false; undo.key = null; undo.tick = false; undo.typed = false;
     // A question waiting on the state before (where ratings go, a download) goes.
     if (R.CriteriaUI && R.CriteriaUI.close) R.CriteriaUI.close();
+    // So does By consequence's offer to update paths (js/ui-consequence.js).
+    if (R.ConsequenceUI && R.ConsequenceUI.leave) R.ConsequenceUI.leave();
     clearGuard();
     markDirty(); scheduleAutosave();
     if (R.Pages[e.stage]) state.stage = e.stage;
@@ -666,6 +671,8 @@ window.RiskApp.App = (function () {
     if (alias) state.stage = alias();
     if (!R.Pages[state.stage]) state.stage = "home";
     renderNav(); renderHeaderSummary();
+    // By consequence's offer to update paths lasts only while its page shows.
+    if (R.ConsequenceUI && R.ConsequenceUI.leave && !(state.stage === "risk" && R.RiskPage && R.RiskPage.ui.view === "consequence")) R.ConsequenceUI.leave();
     var main = $("main"); main.innerHTML = "";
     R.Pages[state.stage](main);
     // The question before a download, when one is waiting on this page.
@@ -917,7 +924,17 @@ window.RiskApp.App = (function () {
       setBaseline: function (text, fileName) { return R.Reports.setBaseline(text, fileName); },
       clearBaseline: function () { return R.Reports.clearBaseline(); },
       compareBaseline: function (project, today) { return R.Compare.compare(project || state.project, today); },
-      comparisonLines: R.Compare.lines, comparisonRows: R.Compare.rows, baselineWords: R.Compare.baselineWords
+      comparisonLines: R.Compare.lines, comparisonRows: R.Compare.rows, baselineWords: R.Compare.baselineWords,
+      // Consequence first: the consequences, the paths to each and through
+      // each zone or conduit, a path in words, a path's impact against its
+      // consequence's, and the zones a path passes through with no threat.
+      consequencesOf: function (project) { return M.consequencesOf(project || state.project); },
+      consequenceById: function (id, project) { return M.consequenceById(project || state.project, id); },
+      pathsTo: function (id, project) { return E.pathsTo(project || state.project, id); },
+      pathsThrough: function (id, project) { return E.pathsThrough(project || state.project, id); },
+      pathWords: E.pathWords, viaOf: M.viaOf,
+      pathImpactVs: function (t, k, project) { return E.pathImpactVs(t, k, project || state.project); },
+      steppingStones: function (project) { return E.steppingStones(project || state.project); }
     };
   }
 

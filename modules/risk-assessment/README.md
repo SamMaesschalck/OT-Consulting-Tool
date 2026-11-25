@@ -29,7 +29,7 @@ parity check find pages by it, never by label text):
 | 2 High-level risk | `srs` | ZCR 2 |
 | 3 Zones and conduits (tabs: Zones and conduits, Asset register) | `zones` | ZCR 3 |
 | 4 Risk comparison | `compare` | ZCR 4 |
-| 5 Detailed risk (tabs: By zone, Register, Heat map, SL-T grid) | `risk`, `slt` | ZCR 5, ZCR 5.6 |
+| 5 Detailed risk (tabs: By zone, By consequence, Register, Heat map, SL-T grid) | `risk`, `slt` | ZCR 5, ZCR 5.6 |
 | 6 Requirements specification | `spec` | ZCR 6 |
 | 7 Approval | `approval` | ZCR 7 |
 | Report | `report` | |
@@ -665,6 +665,114 @@ so no text is written twice. The schema does not move.
   requirements section and justifications are the detailed report's line for
   line. `scripts/test-risk-specfile.html` covers the rest.
 
+### Consequence first (built Nov 2026)
+
+A workshop can start from what can happen and work back to how it could
+happen (cyber PHA, consequence-driven cyber-informed engineering): a bow-tie,
+the consequence on the right and the paths that lead to it on the left. The
+schema stays `spt-risk-project/0.3`; every field is optional, tidied by the
+migration when present and never added, so a file without them behaves and
+prints exactly as before (`scripts/test-risk-consequence.html` holds the
+frozen files and the demo without its consequences to the v0.7.0 SL-T
+suggestions and Word text, `scripts/fixtures/slt-suggestions-v0.7.0.js` and
+`word-v0.7.0.js`).
+
+- **The data.** `project.consequences` `[{ id ("K1"...), title, description,
+  impact, impactByCategory, source, hlaIds, notes }]`, numbered from
+  `counters.consequence` (kept above every K id; absent until the first).
+  The impact mirrors the worst category by the threat rules (never lowered
+  while an entry no longer fits; a misfit is open on step 5, and a change of
+  criteria moves and counts its ratings too). A threat has `consequenceId`
+  and `via`, the zones and conduits the path passes through before it acts
+  in its own (in order; never EXT, which the entry point describes, nor its
+  own). A path is a threat: every rating, decision and output is its
+  threat's. The prune drops a consequenceId or via id that points at
+  nothing and a consequence's ranked system that has gone. The released
+  v0.7.0 normaliser keeps them (`scripts/fixtures/v0.7.0-migrate.js`).
+- **Step 5, By consequence** (`js/ui-consequence.js`), a tab beside By zone
+  (the order is `TAB_ORDER` in `js/ui-risk.js`, one line). Each consequence
+  is a card headed by its id and title: its paths on the left (a table
+  named "Paths to K1": where each acts, its via, threat source, entry
+  point, unmitigated risk, treatment decision, Open in By zone, Unlink),
+  the consequence on the right (impact per category, source, ranked
+  systems; Edit, Remove; the title line only while editing). Below about
+  1400 px the two stack, the consequence first, and the path table scrolls
+  sideways. + Add consequence; + Add path (where it acts, via, statement,
+  source, entry point, assets, vulnerabilities) makes a threat there whose
+  impact (and categories) is copied from the consequence and whose
+  requirements are left to pick (its own consequence text is left empty);
+  From library makes house scenarios paths (the picker of
+  `js/ui-library.js`); Link adds an existing threat, keeping its own rating
+  (the toast says "T2 now leads to K1, not K2." when it led elsewhere). A
+  path rated below or above its consequence says so ("Impact lower than K1
+  (Severe)"); nothing changes either silently. Changing a consequence's
+  impact offers, after the impact controls and as a polite status, to
+  update the paths still on the old value ("T1 and T9 are still rated
+  Serious."; Update or Leave as they are; Undo): a path is on it when its
+  own category ratings are the ones the consequence had when editing began
+  or its impact last moved, or when it has none and its impact is the old
+  one, so a path rated on categories of its own is never overwritten. There
+  is no offer to un-rate. The offer is checked against the project each time
+  it is drawn or used, and goes on an undo or when the page is left.
+  Unlink, Remove (the paths stay threats), Add path and the library offer
+  Undo. A path opened in By zone is remembered: back on the tab, its row's
+  Open button has the keyboard. By zone's editor has Leads to (with Open
+  K1) and Via (once the project has a consequence, or the threat a via; the
+  chips say "Z7 Utilities", a long name cut short); the register a
+  Consequence filter (once there is a consequence) and a Leads to column
+  (once there is a consequence or a via; a route with no consequence reads
+  "Via Z4"). Step 2's Start from this consequence makes one from a ranked
+  system's impact, categories and source, linked to it, its title and
+  description left to write ("In K1, K2 and K3" names the ones that
+  concern it). Go to a consequence opens it. Duplicate and Copy to keep the
+  consequence and the via (Copy to drops the via where the copy would pass
+  through where it acts); Move keeps both and the prune drops a via through
+  where it now acts.
+- **Stepping stones.** A zone or conduit a path passes through with no
+  threat of its own is flagged "On the path to K1" ("On a path" with no
+  consequence) on the step 5 rail, its panel and step 3's tables, and as a
+  pill on a path's Via. The SL-T suggestion has a house method, said as such
+  in the Why trace, on About, in the Word appendix, the driving scenarios'
+  lead-in and the Criteria sheet: a zone or conduit a scenario passes
+  through (its via), with or without a consequence, is suggested, on the
+  scenario's affected requirements, the SL its unmitigated risk maps to (the
+  mapping its own threats use, with the same SL4 escalation note at very
+  high). The route is as recorded; it is not checked against the conduits.
+  A suggestion only; driving scenarios name the path ("T1 via Z3 and C2 to
+  K1 (High)"). The specification prints no suggestion, so it leaves the
+  method out.
+- **Completeness** (warns): a consequence with no title ("K4: no title."); a
+  consequence with no path; a path to a consequence with no threat source or
+  entry point (a plain threat keeps today's minimum). There is no rule on
+  the route.
+- **Deliverables.** The full Word report has Consequences and how they could
+  arise after the risk register, on its landscape page (each consequence:
+  "Impact: Severe. By category: Safety (injury / loss of life) Severe; ...",
+  source and ranked systems by name, description, then a table of its paths:
+  path, acts in, via, threat source, entry point, unmitigated, risk today,
+  decision; then "T1 and T9 are rated below this consequence's worst case."
+  and the same for above), only when there are consequences; its lead-in says
+  what Risk today is. The register gains a Leads to column and a threat's
+  detail Leads to and Via rows when used. The specification and the
+  high-level report have none of it. Excel: a Consequences sheet after the
+  threat register (one row per path; "No path recorded" in the Path column
+  for a consequence with none) and a Leads to column on the threat register,
+  when used. The review pack: Leads to and Via detail rows, each on its own.
+  Routes read as "and" lists everywhere ("Z3 and C2"). The risk context
+  (still 1.4, provenance only): a threat's `consequenceId` and `via` (only
+  ids still in the project), and a top-level `consequences` `[{ id, title,
+  impact }]`, each only when recorded. The comparison with a previous
+  assessment: consequences added, removed, renumbered, renamed, their impact
+  changed, and a path's consequence changed (the previous one in today's
+  numbering). Removing a conduit takes it out of every via (the prune), and a
+  category rated only by a consequence counts as rated on step 1.
+- **The demo** has K1 (an HF acid release, Severe on safety, environment and
+  production: T1 via Z3 and C2, T4 via Z4, T9 via Z3), K2 (unplanned
+  shutdown, from an interview with the asset owner: T2 via Z4, T7) and K3
+  (loss of view: T3). Z3's and Z4's justifications say why IAC is held at
+  SL2 below the paths' SL3, and Z4's assumptions note that the engineering
+  VLAN and the keyed SIS connection are not modelled as conduits.
+
 ## Report page
 
 The Report page has three views, Sections, Word pages and Summary, over both
@@ -923,7 +1031,11 @@ remote access) runs both ways, sessions always started from the jump host in
 Z3. Since phase 5 it keeps the house criteria (so the Word baseline stays
 meaningful), and T1, T4 and T6 give their impact per consequence category
 (each impact the worst of them), and A1 and A2 the source of their
-consequence (a HAZOP revalidation, a LOPA and SIL determination).
+consequence (a HAZOP revalidation, a LOPA and SIL determination). It is worked consequence first too:
+K1 (an HF acid release), K2 (an unplanned shutdown) and K3 (loss of view),
+with the threats that lead to each as its paths (see Consequence first).
+The paths through Z3 and Z4 raise their suggested IAC to SL3 by the house
+method; their SL-T stay at SL2, and Z3's and Z4's justifications say why.
 `scripts/test-tour-risk.html` holds it to zero completeness problems and
 its approvals to Unchanged since approval.
 
@@ -981,6 +1093,9 @@ js/ui-criteria.js                  step 1's risk criteria editor: the matrix, pr
                                    and where ratings go, levels and categories
 js/ui-library.js                   step 5's Add from library picker over the house
                                    scenario library, and step 2's Send to step 5
+js/ui-consequence.js               step 5's By consequence tab: the bow-tie of each
+                                   consequence and its paths, and step 2's Start from
+                                   this consequence
 js/ui-risk.js                      step 5: the zone workshop (rail, SL-T strip, scenario
                                    table and editor), Register, Heat map, SL-T grid
 js/ui-zones.js                     step 3: its tabs, drawing, tables, detail panel, paste,
@@ -1053,6 +1168,10 @@ scripts/test-risk-assets.html      phase 6a: the paste read (quoting, line endin
                                    mapping), the preview's problems, Update existing, one
                                    undo; the register's sort, filters, edits and moves; Word's
                                    asset tables and the Assets sheet
+scripts/test-risk-consequence.html consequence first: the data, migration and prune, the
+                                   v0.7.0 normaliser, By consequence, Leads to and Via,
+                                   the register, stepping stones and the SL-T house method
+                                   (same as v0.7.0 without via), completeness and outputs
 scripts/test-risk-compare.html     phase 6a: the baseline from the demo and the frozen files,
                                    every kind of change, numbered again, criteria changed, an
                                    empty baseline, the card, the Word section, the Changes sheet
@@ -1073,8 +1192,10 @@ scripts/test-risk-nav.html         the sidebar and step status, Home, Assign to 
                                    the demo, and a file with the new fields in v0.7
 scripts/fixtures/                  frozen files: the tour as v0.7 saved it, the tour as
                                    phase 3 saved it (0.2), a hand-made 0.1 file, the
-                                   released v0.7 normaliser and the phase 5a drawing
-                                   layout; never edited or regenerated
+                                   released v0.7 normaliser, the phase 5a drawing
+                                   layout, and from the v0.7.0 release its migrate.js,
+                                   its SL-T suggestions and its Word text; never edited
+                                   or regenerated
 scripts/test-tour-risk.html        tour-mode tests (seeding, autosave protection), and the
                                    demo as a workshop example with zero completeness problems
 scripts/test-risk-reports.html     Word/Excel deliverable tests, with phase 4's sections and
@@ -1135,6 +1256,9 @@ fails loudly.
   `vendor`, `model`, `version` and `criticality` beside `name` and `type`; and
   a top-level `approvals` list (`name`, `role`, `organisation`, `date`,
   `scope`, given approvals only) sits beside the single `approval` mirror.
+  Consequence first adds, on the same string, each threat's `consequenceId`
+  and `via` and a top-level `consequences` list (`id`, `title`, `impact`),
+  only when recorded; the Assessment Tool keeps none of it.
   Each field is written only when it holds something. The Assessment Tool
   keeps `approvals` with the zones and conduits it already kept, and shows
   none of it. `scripts/test-risk-interchange.html` checks the demo export

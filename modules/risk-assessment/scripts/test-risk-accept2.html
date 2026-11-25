@@ -71,7 +71,8 @@
         ok(d0.blocks.some(function (b) { return b.type === "heading" && b.text === "Executive summary"; }), "not this one's");
         var hs = d0.blocks.filter(function (b) { return b.type === "heading"; });
         ok(hs.every(function (b) { return !b.sub; }), "every heading matched the build's list of sections");
-        ok(hs.filter(function (b) { return !b.sectionKey; }).every(function (b) { return /^[ZC]\d+: /.test(b.text); }) && hs.filter(function (b) { return !b.sectionKey; }).length === P().zones.length + P().conduits.length, "only a zone's or conduit's own heading has no key");
+        // Consequence first: a consequence's own heading is named on step 5, like a zone's, so it has no key either.
+        ok(hs.filter(function (b) { return !b.sectionKey; }).every(function (b) { return /^[ZC]\d+: /.test(b.text) || (P().consequences || []).some(function (k) { return b.text === k.id + " " + (k.title || "Untitled consequence"); }); }) && hs.filter(function (b) { return !b.sectionKey; }).length === P().zones.length + P().conduits.length + (P().consequences || []).length, "only a zone's or conduit's own heading has no key");
         reset();
       });
     }).catch(function (e) { ok(false, "threw: " + (e && e.message) + " " + (e && e.stack)); }).then(function () {

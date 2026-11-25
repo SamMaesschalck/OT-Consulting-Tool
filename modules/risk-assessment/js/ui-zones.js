@@ -71,7 +71,15 @@
     var open = rows.filter(function (r) { return r.open || r.reasonMissing; }).length;
     if (open) bits.push(h("span", { class: "pill neutral val-warn", text: open + " to answer" }));
     else if (rows.some(function (r) { return r.answer === "not-separated"; })) bits.push(h("span", { class: "pill neutral", text: "Not separated" }));
+    var stone = stonePill(p, z);
+    if (stone) bits.push(stone);
     return bits;
+  }
+  // A zone or conduit a path passes through with no threat of its own (step 5).
+  function stonePill(p, o) {
+    var ks = E.steppingStones(p)[o.id];
+    if (!ks) return null;
+    return h("span", { class: "pill flag stone-pill", "data-stone": o.id, text: R.RiskPage.stoneWords(ks) });
   }
   function zonesTable(p) {
     var body = [];
@@ -108,7 +116,7 @@
           h("td", null, [pickButton("conduit", c)]),
           h("td", { text: ends(c) }),
           h("td", { text: c.name || "" }),
-          h("td", { class: "muted", text: marks.join(", ") })
+          h("td", { class: "muted" }, [marks.join(", "), stonePill(p, c) ? " " : null, stonePill(p, c)])
         ]));
       });
       body.push(h("table", { class: "tbl compact" }, [h("thead", null, [h("tr", null, [
@@ -354,6 +362,8 @@
         if (!confirmRemove(filled, "conduit " + c.id)) return;
         var mk = A.undoMark();
         p.conduits.splice(p.conduits.indexOf(c), 1);
+        // No path passes through it any more (as for a zone removed).
+        R.Migrate.pruneDangling(p);
         sel.kind = null; sel.id = null;
         touched(); rerender();
         A.offerUndo("Conduit " + c.id + " removed.", backTo("conduit", c.id), mk);

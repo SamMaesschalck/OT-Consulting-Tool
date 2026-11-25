@@ -189,6 +189,12 @@ window.RiskReview = (function () {
         var details = [["Likelihood × impact", rating(t.likelihood, t.impact, p)], ["Affected FRs", affected.length ? affected.join(", ") : "None marked"]];
         // The impact per consequence category, where given (phase 5).
         if (x.categories && x.categories.length) details.push(["Impact by category", x.categories.map(function (r) { return r.name + ": " + r.levelName; }).join("; ")]);
+        // Consequence first: the consequence the threat is a path to, and the
+        // zones and conduits it passes through on the way.
+        // Each on its own: a route is shown with or without a consequence,
+        // in order ("Z3 and C2").
+        if (x.consequence) details.push(["Leads to", x.consequence.id + (x.consequence.title ? " " + x.consequence.title : "")]);
+        if (x.via && x.via.length) details.push(["Via", window.RiskApp.Engine.andList(x.via)]);
         // Schema 0.3: the rating with the countermeasures in place today, and
         // after the planned ones; a rating not given takes the one before it.
         if (x.current) details.push(["Current likelihood × impact", rating(t.currentLikelihood || t.likelihood, t.currentImpact || t.impact, p)]);

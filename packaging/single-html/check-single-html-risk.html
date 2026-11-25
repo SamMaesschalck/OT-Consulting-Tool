@@ -89,6 +89,17 @@
       return /Copyright and licence/.test(t) && /SolutionsPT/.test(t) ? t.length : 0;
     })();
     r.aboutVersion = doc.getElementById("main").textContent.indexOf(A.Version.product + " (zones & conduits) " + A.Version.label) !== -1;
+    // Step 5's By consequence tab on the demo: a card per consequence (found by data-tab and
+    // data-consequence-id, never by label text).
+    r.kCards = (function () {
+      var risk = doc.querySelector('#sidebar .nav-item[data-stage="risk"]');
+      if (!risk) return -1;
+      risk.click();
+      var tab = doc.querySelector('#main .step-tabs [data-tab="consequence"]');
+      if (!tab) return -1;
+      tab.click();
+      return doc.querySelectorAll("#main [data-consequence-id]").length;
+    })();
     // The deliverables, built as the app builds them.
     return w.docx.Packer.toBlob(RX.buildWordDoc(p, {})).then(function (b) {
       r.word = b.size;
@@ -154,6 +165,7 @@
         var b = single.pages[i] || {};
         ok(b.name === a.name && b.len === a.len && b.len > 150, "page '" + a.name + "' renders identically (" + b.len + " chars)", a.len + " vs " + b.len);
       });
+      ok(folder.kCards === 3 && single.kCards === folder.kCards, "step 5's By consequence shows the demo's consequences (" + single.kCards + " cards)", folder.kCards + " vs " + single.kCards);
       ok(close(folder.word, single.word), "the Word report builds to the same size (" + single.word + " bytes)", folder.word + " vs " + single.word);
       ok(/^cover \d+ sheets [1-9]/.test(single.preview) && single.preview === folder.preview, "the Word preview reads the report back and draws it (" + single.preview + ")", folder.preview + " vs " + single.preview);
       ok(close(folder.wordHL, single.wordHL), "the high-level Word report builds to the same size (" + single.wordHL + " bytes)", folder.wordHL + " vs " + single.wordHL);

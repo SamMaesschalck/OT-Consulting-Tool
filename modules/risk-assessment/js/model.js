@@ -529,6 +529,43 @@ window.RiskApp.Model = (function () {
     return !!a && (ASSET_TEXT_FIELDS.some(function (k) { return typeof a[k] === "string" && a[k].trim(); }) || ASSET_CRITICALITY.indexOf(a.criticality) >= 0);
   }
 
+  // ---------- Consequence first (Nov 2026) ----------
+  // Optional and written only once set, like the fields above; the schema
+  // stays spt-risk-project/0.3 and a file without them reads as before.
+  //
+  //   project.consequences   [{ id ("K1"...), title, description, impact,
+  //                          impactByCategory, source, hlaIds, notes }]: what
+  //                          can happen, worked back to how (a bow-tie). The
+  //                          impact mirrors the worst of its categories, by the
+  //                          rules a threat's does.
+  //   counters.consequence   the last K number given (absent until the first)
+  //   threat.consequenceId   the consequence the scenario is a path to
+  //   threat.via             the zones and conduits the path passes through
+  //                          before it acts in its own, in order (never EXT,
+  //                          which the entry point describes, nor its own)
+  // A path is a threat in the zone or conduit where it acts: every rating,
+  // decision and output of a threat applies to it unchanged.
+  var CONSEQUENCE_TEXT_FIELDS = ["title", "description", "impact", "source", "notes"];
+  function emptyConsequence(id) { return { id: id, title: "", description: "", impact: "", source: "", hlaIds: [], notes: "" }; }
+  function isRecord(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
+  function consequencesOf(pj) { return pj && Array.isArray(pj.consequences) ? pj.consequences.filter(isRecord) : []; }
+  function consequenceById(pj, id) { return id ? consequencesOf(pj).filter(function (k) { return k.id === id; })[0] || null : null; }
+  // The next K id: above the counter and above every id already in the file.
+  function nextConsequenceId(pj) {
+    if (!pj.counters) pj.counters = {};
+    var n = typeof pj.counters.consequence === "number" ? pj.counters.consequence : 0;
+    consequencesOf(pj).forEach(function (k) { var m = /^K(\d+)$/.exec(String(k.id || "")); if (m && Number(m[1]) > n) n = Number(m[1]); });
+    pj.counters.consequence = n + 1;
+    return "K" + pj.counters.consequence;
+  }
+  function viaOf(t) { return t && Array.isArray(t.via) ? t.via.filter(function (x) { return typeof x === "string" && x; }) : []; }
+  // Writes a path's via, or takes it away when empty.
+  function setVia(t, list) {
+    var seen = {}, out = (list || []).filter(function (x) { if (typeof x !== "string" || !x || seen[x]) return false; seen[x] = true; return true; });
+    if (out.length) t.via = out; else delete t.via;
+  }
+  function setConsequenceId(t, id) { if (id) t.consequenceId = id; else delete t.consequenceId; }
+
   // True when the consultant has entered anything worth protecting — gates the
   // Load confirm so an untouched session opens a file without a needless nag.
   function projectHasContent(pj) {
@@ -546,7 +583,7 @@ window.RiskApp.Model = (function () {
       any(s.policies) || r.tolerableConfirmed || any(approvalsOf(pj)) ||
       pj.assessmentType || sectionEdits(pj.reportCustom) || (pj.review && any(pj.review.rounds)) ||
       criteriaUsable(pj.criteria) || Array.isArray(pj.safetyFloorFR) ||
-      !!(pj.baseline && typeof pj.baseline === "object")
+      !!(pj.baseline && typeof pj.baseline === "object") || any(pj.consequences)
     );
   }
   // A report section edited in either report.
@@ -585,6 +622,8 @@ window.RiskApp.Model = (function () {
     ZONE_LEVELS: ZONE_LEVELS, zoneLevel: zoneLevel, LIBRARY: LIBRARY,
     ASSET_TEXT_FIELDS: ASSET_TEXT_FIELDS, ASSET_CRITICALITY: ASSET_CRITICALITY, ASSET_CRITICALITY_LABEL: ASSET_CRITICALITY_LABEL,
     ASSET_FIELD_LABEL: ASSET_FIELD_LABEL, assetExtended: assetExtended,
+    CONSEQUENCE_TEXT_FIELDS: CONSEQUENCE_TEXT_FIELDS, emptyConsequence: emptyConsequence, consequencesOf: consequencesOf,
+    consequenceById: consequenceById, nextConsequenceId: nextConsequenceId, viaOf: viaOf, setVia: setVia, setConsequenceId: setConsequenceId,
     projectHasContent: projectHasContent
   };
 }());

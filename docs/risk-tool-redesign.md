@@ -246,6 +246,15 @@ About 675 `ok(` calls across 13 pages pin today's behaviour. Phase 4 is at least
     - A justification that names a threat or countermeasure of the project by its id is a warn-only item on the one list, the specification's alone (`spec: true`, `doc` null), since the specification does not list them (phase 6 review). The demo's justifications were reworded without ids or tool words, so the demo keeps nothing open; the approvals do not cover justifications, so their fingerprints did not need retaking.
     - The interchange with the Assessment Tool stays `spt-risk-context/1.4`: the released v0.7 importer refuses any schema its bundled contract does not list, so a 1.5 file would be rejected. The options are for the owner.
 
+## Consequence first
+
+Built Nov 2026 on `feature/risk-consequence-first` (step 5's By consequence tab; `modules/risk-assessment/README.md`, "Consequence first", has the detail). The schema stays `spt-risk-project/0.3` and the interchange `spt-risk-context/1.4`; every field is optional and provenance only. The decisions:
+
+- **Stepping stone, a house rule.** A zone or conduit a scenario passes through (its via) is suggested, on the scenario's affected foundational requirements, the SL-T its unmitigated risk maps to, as a threat of its own would. Any via counts, with or without a consequence. It is stated everywhere as the house method (Why trace, About, the Word appendix and driving scenarios, the Criteria sheet), never as the standard's. The specification prints no suggestion, so it leaves the method out. A suggestion only: no SL-T is filled.
+- **Via is not checked against the conduits.** The route is as recorded; the tool does not check that a conduit joins each step, and there is no completeness rule on it. The methods say so in one clause. Where the demo's routes cross a connection that is not drawn as a conduit, the zone's assumptions say so (Z4).
+- **A path's impact is copied, never changed silently.** Add path and the library copy the consequence's impact and categories once. After that a path keeps its own rating: a change to the consequence's impact only offers to update the paths still on the old value (their own category ratings as the consequence had them, or none and the old impact), with Update, Leave as they are and Undo. There is no offer to un-rate, and the offer is checked against the project each time it is drawn or used, and goes on an undo or when the page is left. A path rated below or above its consequence is said, never corrected.
+- **The register column is "Leads to".** In the UI register, the Word register, a threat's Word detail, the Excel threat register and the review pack, so it is not confused with a threat's own consequence text (which Add path leaves empty). The register filter keeps the name Consequence. The rating that stands on the Consequences pages is "Risk today" in Word and Excel, and the Word lead-in says what it is.
+
 ## To verify against a licensed copy of IEC 62443-3-2
 
 - Clause 4.1 is an overview, and ZCR 1 to ZCR 7 sit at 4.2 to 4.8.

@@ -96,7 +96,8 @@ H.test(function (ok) {
   ok(consumedOk(demo), "the six consumed zone fields and the conduit fields are there, with their types");
   ok(consumedOk(old), "as they were in the file v0.7 wrote");
   ok(demo.conduits.some(function (c) { return c.toZone === "EXT" || c.fromZone === "EXT"; }), "and the outside is still EXT");
-  var NEW = ["approvals", "riskComparison", "initialRisk"];
+  // Consequence first adds a top-level consequences list (provenance, the demo has three).
+  var NEW = ["approvals", "riskComparison", "initialRisk", "consequences"];
   function without(o) { return Object.keys(o).filter(function (k) { return NEW.indexOf(k) < 0; }); }
   ok(same(without(demo), Object.keys(old)) && same(without(demo.zones[0]), Object.keys(old.zones[0])) && same(without(demo.conduits[0]), Object.keys(old.conduits[0])),
     "apart from the new fields, its keys are the ones v0.7 wrote");

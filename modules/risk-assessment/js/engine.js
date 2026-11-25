@@ -389,6 +389,77 @@ window.RiskApp.Engine = (function () {
   function impactName(id, project) { return scaleName(M.criteriaOf(project).impact, id); }
   function zoneSafety(zone) { return !!zone.flags["sis-present"] || zone.assets.some(function (a) { return a.type === "safety-plc"; }); }
 
+  // ---------- Paths through a zone or conduit (consequence first) ----------
+  // A path is a threat that acts in its own zone or conduit after passing
+  // through others (threat.via), whether or not it leads to a consequence.
+  // The house method gives a zone or conduit a scenario passes through (its
+  // via), on the scenario's affected requirements, the SL its unmitigated
+  // risk maps to, as a threat of its own would: a stepping stone with no
+  // threats of its own would otherwise look low risk. A suggestion only. The
+  // route is as recorded; it is not checked against the conduits.
+  //
+  // The paths whose via names this zone or conduit: [{ t, owner }].
+  function pathsThrough(project, id) {
+    var out = [];
+    project.zones.concat(project.conduits).forEach(function (o) {
+      (o.threats || []).forEach(function (t) { if (o.id !== id && M.viaOf(t).indexOf(id) >= 0) out.push({ t: t, owner: o }); });
+    });
+    return out;
+  }
+  // The paths that lead to a consequence: [{ t, owner }], zones then conduits.
+  function pathsTo(project, kId) {
+    var out = [];
+    if (!kId) return out;
+    project.zones.concat(project.conduits).forEach(function (o) {
+      (o.threats || []).forEach(function (t) { if (t.consequenceId === kId) out.push({ t: t, owner: o }); });
+    });
+    return out;
+  }
+  // A path's unmitigated impact against its consequence's: "lower", "higher",
+  // "same", or null when either is not rated (or not on the criteria).
+  function pathImpactVs(t, k, project) {
+    if (!t || !k || !t.impact || !k.impact) return null;
+    var a = impactRank(t.impact, project), b = impactRank(k.impact, project);
+    if (a < 0 || b < 0) return null;
+    return a < b ? "lower" : a > b ? "higher" : "same";
+  }
+  // The zones and conduits a path passes through that no threat of their own
+  // touches: id -> [consequence ids], the stepping stones the step 5 rail and
+  // step 3's tables flag.
+  function steppingStones(project) {
+    var out = {};
+    project.zones.concat(project.conduits).forEach(function (o) {
+      if ((o.threats || []).length) return;
+      var ks = [];
+      pathsThrough(project, o.id).forEach(function (x) { var k = x.t.consequenceId; if (k && M.consequenceById(project, k) && ks.indexOf(k) < 0) ks.push(k); });
+      if (pathsThrough(project, o.id).length) out[o.id] = ks;
+    });
+    return out;
+  }
+
+  // The worst unmitigated band of those paths on one requirement, the paths
+  // at it and the SL it maps to.
+  function viaOnFR(paths, fr, project) {
+    var band = null;
+    paths.forEach(function (x) { var r = threatRisk(x.t, project); if (r && (x.t.affectedFR || []).indexOf(fr) >= 0 && (band == null || BAND_RANK[r] > BAND_RANK[band])) band = r; });
+    var at = band ? paths.filter(function (x) { return threatRisk(x.t, project) === band && (x.t.affectedFR || []).indexOf(fr) >= 0; }) : [];
+    return { band: band, paths: at, sl: band && RULES.riskToSL[band] ? RULES.riskToSL[band].suggest : null };
+  }
+  function andList(a) { return a.length > 1 ? a.slice(0, -1).join(", ") + " and " + a[a.length - 1] : (a[0] || ""); }
+  // A path in words: "T1 via Z3 and C2 to K1" ("to" only with a consequence).
+  function pathWords(t) {
+    var via = M.viaOf(t);
+    return t.id + (via.length ? " via " + andList(via) : "") + (t.consequenceId ? " to " + t.consequenceId : "");
+  }
+  // "House method for a scenario that passes through this zone (its via):
+  // T1 via Z3 and C2 to K1 (acting in Z1) has a high unmitigated risk on
+  // IAC, which maps to SL3."
+  function viaTrace(v, fr, isCond) {
+    return "House method for a scenario that passes through this " + (isCond ? "conduit" : "zone") + " (its via): " +
+      andList(v.paths.map(function (x) { return pathWords(x.t) + " (acting in " + x.owner.id + ")"; })) +
+      (v.paths.length === 1 ? " has" : " have") + " a " + BAND_NAME[v.band].toLowerCase() + " unmitigated risk on " + fr + ", which maps to SL" + v.sl + ".";
+  }
+
   // Per-foundational-requirement suggestion for a zone.
   // Returns { byFR: {fr: {sl, risk, trace[]}}, safetyRelated, worstRisk }.
   function suggestZone(zone, project) {
@@ -398,6 +469,7 @@ window.RiskApp.Engine = (function () {
     var result = { byFR: {}, safetyRelated: safety, worstRisk: worstRiskOf(zone.threats, project) };
     var perCategory = M.criteriaOf(project).hasCategoryTolerable;
     var floorFR = M.safetyFloorFR(project);
+    var through = pathsThrough(project, zone.id);
 
     FR_IDS.forEach(function (fr) {
       var trace = [];
@@ -426,6 +498,15 @@ window.RiskApp.Engine = (function () {
           : "This risk is above tolerable risk (" + BAND_NAME[tolerable].toLowerCase() + "), so each threat behind it needs a treatment decision.");
       } else {
         trace.push("No threats affecting " + fr + " captured yet.");
+      }
+      // A path through the zone (house method; only when one names it).
+      var v = through.length ? viaOnFR(through, fr, project) : null;
+      if (v && v.band) {
+        trace.push(viaTrace(v, fr, false));
+        // The same escalation note as a threat of its own at very high.
+        var vm0 = RULES.riskToSL[v.band];
+        if (v.band === "very-high" && vm0 && vm0.escalateTo) trace.push("Escalation to SL" + vm0.escalateTo + " available for " + fr + " only if a nation-state-grade adversary is in scope.");
+        if (sl == null || v.sl > sl) sl = v.sl;
       }
 
       MODS.forEach(function (mod) {
@@ -461,6 +542,7 @@ window.RiskApp.Engine = (function () {
   function suggestConduit(cond, project) {
     var ends = ["fromZone", "toZone"].map(function (k) { var z = findZone(project, cond[k]); return z ? { id: cond[k], sug: suggestZone(z, project), name: z.name } : (cond[k] === "EXT" ? { id: "EXT", sug: null, name: "external" } : null); });
     var result = { byFR: {}, worstRisk: worstRiskOf(cond.threats, project) };
+    var through = pathsThrough(project, cond.id);
 
     FR_IDS.forEach(function (fr) {
       var trace = ["House heuristic: a conduit takes the higher of its own risk-derived SL and the connected zones' suggested SL, per FR."];
@@ -469,6 +551,11 @@ window.RiskApp.Engine = (function () {
         if (t.affectedFR.indexOf(fr) >= 0) { var r = threatRisk(t, project); if (r && (band == null || BAND_RANK[r] > BAND_RANK[band])) band = r; }
       });
       if (band) { var m = RULES.riskToSL[band]; sl = m.suggest; trace.push("Conduit's own unmitigated risk " + BAND_NAME[band].toLowerCase() + " for " + fr + ": " + m.trace); }
+      var v = through.length ? viaOnFR(through, fr, project) : null;
+      if (v && v.band) {
+        trace.push(viaTrace(v, fr, true));
+        if (sl == null || v.sl > sl) sl = v.sl;
+      }
       ends.forEach(function (e) {
         if (e && e.sug && e.sug.byFR[fr] && e.sug.byFR[fr].sl != null) {
           if (sl == null || e.sug.byFR[fr].sl > sl) sl = e.sug.byFR[fr].sl;
@@ -490,10 +577,14 @@ window.RiskApp.Engine = (function () {
   // The drivers set the suggestion only when their mapped SL reaches it; above
   // it, a zone's suggestion comes from the safety floor and a conduit's from
   // the zones it joins. A requirement with no driver and no suggestion is left out.
+  // A suggestion set by a path through the zone or conduit (house method)
+  // is raisedBy "via", with the paths: via [{ id, ownerId, band, words }],
+  // words being the path as "T1 via Z3 and C2 to K1".
   function sltDrivers(owner, project) {
     var isCond = "fromZone" in owner, sug = isCond ? suggestConduit(owner, project) : suggestZone(owner, project);
     var ends = isCond ? [owner.fromZone, owner.toZone].filter(function (id, i, a) { return id && id !== "EXT" && a.indexOf(id) === i; })
       .map(function (id) { var z = findZone(project, id); return z ? { id: id, sug: suggestZone(z, project) } : null; }).filter(Boolean) : [];
+    var through = pathsThrough(project, owner.id);
     var out = [];
     FR_IDS.forEach(function (fr) {
       var band = null;
@@ -502,12 +593,16 @@ window.RiskApp.Engine = (function () {
       var mapped = band && RULES.riskToSL[band] ? RULES.riskToSL[band].suggest : null;
       var sl = sug.byFR[fr] ? sug.byFR[fr].sl : null;
       var raisedBy = null, from = [];
+      var v = through.length ? viaOnFR(through, fr, project) : null;
       if (sl != null && (mapped == null || mapped < sl)) {
-        if (isCond) { from = ends.filter(function (e) { return e.sug.byFR[fr] && e.sug.byFR[fr].sl === sl; }).map(function (e) { return e.id; }); raisedBy = from.length ? "inherited" : null; }
+        if (v && v.band && v.sl === sl) raisedBy = "via";
+        else if (isCond) { from = ends.filter(function (e) { return e.sug.byFR[fr] && e.sug.byFR[fr].sl === sl; }).map(function (e) { return e.id; }); raisedBy = from.length ? "inherited" : null; }
         else if (zoneSafety(owner) && M.safetyFloorFR(project).indexOf(fr) >= 0) raisedBy = "floor";
       }
       if (!drivers.length && !raisedBy) return;
-      out.push({ fr: fr, sl: sl, band: band, drivers: drivers, mapped: mapped, raisedBy: raisedBy, from: from });
+      var entry = { fr: fr, sl: sl, band: band, drivers: drivers, mapped: mapped, raisedBy: raisedBy, from: from };
+      if (raisedBy === "via") entry.via = v.paths.map(function (x) { return { id: x.t.id, ownerId: x.owner.id, band: v.band, words: pathWords(x.t) }; });
+      out.push(entry);
     });
     return out;
   }
@@ -908,8 +1003,13 @@ window.RiskApp.Engine = (function () {
         if (m.length) out.push({ kind: "threat", owner: o, item: t, misfits: m });
       });
     });
+    M.consequencesOf(project).forEach(function (k) {
+      var m = ratingMisfits(k, CONSEQUENCE_RATING_WORDS, "impactByCategory", "impact", project);
+      if (m.length) out.push({ kind: "consequence", owner: null, item: k, misfits: m });
+    });
     return out;
   }
+  var CONSEQUENCE_RATING_WORDS = [["impact", "impact", "the impact"]];
 
   // ---------- Changing the criteria (step 1) ----------
   //
@@ -927,6 +1027,7 @@ window.RiskApp.Engine = (function () {
         addMap(t.impactByCategory);
       });
     });
+    M.consequencesOf(project).forEach(function (k) { add("impact", k.impact); addMap(k.impactByCategory); });
     return use;
   }
   // Moves the ratings on one level to another, as the consultant chose:
@@ -947,6 +1048,7 @@ window.RiskApp.Engine = (function () {
         mvMap(t.impactByCategory);
       });
     });
+    M.consequencesOf(project).forEach(function (k) { mv(k, "impact", "impact"); mvMap(k.impactByCategory); });
     return n;
   }
   // The default move for each level, from one scale to another. A level is
@@ -986,6 +1088,7 @@ window.RiskApp.Engine = (function () {
     }
     project.srs.highLevelAssets.forEach(function (a) { if (a) sync(a, "consequenceByCategory", "consequence"); });
     project.zones.concat(project.conduits).forEach(function (o) { o.threats.forEach(function (t) { sync(t, "impactByCategory", "impact"); }); });
+    M.consequencesOf(project).forEach(function (k) { sync(k, "impactByCategory", "impact"); });
   }
   // How the deliverables name the criteria in use.
   // generic: the generic preset the criteria still are, unchanged ("" if none).
@@ -1090,6 +1193,14 @@ window.RiskApp.Engine = (function () {
         if (!t.affectedFR.length) add("risk", "detailed", label + " / " + t.id + ": no affected foundational requirements marked.", tt);
         if (T.open) add("risk", "detailed", label + " / " + t.id + ": above tolerable risk with no treatment decision" + (T.state === "suggested" ? " (a suggestion is waiting to be confirmed)." : "."), tt);
         else if (T.gap) add("risk", "detailed", label + " / " + t.id + ": " + T.gap + ".", tt);
+        // A path to a consequence says where it starts: a threat source and
+        // an entry point (a threat that leads to none keeps the minimum above).
+        if (t.consequenceId && M.consequenceById(p, t.consequenceId)) {
+          var miss = [];
+          if (!String(t.source || "").trim()) miss.push("threat source");
+          if (!String(t.entryPoint || "").trim()) miss.push("entry point");
+          if (miss.length) add("risk", "detailed", label + " / " + t.id + ": a path to " + t.consequenceId + " with no " + miss.join(" or ") + ".", tt);
+        }
       });
       // The justification is the deliverable, so flag it only where there is a
       // target to justify — a zone with no SL-T yet is 'incomplete', not
@@ -1099,6 +1210,14 @@ window.RiskApp.Engine = (function () {
     }
     vm.zones.forEach(function (row) { var z = row.o; checkOwner(row, z.id + (z.name ? " (" + z.name + ")" : "")); });
     vm.conduits.forEach(function (row) { var c = row.o; checkOwner(row, c.id + (c.name ? " (" + c.name + ")" : "")); });
+    // Consequence first: a consequence no path leads to yet, and one whose
+    // impact no longer fits the risk criteria.
+    M.consequencesOf(p).forEach(function (k) {
+      var kTitle = String(k.title || "").trim(), label = k.id + (kTitle ? " (" + kTitle + ")" : ""), tgt = { kind: "consequence", id: k.id };
+      if (!kTitle) add("risk", "detailed", label + ": no title.", tgt);
+      misfits.forEach(function (f) { if (f.item === k) add("risk", "detailed", label + ": " + misfitText(f.misfits), tgt); });
+      if (!pathsTo(p, k.id).length) add("risk", "detailed", label + ": no path leads to it.", tgt);
+    });
     return items;
   }
 
@@ -1210,7 +1329,8 @@ window.RiskApp.Engine = (function () {
 
   function buildRiskContext(project) {
     var p = project, tolerable = tolerableOf(p);
-    var vm = VM().build(p);
+    var vm = VM().build(p), ownerIds = {};
+    p.zones.concat(p.conduits).forEach(function (o) { if (o && o.id) ownerIds[o.id] = true; });
     // residualRisk is the planned rating, else the current one (schema 0.3:
     // the residual pair means after planned measures; the view model's
     // residualRisk), with the pair it was worked out from: a side not given
@@ -1219,9 +1339,16 @@ window.RiskApp.Engine = (function () {
       var t = x.t, planned = x.planned != null, current = x.current != null;
       var L = planned ? (t.residualLikelihood || t.currentLikelihood || t.likelihood) : current ? (t.currentLikelihood || t.likelihood) : null;
       var I = planned ? (t.residualImpact || t.currentImpact || t.impact) : current ? (t.currentImpact || t.impact) : null;
-      return { id: t.id, statement: t.statement, source: t.source, affectedFR: t.affectedFR.slice(), likelihood: t.likelihood, impact: t.impact, unmitigatedRisk: x.risk,
+      var out = { id: t.id, statement: t.statement, source: t.source, affectedFR: t.affectedFR.slice(), likelihood: t.likelihood, impact: t.impact, unmitigatedRisk: x.risk,
         residualLikelihood: L || null, residualImpact: I || null,
         residualRisk: x.residualRisk, exceedsTolerable: x.exceeds, disposition: x.disposition, acceptance: t.acceptance || "" };
+      // Consequence first (provenance only): the consequence the threat is a
+      // path to and the zones and conduits it passes through, when recorded.
+      if (t.consequenceId && M.consequenceById(p, t.consequenceId)) out.consequenceId = t.consequenceId;
+      // A via names only zones and conduits still in the project.
+      var via = M.viaOf(t).filter(function (id) { return ownerIds[id]; });
+      if (via.length) out.via = via;
+      return out;
     }); }
     function vecFrom(sug) { var o = {}; FR_IDS.forEach(function (fr) { o[fr] = sug.byFR[fr].sl; }); return o; }
     function tgtVec(owner) { var o = {}; FR_IDS.forEach(function (fr) { o[fr] = owner.slTargetByFR[fr] != null ? owner.slTargetByFR[fr] : null; }); return o; }
@@ -1305,6 +1432,9 @@ window.RiskApp.Engine = (function () {
       Object.keys(ctx).forEach(function (k) { ordered[k] = ctx[k]; if (k === "approval") ordered.approvals = approvals; });
       ctx = ordered;
     }
+    // The consequences the threats lead to (provenance only), when any.
+    var ks = M.consequencesOf(p);
+    if (ks.length) ctx.consequences = ks.map(function (k) { return { id: k.id, title: k.title || "", impact: k.impact || null }; });
     return ctx;
   }
 
@@ -1330,6 +1460,7 @@ window.RiskApp.Engine = (function () {
     categoryMapFits: categoryMapFits, matrixGaps: matrixGaps, tolerableByCategoryWords: tolerableByCategoryWords,
     criteriaWords: criteriaWords, criteriaOf: M.criteriaOf,
     suggestZone: suggestZone, suggestConduit: suggestConduit, sltDrivers: sltDrivers, safetyFloorWords: safetyFloorWords,
+    pathsThrough: pathsThrough, pathsTo: pathsTo, pathWords: pathWords, pathImpactVs: pathImpactVs, steppingStones: steppingStones, andList: andList,
     maxDefined: maxDefined, frSug: frSug, vecStr: vecStr,
     CONDUIT_RULE: CONDUIT_RULE, isBand: isBand, worstBand: worstBand, hlaById: hlaById, hlaRisk: hlaRisk, zonesOfHLA: zonesOfHLA,
     initialRiskOf: initialRiskOf, comparison: comparison, hlaComparison: hlaComparison,

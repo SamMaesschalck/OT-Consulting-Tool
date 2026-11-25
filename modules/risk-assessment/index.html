@@ -379,6 +379,26 @@
     .paste-map .field { min-width: 160px; }
     .changes-head { margin: 10px 0 4px; font-size: 13px; color: var(--text-muted); }
     .sug-word { font-size: 11px; margin-top: 2px; }
+    /* Step 5 By consequence: a bow-tie per consequence, the paths on the left
+       and the consequence on the right (stacked on a narrow page). */
+    .bowtie { display: grid; grid-template-columns: minmax(0, 7fr) minmax(220px, 3fr); gap: 14px; align-items: start; }
+    /* Stacked on a narrower window, the consequence first. */
+    @media (max-width: 1400px) { .bowtie { grid-template-columns: 1fr; } .bowtie > .bowtie-k { order: -1; } }
+    .path-scroll { overflow-x: auto; }
+    .path-table .path-via { min-width: 110px; }
+    .vh { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    .bowtie-paths .tbl td { vertical-align: top; font-size: 12.5px; }
+    .bowtie-k { border-left: 4px solid var(--brand-blue); padding: 6px 10px; background: var(--surface-2); border-radius: var(--radius); }
+    .bowtie-k .k-title { font-weight: 700; font-size: 14px; margin: 0 0 4px; }
+    .bowtie-k .k-line { font-size: 13px; margin: 2px 0; }
+    .k-form { display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 4px 10px; margin-top: 6px; }
+    .k-form .field { margin: 0; }
+    .k-form .wide { grid-column: 1 / -1; }
+    .path-form { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-top: 8px; background: var(--surface); }
+    .path-form .threat-grid .field { margin: 0; }
+    .k-offer { margin-top: 8px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .path-note { font-size: 12px; }
+    .stone-pill { font-size: 11px; }
 
     .print-only { display: none; }
     @media print {
@@ -449,6 +469,7 @@
   <script src="js/ui-criteria.js"></script>
   <script src="js/ui-library.js"></script>
   <script src="js/ui-risk.js"></script>
+  <script src="js/ui-consequence.js"></script>
   <script src="js/ui-zones.js"></script>
   <script src="js/ui-assets.js"></script>
   <script src="js/ui-spec.js"></script>

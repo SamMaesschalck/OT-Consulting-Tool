@@ -203,7 +203,8 @@
     t8.treatment = { decision: null, confirmed: false, reason: "" }; // the acceptance text is still there, with no decision
     var undecided = RX.buildWordDoc(p, {}), uText = docText(undecided);
     var redRuns = runsOf(undecided).filter(function (r) { return r.color === "E00000"; }).map(function (r) { return r.text; });
-    ok(redRuns.filter(function (t) { return t === "No decision recorded"; }).length === 2, "Word: the two threats with no confirmed decision say so in red, in their registers", redRuns.join(" | "));
+    // Consequence first: T2 is a path to K2, so it says so in red in Consequences and how they could arise too (was 2).
+    ok(redRuns.filter(function (t) { return t === "No decision recorded"; }).length === 3, "Word: the two threats with no confirmed decision say so in red: in the register (both) and, for T2, a path to K2, in Consequences and how they could arise (3 runs)", redRuns.join(" | "));
     ok(redRuns.some(function (t) { return /^2 threats above tolerable risk have no treatment decision recorded: T2 \(Z1\), T8 \(Z4\)\.$/.test(t); }), "Word: and the executive summary names them, in red", redRuns.join(" | "));
     ok(uText.indexOf("5/7") !== -1 && /no decision recorded/.test(uText) && uText.indexOf("NO DISPOSITION") === -1, "Word: the scorecard counts only confirmed decisions");
     // Phase 4 review (wording 1): "formally" is gone from the tally, so the check is on its words now.
@@ -235,7 +236,8 @@
     }
     // Reduce, with a tolerable residual rating and no countermeasure at all (T1 of Z1; T2 loses its cover too).
     var vR = variant(function (q) { q.zones[0].countermeasures = []; });
-    ok(vR.red.filter(function (t) { return t === "Reduce with countermeasures (none recorded)"; }).length === 2 && vR.text.indexOf("Z1") !== -1 && (vR.S.threats[0].current || vR.S.threats[0].residual) === "medium",
+    // Consequence first: T1 and T2 are paths, so each prints again in Consequences and how they could arise (was 2).
+    ok(vR.red.filter(function (t) { return t === "Reduce with countermeasures (none recorded)"; }).length === 4 && vR.text.indexOf("Z1") !== -1 && (vR.S.threats[0].current || vR.S.threats[0].residual) === "medium",
       "Word: reduce with no covering countermeasure prints as none recorded, in red, whatever the residual rating", vR.red.join(" | "));
     // Phase 4b demo: T7 and T9 stay reduced, T5 being reduced, T4 through the SL-T programme (was: 1 reduced, 3 being reduced).
     ok(/^The treatment decisions are: 2 reduced to within tolerable risk, 1 being reduced with countermeasures, 1 treated through the SL-T programme and 1 accepted by the asset owner\. The register holds 3 existing and 3 planned countermeasures\.$/.test(vR.decisions) && vR.S.dispositionCounts.mitigated === 2 && vR.S.dispositionCounts.none === 2,
@@ -377,7 +379,8 @@
     phase4bExcel(wb);
     var names = wb.worksheets.map(function (ws) { return ws.name; }).join(",");
     // Phase 4b: five new sheets; the eight it had keep their names and their order. Phase 6a: Assets after Conduits.
-    ok(names === "Front,Summary,Ranking,Threat register,Treatment plan,Accepted risks,Vulnerabilities,Zones,Conduits,Assets,Countermeasures,SL-T,Criteria,Basis", "workbook has the eight sheets it had, by name and in order, the five new ones, and Assets (phase 6a)", names);
+    // Consequence first: the demo has consequences, so Consequences follows the threat register.
+    ok(names === "Front,Summary,Ranking,Threat register,Consequences,Treatment plan,Accepted risks,Vulnerabilities,Zones,Conduits,Assets,Countermeasures,SL-T,Criteria,Basis", "workbook has the eight sheets it had, by name and in order, the five new ones, and Assets (phase 6a)", names);
     var front = wb.getWorksheet("Front");
     ok(front.getCell("B2").value === "Acme Petrochemicals Ltd", "Front carries the client");
     ok(/R\. Calder/.test(String(front.getCell("B13").value)), "Front carries the sign-off");
@@ -454,7 +457,8 @@
       // The risk register, the treatment plan and the accepted risks, on landscape pages of their own.
       // Phase 5b: the drawing's landscape page is section 2, so the register's is section 4 (was 2).
       var land = [].concat(doc.sections[4].children).filter(function (n) { return n.__t === "p" && n.heading === "h1"; }).map(function (n) { return n.text; });
-      ok(land.join("|") === "Risk register|Treatment plan|Accepted risks" && doc.sections[5].children[0].text === "Zones, conduits and the detailed risk assessment",
+      // Consequence first: the demo's consequences section sits on the register's landscape page, after it.
+      ok(land.join("|") === "Risk register|Consequences and how they could arise|Treatment plan|Accepted risks" && doc.sections[5].children[0].text === "Zones, conduits and the detailed risk assessment",
         "4b Word: the risk register, treatment plan and accepted risks are the landscape section, and the zones come after it", land.join("|"));
       // A renamed landscape section keeps its page, and a hidden one takes its page with it.
       var q2 = JSON.parse(JSON.stringify(p));
@@ -462,7 +466,7 @@
       // Phase 5b: the drawing's own landscape page holds no level 1 heading, so it is left out of this
       // count (was: every landscape section, of four sections).
       var d2 = RX.buildWordDoc(q2, {}), land2 = d2.sections.filter(function (s) { return s.properties.page.size.orientation === "landscape" && s.children.some(function (n) { return n.__t === "p" && n.heading === "h1"; }); });
-      ok(land2.length === 1 && land2[0].children.filter(function (n) { return n.__t === "p" && n.heading === "h1"; }).map(function (n) { return n.text; }).join("|") === "Register of risks|Treatment plan" && d2.sections.length === 6,
+      ok(land2.length === 1 && land2[0].children.filter(function (n) { return n.__t === "p" && n.heading === "h1"; }).map(function (n) { return n.text; }).join("|") === "Register of risks|Consequences and how they could arise|Treatment plan" && d2.sections.length === 6,
         "4b Word: a renamed register stays on its landscape page, and a hidden section leaves with its page", d2.sections.map(function (s) { return s.properties.page.size.orientation; }).join());
       var rg = at("\nRisk register\n");
       ok(rg > at("\nRisk comparison\n") && at("\nZone or conduit\nThreat scenario\nUnmitigated\nCurrent\nPlanned\nTreatment decision\n", rg) > rg, "4b Word: the register's columns: zone or conduit, scenario, unmitigated, current, planned, decision");
@@ -508,16 +512,19 @@
         "4b Word: the SL-T section gives the scenarios driving each requirement's target, zone by zone");
       // Phase 4 review (logic 8, wording 10): where a suggestion is above what the drivers map to, the row says where it
       // comes from (was: Z2 and C2 named only threats, and a requirement with an inherited target had no row).
-      ok(at("\nFor each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. On the house mapping these set the suggested SL-T; the justifications follow.\nZone or conduit\nFoundational requirements\nDriving scenarios\n", st) > st,
+      // Consequence first: the demo's paths pass through zones, so the lead-in says how a path is named.
+      ok(at("\nFor each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. On the house mapping these set the suggested SL-T; the justifications follow. A scenario written with via passes through that zone or conduit on its way to where it acts; by the house method it sets the suggestion there.\nZone or conduit\nFoundational requirements\nDriving scenarios\n", st) > st,
         "4b Word: the driving scenarios' lead-in and columns say what the rows are");
       ok(at("\nZ2 Safety Instrumented System\nIAC, SI\nT4 (High)\n\nUC, DC, RDF, TRE, RA\nSL3 from the safety floor\n", st) > st, "4b Word: a safety zone's requirements no threat drives say their SL3 comes from the safety floor");
       ok(at("\nC2 Vendor remote access\nIAC, RDF\nT9 (High)\n\nSI\nSL3 inherited from Z3 and Z1\n\nDC\nSL2 inherited from Z3\n\nRA\nSL2 inherited from Z1\n", st) > st, "4b Word: a conduit's requirements its own threats do not drive say which zone the suggestion is inherited from",
         text.slice(at("\nC2 Vendor remote access\n", st), at("\nC2 Vendor remote access\n", st) + 220).replace(/\n/g, " | "));
-      var vInh = variant(function (q) { q.zones[0].threats[0].affectedFR = ["IAC"]; q.conduits[1].threats[0].likelihood = "low"; q.conduits[1].threats[0].impact = "minor"; });
+      // Consequence first: the inherited target is read on the demo's threats without their paths (T1 passes through C2).
+      function noVia(q) { q.zones.concat(q.conduits).forEach(function (o) { o.threats.forEach(function (t) { delete t.via; }); }); }
+      var vInh = variant(function (q) { noVia(q); q.zones[0].threats[0].affectedFR = ["IAC"]; q.conduits[1].threats[0].likelihood = "low"; q.conduits[1].threats[0].impact = "minor"; });
       var vst = vInh.text.indexOf("\nDriving scenarios\n");
       ok(/\nC2 Vendor remote access\nIAC\nT9 \(Low\); SL3 inherited from Z1\n/.test(vInh.text.slice(vst)), "4b Word: a driver below the suggestion is named with where the suggestion comes from",
         vInh.text.slice(vInh.text.indexOf("\nC2 Vendor remote access\n", vst), vInh.text.indexOf("\nC2 Vendor remote access\n", vst) + 200).replace(/\n/g, " | "));
-      var vNoT = variant(function (q) { q.conduits[1].threats = []; });
+      var vNoT = variant(function (q) { noVia(q); q.conduits[1].threats = []; });
       var vnst = vNoT.text.indexOf("\nDriving scenarios\n");
       ok(/\nC2 Vendor remote access\nIAC, SI, RDF\nSL3 inherited from Z3 and Z1\n/.test(vNoT.text.slice(vnst)) || /\nC2 Vendor remote access\n[A-Z, ]+\nSL\d inherited from /.test(vNoT.text.slice(vnst)),
         "4b Word: a conduit with no threat of its own but an inherited target says so, not \"No rated threat\"", vNoT.text.slice(vNoT.text.indexOf("\nC2 Vendor remote access\n", vnst), vNoT.text.indexOf("\nC2 Vendor remote access\n", vnst) + 200).replace(/\n/g, " | "));

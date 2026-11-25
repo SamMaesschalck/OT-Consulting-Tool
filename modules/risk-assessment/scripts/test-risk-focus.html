@@ -162,9 +162,10 @@
     ok(!one || one.getAttribute("aria-label") === "Accept 1 suggestion for C1", "and one suggestion is said in the singular", one && one.getAttribute("aria-label"));
 
     // ---- 12: the step tabs mark the page showing ----
+    // Consequence first: five tabs now, By consequence beside By zone (was four).
     demo();
     var tabs = [].slice.call(main().querySelectorAll(".step-tabs [data-tab]"));
-    ok(tabs.length === 4 && tabs.every(function (b) { return !b.hasAttribute("aria-pressed"); }) && main().querySelector('.step-tabs [data-tab="risk"]').getAttribute("aria-current") === "page" && tabs.filter(function (b) { return b.hasAttribute("aria-current"); }).length === 1,
+    ok(tabs.length === 5 && tabs.every(function (b) { return !b.hasAttribute("aria-pressed"); }) && main().querySelector('.step-tabs [data-tab="risk"]').getAttribute("aria-current") === "page" && tabs.filter(function (b) { return b.hasAttribute("aria-current"); }).length === 1,
       "the step tabs mark the one showing with aria-current, not as pressed toggles");
 
     // ---- 9: the Scales close on Escape, an outside click and the keyboard leaving ----

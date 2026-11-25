@@ -36,9 +36,9 @@
   var ui = {
     sel: null,            // the zone or conduit open in By zone
     open: {},             // owner id -> the scenario whose editor is open
-    view: "zone",         // "zone" | "register" | "heatmap"
+    view: "zone",         // "zone" | "consequence" | "register" | "heatmap"
     heat: "unmitigated",  // the heat map's state: "unmitigated" | "current" | "planned"
-    filter: { owner: "", band: "", decision: "", open: false, cell: null },
+    filter: { owner: "", band: "", decision: "", open: false, cell: null, consequence: "" },
     scalesOpen: false,
     sec: {},              // "vuln:Z1" / "cm:Z1" -> the zone's section is open
     why: {},              // owner id -> the SL-T strip's Why is open
@@ -52,7 +52,7 @@
   function fresh() {
     if (ui.forProject !== project()) {
       ui.forProject = project(); ui.sel = null; ui.selObj = null; ui.open = {}; ui.view = "zone"; ui.heat = "unmitigated";
-      ui.filter = { owner: "", band: "", decision: "", open: false, cell: null };
+      ui.filter = { owner: "", band: "", decision: "", open: false, cell: null, consequence: "" };
       ui.sec = {}; ui.why = {}; ui.move = {}; ui.railScroll = 0; ui.reveal = false; ui.scalesOpen = false;
     }
   }
@@ -328,6 +328,50 @@
     M.THREAT_LINK_FIELDS.forEach(function (k) { if (!Array.isArray(t[k])) t[k] = []; });
     if (!Array.isArray(t.affectedFR)) t.affectedFR = [];
   }
+  // Consequence first: the consequence the scenario leads to and the zones
+  // and conduits its path passes through. Shown once the project has a
+  // consequence, or the scenario a via.
+  function pathFields(o, t, p) {
+    var ks = M.consequencesOf(p), via = M.viaOf(t);
+    if (!ks.length && !via.length) return null;
+    var kids = [];
+    if (ks.length) {
+      var sel = h("select", { "data-field": "leads-to", onChange: function (e) { M.setConsequenceId(t, e.target.value); touched(); rerender(); } });
+      sel.appendChild(h("option", { value: "", text: "None" }));
+      ks.forEach(function (k) { var op = h("option", { value: k.id, text: k.id + (k.title ? " " + k.title : "") }); if (t.consequenceId === k.id) op.setAttribute("selected", "selected"); sel.appendChild(op); });
+      // Back to the consequence on By consequence, at this path.
+      var kNow = M.consequenceById(p, t.consequenceId);
+      kids.push(h("div", { class: "field" }, [labelFor("Leads to", sel), h("div", { class: "inline-add" }, [sel,
+        kNow ? h("button", { type: "button", class: "link-btn", "data-action": "open-consequence", text: "Open " + kNow.id, "aria-label": "Open " + kNow.id + " on By consequence",
+          onClick: function () { showConsequence(kNow.id); A.navigate("risk", '[data-consequence-id="' + kNow.id + '"] [data-threat-id="' + t.id + '"] [data-action="open-path"]'); } }) : null])]));
+    }
+    var others = owners(p).filter(function (x) { return x !== o; });
+    kids.push(h("div", { class: "field" }, [h("div", { class: "lbl", text: "Via" + (via.length ? ": " + E.andList(via) : "") }),
+      h("div", { class: "chip-row", role: "group", "aria-label": "Via, in order" }, others.map(function (x) {
+        var on = via.indexOf(x.id) >= 0;
+        return chip(ownerChip(x), on, "via-" + x.id, function () {
+          var list = M.viaOf(t); toggleIn(list, x.id); M.setVia(t, list); touched(); rerender();
+        }, { cls: "xs", title: x.name || null });
+      }))]));
+    return h("div", { class: "threat-grid", "data-part": "path" }, kids);
+  }
+  // A zone or conduit on a Via chip: "Z7 Utilities", a long name cut short
+  // (the whole name is the chip's title).
+  function ownerChip(x) {
+    var n = String(x.name || "").trim();
+    if (n.length > 18) n = n.slice(0, 17).replace(/\s+$/, "") + "…";
+    return x.id + (n ? " " + n : "");
+  }
+  // A path rated below (or above) the worst case of its consequence, said
+  // plainly: "Impact lower than K1 (Severe)".
+  function impactVsWords(vs, k, p) {
+    return "Impact " + (vs === "lower" ? "lower" : "higher") + " than " + k.id + " (" + E.impactName(k.impact, p) + ")";
+  }
+  function impactNote(t, p) {
+    var k = M.consequenceById(p, t.consequenceId), vs = E.pathImpactVs(t, k, p);
+    if (vs !== "lower" && vs !== "higher") return null;
+    return h("div", { class: "hint", "data-part": "impact-vs", text: impactVsWords(vs, k, p) + "." });
+  }
   function scenarioEditor(x, p, tol) {
     var o = x.owner, t = x.t, T = x.treatment;
     ensureLists(t);
@@ -365,6 +409,7 @@
         })) : null,
         h("div", { class: "inline-add" }, [vulnIn, h("button", { type: "button", class: "btn sm", "data-action": "add-vuln", text: "Add", onClick: addVuln })])]),
       liveText("Consequence", t.consequence, function (v) { t.consequence = v; }, { attrs: { "data-field": "consequence" }, placeholder: "e.g. Loss of containment; unit trip" }),
+      pathFields(o, t, p),
       h("div", { class: "field" }, [h("div", { class: "lbl", text: "Affected foundational requirements" }),
         h("div", { class: "chip-row", role: "group", "aria-label": "Affected foundational requirements" }, FRS.map(function (f) {
           return chip(f.id, t.affectedFR.indexOf(f.id) >= 0, "fr-" + f.id, function () { toggleIn(t.affectedFR, f.id); touched(); rerender(); }, { title: f.fr + ": " + f.name });
@@ -398,7 +443,8 @@
       liveText("Likelihood rationale", t.likelihoodRationale, function (v) { t.likelihoodRationale = v; }, { attrs: { "data-field": "likelihoodRationale" },
         placeholder: "One line: why this likelihood." }),
       h("div", { class: "rating-line" }, [h("strong", { text: "Unmitigated risk: " }), riskPill(x.risk),
-        x.risk ? h("span", { class: "muted", text: "  = impact × likelihood" + (x.exceeds ? ", above tolerable risk" : "") }) : h("span", { class: "muted", text: "  (set likelihood and impact)" })])
+        x.risk ? h("span", { class: "muted", text: "  = impact × likelihood" + (x.exceeds ? ", above tolerable risk" : "") }) : h("span", { class: "muted", text: "  (set likelihood and impact)" })]),
+      impactNote(t, p)
     ]));
 
     // 3. Existing countermeasures and the current rating.
@@ -449,6 +495,10 @@
     n.affectedFR = t.affectedFR.slice();
     // Where the scenario came from, when it came from the house library.
     if (t.libraryId) n.libraryId = t.libraryId;
+    // The consequence it leads to and the route it takes go with it (copyTo
+    // drops the route where it would pass through where the copy acts).
+    if (t.consequenceId) n.consequenceId = t.consequenceId;
+    M.setVia(n, M.viaOf(t));
     // The impact per category is part of the unmitigated rating.
     if (t.impactByCategory && typeof t.impactByCategory === "object" && Object.keys(t.impactByCategory).length) n.impactByCategory = JSON.parse(JSON.stringify(t.impactByCategory));
     return n;
@@ -473,6 +523,8 @@
       var to = findOwner(p, id); if (!to || to === o) return;
       p.counters.threat += 1;
       var n = copyOf(t, "T" + p.counters.threat);
+      // A route through the zone or conduit the copy now acts in does not fit it.
+      if (M.viaOf(n).indexOf(to.id) >= 0) M.setVia(n, []);
       to.threats.push(n); made.push(n.id + " in " + to.id);
     });
     return made;
@@ -752,7 +804,10 @@
 
   // ---------- By zone ----------
 
+  // A zone or conduit a path passes through with no threat of its own, in words.
+  function stoneWords(ks) { return ks.length ? "On the path to " + E.andList(ks) : "On a path"; }
   function rail(vm, p, open, selO) {
+    var stones = E.steppingStones(p);
     function item(row) {
       var o = row.o, skip = E.comparison(o, p).skip, on = o === selO, n = open.owner[o.id] || 0;
       var nEl = h("span", { class: "rail-open" + (n ? " val-warn" : ""), text: n ? n + " open" : "" });
@@ -764,6 +819,7 @@
           h("span", { class: "muted", text: o.threats.length + " scenario" + (o.threats.length === 1 ? "" : "s") }),
           row.worstRisk ? riskPill(row.worstRisk) : null,
           skip ? h("span", { class: "pill neutral", text: "Not required" }) : null,
+          stones[o.id] ? h("span", { class: "pill flag stone-pill", "data-stone": o.id, text: stoneWords(stones[o.id]) }) : null,
           nEl
         ])
       ]);
@@ -796,6 +852,8 @@
     var skip = E.comparison(o, p).skip;
     var head = [];
     if (skip) head.push(h("span", { class: "pill neutral", text: "Not required" }));
+    var stone = E.steppingStones(p)[o.id];
+    if (stone) head.push(h("span", { class: "pill flag stone-pill", "data-stone": o.id, style: "margin-left:6px", text: stoneWords(stone) }));
     if (row.worstRisk) head.push(riskPill(row.worstRisk));
     if (row.exceeding.length) head.push(h("span", { class: "pill flag", style: "margin-left:6px", text: row.exceeding.length + " over tolerable" }));
     var exceeding = row.exceeding, openT = row.open, suggested = row.suggested, linkSug = row.linkSuggested;
@@ -876,6 +934,10 @@
       if (["reduce", "accept", "slt"].indexOf(f.decision) >= 0 && !(T.confirmed && T.decision === f.decision)) return false;
     }
     if (f.cell) { var li = stateLI(x.t, f.cell.state); if (li.L !== f.cell.L || li.I !== f.cell.I) return false; }
+    if (f.consequence) {
+      var kid = x.consequence ? x.consequence.id : "";
+      if (f.consequence === "none" ? !!kid : kid !== f.consequence) return false;
+    }
     return true;
   }
   // The keyboard lands on the scenario's open button, as Go to does.
@@ -891,10 +953,15 @@
   }
   function renderRegister(main, p, vm, open) {
     var f = ui.filter;
+    // Consequence first: a filter once there is a consequence, and a Leads to
+    // column once there is a consequence or a scenario with a via.
+    var ks = M.consequencesOf(p), kCol = ks.length > 0 || vm.threats.some(function (x) { return x.via.length > 0; });
+    if (f.consequence && f.consequence !== "none" && !M.consequenceById(p, f.consequence)) f.consequence = "";
     var bar = h("div", { class: "reg-filters no-print", role: "group", "aria-label": "Filter the register" }, [
       filterSelect("owner", "Zone or conduit", [{ id: "", text: "All zones and conduits" }].concat(vm.owners.map(function (r) { return { id: r.o.id, text: r.o.id + (r.o.name ? " " + r.o.name : "") }; }))),
       filterSelect("band", "Unmitigated risk", [{ id: "", text: "Any unmitigated risk" }].concat(BANDS.slice().reverse().map(function (b) { return { id: b.id, text: b.name }; }))),
       filterSelect("decision", "Decision", DECISION_FILTERS),
+      ks.length ? filterSelect("consequence", "Consequence", [{ id: "", text: "Any consequence" }, { id: "none", text: "No consequence" }].concat(ks.map(function (k) { return { id: k.id, text: k.id + (k.title ? " " + k.title : "") }; }))) : null,
       h("label", { class: "check-line" }, [h("input", { type: "checkbox", "data-filter": "open", checked: f.open, onChange: function (e) { f.open = e.target.checked; rerender(); } }), "Open only"]),
       f.cell ? h("span", { class: "pill neutral reg-cell", "data-cell-filter": "" }, [
         cap(f.cell.state) + ": " + E.impactName(f.cell.I, p) + " impact, " + E.likelihoodName(f.cell.L, p).toLowerCase() + " likelihood",
@@ -906,11 +973,14 @@
       h("th", { text: "Zone or conduit", style: "width:150px" }), h("th", { text: "ID", style: "width:56px" }), h("th", { text: "Scenario" }), h("th", { text: "FRs", style: "width:110px" }),
       h("th", { text: "Unmitigated", class: "center", style: "width:96px" }), h("th", { text: "Current", class: "center", style: "width:86px" }), h("th", { text: "Planned", class: "center", style: "width:86px" }),
       h("th", { text: "Decision", style: "width:180px" }), h("th", { text: "Open", class: "center", style: "width:52px" })
-    ])])]);
+    ].concat(kCol ? [h("th", { text: "Leads to", style: "width:140px" })] : []))])]);
     var tb = h("tbody");
-    if (!rows.length) tb.appendChild(h("tr", null, [h("td", { colspan: "9", class: "muted", text: vm.threats.length ? "No scenario matches the filter." : "No scenarios yet." })]));
+    if (!rows.length) tb.appendChild(h("tr", null, [h("td", { colspan: String(kCol ? 10 : 9), class: "muted", text: vm.threats.length ? "No scenario matches the filter." : "No scenarios yet." })]));
     rows.forEach(function (x) {
       var n = open.threat[x.owner.id + "/" + x.t.id];
+      // "K1 via Z3 and C2", "K3", or a route with no consequence: "Via Z4".
+      var kText = (x.consequence ? x.consequence.id : "") + (x.via.length ? (x.consequence ? " via " : "Via ") + E.andList(x.via) : "");
+      var kCell = kCol ? [h("td", { "data-reg-consequence": "", title: x.consequence ? x.consequence.title || null : null, text: kText })] : [];
       tb.appendChild(h("tr", { "data-reg-row": x.owner.id + "/" + x.t.id }, [
         h("td", { text: x.owner.id + (x.owner.name ? " " + x.owner.name : "") }),
         h("td", null, [h("button", { type: "button", class: "link-btn", "data-action": "reg-open", "aria-label": "Open " + x.t.id + " in " + x.owner.id, text: x.t.id, onClick: function () { openScenario(x.owner.id, x.t.id); } })]),
@@ -921,7 +991,7 @@
         h("td", { class: "center" }, [x.planned ? riskPill(x.planned) : null]),
         h("td", { class: x.exceeds && !x.decided ? "val-warn" : "", text: decisionWords(x) }),
         h("td", { class: "center", text: n ? String(n) : "" })
-      ]));
+      ].concat(kCell)));
     });
     tbl.appendChild(tb);
     main.appendChild(card("Register", rows.length + " of " + vm.threats.length + " scenario" + (vm.threats.length === 1 ? "" : "s"), [bar, tbl], null, { "data-view": "register" }));
@@ -950,7 +1020,7 @@
         return h("td", { class: "center heat-cell risk-" + b + (R.ViewModel.heatAbove(cells, sv.id, l.id, b, tol) ? " above-tol" : "") }, [
           h("button", { type: "button", class: "heat-btn", "data-cell": sv.id + ":" + l.id, disabled: n ? null : "disabled",
             "aria-label": n + " scenario" + (n === 1 ? "" : "s") + ", " + sv.name + " impact, " + l.name.toLowerCase() + " likelihood",
-            onClick: function () { ui.filter = { owner: "", band: "", decision: "", open: false, cell: { state: st, I: sv.id, L: l.id } }; ui.view = "register"; A.navigate("risk", '[data-filter="owner"]'); } },
+            onClick: function () { ui.filter = { owner: "", band: "", decision: "", open: false, cell: { state: st, I: sv.id, L: l.id }, consequence: "" }; ui.view = "register"; A.navigate("risk", '[data-filter="owner"]'); } },
             [h("span", { class: "heat-n", text: n ? String(n) : "" }), h("span", { class: "heat-band", text: BAND_NAME[b] || "Not set" })])
         ]);
       }))));
@@ -1031,9 +1101,13 @@
 
   // ---------- The page ----------
 
-  // Step 5's tabs: By zone, Register, Heat map (views of risk) and the SL-T grid (slt).
+  // Step 5's tabs: By zone, By consequence, Register, Heat map (views of
+  // risk) and the SL-T grid (slt), in this order. Putting By consequence
+  // first is a change to this one list.
+  var TAB_ORDER = ["risk", "consequence", "register", "heatmap", "slt"];
   function stepTabs(active) {
     var p = project(), threats = owners(p).reduce(function (a, o) { return a + o.threats.length; }, 0), slt = A.sltCount();
+    var nK = M.consequencesOf(p).length;
     function tab(id, text, badge) {
       var on = active === id;
       // The tab showing is the current page of the step (not a pressed toggle).
@@ -1041,15 +1115,22 @@
         onClick: function () {
           if (on) return;
           if (id === "slt") A.navigate("slt", '.step-tabs [data-tab="slt"]');
-          else { ui.view = id === "risk" ? "zone" : id; A.navigate("risk", '.step-tabs [data-tab="' + id + '"]'); }
+          else {
+            ui.view = id === "risk" ? "zone" : id;
+            // Back on By consequence after opening a path from it: that path's row.
+            var back = id === "consequence" && R.ConsequenceUI ? R.ConsequenceUI.comeBack() : null;
+            A.navigate("risk", back || '.step-tabs [data-tab="' + id + '"]');
+          }
         } }, [text, badge ? h("span", { class: "badge", text: badge }) : null]);
     }
-    return h("div", { class: "step-tabs no-print", role: "group", "aria-label": "Detailed risk" }, [
-      tab("risk", "By zone", threats ? String(threats) : null),
-      tab("register", "Register"),
-      tab("heatmap", "Heat map"),
-      tab("slt", "SL-T grid", slt)
-    ]);
+    var tabs = {
+      risk: tab("risk", "By zone", threats ? String(threats) : null),
+      consequence: tab("consequence", "By consequence", nK ? String(nK) : null),
+      register: tab("register", "Register"),
+      heatmap: tab("heatmap", "Heat map"),
+      slt: tab("slt", "SL-T grid", slt)
+    };
+    return h("div", { class: "step-tabs no-print", role: "group", "aria-label": "Detailed risk" }, TAB_ORDER.map(function (id) { return tabs[id]; }));
   }
 
   function renderRisk(main) {
@@ -1063,6 +1144,8 @@
     var tolWords = "tolerable risk is " + BAND_NAME[E.tolerableOf(p)].toLowerCase() + " (step 1).";
     main.appendChild(h("div", { class: "framing-note", text: cw.source === "client" ? "The client's risk matrix; " + tolWords :
       cw.source === "project" ? "The risk matrix agreed for this assessment; " + tolWords : "SolutionsPT house risk matrix; the standard prescribes none. " + cap(tolWords) }));
+    // By consequence works before there are zones: a consequence needs none.
+    if (view === "consequence") { R.ConsequenceUI.render(main, p, R.ViewModel.build(p), openMap(p)); return; }
     if (!p.zones.length && !p.conduits.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
     var vm = R.ViewModel.build(p), open = openMap(p);
     if (view === "register") { renderRegister(main, p, vm, open); return; }
@@ -1086,7 +1169,18 @@
     return true;
   }
 
-  R.RiskPage = { select: select, ui: ui, acceptSuggested: acceptSuggested, copyTo: copyTo, moveTo: moveTo, duplicate: duplicate, refresh: refresh };
+  // Opens By consequence at one consequence (Go to, step 2, an undo).
+  function showConsequence(kId) {
+    fresh();
+    ui.view = "consequence";
+    if (R.ConsequenceUI && kId) R.ConsequenceUI.reveal(kId);
+    return true;
+  }
+
+  R.RiskPage = { select: select, ui: ui, acceptSuggested: acceptSuggested, copyTo: copyTo, moveTo: moveTo, duplicate: duplicate, refresh: refresh,
+    showConsequence: showConsequence, openScenario: openScenario, TAB_ORDER: TAB_ORDER,
+    // For the By consequence view (js/ui-consequence.js): the in-place updates.
+    live: live, edited: edited, decisionWords: decisionWords, ownerLabel: ownerLabel, stoneWords: stoneWords, ownerChip: ownerChip, impactVsWords: impactVsWords };
   var P = R.Pages;
   P.risk = renderRisk; P.slt = renderSlt;
 }());
