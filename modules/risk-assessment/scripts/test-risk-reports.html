@@ -513,7 +513,7 @@
       // Phase 4 review (logic 8, wording 10): where a suggestion is above what the drivers map to, the row says where it
       // comes from (was: Z2 and C2 named only threats, and a requirement with an inherited target had no row).
       // Consequence first: the demo's paths pass through zones, so the lead-in says how a path is named.
-      ok(at("\nFor each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. On the house mapping these set the suggested SL-T; the justifications follow. A scenario written with via passes through that zone or conduit on its way to where it acts; by the house method it sets the suggestion there.\nZone or conduit\nFoundational requirements\nDriving scenarios\n", st) > st,
+      ok(at("\nFor each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. On the house mapping these set the suggested SL-T; the justifications follow. By the house method, a scenario also sets the suggestion for each zone or conduit it passes through on its way to where it acts.\nZone or conduit\nFoundational requirements\nDriving scenarios\n", st) > st,
         "4b Word: the driving scenarios' lead-in and columns say what the rows are");
       ok(at("\nZ2 Safety Instrumented System\nIAC, SI\nT4 (High)\n\nUC, DC, RDF, TRE, RA\nSL3 from the safety floor\n", st) > st, "4b Word: a safety zone's requirements no threat drives say their SL3 comes from the safety floor");
       ok(at("\nC2 Vendor remote access\nIAC, RDF\nT9 (High)\n\nSI\nSL3 inherited from Z3 and Z1\n\nDC\nSL2 inherited from Z3\n\nRA\nSL2 inherited from Z1\n", st) > st, "4b Word: a conduit's requirements its own threats do not drive say which zone the suggestion is inherited from",

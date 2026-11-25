@@ -346,8 +346,8 @@
           onClick: function () { showConsequence(kNow.id); A.navigate("risk", '[data-consequence-id="' + kNow.id + '"] [data-threat-id="' + t.id + '"] [data-action="open-path"]'); } }) : null])]));
     }
     var others = owners(p).filter(function (x) { return x !== o; });
-    kids.push(h("div", { class: "field" }, [h("div", { class: "lbl", text: "Via" + (via.length ? ": " + E.andList(via) : "") }),
-      h("div", { class: "chip-row", role: "group", "aria-label": "Via, in order" }, others.map(function (x) {
+    kids.push(h("div", { class: "field" }, [h("div", { class: "lbl", text: "Passes through" + (via.length ? ": " + E.andList(via) : "") }),
+      h("div", { class: "chip-row", role: "group", "aria-label": "Passes through, in order" }, others.map(function (x) {
         var on = via.indexOf(x.id) >= 0;
         return chip(ownerChip(x), on, "via-" + x.id, function () {
           var list = M.viaOf(t); toggleIn(list, x.id); M.setVia(t, list); touched(); rerender();
@@ -805,7 +805,7 @@
   // ---------- By zone ----------
 
   // A zone or conduit a path passes through with no threat of its own, in words.
-  function stoneWords(ks) { return ks.length ? "On the path to " + E.andList(ks) : "On a path"; }
+  function stoneWords(ks) { return ks.length ? "On the route to " + E.andList(ks) : "On a scenario's route"; }
   function rail(vm, p, open, selO) {
     var stones = E.steppingStones(p);
     function item(row) {
@@ -978,8 +978,8 @@
     if (!rows.length) tb.appendChild(h("tr", null, [h("td", { colspan: String(kCol ? 10 : 9), class: "muted", text: vm.threats.length ? "No scenario matches the filter." : "No scenarios yet." })]));
     rows.forEach(function (x) {
       var n = open.threat[x.owner.id + "/" + x.t.id];
-      // "K1 via Z3 and C2", "K3", or a route with no consequence: "Via Z4".
-      var kText = (x.consequence ? x.consequence.id : "") + (x.via.length ? (x.consequence ? " via " : "Via ") + E.andList(x.via) : "");
+      // "K1 through Z3 and C2", "K3", or a route with no consequence: "Through Z4".
+      var kText = (x.consequence ? x.consequence.id : "") + (x.via.length ? (x.consequence ? " through " : "Through ") + E.andList(x.via) : "");
       var kCell = kCol ? [h("td", { "data-reg-consequence": "", title: x.consequence ? x.consequence.title || null : null, text: kText })] : [];
       tb.appendChild(h("tr", { "data-reg-row": x.owner.id + "/" + x.t.id }, [
         h("td", { text: x.owner.id + (x.owner.name ? " " + x.owner.name : "") }),

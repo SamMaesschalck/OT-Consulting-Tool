@@ -194,7 +194,7 @@ window.RiskReview = (function () {
         // Each on its own: a route is shown with or without a consequence,
         // in order ("Z3 and C2").
         if (x.consequence) details.push(["Leads to", x.consequence.id + (x.consequence.title ? " " + x.consequence.title : "")]);
-        if (x.via && x.via.length) details.push(["Via", window.RiskApp.Engine.andList(x.via)]);
+        if (x.via && x.via.length) details.push(["Passes through", window.RiskApp.Engine.andList(x.via)]);
         // Schema 0.3: the rating with the countermeasures in place today, and
         // after the planned ones; a rating not given takes the one before it.
         if (x.current) details.push(["Current likelihood × impact", rating(t.currentLikelihood || t.likelihood, t.currentImpact || t.impact, p)]);

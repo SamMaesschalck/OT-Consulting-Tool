@@ -94,7 +94,7 @@
     R.Migrate.pruneDangling(p);
     touched(); rerender();
     A.focusAfter('[data-action="add-consequence"]');
-    A.offerUndo(k.id + " removed; its paths stay as threats.", backTo(k.id, kSel(k, '[data-action="edit-consequence"]')), mk);
+    A.offerUndo(k.id + " removed. Its scenarios stay where they are.", backTo(k.id, kSel(k, '[data-action="edit-consequence"]')), mk);
   }
   // After the consequence's impact changed: the paths still on the old
   // value are offered the new one, and nothing changes until chosen. A path
@@ -149,7 +149,7 @@
     cu.offer = null;
     touched(); rerender();
     A.focusAfter(back);
-    A.offerUndo(n + " path" + (n === 1 ? "" : "s") + " updated to " + E.impactName(k.impact, p) + ".", backTo(k.id, back), mk);
+    A.offerUndo(n + " scenario" + (n === 1 ? "" : "s") + " updated to " + E.impactName(k.impact, p) + ".", backTo(k.id, back), mk);
   }
 
   // ---------- Paths ----------
@@ -190,11 +190,11 @@
 
   // ---------- Drawing ----------
 
-  function viaWords(x) { return x.via.length ? E.andList(x.via) : "Direct"; }
+  function viaWords(x) { return x.via.length ? E.andList(x.via) : "None"; }
   function pathRows(k, p, vm, open) {
     var rows = vm.threats.filter(function (x) { return x.consequence === k; });
     var stones = E.steppingStones(p);
-    if (!rows.length) return h("p", { class: "muted ed-none", text: "No path yet." });
+    if (!rows.length) return h("p", { class: "muted ed-none", text: "No scenarios yet." });
     var tb = h("tbody");
     rows.forEach(function (x) {
       var t = x.t, vs = E.pathImpactVs(t, k, p), n = open.threat[x.owner.id + "/" + t.id];
@@ -208,9 +208,9 @@
         h("td", null, [h("button", { type: "button", class: "link-btn", "data-action": "open-path", text: t.id, "aria-label": "Open " + t.id + " in " + x.owner.id,
           onClick: function () { fresh().back = { k: k.id, owner: x.owner.id, t: t.id }; R.RiskPage.openScenario(x.owner.id, t.id); } })]),
         h("td", { text: x.owner.id + (x.owner.name ? " " + x.owner.name : "") }),
-        h("td", { class: "path-via" }, [viaWords(x), thin.length ? h("div", null, [h("span", { class: "pill flag stone-pill", "data-stone-note": "", text: "No threats of its own: " + E.andList(thin) })]) : null]),
-        h("td", { text: t.source || "Not given", class: t.source ? "" : "val-warn" }),
-        h("td", { text: t.entryPoint || "Not given", class: t.entryPoint ? "" : "val-warn" }),
+        h("td", { class: "path-via" }, [viaWords(x), thin.length ? h("div", null, [h("span", { class: "pill flag stone-pill", "data-stone-note": "", text: "No threats recorded in " + E.andList(thin) })]) : null]),
+        h("td", { text: t.source || "Not recorded", class: t.source ? "" : "val-warn" }),
+        h("td", { text: t.entryPoint || "Not recorded", class: t.entryPoint ? "" : "val-warn" }),
         h("td", { class: "center" }, [riskPill(x.risk),
           vs === "lower" || vs === "higher" ? h("div", { class: "muted path-note", "data-part": "impact-vs", text: R.RiskPage.impactVsWords(vs, k, p) }) : null]),
         h("td", null, [dec, n ? h("div", { class: "val-warn path-note", text: n + " open" }) : null]),
@@ -222,9 +222,9 @@
           } })])
       ]));
     });
-    var tbl = h("table", { class: "tbl compact path-table", "aria-label": "Paths to " + k.id }, [h("thead", null, [h("tr", null, [
-      h("th", { text: "Path", style: "width:52px" }), h("th", { text: "Acts in" }), h("th", { text: "Via", class: "path-via" }), h("th", { text: "Threat source" }),
-      h("th", { text: "Entry point" }), h("th", { text: "Unmitigated", class: "center", style: "width:96px" }), h("th", { text: "Decision", style: "width:140px" }),
+    var tbl = h("table", { class: "tbl compact path-table", "aria-label": "Scenarios leading to " + k.id }, [h("thead", null, [h("tr", null, [
+      h("th", { text: "Scenario", style: "width:64px" }), h("th", { text: "Zone or conduit" }), h("th", { text: "Passes through", class: "path-via" }), h("th", { text: "Threat source" }),
+      h("th", { text: "Entry point" }), h("th", { text: "Unmitigated risk", class: "center", style: "width:96px" }), h("th", { text: "Treatment decision", style: "width:140px" }),
       h("th", { style: "width:58px" }, [h("span", { class: "vh", text: "Actions" })])
     ])]), tb]);
     return h("div", { class: "path-scroll" }, [tbl]);
@@ -243,9 +243,9 @@
     all.forEach(function (x) { var op = h("option", { value: x.id, text: x.id + (x.name ? " " + x.name : "") }); if (x.id === f.owner) op.setAttribute("selected", "selected"); ownerSel.appendChild(op); });
     var assets = E.threatAssets(o, p);
     var kids = [
-      h("div", { class: "threat-grid" }, [h("div", { class: "field" }, [labelFor("Acts in", ownerSel), ownerSel]),
-        h("div", { class: "field" }, [h("div", { class: "lbl", text: "Via" + (f.via.length ? ": " + E.andList(f.via) : "") }),
-          h("div", { class: "chip-row", role: "group", "aria-label": "Via, in order" }, all.filter(function (x) { return x.id !== f.owner; }).map(function (x) {
+      h("div", { class: "threat-grid" }, [h("div", { class: "field" }, [labelFor("Zone or conduit", ownerSel), ownerSel]),
+        h("div", { class: "field" }, [h("div", { class: "lbl", text: "Passes through" + (f.via.length ? ": " + E.andList(f.via) : "") }),
+          h("div", { class: "chip-row", role: "group", "aria-label": "Passes through, in order" }, all.filter(function (x) { return x.id !== f.owner; }).map(function (x) {
             return chip(R.RiskPage.ownerChip(x), f.via.indexOf(x.id) >= 0, "pvia-" + x.id, function () { toggleIn(f.via, x.id); rerender(); }, x.name);
           }))])]),
       text("Threat statement", "statement", "path-statement", "e.g. An attacker on the vendor path changes the reactor setpoints."),
@@ -256,14 +256,14 @@
       o.vulnerabilities.length ? h("div", { class: "field" }, [h("div", { class: "lbl", text: "Vulnerabilities" }), h("div", { class: "chip-row", role: "group", "aria-label": "Vulnerabilities" }, o.vulnerabilities.map(function (v) {
         return chip(v.id + " " + (v.description || ""), f.vulns.indexOf(v.id) >= 0, "pvuln-" + v.id, function () { toggleIn(f.vulns, v.id); rerender(); });
       }))]) : null,
-      h("p", { class: "hint", text: "The impact is copied from the consequence; mark the affected FRs in the scenario." }),
+      h("p", { class: "hint", text: "The impact is copied from the consequence. Mark the affected FRs in By zone." }),
       h("div", { class: "btn-row" }, [
-        h("button", { type: "button", class: "btn sm primary", "data-action": "path-add", text: "Add path", onClick: function () {
+        h("button", { type: "button", class: "btn sm primary", "data-action": "path-add", text: "Add scenario", onClick: function () {
           var mk = A.undoMark(), t = addPath(k, f);
           if (!t) return;
           st.form = null; touched(); rerender();
           A.focusAfter(kSel(k, '[data-threat-id="' + t.id + '"] [data-action="open-path"]'));
-          A.offerUndo(t.id + " added to " + o.id + " as a path to " + k.id + ".", backTo(k.id, kSel(k, '[data-action="add-path"]')), mk);
+          A.offerUndo(t.id + " added to " + o.id + ", leading to " + k.id + ".", backTo(k.id, kSel(k, '[data-action="add-path"]')), mk);
         } }),
         M.LIBRARY ? h("button", { type: "button", class: "btn sm", "data-action": "path-library", text: "From library", "aria-expanded": st.lib === k.id ? "true" : "false",
           onClick: function () {
@@ -283,12 +283,12 @@
           if (!res.threats.length) return;
           A.focusAfter(kSel(k, '[data-threat-id="' + res.threats[0].id + '"] [data-action="open-path"]'));
           var n = res.threats.length;
-          A.offerUndo(n + " path" + (n === 1 ? "" : "s") + " to " + k.id + " added from the library.", backTo(k.id, kSel(k, '[data-action="add-path"]')), res.mark);
+          A.offerUndo(n + " scenario" + (n === 1 ? "" : "s") + " added from the library, leading to " + k.id + ".", backTo(k.id, kSel(k, '[data-action="add-path"]')), res.mark);
         },
         onClose: function () { st.lib = null; rerender(); A.focusAfter(kSel(k, '[data-action="path-library"]')); }
       }));
     }
-    var wrap = h("div", { class: "path-form", "data-path-form": k.id, role: "group", "aria-label": "New path to " + k.id }, kids);
+    var wrap = h("div", { class: "path-form", "data-path-form": k.id, role: "group", "aria-label": "New scenario leading to " + k.id }, kids);
     wrap.addEventListener("keydown", function (e) { if (e.key === "Escape" && !e.defaultPrevented && !e.target.closest("[data-library-picker]")) { e.preventDefault(); cancel(); } });
     return wrap;
   }
@@ -305,13 +305,13 @@
     var rows = [];
     owners(p).forEach(function (o) { o.threats.forEach(function (t) { if (t.consequenceId !== k.id) rows.push({ o: o, t: t }); }); });
     if (!rows.length) return null;
-    var sel = h("select", { "data-k-field": "link-threat", "aria-label": "Threat to link to " + k.id });
-    sel.appendChild(h("option", { value: "", text: "Link a threat" }));
+    var sel = h("select", { "data-k-field": "link-threat", "aria-label": "Scenario to link to " + k.id });
+    sel.appendChild(h("option", { value: "", text: "Link a scenario" }));
     rows.forEach(function (r) {
       sel.appendChild(h("option", { value: r.o.id + "/" + r.t.id, text: r.t.id + " (" + r.o.id + ") " + shortText(r.t.statement, 60) + (r.t.consequenceId ? " [leads to " + r.t.consequenceId + "]" : "") }));
     });
     var btn = h("button", { type: "button", class: "btn sm", "data-action": "link-threat", text: "Link", onClick: function () {
-      if (!sel.value) { toast("Choose a threat to link."); return; }
+      if (!sel.value) { toast("Choose a scenario to link."); return; }
       var ids = sel.value.split("/"), o0 = findOwner(state.project, ids[0]);
       var t0 = o0 && o0.threats.filter(function (x) { return x.id === ids[1]; })[0], was = t0 && M.consequenceById(state.project, t0.consequenceId) ? t0.consequenceId : "";
       var mk = A.undoMark(), t = linkThreat(k, ids[0], ids[1]);
@@ -330,7 +330,7 @@
     var st = fresh(), lo = liveOffer(p, k);
     if (!lo) return null;
     var ids = lo.paths.map(function (x) { return x.t.id; });
-    return h("div", { class: "k-offer" + (extraCls ? " " + extraCls : ""), role: "group", "aria-label": "Update the paths" }, [
+    return h("div", { class: "k-offer" + (extraCls ? " " + extraCls : ""), role: "group", "aria-label": "Update the scenarios" }, [
       h("span", { role: "status", "aria-live": "polite", "data-offer-text": "", text: E.andList(ids) + (ids.length === 1 ? " is" : " are") + " still rated " + E.impactName(lo.off.from, p) + "." }),
       h("button", { type: "button", class: "btn sm", "data-action": "offer-update", text: "Update to " + E.impactName(lo.off.to, p), onClick: function () { applyOffer(p, k); } }),
       h("button", { type: "button", class: "btn sm", "data-action": "offer-leave", text: "Leave as they are", onClick: function () { st.offer = null; rerender(); A.focusAfter(kSel(k, '[data-action="edit-consequence"]')); } })
@@ -415,7 +415,7 @@
     var st = fresh(), hasOwners = owners(p).length > 0;
     var left = [pathRows(k, p, vm, open),
       h("div", { class: "btn-row", style: "margin-top:8px" }, [
-        h("button", { type: "button", class: "btn sm", "data-action": "add-path", text: "+ Add path", disabled: hasOwners ? null : "disabled",
+        h("button", { type: "button", class: "btn sm", "data-action": "add-path", text: "+ Add scenario", disabled: hasOwners ? null : "disabled",
           "aria-expanded": st.form && st.form.k === k.id ? "true" : "false",
           onClick: function () {
             st.form = { k: k.id, owner: "", via: [], statement: "", source: "", entry: "", assets: [], vulns: [] }; st.lib = null; R.LibraryUI.close();
@@ -423,11 +423,11 @@
           } }),
         linkControl(k, p)
       ]),
-      hasOwners ? null : h("p", { class: "hint", text: "Define zones in step 3 to add a path." }),
+      hasOwners ? null : h("p", { class: "hint", text: "Add zones in step 3 first." }),
       st.form && st.form.k === k.id && hasOwners ? pathForm(k, p) : null
     ];
     var n = vm.threats.filter(function (x) { return x.consequence === k; }).length;
-    return card(cardTitle(k), n + " path" + (n === 1 ? "" : "s"), [
+    return card(cardTitle(k), n + " scenario" + (n === 1 ? "" : "s"), [
       h("div", { class: "bowtie" }, [h("div", { class: "bowtie-paths" }, left), consequencePanel(k, p)])
     ], null, { "data-consequence-id": k.id, class: "card k-card" });
   }
@@ -439,7 +439,7 @@
         var k = newConsequence(p); st.edit[k.id] = true; touched(); rerender();
         A.focusAfter(kSel(k, '[data-k-field="title"]'));
       } }),
-      h("span", { class: "hint", text: "Start from what can happen, then add the paths that lead to it." })
+      h("span", { class: "hint", text: "Start from what could happen, then add the threat scenarios that could cause it." })
     ]));
     if (!ks.length) main.appendChild(card("Consequences", null, [h("p", { class: "muted", text: "No consequences yet." })], null, { "data-view": "consequence" }));
     ks.forEach(function (k) { main.appendChild(consequenceCard(k, p, vm, open)); });

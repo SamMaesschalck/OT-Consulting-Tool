@@ -48,7 +48,7 @@
         return t;
       })(),
       h("p", { class: "hint", style: "margin-top:8px", text: "Risk band → suggested SL-T: " + BANDS.map(function (b) { var m = RULES.riskToSL[b.id]; return b.name + " → SL" + m.suggest + (m.escalateTo ? " (can escalate to SL" + m.escalateTo + ")" : ""); }).join("; ") + "." }),
-      h("p", { class: "hint", "data-method": "via", text: "House method: where a path passes through a zone or conduit (its via), its unmitigated risk also suggests an SL-T there, on the FRs the path affects. The route is as recorded; the tool does not check it against the conduits." })
+      h("p", { class: "hint", "data-method": "via", text: "House method: a scenario's unmitigated risk also suggests an SL-T for each zone or conduit it passes through, on the FRs it affects. The route is as recorded and is not checked against the conduits." })
     ]));
 
     main.appendChild(card("Exposure modifiers & special rules", null, [

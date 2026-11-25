@@ -449,13 +449,13 @@ window.RiskApp.Engine = (function () {
   // A path in words: "T1 via Z3 and C2 to K1" ("to" only with a consequence).
   function pathWords(t) {
     var via = M.viaOf(t);
-    return t.id + (via.length ? " via " + andList(via) : "") + (t.consequenceId ? " to " + t.consequenceId : "");
+    return t.id + (via.length ? " through " + andList(via) : "") + (t.consequenceId ? " to " + t.consequenceId : "");
   }
-  // "House method for a scenario that passes through this zone (its via):
-  // T1 via Z3 and C2 to K1 (acting in Z1) has a high unmitigated risk on
-  // IAC, which maps to SL3."
+  // "House method for a scenario that passes through this zone: T1 through
+  // Z3 and C2 to K1 (acting in Z1) has a high unmitigated risk on IAC,
+  // which maps to SL3."
   function viaTrace(v, fr, isCond) {
-    return "House method for a scenario that passes through this " + (isCond ? "conduit" : "zone") + " (its via): " +
+    return "House method for a scenario that passes through this " + (isCond ? "conduit" : "zone") + ": " +
       andList(v.paths.map(function (x) { return pathWords(x.t) + " (acting in " + x.owner.id + ")"; })) +
       (v.paths.length === 1 ? " has" : " have") + " a " + BAND_NAME[v.band].toLowerCase() + " unmitigated risk on " + fr + ", which maps to SL" + v.sl + ".";
   }
@@ -1199,7 +1199,7 @@ window.RiskApp.Engine = (function () {
           var miss = [];
           if (!String(t.source || "").trim()) miss.push("threat source");
           if (!String(t.entryPoint || "").trim()) miss.push("entry point");
-          if (miss.length) add("risk", "detailed", label + " / " + t.id + ": a path to " + t.consequenceId + " with no " + miss.join(" or ") + ".", tt);
+          if (miss.length) add("risk", "detailed", label + " / " + t.id + ": leads to " + t.consequenceId + " but has no " + miss.join(" or ") + ".", tt);
         }
       });
       // The justification is the deliverable, so flag it only where there is a
@@ -1216,7 +1216,7 @@ window.RiskApp.Engine = (function () {
       var kTitle = String(k.title || "").trim(), label = k.id + (kTitle ? " (" + kTitle + ")" : ""), tgt = { kind: "consequence", id: k.id };
       if (!kTitle) add("risk", "detailed", label + ": no title.", tgt);
       misfits.forEach(function (f) { if (f.item === k) add("risk", "detailed", label + ": " + misfitText(f.misfits), tgt); });
-      if (!pathsTo(p, k.id).length) add("risk", "detailed", label + ": no path leads to it.", tgt);
+      if (!pathsTo(p, k.id).length) add("risk", "detailed", label + ": no threat scenario leads to it.", tgt);
     });
     return items;
   }
