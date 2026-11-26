@@ -98,7 +98,7 @@ H.test(function (ok, done) {
   });
 
   var covered = jobs.map(function (j) { return j.id; });
-  ["onr-syaps-cyber", "onr-syaps-full", "onr-syaps-management", "iec-62443-4-1", "risk-appetite",
+  ["onr-syaps-cyber", "onr-syaps-full", "onr-syaps-management", "iec-62443-4-1", "iec-62443-2-4", "risk-appetite",
    "supplier-screener", "general-ot-posture", "nis2-assessment", "ncsc-caf"].forEach(function (id) {
     ok(covered.indexOf(id) !== -1, id + " is among the instruments offering the organisation-wide workbook", covered.join(", "));
   });

@@ -1243,15 +1243,20 @@ window.App.ExportXLSX = (function () {
     if (scored.anyTargets) {
       rows.push([styledCell("Meeting target ML", { bold: true }), scored.overall.meeting + " / " + (scored.overall.meeting + scored.overall.below)]);
     }
+    var outLine = window.App.Report.mlOutOfScopeLine(scored, instrument);
+    if (outLine) rows.push([styledCell("Out of scope", { bold: true }), outLine]);
     var ws = aoaSheet(rows);
     ws["!cols"] = [{ wch: 38 }, { wch: 60 }];
     return ws;
   }
 
   function mlRequirementsSheet(scored, instrument) {
-    var head = ["SPE", "Theme", "Code", "Title", "Achieved ML", "Target ML", "Meets / below", "State", "Evidence", "Notes"].concat(TRACKER_HEAD);
+    var shortCol = window.App.Report.mlNoun(instrument, "elementShort");
+    var head = [shortCol.charAt(0).toUpperCase() + shortCol.slice(1), "Theme", "Code", "Title", "Achieved ML", "Target ML", "Meets / below", "State", "Evidence", "Notes"].concat(TRACKER_HEAD);
     var rows = [headerRow(head)];
     scored.perRequirement.forEach(function (it) {
+      // A grouping set out of scope is named once on the Front sheet, not per row.
+      if (it.outOfScope) return;
       var meets = "-";
       if (it.hasTarget && it.scored) meets = it.meetsTarget ? "Meets" : "Below";
       var stateText = it.ml === null ? "unanswered" : it.mlLabel;
@@ -1352,12 +1357,12 @@ window.App.ExportXLSX = (function () {
     var rows = [
       [styledCell("Read me", { headerColor: true })],
       [styledCell("Scope", { bold: true, fill: FILL.sub })],
-      [window.App.Report.standardRef(instrument) + " maturity assessment. Maturity levels are set per requirement by the consultant; results are an achieved-ML profile by Security Program Element and theme."],
+      [window.App.Report.standardRef(instrument) + " maturity assessment. Maturity levels are set per requirement by the consultant; results are an achieved-ML profile by " + window.App.Report.mlNoun(instrument, "elementNoun") + " and theme."],
       [styledCell("Per requirement", { bold: true, fill: FILL.sub })],
       ["  - One maturity level per requirement: ML1 Initial, ML2 Managed (documentation begins at ML2), ML3 Defined / Practiced, ML4 Improving. Levels apply independently per requirement."],
       ["  - Not met = not satisfied at any ML; treated as a floor finding (ranks below ML1)."],
       ["  - Unknown reduces coverage and confidence (not scored). N/A is excluded from score and coverage."],
-      ["  - Optional target ML per requirement should derive from risk (62443-3-2), not a flat default. Where set, met/below is reported per requirement and per element."],
+      ["  - Optional target ML per requirement should derive from " + window.App.Report.mlNoun(instrument, "targetSource") + ", not a flat default. Where set, met/below is reported per requirement and per element."],
       [styledCell("Roll-up", { bold: true, fill: FILL.sub })],
       ["  - No single program grade. Mean ML per element is context only."],
       ["  - Requirements do not compensate for one another. A not-met or below-target requirement is reported as a floor finding and is never averaged away."],
@@ -2325,7 +2330,8 @@ window.App.ExportXLSX = (function () {
     var entries = (opts && opts.siteEntries) || [{
       id: "current",
       name: ((engagement.engagement || {}).siteName) || "This site",
-      responses: engagement.responses || []
+      responses: engagement.responses || [],
+      targets: engagement.targets || []
     }];
     var roll = C.rollUpSites({
       instrument: instrument, taxonomy: taxonomy, profile: profile,
@@ -2548,7 +2554,7 @@ window.App.ExportXLSX = (function () {
 
       XLSX.utils.book_append_sheet(wb, mlFrontSheet(engagement, instrument, scoredM), "Front");
       XLSX.utils.book_append_sheet(wb, mlRequirementsSheet(scoredM, instrument), "Requirements");
-      XLSX.utils.book_append_sheet(wb, mlByElementSheet(scoredM, instrument), "By SPE");
+      XLSX.utils.book_append_sheet(wb, mlByElementSheet(scoredM, instrument), window.App.Report.mlNoun(instrument, "elementSheet"));
       XLSX.utils.book_append_sheet(wb, mlByThemeSheet(scoredM), "By theme");
       // Roadmap exists whenever there are findings to prioritise: below-target
       // requirements when the target overlay is on, otherwise every not-met / ML1

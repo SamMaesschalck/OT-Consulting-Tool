@@ -31,7 +31,7 @@ window.docx = (function () {
 })();
 </script>
 <script src="harness.js"></script>
-<script>H.app({ xlsx: true, docx: "mock", tours: ["41", "ml"] });</script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["24", "41", "ml"] });</script>
 <script>
 // Two instruments share the program-maturity-ml family. The chassis strings
 // used to name the first of them everywhere, so a 62443-4-1 report told its
@@ -65,12 +65,28 @@ window.docx = (function () {
     return hs;
   }
 
+  // ml3: what ML3 means in this part, as How to read must say it. The three
+  // parts differ only there: practised on the IACS (2-1:2024), in product
+  // development (4-1), or delivered to an asset owner at least once (2-4).
+  var ML3 = {
+    "iec-62443-2-1-2024": "ML3 Defined / Practiced (actively practised on the IACS)",
+    "iec-62443-4-1": "ML3 Defined / Practiced (actively practised in product development)",
+    "iec-62443-2-4": "ML3 Defined / Practiced (delivered for an asset owner at least once, and repeatable across the organisation)"
+  };
   var CASES = [
     { id: "iec-62443-2-1-2024", tour: "TourML", ref: "ISA/IEC 62443-2-1:2024",
       element: "Security Program Element", other: "ISA/IEC 62443-4-1", otherNoun: /\bPractice\b/ },
     { id: "iec-62443-4-1", tour: "Tour41", ref: "ISA/IEC 62443-4-1",
-      element: "Practice", other: "ISA/IEC 62443-2-1:2024", otherNoun: /Security Program Element/ }
+      element: "Practice", other: "ISA/IEC 62443-2-1:2024", otherNoun: /Security Program Element/ },
+    { id: "iec-62443-2-4", tour: "Tour24", ref: "ISA/IEC 62443-2-4:2023",
+      element: "Functional area", other: "ISA/IEC 62443-2-1:2024", otherNoun: /Security Program Element|\bPractice\b|\bSPEs?\b/ }
   ];
+  function ml3Check(tag, id, text, where) {
+    ok(text.indexOf(ML3[id]) !== -1, tag + ": " + where + " How to read gives its own ML3 meaning", ML3[id]);
+    Object.keys(ML3).forEach(function (k) {
+      if (k !== id) ok(text.indexOf(ML3[k]) === -1, tag + ": " + where + " does not use the ML3 meaning of " + k);
+    });
+  }
 
   try {
     E.loadCatalog();
@@ -106,6 +122,7 @@ window.docx = (function () {
     ok(!c.otherNoun.test(t), tag + ": nor uses the other instrument's noun");
     ok(t.indexOf("Results by " + c.element) !== -1, tag + ": results are grouped by its own noun",
        t.indexOf("Results by") >= 0 ? t.slice(t.indexOf("Results by"), t.indexOf("Results by") + 40) : "(none)");
+    ml3Check(tag, c.id, t, "the screen");
 
     // ---- the Word document ----
     window.__doc = null;
@@ -125,6 +142,13 @@ window.docx = (function () {
           ok(hs.indexOf("Results by " + c.element) !== -1, tag + ": Word groups results by its own noun",
              hs.join(" | "));
           ok(hs.indexOf("Findings by " + c.element) !== -1, tag + ": and findings too");
+          ml3Check(tag, c.id, txt, "Word");
+          // The glossary carries the same meaning, in its own words.
+          var gl = (R.glossarySections(inst, E.state.taxonomy, narr) || []).map(function (s) { return JSON.stringify(s.rows || []); }).join(" ");
+          var lv3 = R.mlLevels(inst).filter(function (l) { return l.id === "ML3"; })[0];
+          ok(!!lv3 && gl.indexOf(lv3.glossary) !== -1, tag + ": the glossary's ML3 row is the instrument's own", lv3 && lv3.glossary);
+          ok(c.id === "iec-62443-2-1-2024" || gl.indexOf("industrial automation and control system, not only written down") === -1,
+             tag + ": and never 2-1:2024's");
           // The composed summary, not the bullet fallback.
           var start = -1;
           for (var k = 0; k < hs.length; k++) if (/Executive summary/i.test(hs[k])) { start = k; break; }

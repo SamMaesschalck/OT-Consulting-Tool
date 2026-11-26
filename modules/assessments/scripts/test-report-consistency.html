@@ -33,7 +33,7 @@ window.docx = (function () {
 })();
 </script>
 <script src="harness.js"></script>
-<script>H.app({ xlsx: true, docx: "mock", tours: ["41", "42", "caf", "cis", "cra", "csms", "ml", "nis2", "nist", "posture", "sl", "supplier"] });</script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["24", "41", "42", "caf", "cis", "cra", "csms", "ml", "nis2", "nist", "posture", "sl", "supplier"] });</script>
 <script>
 // Every family's Word report must carry BOTH a "Method and limitations"
 // section and an "Appendix: scoring methodology" describing ITS OWN rules.
@@ -48,7 +48,7 @@ window.docx = (function () {
   var SEED = {
     "iec-62443-3-3": A.TourSL, "iec-62443-4-2": A.Tour42, "ncsc-caf": A.TourCAF,
     "general-ot-posture": A.TourPosture, "iec-62443-2-1-2024": A.TourML,
-    "nis2-assessment": A.TourNIS2, "iec-62443-4-1": A.Tour41,
+    "nis2-assessment": A.TourNIS2, "iec-62443-4-1": A.Tour41, "iec-62443-2-4": A.Tour24,
     "iec-62443-2-1-2010": A.TourCSMS, "eu-cra": A.TourCRA,
     "supplier-screener": A.TourSupplier, "nist-800-53": A.TourNIST, "cis-controls-v8": A.TourCIS
   };

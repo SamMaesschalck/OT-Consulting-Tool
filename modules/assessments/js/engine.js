@@ -1860,7 +1860,7 @@ window.App.Engine = (function () {
       return window.App.ScoringCAF.scoreSite(state.instrument, state.profile, responses, getActiveCAFOverlay());
     }
     if (state.scoringFamily === "program-maturity-ml") {
-      return window.App.ScoringProgramML.scoreSite(state.instrument, state.profile, responses);
+      return window.App.ScoringProgramML.scoreSite(state.instrument, state.profile, responses, findTarget(state.activeTargetId));
     }
     if (state.scoringFamily === "nis2-conformance") {
       return window.App.ScoringNIS2.scoreSite(state.instrument, state.profile, responses);
@@ -1992,6 +1992,57 @@ window.App.Engine = (function () {
   function getMLThemeName(theme) {
     var names = (state.instrument && state.instrument.themeNames) || {};
     return names[theme] || theme;
+  }
+
+  // Groupings out of scope per target (instrument.elementScoping). Kept on the
+  // target as its own field, apart from the answers, so turning a grouping
+  // back on restores what was recorded. See ScoringProgramML.outOfScopeMap.
+  function supportsElementScoping() {
+    return !!(state.instrument && state.instrument.elementScoping);
+  }
+  function findTarget(targetId) {
+    return ((state.engagement && state.engagement.targets) || []).filter(function (t) { return t.id === targetId; })[0] || null;
+  }
+  function isElementInScope(targetId, elementId) {
+    if (!supportsElementScoping()) return true;
+    var t = findTarget(targetId);
+    var e = t && t.elementScope && t.elementScope[elementId];
+    return !(e && e.out);
+  }
+  function getElementScopeNote(targetId, elementId) {
+    var t = findTarget(targetId);
+    var e = t && t.elementScope && t.elementScope[elementId];
+    return (e && e.note) || "";
+  }
+  function setElementInScope(targetId, elementId, inScope) {
+    if (!supportsElementScoping()) return false;
+    var t = findTarget(targetId);
+    if (!t) return false;
+    if (!t.elementScope) t.elementScope = {};
+    var e = t.elementScope[elementId] || {};
+    e.out = !inScope;
+    // A note is worth keeping when the area comes back in; an empty record is not.
+    if (!e.out && !e.note) delete t.elementScope[elementId];
+    else t.elementScope[elementId] = e;
+    if (!Object.keys(t.elementScope).length) delete t.elementScope;
+    emit("targets-changed", state.engagement.targets);
+    return true;
+  }
+  function setElementScopeNote(targetId, elementId, note) {
+    if (!supportsElementScoping()) return false;
+    var t = findTarget(targetId);
+    if (!t) return false;
+    if (!t.elementScope) t.elementScope = {};
+    var e = t.elementScope[elementId] || { out: false };
+    e.note = String(note || "");
+    t.elementScope[elementId] = e;
+    emit("targets-changed", state.engagement.targets);
+    return true;
+  }
+  function getOutOfScopeElements(targetId) {
+    var ML = window.App.ScoringProgramML;
+    var map = ML ? ML.outOfScopeMap(state.instrument, findTarget(targetId)) : {};
+    return Object.keys(map);
   }
 
   // nis2-conformance selectors.
@@ -2136,6 +2187,12 @@ window.App.Engine = (function () {
     getMLTargetOverlay: getMLTargetOverlay,
     isMLTargetOverlayEnabled: isMLTargetOverlayEnabled,
     getMLThemeName: getMLThemeName,
+    supportsElementScoping: supportsElementScoping,
+    isElementInScope: isElementInScope,
+    getElementScopeNote: getElementScopeNote,
+    setElementInScope: setElementInScope,
+    setElementScopeNote: setElementScopeNote,
+    getOutOfScopeElements: getOutOfScopeElements,
     // NIS2
     getNIS2Categories: getNIS2Categories,
     getNIS2ItemsByCategory: getNIS2ItemsByCategory,

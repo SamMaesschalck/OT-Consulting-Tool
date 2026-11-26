@@ -6,7 +6,7 @@
   The automatic checks (modules/report-review/js/checks.js, loaded here from its
   own module) run on real packs built from every demo. Each check gets one
   positive and one clean negative on real demo data, and every check runs over all
-  20 demos, with what it flags printed in the page ("flagged ...") so that false
+  21 demos, with what it flags printed in the page ("flagged ...") so that false
   alarms are read and argued with, not assumed away. The pinned counts at the end
   of the page are there because a false alarm costs trust: a new flag on a demo is
   a change to look at.
@@ -221,10 +221,10 @@ H.test(function (ok, done) {
     var fp2 = clone(packs["iec-62443-3-3"]);
     ok(fp2.documents.length === 1 && fp2.facts.perTarget.length === 3 && of(RK.run(fp2, {}), "figures").length === 0, "a document covering several zones has no single fact to compare, so it is left alone");
 
-    ok.note("totals across the 20 demos: " + JSON.stringify(flagged));
+    ok.note("totals across the 21 demos: " + JSON.stringify(flagged));
     // The standing rule: no deliverable describes the software. Every demo
     // reads clean, so anything flagged here is a new sentence to rewrite.
-    ok(flagged["internal-wording"] === 0, "internal wording: none in any of the 20 demos' Word reports", String(flagged["internal-wording"]));
+    ok(flagged["internal-wording"] === 0, "internal wording: none in any of the 21 demos' Word reports", String(flagged["internal-wording"]));
     // The risk checks read only the risk tool's packs (test-risk-checks.html).
     ok(flagged["risk-no-disposition"] === 0 && flagged["risk-slt-justification"] === 0, "the risk checks raise nothing on an assessment demo");
     function textOf(id) { return packs[id].documents.map(function (d) { return A.DocxBlocks.flatten(d.blocks).map(function (b) { return b.text; }).join("\n"); }).join("\n"); }

@@ -1,0 +1,2473 @@
+{
+    "id":  "iec-62443-2-4",
+    "title":  "ISA/IEC 62443-2-4:2023 Service Provider Security Program Assessment",
+    "display":  {
+                    "standardRef":  "ISA/IEC 62443-2-4:2023",
+                    "elementNoun":  "functional area",
+                    "elementNounTitle":  "Functional area",
+                    "elementNounPlural":  "functional areas",
+                    "requirementNoun":  "requirement",
+                    "programmeNoun":  "service provider security program",
+                    "programmeTitle":  "Service provider security program",
+                    "elementShort":  "functional area",
+                    "elementShortPlural":  "functional areas",
+                    "elementSheet":  "By area",
+                    "targetSource":  "the contract with the asset owner"
+                },
+    "framework":  "ISA/IEC 62443-2-4",
+    "edition":  "2.0 (2023)",
+    "family":  "iec-62443",
+    "contentVersion":  "1.0.0",
+    "scoringFamily":  "program-maturity-ml",
+    "scoringProfileRef":  "program-maturity-ml",
+    "targetDimension":  "service-provider",
+    "targetDimensionLabel":  "Service provider",
+    "targetDimensionLabelPlural":  "Service providers",
+    "status":  "active",
+    "elementScoping":  true,
+    "framing":  "ISA/IEC 62443-2-4:2023 sets out the security processes a service provider can offer an asset owner when it integrates or maintains the asset owner\u0027s automation solution. Together those processes make up the provider\u0027s security program. The requirements fall into twelve functional areas. Each is a base requirement or an enhancement of one, and each is placed at its own maturity level, ML1 to ML4, on the same maturity model as 62443-2-1:2024 and 62443-4-1. The asset owner usually decides in the contract which requirements apply to the service, and a functional area the contract does not cover is left out of the assessment.",
+    "sourceNote":  "Functional area structure, requirement identifiers and the maturity model are taken from ISA/IEC 62443-2-4:2023 (Edition 2.0), held under licence. Titles, hints, rationales, evidence prompts and ML anchors are written in our own words, and no text from the standard is reproduced. IEC does not certify conformity, so the result is a gap and maturity profile, not a certification. Source: ISA/IEC 62443-2-4:2023 (copyright IEC).",
+    "maturityNote":  "Reuses the program-maturity-ml scoring family. 62443-2-4 uses the same four maturity levels as 62443-2-1:2024, with one difference of meaning at ML3: a process counts as practised once the provider has delivered it to an asset owner at least once.",
+    "maturityModel":  {
+                          "basis":  "CMMI-SVC; MLs apply independently per base requirement and per enhancement; documentation required from ML2 upward",
+                          "levels":  [
+                                         {
+                                             "id":  "ML1",
+                                             "name":  "Initial",
+                                             "anchor":  "Process is performed but ad hoc and often undocumented or not fully documented; consistency over time is hard to demonstrate.",
+                                             "shortAnchor":  "Performed but ad hoc, not (fully) documented.",
+                                             "readAs":  "ad hoc",
+                                             "glossary":  "Done ad hoc, if at all. It depends on individuals rather than on a process."
+                                         },
+                                         {
+                                             "id":  "ML2",
+                                             "name":  "Managed",
+                                             "anchor":  "Documentation exists describing how to manage and perform the capability (written procedures or training); practices are repeatable and managed to documented plans. Documentation begins at ML2.",
+                                             "shortAnchor":  "Documented procedures/training; repeatable, managed to plan.",
+                                             "readAs":  "documented and repeatable; documentation begins at ML2",
+                                             "glossary":  "Documented and repeatable. Documentation begins here."
+                                         },
+                                         {
+                                             "id":  "ML3",
+                                             "name":  "Defined / Practiced",
+                                             "anchor":  "An ML2 process that the provider has used to deliver the service to an asset owner at least once, and whose delivery can be shown to repeat across the provider\u0027s organisation, tailored to each contract.",
+                                             "shortAnchor":  "Documented process delivered for an asset owner at least once, repeatable across the organisation.",
+                                             "readAs":  "delivered for an asset owner at least once, and repeatable across the organisation",
+                                             "glossary":  "Used to deliver the service to an asset owner at least once, and shown to repeat across the organisation."
+                                         },
+                                         {
+                                             "id":  "ML4",
+                                             "name":  "Improving",
+                                             "anchor":  "Using process metrics, effectiveness or performance improvement of the process is demonstrated; the program improves the process through technological, procedural or management changes.",
+                                             "shortAnchor":  "Measured with metrics; process is improved over time.",
+                                             "readAs":  "metrics-driven improvement",
+                                             "glossary":  "Measured, and improved on the basis of what the measurements show."
+                                         }
+                                     ],
+                          "_display":  "Show these full definitions ONCE in a help/reference panel, not inline on every requirement. The per-requirement selector uses achievedScale.ordered[].short labels only. \u0027readAs\u0027 and \u0027glossary\u0027 are the report\u0027s wording for each level."
+                      },
+    "themeNames":  {
+                       "ORG":  "Organizational security measures",
+                       "CM":  "Configuration management",
+                       "NET":  "Network and communications security",
+                       "COMP":  "Component security",
+                       "DATA":  "Data security",
+                       "USER":  "User access control",
+                       "EVENT":  "Event and incident management",
+                       "AVAIL":  "System integrity and availability"
+                   },
+    "elements":  [
+                     {
+                         "id":  "SP01",
+                         "name":  "Solution staffing",
+                         "summary":  "How the provider vets, briefs and binds the people it puts on the asset owner\u0027s automation solution, subcontractors included, and who leads on security."
+                     },
+                     {
+                         "id":  "SP02",
+                         "name":  "Assurance",
+                         "summary":  "How the provider shows the asset owner that the solution is secure enough: evidence for components, safe use of scanning tools and a hardening guide that is followed."
+                     },
+                     {
+                         "id":  "SP03",
+                         "name":  "Architecture",
+                         "summary":  "How the provider designs, hardens and protects the solution, from risk assessment and network segmentation to device administration and protection of sensitive data."
+                     },
+                     {
+                         "id":  "SP04",
+                         "name":  "Wireless",
+                         "summary":  "How the provider documents, secures and controls any wireless networks that form part of the solution."
+                     },
+                     {
+                         "id":  "SP05",
+                         "name":  "SIS",
+                         "summary":  "How the provider keeps the safety instrumented system protected from other systems and from unauthorised change, including control of its configuration mode."
+                     },
+                     {
+                         "id":  "SP06",
+                         "name":  "Configuration management",
+                         "summary":  "How the provider keeps drawings, as-built records, the asset register and device settings accurate and checked."
+                     },
+                     {
+                         "id":  "SP07",
+                         "name":  "Remote access",
+                         "summary":  "How the provider\u0027s remote access to the solution is declared, approved per session, protected and limited to accepted tools."
+                     },
+                     {
+                         "id":  "SP08",
+                         "name":  "Event management",
+                         "summary":  "How the provider sets up detection, logging and reporting of security events, incidents and process alarms on the solution."
+                     },
+                     {
+                         "id":  "SP09",
+                         "name":  "Account management",
+                         "summary":  "How the provider administers accounts and passwords on the solution, from unique and default accounts to removal and password rules."
+                     },
+                     {
+                         "id":  "SP10",
+                         "name":  "Malware protection",
+                         "summary":  "How the provider installs, maintains and proves anti-malware protection, and keeps supplied equipment and portable media clean."
+                     },
+                     {
+                         "id":  "SP11",
+                         "name":  "Patch management",
+                         "summary":  "How the provider qualifies, reports on, sources and installs patches, with the asset owner approving each one."
+                     },
+                     {
+                         "id":  "SP12",
+                         "name":  "Backup/Restore",
+                         "summary":  "How the provider backs up and restores the solution, documents and verifies the process, and supports disaster recovery."
+                     }
+                 ],
+    "requirements":  [
+                         {
+                             "id":  "SP.01.01-BR",
+                             "code":  "SP.01.01 BR",
+                             "elementId":  "SP01",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Staff briefed on 62443-2-4 duties",
+                             "hint":  "The provider can show that its own staff on the automation solution have been told which 62443-2-4 requirements the asset owner has asked for, and that they work to them.",
+                             "rationale":  "Many incidents start with an engineer who did not know a rule existed, such as plugging in a personal USB stick. Briefed staff are less likely to weaken the system by accident.",
+                             "evidencePrompt":  "Ask for the briefing or training material, attendance or acknowledgement records for staff on this job, and how new joiners are briefed before they start.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.01-RE1",
+                             "code":  "SP.01.01 RE(1)",
+                             "elementId":  "SP01",
+                             "kind":  "RE",
+                             "parentId":  "SP.01.01-BR",
+                             "theme":  "ORG",
+                             "title":  "Subcontractors briefed on 62443-2-4 duties",
+                             "hint":  "The provider can show that subcontractors, consultants and representatives it puts on the job have been briefed on the asset owner\u0027s chosen 62443-2-4 requirements and work to them.",
+                             "rationale":  "Third parties often know the least about a site. Briefing them to the same standard as direct staff stops the owner inheriting a weaker link through the supply chain.",
+                             "evidencePrompt":  "Ask for the briefing pack issued to subcontractors and consultants, signed acknowledgements, and the contract clauses that pass these duties down.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.02-BR",
+                             "code":  "SP.01.02 BR",
+                             "elementId":  "SP01",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Staff briefed on owner\u0027s site security rules",
+                             "hint":  "The provider can show that everyone it assigns, including subcontractors and consultants, knows and follows the asset owner\u0027s own security policies and procedures on top of 62443-2-4.",
+                             "rationale":  "Each site has its own rules, for example on shared maintenance accounts. People who have not been told them can break them without meaning to, and the owner carries the consequences.",
+                             "evidencePrompt":  "Ask how the owner\u0027s site rules reach each person before they start, for example induction records, read-and-sign sheets or site-specific briefing notes.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.02-RE1",
+                             "code":  "SP.01.02 RE(1)",
+                             "elementId":  "SP01",
+                             "kind":  "RE",
+                             "parentId":  "SP.01.02-BR",
+                             "theme":  "ORG",
+                             "title":  "Staff follow owner\u0027s MoC and permit to work",
+                             "hint":  "The provider can show that its people, subcontractors and consultants know and follow the asset owner\u0027s management of change and permit to work processes for control equipment and its connections.",
+                             "rationale":  "Changes to controllers, workstations and servers made outside the owner\u0027s change process are hard to trace and can open unauthorised routes into the system.",
+                             "evidencePrompt":  "Ask for completed MoC and permit to work records raised by provider staff on recent jobs, and how staff are briefed on the owner\u0027s change process.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.03-BR",
+                             "code":  "SP.01.03 BR",
+                             "elementId":  "SP01",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Staff bound to protect owner data",
+                             "hint":  "The provider can show that its staff on the automation solution have been told about, and comply with, the policies and contract terms (such as an NDA) that keep the asset owner\u0027s data confidential.",
+                             "rationale":  "Owner data such as recipes, drawings and network details can leak through simple carelessness, like a printout left on a desk. Staff need to know what is confidential and how to handle it.",
+                             "evidencePrompt":  "Ask for the NDA or confidentiality terms in place, how staff are told about them, and any signed acknowledgements for people on this job.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.03-RE1",
+                             "code":  "SP.01.03 RE(1)",
+                             "elementId":  "SP01",
+                             "kind":  "RE",
+                             "parentId":  "SP.01.03-BR",
+                             "theme":  "ORG",
+                             "title":  "Subcontractors bound to protect owner data",
+                             "hint":  "The provider can show that subcontractors, consultants and representatives it assigns have been told about, and comply with, the rules for keeping the asset owner\u0027s data confidential.",
+                             "rationale":  "Confidential owner data often passes to third parties during a project. Without matching obligations on them, the owner\u0027s protection stops at the provider\u0027s own staff.",
+                             "evidencePrompt":  "Ask for the NDAs or flow-down clauses with subcontractors and consultants, and how those people are told what data is confidential.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.04-BR",
+                             "code":  "SP.01.04 BR",
+                             "elementId":  "SP01",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Only background-checked staff assigned",
+                             "hint":  "The provider can show that staff it assigns to the automation solution have passed security background checks, where these are practical and lawful in the country concerned.",
+                             "rationale":  "A check cannot prove someone is trustworthy, but it can flag a known history of concern before that person is given access to control systems.",
+                             "evidencePrompt":  "Ask for the vetting policy, what checks it covers (for example identity and criminal record), how often they are repeated, and the check records for staff on this job. Note any country where checks are not possible.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.04-RE1",
+                             "code":  "SP.01.04 RE(1)",
+                             "elementId":  "SP01",
+                             "kind":  "RE",
+                             "parentId":  "SP.01.04-BR",
+                             "theme":  "ORG",
+                             "title":  "Only background-checked subcontractors assigned",
+                             "hint":  "The provider can show that subcontractors, consultants and representatives it assigns have passed security background checks, where practical and allowed by local law.",
+                             "rationale":  "Third-party staff often get the same access as the provider\u0027s own people, so the owner needs the same assurance about them before they reach the system.",
+                             "evidencePrompt":  "Ask how the provider confirms vetting for subcontractor staff, for example contract clauses, supplier attestations or check results, and how gaps are handled.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.05-BR",
+                             "code":  "SP.01.05 BR",
+                             "elementId":  "SP01",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Named security contact for the solution",
+                             "hint":  "The provider can name one accountable security contact for the automation solution who liaises with the owner, checks tenders against the agreed requirements and reports any deviations.",
+                             "rationale":  "A single named contact gives the owner one place to raise security questions and to agree how deviations, including gaps against 62443-3-3, will be handled or compensated.",
+                             "evidencePrompt":  "Ask who the named contact is, their written role description, and examples of deviations or tender issues they have raised with the owner.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.06-BR",
+                             "code":  "SP.01.06 BR",
+                             "elementId":  "SP01",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Qualified security lead assigned",
+                             "hint":  "The provider can show documented minimum security qualifications for its security lead role, and that the lead assigned to this automation solution meets them.",
+                             "rationale":  "Weak security decisions, or poor delivery of sound ones, leave the system exposed. A lead with proven OT security experience lowers that chance.",
+                             "evidencePrompt":  "Ask for the qualification criteria for the role (experience, training, certifications), the assigned lead\u0027s CV or records against them, and whether the owner agreed the criteria.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.01.07-BR",
+                             "code":  "SP.01.07 BR",
+                             "elementId":  "SP01",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Owner told about staff changes",
+                             "hint":  "The provider can notify the asset owner when its staff, subcontractors or consultants with access to the automation solution join, leave or change role.",
+                             "rationale":  "The owner can only revoke badges, accounts and access lists for people it knows have gone. Late notice leaves live access with people who no longer need it.",
+                             "evidencePrompt":  "Ask for the agreed notification timescale and scope, and records of recent leaver or role-change notices sent to the owner.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.02.01-BR",
+                             "code":  "SP.02.01 BR",
+                             "elementId":  "SP02",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Evidence that components are secure enough",
+                             "hint":  "The provider can give the asset owner documents showing that the components it is responsible for have security that matches the risk they carry.",
+                             "rationale":  "The owner needs grounds to trust each component beyond the vendor\u0027s word. Test results, certifications or assessments show whether the protection fits the risk.",
+                             "evidencePrompt":  "Deliverable: component security verification records, such as certificates (for example 62443-4-2), penetration, fuzz or robustness test reports, or assessment results for each component in scope.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.02.02-BR",
+                             "code":  "SP.02.02 BR",
+                             "elementId":  "SP02",
+                             "kind":  "BR",
+                             "theme":  "EVENT",
+                             "title":  "Recommended security tools and safe use",
+                             "hint":  "The provider can recommend security analysis tools, such as network scanners, for the automation solution, and explain why to use them, how to use them and how to avoid side effects.",
+                             "rationale":  "Scanning can find rogue devices and open ports, but a careless scan can upset a live control network. The owner needs to know the risks and how to limit them before anyone runs a tool.",
+                             "evidencePrompt":  "Deliverable: a tool guide listing the recommended security analysis tools, their purpose, usage instructions, known effects on performance and the settings or timing that avoid them.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.02.02-RE1",
+                             "code":  "SP.02.02 RE(1)",
+                             "elementId":  "SP02",
+                             "kind":  "RE",
+                             "parentId":  "SP.02.02-BR",
+                             "theme":  "EVENT",
+                             "title":  "Owner approval before running scans",
+                             "hint":  "The provider can obtain the asset owner\u0027s approval before running network scans or any other security analysis tool at the owner\u0027s site.",
+                             "rationale":  "Even a well-configured scan can affect a running system. Approval lets the owner pick the timing and accept the risk before the scan runs.",
+                             "evidencePrompt":  "Ask for the approval procedure and recent approval records, such as permits or signed requests, for scans run on the owner\u0027s site.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.02.02-RE2",
+                             "code":  "SP.02.02 RE(2)",
+                             "elementId":  "SP02",
+                             "kind":  "RE",
+                             "parentId":  "SP.02.02-BR",
+                             "theme":  "EVENT",
+                             "title":  "Scheduled scans for unknown devices and weaknesses",
+                             "hint":  "The provider can plan and run security analysis tools to find unrecorded or unauthorised systems and vulnerabilities, following the asset owner\u0027s operating procedures.",
+                             "rationale":  "Unknown devices and unexpected open ports are common ways in. Regular scans, for example just before handover or on an agreed maintenance cycle, find them without disrupting production.",
+                             "evidencePrompt":  "Ask for the scan schedule, recent scan reports covering wired and wireless segments, and how findings were followed up.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.02.02-RE3",
+                             "code":  "SP.02.02 RE(3)",
+                             "elementId":  "SP02",
+                             "kind":  "RE",
+                             "parentId":  "SP.02.02-BR",
+                             "theme":  "AVAIL",
+                             "title":  "System proven to tolerate network scans",
+                             "hint":  "The provider can demonstrate that the control system components in the automation solution keep their essential functions running while being scanned during normal operation.",
+                             "rationale":  "If a scan can stall a controller, the owner cannot safely check its own network. Proof of tolerance lets the owner scan as a routine task without putting production at risk.",
+                             "evidencePrompt":  "Deliverable: test evidence that essential control functions carried on under system or network scans, for example robustness or scan-tolerance test reports referencing 62443-3-3.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.02.03-BR",
+                             "code":  "SP.02.03 BR",
+                             "elementId":  "SP02",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Hardening guide for the solution",
+                             "hint":  "The provider can give the asset owner a guide describing how to harden the automation solution, covering architecture, configuration settings and the addition of new components.",
+                             "rationale":  "The owner needs to know which settings and design choices protect the system, so it can govern it and connect it to other networks without undoing them.",
+                             "evidencePrompt":  "Deliverable: a hardening guide for the automation solution covering, for example, firewall placement and rules, security settings, verification steps and installing new components, with any supplier guides referenced.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.02.03-RE1",
+                             "code":  "SP.02.03 RE(1)",
+                             "elementId":  "SP02",
+                             "kind":  "RE",
+                             "parentId":  "SP.02.03-BR",
+                             "theme":  "COMP",
+                             "title":  "Hardening guide followed during work",
+                             "hint":  "The provider can show that its staff and subcontractors follow its hardening guidelines and procedures whenever they work on the automation solution.",
+                             "rationale":  "Checks during build and maintenance catch hardening settings that were missed or undone before they turn into weak points.",
+                             "evidencePrompt":  "Ask for completed hardening checklists, FAT and SAT records or maintenance reports showing hardening was checked, and how deviations were handled.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.01-BR",
+                             "code":  "SP.03.01 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "Perform or support a security risk assessment",
+                             "hint":  "The provider can carry out a security risk assessment of the automation solution, or take an active part in one led by the asset owner or someone acting for it.",
+                             "rationale":  "Risk assessment is the basis for security design choices and later remediation. The asset owner needs a provider that can either run one or bring detailed knowledge of the system to one.",
+                             "evidencePrompt":  "Ask for the risk assessment method, a recent example (redacted if needed) and the names of the people qualified to run or contribute to one.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.01-RE1",
+                             "code":  "SP.03.01 RE(1)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.01-BR",
+                             "theme":  "ORG",
+                             "title":  "Report risk findings and mitigations",
+                             "hint":  "The provider can tell the asset owner what its risk assessments of the automation solution found, with the mitigation measures and procedures it recommends for each issue.",
+                             "rationale":  "Reporting each issue with a proposed fix lets the asset owner decide what to treat and plan the budget for it.",
+                             "evidencePrompt":  "Ask for a sample risk assessment report or findings summary given to an asset owner, showing the issues found and the mitigations proposed.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.01-RE2",
+                             "code":  "SP.03.01 RE(2)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.01-BR",
+                             "theme":  "ORG",
+                             "title":  "Independent security review of the control system",
+                             "hint":  "The provider can show that the control system in the automation solution has had an architecture review, security assessment or threat analysis by an independent party the asset owner accepts.",
+                             "rationale":  "An outside review gives the asset owner more confidence than the supplier\u0027s own claims. It is usually done on the control system product and arranged by its supplier or by the provider.",
+                             "evidencePrompt":  "Ask for the independent review or assessment report (or certificate), who carried it out, its scope and date, and how the asset owner agreed the reviewer was acceptable.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.02-BR",
+                             "code":  "SP.03.02 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Build the network to the approved design",
+                             "hint":  "The provider can implement the communication architecture, including firewalls or equivalent security devices, as set out in the automation solution design the asset owner approved.",
+                             "rationale":  "Segmentation only protects the system if what is installed matches what was designed and agreed. Design records also need updating as the build changes so they stay accurate.",
+                             "evidencePrompt":  "Ask for the approved network design, the as-built drawings, and records (such as FAT/SAT checks or firewall rule reviews) showing the installed segmentation matches the design.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.02-RE1",
+                             "code":  "SP.03.02 RE(1)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.02-BR",
+                             "theme":  "NET",
+                             "title":  "Map segments and mark interfaces trusted or not",
+                             "hint":  "The provider can list and record every communication segment of the automation solution, wireless and SIS segments included, and label each interface between segments as trusted or untrusted.",
+                             "rationale":  "The asset owner cannot protect boundaries nobody has found. A segment map with a trust label on each interface shows where controls are needed, such as BPCS to SIS or links out to historians.",
+                             "evidencePrompt":  "Ask for the segment inventory or zone and conduit drawing showing every interface, the segments it joins, any external access points and whether it is designated trusted or untrusted.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.02-RE2",
+                             "code":  "SP.03.02 RE(2)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.02-BR",
+                             "theme":  "NET",
+                             "title":  "Protect untrusted interfaces",
+                             "hint":  "The provider can put a network security device or equivalent on every interface marked untrusted, and record how each is protected, including the policies and rules applied.",
+                             "rationale":  "Untrusted interfaces are the obvious ways in, including the link between the control network and the site network. Written rule sets let the asset owner maintain them after handover.",
+                             "evidencePrompt":  "Ask for the firewall or security device rule sets for each untrusted interface, the written policy behind them, and the handover record if the asset owner now maintains them.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.03-BR",
+                             "code":  "SP.03.03 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "EVENT",
+                             "title":  "Manage vulnerabilities in the solution",
+                             "hint":  "The provider can identify, assess, address and disclose vulnerabilities affecting the automation solution and its procedures, both new ones found in its own scope and those already made public.",
+                             "rationale":  "New weaknesses appear throughout the life of a system. The asset owner relies on the provider to spot those in the parts it is responsible for and to propose fixes or remediation plans.",
+                             "evidencePrompt":  "Ask for the vulnerability handling procedure, the sources monitored (supplier advisories, feeds), and a recent example showing assessment, recommended action and notice to the asset owner.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.03-RE1",
+                             "code":  "SP.03.03 RE(1)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.03-BR",
+                             "theme":  "NET",
+                             "title":  "Document known protocol weaknesses and mitigations",
+                             "hint":  "The provider can give the asset owner a document describing the weaknesses already known in the communication protocols the automation solution uses, and how to mitigate each one.",
+                             "rationale":  "Many industrial protocols lack encryption or authentication by design. Knowing this up front lets the asset owner add compensating measures, such as port lockdown or physical protection of links.",
+                             "evidencePrompt":  "Deliverable: a protocol weaknesses and mitigations document for the automation solution. Ask to see it, or a sample from another project, and check it covers each protocol in use.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.04-BR",
+                             "code":  "SP.03.04 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Secure, accurate time synchronisation",
+                             "hint":  "The provider can connect the automation solution to a secure, accurate time source, using a time protocol recognised in both IT security and industrial automation, whoever supplies the source.",
+                             "rationale":  "Event logs only help an investigation if their timestamps can be trusted and lined up across devices. A tampered or drifting clock undermines forensic work.",
+                             "evidencePrompt":  "Ask how the time source is connected and protected, which protocol is used (for example IEC 61588 PTP or authenticated NTP), and the time settings on a sample of devices.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.05-BR",
+                             "code":  "SP.03.05 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Enable only needed functions",
+                             "hint":  "The provider can disable unneeded software, services, ports, USB and wireless functions unless approved, allow only authorised network addresses, lock unused switch and configuration ports, and keep these settings in place.",
+                             "rationale":  "Every unused service, port or interface is another way in. Cutting them back, and checking that maintenance does not re-enable them, shrinks what an attacker can reach.",
+                             "evidencePrompt":  "Ask for hardening checklists, port and service listings, network scan results showing only authorised addresses, switch port settings, and how hardening is rechecked after maintenance.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.05-RE1",
+                             "code":  "SP.03.05 RE(1)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.05-BR",
+                             "theme":  "COMP",
+                             "title":  "Only authorised CA certificates installed",
+                             "hint":  "The provider can check that only needed, documented CA certificates approved by the asset owner, self-signing ones included, are installed, and remove the rest.",
+                             "rationale":  "Operating systems install a broad set of default CA certificates. Leaving them in place lets software the asset owner never wanted be trusted on control system hosts.",
+                             "evidencePrompt":  "Ask for the approved certificate list, a certificate store export from a sample host compared against it, and the procedure for removing default CA certificates after installs and upgrades.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.06-BR",
+                             "code":  "SP.03.06 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Workstation session lock",
+                             "hint":  "The provider can turn on session locking for the workstations it is responsible for, as the asset owner requires, hiding the screen and blocking input until the user or an administrator unlocks it.",
+                             "rationale":  "Unattended workstations, particularly those used to manage network devices or wireless, can be read or used by anyone passing. A lock stops casual misuse and exposure of what is on screen.",
+                             "evidencePrompt":  "Ask for the lock settings (timeout, unlock method) applied by policy or build standard, the list of workstations covered, and a demonstration on a sample machine.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.07-BR",
+                             "code":  "SP.03.07 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Engineering devices cannot bypass controls",
+                             "hint":  "The provider can install and set up wired and wireless engineering workstations and handhelds so they cannot get round the automation solution\u0027s access controls or its security devices at the Level 3 boundary.",
+                             "rationale":  "A laptop or handheld connected straight to field devices can sidestep every check on the normal path. Removing such direct routes keeps engineering work inside the system\u0027s access controls.",
+                             "evidencePrompt":  "Ask how engineering and handheld devices connect to control and instrumentation devices, for network drawings showing no direct paths around access controls, and for their configuration records.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.07-RE1",
+                             "code":  "SP.03.07 RE(1)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.07-BR",
+                             "theme":  "USER",
+                             "title":  "Multi-factor login on workstations",
+                             "hint":  "The provider can set up multi-factor authentication on the automation solution workstations it is responsible for, where the asset owner requires it, including supplying any tokens or readers needed.",
+                             "rationale":  "A password alone is weak on machines in open or unattended areas. A second factor, such as a smart card, makes stolen or guessed credentials far less useful to an intruder.",
+                             "evidencePrompt":  "Ask for the multi-factor design, the workstations it covers, the factors used, and a demonstration of a login on a sample workstation.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.08-BR",
+                             "code":  "SP.03.08 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Least privilege for network device administration",
+                             "hint":  "The provider can set up administration of the network devices it is responsible for so each administrator gets only the access and privileges their task needs.",
+                             "rationale":  "Switches, routers and firewalls are frequent targets and hold the segmentation together. Limiting admin rights reduces the damage a misused or compromised account can do.",
+                             "evidencePrompt":  "Ask for the network device admin account list, the privilege levels assigned, and the device configuration showing restricted rights for each account or role.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.08-RE1",
+                             "code":  "SP.03.08 RE(1)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.08-BR",
+                             "theme":  "USER",
+                             "title":  "Access control on network devices",
+                             "hint":  "The provider can configure access controls on network devices, wireless ones included, to the scheme the asset owner requires, such as role-based access with separate roles where needed.",
+                             "rationale":  "Where the asset owner splits network administration across several roles, the devices have to enforce that split. Otherwise everyone with access ends up with full rights.",
+                             "evidencePrompt":  "Ask for the access control scheme agreed with the asset owner, the roles configured on sample switches, routers and access points, and their access lists.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.08-RE2",
+                             "code":  "SP.03.08 RE(2)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.08-BR",
+                             "theme":  "DATA",
+                             "title":  "Protect network device admin data",
+                             "hint":  "The provider can protect the confidentiality and integrity of sensitive data used to administer communication devices, such as passwords and configuration, both stored on the device and in transit.",
+                             "rationale":  "Stolen or altered device credentials and configuration hand an attacker control of the network. Encryption on the device and on management links keeps that data out of reach.",
+                             "evidencePrompt":  "Ask how admin credentials and configuration are protected (encrypted storage, SSH or TLS for management) and for the summary given to the asset owner when requested.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.08-RE3",
+                             "code":  "SP.03.08 RE(3)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.08-BR",
+                             "theme":  "USER",
+                             "title":  "Mutual authentication for device administration",
+                             "hint":  "The provider can configure communication devices so the administrator and the device each prove their identity before an admin session starts, where the asset owner requires it.",
+                             "rationale":  "Mutual authentication stops an attacker posing as either side. The device can reject people who are not authorised and the administrator knows the device is genuine.",
+                             "evidencePrompt":  "Ask which method is used (certificates, challenge and response, Kerberos), the device settings that enable it, and a demonstration of an admin session.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.09-BR",
+                             "code":  "SP.03.09 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "DATA",
+                             "title":  "Only valid, authorised control actions and flows",
+                             "hint":  "The provider can make sure control actions and data flows, configuration changes included, are valid, started or approved by an authorised user, and sent over an approved path in the approved direction.",
+                             "rationale":  "Controllers should not act on commands that are out of range, from the wrong person or arriving by an unexpected route. Checking all three guards against both mistakes and malicious writes.",
+                             "evidencePrompt":  "Ask for the configured limits on setpoint writes, the list of connections and ports allowed to send commands, the permission model, and any dual approval used for high-impact actions.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.10-BR",
+                             "code":  "SP.03.10 BR",
+                             "elementId":  "SP03",
+                             "kind":  "BR",
+                             "theme":  "DATA",
+                             "title":  "Identify data that needs protecting",
+                             "hint":  "The provider can identify and record where data needing protection is stored and how it flows in the automation solution, with what it needs in terms of confidentiality, integrity and availability.",
+                             "rationale":  "Passwords, certificates, recipes, logs and backups can only be protected once someone knows where they are. The asset owner sets or approves the criteria, so the provider works from those.",
+                             "evidencePrompt":  "Deliverable: a register of sensitive data storage points and data flows with their protection requirements. Check that the asset owner set or approved the criteria used.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.10-RE1",
+                             "code":  "SP.03.10 RE(1)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.10-BR",
+                             "theme":  "DATA",
+                             "title":  "Access control on sensitive data",
+                             "hint":  "The provider can configure the automation solution\u0027s access controls so the data marked as needing protection cannot be read or altered without authority, whether stored or moving.",
+                             "rationale":  "Once sensitive data has been identified, the system has to be set up to guard it. Typical measures include encryption and protection against memory dumps and sniffing.",
+                             "evidencePrompt":  "Ask how each item in the sensitive data register is protected, with configuration evidence for permissions, encryption and certificates on a sample of storage points and flows.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.10-RE2",
+                             "code":  "SP.03.10 RE(2)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.10-BR",
+                             "theme":  "DATA",
+                             "title":  "Document data retention capabilities",
+                             "hint":  "The provider can give the asset owner a description of how the automation solution stores and archives sensitive data, covering capacity, pruning and purging, and how long data is kept.",
+                             "rationale":  "Historical data and events are needed for forensics and event analysis. The asset owner must know how long they are kept and whether an external archive is needed.",
+                             "evidencePrompt":  "Deliverable: a data retention description for the automation solution. Check it states capacities, retention periods, purge behaviour and any export to a history archive.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.10-RE3",
+                             "code":  "SP.03.10 RE(3)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.10-BR",
+                             "theme":  "DATA",
+                             "title":  "Use accepted cryptography and manage keys",
+                             "hint":  "The provider can set up the components it supplies to use current, widely accepted cryptographic algorithms and management of cryptographic keys, and tell the asset owner the resulting settings when asked.",
+                             "rationale":  "Weak or home-grown cryptography gives a false sense of protection. Current, recognised algorithms with properly handled keys keep encrypted data and links trustworthy.",
+                             "evidencePrompt":  "Ask for the cryptographic settings of supplied components (algorithms, how keys are generated, stored and distributed) and the summary given to the asset owner.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.03.10-RE4",
+                             "code":  "SP.03.10 RE(4)",
+                             "elementId":  "SP03",
+                             "kind":  "RE",
+                             "parentId":  "SP.03.10-BR",
+                             "theme":  "DATA",
+                             "title":  "Wipe data from removed components",
+                             "hint":  "The provider can permanently delete or destroy all data needing protection held on any component at the point it takes that component out of the automation solution.",
+                             "rationale":  "A retired controller, disk or workstation may still hold passwords, configuration or recipes. Wiping or destroying its memory stops anyone who later gets hold of it reading that data.",
+                             "evidencePrompt":  "Ask for the sanitisation procedure, the method used for each type of media, and wipe or disposal records for recently removed components.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.04.01-BR",
+                             "code":  "SP.04.01 BR",
+                             "elementId":  "SP04",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Wireless architecture records kept current",
+                             "hint":  "The provider can keep the wireless architecture records up to date: data flows over wireless instruments and links, intruder and handheld access controls, and protection of remote wireless management.",
+                             "rationale":  "Wireless reaches past the fence line, so an out-of-date picture of what is on air and how it is guarded makes it easy to miss a way into the automation solution.",
+                             "evidencePrompt":  "Ask for current wireless architecture drawings or descriptions with revision history, showing data flows, wireless bridges and the security controls on each link, and ask what triggers an update after a change.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.04.02-BR",
+                             "code":  "SP.04.02 BR",
+                             "elementId":  "SP04",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Wireless authentication and access control",
+                             "hint":  "The provider can configure the automation solution so wireless devices and users must authenticate and access lists limit what they reach, using methods recognised in industrial security practice.",
+                             "rationale":  "Weak or home-grown wireless authentication lets anyone within radio range join the network. Recognised methods give the asset owner a known level of protection.",
+                             "evidencePrompt":  "Ask for the wireless configuration showing the authentication method (for example WPA3-Enterprise or 802.1X) and the access control lists, and the provider\u0027s procedure or standard build that sets them.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.04.02-RE1",
+                             "code":  "SP.04.02 RE(1)",
+                             "elementId":  "SP04",
+                             "kind":  "RE",
+                             "parentId":  "SP.04.02-BR",
+                             "theme":  "NET",
+                             "title":  "Wireless traffic protected in transit",
+                             "hint":  "The provider can configure wireless links, device to access point and access point to access point, to protect data in transit, using recognised cryptography where encryption is used.",
+                             "rationale":  "Radio traffic can be captured from outside the site. Protecting it stops eavesdropping on, and tampering with, process data and commands sent over the air.",
+                             "evidencePrompt":  "Ask for the wireless and backhaul configuration showing the encryption and integrity settings in use, and the provider\u0027s guidance on which ciphers and protocols it accepts.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.04.03-BR",
+                             "code":  "SP.04.03 BR",
+                             "elementId":  "SP04",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Wireless protocol conformance statement",
+                             "hint":  "The provider can give the asset owner a written statement of the wireless protocols the automation solution uses and whether each follows recognised industrial standards and local radio rules.",
+                             "rationale":  "The asset owner needs to know the wireless technology has been vetted for industrial use and is legal to operate at the site before it carries control data.",
+                             "evidencePrompt":  "Deliverable: a wireless protocol conformance statement listing each protocol in use, the industry standard it follows (for example ISA100.11a, WirelessHART or IEEE 802.11) and its compliance with local radio regulations.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.04.03-RE1",
+                             "code":  "SP.04.03 RE(1)",
+                             "elementId":  "SP04",
+                             "kind":  "RE",
+                             "parentId":  "SP.04.03-BR",
+                             "theme":  "NET",
+                             "title":  "Wireless network names reveal nothing",
+                             "hint":  "The provider can give each wireless network its own identifier that is meaningful to the site team but gives an outsider no clue to the network, its location or its owner.",
+                             "rationale":  "An SSID carrying a company or unit name tells an attacker what they are looking at and where. Where the asset owner sets the names, the provider advises on or reviews them.",
+                             "evidencePrompt":  "Ask for the list of wireless network identifiers (SSIDs and similar) with the naming convention, and any guidance or review the provider gave on names the asset owner chose.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.04.03-RE2",
+                             "code":  "SP.04.03 RE(2)",
+                             "elementId":  "SP04",
+                             "kind":  "RE",
+                             "parentId":  "SP.04.03-BR",
+                             "theme":  "NET",
+                             "title":  "Wireless addresses assigned and verified",
+                             "hint":  "The provider can set the addresses of wireless devices in the automation solution and then check that each one has been assigned as planned.",
+                             "rationale":  "Rogue or spoofed addresses, or a dynamic address service that changes them, can let an unknown device in or knock a known one off the network.",
+                             "evidencePrompt":  "Ask for the address allocation plan for wireless devices, the configuration that fixes or reserves each address, and the record of the check that assigned addresses match the plan.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.01-BR",
+                             "code":  "SP.05.01 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "ORG",
+                             "title":  "SIS communications risk reviewed",
+                             "hint":  "The provider can show the asset owner that security architecture reviews or risk assessments covering SIS communications have been carried out and that the findings have been dealt with.",
+                             "rationale":  "The SIS is the last layer of protection for people and equipment. Unresolved weaknesses in how it communicates put that layer at risk, and some fixes fall to the provider on site.",
+                             "evidencePrompt":  "Ask for the SIS communications risk assessment or architecture review, its findings, and a record of how each was mitigated, including any mitigations the SIS supplier passed to the provider.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.02-BR",
+                             "code":  "SP.05.02 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Safety traffic shielded from other traffic",
+                             "hint":  "The provider can configure the automation solution so SIS safety communications and functions are shielded from the BPCS and all other traffic, for example by physical separation or non-routable links.",
+                             "rationale":  "Traffic the SIS needs in order to act must not be slowed, flooded or altered by other systems, and the separation itself must not degrade safety performance.",
+                             "evidencePrompt":  "Ask for network drawings showing SIS and BPCS separation, firewall or gateway rules at the boundary, and evidence that the separation was tested without harming safety communications.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.03-BR",
+                             "code":  "SP.05.03 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "External traffic cannot disturb the SIS",
+                             "hint":  "The provider can configure the automation solution so traffic from outside it, remote access sessions included, has no way to interfere with how the SIS runs.",
+                             "rationale":  "Connections from business networks and remote users are where many attacks start. The SIS has to keep working whatever arrives from outside the automation solution.",
+                             "evidencePrompt":  "Ask for the boundary design and firewall rules showing that no external or remote access path reaches the SIS, with test or review records confirming it.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.04-BR",
+                             "code":  "SP.05.04 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Non-SIS applications kept out of safety traffic",
+                             "hint":  "The provider can configure the automation solution so applications outside the SIS, control system applications included, cannot take part in or disrupt the communications safety functions rely on.",
+                             "rationale":  "If a control system application can send data or commands into safety-critical traffic, a fault or compromise there can reach the safety functions.",
+                             "evidencePrompt":  "Ask for a data flow description showing what passes between SIS and non-SIS applications, the controls that stop safety-critical data or commands crossing, and how any exceptions were reviewed.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.05-BR",
+                             "code":  "SP.05.05 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "SIS engineering stations outside the SIS protected",
+                             "hint":  "The provider can protect SIS engineering workstations that sit outside the SIS from compromise by traffic from Level 3 and above, typically by passing all such traffic through a network security device.",
+                             "rationale":  "These stations can change safety logic. If a host on a wider site or business network can reach them freely, an attacker has a route towards the SIS.",
+                             "evidencePrompt":  "Ask for a network drawing showing where SIS engineering workstations sit, the firewall between Level 2 and Level 3, and its rules for traffic to those workstations.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.05-RE1",
+                             "code":  "SP.05.05 RE(1)",
+                             "elementId":  "SP05",
+                             "kind":  "RE",
+                             "parentId":  "SP.05.05-BR",
+                             "theme":  "NET",
+                             "title":  "In-SIS engineering stations closed to remote access",
+                             "hint":  "The provider can protect SIS engineering workstations inside the SIS from remote access, by not installing remote access tools, disabling them, or blocking remote sessions to them.",
+                             "rationale":  "Remote desktop or similar tools on a station that can program the SIS give an outsider a direct path to the safety logic.",
+                             "evidencePrompt":  "Ask for the software and service lists for in-SIS engineering workstations showing remote access tools absent or disabled, and firewall rules that block remote sessions to them.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.06-BR",
+                             "code":  "SP.05.06 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Controlled, authorised entry into the SIS",
+                             "hint":  "The provider can make every access to the SIS from outside it pass through, and be authorised at, the SIS interface, for example a gateway that serves only BPCS to SIS access.",
+                             "rationale":  "Fewer physical routes into the SIS means a smaller attack surface and a single place to decide who and what is let in.",
+                             "evidencePrompt":  "Ask for drawings showing the SIS interface or gateway as the only entry point, its access control configuration, and a check that no other paths exist.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.07-BR",
+                             "code":  "SP.05.07 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "SIS functions isolated from other station software",
+                             "hint":  "The provider can protect the SIS functions carried out from SIS engineering workstations against interference by any other software installed on those workstations.",
+                             "rationale":  "Unvetted tools on a safety engineering station could, by accident or design, corrupt safety-related software. Limiting and separating what runs there lowers that chance.",
+                             "evidencePrompt":  "Ask for the installed software list and hardening baseline for SIS engineering workstations, with the provider\u0027s rule for what may be installed and how safety software is kept apart.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.08-BR",
+                             "code":  "SP.05.08 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "No unauthorised wireless in safety functions",
+                             "hint":  "The provider can check that unauthorised wireless devices are not built into SIS safety functions, and that wireless is kept out of them where the asset owner forbids it.",
+                             "rationale":  "Radio is not contained by fences or cabinets, so a wireless link inside a safety function opens it to attack from anyone in range.",
+                             "evidencePrompt":  "Ask for the SIS architecture and device list showing no wireless links within safety functions, or the asset owner\u0027s approval where wireless is allowed, and the verification record.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.09-BR",
+                             "code":  "SP.05.09 BR",
+                             "elementId":  "SP05",
+                             "kind":  "BR",
+                             "theme":  "DATA",
+                             "title":  "SIS configuration mode switch",
+                             "hint":  "The provider can turn SIS configuration mode on and off for the asset owner, so that while it is off the SIS will not accept configuration changes.",
+                             "rationale":  "Keeping the SIS locked except during planned work stops accidental or malicious changes to safety logic in normal operation.",
+                             "evidencePrompt":  "Ask for the written procedure for enabling and disabling SIS configuration mode, the mechanism used (keyswitch or software lock), and records of its use during recent work.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.09-RE1",
+                             "code":  "SP.05.09 RE(1)",
+                             "elementId":  "SP05",
+                             "kind":  "RE",
+                             "parentId":  "SP.05.09-BR",
+                             "theme":  "DATA",
+                             "title":  "Keyswitch for SIS configuration mode",
+                             "hint":  "The provider can use a physical keyswitch to turn SIS configuration mode on and off, and keep it locked in the off position when no configuration work is planned.",
+                             "rationale":  "Needing someone to turn a physical key on purpose makes an unplanned or remote change to the SIS configuration much less likely.",
+                             "evidencePrompt":  "Ask to see the keyswitch on site, the procedure for operating it and the record of who holds the key.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.05.09-RE2",
+                             "code":  "SP.05.09 RE(2)",
+                             "elementId":  "SP05",
+                             "kind":  "RE",
+                             "parentId":  "SP.05.09-BR",
+                             "theme":  "DATA",
+                             "title":  "Independent test of the SIS lock",
+                             "hint":  "The provider can arrange for an independent third party to confirm that the SIS configuration cannot be changed while the keyswitch is locked in the disabled position.",
+                             "rationale":  "A test by someone outside the supplier and provider gives the asset owner extra confidence that the lock really blocks changes, whether checked before delivery or after installation.",
+                             "evidencePrompt":  "Ask for a third-party verification report on the SIS configuration lock, who commissioned it, and whether it covered the delivered product or the installed system.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.06.01-BR",
+                             "code":  "SP.06.01 BR",
+                             "elementId":  "SP06",
+                             "kind":  "BR",
+                             "theme":  "CM",
+                             "title":  "Accurate infrastructure drawings",
+                             "hint":  "The provider can supply and maintain logical and physical drawings of the automation solution showing network segments, network devices and every internal and external interface, detailed enough to identify each one.",
+                             "rationale":  "Risk assessments, change reviews and incident investigations all start from the drawings. If they are wrong, every decision based on them is weaker.",
+                             "evidencePrompt":  "Ask for current logical and physical network drawings under revision control, showing segments, devices, gateways and interface identifiers (IP or MAC addresses), and what triggers an update.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.06.01-RE1",
+                             "code":  "SP.06.01 RE(1)",
+                             "elementId":  "SP06",
+                             "kind":  "RE",
+                             "parentId":  "SP.06.01-BR",
+                             "theme":  "CM",
+                             "title":  "As-built connection and configuration records current",
+                             "hint":  "The provider can keep as-built records up to date for each installed device: what it is connected to, how, and the configuration loaded into it.",
+                             "rationale":  "When a device fails or behaves oddly, the team needs to know its address, its switch port and the exact configuration it should be running.",
+                             "evidencePrompt":  "Ask for as-built connection schedules and configuration records for a sample of devices (address, switch and port, configuration file), and compare them with what is installed.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.06.02-BR",
+                             "code":  "SP.06.02 BR",
+                             "elementId":  "SP06",
+                             "kind":  "BR",
+                             "theme":  "CM",
+                             "title":  "Asset inventory register",
+                             "hint":  "The provider can create and maintain an inventory of the devices and software it is responsible for in the automation solution, with model, version and serial numbers.",
+                             "rationale":  "Without an accurate register the asset owner cannot spot unauthorised components or tell quickly whether a newly published vulnerability affects the site.",
+                             "evidencePrompt":  "Ask for the inventory register for the provider\u0027s scope and how it is kept current, and spot check entries against installed equipment and software versions.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.06.03-BR",
+                             "code":  "SP.06.03 BR",
+                             "elementId":  "SP06",
+                             "kind":  "BR",
+                             "theme":  "CM",
+                             "title":  "Device settings checked against approved values",
+                             "hint":  "The provider can verify that wired and wireless control and instrumentation devices hold the configuration values that were approved for them.",
+                             "rationale":  "Checking settings against an approved baseline catches download errors and unauthorised changes before they affect the process.",
+                             "evidencePrompt":  "Ask for approved configuration baselines and records of verification after download or change, for example comparison reports or witnessed checks from an engineering workstation.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.07.01-BR",
+                             "code":  "SP.07.01 BR",
+                             "elementId":  "SP07",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Accepted remote access applications only",
+                             "hint":  "The provider can make sure every remote access application used in the automation solution is one recognised in industrial security practice.",
+                             "rationale":  "Obscure or unsupported remote access tools often lack basic protections and patches, and give the asset owner little assurance about who is connecting.",
+                             "evidencePrompt":  "Ask for the list of remote access applications in use, the provider\u0027s basis for accepting each one, and evidence that unapproved tools are not installed.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.07.02-BR",
+                             "code":  "SP.07.02 BR",
+                             "elementId":  "SP07",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Remote access set-up and use instructions",
+                             "hint":  "The provider can give the asset owner detailed instructions to install, configure, run and shut down the remote access applications it recommends.",
+                             "rationale":  "The asset owner must be able to set up remote access safely and to end any connection itself.",
+                             "evidencePrompt":  "Ask for the provider\u0027s remote access instructions covering installation, configuration, operation and termination, and confirm that the asset owner can end sessions without the provider.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.07.03-BR",
+                             "code":  "SP.07.03 BR",
+                             "elementId":  "SP07",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Each proposed remote connection declared",
+                             "hint":  "The provider can tell the asset owner about every remote connection it proposes, giving its purpose, the application, how it will be made and where the remote client will be.",
+                             "rationale":  "The asset owner can only approve or refuse remote access sensibly if it knows who will connect, from where and by what route.",
+                             "evidencePrompt":  "Ask for the remote connection requests or register showing, for each connection, its purpose, application, route (for example VPN over the internet) and the client\u0027s location and identity.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.07.04-BR",
+                             "code":  "SP.07.04 BR",
+                             "elementId":  "SP07",
+                             "kind":  "BR",
+                             "theme":  "NET",
+                             "title":  "Owner approval before each remote connection",
+                             "hint":  "The provider can obtain the asset owner\u0027s approval before using any remote access connection, and use only connections that have been approved.",
+                             "rationale":  "Approval keeps the asset owner in control of who reaches the automation solution and when, whether the link is user to system, system to system or by modem.",
+                             "evidencePrompt":  "Ask for approval records (permits, tickets or logs) for recent remote sessions, and match them against connection logs to show none took place without approval.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.07.04-RE1",
+                             "code":  "SP.07.04 RE(1)",
+                             "elementId":  "SP07",
+                             "kind":  "RE",
+                             "parentId":  "SP.07.04-BR",
+                             "theme":  "NET",
+                             "title":  "Remote sessions over public networks protected",
+                             "hint":  "The provider can protect its remote access connections that cross the internet or other public networks to the level the asset owner requires, for example with a VPN and client authentication.",
+                             "rationale":  "Remote support from the provider\u0027s own offices crosses networks nobody on site controls. Without protection the session can be intercepted or hijacked.",
+                             "evidencePrompt":  "Ask for the remote access architecture showing the VPN or equivalent, the authentication used for remote clients, and the asset owner\u0027s stated protection requirements.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.08.01-BR",
+                             "code":  "SP.08.01 BR",
+                             "elementId":  "SP08",
+                             "kind":  "BR",
+                             "theme":  "EVENT",
+                             "title":  "Incident detection, reporting and response",
+                             "hint":  "The provider can set up the automation solution to decide which compromises and incidents are detected, which are reported to the asset owner, and which need a response, including support to an incident team.",
+                             "rationale":  "Without agreed rules on what counts as an incident and who is told, attacks on the system can go unnoticed or unanswered, and the asset owner loses sight of its security risk.",
+                             "evidencePrompt":  "Ask for the incident handling procedure for this automation solution: the detection criteria, the reporting triggers and contacts agreed with the asset owner, and records of a recent incident or exercise taken through to closure.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.08.01-RE1",
+                             "code":  "SP.08.01 RE(1)",
+                             "elementId":  "SP08",
+                             "kind":  "RE",
+                             "parentId":  "SP.08.01-BR",
+                             "theme":  "EVENT",
+                             "title":  "Automatic reporting of detected compromises",
+                             "hint":  "The provider can configure the automation solution so that compromises it detects automatically are reported to the asset owner over a widely used, standards-based interface.",
+                             "rationale":  "If detected compromises arrive over an interface the asset owner already watches, such as a SIEM feed, they are seen and acted on whether or not they turn into a declared incident.",
+                             "evidencePrompt":  "Ask to see the configuration that forwards automatically detected compromises, the interface and format used (for example syslog to a SIEM), and a test record showing an alert reaching the asset owner.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.08.02-BR",
+                             "code":  "SP.08.02 BR",
+                             "elementId":  "SP08",
+                             "kind":  "BR",
+                             "theme":  "EVENT",
+                             "title":  "Audit logging of security events",
+                             "hint":  "The provider can configure the automation solution to record all security-related events, such as logins, logouts and account changes, in an audit log kept for as long as the asset owner requires.",
+                             "rationale":  "An audit trail shows who did what and when, supports forensic work and event correlation, and makes it hard for anyone to deny an action they took on the system.",
+                             "evidencePrompt":  "Ask for the logging configuration standard, the list of security events captured, the retention period set against the asset owner\u0027s requirement, and a sample audit log extract from a delivered system.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.08.02-RE1",
+                             "code":  "SP.08.02 RE(1)",
+                             "elementId":  "SP08",
+                             "kind":  "RE",
+                             "parentId":  "SP.08.02-BR",
+                             "theme":  "EVENT",
+                             "title":  "Security events available over standard interfaces",
+                             "hint":  "The provider can set up the automation solution so that security data and events can be collected over standard interfaces, such as SNMP, syslog or CEF, that both IT and OT tools understand.",
+                             "rationale":  "Standard interfaces let the asset owner feed events into off-the-shelf monitoring and analysis tools without bespoke integration, so that security data is collected and used.",
+                             "evidencePrompt":  "Ask which interfaces the provider configures for security event collection, how they are set up on each platform type, and evidence of events arriving at the asset owner\u0027s collector.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.08.02-RE2",
+                             "code":  "SP.08.02 RE(2)",
+                             "elementId":  "SP08",
+                             "kind":  "RE",
+                             "parentId":  "SP.08.02-BR",
+                             "theme":  "EVENT",
+                             "title":  "Security logging tested and verified",
+                             "hint":  "The provider can show the asset owner, for example by simulating events, that security-related events are written to the audit log and reported as intended.",
+                             "rationale":  "Logging that has never been tested often fails without anyone noticing. A demonstration gives the asset owner confidence that the audit trail will be there when an investigation needs it.",
+                             "evidencePrompt":  "Ask for the logging verification procedure and a completed test record, such as a FAT or SAT sheet showing simulated security events and the matching audit log entries.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.08.03-BR",
+                             "code":  "SP.08.03 BR",
+                             "elementId":  "SP08",
+                             "kind":  "BR",
+                             "theme":  "EVENT",
+                             "title":  "Logging and alerting of process events",
+                             "hint":  "The provider can configure the automation solution to log process events chosen by the asset owner, such as state, operating condition and configuration changes, and to notify operators of them.",
+                             "rationale":  "Records of setpoint and configuration changes, manual or automatic, help with forensics and can reveal tampering with the process that security logs alone would miss.",
+                             "evidencePrompt":  "Ask for the alarm and event configuration specification agreed with the asset owner, how operator notifications are set up, and a sample event journal showing configuration and state changes.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.08.03-RE1",
+                             "code":  "SP.08.03 RE(1)",
+                             "elementId":  "SP08",
+                             "kind":  "RE",
+                             "parentId":  "SP.08.03-BR",
+                             "theme":  "EVENT",
+                             "title":  "Protected reporting of alarms and events",
+                             "hint":  "The provider can configure the automation solution to send alarms, alerts and events to external systems such as a central log over a standard interface that guards them against tampering and disclosure.",
+                             "rationale":  "Alarm and event data sent off the system can be altered or read in transit. Protecting it keeps the central record trustworthy and avoids leaking process information.",
+                             "evidencePrompt":  "Ask how alarm and event forwarding is configured, which protocol and protections are used (for example authenticated, encrypted transport), and evidence of it working on a delivered system.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.08.04-BR",
+                             "code":  "SP.08.04 BR",
+                             "elementId":  "SP08",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Event storm limits documented",
+                             "hint":  "The provider can give the asset owner a written description of how well the automation solution copes when a very large number of events arrive at once, and where its limits lie.",
+                             "rationale":  "Event storms can overload controllers, networks and consoles and act as a denial of service. Knowing the limits lets the asset owner judge the risk and plan around it.",
+                             "evidencePrompt":  "Deliverable: an event storm capability statement for the automation solution. Ask how the limits were established, for example from robustness or stress test results, and when the statement was last updated.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.01-BR",
+                             "code":  "SP.09.01 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Centralised account management",
+                             "hint":  "The provider can set up a single account database, distributed or redundant if needed, for user and service accounts, managed from chosen workstations and enforced locally on each system.",
+                             "rationale":  "Managing accounts machine by machine leads to mismatches that either lock people out or leave access in place that should have gone. One central store keeps access consistent.",
+                             "evidencePrompt":  "Ask how account management is designed for multi-node systems (for example a domain or LDAP directory), who can create accounts, where they can be managed from, and how settings reach each node.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.02-BR",
+                             "code":  "SP.09.02 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Individual accounts for each user",
+                             "hint":  "The provider can create and maintain a separate account for every user of the automation solution, so that nobody has to share a login with anyone else.",
+                             "rationale":  "Shared logins hide who did what. Individual accounts let actions be traced to a person and let access be withdrawn from one user without affecting the others.",
+                             "evidencePrompt":  "Ask for the account creation procedure, the current user account list for a delivered system, and how the provider checks that no generic or shared logins are in use.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.02-RE1",
+                             "code":  "SP.09.02 RE(1)",
+                             "elementId":  "SP09",
+                             "kind":  "RE",
+                             "parentId":  "SP.09.02-BR",
+                             "theme":  "USER",
+                             "title":  "Default accounts listed with reset instructions",
+                             "hint":  "The provider can give the asset owner a list of every default user and service account installed in the automation solution, with the tools and steps to set or reset each password.",
+                             "rationale":  "Hidden accounts and passwords that cannot be changed are a common way in. A full list with reset steps lets the asset owner take control of every credential, including service logons.",
+                             "evidencePrompt":  "Deliverable: a register of default user and service accounts with password change instructions. Check it also covers the services and processes that store those passwords and must be updated with them.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.02-RE2",
+                             "code":  "SP.09.02 RE(2)",
+                             "elementId":  "SP09",
+                             "kind":  "RE",
+                             "parentId":  "SP.09.02-BR",
+                             "theme":  "USER",
+                             "title":  "Generated accounts and passwords unique",
+                             "hint":  "Where the automation solution generates accounts or passwords for individual users, other than operator and service groups, the provider can make sure each account and password is unique.",
+                             "rationale":  "If generated passwords repeat, learning one user\u0027s credentials opens other accounts. Unique values keep a single disclosure contained.",
+                             "evidencePrompt":  "Ask how accounts and passwords are generated, what check prevents duplicates, and a sample showing generated credentials for different users. Mark N/A if the system does not generate them.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.02-RE3",
+                             "code":  "SP.09.02 RE(3)",
+                             "elementId":  "SP09",
+                             "kind":  "RE",
+                             "parentId":  "SP.09.02-BR",
+                             "theme":  "USER",
+                             "title":  "Essential accounts set never to expire",
+                             "hint":  "The provider can configure service, auto-login, operator and other accounts needed for continuous operation so they do not expire or disable themselves, unless an administrator acts.",
+                             "rationale":  "An operator or service account that locks itself out can stop a process display or a running service. Keeping these accounts permanent avoids a self-inflicted loss of control.",
+                             "evidencePrompt":  "Ask for the list of accounts treated as essential, the expiry and lockout settings applied to them, and the risk assessment record that accepts non-expiring accounts.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.02-RE4",
+                             "code":  "SP.09.02 RE(4)",
+                             "elementId":  "SP09",
+                             "kind":  "RE",
+                             "parentId":  "SP.09.02-BR",
+                             "theme":  "USER",
+                             "title":  "Built-in administrator disabled or renamed",
+                             "hint":  "The provider can disable the built-in administrator account or, where that is not possible, rename it or otherwise make it hard to find and misuse.",
+                             "rationale":  "The built-in administrator is a well-known target for attackers and malware. Disabling it is safer than renaming it, because a renamed account keeps the same underlying identifier.",
+                             "evidencePrompt":  "Ask for the hardening procedure covering the built-in administrator, and evidence from a delivered system showing it disabled, or renamed with the reason it could not be disabled.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.03-BR",
+                             "code":  "SP.09.03 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Unused default accounts removed",
+                             "hint":  "The provider can remove or disable default accounts that the automation solution does not need, whether they come with the operating system, the control system or other software.",
+                             "rationale":  "Built-in accounts reappear whenever a computer is added or software is reinstalled. Left in place they give an attacker a known way in that nobody is watching.",
+                             "evidencePrompt":  "Ask for the hardening checklist covering default accounts, how it is reapplied after a rebuild or reinstall, and an account listing from a delivered node showing what was removed or disabled.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.04-BR",
+                             "code":  "SP.09.04 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Accounts removed when no longer needed",
+                             "hint":  "The provider can remove user accounts once they are no longer needed, including temporary integration or maintenance accounts and those of its staff who have left the automation solution.",
+                             "rationale":  "Leftover provider accounts are an easy route in for an attacker, and the asset owner may not know they exist. Removing them promptly keeps access limited to current need.",
+                             "evidencePrompt":  "Ask for the account removal procedure, how it links to staff leaving the project and to telling the asset owner, and records showing temporary accounts removed after recent work.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.04-RE1",
+                             "code":  "SP.09.04 RE(1)",
+                             "elementId":  "SP09",
+                             "kind":  "RE",
+                             "parentId":  "SP.09.04-BR",
+                             "theme":  "USER",
+                             "title":  "Account removal report after site work",
+                             "hint":  "After integration or maintenance work, the provider can produce a report from the audit log showing that the accounts used for that work have been removed if no longer needed.",
+                             "rationale":  "A report drawn from the audit log shows the asset owner that the provider has not left working accounts behind after a job.",
+                             "evidencePrompt":  "Ask for an example close-out report from a recent integration or maintenance visit, with the audit log entries showing the accounts used and their removal.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.05-BR",
+                             "code":  "SP.09.05 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Password complexity configurable",
+                             "hint":  "The provider can configure password policies on the automation solution to meet a widely accepted minimum complexity, and can apply a range of asset owner password policies.",
+                             "rationale":  "Complex passwords are harder to guess or crack. Being able to apply the asset owner\u0027s policy across the system avoids weak local settings left on individual nodes.",
+                             "evidencePrompt":  "Ask for the password policy settings applied to delivered systems (length, character sets) and how they are aligned with the asset owner\u0027s policy, for example through group policy.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.06-BR",
+                             "code":  "SP.09.06 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Password expiry configurable",
+                             "hint":  "The provider can configure local and system-wide (for example domain) user passwords to expire after a period set by the asset owner, and check the setting at handover and after maintenance.",
+                             "rationale":  "A password that never changes has more time to be leaked or discovered. Regular expiry limits how long a stolen password stays useful to an attacker.",
+                             "evidencePrompt":  "Ask for the expiry settings for local and domain accounts, where the period comes from in the asset owner\u0027s policy, and handover or maintenance records showing the setting was checked.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.06-RE1",
+                             "code":  "SP.09.06 RE(1)",
+                             "elementId":  "SP09",
+                             "kind":  "RE",
+                             "parentId":  "SP.09.06-BR",
+                             "theme":  "USER",
+                             "title":  "Warning before password expiry",
+                             "hint":  "The provider can configure password policies so users are prompted to change their password a set number of days before it expires, with the number chosen by the asset owner.",
+                             "rationale":  "A warning gives users time to change a password before it lapses, so operators are not locked out at a bad moment. It does not apply to passwords that never expire.",
+                             "evidencePrompt":  "Ask to see the expiry warning setting on a delivered system and the asset owner requirement it was configured to meet.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.07-BR",
+                             "code":  "SP.09.07 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Default passwords changed",
+                             "hint":  "The provider can change default passwords as the asset owner requires, typically at installation, at reinstallation and after a reset or recovery.",
+                             "rationale":  "Default passwords for many products are published or widely known. Leaving them in place gives anyone with that knowledge direct access to the system.",
+                             "evidencePrompt":  "Ask for the procedure for changing default passwords, the points at which it is applied (install, reinstall, reset, recovery), and a completed checklist from a recent job.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.08-BR",
+                             "code":  "SP.09.08 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Password reuse blocked",
+                             "hint":  "The provider can configure password policies so users cannot reuse a set number of their previous passwords, with the number chosen by the asset owner, and check that it is applied.",
+                             "rationale":  "Without a history rule, a user can change a password and switch straight back, so the change achieves nothing and an old leaked password stays valid.",
+                             "evidencePrompt":  "Ask to see the password history setting on a delivered system, the asset owner value it reflects, and how the provider verifies it after configuration.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.08-RE1",
+                             "code":  "SP.09.08 RE(1)",
+                             "elementId":  "SP09",
+                             "kind":  "RE",
+                             "parentId":  "SP.09.08-BR",
+                             "theme":  "USER",
+                             "title":  "Minimum password age enforced",
+                             "hint":  "The provider can configure password policies so a user cannot change their password again until a set number of days has passed, with the number chosen by the asset owner.",
+                             "rationale":  "A minimum age stops users cycling through several changes in a row to get back to a favourite password, which would defeat the reuse rule.",
+                             "evidencePrompt":  "Ask to see the minimum password age setting on a delivered system and the asset owner requirement behind it.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.09-BR",
+                             "code":  "SP.09.09 BR",
+                             "elementId":  "SP09",
+                             "kind":  "BR",
+                             "theme":  "USER",
+                             "title":  "Record of passwords shared with the provider",
+                             "hint":  "The provider can keep a protected, current record of accounts whose passwords the asset owner has agreed to share with it, and of who in its organisation and supply chain holds them.",
+                             "rationale":  "Unmanaged shared passwords leave the asset owner unsure who can get into the system. A protected log of holders, including subcontractors, keeps that knowledge in one place.",
+                             "evidencePrompt":  "Ask to see the shared password register, how it is protected from unauthorised reading or change, how it is kept current, and whether it lists subcontractors and consultants holding passwords.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.09.09-RE1",
+                             "code":  "SP.09.09 RE(1)",
+                             "elementId":  "SP09",
+                             "kind":  "RE",
+                             "parentId":  "SP.09.09-BR",
+                             "theme":  "USER",
+                             "title":  "Reporting shared passwords for change",
+                             "hint":  "The provider can tell the asset owner about shared passwords that are no longer needed, have been passed on or are known to be compromised, and help the asset owner change them.",
+                             "rationale":  "Passwords shared during commissioning, testing or fault finding tend to linger. Reporting them promptly, along with any suspected compromise, lets the asset owner change them before they are misused.",
+                             "evidencePrompt":  "Ask for the procedure for reporting shared or compromised passwords, examples of notifications sent to asset owners, and records of the provider supporting the password changes.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.10.01-BR",
+                             "code":  "SP.10.01 BR",
+                             "elementId":  "SP10",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Anti-malware setup instructions",
+                             "hint":  "The provider can give the asset owner written instructions for installing, configuring and updating the anti-malware tools it has tested and verified for this automation solution.",
+                             "rationale":  "Without guidance tied to a tested product, the owner may install or tune anti-malware in a way that upsets control software, or leaves gaps the provider never checked.",
+                             "evidencePrompt":  "Deliverable: anti-malware installation, configuration and update instructions for the automation solution. Ask which products were tested, on which platforms, and when the instructions were last revised.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.10.02-BR",
+                             "code":  "SP.10.02 BR",
+                             "elementId":  "SP10",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Anti-malware installed, configured and current",
+                             "hint":  "The provider can show that anti-malware on the platforms it looks after is set up to its approved, owner-agreed procedure, with definition updates loaded inside the agreed window and settings kept up to date.",
+                             "rationale":  "Anti-malware that is out of date or wrongly set gives false comfort. An agreed update window also tells the owner how long a new threat could go unchecked.",
+                             "evidencePrompt":  "Ask for installation and configuration records per platform, the agreed timeframe for loading definition updates, and update logs showing it was met. Where allowlisting is used, ask for the change history of the allowlist.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.10.02-RE1",
+                             "code":  "SP.10.02 RE(1)",
+                             "elementId":  "SP10",
+                             "kind":  "RE",
+                             "parentId":  "SP.10.02-BR",
+                             "theme":  "COMP",
+                             "title":  "Per-component anti-malware status record",
+                             "hint":  "The provider can produce and maintain a record, per component, of whether anti-malware is installed or cannot be, its current settings, the approved definition level and any other measures used to limit infection.",
+                             "rationale":  "The owner needs to see where protection is missing or weaker and what stands in for it, so that each unprotected device is a known, managed exception.",
+                             "evidencePrompt":  "Deliverable: an anti-malware status document covering each component. Check a sample of entries against the live systems, including components recorded as unable to run anti-malware and the compensating measures listed for them.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.10.03-BR",
+                             "code":  "SP.10.03 BR",
+                             "elementId":  "SP10",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Anti-malware detection tested on request",
+                             "hint":  "When the owner asks, the provider can show that the installed anti-malware spots known malware and acts on it, for example by quarantining or deleting a test file.",
+                             "rationale":  "A test on demand confirms the protection is active and set to act. It cannot prove cover against malware nobody has seen yet.",
+                             "evidencePrompt":  "Ask for the test method used (such as an EICAR test file, an IDS/IPS check or an allowlisting test), records of tests run at the owner\u0027s request, and the result seen on each platform tested.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.10.04-BR",
+                             "code":  "SP.10.04 BR",
+                             "elementId":  "SP10",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Definition file approval and status reporting",
+                             "hint":  "The provider can describe how new malware definition files are assessed and approved for the automation solution, and report each file\u0027s status to the owner within an agreed number of days of release.",
+                             "rationale":  "Definition files can occasionally clash with control software. The owner needs to know quickly which ones are safe to load, for which components, and which have been held back.",
+                             "evidencePrompt":  "Deliverable: a document describing how definition files are evaluated, approved and reported on. Ask for recent status reports showing applicability, approval state and date sent, against the agreed number of days.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.10.05-BR",
+                             "code":  "SP.10.05 BR",
+                             "elementId":  "SP10",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Supplied equipment checked for malware",
+                             "hint":  "The provider can show that every component it supplies, workstations included, has been checked and found clear of known malware before it goes into service in the automation solution.",
+                             "rationale":  "New or repaired equipment is a common way for malware to get past site defences. Checking it on the way in costs far less than cleaning up an infected control network.",
+                             "evidencePrompt":  "Ask for the pre-use scanning or verification procedure, scan records for recently supplied equipment, and any supply chain assurances relied on, such as scans the control system vendor runs before delivery.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.10.05-RE1",
+                             "code":  "SP.10.05 RE(1)",
+                             "elementId":  "SP10",
+                             "kind":  "RE",
+                             "parentId":  "SP.10.05-BR",
+                             "theme":  "COMP",
+                             "title":  "Dedicated portable media for site work",
+                             "hint":  "The provider can show that portable media it uses for testing, commissioning or maintenance on this automation solution is kept for that work and not plugged into other systems.",
+                             "rationale":  "A USB stick that also visits office laptops or other customers\u0027 sites can carry infection between them. Keeping media dedicated limits where it can pick malware up.",
+                             "evidencePrompt":  "Ask for the portable media policy and a register or labelling scheme for dedicated media, and ask field staff how media is stored, issued and kept apart from general use.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.10.05-RE2",
+                             "code":  "SP.10.05 RE(2)",
+                             "elementId":  "SP10",
+                             "kind":  "RE",
+                             "parentId":  "SP.10.05-BR",
+                             "theme":  "COMP",
+                             "title":  "Portable media scanned before use",
+                             "hint":  "The provider can show that any portable media its staff connect to or use in the automation solution, laptops and installation media included, is checked and clear of known malware first.",
+                             "rationale":  "Removable media and visiting laptops are a well-known route for malware into isolated control networks. A scan before connection catches known threats at the point of entry.",
+                             "evidencePrompt":  "Ask for the media scanning procedure, scanning station or kiosk logs, and records showing media and laptops were checked before connection on recent site visits.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.01-BR",
+                             "code":  "SP.11.01 BR",
+                             "elementId":  "SP11",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Patch evaluation and approval described",
+                             "hint":  "The provider can give the owner a document explaining how it decides which security patches apply to the software it is responsible for, and how they are tested and approved. Firmware updates count as patches.",
+                             "rationale":  "The owner can only rely on the provider\u0027s patch advice if it can see how that advice is reached, for control system, operating system and third-party software alike.",
+                             "evidencePrompt":  "Deliverable: a patch qualification process document. Check it covers control system, operating system and third-party software, and how it builds on the product supplier\u0027s own patch guidance.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.01-RE1",
+                             "code":  "SP.11.01 RE(1)",
+                             "elementId":  "SP11",
+                             "kind":  "RE",
+                             "parentId":  "SP.11.01-BR",
+                             "theme":  "COMP",
+                             "title":  "Patch process reviewed as risks change",
+                             "hint":  "The provider can review and adjust how it evaluates and approves security patches, both periodically and when the threat picture shifts, such as when a vulnerability starts being exploited.",
+                             "rationale":  "A patch process built for routine releases may be too slow when a flaw is under active attack. Reviewing it keeps the response in step with the risk the owner actually faces.",
+                             "evidencePrompt":  "Ask for records of reviews of the patch evaluation process, what prompted each one and what changed as a result, and any link to incident handling where urgent patches were fast-tracked.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.02-BR",
+                             "code":  "SP.11.02 BR",
+                             "elementId":  "SP11",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Patch status information for the owner",
+                             "hint":  "The provider can tell the owner, within an agreed time of release, which security patches apply, their approval state, any restart they need, why any were rejected, and how unapproved ones will be handled.",
+                             "rationale":  "Patch decisions sit with the owner, who needs a clear and timely view of what is approved, what is not and why, and what a patch will do to a running system before scheduling it.",
+                             "evidencePrompt":  "Deliverable: patch status documentation for the automation solution. Check a recent issue for applicability, approval or lifecycle state, restart warnings, reasons for rejection and remediation plans, and that it met the agreed timeframe.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.02-RE1",
+                             "code":  "SP.11.02 RE(1)",
+                             "elementId":  "SP11",
+                             "kind":  "RE",
+                             "parentId":  "SP.11.02-BR",
+                             "theme":  "COMP",
+                             "title":  "Approved patch list in electronic form",
+                             "hint":  "The provider can publish, through a widely used electronic interface and within an agreed time, a list of applicable and approved security patches and the software versions they apply to.",
+                             "rationale":  "An electronic list lets the owner, or its tools, work out which patches to fetch without reading reports by hand, which matters on larger estates with many components.",
+                             "evidencePrompt":  "Ask for the interface or feed used and who hosts it (supplier, provider or a named third party), and a sample of the list showing approved patches with software versions. Check it was issued within the agreed period.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.02-RE2",
+                             "code":  "SP.11.02 RE(2)",
+                             "elementId":  "SP11",
+                             "kind":  "RE",
+                             "parentId":  "SP.11.02-BR",
+                             "theme":  "COMP",
+                             "title":  "Mitigation where the owner declines a patch",
+                             "hint":  "If the owner turns down a patch the provider has approved, for example over operational impact, the provider can propose a mitigation plan on request and carry it out once the owner agrees.",
+                             "rationale":  "Declining a patch leaves the weakness open. Compensating measures agreed with the owner reduce that exposure.",
+                             "evidencePrompt":  "Ask for examples of mitigation plans for declined patches, the owner\u0027s approval of each, and evidence the agreed measures were put in place.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.03-BR",
+                             "code":  "SP.11.03 BR",
+                             "elementId":  "SP11",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Controlled sourcing and redistribution of patches",
+                             "hint":  "The provider\u0027s patch handling lets the owner get patches straight from the manufacturer, and the provider passes patches on itself only where the owner approves and the manufacturer\u0027s terms allow it.",
+                             "rationale":  "Patches from an unofficial channel may be fake or tampered with. A known source and an agreed delivery route cut that risk and keep within licence terms.",
+                             "evidencePrompt":  "Ask for the patch delivery policy, owner approvals for any redistribution, manufacturer licence terms permitting it, and the agreed delivery method (for example secure transfer or physical media).",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.04-BR",
+                             "code":  "SP.11.04 BR",
+                             "elementId":  "SP11",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Patch installation instructions",
+                             "hint":  "The provider can give the owner written instructions for installing patches by hand from portable media and through a patch management server, and for obtaining patch status reports.",
+                             "rationale":  "The owner may need to patch without the provider on site. Clear instructions for each method reduce mistakes and let the owner check what has actually gone in.",
+                             "evidencePrompt":  "Deliverable: patching instructions covering manual installation from portable media, use of the patch management server, and how to get patch status reports.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.05-BR",
+                             "code":  "SP.11.05 BR",
+                             "elementId":  "SP11",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Owner approval before each patch",
+                             "hint":  "The provider can show that it gets the owner\u0027s approval before installing any security patch, patch by patch, with no blanket or assumed consent.",
+                             "rationale":  "Patching can restart devices or change behaviour on a running system. The owner carries that operational risk, so the owner decides whether each patch goes in.",
+                             "evidencePrompt":  "Ask for the policy requiring owner approval per patch, and approval records (change requests, permits or sign-offs) matched to recent patch installations.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.06-BR",
+                             "code":  "SP.11.06 BR",
+                             "elementId":  "SP11",
+                             "kind":  "BR",
+                             "theme":  "COMP",
+                             "title":  "Patches installed at the owner\u0027s chosen time",
+                             "hint":  "When the owner asks for security patches or firmware upgrades to be installed, the provider can do the work at the time the owner sets.",
+                             "rationale":  "A patch that needs a reboot can upset the process if applied at the wrong moment. Letting the owner set the timing keeps patching in line with production and outage plans.",
+                             "evidencePrompt":  "Ask for work orders or change records showing the requested installation time and the actual time, with any outage or permit-to-work references.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.06-RE1",
+                             "code":  "SP.11.06 RE(1)",
+                             "elementId":  "SP11",
+                             "kind":  "RE",
+                             "parentId":  "SP.11.06-BR",
+                             "theme":  "COMP",
+                             "title":  "Hardening kept after patching",
+                             "hint":  "The provider can check whether installing a patch has weakened the system\u0027s hardening, for example by re-enabling services or resetting settings, and put it right, whoever installed the patch.",
+                             "rationale":  "Updates sometimes reverse security settings without warning. Without a check afterwards, the owner can end up less protected after patching than before it.",
+                             "evidencePrompt":  "Ask for post-patch hardening checks (checklists, baseline comparisons or scan results) and records of settings restored after recent patches.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.06-RE2",
+                             "code":  "SP.11.06 RE(2)",
+                             "elementId":  "SP11",
+                             "kind":  "RE",
+                             "parentId":  "SP.11.06-BR",
+                             "theme":  "COMP",
+                             "title":  "Network updates checked as genuine and intact",
+                             "hint":  "For devices updated over the network, the provider can show the update process confirms software and firmware images are genuine and unaltered, and that only authorised people can push updates.",
+                             "rationale":  "A tampered or corrupted image loaded into a controller can do as much harm as an attack. Checking origin and integrity guards against counterfeit or damaged updates.",
+                             "evidencePrompt":  "Ask for a description of the update mechanism, the use of signed images or hash checks, who is authorised to push updates, and how images are protected in transit and at rest.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.11.06-RE3",
+                             "code":  "SP.11.06 RE(3)",
+                             "elementId":  "SP11",
+                             "kind":  "RE",
+                             "parentId":  "SP.11.06-BR",
+                             "theme":  "COMP",
+                             "title":  "Patch installation status tracked",
+                             "hint":  "The provider can work out, by manual checks or tooling, which applicable security patches have and have not been installed on the parts of the automation solution it is responsible for.",
+                             "rationale":  "Approved patches are of little use if nobody knows which ones are missing. A current view of installation status shows where exposure remains.",
+                             "evidencePrompt":  "Ask for patch compliance reports or tool output for the automation solution, and spot check a few components against the report.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.01-BR",
+                             "code":  "SP.12.01 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Recommended backup procedures",
+                             "hint":  "The provider can give the owner a document on backing up the automation solution in full and in part: the method, which data to include, offsite storage advice, and holding off changes while a backup runs.",
+                             "rationale":  "A backup that misses controller settings, keys or field parameters may not get the system running again. The owner needs to know what a complete backup holds and how to keep it safe.",
+                             "evidencePrompt":  "Deliverable: backup procedures for the automation solution. Check the backup method, the data covered (from operating system files and keys through applications, databases and logs to network, controller and field instrument settings), offsite storage advice and the rule on changes during a backup.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.02-BR",
+                             "code":  "SP.12.02 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Restore instructions",
+                             "hint":  "The provider can give the owner written instructions for bringing the automation solution, or single components, back to normal operation from backup, including what to do if things have changed since.",
+                             "rationale":  "Restores are often done under pressure after a failure or incident. Clear instructions, covering awkward cases too, cut downtime and warn where a restore may be incomplete.",
+                             "evidencePrompt":  "Deliverable: restore instructions for the full system and for components. Check they deal with abnormal cases, such as an architecture changed since the backup, and apply to simulators as well as live systems.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.03-BR",
+                             "code":  "SP.12.03 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Handling of portable backup media",
+                             "hint":  "The provider can give the owner documentation on how portable backup media is controlled, stored and protected, in line with the owner\u0027s own policies and procedures.",
+                             "rationale":  "Backup media holds a full copy of the system, often with credentials and configuration. Lost or tampered media can block recovery or hand an attacker what they need.",
+                             "evidencePrompt":  "Deliverable: backup media handling procedure. Ask how media is labelled, stored, moved, accessed and destroyed, and how this fits the owner\u0027s policies.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.04-BR",
+                             "code":  "SP.12.04 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Checking a backup succeeded",
+                             "hint":  "The provider can give the owner documentation explaining how to confirm that a system backup has completed successfully and can be relied on.",
+                             "rationale":  "A backup job can report success yet leave a copy that will not restore. A defined check gives the owner confidence before the copy is ever needed.",
+                             "evidencePrompt":  "Deliverable: backup verification instructions. Ask for records of recent checks and what they test, such as completion logs, checksums or trial restores.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.05-BR",
+                             "code":  "SP.12.05 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Full backup and restore demonstrated",
+                             "hint":  "The provider can demonstrate a complete backup of the automation solution and a restore from it to a working system, or a partial run if the owner prefers, with database rollback handled properly.",
+                             "rationale":  "Only a successful restore proves the backup arrangement works. Showing it before an emergency exposes gaps while there is still time to fix them.",
+                             "evidencePrompt":  "Ask for records of a backup and restore demonstration or test, its scope (full or partial) and result, and steps taken for databases, such as suspending automatic rollback during the backup.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.06-BR",
+                             "code":  "SP.12.06 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Backups follow the owner\u0027s schedule",
+                             "hint":  "The provider can carry out backups of the automation solution on the owner\u0027s schedule and in line with the owner\u0027s restore and disaster recovery objectives.",
+                             "rationale":  "How often to back up depends on how much data and configuration the owner can afford to lose. Working to the owner\u0027s schedule ties the provider\u0027s work to that business decision.",
+                             "evidencePrompt":  "Ask for the owner\u0027s backup schedule and recovery objectives, and backup logs showing the provider has kept to them.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.07-BR",
+                             "code":  "SP.12.07 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Operation continues during backup",
+                             "hint":  "The provider can demonstrate that taking a backup does not disturb the normal running of the automation solution, including control of the process.",
+                             "rationale":  "If backups slow or interrupt control, staff will avoid running them. Showing they are safe to take while the system is live keeps backups happening on time.",
+                             "evidencePrompt":  "Ask for test or commissioning records showing backups taken during operation, with performance or alarm data showing no effect on control.",
+                             "deliverableDoc":  false,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.08-BR",
+                             "code":  "SP.12.08 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "EVENT",
+                             "title":  "Audit logging of backup and restore",
+                             "hint":  "The provider can give the owner documentation on how to set up and keep audit logs that record every backup and restore activity on the automation solution.",
+                             "rationale":  "Logs of when backups and restores ran, who ran them and with what result give the owner evidence of good practice and a trail to follow if something goes wrong.",
+                             "evidencePrompt":  "Deliverable: documentation on configuring and maintaining backup and restore audit logs. Ask to see sample log entries showing time, person and outcome.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         },
+                         {
+                             "id":  "SP.12.09-BR",
+                             "code":  "SP.12.09 BR",
+                             "elementId":  "SP12",
+                             "kind":  "BR",
+                             "theme":  "AVAIL",
+                             "title":  "Disaster recovery plan",
+                             "hint":  "The provider can document a recommended disaster recovery plan: likely scenarios and their effect, how to recover and reintegrate failed components, and the minimum setup needed to rebuild the whole system.",
+                             "rationale":  "After a major cyber incident or site loss, the owner needs a worked-out route back to operation that does not depend on equipment that may itself have been lost.",
+                             "evidencePrompt":  "Deliverable: disaster recovery plan for the automation solution. Check it covers scenarios including cyber attack, recovery steps, the minimum architecture for a full rebuild, and where restore tools such as a test bench or offline engineering tools are kept.",
+                             "deliverableDoc":  true,
+                             "verbatimText":  "",
+                             "otLens":  {
+                                            "framing":  "",
+                                            "gotchas":  ""
+                                        },
+                             "allowNA":  true
+                         }
+                     ],
+    "achievedScale":  {
+                          "_note":  "ONE control per requirement. Consultant picks one value. \u0027not-met\u0027 is the bottom of the scale; ML1-4 are increasing maturity; \u0027unknown\u0027 and \u0027na\u0027 are non-scoring states shown alongside.",
+                          "ordered":  [
+                                          {
+                                              "value":  "not-met",
+                                              "label":  "Not met",
+                                              "short":  "Not met",
+                                              "scored":  true,
+                                              "rank":  0
+                                          },
+                                          {
+                                              "value":  "ML1",
+                                              "label":  "ML1",
+                                              "short":  "ML1 · ad hoc",
+                                              "scored":  true,
+                                              "rank":  1
+                                          },
+                                          {
+                                              "value":  "ML2",
+                                              "label":  "ML2",
+                                              "short":  "ML2 · documented",
+                                              "scored":  true,
+                                              "rank":  2
+                                          },
+                                          {
+                                              "value":  "ML3",
+                                              "label":  "ML3",
+                                              "short":  "ML3 · practised",
+                                              "scored":  true,
+                                              "rank":  3
+                                          },
+                                          {
+                                              "value":  "ML4",
+                                              "label":  "ML4",
+                                              "short":  "ML4 · improving",
+                                              "scored":  true,
+                                              "rank":  4
+                                          }
+                                      ],
+                          "nonScoring":  [
+                                             {
+                                                 "value":  "unknown",
+                                                 "label":  "Unknown",
+                                                 "effect":  "reduces coverage + confidence; not scored"
+                                             },
+                                             {
+                                                 "value":  "na",
+                                                 "label":  "N/A",
+                                                 "effect":  "excluded from score and coverage"
+                                             }
+                                         ]
+                      },
+    "targetOverlay":  {
+                          "enabled":  false,
+                          "_note":  "Optional. Off by default. When enabled, each requirement gains an optional target ML, usually set from the contract. When off, the report shows the achieved-ML profile only.",
+                          "targetScale":  [
+                                              "ML1",
+                                              "ML2",
+                                              "ML3",
+                                              "ML4"
+                                          ]
+                      },
+    "_contentNote":  "123 requirements (72 base requirements, 51 enhancements) across 12 functional areas, ids from the standard. Content is paraphrased from the licensed standard in our own words; verbatimText is empty by design. \u0027kind\u0027 (BR/RE), \u0027parentId\u0027 (an enhancement\u0027s base requirement) and \u0027deliverableDoc\u0027 (a document is delivered to the asset owner) are carried for the views; the scorer ignores them. Themes reuse the eight 62443-2-1:2024 themes.",
+    "_scopingNote":  "elementScoping: a whole functional area can be set out of scope per target (target.elementScope). Its rows then score as N/A, and their answers are kept.",
+    "seriesContext":  "ISA/IEC 62443 is a series of standards divided by who is responsible for what. This part, 62443-2-4, covers the service provider who integrates or maintains an automation solution for an asset owner. It is the companion of 62443-2-1, which covers the asset owner\u0027s own security program, and of 62443-4-1, which covers the product supplier\u0027s development process."
+}

@@ -85,6 +85,33 @@ window.App.Data.shared.engagementGuidance = {
         "Configuration / release manager"
       ]
     },
+    "iec-62443-2-4": {
+      "commonDocuments": [
+        "Service contract or statement of work, showing which 62443-2-4 requirements the asset owner asked for",
+        "The provider's security policy and procedures for integration or maintenance work",
+        "Staff and subcontractor briefing material, vetting records and the named security contact",
+        "Hardening guides, network design records and as-built drawings for the automation solution",
+        "Remote access procedure, approved tools list and session approval records",
+        "Account, password and anti-malware procedures used on the asset owner's systems",
+        "Patch qualification process and patch status reports given to the asset owner",
+        "Backup, restore and disaster recovery procedures for the solution"
+      ],
+      "oftenForgotten": [
+        "Records showing a process has been delivered to an asset owner (needed for ML3)",
+        "Deliverable documents the asset owner should already hold, such as the default accounts list or event storm statement",
+        "Subcontractor contracts that pass the security duties down",
+        "Account removal reports and shared password records from recent jobs",
+        "Evidence of a full backup and restore test",
+        "Metrics or reviews that show a process improving over time (needed for ML4)"
+      ],
+      "keyStakeholders": [
+        "Service or contract manager on the provider side",
+        "The provider's named security contact or security lead",
+        "Lead engineer or technician who works on the solution",
+        "Asset owner's representative for the service (contract owner or site engineer)",
+        "Subcontractor lead, where part of the work is subcontracted"
+      ]
+    },
     "iec-62443-2-1-2010": {
       "commonDocuments": [
         "CSMS scope statement and security policy set",

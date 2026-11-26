@@ -231,24 +231,79 @@ window.App.ScoringProgramML = (function () {
     };
   }
 
+  // ---- groupings out of scope (instrument.elementScoping) ----------------
+  //
+  // A consultant can set a whole grouping out of scope for one target, for
+  // example a functional area the service contract does not cover. It is
+  // stored on the target as its own field, never written into the answers:
+  //   target.elementScope = { "<elementId>": { out: true, note: "..." } }
+  // so switching the grouping back on brings the answers straight back.
+  // Instruments without the flag ignore the field entirely.
+  function outOfScopeMap(instrument, target) {
+    var map = {};
+    if (!instrument || !instrument.elementScoping || !target) return map;
+    var es = target.elementScope || {};
+    var known = {};
+    (instrument.elements || []).forEach(function (el) { known[el.id] = true; });
+    Object.keys(es).forEach(function (id) {
+      if (known[id] && es[id] && es[id].out) map[id] = String(es[id].note || "");
+    });
+    return map;
+  }
+
+  // The requirement ids a target leaves out because their grouping is out of
+  // scope, as a lookup. Shared with the baseline comparison and the
+  // organisation-wide roll-up.
+  function outOfScopeRequirementIds(instrument, target) {
+    var map = outOfScopeMap(instrument, target), ids = {};
+    (instrument.requirements || []).forEach(function (r) {
+      if (Object.prototype.hasOwnProperty.call(map, r.elementId)) ids[r.id] = true;
+    });
+    return ids;
+  }
+
+  // A scored item for a row whose grouping is out of scope: N/A in every
+  // count, never a finding, with the answer itself left untouched.
+  function asOutOfScope(it) {
+    it.ml = "na";
+    it.mlValue = null;
+    it.mlLabel = "Out of scope";
+    it.meetsTarget = null; it.belowTarget = false; it.gap = null; it.isFloor = false;
+    it.scored = false; it.isLevel = false; it.isNotMet = false; it.isUnknown = false;
+    it.isNA = true;
+    it.outOfScope = true;
+    return it;
+  }
+
   // ---- whole site -------------------------------------------------------
 
-  function scoreSite(instrument, profile, responses) {
+  // `target` is optional: the target being scored, read only for its
+  // elementScope (and only when the instrument opts in to elementScoping).
+  function scoreSite(instrument, profile, responses, target) {
     var byR = {};
     (responses || []).forEach(function (r) { byR[r.requirementId || r.outcomeId] = r; });
+    var outMap = outOfScopeMap(instrument, target);
 
     var perRequirement = (instrument.requirements || []).map(function (req) {
       var it = scoreRequirement(req, byR[req.id], instrument, profile);
+      if (Object.prototype.hasOwnProperty.call(outMap, req.elementId)) asOutOfScope(it);
       it.elementName = elementName(req.elementId, instrument);
       it.themeName   = themeName(req.theme, instrument);
       return it;
     });
 
     var elements = (instrument.elements || []);
-    var byElement = elements.map(function (el) {
+    var byElementAll = elements.map(function (el) {
       var items = perRequirement.filter(function (it) { return it.elementId === el.id; });
-      return Object.assign({ elementId: el.id, name: el.name, themes: el.themes || [], requirements: items }, rollUp(items));
+      var row = Object.assign({ elementId: el.id, name: el.name, themes: el.themes || [], requirements: items }, rollUp(items));
+      if (Object.prototype.hasOwnProperty.call(outMap, el.id)) { row.outOfScope = true; row.scopeNote = outMap[el.id]; }
+      return row;
     });
+    // Results, findings and the weakest grouping cover what is in scope; the
+    // groupings left out are listed once, on their own.
+    var byElement = byElementAll.filter(function (e) { return !e.outOfScope; });
+    var outOfScopeElements = byElementAll.filter(function (e) { return e.outOfScope; })
+      .map(function (e) { return { elementId: e.elementId, name: e.name, note: e.scopeNote || "" }; });
 
     // Themes present in the instrument, in first-seen order.
     var themeOrder = [];
@@ -321,6 +376,8 @@ window.App.ScoringProgramML = (function () {
       instrumentTitle: instrument.title,
       perRequirement: perRequirement,
       byElement: byElement,
+      byElementAll: byElementAll,
+      outOfScopeElements: outOfScopeElements,
       byTheme: byTheme,
       overall: overall,
       weakestElements: ranked,
@@ -350,7 +407,7 @@ window.App.ScoringProgramML = (function () {
     });
     return {
       perTarget: (engagement.targets || []).map(function (t) {
-        return { target: t, result: scoreSite(instrument, profile, responsesByTarget[t.id] || []) };
+        return { target: t, result: scoreSite(instrument, profile, responsesByTarget[t.id] || [], t) };
       }),
       instrument: instrument,
       profile: profile
@@ -379,6 +436,8 @@ window.App.ScoringProgramML = (function () {
     confidenceKey: confidenceKey,
     coverageThreshold: coverageThreshold,
     scoreRequirement: scoreRequirement,
+    outOfScopeMap: outOfScopeMap,
+    outOfScopeRequirementIds: outOfScopeRequirementIds,
     rollUp: rollUp,
     scoreSite: scoreSite,
     scoreEngagement: scoreEngagement,

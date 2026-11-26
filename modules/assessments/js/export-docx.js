@@ -4057,7 +4057,7 @@ window.App.ExportDOCX = (function () {
     if (sc) out.push(body(sc));
     out = out.concat(attributionParas(instrument, !!instrument.framing));
     out.push(h1("How to read this report"));
-    out.push(body("Each " + window.App.Report.mlNoun(instrument, "requirementNoun") + " is assessed at one maturity level: ML1 Initial (ad hoc), ML2 Managed (documented and repeatable; documentation begins at ML2), ML3 Defined / Practiced (actively practised on the IACS), or ML4 Improving (metrics-driven improvement). Levels apply independently per requirement. Not met means the requirement is not satisfied at any level. Unknown lowers coverage and confidence; Not applicable is excluded. Results are a profile across the elements; there is no single programme grade."));
+    out.push(body(window.App.Report.mlHowToRead(instrument, window.App.Report.mlNoun(instrument, "elementNounPlural").toLowerCase())));
     return out;
   }
 
@@ -4210,7 +4210,10 @@ window.App.ExportDOCX = (function () {
   function mlLimitationsSection(scored, instrument) {
     var children = [ h1("Method and limitations") ];
     children.push(body("The consultant set a maturity level for each requirement against the ML1-ML4 anchors, taking account of the OT context. The result is a profile of achieved maturity levels, not a single programme grade, and mean ML is given for context only. Unknown answers reduce coverage and confidence; Not applicable requirements are excluded. A requirement that is Not met, or below its target ML, is reported as a floor finding and is not averaged away."));
-    children.push(body("Requirement titles are verified from " + window.App.Report.standardRef(instrument) + "; the assessor questions are paraphrased and the verbatim requirement text and OT lens are to be populated by the licence holder."));
+    // Groupings set out of scope are named once, here, never per requirement.
+    var outLine = window.App.Report.mlOutOfScopeLine(scored, instrument);
+    if (outLine) children.push(body(outLine));
+    children.push(body("The requirement titles and assessor questions paraphrase " + window.App.Report.standardRef(instrument) + ". The standard is the authoritative text."));
     return children;
   }
 
@@ -6210,7 +6213,7 @@ window.App.ExportDOCX = (function () {
   function csmsLimitations(instrument) {
     var children = [ h1("Method and limitations") ];
     children.push(body("Conformance states are set per element by the consultant against the four-point scale (Not in place / Partially / Largely / In place), informed by OT context. This assessment reports a conformance profile by category and element group; it does not compute a single CSMS grade. The conformance index is presented for context only. Unknown answers reduce coverage and confidence; Not applicable elements are excluded. A Not-in-place element is surfaced as a floor finding and is not averaged away."));
-    children.push(body("Element titles are verified from ISA/IEC 62443-2-1:2010; the assessor framing is paraphrased and the verbatim requirement text and OT lens are to be populated by the licence holder."));
+    children.push(body("The element titles follow ISA/IEC 62443-2-1:2010 and the assessor framing paraphrases it. The standard is the authoritative text."));
     return children;
   }
 
@@ -6988,7 +6991,8 @@ window.App.ExportDOCX = (function () {
     var entries = (opts && opts.siteEntries) || [{
       id: "current",
       name: ((engagement.engagement || {}).siteName) || "This site",
-      responses: engagement.responses || []
+      responses: engagement.responses || [],
+      targets: engagement.targets || []
     }];
 
     var roll = C.rollUpSites({

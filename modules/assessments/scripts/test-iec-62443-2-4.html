@@ -1,0 +1,333 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en"><head><meta charset="utf-8"/><title>IEC 62443-2-4 instrument</title></head>
+<body>
+<!--
+  ISA/IEC 62443-2-4:2023, the service provider security program, on the
+  program-maturity-ml family. Pins:
+    - the content: 123 rows (72 base requirements, 51 enhancements), the
+      per-area counts, the id pattern, parents resolving, 22 deliverable
+      documents, empty verbatimText, no dashes, no sector words;
+    - the theme roll-up over the eight 2-1:2024 themes;
+    - the functional-area scoping switch (elementScoping): rows out of scope
+      score as N/A and keep their answers, the switch survives save and load,
+      the baseline comparison and the export-scope chooser, and the Word and
+      Excel files name the area once; an instrument without the flag ignores it;
+    - the demo scores, reports and exports, with the narrative's two caveats
+      in Word;
+    - 2-1:2024's How to read and glossary wording, unchanged word for word.
+-->
+<script>
+window.docx = (function () {
+  function TextRun(o){ if(typeof o==="string") o={text:o}; this.__type="TextRun"; this.text=o.text||""; }
+  function Paragraph(o){ o=o||{}; this.__type="Paragraph"; this.children=o.children||[]; this.heading=o.heading||null;
+    this.style=o.style||null; this.text=this.children.map(function(r){return r&&r.text!=null?r.text:"";}).join(""); }
+  function TableCell(o){ o=o||{}; this.__type="TableCell"; this.children=o.children||[]; }
+  function TableRow(o){ o=o||{}; this.__type="TableRow"; this.children=o.children||[]; }
+  function Table(o){ o=o||{}; this.__type="Table"; this.rows=o.rows||[]; }
+  function ImageRun(){ this.__type="ImageRun"; this.text=""; }
+  function PageBreak(){ this.__type="PageBreak"; this.text=""; }
+  function Header(o){ this.__type="Header"; this.children=(o&&o.children)||[]; }
+  function Footer(o){ this.__type="Footer"; this.children=(o&&o.children)||[]; }
+  function Document(o){ this.__type="Document"; this.sections=o.sections||[]; window.__doc=this; }
+  var Packer={ toBlob:function(d){ window.__doc=d; return Promise.resolve(new Blob(["x"])); } };
+  return { Document:Document,Paragraph:Paragraph,TextRun:TextRun,TableCell:TableCell,TableRow:TableRow,
+    Table:Table,ImageRun:ImageRun,PageBreak:PageBreak,Header:Header,Footer:Footer,
+    PageNumber:{CURRENT:"CURRENT",TOTAL_PAGES:"TOTAL_PAGES"},
+    PageOrientation:{PORTRAIT:"portrait",LANDSCAPE:"landscape"},
+    TableLayoutType:{FIXED:"fixed",AUTOFIT:"autofit"}, HeightRule:{AUTO:"auto",EXACT:"exact",AT_LEAST:"atLeast"},
+    HeadingLevel:{TITLE:"Title",HEADING_1:"Heading1",HEADING_2:"Heading2",HEADING_3:"Heading3"},
+    AlignmentType:{LEFT:"left",CENTER:"center",RIGHT:"right"},
+    WidthType:{PERCENTAGE:"pct"}, ShadingType:{SOLID:"solid"}, Packer:Packer };
+})();
+</script>
+<script src="harness.js"></script>
+<script>H.app({ xlsx: true, docx: "mock", tours: ["24", "ml"] }); H.dom();</script>
+<script>
+H.test(function (ok, done) {
+  window.confirm = function () { return true; }; window.alert = function () {};
+  var A = window.App, E = A.Engine, R = A.Report, ML = A.ScoringProgramML, C = A.Compare;
+  E.loadCatalog(); A.UI.init({ autosave: false });
+  var ID = "iec-62443-2-4";
+
+  function docText() {
+    var t = [];
+    (function walk(n) {
+      if (!n) return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      if (n.__type === "Paragraph") { t.push(n.text || ""); return; }
+      if (n.__type === "Table") { walk(n.rows); return; }
+      if (n.__type === "TableRow" || n.__type === "TableCell") { walk(n.children); return; }
+    })((window.__doc.sections || []).map(function (s) { return s.children; }));
+    return t.join("\n");
+  }
+  function sheetText(wb, name) {
+    var ws = wb.Sheets[name], parts = [];
+    if (!ws) return "";
+    Object.keys(ws).forEach(function (k) {
+      if (k.charAt(0) === "!") return;
+      var c = ws[k]; if (c && c.v != null) parts.push(String(c.v));
+    });
+    return parts.join("\n");
+  }
+  function count(hay, needle) { var n = 0, i = -1; while ((i = hay.indexOf(needle, i + 1)) !== -1) n++; return n; }
+  function strings(o, out) {
+    out = out || [];
+    if (typeof o === "string") out.push(o);
+    else if (Array.isArray(o)) o.forEach(function (x) { strings(x, out); });
+    else if (o && typeof o === "object") Object.keys(o).forEach(function (k) { strings(o[k], out); });
+    return out;
+  }
+
+  // ---- content -----------------------------------------------------------
+  E.activateInstrument(ID);
+  var inst = E.state.instrument, narr = E.getActiveNarrative();
+  var reqs = inst.requirements || [];
+  ok(reqs.length === 123, "123 requirement rows", String(reqs.length));
+  ok(reqs.filter(function (r) { return r.kind === "BR"; }).length === 72, "72 base requirements");
+  ok(reqs.filter(function (r) { return r.kind === "RE"; }).length === 51, "51 enhancements");
+  var want = [11, 7, 24, 6, 12, 4, 5, 8, 17, 8, 12, 9];
+  var got = want.map(function (_, i) {
+    var el = "SP" + (i < 9 ? "0" : "") + (i + 1);
+    return reqs.filter(function (r) { return r.elementId === el; }).length;
+  });
+  ok(got.join(",") === want.join(","), "per-area counts 11, 7, 24, 6, 12, 4, 5, 8, 17, 8, 12, 9", got.join(","));
+  ok((inst.elements || []).map(function (e) { return e.id; }).join(",") === "SP01,SP02,SP03,SP04,SP05,SP06,SP07,SP08,SP09,SP10,SP11,SP12",
+     "twelve functional areas SP01 to SP12");
+  ok((inst.elements || []).every(function (e) { return e.name && e.summary && e.summary.length > 40; }), "each area has a name and a summary");
+
+  var ids = {}, dup = [], badId = [], badParent = [], badCode = [];
+  reqs.forEach(function (r) {
+    if (ids[r.id]) dup.push(r.id); ids[r.id] = r;
+    var m = /^SP\.(\d\d)\.(\d\d)-(BR|RE(\d))$/.exec(r.id);
+    if (!m || r.elementId !== "SP" + m[1] || (m[3] === "BR") !== (r.kind === "BR")) badId.push(r.id);
+    var code = m ? ("SP." + m[1] + "." + m[2] + (r.kind === "BR" ? " BR" : " RE(" + m[4] + ")")) : "";
+    if (r.code !== code) badCode.push(r.id + "/" + r.code);
+  });
+  ok(dup.length === 0, "ids are unique", dup.join(","));
+  ok(badId.length === 0, "every id is SP.nn.nn-BR or -REn, in its own area and kind", badId.join(","));
+  ok(badCode.length === 0, "every code matches its id (SP.nn.nn BR / RE(n))", badCode.join(","));
+  reqs.forEach(function (r) {
+    if (r.kind === "RE") {
+      var p = ids[r.parentId];
+      if (!p || p.kind !== "BR" || p.id !== r.id.replace(/-RE\d$/, "-BR")) badParent.push(r.id);
+    } else if (r.parentId) badParent.push(r.id + " (BR with a parent)");
+  });
+  ok(badParent.length === 0, "every enhancement's parent resolves to its own base requirement", badParent.join(","));
+  ok(reqs.every(function (r) { return r.verbatimText === ""; }), "verbatimText is empty on every row");
+  ok(reqs.every(function (r) { return !("srcPage" in r); }), "no srcPage in the shipped data");
+  ok(reqs.every(function (r) { return r.title && r.hint && r.rationale && r.evidencePrompt; }), "every row has a title, hint, rationale and evidence prompt");
+  var docs = reqs.filter(function (r) { return r.deliverableDoc === true; }).length;
+  ok(docs === 22, "22 rows deliver a document to the asset owner", String(docs));
+
+  var THEMES = ["ORG", "CM", "NET", "COMP", "DATA", "USER", "EVENT", "AVAIL"];
+  ok(reqs.every(function (r) { return THEMES.indexOf(r.theme) !== -1; }), "every theme is one of the eight 2-1:2024 themes");
+  ok(THEMES.every(function (t) { return inst.themeNames && inst.themeNames[t]; }), "themeNames names all eight");
+
+  var all = strings(inst).concat(strings(narr));
+  var dashes = all.filter(function (s) { return /[–—]/.test(s); });
+  ok(dashes.length === 0, "no em or en dashes in the instrument or the narrative", dashes.slice(0, 2).join(" | "));
+  var SECTOR = /\b(ships?|shipping|shipowners?|vessels?|maritime|marine|plants?|refiner(y|ies)|oil|offshore|factor(y|ies)|nuclear|pharma\w*|pipelines?|crew)\b/i;
+  var guide = A.Data && A.Data.shared && A.Data.shared.engagementGuidance;
+  var g24 = guide ? (guide.instruments || guide)[ID] : null;
+  var sect = all.concat(strings(g24 || {})).filter(function (s) { return SECTOR.test(s); });
+  ok(sect.length === 0, "no sector words in the instrument, narrative or engagement guidance",
+     sect.slice(0, 2).map(function (s) { return s.match(SECTOR)[0] + ": " + s.slice(0, 80); }).join(" | "));
+  ok(!!g24 && (g24.commonDocuments || []).length > 3 && (g24.oftenForgotten || []).length > 2 && (g24.keyStakeholders || []).length > 2,
+     "engagement guidance has its own 2-4 entry");
+
+  ok(inst.edition === "2.0 (2023)" && inst.targetDimension === "service-provider" && inst.targetDimensionLabel === "Service provider",
+     "edition and target dimension");
+  ok(R.standardRef(inst) === "ISA/IEC 62443-2-4:2023", "standardRef");
+  ok(R.mlNoun(inst, "elementNoun") === "functional area" && R.mlNoun(inst, "programmeNoun") === "service provider security program", "display nouns");
+  var lv3 = (inst.maturityModel.levels || []).filter(function (l) { return l.id === "ML3"; })[0];
+  ok(!!lv3 && /asset owner at least once/.test(lv3.anchor) && /asset owner at least once/.test(lv3.shortAnchor) && !/IACS/.test(lv3.anchor + lv3.shortAnchor),
+     "ML3 means delivered to an asset owner at least once, not practised on the IACS");
+  ok(inst.elementScoping === true, "elementScoping is on for 2-4");
+
+  // ---- theme roll-up -----------------------------------------------------
+  var tid = E.state.activeTargetId;
+  reqs.forEach(function (r) { E.setResponse(tid, r.id, { applicable: true, ml: r.theme === "USER" ? "ML3" : "ML2" }); });
+  var sc = E.scoreActiveTarget();
+  var user = (sc.byTheme || []).filter(function (t) { return t.theme === "USER"; })[0];
+  var nUser = reqs.filter(function (r) { return r.theme === "USER"; }).length;
+  ok((sc.byTheme || []).length === 8, "the roll-up has all eight themes", String((sc.byTheme || []).length));
+  ok(!!user && user.counts.ML3 === nUser && user.counts.ML2 === 0, "a theme rolls up its own rows (USER " + nUser + " at ML3)");
+  ok((sc.byTheme || []).every(function (t) {
+    return t.total === reqs.filter(function (r) { return r.theme === t.theme; }).length;
+  }), "every theme's total is its row count");
+
+  // ---- scoping switch ----------------------------------------------------
+  var sp05 = reqs.filter(function (r) { return r.elementId === "SP05"; });
+  sp05.forEach(function (r, i) { E.setResponse(tid, r.id, { applicable: true, ml: i < 3 ? "not-met" : "ML1" }); });
+  var before = E.scoreActiveTarget();
+  ok(before.overall.counts.notMet === 3 && before.roadmap.length === 12, "SP05 answered: 3 not met, 12 on the roadmap");
+  ok(E.isElementInScope(tid, "SP05"), "SP05 starts in scope");
+
+  E.setElementInScope(tid, "SP05", false);
+  E.setElementScopeNote(tid, "SP05", "No safety system in this contract");
+  var outSc = E.scoreActiveTarget();
+  var outRows = outSc.perRequirement.filter(function (it) { return it.elementId === "SP05"; });
+  ok(outRows.length === 12 && outRows.every(function (it) { return it.isNA && it.outOfScope && !it.isFloor && !it.scored; }),
+     "out of scope: every SP05 row scores as N/A, never a finding");
+  ok(outSc.overall.counts.notMet === 0 && outSc.roadmap.length === 0, "out of scope: no not-met and nothing on the roadmap");
+  ok(outSc.overall.total === 111, "out of scope: 111 applicable requirements", String(outSc.overall.total));
+  ok(outSc.byElement.length === 11 && !outSc.byElement.some(function (e) { return e.elementId === "SP05"; }), "results cover the 11 areas in scope");
+  ok(outSc.outOfScopeElements.length === 1 && outSc.outOfScopeElements[0].elementId === "SP05" &&
+     outSc.outOfScopeElements[0].note === "No safety system in this contract", "the area out of scope is listed once, with its note");
+  ok(sp05.every(function (r) { var x = E.findResponse(tid, r.id); return x && (x.ml === "not-met" || x.ml === "ML1"); }),
+     "the SP05 answers are still there");
+  var tgt = E.state.engagement.targets.filter(function (t) { return t.id === tid; })[0];
+  ok(!!tgt.elementScope && tgt.elementScope.SP05.out === true, "stored on the target as its own field");
+
+  // The export-scope chooser hands the exporters a filtered engagement.
+  var filt = A.UI.__filteredEngagementFor([tid]);
+  var fsc = ML.scoreEngagement(filt, inst, E.state.profile).perTarget[0].result;
+  ok(fsc.outOfScopeElements.length === 1 && fsc.overall.counts.notMet === 0, "the export-scope chooser keeps the area out of scope");
+
+  // Save and load.
+  var pf = JSON.parse(JSON.stringify(E.getProjectFile()));
+  E.loadProjectFile(pf);
+  E.activateInstrument(ID);
+  tid = E.state.activeTargetId;
+  ok(!E.isElementInScope(tid, "SP05") && E.getElementScopeNote(tid, "SP05") === "No safety system in this contract",
+     "after save and load: SP05 still out of scope, note kept");
+  ok(sp05.every(function (r) { var x = E.findResponse(tid, r.id); return x && x.ml; }), "after save and load: the SP05 answers are kept");
+  ok(E.scoreActiveTarget().overall.counts.notMet === 0, "after save and load: still not scored");
+
+  // Baseline: last time SP05 was in scope and answered; now it is out. It is
+  // absent from the comparison, not "no longer assessed".
+  var basePf = JSON.parse(JSON.stringify(pf));
+  var bAss = A.Storage.findAssessment(basePf, ID);
+  delete bAss.targets[0].elementScope;
+  var ex = C.extractBaseline(basePf, ID, "last-year.json");
+  ok(ex.ok, "baseline extracted");
+  E.setBaseline(ex.baseline);
+  var prog = A.UI.__progressExportPayload(tid);
+  ok(!!prog && prog.summary.noLongerAssessed === 0, "baseline: nothing reported as no longer assessed", prog && JSON.stringify(prog.summary));
+  var cmpCount = prog ? Object.keys(prog.summary).reduce(function (s, k) { return s + prog.summary[k]; }, 0) : 0;
+  ok(cmpCount === 111, "baseline: the comparison covers the 111 requirements in scope", String(cmpCount));
+  ok(!!prog && !prog.movements.some(function (m) { return /^SP\.05\./.test(m.code); }), "baseline: no SP05 movement");
+  E.setBaseline(null);
+
+  // Organisation-wide roll-up: a site that set the area out of scope is not
+  // applicable there, not the weakest site and not an unassessed one.
+  var roll = C.rollUpSites({ instrument: inst, profile: E.state.profile, family: "program-maturity-ml", entries: [
+    { id: "a", name: "Site A", targets: [{ id: "ta", elementScope: { SP05: { out: true } } }],
+      responses: [{ targetId: "ta", requirementId: sp05[0].id, applicable: true, ml: "not-met" }] },
+    { id: "b", name: "Site B", targets: [{ id: "tb" }],
+      responses: [{ targetId: "tb", requirementId: sp05[0].id, applicable: true, ml: "ML2" }] }
+  ] });
+  var rItem = roll.items.filter(function (i) { return i.id === sp05[0].id; })[0];
+  ok(!!rItem && rItem.scoredSites === 1 && rItem.worstSites.join() === "Site B" && rItem.unscoredSites.length === 0,
+     "roll-up: the site with SP05 out of scope is left out of that row", rItem && JSON.stringify({ w: rItem.worstSites, s: rItem.scoredSites, u: rItem.unscoredSites }));
+
+  // On screen: the area page carries the switch and the note; the sidebar marks it.
+  A.UI.go("ml-element", "SP05");
+  var main = document.getElementById("main");
+  var tog = main.querySelector(".ml-scope-toggle"), noteIn = main.querySelector(".ml-scope-note");
+  ok(!!tog && tog.checked === false, "the SP05 page shows the scope switch, off");
+  ok(!!noteIn && noteIn.value === "No safety system in this contract", "and the note, ready to edit");
+  ok(main.querySelectorAll(".ml-scale-row").length === 12, "the 12 SP05 rows stay on the page, answers and all");
+  ok(/SP05 SIS\s*out/.test(document.getElementById("sidebar").textContent), "the sidebar marks the area out",
+     document.getElementById("sidebar").textContent.slice(0, 600));
+  A.UI.go("engagement");
+  var eng = main.textContent;
+  ok(eng.indexOf("Service provider security program maturity: how this instrument works") !== -1, "the getting-started card names the service provider program");
+  ok(eng.indexOf("should come from the contract with the asset owner") !== -1 && eng.indexOf("62443-3-2") === -1,
+     "and says a target ML comes from the contract, not 62443-3-2");
+  ok(eng.indexOf("by functional area and theme") !== -1 && !/\bby SPE\b/.test(eng), "and profiles by functional area, not SPE");
+
+  // Back in scope, from the page itself: the answers count again, exactly as before.
+  A.UI.go("ml-element", "SP05");
+  tog = main.querySelector(".ml-scope-toggle");
+  tog.checked = true; tog.dispatchEvent(new Event("change"));
+  ok(!main.querySelector(".ml-scope-note") && main.querySelector(".ml-scope-toggle").checked, "switching it on hides the note field");
+  var back = E.scoreActiveTarget();
+  ok(E.isElementInScope(tid, "SP05") && back.overall.counts.notMet === 3 && back.roadmap.length === 12,
+     "back in scope: the kept answers score again");
+  ok(E.getElementScopeNote(tid, "SP05") === "No safety system in this contract", "back in scope: the note is kept for next time");
+
+  // ---- an instrument without the flag ignores the field -------------------
+  E.activateInstrument("iec-62443-2-1-2024");
+  var t21 = E.state.engagement.targets[0];
+  var r21 = E.state.instrument.requirements[0];
+  E.setResponse(t21.id, r21.id, { applicable: true, ml: "not-met" });
+  t21.elementScope = {}; t21.elementScope[r21.elementId] = { out: true, note: "x" };
+  var s21 = E.scoreActiveTarget();
+  ok(!E.supportsElementScoping() && s21.overall.counts.notMet === 1 && (s21.outOfScopeElements || []).length === 0,
+     "2-1:2024 has no elementScoping: the field changes nothing");
+  ok(E.setElementInScope(t21.id, r21.elementId, false) === false, "and the engine refuses to set it");
+  delete t21.elementScope;
+
+  // ---- 2-1:2024 wording, word for word -----------------------------------
+  var inst21 = E.state.instrument;
+  ok(R.mlHowToRead(inst21, "elements") ===
+     "Each Security Program Requirement is assessed at one maturity level: ML1 Initial (ad hoc), ML2 Managed (documented and repeatable; documentation begins at ML2), ML3 Defined / Practiced (actively practised on the IACS), or ML4 Improving (metrics-driven improvement). Levels apply independently per requirement. Not met means the requirement is not satisfied at any level. Unknown lowers coverage and confidence; Not applicable is excluded. Results are a profile across the elements; there is no single programme grade.",
+     "2-1:2024 How to read is unchanged word for word");
+  var gl21 = R.glossarySections(inst21, null, null)[0].rows.map(function (r) { return r.join(": "); }).join(" | ");
+  ok(gl21 === "ML1 Initial: Done ad hoc, if at all. It depends on individuals rather than on a process. | ML2 Managed: Documented and repeatable. Documentation begins here. | ML3 Defined / Practiced: Actively practised on the industrial automation and control system, not only written down. | ML4 Improving: Measured, and improved on the basis of what the measurements show. | Not met: The requirement is not satisfied at any level.",
+     "2-1:2024 glossary levels unchanged word for word", gl21);
+  ok(R.mlNoun(inst21, "elementSheet") === "By SPE" && R.mlNoun(inst21, "targetSource") === "risk (62443-3-2)" &&
+     R.mlNoun(inst21, "programmeTitle") === "Security Program", "2-1:2024 keeps its sheet name, target source and card title");
+
+  // ---- the demo: scores, reports, exports --------------------------------
+  E.activateInstrument(ID);
+  // Start from a clean target so the demo is all that is answered.
+  tid = E.state.activeTargetId;
+  E.state.engagement.responses.length = 0;
+  delete E.state.engagement.targets[0].elementScope;
+  A.Tour24.apply(E);
+  var d = E.scoreActiveTarget(), c = d.overall.counts;
+  ok(A.Tour24.rows.length === 111, "the demo answers every requirement in scope (111)", String(A.Tour24.rows.length));
+  ok(E.getActiveTarget().name === "Vessel operations and maintenance service", "the demo target is the vessel service");
+  ok(c.notMet === 8 && c.ML1 === 17 && c.ML2 > 30 && c.ML3 > 20 && c.ML4 === 3 && c.unknown === 3,
+     "answers spread across not met, ML1, ML2, ML3 with a few ML4 and unknowns", JSON.stringify(c));
+  ok(d.outOfScopeElements.length === 1 && d.outOfScopeElements[0].elementId === "SP05" && d.outOfScopeElements[0].note.length > 20,
+     "SP05 SIS is out of scope, with a scope note");
+  ok(d.roadmap.length === 25 && d.roadmap.every(function (it) { return it.owner && it.action && it.impact; }),
+     "every roadmap item carries a remediation plan", String(d.roadmap.length));
+  ok(d.perRequirement.filter(function (it) { return it.notes; }).length >= 3, "consultant notes on at least three rows");
+
+  A.UI.go("report");
+  ok(/111 \/ 111/.test(document.getElementById("sidebar").textContent), "progress counts the 111 rows in scope, not 123",
+     (document.getElementById("sidebar").textContent.match(/\d+ \/ \d+/) || [""])[0]);
+  var scr = document.getElementById("main").textContent;
+  ok(scr.indexOf("Results by Functional area") !== -1, "the screen report renders");
+  ok(count(scr, "Out of scope for this assessment: functional area SP05 SIS") === 1, "the screen names SP05 out of scope once");
+  ok(scr.indexOf("SP05 SIS") === scr.lastIndexOf("SP05 SIS"), "and nowhere else");
+
+  var wb = null, xerr = null;
+  try { wb = A.ExportXLSX.build(E.state.engagement, inst, E.state.taxonomy, E.state.profile, { targetId: tid }); } catch (e) { xerr = e; }
+  ok(!xerr && !!wb, "the Excel workbook builds", xerr && xerr.message);
+  if (wb) {
+    ok(wb.SheetNames.indexOf("By area") !== -1 && wb.SheetNames.indexOf("By SPE") === -1, "the results sheet is By area", wb.SheetNames.join(", "));
+    var front = sheetText(wb, "Front");
+    ok(count(front, "functional area SP05 SIS") === 1, "Excel names SP05 out of scope once, on the Front sheet");
+    ok(sheetText(wb, "Requirements").indexOf("SP.05.") === -1, "the Excel register leaves the SP05 rows out");
+    ok(sheetText(wb, "Read me").indexOf("Security Program Element") === -1 && sheetText(wb, "Read me").indexOf("62443-3-2") === -1,
+       "the Excel read me uses 2-4's own nouns");
+    var allX = wb.SheetNames.map(function (n) { return sheetText(wb, n); }).join("\n");
+    ok(!/[–—]/.test(allX), "no dashes in the workbook");
+  }
+
+  window.__doc = null;
+  A.ExportDOCX.buildAsync(E.state.engagement, inst, E.state.taxonomy, E.state.profile, narr, { targetId: tid }, function (err) {
+    try {
+      ok(!err && !!window.__doc, "the Word report builds", err && (err.message || String(err)));
+      if (window.__doc) {
+        var txt = docText();
+        ok(txt.indexOf("It is not a certification or a statement of conformance") !== -1, "Word carries the not-a-certification caveat");
+        ok(txt.indexOf("ML1 included, so a requirement that is not met is the finding") !== -1, "Word carries the any-level-conforms caveat");
+        ok(count(txt, "Out of scope for this assessment: functional area SP05 SIS") === 1, "Word names SP05 out of scope once");
+        ok(txt.indexOf("SP.05.") === -1, "no SP05 requirement appears in Word");
+        ok(txt.indexOf("ML3 Defined / Practiced (delivered for an asset owner at least once") !== -1, "Word How to read gives 2-4's ML3");
+        ok(txt.indexOf("across 11 functional areas") !== -1, "the executive summary counts the 11 areas in scope");
+        ok(!/[–—]/.test(txt), "no dashes in the Word text");
+      }
+    } catch (e) { ok(false, "Word checks threw: " + e.message); }
+    done();
+  });
+});
+</script>
+</body></html>

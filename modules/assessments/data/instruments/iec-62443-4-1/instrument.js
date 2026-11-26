@@ -13,7 +13,12 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                     "elementNounTitle":  "Practice",
                     "elementNounPlural":  "practices",
                     "requirementNoun":  "requirement",
-                    "programmeNoun":  "secure product development lifecycle"
+                    "programmeNoun":  "secure product development lifecycle",
+                    "programmeTitle":  "Secure development lifecycle",
+                    "elementShort":  "practice",
+                    "elementShortPlural":  "practices",
+                    "elementSheet":  "By practice",
+                    "targetSource":  "the product's security requirements and customer commitments"
                 },
     "framework":  "ISA/IEC 62443-4-1",
     "edition":  "2018",
@@ -34,25 +39,33 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                                              "id":  "ML1",
                                              "name":  "Initial",
                                              "anchor":  "Process is performed but ad hoc and often undocumented or not fully documented; consistency over time is hard to demonstrate.",
-                                             "shortAnchor":  "Performed but ad hoc, not (fully) documented."
+                                             "shortAnchor":  "Performed but ad hoc, not (fully) documented.",
+                                             "readAs":  "ad hoc",
+                                             "glossary":  "Done ad hoc, if at all. It depends on individuals rather than on a process."
                                          },
                                          {
                                              "id":  "ML2",
                                              "name":  "Managed",
                                              "anchor":  "Documentation exists describing how to manage and perform the capability (written procedures or training); practices are repeatable and managed to documented plans. Documentation begins at ML2.",
-                                             "shortAnchor":  "Documented procedures/training; repeatable, managed to plan."
+                                             "shortAnchor":  "Documented procedures/training; repeatable, managed to plan.",
+                                             "readAs":  "documented and repeatable; documentation begins at ML2",
+                                             "glossary":  "Documented and repeatable. Documentation begins here."
                                          },
                                          {
                                              "id":  "ML3",
                                              "name":  "Defined / Practiced",
                                              "anchor":  "An ML2 process that is actively practised in product development, with performance shown to be repeatable over time.",
-                                             "shortAnchor":  "Documented process actively practised, repeatable over time."
+                                             "shortAnchor":  "Documented process actively practised, repeatable over time.",
+                                             "readAs":  "actively practised in product development",
+                                             "glossary":  "Actively practised on real product development work, not only written down."
                                          },
                                          {
                                              "id":  "ML4",
                                              "name":  "Improving",
                                              "anchor":  "Using process metrics, effectiveness or performance improvement of the process is demonstrated; the supplier improves the process through technological, procedural or management changes.",
-                                             "shortAnchor":  "Measured with metrics; process is improved over time."
+                                             "shortAnchor":  "Measured with metrics; process is improved over time.",
+                                             "readAs":  "metrics-driven improvement",
+                                             "glossary":  "Measured, and improved on the basis of what the measurements show."
                                          }
                                      ],
                           "_display":  "Show these full definitions ONCE in a help/reference panel, not inline on every requirement. The per-requirement selector uses achievedScale.ordered[].short labels only."
