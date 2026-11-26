@@ -426,7 +426,7 @@ window.RiskReview = (function () {
     // One accepted change per comment: a second would write over the record
     // of what the first replaced, and its Undo with it.
     if (t.accepted && t.accepted.revert) return { can: false, why: "Wording from this comment is already in the report. Undo the accepted wording first, then accept the new suggestion." };
-    if (a.kind !== "block") return { can: false, why: "This comment is on the zones and threats behind the reports, not on their wording, so copy the wording and use Go to." };
+    if (a.kind !== "block") return { can: false, why: "This comment is on the zones and threats behind the reports, so it cannot be accepted into the wording. Copy the wording and use Go to." };
     if (!docs) return { can: false, why: "Still checking this against the current report." };
     var doc = docFor(a, docs), i = docs.indexOf(doc);
     var docId = reportIdFor(a, docs);
@@ -436,7 +436,7 @@ window.RiskReview = (function () {
     // A heading: the section's own title.
     var isHeading = !a.cell && doc.blocks.some(function (b) { return b.type === "heading" && !b.sub && norm(b.text) === norm(a.quote); });
     if (isHeading) {
-      if (!a.sectionKey) return { can: false, why: "This heading is a name from the assessment, not a section title. Rename it where it is entered." };
+      if (!a.sectionKey) return { can: false, why: "This heading is a name taken from the assessment, so it has no section title to change. Rename it where it is entered." };
       if (probe.some(function (s) { return s.key === a.sectionKey && s.repeat; })) {
         return { can: false, why: "This heading is built from a zone's name, so it cannot be changed for one zone. Use Edit on the Report page to change the words around the name." };
       }
@@ -565,7 +565,7 @@ window.RiskReview = (function () {
     if (!t) return { can: false };
     if (failedPlans[t.comment.id]) return { can: false, why: "That wording did not reach the Word document when it was rebuilt, so copy it and use Go to." };
     try { return planAccept(t, cachedDocs()); }
-    catch (e) { console.error(e); return { can: false, why: "This could not be worked out, so copy the wording." }; }
+    catch (e) { console.error(e); return { can: false, why: "The tool could not work out how to apply this, so copy the wording." }; }
   }
   // Apply, rebuild, check the wording is really in the Word document. If not,
   // undo and say so; the comment stays open, with Copy.
@@ -595,7 +595,7 @@ window.RiskReview = (function () {
         t.status = "resolved"; t.statusAt = t.accepted.at;
         RT().touched();
         done({ ok: true, message: "Accepted into the " + plan.kind + ", and checked in the rebuilt Word document." +
-          (plan.kind === "paragraph" ? " Only that paragraph is changed: the rest of the section's opening is still written from the assessment." : "") +
+          (plan.kind === "paragraph" ? " Only that paragraph is changed. The rest of the section's opening is still written from the assessment." : "") +
           (plan.places > 1 ? " The same paragraph is printed " + plan.places + " times in this report, and each now has the new wording." : "") });
       });
     });
@@ -870,8 +870,8 @@ window.RiskReview = (function () {
     var holder = h("div", { class: "rv-panel" });
     var warnBox = h("ul", { class: "rv-warnings", style: "margin:0 0 10px;padding-left:18px;font-size:13px" });
     var p = project(), lead = (p.zones.length || p.conduits.length)
-      ? "Reviewers open the pack in the OT Cyber Report Review Tool; import their review files here."
-      : "Until there are zones, the pack holds only the high-level report; import reviewers' files here.";
+      ? "Reviewers open the pack in the OT Cyber Report Review Tool. Import their review files here."
+      : "Until there are zones, the pack holds only the high-level report. Import the reviewers' files here.";
     main.appendChild(card("Review", null, [
       h("p", { class: "issue-lead", text: lead }),
       warnBox,

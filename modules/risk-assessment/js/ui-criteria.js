@@ -110,7 +110,7 @@
     }
     function cancel() { pending = null; rerender(); A.focusAfter(pd.cancel); }
     var box = h("div", { class: "criteria-map", "data-criteria-map": "", role: "group", "aria-label": "Where the ratings go" }, [
-      h("p", { class: "criteria-map-h", text: "Choose where each level's ratings go; any left stay open." }),
+      h("p", { class: "criteria-map-h", text: "Choose where each level's ratings go, or leave them as they are to rate again later." }),
       h("table", { class: "tbl compact" }, [h("thead", null, [h("tr", null, [h("th", { text: "Scale" }), h("th", { text: "Level" }), h("th", { text: "Ratings", class: "center" }), h("th", { text: "Moves to" })])]),
         h("tbody", null, pd.rows.map(function (r) {
           return h("tr", { "data-map-row": r.kind + ":" + r.id }, [h("td", { text: r.kind === "likelihood" ? "Likelihood" : "Impact" }), h("td", { text: r.name }), h("td", { class: "center", text: String(r.n) }), h("td", null, [sel(r)])]);
@@ -174,8 +174,8 @@
   }
   function sourceWords(p) {
     var w = E.criteriaWords(p);
-    return w.source === "client-house" ? "The client's criteria are marked in use: enter them here." :
-      w.source === "client" ? "The client's criteria." : w.source === "project" ? "Changed from the house criteria for this assessment." : "The SolutionsPT house criteria.";
+    return w.source === "client-house" ? "The client's criteria are marked as in use, so enter them here." :
+      w.source === "client" ? "These are the client's criteria." : w.source === "project" ? "These criteria were changed from the SolutionsPT defaults for this assessment." : "These are the SolutionsPT default criteria.";
   }
 
   // ---------- The levels and the categories ----------
@@ -190,7 +190,7 @@
         onInput: function (e) { var cc = edit(p), x = cc[kind].filter(function (y) { return y.id === l.id; })[0]; if (x) x.name = e.target.value; delete cc.preset; settle(p); touched(); } }));
       // A meaning wraps over two lines rather than being cut off.
       var note = h("textarea", { rows: "2", value: l.note, "data-field": "crit-" + kind + "-note-" + l.id, "aria-label": "What " + l.name + " means",
-        placeholder: "One line: what this level means",
+        placeholder: "What this level means, in one line",
         onInput: function (e) { var cc = edit(p), x = cc[kind].filter(function (y) { return y.id === l.id; })[0]; if (x) x.note = e.target.value; delete cc.preset; settle(p); touched(); } });
       var n = use[l.id] || 0;
       return h("tr", { "data-level": kind + ":" + l.id }, [
@@ -209,7 +209,7 @@
       h("strong", { text: title }),
       h("table", { class: "tbl compact" }, [h("thead", null, [h("tr", null, [h("th", { text: "Level", style: "width:150px" }), h("th", { text: "Meaning" }), h("th", { text: "Ratings", class: "center", style: "width:64px" }), h("th", { text: "", style: "width:40px" })])]),
         h("tbody", null, rows)]),
-      h("div", { class: "btn-row" }, [add, h("span", { class: "hint", text: "Highest first." })])
+      h("div", { class: "btn-row" }, [add, h("span", { class: "hint", text: "Levels are listed highest first." })])
     ]);
   }
   // A new level at the top of its scale; its matrix cells copy the level

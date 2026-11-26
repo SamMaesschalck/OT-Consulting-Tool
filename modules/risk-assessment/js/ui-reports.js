@@ -151,10 +151,10 @@ window.RiskApp.Reports = (function () {
     var p = state.project, s = p.srs;
     main.appendChild(h("div", { class: "print-only" }, [
       h("h1", { class: "page-title", text: "High-level cyber security risk assessment: " + (p.suc.name || "unnamed SUC") }),
-      h("p", { class: "page-sub", text: "IEC 62443-3-2 high-level risk assessment · " + todayISO() + " · relative risk ranking to prioritise systems and frame zoning. Risk bands are from " + E.criteriaWords(p).matrix + "." })
+      h("p", { class: "page-sub", text: "IEC 62443-3-2 high-level risk assessment · " + todayISO() + ". The systems are ranked by relative risk to set priorities and guide the zoning. Risk bands are from " + E.criteriaWords(p).matrix + "." })
     ]));
     main.appendChild(h("h1", { class: "page-title no-print", text: "High-level risk assessment report" }));
-    main.appendChild(pageSub("hlreport", "A deliverable on its own that needs no zones or SL-T.", "no-print"));
+    main.appendChild(pageSub("hlreport", "You can issue this report on its own, before any zones or SL-T are set.", "no-print"));
 
     main.appendChild(h("div", { class: "btn-row no-print", style: "margin-bottom:16px" }, [
       h("button", { class: "btn primary", text: "Download Word report", onClick: function () { downloadWordReport({ highLevelOnly: true }); } }),
@@ -182,7 +182,7 @@ window.RiskApp.Reports = (function () {
     main.appendChild(card("Relative risk ranking", "highest risk first", hl ? [
       hl,
       h("p", { class: "hint no-print", style: "margin-top:10px", text: "Assign the systems to zones in step 2." })
-    ] : [h("p", { class: "muted", text: "No systems ranked yet: add them in step 2." })]));
+    ] : [h("p", { class: "muted", text: "No systems ranked yet. Add them in step 2." })]));
 
     main.appendChild(approvalCard(p));
   }
@@ -193,10 +193,10 @@ window.RiskApp.Reports = (function () {
     var p = state.project;
     main.appendChild(h("div", { class: "print-only" }, [
       h("h1", { class: "page-title", text: "OT cyber risk assessment summary: " + (p.suc.name || "unnamed SUC") }),
-      h("p", { class: "page-sub", text: "IEC 62443-3-2 zones and conduits assessment · " + todayISO() + " · SL suggestions are a SolutionsPT house heuristic; consultant SL-T (per FR) and justification are the deliverable." })
+      h("p", { class: "page-sub", text: "IEC 62443-3-2 zones and conduits assessment · " + todayISO() + ". The suggested SLs come from a SolutionsPT heuristic. Each SL-T, set per FR, and its justification are the consultant's judgement." })
     ]));
     main.appendChild(h("h1", { class: "page-title no-print", text: "Detailed report summary" }));
-    main.appendChild(h("p", { class: "page-sub no-print", text: "The assessment on one page; SL-T is shown per FR (" + FR_IDS.join("/") + ")." }));
+    main.appendChild(h("p", { class: "page-sub no-print", text: "The assessment on one page, with the SL-T shown for each FR (" + FR_IDS.join("/") + ")." }));
 
     var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
     if (rvCard) main.appendChild(rvCard);
@@ -248,7 +248,7 @@ window.RiskApp.Reports = (function () {
     zt.appendChild(ztb);
     main.appendChild(card("Zones", p.zones.length + " zone" + (p.zones.length === 1 ? "" : "s"), [
       p.zones.length ? zt : h("p", { class: "muted", text: "No zones defined." }),
-      anyResidual ? h("p", { class: "hint", style: "margin-top:8px", text: "Unmitigated → rating that stands, where countermeasures change it." }) : null
+      anyResidual ? h("p", { class: "hint", style: "margin-top:8px", text: "The arrow leads from the unmitigated risk to the rating that stands, where countermeasures change it." }) : null
     ]));
 
     if (p.conduits.length) {
@@ -288,7 +288,7 @@ window.RiskApp.Reports = (function () {
 
   function reportsAvailable() {
     if (window.RiskExports && window.docx && window.ExcelJS) return true;
-    toast("Report libraries not loaded: open the app from its folder so vendor/ and js/ are alongside index.html.", "err");
+    toast("The report libraries did not load. Open the app from its folder, with vendor/ and js/ beside index.html.", "err");
     return false;
   }
   // One question before a download, never a block: the report's part of the
@@ -355,14 +355,14 @@ window.RiskApp.Reports = (function () {
         }))
       : h("p", { class: "muted", text: "Nothing open." });
     var body = outOfScope
-      ? [h("p", { class: "muted", text: "Not part of a high-level-only assessment." }), items.length ? h("details", null, [h("summary", { text: "Show what is open" }), list]) : null]
+      ? [h("p", { class: "muted", text: "A high-level-only assessment does not include this document." }), items.length ? h("details", null, [h("summary", { text: "Show what is open" }), list]) : null]
       : [list];
     return card(DOC_TITLES[doc], items.length ? items.length + " open" : "ready to issue", body, null, { "data-readiness": doc });
   }
   function renderCheckIssue(main) {
     var p = state.project, hlOnly = M.assessmentType(p) === "high-level";
     main.appendChild(h("h1", { class: "page-title", text: "Check and issue" }));
-    main.appendChild(h("p", { class: "page-sub", text: (p.suc.name ? p.suc.name + ": what" : "What") + " is still open in each report, and the downloads." }));
+    main.appendChild(h("p", { class: "page-sub", text: "See what is still open in each report" + (p.suc.name ? " for " + p.suc.name : "") + ", and download the reports." }));
     var rvCard = window.RiskReview ? window.RiskReview.warningsCard(h, card) : null;
     if (rvCard) main.appendChild(rvCard);
     // The requirements specification (phase 6b) last: an extra, for a client

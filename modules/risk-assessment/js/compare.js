@@ -107,8 +107,8 @@ window.RiskApp.Compare = (function () {
   // { error }. The file is read on a copy and never touches the open project.
   function baselineFrom(text, fileName) {
     var data;
-    try { data = JSON.parse(text); } catch (e) { return { error: "Not a valid JSON file." }; }
-    if (!data || !R.Migrate.accepts(data.schema)) return { error: "Not a risk project file this tool reads." };
+    try { data = JSON.parse(text); } catch (e) { return { error: "The file is not valid JSON." }; }
+    if (!data || !R.Migrate.accepts(data.schema)) return { error: "The file is not a risk project file this tool can read." };
     var p = R.Migrate.normaliseProject(data);
     var eng = p.engagement || {};
     return { baseline: {
@@ -376,7 +376,7 @@ window.RiskApp.Compare = (function () {
   function cmState(m) { return m.existing ? "in place" : (STATUS[m.status] ? lc1(STATUS[m.status]) : "planned"); }
   function cmStatusWords(a, b) {
     if (!a.existing && b.existing) return "now in place";
-    if (a.existing && !b.existing) return "no longer in place; now " + cmState(b);
+    if (a.existing && !b.existing) return "no longer in place (now " + cmState(b) + ")";
     if (!STATUS[a.status]) return "now " + cmState(b);
     return "moved from " + cmState(a) + " to " + cmState(b);
   }
@@ -384,25 +384,25 @@ window.RiskApp.Compare = (function () {
   var DECISION_WORDS = { reduce: "reduce with countermeasures", accept: "risk accepted", transfer: "risk transferred", slt: "treated through the SL-T programme", within: "within tolerable risk", none: "no decision recorded" };
   function decisionLine(x) {
     var id = x.cur.t.id + " (" + x.cur.owner.id + ")";
-    if (x.from === "none" || x.from === "within") return id + ": decision now recorded: " + DECISION_WORDS[x.to] + ".";
-    if (x.to === "none") return id + ": no decision recorded now (was " + DECISION_WORDS[x.from] + ").";
-    return id + ": was " + DECISION_WORDS[x.from] + "; now " + DECISION_WORDS[x.to] + ".";
+    if (x.from === "none" || x.from === "within") return id + ": a decision is now recorded (" + DECISION_WORDS[x.to] + ").";
+    if (x.to === "none") return id + ": no decision is recorded now (was " + DECISION_WORDS[x.from] + ").";
+    return id + ": now " + DECISION_WORDS[x.to] + " (was " + DECISION_WORDS[x.from] + ").";
   }
   function noLongerAccepted(x) {
     var d = decisionOf(x.cur.t), id = x.cur.t.id + " (" + x.cur.owner.id + ")";
-    if (d === "within") return id + " no longer accepted; it is now within tolerable risk.";
-    if (d === "none") return id + " no longer accepted; no decision is recorded now.";
-    if (d === "accept") return id + " no longer accepted; " + lc1(x.cur.t.label || "no decision recorded") + ".";
-    return id + " no longer accepted; the decision is now " + DECISION_WORDS[d] + ".";
+    if (d === "within") return id + " is no longer accepted, as it is now within tolerable risk.";
+    if (d === "none") return id + " is no longer accepted and no decision is recorded now.";
+    if (d === "accept") return id + " is no longer counted as accepted. Its decision is now " + lc1(x.cur.t.label || "no decision recorded") + ".";
+    return id + " is no longer accepted. The decision is now " + DECISION_WORDS[d] + ".";
   }
   var DETAILED_WORDS = { "true": "required", "false": "not required", "null": "not decided" };
   function detailedLine(x) {
     var w = who(x.cur);
     if (x.to == null) return w + ": the decision on a detailed assessment is no longer recorded (was " + DETAILED_WORDS[String(x.from)] + ").";
-    return w + ": detailed assessment now judged " + DETAILED_WORDS[String(x.to)] + " (was " + DETAILED_WORDS[String(x.from)] + ").";
+    return w + ": a detailed assessment is now judged " + DETAILED_WORDS[String(x.to)] + " (was " + DETAILED_WORDS[String(x.from)] + ").";
   }
   // How a zone or conduit was assessed, in words: "grouped with Z3".
-  var DEPTH_PHRASE = { detailed: "assessed in detail", grouped: "grouped", reused: "reused from earlier results", proportionate: "a proportionate review", deferred: "deferred" };
+  var DEPTH_PHRASE = { detailed: "assessed in detail", grouped: "grouped", reused: "reused from earlier results", proportionate: "given a proportionate review", deferred: "deferred" };
   function depthPhrase(x) { return x.depth === "grouped" && x.withId ? "grouped with " + x.withId : (DEPTH_PHRASE[x.depth] || "assessed in detail"); }
   // A conduit's ends in words: "Z1 and Z3".
   function endWords(pair) { return pair.map(function (e) { return e === "EXT" ? "an external network" : e ? e : "an end not set"; }).join(" and "); }
@@ -413,9 +413,9 @@ window.RiskApp.Compare = (function () {
     return bits.length ? ", with its " + bits.join(" and ") : "";
   }
   function renamedLine(x) {
-    if (!x.prev.name) return x.cur.id + " had no name; now " + x.cur.name + ".";
-    if (!x.cur.name) return x.cur.id + " was named " + x.prev.name + "; now it has no name.";
-    return x.cur.id + " was named " + x.prev.name + "; now " + x.cur.name + ".";
+    if (!x.prev.name) return x.cur.id + " had no name and is now named " + x.cur.name + ".";
+    if (!x.cur.name) return x.cur.id + " was named " + x.prev.name + " and now has no name.";
+    return x.cur.id + " was named " + x.prev.name + " and is now named " + x.cur.name + ".";
   }
   function renumberedLine(x) {
     return who(x.cur) + " was numbered " + x.prev.id + (norm(x.prev.name) !== norm(x.cur.name) && x.prev.name ? " and named " + x.prev.name : "") + ".";
@@ -440,7 +440,7 @@ window.RiskApp.Compare = (function () {
     rk.renumbered.forEach(function (x) { rs.push(renumberedLine(x)); });
     rk.renamed.forEach(function (x) { rs.push(renamedLine(x)); });
     rk.ratings.forEach(function (x) { rs.push(who(x.cur) + ": risk " + moveWords(x.from, x.to, withLI) + "."); });
-    rk.categories.forEach(function (x) { rs.push(who(x.cur) + ": impact by consequence category changed."); });
+    rk.categories.forEach(function (x) { rs.push(who(x.cur) + ": the impact by consequence category changed."); });
     rk.decisions.forEach(function (x) { rs.push(detailedLine(x)); });
     group("ranked", "Ranked systems", rs);
     var ow = [];
@@ -448,8 +448,8 @@ window.RiskApp.Compare = (function () {
     d.owners.removed.forEach(function (o) { ow.push(who(o) + " removed" + held(o) + "."); });
     d.owners.renumbered.forEach(function (x) { ow.push(renumberedLine(x)); });
     d.owners.renamed.forEach(function (x) { ow.push(renamedLine(x)); });
-    (d.owners.ends || []).forEach(function (x) { ow.push(x.cur.id + " now joins " + endWords(x.to) + "; was " + endWords(x.from) + "."); });
-    (d.owners.depth || []).forEach(function (x) { ow.push(who(x.cur) + ": now " + depthPhrase(x.to) + "; was " + depthPhrase(x.from) + "."); });
+    (d.owners.ends || []).forEach(function (x) { ow.push(x.cur.id + " now joins " + endWords(x.to) + " (was " + endWords(x.from) + ")."); });
+    (d.owners.depth || []).forEach(function (x) { ow.push(who(x.cur) + " is now " + depthPhrase(x.to) + " (was " + depthPhrase(x.from) + ")."); });
     group("owners", "Zones and conduits", ow);
     group("slt", "SL-T", d.slt.map(function (x) {
       return who(x.owner) + ": " + x.changes.map(sltWords).join(", ") + ".";
@@ -471,7 +471,7 @@ window.RiskApp.Compare = (function () {
     (d.cms.status || []).forEach(function (x) { cm.push(x.cur.m.id + " (" + x.cur.owner.id + "): " + cmStatusWords(x.prev.m, x.cur.m) + "."); });
     group("countermeasures", "Countermeasures", cm);
     var ac = [];
-    d.accepted.added.forEach(function (x) { ac.push(x.cur.t.id + " (" + x.cur.owner.id + ") accepted since the previous assessment."); });
+    d.accepted.added.forEach(function (x) { ac.push(x.cur.t.id + " (" + x.cur.owner.id + ") has been accepted since the previous assessment."); });
     d.accepted.removed.forEach(function (x) { ac.push(noLongerAccepted(x)); });
     group("accepted", "Accepted risks", ac);
     group("consequences", "Consequences", consequenceLines(d));
@@ -486,12 +486,15 @@ window.RiskApp.Compare = (function () {
     (c.added || []).forEach(function (k) { out.push(kWho(k) + " added" + (k.In ? ", impact " + k.In : "") + "."); });
     (c.removed || []).forEach(function (k) { out.push(kWho(k) + " removed."); });
     (c.renumbered || []).forEach(function (x) { out.push(kWho(x.cur) + " was numbered " + x.prev.id + "."); });
-    (c.renamed || []).forEach(function (x) { out.push(x.cur.id + " was " + (x.prev.title || "untitled") + "; now " + (x.cur.title || "untitled") + "."); });
-    (c.impact || []).forEach(function (x) { out.push(x.cur.id + ": impact " + (x.prev.In ? "changed from " + x.prev.In : "set") + (x.cur.In ? " to " + x.cur.In : ", no longer rated") + "."); });
+    (c.renamed || []).forEach(function (x) { out.push(x.cur.id + (x.prev.title ? " was titled " + x.prev.title : " had no title") + (x.cur.title ? " and is now titled " + x.cur.title : " and now has none") + "."); });
+    (c.impact || []).forEach(function (x) {
+      var a = x.prev.In, b = x.cur.In;
+      out.push(x.cur.id + ": " + (a && b ? "impact changed from " + a + " to " + b : b ? "impact set to " + b : "impact no longer rated" + (a ? " (was " + a + ")" : "")) + ".");
+    });
     (c.paths || []).forEach(function (x) {
       var id = x.cur.t.id + " (" + x.cur.owner.id + ")";
       if (!x.to) out.push(id + " no longer leads to " + x.from + ".");
-      else out.push(id + " now leads to " + x.to + (x.from ? "; was " + x.from : "") + ".");
+      else out.push(id + " now leads to " + x.to + (x.from ? " (was " + x.from + ")" : "") + ".");
     });
     return out;
   }
@@ -517,7 +520,7 @@ window.RiskApp.Compare = (function () {
     function cmCell(m) { return cap(cmState(m)); }
     function ratingCell(r) { return r && (r.band || r.Ln || r.In) ? cap(rating(r, withLI)) : ""; }
     if (d.tolerable) add("Risk criteria", "", "Tolerable risk", "Changed", band(d.tolerable.from), band(d.tolerable.to));
-    if (d.criteriaChanged) add("Risk criteria", "", "Risk criteria", "Changed; ratings compared by band only", "", "");
+    if (d.criteriaChanged) add("Risk criteria", "", "Risk criteria", "Changed, so ratings are compared by band only", "", "");
     else if (d.byCategoryChanged) add("Risk criteria", "", "Tolerable risk per consequence category", "Changed", "", "");
     var rk = d.ranked || { added: [], removed: [], renumbered: [], renamed: [], ratings: [], categories: [], decisions: [] };
     rk.added.forEach(function (a) { add("Ranked systems", "", who(a), "Added", "", ratingCell(a.rating)); });

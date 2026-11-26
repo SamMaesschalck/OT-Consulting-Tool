@@ -34,7 +34,7 @@ window.RiskWordPreview = (function () {
   function render(main, h) {
     var DP = window.App && window.App.DocPreview;
     main.appendChild(h("h1", { class: "page-title", text: "Word preview" }));
-    main.appendChild(h("p", { class: "page-sub", text: "The Word report, page by page. Edit it in Sections." }));
+    main.appendChild(h("p", { class: "page-sub", text: "This is the Word file as it downloads. Edit the text in Sections." }));
     if (!DP || !window.App.DocxImport || !RX() || !window.docx) {
       main.appendChild(h("p", { class: "muted", text: "The Word preview is not available in this copy of the tool." }));
       return;
@@ -87,7 +87,7 @@ window.RiskWordPreview = (function () {
         if (stateText.isConnected) { say("Drawing the pages…", 0.97); setTimeout(function () { if (seq === ui.seq && paper.isConnected) show(read); }, 0); }
       }, function (e) {
         if (seq !== ui.seq) return;
-        ui.key = key; ui.read = null; ui.error = "The Word report could not be built: " + ((e && e.message) || "something went wrong.");
+        ui.key = key; ui.read = null; ui.error = "The Word report could not be built: " + ((e && e.message) || "the reason is not known.");
         if (stateText.isConnected) say(ui.error, null);
       });
     }, 30);

@@ -11,8 +11,8 @@ window.Suite.Data = {
                         "name":  "OT Cyber Assessment Tool",
                         "shortName":  "Assessments",
                         "navLabel":  "Assess",
-                        "summary":  "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and more.",
-                        "useWhen":  "To measure a site, system, product or supplier against a standard and report the gaps. One project file can hold several assessments for a customer, such as this year\u0027s and a re-assessment.",
+                        "summary":  "Assess a site, system, product or supplier against IEC 62443, NCSC CAF, NIS2, NIST, CIS, ONR SyAPs, the EU CRA and other standards.",
+                        "useWhen":  "Use it to report a customer\u0027s gaps against a standard, and keep later re-assessments in the same project file.",
                         "entry":  "../modules/assessments/index.html",
                         "payload":  "assessments",
                         "tour":  {
@@ -29,7 +29,7 @@ window.Suite.Data = {
                         "shortName":  "Risk assessment",
                         "navLabel":  "Risk",
                         "summary":  "Run an IEC 62443-3-2 risk assessment and set a target security level for each zone and conduit.",
-                        "useWhen":  "Before a 62443-3-3 assessment, to set the targets it is measured against. Export the risk context file and import it into that assessment.",
+                        "useWhen":  "Use it before a 62443-3-3 assessment to set the targets, then import its risk context file into that assessment.",
                         "entry":  "../modules/risk-assessment/index.html",
                         "payload":  "risk-assessment",
                         "tour":  {
@@ -48,7 +48,7 @@ window.Suite.Data = {
                         "shortName":  "Report review",
                         "navLabel":  "Review",
                         "summary":  "Review a colleague\u0027s report and the engagement behind it, and give a verdict.",
-                        "useWhen":  "When a colleague sends you a review pack. Save your comments to a review file and send it back to them.",
+                        "useWhen":  "Use it when a colleague sends you a review pack, and send your comments back to them as a review file.",
                         "entry":  "../modules/report-review/index.html",
                         "payload":  "report-review",
                         "tour":  {
@@ -67,7 +67,7 @@ window.Suite.Data = {
                         "shortName":  "Documents",
                         "navLabel":  "Write",
                         "summary":  "Write proposals, method statements and other documents in the SolutionsPT template, or rebuild a Word file in it.",
-                        "useWhen":  "For any document that is not an assessment or risk report but should look like one.",
+                        "useWhen":  "Use it for any other document that should look like a SolutionsPT assessment or risk report.",
                         "entry":  "../modules/documents/index.html",
                         "payload":  "documents",
                         "tour":  {

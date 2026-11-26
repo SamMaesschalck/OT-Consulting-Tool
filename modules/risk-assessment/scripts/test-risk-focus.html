@@ -249,7 +249,7 @@
     var vhs = vh ? w.getComputedStyle(vh) : null, his = hi ? w.getComputedStyle(hi) : null;
     ok(!!vhs && vhs.outlineStyle === "dashed" && vhs.outlineColor !== vhs.backgroundColor && vhs.outlineColor === "rgb(255, 255, 255)" && !!his && his.outlineColor !== his.backgroundColor,
       "the above-tolerable outline contrasts with the cell's fill, Very high included", vhs && [vhs.outlineColor, vhs.backgroundColor].join(" on "));
-    ok([].some.call(main().querySelectorAll('[data-view="heatmap"] p.hint'), function (e) { return e.textContent === "Outlined cells are above tolerable risk; a rating not given takes the one before it."; }), "its hint says what the outline means first");
+    ok([].some.call(main().querySelectorAll('[data-view="heatmap"] p.hint'), function (e) { return e.textContent === "Outlined cells are above tolerable risk, and a scenario not rated in this state is placed by its previous rating."; }), "its hint says what the outline means first");
     main().querySelector('[data-heat="planned"]').click();
     main().querySelector('[data-cell="serious:low"]').click();
     ok(!!main().querySelector('[data-view="register"]') && same(regRows().sort(), ["C2/T9", "Z1/T1", "Z1/T2", "Z1/T3", "Z3/T5", "Z3/T6", "Z4/T7"].sort()) && /^Planned: Serious impact, low likelihood/.test(main().querySelector("[data-cell-filter]").textContent),

@@ -1,7 +1,7 @@
 {
   "schema": "spt-scenario-library/1.0",
-  "version": "1.1",
-  "date": "2026-11-14",
+  "version": "1.2",
+  "date": "2026-11-26",
   "owner": "Sam Maesschalck",
   "_note": "HOUSE scenario library for step 5 of the risk tool. The wording is owned by Sam Maesschalck (SolutionsPT, named 14 Nov 2026), who approves any change to it. Every scenario is written in SolutionsPT's own words for this tool and is not taken from any standard, threat framework or vendor document. The SR ids are references to IEC 62443-3-3 system requirements by id only; no requirement text is reproduced. The library holds no ratings: the consultant rates every scenario added from it. Nothing in this note is shown in the tool or printed in a deliverable.",
   "tags": {
@@ -112,7 +112,7 @@
     {
       "id": "HS06",
       "title": "Forged commands on an unauthenticated industrial protocol",
-      "statement": "A device on the control network sends forged or altered commands over an industrial protocol that accepts any sender, changing outputs or set points.",
+      "statement": "A device on the control network sends forged or altered commands over an industrial protocol that accepts any sender, and changes outputs or set points.",
       "source": "Attacker with a foothold in the control network",
       "entryPoint": "Control network carrying unauthenticated protocol traffic, such as Modbus TCP",
       "consequence": "Unexpected valve or drive movement, process upset, equipment damage",
@@ -234,7 +234,7 @@
       "statement": "A phishing email gives an attacker an engineer's credentials, which they then use on the remote access service or jump hosts that serve the control system.",
       "source": "External attacker",
       "entryPoint": "Engineer's corporate email, then the remote access portal",
-      "consequence": "The attacker works as a trusted engineer would",
+      "consequence": "The attacker can act as a trusted engineer",
       "affectedFR": ["IAC", "UC"],
       "assetTypes": ["engineering-workstation", "business"],
       "vulnerabilities": ["The same password for corporate and OT accounts", "Remote access protected by a password alone", "OT accounts held in the corporate directory"],
@@ -271,7 +271,7 @@
       "consequence": "Operators do not act on a real problem; damage or a release follows",
       "affectedFR": ["SI", "IAC"],
       "assetTypes": ["hmi", "plc", "network"],
-      "vulnerabilities": ["No integrity protection on traffic between controllers and HMIs", "A single source for process values, with no cross check", "Network devices that let traffic be intercepted"],
+      "vulnerabilities": ["No integrity protection on traffic between controllers and HMIs", "Process values come from one source, with no cross check", "Network devices that let traffic be intercepted"],
       "countermeasures": [
         { "description": "Integrity protection on control communications where supported", "srRefs": ["SR 3.1"] },
         { "description": "Alarm when a critical value disagrees with an independent reading", "srRefs": ["SR 6.2"] },
@@ -316,7 +316,7 @@
     {
       "id": "HS18",
       "title": "Contractor laptop connected to the control network",
-      "statement": "A contractor connects their own laptop to the control network for commissioning or fault finding, bringing in malware or opening an uncontrolled path out.",
+      "statement": "A contractor connects their own laptop to the control network for commissioning or fault finding. The laptop brings in malware or opens an uncontrolled path out.",
       "source": "Contractor without malicious intent, with malware already on the laptop",
       "entryPoint": "Spare switch port or a network connection in a cabinet",
       "consequence": "Malware on control hosts, or an unmanaged route to outside networks",
@@ -404,7 +404,7 @@
       "statement": "An attacker in the business network reaches the control zone through a firewall rule added for convenience and never removed.",
       "source": "External attacker, helped by changes made for convenience",
       "entryPoint": "Firewall and switch management interfaces",
-      "consequence": "Zones that are separate on paper but not in practice, so any attack spreads further",
+      "consequence": "Zones that are separate on paper are joined in practice, so any attack spreads further",
       "affectedFR": ["RDF", "RA"],
       "assetTypes": ["network"],
       "vulnerabilities": ["Temporary rules never removed", "Management interfaces open to the whole network", "No baseline of approved settings"],
@@ -435,7 +435,7 @@
     {
       "id": "HS25",
       "title": "Field devices reconfigured",
-      "statement": "Field instruments, drives or remote I/O are reconfigured over a field network or with a handheld configurator, changing their ranges or behaviour.",
+      "statement": "Field instruments, drives or remote I/O are reconfigured over a field network or with a handheld configurator, which changes their ranges or behaviour.",
       "source": "Attacker with field network access, or careless maintenance",
       "entryPoint": "Field network, handheld configurator or instrument management software",
       "consequence": "Wrong readings or actions at the plant, hidden from the control room",
@@ -469,7 +469,7 @@
     {
       "id": "HS27",
       "title": "Single point of failure brings a long outage",
-      "statement": "An attacker disables a single critical server or switch, by a crafted message or by deleting its configuration, and with no redundancy or tested recovery the control system stays down.",
+      "statement": "An attacker disables a single critical server or switch with a crafted message or by deleting its configuration. With no redundancy or tested recovery, the control system stays down.",
       "source": "Attacker with network access",
       "entryPoint": "Single points of failure in the control system",
       "consequence": "Extended loss of view or control; process shutdown",
@@ -562,7 +562,7 @@
       "assetTypes": ["hmi", "server", "engineering-workstation", "historian"],
       "vulnerabilities": ["Control hosts joined to the business directory", "IT administrator accounts with rights on control hosts", "Deployment tools that can reach the control zone"],
       "countermeasures": [
-        { "description": "Manage control hosts from a directory and tools inside the control system, not from the business network", "srRefs": ["SR 5.1"] },
+        { "description": "Manage control hosts from their own directory and tools inside the control system, separate from the business network", "srRefs": ["SR 5.1"] },
         { "description": "Keep administrator accounts for control hosts separate, limited to the task and reviewed", "srRefs": ["SR 1.3", "SR 2.1"] },
         { "description": "Allow only approved software to run on control hosts", "srRefs": ["SR 3.2"] }
       ],
@@ -571,7 +571,7 @@
     {
       "id": "HS33",
       "title": "Package unit connected without review",
-      "statement": "A supplier's package unit arrives with its own network and remote access, and is connected to the control network without review, opening a path around the zone boundaries.",
+      "statement": "A supplier's package unit arrives with its own network and remote access and is connected to the control network without review. This opens a path around the zone boundaries.",
       "source": "Attacker using the package supplier's remote access, or malware already on the unit",
       "entryPoint": "The package unit's network, or its supplier's remote access or modem",
       "consequence": "An unmanaged route into the control network, and changes to the unit's control the site does not know about",

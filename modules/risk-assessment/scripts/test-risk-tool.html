@@ -76,7 +76,7 @@
     // --- exposure modifier appears in trace for its FRs, does not auto-raise SL ---
     z.flags["remote-access"] = true; // affects IAC,UC,RDF
     s = RT.suggestZone(z, proj);
-    ok(s.byFR.UC.trace.join(" ").indexOf("remote-access") >= 0, "remote-access consideration traced on UC");
+    ok(s.byFR.UC.trace.join(" ").indexOf(RULES.exposureModifiers.filter(function (m) { return m.id === "remote-access"; })[0].label + ": ") >= 0, "remote-access consideration traced on UC");
     ok(s.byFR.UC.sl === null, "exposure alone does not create an SL where no threat hits UC", "got " + s.byFR.UC.sl);
 
     // --- SIS floor applies to every FR ---
@@ -91,14 +91,14 @@
     proj.srs.adversaryClass = 4;
     s = RT.suggestZone(z, proj);
     ok(s.byFR.IAC.sl === 3, "adversary class 4 does not raise SL beyond risk-derived");
-    ok(s.byFR.IAC.trace.join(" ").indexOf("Mismatch:") >= 0, "adversary mismatch flagged in trace");
+    ok(s.byFR.IAC.trace.join(" ").indexOf("The assumed adversary class (SL") >= 0, "adversary mismatch flagged in trace");
     proj.srs.adversaryClass = null;
 
     // --- conduit inherits higher endpoint per FR ---
     var c = RT.emptyConduit(1); c.fromZone = "Z1"; c.toZone = "Z2"; proj.conduits.push(c);
     s = RT.suggestConduit(c, proj);
     ok(s.byFR.IAC.sl === 3, "conduit inherits SL3 for IAC from endpoints", "got " + s.byFR.IAC.sl);
-    ok(s.byFR.IAC.trace.join(" ").indexOf("Inherits") >= 0, "conduit trace notes inheritance");
+    ok(/ suggests SL3 for IAC\./.test(s.byFR.IAC.trace.join(" ")), "conduit trace notes inheritance");
 
     // --- SL-T vector + export v1.1 ---
     w.RiskTool.FR_IDS.forEach(function (fr) { z.slTargetByFR[fr] = (fr === "SI" ? 2 : 3); }); // hold SI below suggestion
@@ -179,7 +179,7 @@
     ok(ctx.approval && ctx.approval.name === "A. Approver" && ctx.approval.approved === true, "risk context exports the asset-owner sign-off");
     ok(ctx.zones[1].safetyRelated === true, "safetyRelated exported");
     ok(ctx.conduits.length === 1 && ctx.conduits[0].slTargetByFR.IAC === 3 && ctx.conduits[0].slTarget === 3, "conduit exported with per-FR + scalar SL-T");
-    ok(ctx.assumptions.some(function (a) { return a.indexOf("Client risk matrix used") === 0; }), "client-matrix assumption surfaced");
+    ok(ctx.assumptions.some(function (a) { return a.indexOf("The client's risk matrix is used") === 0; }), "client-matrix assumption surfaced");
 
     // --- completeness validation ---
     var probs = RT.exportProblems();
@@ -192,7 +192,7 @@
     var cEmpty = RT.emptyConduit(9); proj.conduits.push(cEmpty);
     ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && p.indexOf("no threats") >= 0; }), "empty conduit flagged: no threats");
     cEmpty.slTargetByFR.IAC = 2;
-    ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && p.indexOf("SL-T set with no threats") >= 0; }), "conduit with an SL-T, no threats and no justification asks for the basis");
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && p.indexOf("has an SL-T but no threats") >= 0; }), "conduit with an SL-T, no threats and no justification asks for the basis");
     cEmpty.justification = "Takes the higher SL-T of the two zones it joins.";
     // (Phase 3a: a conduit also needed its risk comparison decided. Since the
     // zone-depth step the comparison is the SUC's, once, and a conduit is
@@ -204,7 +204,7 @@
     // reason. A decision an older build recorded is now read only for the
     // conduit's depth, so it asks for nothing; the conduit is still given
     // the initial risk, as before.)
-    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /no initial risk to rest on/.test(p); }) && RT.depthOf(cEmpty).depth === "detailed",
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /no initial risk behind it/.test(p); }) && RT.depthOf(cEmpty).depth === "detailed",
       "a comparison decided per conduit by an older build asks for nothing now, and the conduit reads as detailed");
     cEmpty.initialRisk = "high";
     // (Phase 3b review: a conduit with an end not set is open on step 3, so
@@ -212,7 +212,7 @@
     // justification rule alone, as it did.)
     ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /neither end is set/.test(p); }), "a conduit with no ends is listed for them");
     cEmpty.fromZone = "Z1"; cEmpty.toZone = "Z2";
-    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && !/: no vulnerabilities recorded.$/.test(p) && !/: characteristics not recorded: /.test(p) && !/: no SL-T set for /.test(p); })
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && !/ has no vulnerabilities recorded.$/.test(p) && !/ has no record of its /.test(p) && !/ has no SL-T for /.test(p); })
 , "a conduit's justification is the basis when it has no threat of its own (assessed in detail, it is still asked for its vulnerabilities)");
     proj.conduits.pop();
 
@@ -407,8 +407,8 @@
     ok(doc.body.textContent.indexOf("Documents reviewed") >= 0, "Basis stage captures documents reviewed");
     ok(doc.body.textContent.indexOf("Systems & evidence observed") >= 0, "Basis stage captures systems observed");
     ok(doc.body.textContent.indexOf("Preparation guidance") >= 0, "Basis stage shows preparation guidance");
-    ok(doc.body.textContent.indexOf("Often forgotten") >= 0 && doc.body.textContent.indexOf("Key stakeholders to interview") >= 0, "guidance lists forgotten docs and key stakeholders");
-    ok(doc.body.textContent.indexOf("Advisory only") >= 0, "guidance is framed as advisory, not a checklist");
+    ok(doc.body.textContent.indexOf("Often forgotten") >= 0 && doc.body.textContent.indexOf("Stakeholders to interview") >= 0, "guidance lists forgotten docs and key stakeholders");
+    ok(doc.body.textContent.indexOf("This guidance is advisory") >= 0, "guidance is framed as advisory, not a checklist");
     ok(w.App.Data.engagementGuidance && w.App.Data.engagementGuidance.oftenForgotten.length >= 5, "guidance data mirror loaded");
     // guidance must never pre-populate the registers: only the one interview
     // this test added earlier should exist
@@ -472,7 +472,7 @@
     // A suggestion carried over from an older file: dashed, worded, one click per zone.
     pt.treatment = { decision: "reduce", confirmed: false, reason: "" }; RT.render();
     var sOpt = opt(pz, pt.id, "reduce");
-    ok(/suggested/.test(sOpt.className) && /^\? /.test(sOpt.textContent) && sOpt.getAttribute("aria-pressed") === "false" && /Suggested, not confirmed/.test(threatCard(pz, pt.id).textContent),
+    ok(/suggested/.test(sOpt.className) && /^\? /.test(sOpt.textContent) && sOpt.getAttribute("aria-pressed") === "false" && /Suggested, unconfirmed/.test(threatCard(pz, pt.id).textContent),
       "a suggestion shows as one, in shape and in words, and not as pressed");
     // (Phase 4: one zone at a time, so the zone without one is looked at first.)
     var z1NoConfirm = !ownerCard("Z1").querySelector('[data-action="confirm-suggested"]');
@@ -531,7 +531,7 @@
     ok(/none of the standard.s text is reproduced/.test(doc.body.textContent), "About states verbatim text is not reproduced (licensing)");
     // Phase 3b: ZCR 6 and ZCR 7 are steps now, so About names all seven and no step as missing.
     ok(/published IEC 62443-3-2:2020 and covers ZCR 1, ZCR 2, ZCR 3, ZCR 4, ZCR 5, ZCR 6 and ZCR 7\./.test(doc.body.textContent) && !/not yet steps? of (its|their) own/.test(doc.body.textContent) && !/ZCR 1 to ZCR 7/.test(doc.body.textContent) && /requirement wording against the published edition/.test(doc.body.textContent) && !/not been checked line by line/.test(doc.body.textContent), "About names the published edition, every step the tool covers, and says what was checked (the requirement wording too, since Nov 2026)");
-    ok(doc.body.textContent.indexOf("house default") >= 0 || doc.body.textContent.indexOf("house defaults") >= 0, "About states the house-heuristic framing");
+    ok(doc.body.textContent.indexOf("are SolutionsPT defaults") >= 0, "About states the house-heuristic framing");
 
     // --- #2 destructive-delete guard: a filled threat confirms before vanishing ---
     clickNav("risk");
@@ -568,7 +568,7 @@
 
     // --- #4 empty-zone export is flagged (was a silent 'success' on an empty handoff) ---
     // state.project is now "Other SUC" with no zones.
-    ok(RT.exportProblems().some(function (p) { return p.indexOf("No zones defined") >= 0; }), "#4 export with no zones is flagged (no silent empty handoff to the 3-3 tool)");
+    ok(RT.exportProblems().some(function (p) { return p.indexOf("No zones are defined") >= 0; }), "#4 export with no zones is flagged (no silent empty handoff to the 3-3 tool)");
 
     // --- #5 dirty tracking, Save*, beforeunload guard, autosave-failure warning, restore gate ---
     var saveBtn = doc.getElementById("btn-save");
@@ -590,7 +590,7 @@
     w.Storage.prototype.setItem = function () { throw new Error("blocked"); };
     RT.flushAutosave();
     w.Storage.prototype.setItem = origSet;
-    ok(doc.getElementById("toast").textContent.indexOf("Autosave unavailable") >= 0, "autosave failure surfaces a one-time warning (locked-down laptop)");
+    ok(doc.getElementById("toast").textContent.indexOf("Autosave is off because browser storage is blocked") >= 0, "autosave failure surfaces a one-time warning (locked-down laptop)");
 
     // New resets to a clean project (confirm is stubbed to true)
     doc.getElementById("btn-new").click();
@@ -608,17 +608,17 @@
     RT.loadProjectText(JSON.stringify({ schema: "spt-risk-project/0.2", suc: { name: "SLT Test", description: "", scopeStatement: "", assumptions: [] }, zones: [{ id: "Z8", name: "", slTargetByFR: { IAC: 2 }, justification: "", threats: [], vulnerabilities: [], countermeasures: [] }], conduits: [] }));
     var cur = RT.state.project;
     var p7 = RT.exportProblems();
-    ok(p7.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no justification") >= 0; }), "#7 an SL-T set without a justification is named in the export warning");
+    ok(p7.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("has no SL-T justification") >= 0; }), "#7 an SL-T set without a justification is named in the export warning");
     ok(p7.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no threats") >= 0 && p.indexOf("basis") >= 0; }), "#7 an SL-T on a zone with no threats prompts recording the basis");
     clickNav("risk"); clickTab("slt");
     ok(doc.body.textContent.indexOf("needs justification") >= 0, "#7 the SL-T card flags 'needs justification' inline when a target is set but unjustified");
     cur.zones[0].justification = "Corporate SL2 floor for all OT zones; no site-specific threats modelled.";
-    ok(!RT.exportProblems().some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no justification") >= 0; }), "#7 recording a justification clears the warning (soft, never blocked)");
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("has no SL-T justification") >= 0; }), "#7 recording a justification clears the warning (soft, never blocked)");
     RT.FR_IDS.forEach(function (fr) { cur.zones[0].slTargetByFR[fr] = null; });
     cur.zones[0].justification = "";
     var p7b = RT.exportProblems();
-    ok(p7b.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no SL-T set") >= 0; }), "#7 a zone with no SL-T is flagged as incomplete");
-    ok(!p7b.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("no justification") >= 0; }), "#7 no justification-nag when there is no SL-T to justify yet");
+    ok(p7b.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("has no SL-T for") >= 0; }), "#7 a zone with no SL-T is flagged as incomplete");
+    ok(!p7b.some(function (p) { return p.indexOf("Z8") >= 0 && p.indexOf("has no SL-T justification") >= 0; }), "#7 no justification-nag when there is no SL-T to justify yet");
 
     // --- save-in-place (File System Access API, stubbed): Save overwrites the
     // --- same file instead of downloading "name (1).json" copies -----------

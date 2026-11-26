@@ -431,7 +431,7 @@ window.RiskReportPage = (function () {
           "Drag a row, or use its arrows, to reorder." }), bodyEl.firstChild);
       } else if (!lead.length) {
         bodyEl.insertBefore(h("p", { class: "muted sect-note", text:
-          "There is no opening wording to rewrite here. You can still rename or hide it." }), bodyEl.firstChild);
+          "This section has no opening wording to rewrite. You can still rename or hide it." }), bodyEl.firstChild);
       }
       var actions = [h("button", {
         class: "sl-btn" + (cur.hidden ? " active" : ""),
@@ -584,7 +584,7 @@ window.RiskReportPage = (function () {
   function render(main, h) {
     ui.h = h;
     main.appendChild(h("h1", { class: "page-title", text: "Report" }));
-    main.appendChild(h("p", { class: "page-sub", text: "The Word report, section by section; use Edit to rename, rewrite or hide one." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Use Edit on a section to rename, rewrite or hide it in the Word report." }));
     ui.tabs = h("div", { class: "rp-tabs", role: "group", "aria-label": "Which report" }, DOCS.map(function (d, i) {
       return h("button", { class: "sl-btn rp-tab", "data-doc": d.id, text: d.label, onClick: function () { openDoc(i); } });
     }));

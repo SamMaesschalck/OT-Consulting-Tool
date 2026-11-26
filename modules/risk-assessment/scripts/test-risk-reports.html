@@ -145,8 +145,8 @@
     // Phase 4 review (wording 1): "What we found" no longer repeats how many are above tolerable risk, so the
     // tolerable risk is named where the summary compares with it (was: "exceed the tolerable risk of Medium").
     var es0 = text.slice(text.indexOf("\nExecutive summary\n"), text.indexOf("\nRisk at a glance\n"));
-    ok(/compared with the tolerable risk of Medium/.test(es0) && /\n9 threats were registered\. The most affected/.test(es0) && es0.indexOf("exceed the tolerable risk") < 0, "exec summary names the tolerable risk", (es0.match(/[^\n]*threats were registered[^\n]*/) || [""])[0]);
-    ok(/The most affected is Z\d/.test(text) && text.indexOf("The highest unmitigated risk is") !== -1, "exec summary says where the risk concentrates and names the worst threat");
+    ok(/compared with the tolerable risk of Medium/.test(es0) && /\n9 threats were registered\. Z\d [^\n]* has the most threats above tolerable risk/.test(es0) && es0.indexOf("exceed the tolerable risk") < 0, "exec summary names the tolerable risk", (es0.match(/[^\n]*threats were registered[^\n]*/) || [""])[0]);
+    ok(/ Z\d [^\n]* has the most threats above tolerable risk \(\d+\)\./.test(text) && text.indexOf("The highest unmitigated risk is") !== -1, "exec summary says where the risk concentrates and names the worst threat");
     // Phase 4b demo: one decision of each kind (was: 2 reduced, 4 being reduced, 1 accepted).
     // Phase 4 review (wording 1): one sentence of the decisions that stand, in the tables' words (was: "Of the 7
     // threats above tolerable risk, 3 are reduced ..., 1 is treated through the target security level programme
@@ -155,7 +155,7 @@
       "treatment tally counts each kind of confirmed decision, in the words the tables use", (text.match(/The treatment decisions? (?:are|is): [^\n]*/) || [""])[0]);
     // Phase 4b: the summary points to the Accepted risks section, which holds the review date (was: "revisited at the next assessment").
     // Phase 4 review (wording 1): T8 is in the table of the threats above tolerable risk today, so no sentence of its own names it again.
-    var topTbl = text.slice(text.indexOf("The threats above tolerable risk today:"), text.indexOf("\nDecisions required\n"));
+    var topTbl = text.slice(text.indexOf("These threats are above tolerable risk today."), text.indexOf("\nDecisions required\n"));
     ok(/\nT8  [^\n]*\nZ4\nHigh\nHigh\nHigh\nRisk accepted(\n|$)/.test(topTbl) && text.indexOf("Accepted risk T8") < 0, "the accepted risk is named in the summary, once: in the table of the threats above tolerable risk today", topTbl.replace(/\n/g, " | ").slice(0, 600));
     ok(text.indexOf("no treatment decision recorded") === -1 && text.indexOf("No decision recorded") === -1 && text.indexOf("7/7") !== -1 && text.indexOf("with a treatment decision") !== -1, "the demo, every decision confirmed, prints no missing decision");
     ok(/ceiling is set by/.test(text) && text.indexOf("IEC 62443-3-3 assessment against these targets") !== -1, "SL-T outcome paragraph names the ceiling driver and the 3-3 handoff");
@@ -171,9 +171,9 @@
     // scorecard keeps its worst-case strip.
     // Phase 4 review: renamed, as the row is gone (was: "SL-T matrix with worst-case row").
     ok(text.indexOf("Target security levels (SL-T, per foundational requirement)") !== -1 && !/\nWorst case\n/.test(text) && /\nZ2 Safety Instrumented System\nSafety related\nSL3/.test(text), "the SL-T matrix marks the safety zone and has no Worst case row");
-    ok(text.indexOf("Justification for Z2") !== -1 && text.indexOf("SIS floor applies") !== -1, "per-zone SL-T justifications print");
+    ok(text.indexOf("Justification for Z2") !== -1 && text.indexOf("takes the SIS floor of SL3") !== -1, "per-zone SL-T justifications print");
     ok(text.indexOf("Sign-off") !== -1 && text.indexOf("R. Calder (Asset Owner - Unit 300)") !== -1, "sign-off section carries the approval");
-    ok(text.indexOf("Method and limitations") !== -1 && text.indexOf("house defaults") !== -1, "limitations state the house-matrix caveat");
+    ok(text.indexOf("Method and limitations") !== -1 && text.indexOf("SolutionsPT defaults and part of the house method") !== -1, "limitations state the house-matrix caveat");
     ok(text.indexOf("undefined") === -1 && text.indexOf("[object") === -1, "no undefined/object leaks in the Word text");
     (function () { // prose style rule: no em-dashes in running text (table cells may use the dash as an empty placeholder)
       // Every body section (phase 4b: the register's landscape pages are sections of their own).
@@ -187,7 +187,7 @@
     ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking") !== -1 && hlText.indexOf("the high-level cyber security risk assessment") !== -1, "high-level variant builds with the ranking");
     ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
     // Phase 3a: the candidates are the systems above tolerable risk (was: ranked High or above), and the decision is per zone, not per system.
-    ok(hlText.indexOf("The systems above the tolerable risk of Medium (") !== -1 && hlText.indexOf("are, by the house method, the candidates for a detailed assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the candidates above tolerable risk and carries the tailor-me note");
+    ok(hlText.indexOf("Under the house method, the systems above the tolerable risk of Medium (") !== -1 && hlText.indexOf(") are the candidates for a detailed assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the candidates above tolerable risk and carries the tailor-me note");
     ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("which justify a detailed assessment") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
     ok(!/per-system|detailed tier|promoted|Promoted|ranked High or above/.test(hlText + "\n" + text), "neither report speaks of promotion, a detailed tier or per-system assessment", (( hlText + "\n" + text).match(/[^\n]*(per-system|detailed tier|promoted|Promoted|ranked High or above)[^\n]*/) || [""])[0]);
     // Since the zone-depth step no zone is found not to need a detailed assessment: the SUC is compared once and every zone and conduit is assessed, at its depth.
@@ -360,10 +360,10 @@
     ok(vM.hl.indexOf(BPCS + "  → Z1, Z3") !== -1 && vM.hl.indexOf(LAB + "  → Z1") !== -1 && vM.det.indexOf(LAB + "  → Z1") !== -1, "Word: both reports' ranking list every zone of each system");
     ok(vM.hl.indexOf("An arrow marks the zones a system is assigned to.") !== -1 && !/detailed tier|promoted/.test(vM.hl), "Word: the arrow is described as the assignment, not as a detailed tier");
     ok(vM.rkZone(BPCS) === "Z1, Z3" && vM.rkZone(LAB) === "Z1", "Excel: the Ranking sheet's Zone column lists every zone", vM.rkZone(BPCS) + " | " + vM.rkZone(LAB));
-    ok(/\n5\nfor detailed assessment/.test(vM.hl) && vM.hl.indexOf("; 5 ranked systems are in zones taken to a detailed assessment.") !== -1, "Word: the tile and the summary count distinct ranked systems (5), not zones (4)", (vM.hl.match(/[^\n]*in zones taken[^\n]*/) || [""])[0]);
+    ok(/\n5\nfor detailed assessment/.test(vM.hl) && vM.hl.indexOf(" Of the ranked systems, 5 are in zones taken to a detailed assessment.") !== -1, "Word: the tile and the summary count distinct ranked systems (5), not zones (4)", (vM.hl.match(/[^\n]*in zones taken[^\n]*/) || [""])[0]);
     ok(vM.ctx.zones[0].fromHighLevelAsset === "A1" && vM.ctx.zones[2].fromHighLevelAsset === "A3" && vM.ctx.schema === "spt-risk-context/1.4", "the risk context keeps its one frozen field, the first system of each zone");
     var vM2 = multi(function (q) { q.zones[0].assessment = { depth: "deferred", reason: "Isolated by a data diode." }; });
-    ok(vM2.hl.indexOf("; 4 ranked systems are in zones taken to a detailed assessment.") !== -1 && /\n4\nfor detailed assessment/.test(vM2.hl) && vM2.hl.indexOf(LAB + "  → Z1") !== -1,
+    ok(vM2.hl.indexOf(" Of the ranked systems, 4 are in zones taken to a detailed assessment.") !== -1 && /\n4\nfor detailed assessment/.test(vM2.hl) && vM2.hl.indexOf(LAB + "  → Z1") !== -1,
       "Word: a zone deferred takes its only system out of the count (the BPCS stays, through Z3), and the ranking still shows the assignment");
     // A high-level-only assessment: the decision is per ranked system, and the summary follows it.
     var vH = multi(function (q) {
@@ -373,7 +373,7 @@
       q.srs.highLevelAssets[4].detailed = { required: true, reason: "Feeds the batch release." };
     });
     var hlFound = (vH.hl.match(/[^\n]*systems were ranked[^\n]*/) || [""])[0];
-    ok(hlFound.indexOf("are, by the house method, the candidates for a detailed assessment") !== -1 && hlFound.split("are, by the house method, the candidates")[0].indexOf(BPCS) === -1 && hlFound.indexOf("A detailed assessment was judged not needed for " + BPCS + ": retired next quarter.") !== -1,
+    ok(hlFound.indexOf(") are the candidates for a detailed assessment") !== -1 && hlFound.indexOf("Under the house method, the systems above") !== -1 && hlFound.split(") are the candidates")[0].indexOf(BPCS) === -1 && hlFound.indexOf("A detailed assessment was judged not needed for " + BPCS + ": retired next quarter.") !== -1,
       "Word, high-level only: a system recorded as Not required leaves the candidates, with its reason", hlFound);
     ok(hlFound.indexOf("A detailed assessment was also judged needed for " + LAB + ": feeds the batch release.") !== -1 && /\n2\nfor detailed assessment/.test(vH.hl), "and one recorded as Required below tolerable risk is named, and the tile counts the two recorded as Required", hlFound);
     phase4b(text, doc, variant);
@@ -467,19 +467,19 @@
       // the 7 threats above tolerable risk are within it; once the planned countermeasures are complete, 5 will be.").
       ok(at("\nOf the 7 threats above tolerable risk before any cyber security countermeasure, 3 are within it with today's countermeasures and 5 will be once the planned countermeasures are complete.\n") === rp + "\nRisk position".length,
         "4b Word: the residual position comes first: within tolerable risk today, and once the plan is done");
-      var top = text.slice(at("The threats above tolerable risk today:", rp), dr);
-      ok(/^The threats above tolerable risk today:\nThreat\nZone or conduit\nUnmitigated\nCurrent\nPlanned\nTreatment decision\nT2 /.test(top) && ["T2", "T4", "T5", "T8"].every(function (id, i, a) { return top.indexOf("\n" + id + "  ") > (i ? top.indexOf("\n" + a[i - 1] + "  ") : 0); }) && top.indexOf("\nT1  ") < 0 && top.indexOf("\nT7  ") < 0,
+      var top = text.slice(at("These threats are above tolerable risk today.", rp), dr);
+      ok(/^These threats are above tolerable risk today\.\nThreat\nZone or conduit\nUnmitigated\nCurrent\nPlanned\nTreatment decision\nT2 /.test(top) && ["T2", "T4", "T5", "T8"].every(function (id, i, a) { return top.indexOf("\n" + id + "  ") > (i ? top.indexOf("\n" + a[i - 1] + "  ") : 0); }) && top.indexOf("\nT1  ") < 0 && top.indexOf("\nT7  ") < 0,
         "4b Word: a short table of the top risks, those above tolerable risk today, worst first", top.replace(/\n/g, " | ").slice(0, 300));
       // Phase 4 review (wording 2): a rating not given carries the one that stands into its cell, so no cell is blank.
       ok(/\nT2  [^\n]*\nZ1\nHigh\nHigh\nMedium\nReduce with countermeasures\n/.test(top) && /\nT4  [^\n]*\nZ2\nHigh\nHigh\nHigh\nTreated through the SL-T programme\n/.test(top) && /\nT5  [^\n]*\nZ3\nHigh\nHigh\nMedium\n/.test(top),
         "4b Word: in that table a current or planned rating not given carries the rating before it, never blank", top.replace(/\n/g, " | ").slice(0, 600));
       // Phase 4 review (wording 5): M8 is only proposed, so the demo has a decision outstanding (was: "Nothing is waiting").
-      ok(text.slice(dr, why).indexOf("\n1 planned countermeasure is proposed and not yet agreed: M8 (Z2).") >= 0 && text.slice(dr, why).indexOf("Nothing is waiting") < 0,
+      ok(text.slice(dr, why).indexOf("\n1 planned countermeasure is proposed and not yet agreed: M8 (Z2).") >= 0 && text.slice(dr, why).indexOf("No decision is outstanding") < 0,
         "4b Word: a planned countermeasure only proposed is a decision required", text.slice(dr, why).replace(/\n/g, " | "));
       var vAgreed = variant(function (q) { q.zones[1].countermeasures[1].status = "agreed"; });
       var vaDr = vAgreed.text.indexOf("\nDecisions required\n"), vaWhy = vAgreed.text.indexOf("\nWhy this assessment\n", vaDr);
-      ok(vAgreed.text.slice(vaDr, vaWhy).indexOf("Nothing is waiting on a decision: every threat above tolerable risk has a treatment decision, the accepted risk is approved and each planned countermeasure has an owner and a due date.") > 0,
-        "4b Word: with M8 agreed the demo has no decision outstanding, and says so");
+      ok(vAgreed.text.slice(vaDr, vaWhy).indexOf("No decision is outstanding. Every threat above tolerable risk has a treatment decision, the accepted risk is approved and each planned countermeasure has an owner and a due date.") > 0,
+        "4b Word: with M8 agreed the demo has no decision outstanding, and says so", vAgreed.text.slice(vaDr, vaWhy).replace(/\n/g, " | "));
       // The risk register, the treatment plan and the accepted risks, on landscape pages of their own.
       // Phase 5b: the drawing's landscape page is section 2, so the register's is section 4 (was 2).
       var land = [].concat(doc.sections[4].children).filter(function (n) { return n.__t === "p" && n.heading === "h1"; }).map(function (n) { return n.text; });
@@ -513,7 +513,7 @@
       // A plan field not given says so in a word.
       var vPlan = variant(function (q) { var m3 = q.zones[0].countermeasures[2]; m3.owner = ""; m3.dueDate = ""; m3.priority = ""; m3.status = ""; m3.srRefs = []; q.zones[0].threats[1].countermeasureIds = ["M2"]; });
       ok(vPlan.text.indexOf("\nM3  Retire OPC DA: migrate the two remaining clients to OPC UA through the DMZ broker\nZ1 Unit 300 BPCS\nNone linked\nNot assigned\nNot set\nNot set\nNot set\n\n") > 0, "4b Word: an empty plan field reads Not assigned, Not set or None linked, and SR references blank");
-      ok(vPlan.text.indexOf("1 planned countermeasure has no owner or due date agreed: M3 (Z1).") > 0 && vPlan.text.indexOf("Nothing is waiting on a decision") < 0, "4b Word: and the summary's decisions required name it");
+      ok(vPlan.text.indexOf("1 planned countermeasure has no owner or due date agreed: M3 (Z1).") > 0 && vPlan.text.indexOf("No decision is outstanding") < 0, "4b Word: and the summary's decisions required name it");
       var vAw = variant(function (q) { q.approvals.forEach(function (e) { e.approved = false; e.fingerprint = ""; }); q.approval.approved = false; });
       ok(vAw.text.indexOf("The asset owner has not yet approved the accepted risks T8 (Z4) and T4 (Z2).") > 0, "4b Word: an accepted risk nobody has approved is a decision required (step 5: with T4's remaining risk)");
       var ar = at("\nAccepted risks\n", tp);
@@ -527,7 +527,7 @@
       var t1 = text.slice(at("\nT1  ", zd), at("\nT2  ", zd));
       ok(/\nEntry point\nVendor VPN and jump host \(C2\)\n/.test(t1) && /\nAssets\nDCS server pair \(redundant\)\n/.test(t1) && /\nVulnerabilities\nV1\n/.test(t1) && /\nConsequence\nUnauthorised setpoint/.test(t1) && /\nCountermeasures\nM1 in place$/.test(t1),
         "4b Word: a threat's detail shows its entry point, linked assets, vulnerabilities, consequence and countermeasures", t1.replace(/\n/g, " | "));
-      var t3 = text.slice(at("\nT3  ", zd), at("\nCountermeasures: M1", zd));
+      var t3 = text.slice(at("\nT3  ", zd), at("\nCountermeasures in place: M1", zd));
       ok(t3.length > 20 && t3.indexOf("\nVulnerabilities\n") < 0 && t3.indexOf("\nCountermeasures\n") < 0, "4b Word: a field with nothing captured is not printed", t3.replace(/\n/g, " | "));
       ok(at("\nVendor jump host (Z3); DCS server pair (redundant) (Z1)\n", zd) > zd, "4b Word: a conduit's threat names its assets with the zone they are in");
       ok(at("Vulnerabilities: V1 DCS servers on an extended-support OS awaiting the vendor's qualified upgrade path (source: DCS vendor lifecycle notice LN-2025-11)", zd) > zd, "4b Word: each vulnerability prints with where it is known from");
@@ -541,7 +541,7 @@
       // Phase 4 review (logic 8, wording 10): where a suggestion is above what the drivers map to, the row says where it
       // comes from (was: Z2 and C2 named only threats, and a requirement with an inherited target had no row).
       // Consequence first: the demo's paths pass through zones, so the lead-in says how a path is named.
-      ok(at("\nFor each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. On the house mapping these set the suggested SL-T; the justifications follow. By the house method, a scenario also sets the suggestion for each zone or conduit it passes through on its way to where it acts.\nZone or conduit\nFoundational requirements\nDriving scenarios\n", st) > st,
+      ok(at("\nThe table gives, for each zone and conduit, the threats with the worst unmitigated risk on each foundational requirement. Under the house method, these threats set the suggested SL-T. The justifications follow the table. By the house method, a scenario also sets the suggestion for each zone or conduit it passes through on its way to where it acts.\nZone or conduit\nFoundational requirements\nDriving scenarios\n", st) > st,
         "4b Word: the driving scenarios' lead-in and columns say what the rows are");
       ok(at("\nZ2 Safety Instrumented System\nIAC, SI\nT4 (High)\n\nUC, DC, RDF, TRE, RA\nSL3 from the safety floor\n", st) > st, "4b Word: a safety zone's requirements no threat drives say their SL3 comes from the safety floor");
       ok(at("\nC2 Vendor remote access\nIAC, RDF\nT9 (High)\n\nSI\nSL3 inherited from Z3 and Z1\n\nDC\nSL2 inherited from Z3\n\nRA\nSL2 inherited from Z1\n", st) > st, "4b Word: a conduit's requirements its own threats do not drive say which zone the suggestion is inherited from",
@@ -618,14 +618,14 @@
       ok(acc7.length === 1 && acc7[0] === "Z4/T8:" + q7b.zones[3].threats[1].acceptance && acc7d[0] === acc7[0] + "|R. Calder|Asset Owner - Unit 300|2026-07-04|2027-06-30",
         "review: with no detail recorded the accepted part reads as it did before, so an older approval still matches; with it, the detail is appended", JSON.stringify([acc7[0].slice(0, 40), acc7d[0].slice(-60)]));
       // Wording 6, 7, 8 and 9: the lead-ins and the zone's countermeasure line.
-      ok(text.indexOf("\nEach threat scenario is rated before any cyber security countermeasure (unmitigated), with the countermeasures in place today (current) and after the planned ones (planned). The unmitigated rating still counts countermeasures built into the components and protection that is not cyber security, such as controlled site access, hardwired interlocks and relief devices. Under each risk is its likelihood × impact. A blank current or planned rating means the rating before it stands. The tolerable risk is Medium.\n") > 0,
+      ok(text.indexOf("\nEach threat scenario is rated before any cyber security countermeasure (unmitigated), with the countermeasures in place today (current) and after the planned ones (planned). The unmitigated rating still counts countermeasures built into the components and protection that is not cyber security, such as controlled site access, hardwired interlocks and relief devices. Each risk shows its likelihood × impact below it. A blank current or planned rating means the rating before it stands. The tolerable risk is Medium.\n") > 0,
         "review: the register's lead-in says what is under each risk");
       ok(text.indexOf("\nEach additional countermeasure has an owner, a priority, a due date and a status. Countermeasures already in place are listed under each zone and conduit.\n") > 0, "review: the treatment plan's lead-in");
       // Step 5: with a remaining risk accepted (T4), the lead-in says it is marked.
-      ok(text.indexOf("\nEach risk above tolerable risk that has been accepted, with the rating that stands, the reason, who accepted it and when it is to be reviewed. A risk still above tolerable risk once its planned countermeasures are complete, whose remaining risk the asset owner accepted, is marked as such.\n") > 0, "review: the accepted risks' lead-in does not assume who accepted it");
+      ok(text.indexOf("\nThe table lists each risk above tolerable risk that has been accepted, with the rating that stands, the reason, who accepted it and when it is to be reviewed. Where a risk stays above tolerable risk once its planned countermeasures are complete and the asset owner accepted the remaining risk, its row says Remaining risk accepted.\n") > 0, "review: the accepted risks' lead-in does not assume who accepted it");
       var zd = text.indexOf("\nZones, conduits and the detailed risk assessment\n");
-      ok(text.indexOf("\nCountermeasures: M1 Per-session vendor access activation with MFA and session recording on the jump host (in place) · M2 Application allow-listing on DCS servers and HMIs (vendor-qualified build) (in place); planned: see the treatment plan.\n", zd) > zd
-        && text.indexOf("\nCountermeasures: none in place; planned: see the treatment plan.\n", zd) > zd && text.indexOf("[existing]", zd) < 0 && text.indexOf("[planned]", zd) < 0,
+      ok(text.indexOf("\nCountermeasures in place: M1 Per-session vendor access activation with MFA and session recording on the jump host · M2 Application allow-listing on DCS servers and HMIs (vendor-qualified build). The planned countermeasures are in the treatment plan.\n", zd) > zd
+        && text.indexOf("\nNo countermeasures are in place. The planned countermeasures are in the treatment plan.\n", zd) > zd && text.indexOf("[existing]", zd) < 0 && text.indexOf("[planned]", zd) < 0,
         "review: a zone's countermeasure line lists those in place and points to the treatment plan for the planned ones");
       ok(text.indexOf("\nT4 is treated through the SL-T programme. The consequence stays severe whatever is added") > 0 && text.indexOf("on every foundational requirement, and the 62443-3-3 programme") > 0, "review: the SL-T decision's reason reads as a sentence of its own");
       // Phase 6 review: the demo's justifications name no threat or countermeasure by id (the specification lists neither).
@@ -648,7 +648,7 @@
       function find(ws, v) { var at = null; ws.eachRow(function (row, i) { row.eachCell(function (c, j) { if (at == null && c.value === v) at = { r: i, c: j }; }); }); return at; }
       function rowVals(ws, r, n) { var out = []; for (var j = 1; j <= n; j++) { var v = ws.getCell(r, j).value; out.push(v == null ? "" : String(v)); } return out.join("|"); }
       var fr = wb.getWorksheet("Front"), last = fr.getRow(fr.rowCount);
-      ok(last.getCell(1).value === "About this workbook" && /A new issue replaces this workbook/.test(last.getCell(2).value) && /make changes in the tool/.test(last.getCell(2).value), "4b Excel: the Front sheet says a new issue replaces it and changes are made in the tool", String(last.getCell(2).value));
+      ok(last.getCell(1).value === "About this workbook" && /each new issue replaces it in full/.test(last.getCell(2).value) && /Make any changes in the tool/.test(last.getCell(2).value), "4b Excel: the Front sheet says a new issue replaces it and changes are made in the tool", String(last.getCell(2).value));
       var su = wb.getWorksheet("Summary");
       var w0 = find(su, "Of those, within tolerable risk with today's countermeasures"), w1 = find(su, "Of those, within tolerable risk once the plan is complete");
       ok(w0 && su.getCell(w0.r, 2).value === 3 && w1 && su.getCell(w1.r, 2).value === 5 && su.getCell(find(su, "Additional countermeasures planned").r, 2).value === 4, "4b Excel: the Summary gives the position today and once the plan is done");
@@ -674,7 +674,7 @@
       var vs = wb.getWorksheet("Vulnerabilities");
       ok(vs.rowCount === 8 && rowVals(vs, 2, 5) === "Z1 Unit 300 BPCS|V1|DCS servers on an extended-support OS awaiting the vendor's qualified upgrade path|DCS vendor lifecycle notice LN-2025-11|T1, T2", "4b Excel: the Vulnerabilities sheet has each one's source and the threats that link it", rowVals(vs, 2, 5));
       var cr = wb.getWorksheet("Criteria");
-      ok(["Risk matrix", "Impact scale", "Likelihood scale", "Security levels (SolutionsPT house summary)", "Suggested SL-T (SolutionsPT house mapping)", "Foundational requirements"].every(function (t) { return !!find(cr, t); }) && cr.getCell(find(cr, "Tolerable risk").r, 2).value === "Medium" && !!find(cr, "High (above)"),
+      ok(["Risk matrix", "Impact scale", "Likelihood scale", "Security levels (SolutionsPT summary)", "Suggested SL-T (house method)", "Foundational requirements"].every(function (t) { return !!find(cr, t); }) && cr.getCell(find(cr, "Tolerable risk").r, 2).value === "Medium" && !!find(cr, "High (above)"),
         "4b Excel: the Criteria sheet holds the matrix with the tolerable line, the scales, the security levels and the FR key");
       var cmw = wb.getWorksheet("Countermeasures");
       ok(rowVals(cmw, 1, 8).split("|").slice(6).join("|") === "SR references|Threat scenarios" && rowVals(cmw, 4, 8).split("|").slice(6).join("|") === "SR 5.1, SR 7.7|T2", "4b Excel: the Countermeasures sheet adds SR references and the scenarios each addresses, after its old columns");

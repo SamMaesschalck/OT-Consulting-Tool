@@ -101,7 +101,7 @@ window.RiskApp.App = (function () {
     try {
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ savedOn: new Date().toISOString(), stage: state.stage, project: state.project }));
     } catch (e) {
-      if (!autosaveBroken) { autosaveBroken = true; toast("Autosave unavailable (browser storage blocked or full). Save to a file regularly.", "err"); }
+      if (!autosaveBroken) { autosaveBroken = true; toast("Autosave is off because browser storage is blocked or full. Save to a file regularly.", "err"); }
     }
   }
   function scheduleAutosave() {
@@ -208,7 +208,7 @@ window.RiskApp.App = (function () {
       downloadBlob(text, suggested);
       markClean();
       toast(blocked ? "Risk project saved as a download (" + suggested + "). Each save here downloads a new copy."
-                    : "Risk project saved (downloaded).");
+                    : "Risk project downloaded.");
       noteRecentFile("save", suggested, null);
       onDone({ ok: true, method: "download", name: suggested, blocked: !!blocked });
     }
@@ -289,9 +289,9 @@ window.RiskApp.App = (function () {
     opts = opts || {};
     var data;
     try { data = JSON.parse(text); }
-    catch (e) { toast("Not a valid JSON file.", "err"); return false; }
+    catch (e) { toast("This file is not valid JSON.", "err"); return false; }
     if (!data || !MG.accepts(data.schema)) {
-      toast("Unrecognised file: expected " + M.ACCEPTED_PROJECT_SCHEMAS.join(" or ") + ", got " + (data && data.schema ? data.schema : "none") + ".", "err");
+      toast("This file is not a risk project. Expected " + M.ACCEPTED_PROJECT_SCHEMAS.join(" or ") + ", found " + (data && data.schema ? data.schema : "no schema") + ".", "err");
       return false;
     }
     if (!opts.demo && projectHasContent(state.project)) {
@@ -327,7 +327,7 @@ window.RiskApp.App = (function () {
     if (dirty && projectHasContent(state.project) && !confirm("Open the demo? Save first to keep unsaved changes in a file.")) return;
     flushAutosave();
     function go() {
-      if (!window.SPT_TOUR_PROJECT) { toast("Tour data missing (data/tour-project.js).", "err"); return; }
+      if (!window.SPT_TOUR_PROJECT) { toast("The demo data (data/tour-project.js) is missing.", "err"); return; }
       TOUR_MODE = true; tourOpenedHere = true;
       projectHandle = null;   // only in memory: Save in the demo always asks where
       loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT), { demo: true });
@@ -337,7 +337,7 @@ window.RiskApp.App = (function () {
     var s = document.createElement("script");
     s.src = "data/tour-project.js";
     s.onload = go;
-    s.onerror = function () { toast("Tour data (data/tour-project.js) failed to load.", "err"); };
+    s.onerror = function () { toast("The demo data (data/tour-project.js) did not load.", "err"); };
     document.head.appendChild(s);
   }
 
@@ -696,7 +696,7 @@ window.RiskApp.App = (function () {
     // basis-only session that has no zones yet (both are valid deliverables).
     if (!projectHasContent(pj)) return;
     var bar = h("div", { class: "autosave-bar no-print" }, [
-      h("span", { class: "autosave-msg", text: "Found unsaved work from " + new Date(snap.savedOn).toLocaleString() + (pj.suc.name ? " (“" + pj.suc.name + "”)" : "") + "." }),
+      h("span", { class: "autosave-msg", text: "There is unsaved work from " + new Date(snap.savedOn).toLocaleString() + (pj.suc.name ? " (“" + pj.suc.name + "”)" : "") + "." }),
       h("button", { class: "btn sm primary", text: "Restore", onClick: function () {
         state.project = MG.normaliseProject(pj); state.stage = knownStage(snap.stage) ? snap.stage : "home"; openedAt = state.stage;
         if (opts.forgetFile) forgetProjectFile();
@@ -816,9 +816,9 @@ window.RiskApp.App = (function () {
       tourScript.src = "data/tour-project.js";
       tourScript.onload = function () {
         if (window.SPT_TOUR_PROJECT) loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT));
-        else toast("Tour data missing (data/tour-project.js).", "err");
+        else toast("The demo data (data/tour-project.js) is missing.", "err");
       };
-      tourScript.onerror = function () { toast("Tour data (data/tour-project.js) failed to load.", "err"); };
+      tourScript.onerror = function () { toast("The demo data (data/tour-project.js) did not load.", "err"); };
       document.head.appendChild(tourScript);
     }
 

@@ -118,7 +118,7 @@
     ok(same.d.empty && RT.comparisonLines(same.d).length === 0 && RT.comparisonRows(same.d).length === 0, "the same assessment again: nothing has changed");
     ok(RT.baselineWords(same.b) === "the previous assessment of Unit 300 Alkylation Unit, 2026-07-01 to 2026-07-04, revision 1.0, approved on 2026-07-04" || /^the previous assessment of .+, 2026-07-01 to 2026-07-04, revision 1\.0, approved on 2026-07-04$/.test(RT.baselineWords(same.b)),
       "the baseline in words names its date, revision and approval", RT.baselineWords(same.b));
-    ok(RT.baselineFrom("{ nope", "x").error === "Not a valid JSON file." && RT.baselineFrom(JSON.stringify({ schema: "spt-risk-project/9.9" }), "x").error === "Not a risk project file this tool reads.", "a file that is not a risk project file is refused, with why");
+    ok(RT.baselineFrom("{ nope", "x").error === "The file is not valid JSON." && RT.baselineFrom(JSON.stringify({ schema: "spt-risk-project/9.9" }), "x").error === "The file is not a risk project file this tool can read.", "a file that is not a risk project file is refused, with why");
 
     // ==== 2. Every kind of change ==============================================================
 
@@ -151,13 +151,13 @@
     ok(A.b.approvedOn === "2024-06-20" && A.b.revision === "0.9", "the baseline's own approval date and revision");
     ok(has(gs, "owners", /^Z5 Packaging line removed, with its 2 threats and 1 countermeasure\.$/), "a zone removed is said once, with what it held", group(gs, "owners").join(" | "));
     ok(!has(gs, "threats", /T20|T21/) && !has(gs, "countermeasures", /M20/), "and its threats and countermeasures are not listed again");
-    ok(has(gs, "owners", /^C3 was named Corporate reporting \(old name\); now /), "a conduit renamed", group(gs, "owners").join(" | "));
+    ok(has(gs, "owners", /^C3 was named Corporate reporting \(old name\) and is now named /), "a conduit renamed", group(gs, "owners").join(" | "));
     // Phase 6 review: the direction in words (was "IAC SL2 to SL3")., group(gs, "slt").join(" | "));
     ok(has(gs, "threats", /^T3 added to Z1: A flooding/) && has(gs, "threats", /^T6 moved from Z1 to Z3\.$/), "a threat added, and one moved to another zone", group(gs, "threats").join(" | "));
     ok(has(gs, "ratings", /^T2 \(Z1\): unmitigated risk (lowered|changed) from [A-Z][a-z ]+ \(High × Serious\) to [A-Z][a-z ]+ \(Medium × Serious\)/), "a rating change names the state, and on the same criteria its likelihood and impact", group(gs, "ratings").join(" | "));
     ok(!has(gs, "ratings", /T2 \(Z1\):.*current/), "a state not rated in either (T2's current) is not said again");
     // Phase 6 review: the decision recorded, not its label (was "reduce with countermeasures to treated through the SL-T programme")., group(gs, "decisions").join(" | "));
-    ok(has(gs, "accepted", /^T8 \(Z4\) accepted since the previous assessment\.$/) && !has(gs, "decisions", /T8/), "an acceptance is said with the accepted risks, not again with the decisions", group(gs, "decisions").join(" | "));
+    ok(has(gs, "accepted", /^T8 \(Z4\) has been accepted since the previous assessment\.$/) && !has(gs, "decisions", /T8/), "an acceptance is said with the accepted risks, not again with the decisions", group(gs, "decisions").join(" | "));
     ok(has(gs, "countermeasures", /^M9 added to Z4: A separate maintenance zone .* \(agreed\)\.$/), "a countermeasure added, with its status", group(gs, "countermeasures").join(" | "));
     ok(has(gs, "countermeasures", /^M5 \(Z3\): moved from proposed to in progress\.$/) && has(gs, "countermeasures", /^M2 \(Z1\): now in place\.$/), "a countermeasure's status moved, and one now in place", group(gs, "countermeasures").join(" | "));
     ok(!group(gs, "criteria").length, "the same criteria and tolerable risk: nothing said about them");
@@ -176,7 +176,7 @@
       "an accepted risk whose review date has passed is said under Decisions required, with or without a previous assessment", exLate.replace(/\n/g, " | "));
     ok(!/has passed/.test(decisionsText(noBase, "2026-11-13")), "only once it has passed");
     var settled = clone(noBase); settled.zones.concat(settled.conduits).forEach(function (o) { o.countermeasures.forEach(function (m) { if (m.status === "proposed") m.status = "agreed"; }); });
-    ok(/Nothing is waiting on a decision/.test(decisionsText(settled, "2026-11-13")) && !/Nothing is waiting on a decision/.test(decisionsText(settled, "2099-01-01")), "a passed review date is something waiting on a decision");
+    ok(/No decision is outstanding/.test(decisionsText(settled, "2026-11-13")) && !/No decision is outstanding/.test(decisionsText(settled, "2099-01-01")), "a passed review date is something waiting on a decision");
     // The test clock: a pinned today is what every output reads when no today is passed, a today
     // passed to the Word builder still wins, and unpinned it is the clock again.
     function decisionsPinned(pj) { var t = docText(RX.buildWordDoc(pj, {})); return t.slice(t.indexOf("\nDecisions required\n"), t.indexOf("\nWhy this assessment\n")); }
@@ -297,7 +297,7 @@
     var sec = withB.slice(iPr, iDec);
     ok(/This assessment is compared with the previous assessment of .+, 2024-06-10 to 2024-06-12, revision 0\.9, approved on 2024-06-20\./.test(sec) && sec.indexOf("acme-2024.json") < 0,
       "it names the previous assessment by its date, revision and approval, not its file", sec.slice(0, 300));
-    ok(/\nSL-T\nZ1 Unit 300 BPCS: IAC raised from SL2 to SL3\.\n/.test(sec) && /\nAccepted risks\nT8 \(Z4\) accepted since the previous assessment\.(\n|$)/.test(sec), "each group with its lines", sec.replace(/\n/g, " | ").slice(0, 600));
+    ok(/\nSL-T\nZ1 Unit 300 BPCS: IAC raised from SL2 to SL3\.\n/.test(sec) && /\nAccepted risks\nT8 \(Z4\) has been accepted since the previous assessment\.(\n|$)/.test(sec), "each group with its lines", sec.replace(/\n/g, " | ").slice(0, 600));
     ok(!/[–—]/.test(sec), "no en or em dash in the section");
     // Phase 6 review: the high-level report now has the section too, with the criteria and the ranking only
     // (was: "the high-level report has no such section"). Re-pointed, same intent: it says nothing the
@@ -324,7 +324,7 @@
     ok(names2.indexOf("Changes") === names2.indexOf("Summary") + 1, "with one, the Changes sheet follows the Summary", names2.join());
     var ch = wb.getWorksheet("Changes");
     var head = []; ch.getRow(3).eachCell(function (c) { head.push(c.value); });
-    ok(/^Compared with the previous assessment of .+, approved on 2024-06-20\.$/.test(String(ch.getRow(1).getCell(1).value)) && head.join("|") === "Area|Zone or conduit|Item|Change|Previous|Now",
+    ok(/^This sheet compares the assessment with the previous assessment of .+, approved on 2024-06-20\.$/.test(String(ch.getRow(1).getCell(1).value)) && head.join("|") === "Area|Zone or conduit|Item|Change|Previous|Now",
       "it says what it is compared with, then its columns", String(ch.getRow(1).getCell(1).value) + " / " + head.join("|"));
     ok(ch.rowCount === 3 + RT.comparisonRows(RT.compareBaseline()).length && !!ch.autoFilter, "one row per change, filtered", String(ch.rowCount));
     // The real libraries pack both.
@@ -351,10 +351,10 @@
     var Hd = against(hP), gh = RT.comparisonLines(Hd.d), rkL = group(gh, "ranked");
     ok(!Hd.d.empty && gh[0] && gh[0].key === "ranked" && gh[0].title === "Ranked systems", "a ranking that moved is no longer \"nothing has changed\": its own group, Ranked systems", JSON.stringify(gh.map(function (g) { return g.key; })));
     ok(rkL.indexOf("A1 Unit 300 BPCS (DCS servers, HMIs, unit PLCs): risk raised from Medium (Low × Serious) to High (Medium × Serious).") >= 0, "a ranked system's rating, with its direction", rkL.join(" | "));
-    ok(has(gh, "ranked", /^A6 CCTV & physical security systems added, rated [A-Z]/) && rkL.indexOf("A9 Old badge system removed.") >= 0 && rkL.indexOf("A5 was named Lab link (old name); now Laboratory information system link.") >= 0,
+    ok(has(gh, "ranked", /^A6 CCTV & physical security systems added, rated [A-Z]/) && rkL.indexOf("A9 Old badge system removed.") >= 0 && rkL.indexOf("A5 was named Lab link (old name) and is now named Laboratory information system link.") >= 0,
       "a system added, removed and renamed", rkL.join(" | "));
-    ok(rkL.indexOf("A3 Plant DMZ & process historian: impact by consequence category changed.") >= 0, "a change to the impact by consequence category");
-    ok(rkL.indexOf("A2 Safety Instrumented System (SIS): detailed assessment now judged required (was not required).") >= 0, "and the decision on a detailed assessment, recorded per system", rkL.join(" | "));
+    ok(rkL.indexOf("A3 Plant DMZ & process historian: the impact by consequence category changed.") >= 0, "a change to the impact by consequence category");
+    ok(rkL.indexOf("A2 Safety Instrumented System (SIS): a detailed assessment is now judged required (was not required).") >= 0, "and the decision on a detailed assessment, recorded per system", rkL.join(" | "));
     ok(!group(gh, "owners").length && !group(gh, "threats").length && dashFree(gh), "nothing else reads as changed, with no dash");
     var hRows = rowsOf(Hd.d);
     ok(hRows.some(function (r) { return r.area === "Ranked systems" && /^A1 /.test(r.item) && r.change === "Raised" && r.before === "Medium (Low × Serious)" && r.now === "High (Medium × Serious)"; }) &&
@@ -374,7 +374,7 @@
     var eP = vs(DEMO), c1 = owner(eP, "C1"), c1to = c1.toZone, wasTo = c1to === "Z4" ? "Z2" : "Z4";
     c1.toZone = wasTo;
     var Ed = against(eP), ge2 = RT.comparisonLines(Ed.d);
-    ok(!Ed.d.empty && group(ge2, "owners").join() === "C1 now joins " + c1.fromZone + " and " + c1to + "; was " + c1.fromZone + " and " + wasTo + ".", "a conduit's ends compared: what it joins now and before", group(ge2, "owners").join(" | "));
+    ok(!Ed.d.empty && group(ge2, "owners").join() === "C1 now joins " + c1.fromZone + " and " + c1to + " (was " + c1.fromZone + " and " + wasTo + ").", "a conduit's ends compared: what it joins now and before", group(ge2, "owners").join(" | "));
     ok(rowsOf(Ed.d).some(function (r) { return r.where === "C1" && r.change === "Ends changed" && r.before === c1.fromZone + " and " + wasTo && r.now === c1.fromZone + " and " + c1to; }), "with a row of its own in the workbook");
     // c. A countermeasure moved to another zone.
     var mP = vs(DEMO), m5 = cm(mP, "M5");
@@ -399,7 +399,7 @@
     // e. An acceptance taken back: the decision now recorded, in words.
     threat(P(), "T8").treatment = { decision: "reduce", confirmed: true, reason: "" };
     var Ad = against(DEMO), ga = RT.comparisonLines(Ad.d);
-    ok(group(ga, "accepted").join() === "T8 (Z4) no longer accepted; the decision is now reduce with countermeasures." && !group(ga, "decisions").length, "an acceptance taken back says the decision now recorded, once", JSON.stringify(ga));
+    ok(group(ga, "accepted").join() === "T8 (Z4) is no longer accepted. The decision is now reduce with countermeasures." && !group(ga, "decisions").length, "an acceptance taken back says the decision now recorded, once", JSON.stringify(ga));
     ok(rowsOf(Ad.d).some(function (r) { return r.change === "No longer accepted" && r.before === "Risk accepted" && r.now === "Reduce with countermeasures"; }), "and so does its row");
     demo();
     // A threat's decision only when the decision recorded changed: a confirmed reduce whose countermeasure
@@ -408,7 +408,7 @@
     ok(!group(RT.comparisonLines(against(lP).d), "decisions").length, "a label that moved with the same decision is not a decision changed");
     // f. A name given since; the workbook's words.
     var nP = vs(DEMO); owner(nP, "C3").name = "";
-    ok(group(RT.comparisonLines(against(nP).d), "owners").join() === "C3 had no name; now " + owner(P(), "C3").name + ".", "a name given since: had no name, now its name");
+    ok(group(RT.comparisonLines(against(nP).d), "owners").join() === "C3 had no name and is now named " + owner(P(), "C3").name + ".", "a name given since: had no name, now its name");
     var aRows = rowsOf(A.d), rnRows = rowsOf(Rn.d);
     ok(aRows.some(function (r) { return r.change === "Status changed" && /^M5 /.test(r.item) && r.before === "Proposed" && r.now === "In progress"; }) &&
        aRows.some(function (r) { return r.change === "Status changed" && /^M2 /.test(r.item) && r.before === "Planned" && r.now === "In place"; }) &&

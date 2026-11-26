@@ -138,7 +138,7 @@
         h("td", { text: z.accountableOrg || "" }),
         h("td", { class: "center", text: String(z.assets.length) }),
         h("td", { class: "center", text: String(z.accessPoints.length + M.listOf(z.physicalAccessPoints).length) }),
-        h("td", { class: open || rows.some(function (r) { return r.departure; }) ? "val-warn" : "", text: !rows.length ? "None raised" : (open ? open + " to answer" : (notSep ? notSep + " not separated" + (rows.some(function (r) { return r.departure; }) ? ", a departure from the standard" : "") : "Met")) }),
+        h("td", { class: open || rows.some(function (r) { return r.departure; }) ? "val-warn" : "", text: !rows.length ? "None raised" : (open ? open + " to answer" : (notSep ? notSep + " not separated" + (rows.some(function (r) { return r.departure; }) ? " (a departure from the standard)" : "") : "Met")) }),
         h("td", { "data-sec-req": z.id, text: M.listOf(z.securityRequirements).join("; ") })
       ]));
     });
@@ -165,7 +165,7 @@
   function renderSpec(main) {
     var p = state.project;
     main.appendChild(h("h1", { class: "page-title", text: "Cyber security requirements specification" }));
-    main.appendChild(pageSub("spec", "The requirements, assumptions and constraints, assembled from the steps."));
+    main.appendChild(pageSub("spec", "This page gathers the requirements, assumptions and constraints recorded in the earlier steps."));
     E.specBlocks(p).forEach(function (b) {
       main.appendChild(card(b.title, null, blockBody(p, b), status(b.done), { "data-check-anchor": "spec-" + b.id, "data-spec": b.id, "data-spec-done": b.done ? "1" : "0" }));
     });

@@ -545,7 +545,7 @@ window.RiskApp.Engine = (function () {
   // Z3 and C2 to K1 (acting in Z1) has a high unmitigated risk on IAC,
   // which maps to SL3."
   function viaTrace(v, fr, isCond) {
-    return "House method for a scenario that passes through this " + (isCond ? "conduit" : "zone") + ": " +
+    return "By the house method, a scenario that passes through this " + (isCond ? "conduit" : "zone") + " counts towards its suggestion. " +
       andList(v.paths.map(function (x) { return pathWords(x.t) + " (acting in " + x.owner.id + ")"; })) +
       (v.paths.length === 1 ? " has" : " have") + " a " + BAND_NAME[v.band].toLowerCase() + " unmitigated risk on " + fr + ", which maps to SL" + v.sl + ".";
   }
@@ -564,8 +564,8 @@ window.RiskApp.Engine = (function () {
   function applyLead(ls, fr, entry) {
     var l = ls && ls.sug.byFR[fr] ? ls.sug.byFR[fr].sl : null;
     if (l == null) return;
-    if (entry.sl == null || l > entry.sl) { entry.sl = l; entry.trace.push("Assessed with " + ls.lead.id + ": takes its suggested SL" + l + " for " + entry.fr + " (house method)."); }
-    else entry.trace.push("Assessed with " + ls.lead.id + ", whose suggestion for " + entry.fr + " is SL" + l + ".");
+    if (entry.sl == null || l > entry.sl) { entry.sl = l; entry.trace.push("It is assessed with " + ls.lead.id + " and takes " + ls.lead.id + "'s suggested SL" + l + " for " + entry.fr + " (house method)."); }
+    else entry.trace.push("It is assessed with " + ls.lead.id + ", whose suggestion for " + entry.fr + " is SL" + l + ".");
   }
 
   // Per-foundational-requirement suggestion for a zone.
@@ -601,13 +601,13 @@ window.RiskApp.Engine = (function () {
       if (maxBand) {
         var m = RULES.riskToSL[maxBand];
         sl = m.suggest;
-        trace.push("Unmitigated risk " + BAND_NAME[maxBand].toLowerCase() + " for " + fr + " (from " + contributing + " threat" + (contributing === 1 ? "" : "s") + "): " + m.trace);
-        if (maxBand === "very-high" && m.escalateTo) trace.push("Escalation to SL" + m.escalateTo + " available for " + fr + " only if a nation-state-grade adversary is in scope.");
+        trace.push("The unmitigated risk for " + fr + " is " + BAND_NAME[maxBand].toLowerCase() + " (from " + contributing + " threat" + (contributing === 1 ? "" : "s") + "). " + m.trace);
+        if (maxBand === "very-high" && m.escalateTo) trace.push("Raising " + fr + " to SL" + m.escalateTo + " is an option only if a nation-state-grade adversary is in scope.");
         if (maxAbove) trace.push(perCategory
           ? "A threat behind this risk is above tolerable risk (" + BAND_NAME[tolerable].toLowerCase() + ", or the tolerable risk of a consequence category), so it needs a treatment decision."
           : "This risk is above tolerable risk (" + BAND_NAME[tolerable].toLowerCase() + "), so each threat behind it needs a treatment decision.");
       } else {
-        trace.push("No threats affecting " + fr + " captured yet.");
+        trace.push("No threat affecting " + fr + " is recorded yet.");
       }
       // A path through the zone (house method; only when one names it).
       var v = through.length ? viaOnFR(through, fr, project) : null;
@@ -615,13 +615,13 @@ window.RiskApp.Engine = (function () {
         trace.push(viaTrace(v, fr, false));
         // The same escalation note as a threat of its own at very high.
         var vm0 = RULES.riskToSL[v.band];
-        if (v.band === "very-high" && vm0 && vm0.escalateTo) trace.push("Escalation to SL" + vm0.escalateTo + " available for " + fr + " only if a nation-state-grade adversary is in scope.");
+        if (v.band === "very-high" && vm0 && vm0.escalateTo) trace.push("Raising " + fr + " to SL" + vm0.escalateTo + " is an option only if a nation-state-grade adversary is in scope.");
         if (sl == null || v.sl > sl) sl = v.sl;
       }
 
       MODS.forEach(function (mod) {
         if (zone.flags[mod.id] && mod.affectsFR && mod.affectsFR.indexOf(fr) >= 0) {
-          trace.push(cap(mod.effect) + " from " + mod.id + " (" + mod.label + "): " + mod.trace);
+          trace.push(mod.label + ": " + lcFirst(String(mod.effect || "")) + ". " + mod.trace);
         }
       });
 
@@ -629,21 +629,21 @@ window.RiskApp.Engine = (function () {
       // by default), narrowed where the project says so (phase 5b).
       if (safety) {
         var floor = SIS_RULE ? SIS_RULE.floorSL : 3;
-        if (floorFR.indexOf(fr) < 0) trace.push("Safety related: the SL" + floor + " floor does not cover " + fr + " in this assessment.");
-        else if (sl == null || sl < floor) { sl = floor; trace.push("SL" + floor + " floor applied (SIS present): " + SIS_RULE.trace); }
-        else trace.push("SIS present: SL" + floor + " floor already met.");
+        if (floorFR.indexOf(fr) < 0) trace.push("The zone is safety related, but the SL" + floor + " floor does not cover " + fr + " in this assessment.");
+        else if (sl == null || sl < floor) { sl = floor; trace.push("The zone is safety related, so the SL" + floor + " floor applies. " + SIS_RULE.trace); }
+        else trace.push("The zone is safety related and the suggestion already meets the SL" + floor + " floor.");
       }
       if (ls) { var le = { fr: fr, sl: sl, trace: trace }; applyLead(ls, fr, le); sl = le.sl; }
 
       if (sl != null && adv && MISMATCH_RULE && adv > sl) {
-        trace.push("Mismatch: the assumed adversary class (SL" + adv + "-grade) exceeds the suggested SL" + sl + " for " + fr + ": " + MISMATCH_RULE.trace);
+        trace.push("The assumed adversary class (SL" + adv + "-grade) is above the suggested SL" + sl + " for " + fr + ". " + MISMATCH_RULE.trace);
       }
 
       result.byFR[fr] = { sl: sl, risk: maxBand, trace: trace };
     });
 
     if (project.srs.clientMatrix) {
-      FR_IDS.forEach(function (fr) { result.byFR[fr].trace.push("Client risk matrix in use: it takes precedence over this house heuristic (hard rule)."); });
+      FR_IDS.forEach(function (fr) { result.byFR[fr].trace.push("The client's risk matrix is in use and takes precedence over the house method."); });
     }
     return result;
   }
@@ -657,12 +657,12 @@ window.RiskApp.Engine = (function () {
     var ls = leadSuggestion(cond, project, plain);
 
     FR_IDS.forEach(function (fr) {
-      var trace = ["House heuristic: a conduit takes the higher of its own risk-derived SL and the connected zones' suggested SL, per FR."];
+      var trace = ["By the house method, a conduit takes the higher of its own risk-derived SL and the suggested SL of the zones it joins, for each FR."];
       var sl = null, band = null;
       cond.threats.forEach(function (t) {
         if (t.affectedFR.indexOf(fr) >= 0) { var r = threatRisk(t, project); if (r && (band == null || BAND_RANK[r] > BAND_RANK[band])) band = r; }
       });
-      if (band) { var m = RULES.riskToSL[band]; sl = m.suggest; trace.push("Conduit's own unmitigated risk " + BAND_NAME[band].toLowerCase() + " for " + fr + ": " + m.trace); }
+      if (band) { var m = RULES.riskToSL[band]; sl = m.suggest; trace.push("The conduit's own unmitigated risk for " + fr + " is " + BAND_NAME[band].toLowerCase() + ". " + m.trace); }
       var v = through.length ? viaOnFR(through, fr, project) : null;
       if (v && v.band) {
         trace.push(viaTrace(v, fr, true));
@@ -671,13 +671,13 @@ window.RiskApp.Engine = (function () {
       ends.forEach(function (e) {
         if (e && e.sug && e.sug.byFR[fr] && e.sug.byFR[fr].sl != null) {
           if (sl == null || e.sug.byFR[fr].sl > sl) sl = e.sug.byFR[fr].sl;
-          trace.push("Inherits SL" + e.sug.byFR[fr].sl + " for " + fr + " from " + e.id + (e.name ? " (" + e.name + ")" : "") + ".");
+          trace.push(e.id + (e.name ? " (" + e.name + ")" : "") + " suggests SL" + e.sug.byFR[fr].sl + " for " + fr + ".");
         } else if (e && e.id === "EXT") {
-          trace.push("EXT endpoint: external party (the conduit boundary is the protection point).");
+          trace.push("One end is an external party, so the conduit boundary is the point of protection.");
         }
       });
       if (ls) { var le = { fr: fr, sl: sl, trace: trace }; applyLead(ls, fr, le); sl = le.sl; }
-      if (sl == null) trace.push("No threats or connected-zone suggestion for " + fr + " yet.");
+      if (sl == null) trace.push("Neither a threat nor a connected zone gives a suggestion for " + fr + " yet.");
       result.byFR[fr] = { sl: sl, risk: band, trace: trace };
     });
     return result;
@@ -767,7 +767,7 @@ window.RiskApp.Engine = (function () {
   // hlaComparison() is the consultant's decision per ranked system, which
   // the comparison only suggests, and one that differs needs a reason.
 
-  var CONDUIT_RULE = "a conduit takes the higher initial risk of the zones it joins unless one is entered (house rule)";
+  var CONDUIT_RULE = "a conduit takes the higher initial risk of the zones it joins unless one is entered";
   function isBand(v) { return typeof v === "string" && BAND_RANK[v] != null; }
   function worstBand(list) {
     var worst = null;
@@ -832,7 +832,7 @@ window.RiskApp.Engine = (function () {
   }
   // The completeness words for a decision that wants a reason.
   function reasonText(c) {
-    return c.noBasis ? ": the decision has no initial risk to rest on and no reason." : ": the decision differs from the comparison and has no reason.";
+    return c.noBasis ? ": the decision has no initial risk behind it and no reason recorded." : ": the decision differs from the comparison and no reason is recorded.";
   }
   function comparison(owner, project) {
     var ir = initialRiskOf(owner, project);
@@ -961,7 +961,7 @@ window.RiskApp.Engine = (function () {
     if (has(function (a) { return a.link === "temporary"; }) && has(function (a) { return a.link !== "temporary"; })) why.temporary = "Temporarily connected devices share the zone with fixed ones.";
     if ((has(function (a) { return a.link === "wireless"; }) || (zone.flags && zone.flags.wireless)) && has(function (a) { return a.link !== "wireless"; })) why.wireless = "Wireless devices share the zone with wired ones.";
     var ext = conduitsOf(project, zone).filter(conduitExternal);
-    if (ext.length && has(isType(IACS_TYPES))) why.external = "Reached from an external network (" + ext.map(function (c) { return c.id; }).join(", ") + ") and holds control system assets.";
+    if (ext.length && has(isType(IACS_TYPES))) why.external = "The zone is reached from an external network (" + andList(ext.map(function (c) { return c.id; })) + ") and holds control system assets.";
     var stored = zone.separation && typeof zone.separation === "object" ? zone.separation : {};
     M.SEPARATION_ROWS.forEach(function (r) {
       if (!why[r.id]) return;
@@ -1036,17 +1036,17 @@ window.RiskApp.Engine = (function () {
     tolerable: "Tolerable risk", regulatory: "Regulatory requirements"
   };
   var SPEC_GAPS = {
-    assumptions: "no operating environment assumptions recorded.",
-    threats: "no assumed adversary or known threats recorded.",
-    policies: "no organisational security policies recorded.",
-    regulatory: "no regulatory requirements recorded."
+    assumptions: "no operating environment assumptions are recorded.",
+    threats: "no assumed adversary or known threats are recorded.",
+    policies: "no organisational security policies are recorded.",
+    regulatory: "no regulatory requirements are recorded."
   };
   // What the threat environment lacks: the adversary or the threats, and a
   // source of threat intelligence.
   function threatGap(p) {
     var r = p.srs, none = !r.adversaryClass && !r.knownThreats.length, noSrc = !M.listOf(r.threatSources).length;
-    if (none && noSrc) return "no assumed adversary, known threats or source of threat intelligence recorded.";
-    return none ? SPEC_GAPS.threats : "no source of threat intelligence recorded.";
+    if (none && noSrc) return "no assumed adversary, known threats or source of threat intelligence are recorded.";
+    return none ? SPEC_GAPS.threats : "no source of threat intelligence is recorded.";
   }
   function specOrder() {
     var m = (M.ZCR && M.ZCR.specBlocks) || {};
@@ -1315,7 +1315,7 @@ window.RiskApp.Engine = (function () {
       if (!conduitsOf(project, o).length) out.push("connected zones or conduits");
       var assets = (o.assets || []).filter(Boolean);
       if (!assets.length) out.push("assets");
-      else if (assets.some(function (a) { return !txt(a.classification) || M.ASSET_CRITICALITY.indexOf(a.criticality) < 0 || M.ASSET_VALUES.indexOf(a.businessValue) < 0; })) out.push("each asset's classification, criticality and business value");
+      else if (assets.some(function (a) { return !txt(a.classification) || M.ASSET_CRITICALITY.indexOf(a.criticality) < 0 || M.ASSET_VALUES.indexOf(a.businessValue) < 0; })) out.push("assets' classification, criticality and business value");
     }
     if (!lines(o.securityRequirements)) out.push("applicable security requirements");
     if (!lines(o.securityPolicies)) out.push("security policies");
@@ -1457,10 +1457,10 @@ window.RiskApp.Engine = (function () {
   function criteriaWords(project) {
     var src = M.criteriaOf(project).source, isHouse = M.criteriaOf(project).isHouse, generic = M.genericPresetOf(project);
     // The client's criteria marked in use but not entered: the tables are the house's.
-    if (src === "client" && isHouse) return { source: "client-house", matrix: "the SolutionsPT house risk matrix", criteria: "The SolutionsPT house risk criteria", generic: "" };
+    if (src === "client" && isHouse) return { source: "client-house", matrix: "the SolutionsPT default risk matrix", criteria: "The SolutionsPT default risk criteria", generic: "" };
     if (src === "client") return { source: "client", matrix: "the client's risk matrix", criteria: "The client's risk criteria", generic: generic };
     if (src === "project") return { source: "project", matrix: "the risk matrix agreed for this assessment", criteria: "The risk criteria agreed for this assessment", generic: generic };
-    return { source: "house", matrix: "the SolutionsPT house risk matrix", criteria: "The SolutionsPT house risk criteria", generic: "" };
+    return { source: "house", matrix: "the SolutionsPT default risk matrix", criteria: "The SolutionsPT default risk criteria", generic: "" };
   }
   // The tolerable risk set per consequence category, in words, for the page
   // and Word: "Safety (injury / loss of life): Low; Financial loss: High", or "".
@@ -1491,9 +1491,9 @@ window.RiskApp.Engine = (function () {
     if (!M.sucAccessPointsOf(p).some(function (x) { return String(x.description || "").trim(); })) add("suc", "both", "The SUC has no access points listed.", { kind: "suc-access" });
     if (!M.tolerableConfirmed(p)) add("suc", "both", "Tolerable risk is not confirmed with the asset owner.", { kind: "criteria" });
     var cwp = criteriaWords(p);
-    if (cwp.source === "client-house") add("suc", "both", "The client's risk criteria are marked in use, but step 1 still holds the house criteria.", { kind: "criteria" });
-    else if (cwp.source === "client" && cwp.generic) add("suc", "both", "The client's criteria are marked in use, but step 1 holds a generic preset.", { kind: "criteria" });
-    if (matrixGaps(p)) add("suc", "both", "The risk matrix has cells not set.", { kind: "criteria" });
+    if (cwp.source === "client-house") add("suc", "both", "The client's risk criteria are marked as in use, but the criteria recorded are still the SolutionsPT defaults.", { kind: "criteria" });
+    else if (cwp.source === "client" && cwp.generic) add("suc", "both", "The client's risk criteria are marked as in use, but the criteria recorded are a generic preset.", { kind: "criteria" });
+    if (matrixGaps(p)) add("suc", "both", "The risk matrix has cells with no band.", { kind: "criteria" });
     // Ratings that no longer fit the criteria (a level or category they no
     // longer have): each on the page it was rated on.
     var misfits = criteriaMisfits(p);
@@ -1509,47 +1509,47 @@ window.RiskApp.Engine = (function () {
 
     // The high-level report: the ranking.
     var hlOnly = M.assessmentType(p) === "high-level";
-    if (!p.srs.highLevelAssets.length) add("srs", "highLevel", "No systems ranked.", { kind: "ranking" });
+    if (!p.srs.highLevelAssets.length) add("srs", "highLevel", "No systems are ranked.", { kind: "ranking" });
     p.srs.highLevelAssets.forEach(function (a) {
       var label = a.id + (a.name ? " (" + a.name + ")" : "");
       var tgt = { kind: "system", id: a.id };
-      if (!a.consequence) add("srs", "highLevel", label + ": impact not rated.", tgt);
+      if (!a.consequence) add("srs", "highLevel", label + " has no impact rating.", tgt);
       // A system inside the SUC belongs to a zone (step 5); one marked outside it does not.
-      if (!hlOnly && p.zones.length && M.inSuc(a) && !zonesOfHLA(p, a.id).length) add("srs", "detailed", label + ": inside the SUC, but in no zone.", tgt);
+      if (!hlOnly && p.zones.length && M.inSuc(a) && !zonesOfHLA(p, a.id).length) add("srs", "detailed", label + " is inside the SUC but in no zone.", tgt);
       if (!hlOnly) return;
       var c = hlaComparison(a, p);
       if (c.open && c.suggested !== null) add("srs", "highLevel", label + ": the decision on a detailed assessment is not confirmed.", tgt);
-      else if (c.open && a.consequence) add("srs", "highLevel", label + ": likelihood not rated, so there is nothing to compare with tolerable risk.", tgt);
+      else if (c.open && a.consequence) add("srs", "highLevel", label + " has no likelihood rating, so there is nothing to compare with tolerable risk.", tgt);
       else if (c.reasonMissing) add("srs", "highLevel", label + reasonText(c), tgt);
     });
 
     // The detailed report.
-    if (!M.sessionsOf(p).length) add("basis", "detailed", "No risk assessment sessions recorded.", { kind: "sessions" });
-    if (!p.zones.length) add("zones", "detailed", "No zones defined: the risk context gives the 3-3 tool nothing to scope. Define zones in step 3.", null);
+    if (!M.sessionsOf(p).length) add("basis", "detailed", "No risk assessment sessions are recorded.", { kind: "sessions" });
+    if (!p.zones.length) add("zones", "detailed", "No zones are defined in step 3, so the risk context gives the 3-3 tool nothing to scope.", null);
     // The risk comparison: the SUC's initial risk, once, against tolerable risk.
-    if ((p.zones.length || p.conduits.length) && !sucComparison(p).band) add("compare", "detailed", "The SUC has no initial risk to compare with tolerable risk: rate a ranked system, or enter a zone's initial risk.", { kind: "suc-compare" });
+    if ((p.zones.length || p.conduits.length) && !sucComparison(p).band) add("compare", "detailed", "The SUC has no initial risk to compare with tolerable risk, as no ranked system, zone or conduit is rated.", { kind: "suc-compare" });
     // The separation rows the zones page raised and nobody has answered.
     p.zones.forEach(function (z) {
       separationRows(z, p).forEach(function (r) {
         var tgt = { kind: "zone", id: z.id, part: "sep-" + r.id };
-        if (r.open) add("zones", "detailed", zoneLabel(z) + ": record whether " + lcFirst(r.label) + " are kept separate.", tgt);
+        if (r.open) add("zones", "detailed", zoneLabel(z) + ": it is not recorded whether " + lcFirst(r.label) + " are kept separate.", tgt);
         // Not separating business and control system assets, or safety
         // related assets in a zone not designated safety related as a whole,
         // departs from a requirement of the standard, so its warning says so;
         // the others are recommendations.
-        else if (r.reasonMissing && r.departure) add("zones", "detailed", zoneLabel(z) + ": " + lcFirst(r.label) + " are not kept separate" + (r.wholeZone ? " and the zone is not designated safety related" : "") + ", which the standard requires, with no justification.", tgt);
-        else if (r.reasonMissing) add("zones", "detailed", zoneLabel(z) + ": " + lcFirst(r.label) + " are not kept separate, with no reason.", tgt);
+        else if (r.reasonMissing && r.departure) add("zones", "detailed", zoneLabel(z) + ": " + lcFirst(r.label) + " are not kept separate" + (r.wholeZone ? " and the zone is not designated safety related" : "") + ". The standard requires " + (r.wholeZone ? "one or the other" : "the separation") + ", and no justification is recorded.", tgt);
+        else if (r.reasonMissing) add("zones", "detailed", zoneLabel(z) + ": " + lcFirst(r.label) + " are not kept separate and no reason is recorded.", tgt);
       });
     });
     // The characteristics each zone and conduit is documented with (step 5).
     p.zones.concat(p.conduits).forEach(function (o) {
       var miss = characteristicsMissing(o, p);
-      if (miss.length) add("zones", "detailed", zoneLabel(o) + ": characteristics not recorded: " + andList(miss) + ".", { kind: "fromZone" in o ? "conduit" : "zone", id: o.id, part: "chars" });
+      if (miss.length) add("zones", "detailed", zoneLabel(o) + " has no record of its " + andList(miss) + ".", { kind: "fromZone" in o ? "conduit" : "zone", id: o.id, part: "chars" });
     });
     // A conduit with an end not chosen: the drawing and its characteristics
     // cannot say what it connects.
     p.conduits.forEach(function (c) {
-      if (!c.fromZone || !c.toZone) add("zones", "detailed", zoneLabel(c) + ": " + (!c.fromZone && !c.toZone ? "neither end is set." : "an end is not set."), { kind: "conduit", id: c.id });
+      if (!c.fromZone || !c.toZone) add("zones", "detailed", zoneLabel(c) + ": " + (!c.fromZone && !c.toZone ? "neither end is set." : "one end is not set."), { kind: "conduit", id: c.id });
     });
     function checkOwner(row, label) {
       var o = row.o, isZone = row.isZone;
@@ -1564,22 +1564,22 @@ window.RiskApp.Engine = (function () {
       // written justification is then the basis.
       if (detailed && !o.threats.length && (isZone || !hasJust)) {
         add(hasSLT ? "slt" : "risk", "detailed", label + (hasSLT
-          ? ": SL-T set with no threats. Give the basis in the justification."
-          : ": no threats identified."), own);
+          ? " has an SL-T but no threats. The justification needs to give the basis."
+          : " has no threats identified."), own);
       }
-      if (D.depth === "grouped" && !D.lead) add("risk", "detailed", label + ": grouped, with no zone or conduit named to share threats with.", atDepth);
-      else if (D.depth === "grouped" && !D.leadOk) add("risk", "detailed", label + ": grouped with " + D.withId + ", which is not assessed in detail.", atDepth);
-      if (D.depth === "reused" && !D.reuseSource) add("risk", "detailed", label + ": reused, with no source named.", atDepth);
-      if (D.depth === "proportionate" && !D.considered && !o.threats.length) add("risk", "detailed", label + ": proportionate, with no note of the threats considered.", atDepth);
-      if (D.depth === "deferred" && !D.reason) add("risk", "detailed", label + ": deferred, with no reason.", atDepth);
+      if (D.depth === "grouped" && !D.lead) add("risk", "detailed", label + " is grouped, but the zone or conduit it is assessed with is not named.", atDepth);
+      else if (D.depth === "grouped" && !D.leadOk) add("risk", "detailed", label + " is grouped with " + D.withId + ", which is not assessed in detail.", atDepth);
+      if (D.depth === "reused" && !D.reuseSource) add("risk", "detailed", label + " is reused, but no source is named.", atDepth);
+      if (D.depth === "proportionate" && !D.considered && !o.threats.length) add("risk", "detailed", label + " has a proportionate review, but the threats considered are not noted.", atDepth);
+      if (D.depth === "deferred" && !D.reason) add("risk", "detailed", label + " is deferred with no reason recorded.", atDepth);
       // A zone or conduit assessed in detail documents its known
       // vulnerabilities; the other depths rest on their record (it only warns).
-      if (detailed && !(o.vulnerabilities || []).some(function (v) { return v && String(v.description || "").trim(); })) add("risk", "detailed", label + ": no vulnerabilities recorded.", { kind: own.kind, id: o.id, part: "vulns" });
+      if (detailed && !(o.vulnerabilities || []).some(function (v) { return v && String(v.description || "").trim(); })) add("risk", "detailed", label + " has no vulnerabilities recorded.", { kind: own.kind, id: o.id, part: "vulns" });
       row.threats.forEach(function (x) {
         var t = x.t, T = x.treatment, tt = { kind: "threat", ownerId: o.id, id: t.id };
-        if (!t.likelihood || !t.impact) add("risk", "detailed", label + " / " + t.id + ": likelihood or impact not set.", tt);
+        if (!t.likelihood || !t.impact) add("risk", "detailed", label + " / " + t.id + ": the likelihood or impact is not set.", tt);
         misfits.forEach(function (f) { if (f.item === t) add("risk", "detailed", label + " / " + t.id + ": " + misfitText(f.misfits), tt); });
-        if (!t.affectedFR.length) add("risk", "detailed", label + " / " + t.id + ": no affected foundational requirements marked.", tt);
+        if (!t.affectedFR.length) add("risk", "detailed", label + " / " + t.id + ": no affected foundational requirement is marked.", tt);
         if (T.open) add("risk", "detailed", label + " / " + t.id + ": above tolerable risk with no treatment decision" + (T.state === "suggested" ? " (a suggestion is waiting to be confirmed)." : "."), tt);
         else if (T.gap) add("risk", "detailed", label + " / " + t.id + ": " + T.gap + ".", tt);
         // A path to a consequence says where it starts: a threat source and
@@ -1601,12 +1601,12 @@ window.RiskApp.Engine = (function () {
       // 'unjustified'. Neither blocks export (the ruling: never hard-gate).
       // Every zone and conduit needs an SL-T; a deferred one says so in its
       // own words.
-      if (!hasSLT) add("slt", "detailed", label + (D.depth === "deferred" ? ": deferred, with no SL-T yet." : ": no SL-T set for any FR."), own);
+      if (!hasSLT) add("slt", "detailed", label + (D.depth === "deferred" ? " is deferred and has no SL-T yet." : " has no SL-T for any FR."), own);
       else {
         // One target per foundational requirement: those still without one.
         var noTarget = FR_IDS.filter(function (fr) { return o.slTargetByFR[fr] == null; });
-        if (noTarget.length) add("slt", "detailed", label + ": no SL-T set for " + andList(noTarget) + ".", own);
-        if (!hasJust && (isZone || o.threats.length || !detailed)) add("slt", "detailed", label + ": SL-T set but no justification.", own);
+        if (noTarget.length) add("slt", "detailed", label + " has no SL-T for " + andList(noTarget) + ".", own);
+        if (!hasJust && (isZone || o.threats.length || !detailed)) add("slt", "detailed", label + " has no SL-T justification.", own);
       }
     }
     vm.zones.forEach(function (row) { var z = row.o; checkOwner(row, z.id + (z.name ? " (" + z.name + ")" : "")); });
@@ -1615,7 +1615,7 @@ window.RiskApp.Engine = (function () {
     // impact no longer fits the risk criteria.
     M.consequencesOf(p).forEach(function (k) {
       var kTitle = String(k.title || "").trim(), label = k.id + (kTitle ? " (" + kTitle + ")" : ""), tgt = { kind: "consequence", id: k.id };
-      if (!kTitle) add("risk", "detailed", label + ": no title.", tgt);
+      if (!kTitle) add("risk", "detailed", label + " has no title.", tgt);
       misfits.forEach(function (f) { if (f.item === k) add("risk", "detailed", label + ": " + misfitText(f.misfits), tgt); });
       if (!pathsTo(p, k.id).length) add("risk", "detailed", label + ": no threat scenario leads to it.", tgt);
     });
@@ -1634,7 +1634,7 @@ window.RiskApp.Engine = (function () {
     // look them up. The specification's alone (doc null, spec: true).
     justificationIds(p).forEach(function (j) {
       items.push({ stage: "slt", doc: null, spec: true, target: { kind: "fromZone" in j.o ? "conduit" : "zone", id: j.o.id },
-        text: j.o.id + (j.o.name ? " " + j.o.name : "") + ": the justification names " + j.ids.join(", ") + ", which the specification does not list." });
+        text: j.o.id + (j.o.name ? " " + j.o.name : "") + ": the justification names " + andList(j.ids) + ", which the specification does not list." });
     });
     // Approval (step 7): for the detailed report once there are zones, for
     // the high-level report once there is a ranking.
@@ -1643,9 +1643,9 @@ window.RiskApp.Engine = (function () {
     var named = states.filter(function (s) { return (s.entry.name || "").trim(); });
     // The specification (phase 6b) is signed off with the detailed report.
     var signSpec = p.zones.length > 0;
-    if (signDoc && !named.length) add("approval", signDoc, "No asset-owner sign-off recorded.", { kind: "approval" });
+    if (signDoc && !named.length) add("approval", signDoc, "No asset owner sign-off is recorded.", { kind: "approval" });
     else if (signDoc && !states.some(function (s) { return s.signed; })) named.forEach(function (s) {
-      add("approval", signDoc, s.entry.name.trim() + ": approval not yet recorded.", { kind: "approval", id: String(s.index) });
+      add("approval", signDoc, s.entry.name.trim() + ": the approval is not yet recorded.", { kind: "approval", id: String(s.index) });
     });
     if (signDoc) items.forEach(function (i) { if (i.stage === "approval" && signSpec) i.spec = true; });
     states.forEach(function (s) {
@@ -1809,7 +1809,7 @@ window.RiskApp.Engine = (function () {
         documents: p.basisOfAssessment.documents.map(function (x) { return { id: x.id, title: x.title, reference: x.reference, source: x.source, relevance: x.relevance }; }),
         observations: p.basisOfAssessment.observations.map(function (x) { return { id: x.id, description: x.description, location: x.location, date: x.date, notes: x.notes }; })
       },
-      assumptions: p.suc.assumptions.slice().concat(p.srs.clientMatrix ? ["Client risk matrix used" + (p.srs.clientMatrixNote ? ": " + p.srs.clientMatrixNote : "")] : []),
+      assumptions: p.suc.assumptions.slice().concat(p.srs.clientMatrix ? ["The client's risk matrix is used" + (p.srs.clientMatrixNote ? ": " + p.srs.clientMatrixNote : "")] : []),
       approval: { name: p.approval.name, role: p.approval.role, date: p.approval.date, statement: p.approval.statement, approved: !!p.approval.approved },
       zones: vm.zones.map(function (row) {
         var z = row.o, s = suggestZone(z, p), tgt = tgtVec(z);

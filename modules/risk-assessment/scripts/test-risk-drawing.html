@@ -187,7 +187,7 @@
     function legendTexts(L6) { return L6.legend.map(function (x) { return x.text; }); }
     var lt = legendTexts(Ld);
     ok(lt.indexOf("Safety related") >= 0 && lt.indexOf("Outside the SUC") >= 0 && lt.some(function (x) { return /^Worst unmitigated risk (low|medium|high|very high)$/.test(x); }) && lt.indexOf("SL-T: highest on any foundational requirement") >= 0, "the demo's legend: safety, worst risk borders, outside the SUC and SL-T", lt.join(" | "));
-    ok(lt.indexOf("Shaded rows: SolutionsPT house layering") < 0 && legendTexts(L).indexOf("Shaded rows: SolutionsPT house layering") >= 0, "the bands are in the legend only when drawn, named as the house layering");
+    ok(lt.indexOf("Shaded rows: SolutionsPT zone levels") < 0 && legendTexts(L).indexOf("Shaded rows: SolutionsPT zone levels") >= 0, "the bands are in the legend only when drawn, named as the house layering");
     ok(legendTexts(L).concat(L.bands.map(function (b) { return b.label; })).every(function (x) { return !/[–—]|62443|IEC/.test(x); }), "no dash, and no claim the layering comes from a standard");
     var bare = M.emptyProject(); bare.zones.push(M.emptyZone(1));
     var Lb = ZM.layout(bare, RT.suggestZone);
@@ -208,7 +208,7 @@
     ok(detail().getAttribute("data-owner-id") === "Z2", "Enter on a box opens it too");
     var lvSel = detail().querySelector('[data-action="zone-level"]');
     ok(!!lvSel && lvSel.options.length === 7 && lvSel.value === "", "the zone panel has a drawing level, Not set and the six house levels");
-    ok(/House layering/.test(lvSel.closest(".field").textContent), "labelled as the house layering");
+    ok(/The SolutionsPT zone level sets/.test(lvSel.closest(".field").textContent), "labelled as the house layering");
     change(lvSel, "safety");
     ok(P().zones[1].level === "safety" && RT.isDirty() && main().querySelector('[data-drawing] svg [data-band="safety"]') && main().querySelector('[data-drawing] svg [data-band="none"]'), "choosing a level stores it and the drawing draws bands (the rest in No level)");
     ok(!detail().querySelector('[data-action="level-left"]'), "alone in its band, no nudge is offered");
@@ -303,7 +303,7 @@
         var ds = drawingSection(xml12), scale = ds.ext ? Number(ds.ext[1]) / 9525 / L12.W : 0;
         ok(scale >= 0.5, "twelve zones in bands print at no less than half the drawing's size (it was 0.41 with the key and legend in the picture)", scale.toFixed(3) + " for " + L12.W + " x " + L12.drawH);
         ok(!!ds.ext && Math.abs(Number(ds.ext[1]) / Number(ds.ext[2]) - L12.W / L12.drawH) < 0.02, "at the drawing's proportions");
-        ok(/Conduit Name Joins/.test(textOf(ds.s.body)) && /Shaded rows: SolutionsPT house layering/.test(textOf(ds.s.body)), "with its key and legend as text in the drawing's section");
+        ok(/Conduit Name Joins/.test(textOf(ds.s.body)) && /Shaded rows: SolutionsPT zone levels/.test(textOf(ds.s.body)), "with its key and legend as text in the drawing's section");
         return docXml(tall);
       }).then(function (xmlT) {
         var ds = drawingSection(xmlT), scale = ds.ext ? Number(ds.ext[1]) / 9525 / Lt.W : 0;

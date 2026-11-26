@@ -109,7 +109,7 @@ window.RiskApp.UI = (function () {
   // adding then removing a blank row stays friction-free while filled work
   // can't vanish on one misclick. Returns true when it's OK to proceed.
   function confirmRemove(filled, label) {
-    return !filled || confirm("Remove this " + label + "? This can't be undone.");
+    return !filled || confirm("Remove this " + label + "? You can undo it with Ctrl+Z.");
   }
 
   function downloadBlob(text, filename) {
@@ -158,7 +158,7 @@ window.RiskApp.UI = (function () {
 
   // Editable list of free-text lines stored as an array.
   function lineListField(label, arr, onChange, placeholder) {
-    return textField(label, arr.join("\n"), function (v) { onChange(lines(v)); }, { textarea: true, placeholder: placeholder, hint: "One per line." });
+    return textField(label, arr.join("\n"), function (v) { onChange(lines(v)); }, { textarea: true, placeholder: placeholder, hint: "Put each one on its own line." });
   }
 
   // attrs: optional extra attributes, such as data-owner-id, which a review

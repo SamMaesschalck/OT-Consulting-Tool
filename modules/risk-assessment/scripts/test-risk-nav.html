@@ -118,24 +118,24 @@
     RT.navigate("srs");
     var row1 = main().querySelector('[data-hla-id="A1"]');
     ok(!!row1 && !!row1.querySelector('[data-detailed="required"].suggested') && /Above tolerable/.test(row1.textContent), "high-level only: the ranking has the comparison as a column, the suggestion dashed");
-    ok(!main().querySelector('select[data-action="assign-zone"]') && !/Assign to zone|New zone/.test(main().textContent) && /decide by the house method which go forward to a detailed assessment/.test(main().querySelector(".page-sub").textContent) && !/assign them to zones/.test(main().querySelector(".page-sub").textContent),
+    ok(!main().querySelector('select[data-action="assign-zone"]') && !/Assign to zone|New zone/.test(main().textContent) && /use the house method to decide which go forward to a detailed assessment/.test(main().querySelector(".page-sub").textContent) && !/assign them to zones/.test(main().querySelector(".page-sub").textContent),
       "high-level only: no zone column with no zones, and the sub-title does not ask for zones", main().querySelector(".page-sub").textContent);
     var hl = texts("highLevel");
-    ok(has(hl, /^A1 \(DCS\): the decision on a detailed assessment is not confirmed\.$/) && has(hl, /^A2 \(Lab link\): the decision on a detailed assessment is not confirmed\.$/) && has(hl, /^A3 \(CCTV\): impact not rated\.$/) && !has(hl, /^A3 .*decision/), "the high-level report's readiness lists each undecided system and the unrated one (which has nothing to compare)", hl.join(" | "));
+    ok(has(hl, /^A1 \(DCS\): the decision on a detailed assessment is not confirmed\.$/) && has(hl, /^A2 \(Lab link\): the decision on a detailed assessment is not confirmed\.$/) && has(hl, /^A3 \(CCTV\) has no impact rating\.$/) && !has(hl, /^A3 .*decision/), "the high-level report's readiness lists each undecided system and the unrated one (which has nothing to compare)", hl.join(" | "));
     ok(RT.stepStatus().srs.state === "open" && navStatus("srs") === RT.stepStatus().srs.open + " open", "and step 2 shows them as open");
     row1.querySelector('[data-detailed="not-required"]').focus();
     row1.querySelector('[data-detailed="not-required"]').click();
     row1 = main().querySelector('[data-hla-id="A1"]');
     ok(P().srs.highLevelAssets[0].detailed.required === false && d.activeElement === row1.querySelector('[data-detailed="not-required"]'), "a choice is one click, and keeps the keyboard focus");
-    ok(!!row1.querySelector('input[data-reason="detailed"]') && has(texts("highLevel"), /^A1 \(DCS\): the decision differs from the comparison and has no reason\.$/), "a choice against the comparison asks for its reason");
+    ok(!!row1.querySelector('input[data-reason="detailed"]') && has(texts("highLevel"), /^A1 \(DCS\): the decision differs from the comparison and no reason is recorded\.$/), "a choice against the comparison asks for its reason");
     type(row1.querySelector('input[data-reason="detailed"]'), "Retired next quarter.");
     ok(!has(texts("highLevel"), /^A1 /) && P().srs.highLevelAssets[0].detailed.reason === "Retired next quarter.", "and the reason settles it");
     // An impact with no likelihood gives no risk band: it is listed, not passed over.
     var a3 = P().srs.highLevelAssets[2];
     a3.consequence = "serious";
-    ok(RT.hlaComparison(a3).suggested === null && has(texts("highLevel"), /^A3 \(CCTV\): likelihood not rated, so there is nothing to compare with tolerable risk\.$/), "high-level only: a system rated for impact alone is listed as having nothing to compare", texts("highLevel").join(" | "));
+    ok(RT.hlaComparison(a3).suggested === null && has(texts("highLevel"), /^A3 \(CCTV\) has no likelihood rating, so there is nothing to compare with tolerable risk\.$/), "high-level only: a system rated for impact alone is listed as having nothing to compare", texts("highLevel").join(" | "));
     a3.detailed = { required: false, reason: "" };
-    ok(has(texts("highLevel"), /^A3 \(CCTV\): the decision has no initial risk to rest on and no reason\.$/) && !has(texts("highLevel"), /^A3 \(CCTV\): likelihood not rated/), "a decision recorded with nothing to compare asks for its reason");
+    ok(has(texts("highLevel"), /^A3 \(CCTV\): the decision has no initial risk behind it and no reason recorded\.$/) && !has(texts("highLevel"), /^A3 \(CCTV\) has no likelihood rating/), "a decision recorded with nothing to compare asks for its reason");
     a3.detailed.reason = "Camera network only.";
     ok(!has(texts("highLevel"), /^A3 /), "and the reason settles it");
     a3.consequence = ""; delete a3.detailed;
@@ -143,9 +143,9 @@
     RT.navigate("review");
     var cards = [].map.call(main().querySelectorAll("[data-readiness]"), function (c) { return c.getAttribute("data-readiness"); }).join(",");
     // Phase 6b: the requirements specification's card comes last, set aside like the detailed one.
-    ok(cards === "highLevel,detailed,spec" && /Not part of a high-level-only assessment/.test(main().querySelector('[data-readiness="detailed"]').textContent) && !/Not part of/.test(main().querySelector('[data-readiness="highLevel"]').textContent),
+    ok(cards === "highLevel,detailed,spec" && /A high-level-only assessment does not include this document/.test(main().querySelector('[data-readiness="detailed"]').textContent) && !/does not include this document/.test(main().querySelector('[data-readiness="highLevel"]').textContent),
       "high-level only: Check and issue puts the high-level report first, and marks the detailed one as not part of it", cards);
-    ok(/Not part of a high-level-only assessment/.test(main().querySelector('[data-readiness="spec"]').textContent), "and the requirements specification too (phase 6b)");
+    ok(/A high-level-only assessment does not include this document/.test(main().querySelector('[data-readiness="spec"]').textContent), "and the requirements specification too (phase 6b)");
     RT.navigate("home");
     main().querySelector('[data-assessment-type="full"]').click();
     ok(P().assessmentType === "full" && navStatus("zones") === "Not started" && !RT.completeness().some(function (i) { return /decision on a detailed assessment/.test(i.text); }), "a full assessment asks for no decision on the ranking: it is made per zone and conduit");
@@ -201,7 +201,7 @@
     // Since the zone-depth step: the standard's comparison is the SUC's, once;
     // each zone's and conduit's own initial risk only suggests its depth
     // (house method), which is set on step 5.
-    ok(/House method/.test(m.querySelector(".framing-note").textContent) && /house rule/.test(m.querySelector(".framing-note").textContent) && !/standard requires|the standard says/i.test(m.textContent) &&
+    ok(/House method/.test(m.querySelector(".framing-note").textContent) && /By the same method, a conduit takes/.test(m.querySelector(".framing-note").textContent) &&!/standard requires|the standard says/i.test(m.textContent) &&
       !!m.querySelector('[data-check-anchor="suc-compare"]') && /SUC against tolerable risk/.test(m.querySelector('[data-check-anchor="suc-compare"]').textContent),
       "comparing per zone and conduit is stated as the house method for the depth, beside the SUC's one comparison, and the conduit rule as a house rule");
     var rowIds = [].map.call(m.querySelectorAll(".cmp-table tbody tr"), function (r) { return r.getAttribute("data-owner-id"); }).join(",");
@@ -227,7 +227,7 @@
     ok(RT.state.stage === "risk" && d.activeElement === main().querySelector('[data-owner-id="Z2"] select[data-field="depth"]'), "Set opens step 5 at the zone's depth, with the keyboard on it", d.activeElement && d.activeElement.outerHTML.slice(0, 80));
     ok(z2.assessment === undefined && RT.depthOf(z2).depth === "detailed" && /Suggested: proportionate/.test(main().querySelector('[data-owner-id="Z2"] [data-part="depth"]').textContent), "the zone is detailed until chosen, with the suggestion beside it");
     main().querySelector('[data-owner-id="Z2"] [data-action="use-depth-suggestion"]').click();
-    ok(z2.assessment.depth === "proportionate" && has(texts("detailed"), /^Z2 \(Utilities\): proportionate, with no note of the threats considered\.$/) &&
+    ok(z2.assessment.depth === "proportionate" && has(texts("detailed"), /^Z2 \(Utilities\) has a proportionate review, but the threats considered are not noted\.$/) &&
       d.activeElement === main().querySelector('[data-owner-id="Z2"] [data-field="depth-considered"]'), "a proportionate review asks for the threats considered, with the keyboard in the note");
     RT.undo();
     ok(RT.depthOf(P().zones[1]).depth === "detailed" && !("assessment" in P().zones[1]) && d.activeElement === main().querySelector('[data-owner-id="Z2"] select[data-field="depth"]'), "Undo takes the depth back, with the keyboard on the depth");
@@ -238,13 +238,13 @@
     ok(!has(texts("detailed"), /^Z2 \(Utilities\): proportionate/) && d.activeElement === main().querySelector('[data-owner-id="Z2"] [data-field="depth-considered"]'), "a note settles it, and the field keeps the focus");
     // A proportionate review asks for no threat scenario: the SL-T and its basis are asked for.
     var pr = texts("detailed");
-    ok(has(pr, /^Z1 \(DCS\): no threats identified\.$/) && !has(pr, /^Z2 \(Utilities\): no threats/) && has(pr, /^Z2 \(Utilities\): no SL-T set for any FR\.$/), "a zone given a proportionate review is asked for no threats, only its SL-T", pr.join(" | "));
+    ok(has(pr, /^Z1 \(DCS\) has no threats identified\.$/) && !has(pr, /^Z2 \(Utilities\) has no threats/) && has(pr, /^Z2 \(Utilities\) has no SL-T for any FR\.$/), "a zone given a proportionate review is asked for no threats, only its SL-T", pr.join(" | "));
     z2.slTargetByFR.IAC = 2;
-    ok(has(texts("detailed"), /^Z2 \(Utilities\): SL-T set but no justification\.$/), "set by hand, the SL-T needs its basis in the justification");
+    ok(has(texts("detailed"), /^Z2 \(Utilities\) has no SL-T justification\.$/), "set by hand, the SL-T needs its basis in the justification");
     z2.justification = "Utilities only; corporate SL2 floor.";
     // Step 5: one SL-T on IAC alone asks for the other six, and the zone's characteristics are asked for on step 3; set and left out here.
     ["IAC", "UC", "SI", "DC", "RDF", "TRE", "RA"].forEach(function (fr) { z2.slTargetByFR[fr] = 2; });
-    ok(!texts("detailed").some(function (x) { return /^Z2 /.test(x) && !/: characteristics not recorded: /.test(x); }), "and with it, nothing is open for that zone");
+    ok(!texts("detailed").some(function (x) { return /^Z2 /.test(x) && !/ has no record of its /.test(x); }), "and with it, nothing is open for that zone");
     RT.navigate("risk");
     // Phase 4: step 5 shows one zone at a time; its rail marks the zone too.
     ok(/Proportionate/.test(main().querySelector('[data-rail-id="Z2"]').textContent) && /Detailed/.test(main().querySelector('[data-rail-id="Z1"]').textContent), "step 5's rail shows each zone's depth: Z2 Proportionate, Z1 Detailed");
@@ -282,7 +282,7 @@
     m = main();
     var det = m.querySelector('[data-readiness="detailed"]'), hlc = m.querySelector('[data-readiness="highLevel"]');
     ok(!!det && !!hlc && det.querySelectorAll(".readiness li").length === RT.readiness("detailed").length && hlc.querySelectorAll(".readiness li").length === RT.readiness("highLevel").length, "Check and issue lists what is open in each report");
-    ok(/High-level report/.test(hlc.textContent) && /A3 \(CCTV\): impact not rated/.test(hlc.textContent) && !/Z1/.test(hlc.textContent), "the high-level report's list holds its own items, not the zones'");
+    ok(/High-level report/.test(hlc.textContent) && /A3 \(CCTV\) has no impact rating/.test(hlc.textContent) && !/Z1/.test(hlc.textContent), "the high-level report's list holds its own items, not the zones'");
     // Phase 3b: the sign-off card moved from Check and issue to step 7 (Approval).
     ok(!!m.querySelector('[data-download="word"]') && !!m.querySelector('[data-download="word-hl"]') && !!m.querySelector('[data-download="excel"]') && !!m.querySelector('[data-download="risk-context"]'), "with every download");
     RT.navigate("approval");
@@ -294,15 +294,15 @@
       li.querySelector('[data-action="goto"]').click();
       return li;
     }
-    var gl = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return /Z1 \(DCS\) \/ T7: likelihood or impact not set/.test(x.textContent); })[0];
-    ok(gl && gl.querySelector('[data-action="goto"]').getAttribute("aria-label") === "Go to: Z1 (DCS) / T7: likelihood or impact not set.", "each Go to names its item for a screen reader");
-    ok(goTo(/Z1 \(DCS\) \/ T7: likelihood or impact not set/) && RT.state.stage === "risk" && main().querySelector('[data-owner-id="Z1"] [data-threat-id="T7"]').classList.contains("check-flash"), "Go to on a threat opens step 5 and flashes the threat");
+    var gl = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return /Z1 \(DCS\) \/ T7: the likelihood or impact is not set/.test(x.textContent); })[0];
+    ok(gl && gl.querySelector('[data-action="goto"]').getAttribute("aria-label") === "Go to: Z1 (DCS) / T7: the likelihood or impact is not set.", "each Go to names its item for a screen reader");
+    ok(goTo(/Z1 \(DCS\) \/ T7: the likelihood or impact is not set/) && RT.state.stage === "risk" && main().querySelector('[data-owner-id="Z1"] [data-threat-id="T7"]').classList.contains("check-flash"), "Go to on a threat opens step 5 and flashes the threat");
     ok(d.activeElement === main().querySelector('[data-owner-id="Z1"] [data-threat-id="T7"]'), "and the keyboard focus lands on the threat");
     RT.navigate("review");
-    ok(goTo(/C1 \(Plant LAN\): no threats identified/) && RT.state.stage === "risk" && main().querySelector('[data-owner-id="C1"]').classList.contains("check-flash") && d.activeElement === main().querySelector('[data-owner-id="C1"]'), "on a conduit, step 5 and the conduit, with the focus");
+    ok(goTo(/C1 \(Plant LAN\) has no threats identified/) && RT.state.stage === "risk" && main().querySelector('[data-owner-id="C1"]').classList.contains("check-flash") && d.activeElement === main().querySelector('[data-owner-id="C1"]'), "on a conduit, step 5 and the conduit, with the focus");
     var nm0 = P().suc.name; P().suc.name = "";
     RT.navigate("review");
-    ok(/^What is still open in each report/.test(main().querySelector(".page-sub").textContent), "Check and issue's sub-title starts with a capital when the SUC has no name");
+    ok(/^See what is still open in each report, and download the reports\./.test(main().querySelector(".page-sub").textContent), "Check and issue's sub-title starts with a capital when the SUC has no name");
     P().suc.name = nm0;
     // The comparison is the SUC's: with nothing rated it is open, and Go to
     // opens step 4 at the SUC's card.
@@ -312,11 +312,11 @@
     ok(goTo(/The SUC has no initial risk to compare with tolerable risk/) && RT.state.stage === "compare" && main().querySelector('[data-check-anchor="suc-compare"]').classList.contains("check-flash"), "on the comparison, step 4 and the SUC's card");
     P().srs.highLevelAssets.forEach(function (a, i) { a.likelihood = keepLik[i]; }); z2.initialRisk = keepIr[0]; c2.initialRisk = keepIr[1];
     RT.navigate("review");
-    ok(goTo(/A3 \(CCTV\): impact not rated/) && RT.state.stage === "srs" && main().querySelector('[data-hla-id="A3"]').classList.contains("check-flash"), "on a ranked system, step 2 and its row");
+    ok(goTo(/A3 \(CCTV\) has no impact rating/) && RT.state.stage === "srs" && main().querySelector('[data-hla-id="A3"]').classList.contains("check-flash"), "on a ranked system, step 2 and its row");
     RT.navigate("review");
-    ok(goTo(/No asset-owner sign-off/) && RT.state.stage === "approval" && main().querySelector('[data-check-anchor="approval"]').classList.contains("check-flash"), "and on the sign-off, its card (step 7)");
+    ok(goTo(/No asset owner sign-off/) && RT.state.stage === "approval" && main().querySelector('[data-check-anchor="approval"]').classList.contains("check-flash"), "and on the sign-off, its card (step 7)");
     RT.navigate("review");
-    ok(goTo(/Z1 \(DCS\): no SL-T set/) && RT.state.stage === "slt" && main().querySelector('[data-owner-id="Z1"]').classList.contains("check-flash"), "on an SL-T, step 5's SL-T tab and the zone");
+    ok(goTo(/Z1 \(DCS\) has no SL-T/) && RT.state.stage === "slt" && main().querySelector('[data-owner-id="Z1"]').classList.contains("check-flash"), "on an SL-T, step 5's SL-T tab and the zone");
     var items = RT.completeness();
     ok(items.every(function (i) { return typeof i.stage === "string" && RT.STAGE_IDS.indexOf(i.stage) >= 0 && /^(detailed|highLevel|both)$/.test(i.doc) && typeof i.text === "string"; }), "every item of the one list names its page and its report");
     ok(same(RT.exportProblems(), RT.readiness("detailed").map(function (i) { return i.text; })), "and the detailed report's part of it is the old completeness list");
@@ -332,7 +332,7 @@
     main().querySelector('[data-download="risk-context"]').click();
     var g = d.getElementById("issue-guard");
     // Phase 3a review: the export's list is headed "Still open:" (was: "Still open in the detailed report:"), and its button says Export anyway.
-    ok(!!g && /Export the risk context anyway\?/.test(g.textContent) && /Still open:/.test(g.textContent) && /T7: likelihood or impact not set/.test(g.textContent) && downloads.length === 0 && confirms === 0, "an export with items open asks in the page, listing them, and not with confirm()");
+    ok(!!g && /Export the risk context anyway\?/.test(g.textContent) && /Still open:/.test(g.textContent) && /T7: the likelihood or impact is not set/.test(g.textContent) && downloads.length === 0 && confirms === 0, "an export with items open asks in the page, listing them, and not with confirm()");
     ok(g.querySelector('[data-action="generate-anyway"]').textContent === "Export anyway" && !/detailed report|Generate/.test(g.textContent), "the export's question speaks of exporting, not of a report");
     ok(g === main().firstChild && g.getAttribute("role") === "alertdialog" && d.activeElement === g.querySelector('[data-action="generate-anyway"]'), "at the top of the page, with the focus on Generate anyway");
     RT.render();
@@ -351,7 +351,7 @@
     ok(/Generate the Word report anyway\?/.test(d.getElementById("issue-guard").textContent) && words.length === 0, "the Word download asks the same way");
     // What is open is worked out again on each redraw: an edit on the page shows in the question.
     th.likelihood = "low"; th.impact = "minor"; RT.render();
-    ok(!!d.getElementById("issue-guard") && !/T7: likelihood or impact not set/.test(d.getElementById("issue-guard").textContent), "the question's list follows the project, not a copy taken when it was asked");
+    ok(!!d.getElementById("issue-guard") && !/T7: the likelihood or impact is not set/.test(d.getElementById("issue-guard").textContent), "the question's list follows the project, not a copy taken when it was asked");
     th.likelihood = ""; th.impact = "";
     RT.navigate("srs");
     ok(!d.getElementById("issue-guard"), "and the question goes when the page changes");
@@ -361,7 +361,7 @@
     // Phase 3b: an unconfirmed tolerable risk is open in both reports, so it is confirmed first.
     P().srs.tolerableConfirmed = P().srs.tolerableRisk;
     // Phase 3b review: the high-level report asks for a sign-off too, so one is recorded.
-    ok(RT.readiness("highLevel").some(function (i) { return i.text === "No asset-owner sign-off recorded." && i.stage === "approval"; }), "the high-level report asks for the asset owner's sign-off as well");
+    ok(RT.readiness("highLevel").some(function (i) { return i.text === "No asset owner sign-off is recorded." && i.stage === "approval"; }), "the high-level report asks for the asset owner's sign-off as well");
     P().approval = { name: "A. Owner", role: "Plant Manager", date: "2026-07-01", statement: "", approved: true };
     // Step 5: both reports ask for the SUC's access points and the reports' classification, so they are recorded.
     P().suc.accessPoints = [{ description: "Vendor VPN from the internet", enters: "" }];
@@ -434,7 +434,7 @@
       RT.touched(); RT.flushAutosave();
       var snap2 = null; try { snap2 = JSON.parse(w.localStorage.getItem(KEY)); } catch (e) {}
       ok(snap2 && snap2.project.suc.name === "Nav Works", "editing the demo writes no autosave");
-      ok(!d.getElementById("home-demo") && /The demo/.test(main().querySelector(".page-sub").textContent), "Home says it is the demo, with no Open the demo");
+      ok(!d.getElementById("home-demo") && /This demo is a completed assessment/.test(main().querySelector(".page-sub").textContent), "Home says it is the demo, with no Open the demo");
       ok(RT.exportProblems().length === 0 && RT.stepStatus().review.state === "done" && ["basis", "suc", "srs", "zones", "compare", "risk", "spec", "approval"].every(function (s) { return RT.stepStatus()[s].state === "done"; }), "every step of the demo is Done", JSON.stringify(RT.stepStatus()));
       var pk = picks;
       return new Promise(function (res) { RT.saveProject(null, res); }).then(function () {

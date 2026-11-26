@@ -201,8 +201,8 @@
       ok(px[ap + 1] === "The risk criteria agreed for this assessment.", "Word: the appendix says the criteria were agreed for this assessment", px[ap + 1]);
       var mi = px.indexOf("Minor", ap);
       ok(mi > ap && px[mi + 3] === "High (above)", "Word: the appendix prints the project's matrix", px.slice(mi, mi + 4).join(" | "));
-      ok(px.indexOf("IEC 62443-3-2, using the risk matrix agreed for this assessment and the SolutionsPT house risk-to-SL mapping") >= 0, "Word: the method row names the matrix agreed for this assessment");
-      ok(px.some(function (x) { return /^The assessment follows .*The risk matrix and its scales were agreed for this assessment, and the risk-to-SL mapping is a SolutionsPT house default\./.test(x); }), "Word: the method text says so too");
+      ok(px.indexOf("IEC 62443-3-2, using the risk matrix agreed for this assessment and the house method's risk-to-SL mapping") >= 0, "Word: the method row names the matrix agreed for this assessment");
+      ok(px.some(function (x) { return /^The assessment follows .*The risk matrix and its scales were agreed for this assessment, and the risk-to-SL mapping is the SolutionsPT default and part of the house method./.test(x); }), "Word: the method text says so too");
       var reg = px.indexOf("T1  Vendor path", px.indexOf("Risk register"));
       ok(reg > 0 && px[reg + 1] === "High", "Word: the register reads the cell", px.slice(reg, reg + 3).join(" | "));
       ok(px.indexOf("Impact by category") < 0 && px.indexOf("Consequence categories") < 0, "Word: with nothing rated per category, nothing about the categories is printed");
@@ -381,23 +381,23 @@
             // ---- F. the client's criteria ----
             load(fresh());
             P().srs.clientMatrix = true; P().srs.clientMatrixNote = "Acme corporate matrix, revision 3";
-            ok(has(texts(), /^The client's risk criteria are marked in use, but step 1 still holds the house criteria\.$/), "the client's criteria marked in use with the house's still in step 1 is open");
-            var ci0 = RT.completeness().filter(function (i) { return /marked in use/.test(i.text); })[0];
+            ok(has(texts(), /^The client's risk criteria are marked as in use, but the criteria recorded are still the SolutionsPT defaults\.$/), "the client's criteria marked in use with the house's still in step 1 is open");
+            var ci0 = RT.completeness().filter(function (i) { return /marked as in use/.test(i.text); })[0];
             ok(ci0.stage === "suc" && ci0.doc === "both" && ci0.target.kind === "criteria", "in step 1, for both reports");
             RT.navigate("suc");
             ok(!!crit().querySelector('[data-criteria-source="client"]') && /enter them here/.test(crit().textContent), "the panel asks for them");
             change(crit().querySelector('select[data-field="crit-cell-serious:low"]'), "high");
-            ok(!has(texts(), /marked in use/) && RT.criteriaWords().source === "client", "entered, the item goes and they are the client's");
+            ok(!has(texts(), /marked as in use/) && RT.criteriaWords().source === "client", "entered, the item goes and they are the client's");
             var wbc = RX.buildWorkbook(P());
-            ok(findRow(wbc.getWorksheet("Criteria"), "The client's risk criteria used in this assessment (Acme corporate matrix, revision 3).") && /^The client's risk matrix, with the SolutionsPT house risk-to-SL mapping\./.test(findRow(wbc.getWorksheet("Front"), "Method note").getCell(2).value), "Excel: the Criteria sheet and the Front sheet say they are the client's");
+            ok(findRow(wbc.getWorksheet("Criteria"), "The client's risk criteria used in this assessment (Acme corporate matrix, revision 3).") && /^The risk matrix is the client's, and the risk-to-SL mapping is the SolutionsPT default and part of the house method./.test(findRow(wbc.getWorksheet("Front"), "Method note").getCell(2).value), "Excel: the Criteria sheet and the Front sheet say they are the client's");
             return words(P()).then(function (px5) {
               var ap5 = px5.indexOf("Appendix: risk criteria");
               ok(px5[ap5 + 1] === "The client's risk criteria used in this assessment (Acme corporate matrix, revision 3)." && !px5.some(function (x) { return /Consultant note: the client's own risk criteria are in use/.test(x); }), "Word: the appendix prints them as the client's, with no note to reconcile", px5[ap5 + 1]);
-              ok(px5.indexOf("IEC 62443-3-2, using the client's risk matrix and the SolutionsPT house risk-to-SL mapping") >= 0, "Word: the method row names the client's matrix");
+              ok(px5.indexOf("IEC 62443-3-2, using the client's risk matrix and the house method's risk-to-SL mapping") >= 0, "Word: the method row names the client's matrix");
               var hi = px5.indexOf("Serious", ap5);
               ok(px5[hi + 1] === "High (above)", "Word: the appendix prints the client's cell", px5.slice(hi, hi + 4).join(" | "));
               RT.navigate("risk");
-              ok(/^The client's risk matrix; tolerable risk is medium/.test(main().querySelector(".framing-note").textContent), "step 5 names the client's matrix");
+              ok(/^This assessment uses the client's risk matrix\. Tolerable risk is medium/.test(main().querySelector(".framing-note").textContent), "step 5 names the client's matrix");
 
               // ---- G. the migration tidies the new fields and changes no rating ----
               var raw = fresh();

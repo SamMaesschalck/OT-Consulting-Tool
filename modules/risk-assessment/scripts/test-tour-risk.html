@@ -135,13 +135,13 @@
     var same = all.filter(function (x) { return (x.T.current && x.T.current === RT.threatRisk(x.t)) || (x.T.planned && x.T.planned === (x.T.current || RT.threatRisk(x.t))); }).map(function (x) { return x.t.id; });
     ok(same.length === 0, "the demo records a current or planned rating only where it differs from the one before it", same.join(","));
     var t2 = z1.threats[1];
-    ok(!t2.currentLikelihood && !t2.currentImpact && /allow-listing \(M2\)[^.]*does not lower the likelihood/.test(t2.likelihoodRationale), "T2's rationale says why its existing allow-listing does not lower its likelihood");
+    ok(!t2.currentLikelihood && !t2.currentImpact && /Allow-listing \(M2\)[^.]*does not lower the likelihood/.test(t2.likelihoodRationale), "T2's rationale says why its existing allow-listing does not lower its likelihood");
     ok(!z2.threats[0].currentLikelihood && !z2.threats[0].currentImpact, "T4 records no current rating: its likelihood is already the lowest on the house scale");
     // Each countermeasure's SR references sit under the FRs it addresses (wording 12): SR n.x is FR n.
     var FRN = { "1": "IAC", "2": "UC", "3": "SI", "4": "DC", "5": "RDF", "6": "TRE", "7": "RA" };
     var off = cms.filter(function (m) { return m.srRefs.some(function (s) { var n = (/^SR (\d)\./.exec(s) || [])[1]; return !n || m.addressesFR.indexOf(FRN[n]) < 0; }); }).map(function (m) { return m.id + " " + m.srRefs.join("/") + " vs " + m.addressesFR.join("/"); });
     ok(off.length === 0, "every SR reference of a countermeasure is on a foundational requirement it addresses", off.join(" | "));
-    ok(z4.vulnerabilities[1].reference === "Interview I2, lead control systems engineer" && /^Corporate clients request read-only reports over HTTPS; process data flows one way, Z3 to corporate\. /.test(p.conduits[2].notes), "V6 cites the interview it came from, and C3's notes say which way the data flows");
+    ok(z4.vulnerabilities[1].reference === "Interview I2, lead control systems engineer" && /^Corporate clients request read-only reports over HTTPS, and process data flows one way, from Z3 to corporate\. /.test(p.conduits[2].notes), "V6 cites the interview it came from, and C3's notes say which way the data flows");
     ok(/^The consequence stays severe whatever is added[^.]*\. The zone is held at SL3 on every foundational requirement/.test(z2.threats[0].treatment.reason) && /An unauthorised change to the safety logic is treated through these targets, with the hardwired keyswitch for program mode in place and a dedicated SIS engineering workstation planned\./.test(z2.justification),
       "T4's reason and Z2's justification say the SL-T programme once, in the report's words");
     // Who accepted T8 is part of the approval: the demo's approvals were taken with it, and still stand.

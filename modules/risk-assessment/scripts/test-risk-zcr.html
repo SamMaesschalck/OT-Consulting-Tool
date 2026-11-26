@@ -176,8 +176,8 @@
         // Phase 3b: steps 6 and 7 cover ZCR 6 and ZCR 7, so About claims all seven and names none as missing.
         ok(/published IEC 62443-3-2:2020/.test(about) && !/ZCR 1 to ZCR 7/.test(about) && /covers ZCR 1, ZCR 2, ZCR 3, ZCR 4, ZCR 5, ZCR 6 and ZCR 7\./.test(about) && !/not yet steps? of (its|their) own/.test(about),
           "About claims only the ZCRs the tool has a page for, and names the rest as not yet steps", about.slice(0, 260));
-        ok(/checked against its contents list/.test(about) && /requirement wording against the published edition/.test(about) && !/not been checked line by line/.test(about), "that the step references were checked, and the requirement wording too (checked in Nov 2026)");
-        ok(/risk matrix and SL mapping are SolutionsPT house defaults/.test(about), "and that the matrix and SL mapping are house defaults");
+        ok(/checked against the standard's contents list/.test(about) && /requirement wording against the published edition/.test(about) && !/not been checked line by line/.test(about), "that the step references were checked, and the requirement wording too (checked in Nov 2026)");
+        ok(/risk matrix and SL mapping are SolutionsPT defaults/.test(about), "and that the matrix and SL mapping are house defaults");
 
         // An unsigned, undecided assessment prints different sentences: check those too.
         return wordXml({});

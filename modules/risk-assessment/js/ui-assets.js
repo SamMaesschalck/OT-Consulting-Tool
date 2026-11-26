@@ -299,11 +299,11 @@
     ]));
     if (P0.parsed) {
       var pr = P0.parsed;
-      if (!pr.rows.length) kids.push(h("p", { class: "muted", text: "Nothing to read." }));
+      if (!pr.rows.length) kids.push(h("p", { class: "muted", text: "There are no rows to read." }));
       else {
         // The columns: what each holds, chosen where the heading is missing or not known.
         kids.push(h("p", { class: "hint", "data-paste-header": pr.header ? "read" : "none",
-          text: pr.header ? (pr.unknown.length ? "Header row read; choose what the other columns hold." : "Header row read.") : "No header row: choose what each column holds." }));
+          text: pr.header ? (pr.unknown.length ? "Header row read. Choose what the other columns hold." : "Header row read.") : "There is no header row. Choose what each column holds." }));
         var maps = h("div", { class: "paste-map" }), dup = AS.duplicates(P0.mapping);
         function colName(c) { return pr.header ? (pr.header[c] || "Column " + (c + 1)) : "Column " + (c + 1) + (pr.rows[0] && pr.rows[0][c] ? " (" + pr.rows[0][c].slice(0, 24) + ")" : ""); }
         for (var c = 0; c < pr.columns; c++) (function (c) {
@@ -313,7 +313,7 @@
           }, { "data-map-col": String(c), "aria-label": "What " + name + " holds", class: dup[c] != null ? "val-warn" : null, "data-map-dup": dup[c] != null ? "" : null });
           s.addEventListener("change", panelAgain);
           var fk = [U.labelFor(name, s), s];
-          if (dup[c] != null) fk.push(h("div", { class: "hint val-warn", text: "Also chosen for " + colName(dup[c]) + "; that column is read." }));
+          if (dup[c] != null) fk.push(h("div", { class: "hint val-warn", text: "Also chosen for " + colName(dup[c]) + ", which is the one read." }));
           maps.appendChild(h("div", { class: "field" }, fk));
         })(c);
         kids.push(maps);
