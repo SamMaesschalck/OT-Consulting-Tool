@@ -248,8 +248,8 @@ window.RiskApp.Engine = (function () {
     // left to complete and never count as a treatment.
     reduceNone: "Reduce with countermeasures (none recorded)",
     reduceNothingPlanned: "Reduce with countermeasures (none planned)",
-    reduceRemaining: "Reduce with countermeasures (remaining risk not accepted)",
-    sltRemaining: "Treat through the SL-T programme (remaining risk not accepted)",
+    reduceRemaining: "Reduce with countermeasures (acceptance of remaining risk incomplete)",
+    sltRemaining: "Treat through the SL-T programme (acceptance of remaining risk incomplete)",
     acceptNoReason: "Accept (no reason recorded)",
     acceptNoBy: "Accept (no record of who accepted it)",
     sltUnset: "Treat through the SL-T programme (no SL-T set)",
@@ -384,18 +384,22 @@ window.RiskApp.Engine = (function () {
     var tMissing = decision === "transfer" ? transferMissing(t) : [];
     var byMissing = decision === "accept" && !String(((t.acceptanceDetail || {}).by) || "").trim();
     // A decision to reduce or to treat through the SL-T programme that leaves
-    // the risk above tolerable risk once the plan is complete needs the asset
-    // owner's acceptance of what remains.
+    // the risk above tolerable risk once the plan is complete may record the
+    // asset owner's acceptance of what remains. The standard does not ask for
+    // it (ZCR 5.11 and 5.12 ask for a decision and, for mitigation, the
+    // additional countermeasures), so it is optional; once started, it is
+    // completed like any acceptance.
     var remainingAbove = (decision === "reduce" || decision === "slt") && afterPlan != null && !afterPlanWithin;
     var rMissing = remainingAbove ? remainingMissing(t) : [];
-    var remainingGap = "the planned rating stays above tolerable risk, with no record of " + (rMissing.length > 1 ? "the asset owner's acceptance of the remaining risk" : rMissing[0]);
+    var remainingPartial = rMissing.length === 1;
+    var remainingGap = rMissing[0] === "who accepted it" ? "the remaining risk is accepted with no record of who accepted it" : "the remaining risk is accepted with no reason recorded";
     var gap = "", label = TREATMENT_LABEL.within, disposition = null;
     if (required && !confirmed) label = TREATMENT_LABEL.none;
     else if (decision === "reduce") {
       if (!covering.length) { gap = "no countermeasure is linked to it" + (linkSuggested.length ? " (a suggested link is waiting to be confirmed)" : ""); label = TREATMENT_LABEL.reduceNone; }
       // Nothing planned and above tolerable risk today: the decision reduces nothing.
       else if (!todayWithin && !plannedLinked.length) { gap = "it is above tolerable risk today and no planned countermeasure is linked to it"; label = TREATMENT_LABEL.reduceNothingPlanned; }
-      else if (rMissing.length) { gap = remainingGap; label = TREATMENT_LABEL.reduceRemaining; }
+      else if (remainingPartial) { gap = remainingGap; label = TREATMENT_LABEL.reduceRemaining; }
       else if (inPlace) { label = TREATMENT_LABEL.reduced; disposition = "mitigated"; }
       else { label = TREATMENT_LABEL.reduce; disposition = "countermeasure"; }
     } else if (decision === "accept") {
@@ -410,7 +414,7 @@ window.RiskApp.Engine = (function () {
     } else if (decision === "slt") {
       if (reasonMissing && sf.unset.length) { gap = "no SL-T is set" + (t.affectedFR.length ? " on a requirement it affects" : "") + " and no reason is recorded"; label = TREATMENT_LABEL.sltUnset; }
       else if (reasonMissing) { gap = "the SL-T is below the suggestion with no reason recorded"; label = TREATMENT_LABEL.sltNoReason; }
-      else if (rMissing.length) { gap = remainingGap; label = TREATMENT_LABEL.sltRemaining; }
+      else if (remainingPartial) { gap = remainingGap; label = TREATMENT_LABEL.sltRemaining; }
       else { label = TREATMENT_LABEL.slt; disposition = "sl-t"; }
     }
     return {

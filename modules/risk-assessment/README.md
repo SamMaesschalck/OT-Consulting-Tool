@@ -319,13 +319,15 @@ only once set (`js/model.js`), and the released v0.7.0 normaliser keeps them.
 - **Reduce, and the remaining risk.** A decision to reduce is incomplete
   (`threatTreatment` gap, no disposition) when the risk is above tolerable
   today and no planned countermeasure is linked ("Reduce with
-  countermeasures (none planned)"), and when the rating once the plan is
-  complete (`afterPlan`) stays above tolerable with no record of the asset
-  owner's acceptance of what remains. A decision to treat through the SL-T
-  programme in the same position is incomplete the same way. The acceptance
-  reuses the threat's acceptance fields: the reason in `acceptance`, who,
-  role, date and review date in `acceptanceDetail` (`remainingAbove`,
-  `remainingAccepted`, `remainingMissing`). Accepted risks in Word and
+  countermeasures (none planned)"), as ZCR 5.12 asks for additional
+  countermeasures. When the rating once the plan is complete (`afterPlan`)
+  stays above tolerable, for a decision to reduce or to treat through the
+  SL-T programme, the asset owner's acceptance of what remains may be
+  recorded. The standard does not ask for it, so it is optional; once
+  started, it is incomplete until it has both a reason and who accepted it.
+  The acceptance reuses the threat's acceptance fields: the reason in
+  `acceptance`, who, role, date and review date in `acceptanceDetail`
+  (`remainingAbove`, `remainingAccepted`, `remainingMissing`). Accepted risks in Word and
   Excel list it, marked "Remaining risk accepted", rated once the plan is
   complete; the approval covers it; the review pack shows it.
 - **Mandatory security countermeasures** are, by the house reading, those
