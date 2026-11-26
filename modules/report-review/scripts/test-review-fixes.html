@@ -469,7 +469,7 @@
           return poll(function () { return R.state.composer && R.state.composer.anchor.blockId === "d0-b4"; });
         }).then(function () {
           ok(R.state.composer.anchor.selection === "findings" && R.state.composer.anchor.quote === blocks[4].text, "words selected in the block itself still say what the comment is about, and the quote stays the whole block", JSON.stringify(R.state.composer.anchor.selection));
-          ok(/Select some words first/.test(D.querySelector(".rr-toolbar").textContent), "and the hint line on the Report page says so");
+          ok(/To comment on some of the words, select them first/.test(D.querySelector(".rr-toolbar").textContent), "and the hint line on the Report page says so");
           W.getSelection().removeAllRanges();
         });
       });

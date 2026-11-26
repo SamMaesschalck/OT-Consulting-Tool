@@ -181,7 +181,7 @@
       return "Text set in columns was brought across as one column.";
     },
     "formatting": function () {
-      return "Formatting was replaced by the house style.";
+      return "Formatting was replaced by the template's styles.";
     }
   };
 

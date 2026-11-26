@@ -382,7 +382,7 @@
     modal("Comments already in the file", function (m) {
       return [
         h("h2", { text: "Also put your new name on " + RC.plural(list.length, "comment") + " already saved as " + old + "?" }),
-        h("p", { text: "Only if they are yours under another spelling." }),
+        h("p", { text: "Do this only if they are yours under another spelling." }),
         h("div", { class: "rr-modal-choices" }, [
           h("button", { type: "button", class: "btn primary", id: "rr-rename-keep", text: "Leave them as " + old, onClick: m.cancel }),
           h("button", { type: "button", class: "btn", id: "rr-rename-also", text: "They are mine: put " + v + " on them", onClick: function () {
@@ -481,7 +481,7 @@
     // on a pack it does not answer.
     function wrongPack() {
       if (state.pack && file.packId === state.pack.packId) return false;
-      toast("This review file answers a different pack" + (file.round ? " (round " + file.round + ")" : "") + ", not the one that is open.", "err");
+      toast("This review file is for a different pack" + (file.round ? " (round " + file.round + ")" : "") + " from the one that is open.", "err");
       return true;
     }
     if (wrongPack()) return done(false);
@@ -629,7 +629,7 @@
     if (/^PK/.test(t)) return { ok: false, error: "This is a Word or Excel file. Open the review pack (.json) instead." };
     if (/^%PDF/.test(t)) return { ok: false, error: "This is a PDF. Open the review pack (.json) instead." };
     var d = RC.parseJson(t);
-    if (!d || typeof d !== "object") return { ok: false, error: "This is not a review pack or a review file: it could not be read." };
+    if (!d || typeof d !== "object") return { ok: false, error: "This file could not be read. It is not a review pack or a review file." };
     var id = RC.identify(t);
     if (!id.ok) return id;
     if (id.kind === "pack") {
@@ -699,7 +699,7 @@
           : state.carried ? "Your review file is open, with your unsaved work added to it. Save to keep it."
           : "Your review is open (round " + (r.round || state.pack.round) + (r.reviewer ? ", as " + r.reviewer : "") + ").";
       } else {
-        msg = "Review pack opened: round " + state.pack.round + "." + (realInTour ? " This is the tour's window: use the Report Review Tool for real work." : "");
+        msg = "Review pack opened: round " + state.pack.round + "." + (realInTour ? " This is the tour's window, so use the Report Review Tool for real work." : "");
       }
       toast(msg);
     }
@@ -1536,7 +1536,7 @@
       where ? h("div", { class: "small muted rr-prev-where", text: where }) : null,
       a.quote ? h("div", { class: "quote small" }, [changed ? h("span", { class: "rr-lbl", text: "Was: " }) : a.cell ? h("span", { class: "rr-lbl", text: "On a cell: " }) : null, cut(a.quote, 240)]) : null,
       now != null ? h("div", { class: "rr-now small" }, [h("span", { class: "rr-lbl", text: "Now reads: " })].concat(wordDiff(a.quote, now))) : null,
-      changed && loc && loc.how === "section" ? h("div", { class: "small muted", text: inline ? "No close match now, so shown on its section heading." : "No close match now. Go to opens its section." }) : null,
+      changed && loc && loc.how === "section" ? h("div", { class: "small muted", text: inline ? "No close match was found, so it is shown on its section heading." : "No close match was found. Go to opens its section." }) : null,
       loc && loc.tie ? h("div", { class: "small muted rr-tie", text: (a.cell ? "These words could not be matched to one cell." : "These words are in the report more than once.") + " Check this is the right place." }) : null,
       gone && !inline ? h("div", { class: "small rr-gone", text: a.kind === "item" ? "This item is no longer in the engagement." : "This is no longer in the report." }) : null,
       h("div", { class: "text", text: c.text }),
@@ -1960,13 +1960,13 @@
     }
     tb.push(findBox());
     tb.push(h("button", { type: "button", class: "btn sm", id: "rr-keys", text: "Keyboard", title: "Keyboard shortcuts", onClick: showKeys }));
-    tb.push(h("span", { class: "muted", text: "Click anything in the report to comment. Select some words first to comment on just those." }));
+    tb.push(h("span", { class: "muted", text: "Click anything in the report to comment on it. To comment on some of the words, select them first." }));
     main.appendChild(h("h1", { class: "page-title", text: (e.instrumentTitle || "Report") }));
     // Who and which round stay in view at any width (the header hides them
     // on a narrow window); with two reports, which one this is.
     var who = [e.client, e.site].filter(Boolean).join(", "), me = state.review && state.review.reviewer;
-    main.appendChild(h("p", { class: "page-sub", text: (who ? who + ". " : "") + "As the client will read it: " +
-      (multi ? "the " + (doc.title || "report") + ", round " + pack.round + "." : "the generated Word report, round " + pack.round + ".") +
+    main.appendChild(h("p", { class: "page-sub", text: (who ? who + ". " : "") +
+      (multi ? "The " + (doc.title || "report") : "The Word report") + " as the client will read it, round " + pack.round + "." +
       (me ? " You are reviewing as " + me + "." : "") }));
     var rq = requestPanel();
     if (rq) main.appendChild(rq);
@@ -2511,7 +2511,7 @@
   function renderEngagement(main) {
     var pack = state.pack, all = pack.items || [], targets = targetsOf(pack);
     main.appendChild(h("h1", { class: "page-title", text: "Engagement" }));
-    main.appendChild(h("p", { class: "page-sub", text: "The answers and evidence behind the report." }));
+    main.appendChild(h("p", { class: "page-sub", text: "These are the answers and evidence behind the report." }));
     // "No evidence" is named for what the pack calls that field, and left out
     // when it has none.
     var evLabel = fieldLabel("evidence");
@@ -2720,7 +2720,7 @@
   }
   function renderChecks(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Automatic checks" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Possible problems in this pack. Make each one a comment or dismiss it." }));
+    main.appendChild(h("p", { class: "page-sub", text: "These are possible problems in this pack. Make each one a comment or dismiss it." }));
     var all = currentChecks(), active = all.filter(function (r) { return !isDismissed(r); }), gone = all.length - active.length;
     // What was found first, in the checks' own order; the clean checks folded
     // into one card, each opening to say what it looked for.
@@ -2798,14 +2798,14 @@
       state.checks = null;
       render(true);
     });
-    return h("div", { style: "margin-bottom:8px" }, [ta, h("div", { class: "small muted", text: "Kept in this browser only." })]);
+    return h("div", { style: "margin-bottom:8px" }, [ta, h("div", { class: "small muted", text: "The list is kept in this browser only." })]);
   }
 
   // ---------- previous round ----------
   function renderPrevious(main) {
     var list = prevComments();
     main.appendChild(h("h1", { class: "page-title", text: "Previous round" }));
-    main.appendChild(h("p", { class: "page-sub", text: "What the author did about each earlier comment. Confirm it or raise it again." }));
+    main.appendChild(h("p", { class: "page-sub", text: "This page shows what the author did about each earlier comment. Confirm each one or raise it again." }));
     var verdicts = (state.pack.previousRound && state.pack.previousRound.verdicts) || [];
     if (verdicts.length) {
       main.appendChild(card("Verdicts so far", null, verdicts.map(function (v) {
@@ -2970,7 +2970,7 @@
         h("button", { type: "button", class: "btn primary", id: "rr-save-2", text: "Save my review file", onClick: function (e) { saveReview(e); } }),
         savedText ? h("span", { class: "small muted", id: "rr-saved-at", text: savedText }) : null
       ]),
-      (r.verdict.value || "none") === "none" ? h("div", { class: "small muted no-print", id: "rr-no-verdict", text: "No verdict yet. Choose one before you send the file." }) : null
+      (r.verdict.value || "none") === "none" ? h("div", { class: "small muted no-print", id: "rr-no-verdict", text: "You have not chosen a verdict yet. Choose one before you send the file." }) : null
     ]);
     // No button sends the saved file to the author's tool, even in the suite:
     // the reviewer is someone else, who sends the file to the author.
@@ -3058,7 +3058,7 @@
   // ---------- welcome and about ----------
   function renderWelcome(main) {
     main.appendChild(h("h1", { class: "page-title", text: "Report review" }));
-    main.appendChild(h("p", { class: "page-sub", text: "Read a report as the client will, and comment on it." }));
+    main.appendChild(h("p", { class: "page-sub", text: "Read a report as the client will see it, and comment as you go." }));
     var drop = h("div", { class: "rr-drop", id: "rr-drop" }, [
       h("p", { text: "Drop a review pack here, or" }),
       h("button", { type: "button", class: "btn primary", id: "rr-open", text: "Open a review pack", onClick: chooseFiles }),
@@ -3066,7 +3066,7 @@
     ]);
     main.appendChild(drop);
     main.appendChild(card("How a review works", null, [h("ol", { class: "rr-steps" }, [
-      h("li", { text: "Open the review pack. It holds client data: handle it as you would the project file." }),
+      h("li", { text: "Open the review pack. It holds client data, so handle it as you would the project file." }),
       h("li", { text: "Read the report and comment as you go. Then work through the checklist and the automatic checks." }),
       h("li", { text: "On Summary and verdict, choose a verdict and save your review file. To carry on later, open the pack and your review file." }),
       h("li", { text: "Send the file to the author." })
@@ -3075,7 +3075,7 @@
   function renderAbout(main) {
     main.appendChild(h("h1", { class: "page-title", text: "About" }));
     main.appendChild(card(V.product + " " + V.label, "version " + V.number, [
-      h("p", { text: "Works offline. Review packs hold client data: handle them as you would the project file." }),
+      h("p", { text: "The tool works offline. Review packs hold client data, so handle them as you would the project file." }),
       h("p", { text: "It reads " + RC.packSchema() + " and writes " + RC.fileSchema() + "." })
     ]));
     main.appendChild(card("Keyboard", null, [keysList()]));
@@ -3084,17 +3084,17 @@
   // The keys, in one place: on About, and from the Keyboard button above the
   // report. Keep it in step with paperKey, itemKey and the wiring.
   var KEYS = [
-    ["Tab", "Moves between parts of the page. Use the keys below inside the report, the section list and the items."],
-    ["Up and Down", "Previous or next block, section or item."],
-    ["Page Up and Page Down", "Previous or next section of the report."],
-    ["Home and End", "First or last block, section or item. In a table, first or last cell of the row."],
+    ["Tab", "Move between parts of the page. Inside the report, the section list and the items, use the keys below."],
+    ["Up and Down", "Go to the previous or next block, section or item."],
+    ["Page Up and Page Down", "Go to the previous or next section of the report."],
+    ["Home and End", "Go to the first or last block, section or item. In a table, they go to the first or last cell of the row."],
     ["Enter or Space", "Comment on the block. On a table, Enter goes into the cells and Space comments on the whole table."],
-    ["In a table", "Arrow keys move between cells, Enter comments on the cell, Escape goes back to the table."],
-    ["Tab from a paragraph", "Goes to its comments, then out of the report."],
-    ["Escape", "Closes an empty comment or reply box, or a question. Clears the find box."],
-    ["Left and Right", "Move between buttons in a group."],
+    ["In a table", "The arrow keys move between cells, Enter comments on the cell and Escape goes back to the table."],
+    ["Tab from a paragraph", "Go to its comments, then out of the report."],
+    ["Escape", "Close an empty comment or reply box, or a question, or clear the find box."],
+    ["Left and Right", "Move between the buttons in a group."],
     ["Ctrl+F", "Find in the report. Enter and Shift+Enter go to the next and previous match."],
-    ["Ctrl+Z", "Undoes a delete while Undo is showing."]
+    ["Ctrl+Z", "Undo a delete while Undo is showing."]
   ];
   function keysList() {
     var kids = [];
@@ -3297,8 +3297,8 @@
     var other = !snap.overFile && snap.someoneElse;
     var text = snap.overFile
       ? "Unsaved work from " + when + " is not in the review file you opened. Restore adds it to the file."
-      : other ? "Unsaved work by " + other + " on this pack, from " + when + "."
-      : "Unsaved work on this pack from " + when + "." + (hasWork(state.review) ? " Restore adds it to what you have done since." : "");
+      : other ? "Unsaved work by " + other + " on this pack was kept from " + when + "."
+      : "Unsaved work on this pack was kept from " + when + "." + (hasWork(state.review) ? " Restore adds it to what you have done since." : "");
     function restore() {
       state.review = withOffered();
       state.restore = null;

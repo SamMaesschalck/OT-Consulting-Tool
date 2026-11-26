@@ -317,7 +317,7 @@
       ok(sw.length === 2 && w.getComputedStyle(sw[0]).color === "rgb(46, 125, 50)" && w.getComputedStyle(sw[1]).color === "rgb(199, 119, 0)", "a key's coloured swatches keep their colours from the Word file");
       ok(Array.prototype.every.call(sw, function (n) { return n.textContent === "■ "; }), "and the words beside them stay in the text colour");
       // #47: which report, everywhere
-      ok(/the Detailed report, round 2/.test(txt(w, ".page-sub")), "the Report page says which report it is", txt(w, ".page-sub"));
+      ok(/The Detailed report as the client will read it, round 2/.test(txt(w, ".page-sub")), "the Report page says which report it is", txt(w, ".page-sub"));
       var red0 = p.documents[0].blocks.filter(function (b) { return b.red; })[0];
       function anc(di) { return { documentIndex: di, documentTitle: p.documents[di].title, kind: "block", sectionKey: red0.sectionKey, sectionTitle: red0.sectionTitle, blockId: di ? red0.id.replace(/^d0-/, "d1-") : red0.id, blockType: red0.type, quote: red0.text, cell: null, targetName: "", itemId: "", field: "" }; }
       R.addComment({ severity: "must-fix", anchor: anc(0), text: "In the detailed one." });
