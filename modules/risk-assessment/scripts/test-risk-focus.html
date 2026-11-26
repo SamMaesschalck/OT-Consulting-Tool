@@ -203,8 +203,8 @@
     // ---- logic 4 and 5: what Duplicate and Move carry ----
     demo(); pick("Z3"); openScen("T5");
     threat("Z3", "T5").residualLikelihood = "medium"; RT.render();
-    // Step 5: the planned rating above tolerable risk now asks for the asset owner's acceptance of what remains (was: "Addressed by M5. Planned risk is still above tolerable risk.").
-    ok(scen("T5").querySelector(".treat-status").textContent === "The planned rating stays above tolerable risk, with no record of the asset owner's acceptance of the remaining risk.", "a planned rating above tolerable risk says so in full", scen("T5").querySelector(".treat-status").textContent);
+    // Accepting what remains is optional (ZCR 5.11 does not ask for it), so the status says the planned risk stays above tolerable.
+    ok(scen("T5").querySelector(".treat-status").textContent === "Addressed by M5. Planned risk is still above tolerable risk.", "a planned rating above tolerable risk says so in full", scen("T5").querySelector(".treat-status").textContent);
 
     demo(); pick("Z4"); openScen("T8");
     var rv = scen("T8").querySelector('[data-field="acc-review"]');

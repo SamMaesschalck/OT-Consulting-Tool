@@ -336,8 +336,8 @@
   // confirmed one is incomplete (reduce with no countermeasure, accept with no
   // reason or no one who accepted it, a transfer with no arrangement or no one who agreed it, a
   // decision to reduce with nothing planned while the risk is above tolerable today, a decision
-  // to reduce or treat through the target levels whose planned rating stays above tolerable
-  // with the remaining risk not accepted, the
+  // to reduce or treat through the target levels with an acceptance of the remaining risk
+  // started but missing its reason or who accepted it, the
   // target levels with none set and no reason). A complete decision with no
   // countermeasure is a legitimate position (treated through the target
   // levels, accepted or transferred), so it is not flagged.

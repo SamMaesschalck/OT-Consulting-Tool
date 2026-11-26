@@ -135,17 +135,24 @@
     var p3b = clone(base), t5 = threatIn(p3b, "Z3", "T5");
     t5.residualLikelihood = "medium"; // planned rating high: stays above tolerable
     var T5 = TT(p3b, "Z3", "T5");
-    ok(T5.remainingAbove && !T5.remainingAccepted && T5.label === "Reduce with countermeasures (remaining risk not accepted)" && T5.disposition === null &&
-      T5.gap === "the planned rating stays above tolerable risk, with no record of the asset owner's acceptance of the remaining risk", "reduce whose planned rating stays above tolerable: incomplete until what remains is accepted", T5.gap);
+    // ZCR 5.11 and 5.12 ask for a decision and, for mitigation, additional countermeasures; they do not ask for
+    // the remaining risk to be accepted, so recording that acceptance is optional (owner, 26 Nov 2026: match the standard).
+    ok(T5.remainingAbove && !T5.remainingAccepted && T5.complete && T5.label === "Reduce with countermeasures" && T5.disposition === "countermeasure" && T5.gap === "",
+      "reduce whose planned rating stays above tolerable: complete, with no acceptance of what remains asked for", T5.label + " / " + T5.gap);
+    ok(!has(texts(p3b), /T5:/), "and the completeness list says nothing of it", texts(p3b).join(" | "));
     t5.acceptance = "Accepted until the proxy is in place."; T5 = TT(p3b, "Z3", "T5");
-    ok(T5.gap === "the planned rating stays above tolerable risk, with no record of who accepted it" && T5.remainingMissing.join() === "who accepted it", "with a reason and no one, it asks for who");
+    ok(T5.gap === "the remaining risk is accepted with no record of who accepted it" && T5.label === "Reduce with countermeasures (acceptance of remaining risk incomplete)" && T5.remainingMissing.join() === "who accepted it",
+      "once an acceptance is started, with a reason and no one, it asks for who", T5.gap);
     t5.acceptanceDetail.by = "R. Calder"; T5 = TT(p3b, "Z3", "T5");
     ok(T5.complete && T5.remainingAccepted && T5.disposition === "countermeasure" && T5.label === "Reduce with countermeasures", "with both, the decision is complete and stays a reduction");
     var T4 = TT(base, "Z2", "T4");
     ok(T4.decision === "slt" && T4.remainingAbove && T4.remainingAccepted && T4.complete && T4.disposition === "sl-t" && T4.afterPlan === "high", "the demo's T4: treated through the SL-T, planned rating High, its remaining risk accepted");
     var p4 = clone(base), t4 = threatIn(p4, "Z2", "T4"); t4.acceptance = "";
-    ok(TT(p4, "Z2", "T4").label === "Treat through the SL-T programme (remaining risk not accepted)" && has(texts(p4), /^Z2 \(Safety Instrumented System\) \/ T4: the planned rating stays above tolerable risk, with no record of why the remaining risk is accepted\.$/),
-      "without its reason, the SL-T decision is incomplete and the list says what is missing", texts(p4).join(" | "));
+    ok(TT(p4, "Z2", "T4").label === "Treat through the SL-T programme (acceptance of remaining risk incomplete)" && has(texts(p4), /^Z2 \(Safety Instrumented System\) \/ T4: the remaining risk is accepted with no reason recorded\.$/),
+      "an acceptance with who but no reason leaves the SL-T decision incomplete and the list says what is missing", texts(p4).join(" | "));
+    var p4c = clone(base), t4c = threatIn(p4c, "Z2", "T4"); t4c.acceptance = ""; t4c.acceptanceDetail = { by: "", role: "", date: "", reviewDate: "" };
+    var T4c = TT(p4c, "Z2", "T4");
+    ok(T4c.complete && !T4c.remainingAccepted && T4c.disposition === "sl-t" && !has(texts(p4c), /T4:/), "with no acceptance at all, the SL-T decision is complete", T4c.label + " / " + T4c.gap);
     var acc = E.approvalBasis(base).accepted;
     ok(acc[acc.length - 1] === "remaining>Z2/T4:" + threatIn(base, "Z2", "T4").acceptance + "|R. Calder|Asset Owner - Unit 300|2026-07-04|2027-06-30", "the remaining risk accepted is part of what an approval covers, after the other accepted risks", acc[acc.length - 1]);
     var p4b = clone(base); threatIn(p4b, "Z2", "T4").acceptanceDetail.by = "A. N. Other";

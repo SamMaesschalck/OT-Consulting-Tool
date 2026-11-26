@@ -638,8 +638,9 @@ window.RiskApp.Model = (function () {
   //   suc.policyImplementation  { policy text: what implements it (text) }, for
   //                          the organisational security policies (suc.policies)
   // A decision to reduce or to treat through the SL-T that leaves the risk
-  // above tolerable risk records the asset owner's acceptance of what remains
-  // in the threat's acceptance fields (js/engine.js threatTreatment).
+  // above tolerable risk may record the asset owner's acceptance of what
+  // remains, optionally, in the threat's acceptance fields (js/engine.js
+  // threatTreatment).
   function inSuc(a) { return !a || a.inSuc !== false; }
   var SESSION_FIELDS = ["date", "topic", "participants"];
   function emptySession(id) { return { id: id, date: "", topic: "", participants: "" }; }

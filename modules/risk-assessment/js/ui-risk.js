@@ -252,7 +252,7 @@
       box.appendChild(h("p", { class: "hint", "data-hint": "transfer", text: "A transfer moves who bears the consequence, so the rating does not change." }));
     } else if ((T.decision === "reduce" || T.decision === "slt") && (T.remainingAbove || (t.acceptance || "").trim())) {
       // The planned rating stays above tolerable risk: the asset owner's
-      // acceptance of what remains, in the acceptance fields.
+      // acceptance of what remains, optional, in the acceptance fields.
       if (!t.acceptanceDetail || typeof t.acceptanceDetail !== "object") t.acceptanceDetail = M.emptyAcceptanceDetail();
       var rd = t.acceptanceDetail;
       var remIn = h("input", { type: "text", "data-reason": "remaining", value: t.acceptance, placeholder: "e.g. Bounded by the keyswitch and permit until the planned work is done.",
@@ -264,7 +264,7 @@
         liveText("Date", rd.date, function (v) { rd.date = v; }, { type: "date", attrs: { "data-field": "acc-date" } }),
         liveText("Review date", rd.reviewDate, function (v) { rd.reviewDate = v; }, { type: "date", attrs: { "data-field": "acc-review" } })
       ]));
-      if (T.remainingAbove) box.appendChild(h("p", { class: "hint", "data-hint": "remaining", text: "The planned rating stays above tolerable risk: record the asset owner's acceptance of what remains." }));
+      if (T.remainingAbove) box.appendChild(h("p", { class: "hint", "data-hint": "remaining", text: "The planned rating stays above tolerable risk. Recording the asset owner's acceptance of what remains is optional." }));
     } else if (T.decision === "accept" || (t.acceptance || "").trim()) {
       if (!t.acceptanceDetail || typeof t.acceptanceDetail !== "object") t.acceptanceDetail = M.emptyAcceptanceDetail();
       var ad = t.acceptanceDetail;
