@@ -11,7 +11,7 @@
     "titleLines": ["Supplier Cyber", "Exposure Screener"],
     "description": "Executive supplier cyber exposure screening"
   },
-  "notes": "High-level, interview-based screener of the cyber exposure a supplier brings: their corporate security, development practice, product security, vulnerability handling, regulatory readiness and the operational dependency you carry. Two stances share the same questions: assess-a-supplier (you screening a vendor, from their answers and evidence) or self-assess (a supplier screening itself before its customers do, where 'the supplier' means your own organisation). Every scored question's band is set by the consultant using judgement of the answer; the tool never derives the band from captured fields. Indicative and deliberately shallow: each weak domain routes into the deep assessment that establishes the real position.",
+  "notes": "This high-level screener uses interviews to judge the cyber exposure a supplier brings: its corporate security, development practice, product security, vulnerability handling, regulatory readiness and the operational dependency the customer carries. The same questions serve two stances. In a supplier assessment the customer screens a vendor from its answers and evidence. In a self-assessment a supplier screens itself before its customers do, and 'the supplier' means the assessed organisation. The consultant sets every scored band by judging the answer, and the captured fields never set it. The screening is indicative and shallow on purpose, and each weak domain points to the deep assessment that establishes the real position.",
   "responseModel": {
     "bandScale": [
       { "value": 0, "label": "Not in place" },
@@ -20,10 +20,10 @@
       { "value": 3, "label": "Fully in place and managed" }
     ],
     "specialStates": [
-      { "value": "unknown", "label": "Unknown", "effect": "reduces coverage; not scored" },
+      { "value": "unknown", "label": "Unknown", "effect": "reduces coverage and is not scored" },
       { "value": "na", "label": "Not applicable", "effect": "excluded from grading and coverage" }
     ],
-    "rule": "The band is always set by the consultant. Capture fields (text, checklist, choice, boolean) inform and evidence the band but never set it."
+    "rule": "The consultant always sets the band. Capture fields (text, checklist, choice, boolean) inform and evidence the band but never set it."
   },
   "domains": [
     { "id": "corp",  "name": "Corporate security & assurance" },
@@ -34,43 +34,43 @@
     { "id": "chain", "name": "Supply chain & operational exposure" }
   ],
   "followUpRoutes": {
-    "intro": "This screener is deliberately shallow: it shows where a supplier is weak, and each weak or ungradeable domain routes into the deep assessment that establishes the real position. Grades here are indicative reads of supplier answers, not verified findings.",
-    "noneTriggered": "No domain graded low enough to trigger a deep-dive recommendation on this screen. Re-screen when the supplier's products, regulatory position or your dependency on them changes materially.",
+    "intro": "The screening shows where a supplier is weak. Each domain that is weak, or that could not be graded, points to the deeper assessment that would establish the real position. The grades here are indicative judgements of the supplier's answers and have not been verified.",
+    "noneTriggered": "No domain graded low enough to call for a deeper assessment. The supplier should be screened again if its products, its regulatory position or the customer's dependency on it change materially.",
     "routes": [
       {
         "domainId": "dev",
         "grades": ["C", "D", "E", "F"],
         "title": "ISA/IEC 62443-4-1 Secure Product Development Lifecycle Assessment",
         "instrumentId": "iec-62443-4-1",
-        "detail": "Assess the supplier's development practice in depth against 62443-4-1: security requirements, secure design and implementation, verification testing and defect management. The screener's read of their SDL is answers-based only."
+        "detail": "Assess the supplier's development practice in depth against 62443-4-1, covering security requirements, secure design and implementation, verification testing and defect management. The screening judged its SDL on its answers alone."
       },
       {
         "domainId": "vuln",
         "grades": ["C", "D", "E", "F"],
         "title": "ISA/IEC 62443-4-1 (defect & update management), and the EU CRA Gap Assessment Part II layer for CRA-scoped products",
         "instrumentId": "iec-62443-4-1",
-        "detail": "Weak vulnerability handling is where supplier risk turns operational: verify the disclosure, remediation and update practices in depth, and for products in CRA scope assess the Annex I Part II obligations directly."
+        "detail": "Weak vulnerability handling is the point where supplier risk becomes operational risk. Verify the supplier's disclosure, remediation and update practices in depth, and for products in CRA scope assess the Annex I Part II obligations directly."
       },
       {
         "domainId": "prod",
         "grades": ["C", "D", "E", "F"],
         "title": "ISA/IEC 62443-4-2 Component Security Assessment, or the EU CRA Annex I Part I layer",
         "instrumentId": "iec-62443-4-2",
-        "detail": "Assess the product's own security capabilities in depth against the component requirements of ISA/IEC 62443-4-2, establishing the capability security level it can honestly claim per foundational requirement. For CRA-scoped products the Annex I Part I layer of the CRA gap assessment covers the essential requirements directly."
+        "detail": "Assess the product's security capabilities in depth against the component requirements of ISA/IEC 62443-4-2, to establish the capability security level it can claim for each foundational requirement. For products in CRA scope, the Annex I Part I layer of the CRA gap assessment covers the essential requirements directly."
       },
       {
         "domainId": "reg",
         "grades": ["C", "D", "E", "F"],
         "title": "EU CRA Gap Assessment / EU Machinery Regulation Gap Assessment",
         "instrumentId": "eu-cra",
-        "detail": "Establish the supplier's real regulatory position with the deep gap assessment that matches their products: the CRA for products with digital elements, the Machinery Regulation for machinery with digital control. Classification and conformity routes decide market access: too consequential to leave at screener depth."
+        "detail": "Establish the supplier's regulatory position with the gap assessment that matches its products. That is the CRA assessment for products with digital elements and the Machinery Regulation assessment for machinery with digital control. Classification and the conformity route decide market access, which is too important to judge from a screening alone."
       },
       {
         "domainId": "chain",
         "grades": ["C", "D", "E", "F"],
         "title": "ISA/IEC 62443-2-4:2023 Service Provider Security Program Assessment",
         "instrumentId": "iec-62443-2-4",
-        "detail": "Where the supplier also integrates, maintains or supports your systems, assess its service provider security program in depth against 62443-2-4: remote access, accounts and passwords, staffing and the other processes its people use on your systems. The screener's read of the supplier's access is answers-based only."
+        "detail": "Where the supplier also integrates, maintains or supports the customer's systems, assess its service provider security program in depth against 62443-2-4. That covers remote access, accounts and passwords, staffing and the other processes its people use on those systems. The screening judged the supplier's access on its answers alone."
       }
     ]
   },
@@ -80,8 +80,8 @@
       "domainId": "corp",
       "prompt": "Does the supplier have a named security lead and a functioning security organisation?",
       "shortTitle": "Security lead and organisation",
-      "rationale": "A supplier without anyone owning security cannot sustain any of the practices the rest of this screener asks about. The presence, seniority and reachability of a security function is the fastest single indicator of how the supplier will behave when something goes wrong with their product in your plant.",
-      "goodLooksLike": "A named security officer or product-security lead with a route to management, a security function that answers questions directly (not via sales), and evidence the role survives reorganisations: policies signed, advisories authored, a contactable team.",
+      "rationale": "If nobody at the supplier owns security, none of the other practices in this screening can last. Whether a security function exists, how senior it is and whether it can be reached is the quickest guide to how the supplier will behave when something goes wrong with its product on the customer's site.",
+      "goodLooksLike": "The supplier has a named security officer or product security lead with a route to management, and a security function that answers questions directly, without going through sales. There is evidence that the role survives reorganisations, such as signed policies, published advisories and a team that can be contacted.",
       "references": ["ISO/IEC 27001 (organisation of information security)", "ISA/IEC 62443-2-1", "NIS2 Art 21 (governance)"],
       "scored": true,
       "allowNA": true,
@@ -99,18 +99,18 @@
     {
       "id": "corp.2",
       "domainId": "corp",
-      "prompt": "Does the supplier hold security certifications, and do the scopes actually cover what you buy?",
+      "prompt": "Does the supplier hold security certifications, and do their scopes cover what the customer buys?",
       "shortTitle": "Certification scope",
-      "rationale": "Certificates are the cheapest assurance a supplier can offer, and the most commonly mis-sold. An ISO 27001 certificate scoped to the corporate office says nothing about the product line, and a 62443 certificate for one product family is routinely presented as covering all of them. The scope statement, not the logo, is the evidence.",
-      "goodLooksLike": "Current certificates (ISO 27001, IEC 62443-4-1/-4-2 or SDL certification, SOC 2 for services) with scope statements that name the products, development sites or services you actually consume: offered unprompted, with the certificate body verifiable.",
+      "rationale": "Certificates are the cheapest assurance a supplier can offer, and the most often mis-sold. An ISO 27001 certificate scoped to the corporate office says nothing about the product line, and a 62443 certificate for one product family is often presented as if it covered them all. The evidence is in the scope statement.",
+      "goodLooksLike": "Current certificates (ISO 27001, IEC 62443-4-1/-4-2 or SDL certification, SOC 2 for services) have scope statements that name the products, development sites or services the customer uses. The supplier offers them without being asked, and the certification body can be verified.",
       "references": ["ISO/IEC 27001", "IEC 62443-4-1 / 62443-4-2 (ISASecure)", "SOC 2"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
         "0": "No certifications, or refuses to evidence them",
         "1": "Certificates exist but scopes are unclear or corporate-only",
-        "2": "Relevant certificates, scope partially covers what you buy",
-        "3": "Current certificates whose scopes verifiably cover the products/services you buy"
+        "2": "Relevant certificates whose scope partly covers what the customer buys",
+        "3": "Current certificates whose scopes verifiably cover the products or services the customer buys"
       },
       "capture": [
         { "id": "certs", "type": "checklist", "label": "Certifications sighted", "options": ["ISO/IEC 27001", "IEC 62443 (any part)", "SOC 2", "Cyber Essentials (Plus)", "Other", "None"] },
@@ -122,15 +122,15 @@
       "domainId": "corp",
       "prompt": "Will the supplier commit to security contractually, and is it transparent when asked?",
       "shortTitle": "Contractual commitment and transparency",
-      "rationale": "What a supplier will sign predicts what it will do. Suppliers who accept security clauses, incident-notification duties and evidence rights have usually built the machinery to honour them; suppliers who strike every clause are telling you what to expect during an incident. Responsiveness to this screener itself is evidence.",
-      "goodLooksLike": "Security schedule accepted in contract: incident and vulnerability notification to you within defined times, right to security evidence or audit, secure development commitments, and support/patch commitments for the products in use. Questionnaires answered substantively and promptly.",
+      "rationale": "What a supplier will sign predicts what it will do. Suppliers that accept security clauses, incident notification duties and evidence rights have usually built the processes to honour them. A supplier that strikes out every clause is showing the customer what to expect during an incident. How readily the supplier responds to this screening is evidence too.",
+      "goodLooksLike": "The contract includes an accepted security schedule. It covers incident and vulnerability notification to the customer within defined times, the right to security evidence or audit, secure development commitments, and support and patch commitments for the products in use. The supplier answers questionnaires fully and promptly.",
       "references": ["NIS2 Art 21(2)(d) (supply chain security)", "NCSC supply chain security guidance", "ISA/IEC 62443-2-4 (service provider requirements)"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
         "0": "Refuses security clauses and questionnaires",
-        "1": "Answers selectively; contracts carry no security commitments",
-        "2": "Some clauses accepted (e.g. notification), evidence rights limited",
+        "1": "Answers selectively, and contracts carry no security commitments",
+        "2": "Some clauses accepted, such as notification, but evidence rights limited",
         "3": "Substantive security schedule in contract and open, prompt transparency"
       },
       "capture": [
@@ -142,17 +142,17 @@
     {
       "id": "dev.1",
       "domainId": "dev",
-      "prompt": "Does the supplier follow a defined secure development lifecycle for the products you buy?",
+      "prompt": "Does the supplier follow a defined secure development lifecycle for the products the customer buys?",
       "shortTitle": "Secure development lifecycle",
-      "rationale": "Product security is manufactured, not bolted on: threat modelling, security requirements and secure design decisions happen during development or not at all. A supplier that cannot describe its SDL in concrete terms for YOUR product line is describing an aspiration, and both the CRA and 62443-4-1 make the process itself the assessable object.",
-      "goodLooksLike": "A documented SDL applied to the product line in question (security requirements, threat modelling, secure coding standards, defined security gates in the release process) with artefacts the supplier can show (redacted threat model, gate records), ideally aligned or certified to IEC 62443-4-1.",
+      "rationale": "Product security is built in during development. Threat modelling, security requirements and secure design decisions happen then or not at all. A supplier that cannot describe its SDL in concrete terms for the product line the customer buys is describing an aspiration. Both the CRA and 62443-4-1 assess the development process itself.",
+      "goodLooksLike": "A documented SDL is applied to the product line in question, covering security requirements, threat modelling, secure coding standards and defined security gates in the release process. The supplier can show artefacts such as a redacted threat model or gate records, and the SDL is ideally aligned with or certified to IEC 62443-4-1.",
       "references": ["IEC 62443-4-1", "EU CRA Annex I Part I (design, development and production)", "Microsoft SDL / OWASP SAMM"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
         "0": "No discernible secure development practice",
         "1": "Claims an SDL, cannot evidence it for this product line",
-        "2": "SDL evidenced but partial (e.g. no threat modelling or gates)",
+        "2": "SDL evidenced but partial, for example without threat modelling or gates",
         "3": "Documented, evidenced SDL for this product line, aligned to 62443-4-1"
       },
       "capture": [
@@ -165,16 +165,16 @@
       "domainId": "dev",
       "prompt": "Is security testing built into the supplier's releases?",
       "shortTitle": "Security testing in releases",
-      "rationale": "Testing is where an SDL either exists or doesn't: static analysis, dependency scanning and penetration testing leave artefacts that are easy to evidence and hard to fake. A supplier that ships OT products without security testing is outsourcing its test programme to your plant.",
-      "goodLooksLike": "Static analysis and dependency/vulnerability scanning in the build pipeline, security-focused testing per release, and periodic independent penetration tests of the product (not just the website) with findings tracked to closure: summaries shareable under NDA.",
+      "rationale": "Testing shows whether an SDL exists. Static analysis, dependency scanning and penetration testing leave artefacts that are easy to evidence and hard to fake. A supplier that ships OT products without security testing leaves its customers' plants to find the problems.",
+      "goodLooksLike": "The build pipeline includes static analysis and dependency and vulnerability scanning, and each release gets security-focused testing. Independent penetration tests of the product itself, beyond the website, take place periodically, with findings tracked to closure and summaries shared under NDA.",
       "references": ["IEC 62443-4-1 (SVV practices)", "EU CRA Annex I Part I (testing)", "OWASP ASVS"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
         "0": "No security testing evident",
         "1": "Ad hoc or claimed testing, no artefacts",
-        "2": "Pipeline scanning routine; independent product testing irregular",
-        "3": "Layered testing per release incl. periodic independent product pen tests"
+        "2": "Routine pipeline scanning, but irregular independent product testing",
+        "3": "Layered testing for each release, including periodic independent product pen tests"
       },
       "capture": [
         { "id": "testing", "type": "checklist", "label": "Testing evidenced", "options": ["Static analysis", "Dependency scanning", "Fuzzing", "Product pen test (independent)", "None evidenced"] },
@@ -186,15 +186,15 @@
       "domainId": "dev",
       "prompt": "Are releases built and delivered with integrity?",
       "shortTitle": "Build and release integrity",
-      "rationale": "Build and delivery is the supply-chain attack surface: a compromised build server or update channel turns the supplier's every customer into a victim simultaneously. Signed artefacts and a controlled pipeline are what stand between you and the next 3CX or SolarWinds arriving with a valid supplier logo.",
-      "goodLooksLike": "A controlled build environment with access control and provenance, signed firmware/installers verified on installation, delivery over authenticated channels, and integrity guidance (hashes, signatures) published so customers can verify what they received.",
+      "rationale": "Build and delivery are where supply chain attacks happen. A compromised build server or update channel makes every one of the supplier's customers a victim at once. Signed artefacts and a controlled pipeline are the main protection against the next 3CX or SolarWinds arriving as a genuine supplier update.",
+      "goodLooksLike": "The build environment is controlled, with access control and provenance. Firmware and installers are signed and verified on installation, delivery uses authenticated channels, and the supplier publishes hashes and signatures so customers can verify what they received.",
       "references": ["IEC 62443-4-1 (SM practices)", "EU CRA Annex I (integrity, secure updates)", "SLSA / NIST SSDF"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
         "0": "Unsigned artefacts, uncontrolled distribution",
         "1": "Some artefacts signed, build controls unclear",
-        "2": "Signed releases; pipeline controls asserted, not evidenced",
+        "2": "Signed releases, but pipeline controls asserted without evidence",
         "3": "Controlled, evidenced pipeline with signed, verifiable releases"
       },
       "capture": [
@@ -206,15 +206,15 @@
     {
       "id": "prod.1",
       "domainId": "prod",
-      "prompt": "Do the products arrive securely configured by default, with real hardening guidance?",
+      "prompt": "Do the products arrive securely configured by default, with product-specific hardening guidance?",
       "shortTitle": "Secure by default and hardening guidance",
-      "rationale": "Default credentials and open services on delivery move the security burden onto every customer, and in OT that burden is rarely picked up: the commissioning configuration IS the production configuration for years. Secure-by-default is also now a legal expectation for CRA-scoped products, not a differentiator.",
-      "goodLooksLike": "No default or shared credentials (forced individual set-up), unnecessary services off on delivery, secure protocol options on by default, and a product-specific hardening guide the supplier maintains, not a generic 'apply your own policy' disclaimer.",
+      "rationale": "Default credentials and open services on delivery pass the security burden to every customer, and in OT that burden is rarely taken up, because the configuration set at commissioning often stays in production for years. For products in CRA scope, secure by default is now a legal expectation.",
+      "goodLooksLike": "The product has no default or shared credentials and forces individual set-up. Unnecessary services are off on delivery and secure protocol options are on by default. The supplier maintains a hardening guide for the product. A generic note telling customers to apply their own policy does not count.",
       "references": ["EU CRA Annex I Part I (secure by default)", "IEC 62443-4-2 (CR 1.5, CR 7.6, CR 7.7)", "CISA Secure by Design"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
-        "0": "Default credentials / wide-open services on delivery",
+        "0": "Default credentials or wide-open services on delivery",
         "1": "Hardening possible but manual and poorly documented",
         "2": "Reasonable defaults, gaps in guidance or residual open services",
         "3": "Secure by default with maintained product-specific hardening guidance"
@@ -229,15 +229,15 @@
       "domainId": "prod",
       "prompt": "Do the products support per-user access control and usable security logging?",
       "shortTitle": "Access control and logging",
-      "rationale": "If the product cannot distinguish users or record what happened, no amount of customer-side control compensates: shared engineering logins and silent devices are how OT incidents become unreconstructable. These capabilities have to exist in the product before your policies can use them.",
-      "goodLooksLike": "Individual accounts with role-based privileges (integrating with your directory where feasible), no hard-coded accounts, and security-relevant events (logons, configuration changes, failures) logged in a form that can be exported or forwarded to your monitoring.",
+      "rationale": "If the product cannot tell users apart or record what happened, no control on the customer's side can make up for it. Shared engineering logins and devices that log nothing make an OT incident impossible to reconstruct. The capabilities have to exist in the product before the customer's policies can use them.",
+      "goodLooksLike": "The product supports individual accounts with role-based privileges, integrated with the customer's directory where feasible, and has no hard-coded accounts. Security-relevant events such as logons, configuration changes and failures are logged in a form that can be exported or forwarded to the customer's monitoring.",
       "references": ["IEC 62443-4-2 (CR 1.x, CR 2.x, CR 6.x)", "EU CRA Annex I Part I (access control, logging)"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
-        "0": "Shared/hard-coded accounts, no security logging",
-        "1": "Basic accounts or logs, not both, with real limitations",
-        "2": "Per-user access and logging present, integration weak",
+        "0": "Shared or hard-coded accounts, and no security logging",
+        "1": "Basic accounts or basic logs, but not both, with significant limitations",
+        "2": "Per-user access and logging present, but weak integration",
         "3": "Role-based per-user access and exportable security logging that fits OT monitoring"
       },
       "capture": [
@@ -250,15 +250,15 @@
       "domainId": "prod",
       "prompt": "Can the products be updated securely and practically in an OT environment?",
       "shortTitle": "Secure, practical updates",
-      "rationale": "An update mechanism that needs a site visit, breaks certification or cannot be scheduled around production will not be used, and an insecure one is an attack channel. Update practicality is where product security meets plant reality, and it decides whether the supplier's fixes ever reach your estate.",
-      "goodLooksLike": "Cryptographically signed updates verified by the device, rollback on failure, offline/staged installation options for air-gapped or windowed environments, clear compatibility statements, and no forced cloud dependency for security fixes.",
+      "rationale": "An update mechanism that needs a site visit, breaks certification or cannot be scheduled around production will not be used, and an insecure one is a route for attack. Whether updates are practical on site decides whether the supplier's fixes ever reach the customer's plant.",
+      "goodLooksLike": "Updates are cryptographically signed, verified by the device and rolled back on failure. Offline or staged installation is possible for air-gapped sites and those with limited maintenance windows. Compatibility statements are clear, and security fixes do not force a cloud dependency.",
       "references": ["EU CRA Annex I Part I (secure updates)", "IEC 62443-4-2 (CR 3.10)", "IEC 62443-2-3 (patch management)"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
         "0": "No viable update path for fielded units",
         "1": "Updates possible but unsigned or operationally impractical",
-        "2": "Signed updates, practicality gaps (no rollback / no offline path)",
+        "2": "Signed updates, with practical gaps such as no rollback or no offline path",
         "3": "Signed, verifiable, rollback-capable updates deployable within OT constraints"
       },
       "capture": [
@@ -270,17 +270,17 @@
     {
       "id": "vuln.1",
       "domainId": "vuln",
-      "prompt": "Does the supplier run a real vulnerability-handling process: disclosure route, triage and structured advisories?",
+      "prompt": "Does the supplier run a working vulnerability handling process, with a disclosure route, triage and structured advisories?",
       "shortTitle": "Vulnerability handling process",
-      "rationale": "Every product has vulnerabilities; what differentiates suppliers is whether they can receive, fix and tell you about them. A supplier with no disclosure route or advisory history either isn't finding vulnerabilities or isn't telling anyone: both are worse than a published CVE list. For CRA-scoped products this is a legal obligation (Annex I Part II).",
-      "goodLooksLike": "A published coordinated vulnerability disclosure policy with a reachable contact (security.txt), a PSIRT or equivalent that triages on defined timelines, and a history of structured advisories (CVE/CSAF, affected versions, severity, fixed version) for the product line.",
+      "rationale": "Every product has vulnerabilities. Suppliers differ in whether they can receive reports, fix the problems and tell their customers. A supplier with no disclosure route or advisory history is either not finding vulnerabilities or not telling anyone, and both are worse than a published CVE list. For products in CRA scope this is a legal obligation under Annex I Part II.",
+      "goodLooksLike": "The supplier publishes a coordinated vulnerability disclosure policy with a reachable contact (security.txt), and a PSIRT or equivalent triages reports to defined timelines. There is a history of structured advisories for the product line, giving CVE or CSAF identifiers, affected versions, severity and the fixed version.",
       "references": ["EU CRA Annex I Part II", "ISO/IEC 29147 / 30111", "IEC 62443-4-1 (DM practices)"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
-        "0": "No disclosure route; no advisory history",
-        "1": "Contactable but ad hoc; advisories rare or unstructured",
-        "2": "CVD policy and advisories exist, cadence or structure inconsistent",
+        "0": "No disclosure route and no advisory history",
+        "1": "Contactable but ad hoc, with rare or unstructured advisories",
+        "2": "CVD policy and advisories exist, but cadence or structure is inconsistent",
         "3": "Published CVD, functioning PSIRT and consistent structured advisories"
       },
       "capture": [
@@ -293,14 +293,14 @@
       "domainId": "vuln",
       "prompt": "Are security fixes produced on severity-driven timelines, separately from feature releases?",
       "shortTitle": "Severity-driven fix timelines",
-      "rationale": "A critical fix that ships 'in the next annual release' (or only bundled with a paid upgrade) is not vulnerability handling, it is a sales motion. OT operators need fixes they can take without absorbing feature risk, and the fix cadence for past advisories is verifiable evidence of what you will actually get.",
-      "goodLooksLike": "Documented remediation SLAs by severity, security patches decoupled from feature/major releases, fixes free of charge for supported versions, and a track record (advisory-to-fix intervals) that matches the policy.",
+      "rationale": "A critical fix that ships in the next annual release, or only with a paid upgrade, is a sales tactic and does not count as vulnerability handling. OT operators need fixes they can apply without taking on the risk of new features. The time taken to fix past advisories is verifiable evidence of what the customer can expect.",
+      "goodLooksLike": "The supplier has documented remediation SLAs by severity and ships security patches separately from feature and major releases. Fixes are free of charge for supported versions, and the time from advisory to fix in past cases matches the policy.",
       "references": ["EU CRA Annex I Part II (security updates without delay, free of charge)", "IEC 62443-4-1 (DM-4)"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
-        "0": "Fixes only via major/paid upgrades, no timelines",
-        "1": "Fixes happen, cadence unpredictable and bundled",
+        "0": "Fixes only through major or paid upgrades, with no timelines",
+        "1": "Fixes happen, but unpredictably and bundled with releases",
         "2": "Severity SLAs stated, record mostly supports them",
         "3": "Decoupled, free, severity-driven fixes with a verifiable track record"
       },
@@ -312,17 +312,17 @@
     {
       "id": "vuln.3",
       "domainId": "vuln",
-      "prompt": "Are support periods defined and long enough for OT service life, with a managed end-of-support?",
+      "prompt": "Are support periods defined and long enough for the service life of OT equipment, with a managed end of support?",
       "shortTitle": "Support period and end of support",
-      "rationale": "OT equipment runs for 15-25 years; a product supported for five leaves you a decade of unpatched exposure or a forced replacement project on the supplier's schedule. The support commitment (and how end-of-support is announced and managed) is one of the largest cost and risk terms in the relationship, and it is negotiable at purchase and rarely after.",
-      "goodLooksLike": "Published support periods per product with security-fix commitments for the whole period, proportionate to OT lifespans (or extendable by agreement), advance end-of-support notice measured in years, and migration paths that do not orphan fielded estates.",
+      "rationale": "OT equipment runs for 15 to 25 years. A product supported for five leaves the customer with a decade of unpatched exposure or a forced replacement on the supplier's schedule. The support commitment, including how the end of support is announced and managed, is one of the largest cost and risk terms in the relationship. It can be negotiated at purchase but rarely afterwards.",
+      "goodLooksLike": "Each product has a published support period with security fixes committed for the whole period, in proportion to OT lifespans or extendable by agreement. End of support is announced years in advance, and migration paths do not leave installed equipment stranded.",
       "references": ["EU CRA (support period determination)", "IEC 62443-2-3", "Procurement security clauses"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
-        "0": "No support commitment; EOL at supplier's whim",
-        "1": "Support informal or short with abrupt EOL history",
-        "2": "Published periods, adequate but inflexible or thinly noticed",
+        "0": "No support commitment, and end of life at the supplier's discretion",
+        "1": "Support informal or short, with a history of abrupt end of life",
+        "2": "Published periods, adequate but inflexible or with short notice",
         "3": "Published OT-proportionate support with managed, long-notice end-of-support"
       },
       "capture": [
@@ -334,10 +334,10 @@
     {
       "id": "reg.1",
       "domainId": "reg",
-      "prompt": "Does the supplier know which EU product regulations apply to what it sells you?",
+      "prompt": "Does the supplier know which EU product regulations apply to what it sells the customer?",
       "shortTitle": "Regulatory scope awareness",
-      "rationale": "A supplier that cannot say whether its product is in CRA scope, what its Annex III class is, or whether the Machinery Regulation's digital requirements bite, has not started the work those answers trigger. Their regulatory ignorance becomes your procurement risk: non-conforming products cannot lawfully be supplied, mid-contract.",
-      "goodLooksLike": "The supplier states, per product: CRA scope and class (default/important/critical), Machinery Regulation applicability for machinery with digital control, RED/EMC positions, and its own NIS2 role where relevant (unprompted or on first asking, consistent with the product reality).",
+      "rationale": "A supplier that cannot say whether its product is in CRA scope, what its Annex III class is, or whether the Machinery Regulation's digital requirements apply has not started the work those answers lead to. The gap becomes the customer's procurement risk, because non-conforming products cannot lawfully be supplied, even partway through a contract.",
+      "goodLooksLike": "For each product the supplier states its CRA scope and class (default, important or critical), whether the Machinery Regulation applies to machinery with digital control, its RED and EMC positions, and its own NIS2 role where relevant. It does so unprompted or when first asked, and the statements match the products.",
       "references": ["EU CRA (Reg 2024/2847)", "EU Machinery Regulation (Reg 2023/1230)", "NIS2 (Dir 2022/2555)"],
       "scored": true,
       "allowNA": true,
@@ -345,7 +345,7 @@
         "0": "Unaware of or dismisses the applicable regulations",
         "1": "General awareness, no per-product position",
         "2": "Scope and class stated for main products, gaps or uncertainty at edges",
-        "3": "Clear, credible per-product regulatory map incl. class and dates"
+        "3": "Clear, credible regulatory map for each product, including class and dates"
       },
       "capture": [
         { "id": "regs", "type": "checklist", "label": "Positions stated", "options": ["CRA scope + class", "Machinery Regulation position", "RED/EMC position", "NIS2 role", "None"] },
@@ -357,13 +357,13 @@
       "domainId": "reg",
       "prompt": "Is the supplier on a credible path to conformity by the applicable dates?",
       "shortTitle": "Path to conformity",
-      "rationale": "Knowing the obligations is not meeting them: the CRA's full obligations apply from 11 December 2027 and the Machinery Regulation from 14 January 2027, and notified-body capacity is the industry's shared bottleneck. A supplier that has not booked its route will not conjure one in the final year, and its products may become unsupplyable to you exactly when replacements are hardest.",
-      "goodLooksLike": "Per product: conformity route chosen (self-assessment vs notified body, correctly derived from class), notified body engaged where required, technical documentation in progress, and dated plans that land before the applicable deadlines (shareable as a roadmap even if summarised).",
+      "rationale": "Knowing the obligations does not meet them. The CRA's full obligations apply from 11 December 2027 and the Machinery Regulation from 14 January 2027, and notified body capacity is limited across the industry. A supplier that has not booked its route will struggle to find one in the final year, and its products may become impossible to supply just when replacements are hardest to find.",
+      "goodLooksLike": "For each product the supplier has chosen a conformity route, either self-assessment or a notified body, correctly derived from the class. A notified body is engaged where required, technical documentation is in progress, and dated plans finish before the applicable deadlines. The supplier can share these as a roadmap, even in summary.",
       "references": ["EU CRA Arts 32/Annex VIII (routes)", "EU Machinery Regulation Art 25/Annex I", "Notified-body engagement lead times"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
-        "0": "No conformity plan; deadlines unacknowledged",
+        "0": "No conformity plan, and deadlines not acknowledged",
         "1": "Intends to comply, no route or dates",
         "2": "Route chosen and started, timeline tight or partially evidenced",
         "3": "Credible dated route per product, notified body engaged where required"
@@ -376,17 +376,17 @@
     {
       "id": "reg.3",
       "domainId": "reg",
-      "prompt": "Could the supplier meet its incident and exploited-vulnerability reporting duties, and would you hear about it?",
+      "prompt": "Could the supplier meet its incident and exploited-vulnerability reporting duties, and would the customer hear about it?",
       "shortTitle": "Incident and vulnerability reporting duties",
-      "rationale": "The CRA's Article 14 clock (24-hour early warning from 11 September 2026) is unmeetable without a rehearsed process, and a supplier that cannot notify a regulator in 24 hours will not notify you faster. Your own NIS2 and incident-response obligations depend on the supplier's willingness to tell you promptly that their product is being exploited in the wild.",
-      "goodLooksLike": "A stood-up reporting process with named owners and out-of-hours cover for the statutory routes, plus a contractual commitment to notify affected customers of actively exploited vulnerabilities and product-relevant incidents within defined hours, with any exercise or live history as evidence.",
+      "rationale": "The CRA's Article 14 deadlines, starting with a 24-hour early warning from 11 September 2026, cannot be met without a rehearsed process. A supplier that cannot notify a regulator within 24 hours will not notify its customers any faster. The customer's own NIS2 and incident response obligations depend on the supplier telling it promptly when its product is being exploited.",
+      "goodLooksLike": "The supplier has a working reporting process for the statutory routes, with named owners and out-of-hours cover. The contract commits it to notify affected customers of actively exploited vulnerabilities and relevant product incidents within defined hours, and exercises or past cases provide evidence.",
       "references": ["EU CRA Art 14", "NIS2 Art 23 (your own reporting dependencies)", "Contractual notification clauses"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
-        "0": "No reporting process; no customer notification commitment",
-        "1": "Ad hoc notification, nothing rehearsed or committed",
-        "2": "Process defined; customer notification informal or slow",
+        "0": "No reporting process and no commitment to notify customers",
+        "1": "Ad hoc notification, with nothing rehearsed or committed",
+        "2": "Process defined, but customer notification informal or slow",
         "3": "Rehearsed statutory reporting plus committed, timed customer notification"
       },
       "capture": [
@@ -398,10 +398,10 @@
     {
       "id": "chain.1",
       "domainId": "chain",
-      "prompt": "Will the supplier show you what is inside the product: components, open source and fourth parties?",
+      "prompt": "Will the supplier show the customer what is inside the product, including components, open source and fourth parties?",
       "shortTitle": "Product composition transparency",
-      "rationale": "Most of any modern product is someone else's code, and the supplier's suppliers are invisible to you unless surfaced deliberately. When the next Log4j lands, an SBOM is the difference between a two-hour exposure check and a two-month vendor correspondence, and willingness to share one is a proxy for whether the supplier knows its own contents.",
-      "goodLooksLike": "A machine-readable SBOM (SPDX/CycloneDX) available per product version, at least under NDA, covering third-party and open-source components; awareness of significant fourth parties (ODM hardware, cloud dependencies, licensed stacks) and upstream advisory monitoring.",
+      "rationale": "Most of any modern product is other people's code, and the supplier's own suppliers stay hidden from the customer unless the supplier discloses them. When the next Log4j appears, an SBOM turns a two-month exchange with the vendor into a two-hour exposure check. A supplier willing to share one usually knows what is in its own products.",
+      "goodLooksLike": "A machine-readable SBOM (SPDX or CycloneDX) is available for each product version, at least under NDA, and covers third-party and open-source components. The supplier knows its significant fourth parties, such as ODM hardware, cloud dependencies and licensed software stacks, and monitors upstream advisories.",
       "references": ["EU CRA Annex I Part II (SBOM)", "NTIA/CISA SBOM guidance", "IEC 62443-4-1 (component management)"],
       "scored": true,
       "allowNA": true,
@@ -419,38 +419,38 @@
     {
       "id": "chain.2",
       "domainId": "chain",
-      "prompt": "Is the supplier's access into your estate known, minimised and controlled?",
-      "shortTitle": "Supplier access to your estate",
-      "rationale": "Supplier remote access is the most common uninventoried pathway into OT estates: support VPNs, cellular modems in cabinets and standing TeamViewer accounts accumulate per project and outlive it. Whatever the supplier's own security, its access is part of YOUR attack surface, and several landmark OT incidents began exactly there.",
-      "goodLooksLike": "A complete, current picture of what access the supplier holds (accounts, tunnels, embedded modems), access that is individually attributed, time-bounded and activated per session with your approval, session recording or monitoring, and prompt deprovisioning evidenced when personnel change.",
+      "prompt": "Is the supplier's access into the customer's estate known, minimised and controlled?",
+      "shortTitle": "Supplier access to the estate",
+      "rationale": "Supplier remote access is the most common unrecorded route into OT estates. Support VPNs, cellular modems in cabinets and standing TeamViewer accounts build up with each project and outlast it. Whatever the supplier's own security, its access is part of the customer's attack surface, and several well-known OT incidents began there.",
+      "goodLooksLike": "The customer has a complete, current record of the supplier's access, including accounts, tunnels and embedded modems. Each access is attributed to an individual, limited in time and activated per session with the customer's approval. Sessions are recorded or monitored, and access is removed promptly, with evidence, when supplier staff change.",
       "references": ["ISA/IEC 62443-2-4 / 62443-3-3 (SR 1/2)", "NCSC remote access guidance", "Your own access-control policy"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
         "0": "Unknown or standing unmanaged access paths",
         "1": "Access known in outline, standing and shared",
-        "2": "Controlled access, gaps in attribution, session control or review",
+        "2": "Controlled access, with gaps in attribution, session control or review",
         "3": "Fully inventoried, per-session, attributed and monitored access"
       },
       "capture": [
-        { "id": "access", "type": "checklist", "label": "Access reality", "options": ["Inventoried fully", "Per-session activation", "Individual attribution", "Session monitoring/recording", "Standing access exists", "Embedded modem/cellular found"] },
+        { "id": "access", "type": "checklist", "label": "Access arrangements", "options": ["Inventoried fully", "Per-session activation", "Individual attribution", "Session monitoring/recording", "Standing access exists", "Embedded modem/cellular found"] },
         { "id": "notes", "type": "text", "label": "Notes / evidence" }
       ]
     },
     {
       "id": "chain.3",
       "domainId": "chain",
-      "prompt": "Are you protected if the supplier fails, is acquired or exits the product line?",
+      "prompt": "Is the customer protected if the supplier fails, is acquired or withdraws from the product line?",
       "shortTitle": "Supplier failure and exit protection",
-      "rationale": "Supplier risk includes the supplier disappearing: insolvency, acquisition by a competitor or a quiet product-line exit can strand safety-relevant systems with no updates, no licence server and no documentation, mid-lifecycle. Continuity terms cost little at signature and are near-impossible to obtain during the event itself.",
-      "goodLooksLike": "Escrow (source, build instructions, signing capability or update continuity) with defined release triggers, contractual data return/portability, documentation sufficient for third-party maintenance, licence terms that survive supplier failure, and change-of-control notification.",
+      "rationale": "Supplier risk includes the supplier disappearing. Insolvency, acquisition by a competitor or an unannounced withdrawal from a product line can leave safety-relevant systems partway through their life with no updates, no licence server and no documentation. Continuity terms cost little when the contract is signed and are almost impossible to obtain once the event happens.",
+      "goodLooksLike": "Escrow of source code, build instructions and signing capability, or another update continuity arrangement, has defined release triggers. The contract provides for data return and portability, documentation is good enough for a third party to maintain the product, licence terms survive supplier failure, and the supplier must give notice of a change of control.",
       "references": ["Escrow agreements (e.g. NCC-style)", "Procurement continuity clauses", "NIS2 Art 21(2)(d)"],
       "scored": true,
       "allowNA": true,
       "bandAnchors": {
         "0": "No continuity protections at all",
         "1": "Discussed, nothing contractual",
-        "2": "Partial (e.g. data return but no escrow or triggers)",
+        "2": "Partial protection, for example data return but no escrow or triggers",
         "3": "Escrow with triggers, survivable licences and exit-tested terms"
       },
       "capture": [
