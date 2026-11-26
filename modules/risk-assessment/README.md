@@ -1,18 +1,18 @@
 # OT Cyber Risk Assessment Tool
 
-An offline, browser-based zones-and-conduits risk assessment that follows the
-order of the published IEC 62443-3-2:2020 (ZCR 1 to ZCR 7). Open `index.html` directly from disk
-(file://). There is no backend and nothing to build to use it; for handing
-out, it is also built as one self-contained HTML file and as a portable exe
-(see Builds below).
+The risk tool runs a zones and conduits risk assessment in the order of the
+published IEC 62443-3-2:2020 (ZCR 1 to ZCR 7). It works offline in the
+browser: open `index.html` directly from disk (file://). It has no backend
+and needs no build step. For handing out, it is also built as one
+self-contained HTML file and as a portable exe (see Builds below).
 
-This app is a sibling of the assessment tool in `../assessments`, not part of
-it. The two codebases are separate and are expected to diverge. When both need
-the same file (vendor libraries, logo, licence, the suite version), its
-canonical copy lives in the repository's `shared/` (or `contracts/`) and
-`tools/sync-shared.ps1` copies it into each module; never reference across
-module folders and never share runtime. The only thing the two apps agree on
-at run time is the interchange file contract described below.
+The app sits beside the assessment tool in `../assessments` and is a separate
+codebase, expected to diverge from it. When both need the same file (vendor
+libraries, logo, licence, the suite version), its canonical copy lives in the
+repository's `shared/` (or `contracts/`) and `tools/sync-shared.ps1` copies it
+into each module. Never reference across module folders and never share
+runtime. At run time the two apps share only the interchange file contract
+described below.
 
 ## Pages and steps
 
@@ -382,7 +382,7 @@ build opens 0.1, 0.2 and 0.3 files.
   countermeasures; the residual pair now means after the planned measures
   (the planned rating). Either of a pair alone falls back to the rating
   before it. The rating that stands is planned, else current, else
-  unmitigated. **Today** is one rule in the engine (`threatTreatment`),
+  unmitigated. **Today** is decided in one place in the engine (`threatTreatment`),
   read by the screen, Word, Excel, the review pack and the risk context
   through the view model: the current rating where rated; else the planned
   rating when no planned countermeasure is linked (nothing is still to come);
@@ -717,9 +717,10 @@ so a file without them behaves and prints exactly as before.
   category changed, the decision on a detailed assessment changed; zones and
   conduits added (with what they hold, not listed again), removed,
   renumbered ("Z1 Unit 300 BPCS was numbered Z2."), renamed ("C3 had no
-  name; now Corporate reporting."), a conduit that now joins other zones
-  ("C1 now joins Z1 and Z2; was Z1 and Z3."), a depth that changed ("C1
-  Historian replication: now grouped with Z3; was assessed in detail.", only
+  name and is now named Corporate reporting."), a conduit that now joins
+  other zones ("C1 now joins Z1 and Z2 (was Z1 and Z3)."), a depth that
+  changed ("C1 Historian replication is now grouped with Z3 (was assessed in
+  detail).", only
   where both copies hold a depth, so one frozen before the depth was kept
   reports none, and on the Changes sheet as Assessment depth changed); the SL-T per FR ("IAC raised
   from SL2 to SL3", "DC set to SL1", "DC no longer set (was SL2)"); threats
@@ -730,14 +731,14 @@ so a file without them behaves and prints exactly as before.
   likelihood and impact on the same criteria and by band only when the
   criteria changed ("The risk criteria changed, so ratings are compared by
   band only."); a treatment decision only when the decision recorded changed
-  ("T4 (Z2): was reduce with countermeasures; now treated through the SL-T
-  programme."; a threat now within tolerable risk needs none, which its
+  ("T4 (Z2): now treated through the SL-T programme (was reduce with
+  countermeasures)."; a threat now within tolerable risk needs none, which its
   rating says); countermeasures added, removed, moved to another zone ("M5
   moved from Z3 to Z1."), now in place or with their status changed ("M5
   (Z3): moved from in progress to done.", "M3 (Z1): now agreed."); accepted
-  risks added or no longer accepted ("T8 (Z4) no longer accepted; the
-  decision is now reduce with countermeasures.", said there, not again with
-  the decisions); a change of tolerable risk or of a category's tolerable
+  risks added or no longer accepted ("T8 (Z4) is no longer accepted. The
+  decision is now reduce with countermeasures.", said there and not again
+  with the decisions); a change of tolerable risk or of a category's tolerable
   risk. A review date that has passed is a fact about today, not a change:
   the full report says it under Decisions required, baseline or not ("The
   review date of the accepted risk T8 (Z4), 2026-10-31, has passed.").
@@ -879,7 +880,7 @@ and `word-v0.7.0.js`.
   - From library turns house scenarios into scenarios for this consequence,
     using the picker in `js/ui-library.js`. Link adds an existing threat and
     keeps its own rating. When the threat led elsewhere, the toast says "T2
-    now leads to K1, not K2."
+    now leads to K1 (was K2)."
   - A scenario whose impact differs from its consequence's says so ("Impact
     lower than K1 (Severe)"). Nothing is corrected silently.
   - Changing a consequence's impact offers to update the scenarios still on
@@ -1006,22 +1007,23 @@ Once a review has started, the Word downloads (detailed and high level) and the 
 
 ## Two tiers
 
-The tool is split into two tiers, matching how 3-2 is used in practice.
+The tool has two tiers, as 3-2 is used in practice.
 
-The high-level tier (ZCR 2) is the high-level risk assessment, done
-here as a relative risk ranking of the systems in scope, and it is a
-deliverable in its own right. You can rank the systems and generate a
+The high-level tier (ZCR 2) is the high-level risk assessment. The tool does
+it as a relative risk ranking of the systems in scope, and it is a
+deliverable on its own. You can rank the systems and generate a
 *High-level risk assessment report* (Report, High level) without
-defining zones, running the detailed assessment or assigning SL-T. Choosing
-"High-level assessment only" on Home says so: the zone steps read Not needed,
+defining zones, running the detailed assessment or assigning SL-T. With
+"High-level assessment only" chosen on Home, the zone steps read Not needed
 and the comparison with tolerable risk is a column of the ranking.
 
 The detailed tier is done per zone and per conduit. The standard compares the
 SUC's initial risk with tolerable risk once (ZCR 4) and, above it, assesses
-every zone and conduit; the depth of each is the consultant's, and suggesting
-it from the zone's own initial risk is the house method. From the ranking, Assign to zone puts a ranked system in a zone (an
-existing one or a new one named after it); the zone's initial risk on the
-comparison is the worst of its systems. No threat is seeded.
+every zone and conduit. The consultant chooses the depth of each, and
+suggesting it from the zone's own initial risk is the house method. From the
+ranking, Assign to zone puts a ranked system in a zone (an existing one or a
+new one named after it), and the zone's initial risk on the comparison is the
+worst of its systems. No threat is seeded.
 
 ## Workflow (IEC 62443-3-2:2020)
 
@@ -1298,7 +1300,8 @@ is accepted by the asset owner, so M4 and M8 are mandatory; the SUC lists
 its access points; each organisational policy says what implements it; the
 basis records three risk assessment sessions; and the second approver is
 the operations manager accountable for the unit (D. Hargreaves). The
-approvals were retaken on the `a3-` fingerprint.
+approvals were retaken on the `a3-` fingerprint, and again when the
+wording pass reworded the T4 and T8 acceptances.
 `scripts/test-tour-risk.html` holds it to zero completeness problems and
 its approvals to Unchanged since approval.
 
@@ -1310,19 +1313,19 @@ its approvals to Unchanged since approval.
   were checked against its contents list (13 Nov 2026), and the requirement
   wording of clauses 3 and 4 and the annexes against the published edition
   (26 Nov 2026), with the tool brought into line. The points listed as a
-  house reading in that file are the tool's interpretation, not claims
-  about the standard. The tool was first built from a 2013 working draft; its
-  clause numbers and terms have been removed. Verbatim normative text and the
-  standard's own example risk tables are not reproduced, because they belong
-  to the licence holder.
+  house reading in that file are the tool's own interpretation and make no
+  claim about the standard. The tool was first built from a 2013 working
+  draft, and that draft's clause numbers and terms have been removed. The
+  tool does not reproduce verbatim normative text or the standard's example
+  risk tables, because they belong to the licence holder.
 - The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house
   defaults. 62443-3-2 prescribes no matrix and no method for setting an
-  SL-T. The tool
-  always shows the rule trace, and the consultant's per-FR SL-T and written
-  justification are the deliverable. A client's own corporate matrix takes
-  precedence: enter it on step 1 (levels, definitions and matrix, mapped onto
-  the four bands), and the reports print it as the client's. The generic
-  presets are the tool's own shapes, not the standard's example matrices.
+  SL-T. The tool always shows the rule trace, and the deliverable is the
+  consultant's SL-T for each FR with its written justification. A client's
+  own corporate matrix takes precedence: enter it on step 1 (levels,
+  definitions and matrix, mapped onto the four bands), and the reports print
+  it as the client's. The generic presets are the tool's own shapes and do
+  not copy the standard's example matrices.
 
 ## Layout
 
@@ -1381,7 +1384,7 @@ js/docx-blocks.js                  reads a generated Word file back into blocks
                                    (synced from shared/)
 js/review.js                       Peer review: packs, review files and Accept
 js/logo.js, js/hero-asset.js       brand assets as base64 (logo, cover art) for
-                                   the Word report — this app's copies
+                                   the Word report (this app's copies)
 css/spt-theme.css                  this app's copy of the SolutionsPT theme
 css/report-page.css                the Report page, in the assessment tool's classes
 data/slt-suggestion-rules.json     house risk model AS DATA (severity/likelihood
@@ -1393,9 +1396,10 @@ data/zcr-map.json                  the ZCR ids, titles and clause numbers of
 data/scenario-library.json         the house scenario library (33 scenarios, no ratings,
                                    SR ids only) + generated .js
 data/risk-context-interchange.json the export contract (spt-risk-context/1.4) + .js
-data/engagement-guidance.json      advisory prep notes (typical & often-forgotten
-                                   documents, key stakeholders) shown on the
-                                   Basis of assessment page; never auto-added
+data/engagement-guidance.json      advisory preparation notes (typical and often
+                                   forgotten documents, stakeholders to interview)
+                                   shown on the Engagement and evidence page and
+                                   never added to the registers
 data/tour-project.js               the completed demo assessment (tour mode only)
 scripts/build-data.ps1             regenerates the .js mirrors after editing JSON
 scripts/test-risk-tool.html        engine + UI tests (headless Edge)
@@ -1403,7 +1407,7 @@ scripts/test-risk-migrate.html     the ladder, shape fill and prune on the froze
 scripts/test-risk-schema03.html    schema 0.3: the model, the 0.2 to 0.3 step (suggested
                                    links, residual to current), asset ids, the prune, the
                                    three ratings and the coverage rule from links, and the
-                                   one rule for the rating that stands today
+                                   rule for the rating that stands today
 scripts/test-risk-workshop.html    step 5: rail, editor, links, current hidden, scales,
                                    duplicate/copy/move, SL-T strip, register, heat map,
                                    SL-T grid, focus, Tab out of a reason, click after typing
@@ -1502,9 +1506,9 @@ scripts/test-risk-accept.html      accepting suggested wording, and Go to
 scripts/test-risk-zcr.html         the ZCR lookup, no draft citation or term on
                                    any page or in the Word reports, and the
                                    alias for reworded section headings
-vendor/docx.umd.js                 Word lib — the rPr-PATCHED copy (see the
-                                   Assessments app's docx patch note); exceljs
-                                   drives the Excel workbook; xlsx unused
+vendor/docx.umd.js                 Word library, the copy with the rPr patch (see
+                                   the Assessments app's docx patch note); exceljs
+                                   builds the Excel workbook; xlsx is unused
 ```
 
 The app's own scripts are classic scripts (no modules, no bundler), so the
@@ -1514,8 +1518,8 @@ folder app runs from file:// and the single-HTML build inlines each
 and load in the order `index.html` lists them, `js/boot.js` last.
 `window.RiskTool` is the facade everything else uses (exports, review, the
 Report page, the Word preview, the suite, the tests, the exe's self-test);
-keep its members when moving code, and give an engine function the project
-rather than letting it read page state.
+keep its members when moving code. An engine function takes the project as
+an argument and never reads page state.
 
 After editing any of the JSON files:
 

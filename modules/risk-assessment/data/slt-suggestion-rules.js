@@ -54,50 +54,50 @@ window.App.Data.sltRules = {
   ],
   "riskToSL": {
     "_note": "HOUSE mapping from an unmitigated per-FR risk band to a suggested SL-T for that foundational requirement. The standard prescribes no matrix and no method for setting an SL-T; this mapping is a SolutionsPT house default.",
-    "low":       { "suggest": 1, "trace": "Unmitigated risk low: protection against mistakes and chance misuse (SL1) is a reasonable target for this foundational requirement." },
-    "medium":    { "suggest": 2, "trace": "Unmitigated risk medium: protect against a deliberate attacker with general IT skills and simple tools (SL2)." },
-    "high":      { "suggest": 3, "trace": "Unmitigated risk high: protect against a capable, resourced, IACS-aware attacker (SL3)." },
-    "very-high": { "suggest": 3, "escalateTo": 4, "trace": "Unmitigated risk very high: SL3 as the working target; SL4 only where a nation-state-grade adversary is genuinely in scope (flag for a conscious decision rather than defaulting)." }
+    "low":       { "suggest": 1, "trace": "SL1 is a reasonable target, as it protects against mistakes and chance misuse." },
+    "medium":    { "suggest": 2, "trace": "SL2 is suggested, to protect against a deliberate attacker with general IT skills and simple tools." },
+    "high":      { "suggest": 3, "trace": "SL3 is suggested, to protect against a deliberate attacker who knows control systems and has purpose-built tools." },
+    "very-high": { "suggest": 3, "escalateTo": 4, "trace": "SL3 is the working target. SL4 is for a nation-state-grade adversary and needs a deliberate decision." }
   },
   "tolerableRisk": {
     "_note": "The organisation's tolerable risk is the highest unmitigated risk band accepted WITHOUT additional countermeasures. Any FR/threat whose unmitigated risk exceeds it must be treated. Default here is a placeholder; capture the client's real threshold.",
     "default": "medium"
   },
   "exposureModifiers": [
-    { "id": "remote-access",     "label": "Permanent or routine remote access (vendor or staff)", "effect": "+1 likelihood consideration", "affectsFR": ["IAC", "UC", "RDF"], "trace": "Standing remote access materially raises the likelihood of an authentication/use-control/data-flow compromise." },
-    { "id": "internet-adjacent", "label": "Internet-reachable or connected to internet-facing zones", "effect": "+1 likelihood consideration", "affectsFR": ["IAC", "SI", "RDF", "RA"], "trace": "Internet adjacency exposes the zone to opportunistic and targeted attack." },
-    { "id": "wireless",          "label": "Wireless links into or within the zone", "effect": "consider +1 likelihood", "affectsFR": ["IAC", "RDF"], "trace": "Wireless extends the boundary beyond physical control." },
-    { "id": "removable-media",   "label": "Routine removable media use", "effect": "consider +1 likelihood", "affectsFR": ["SI", "RDF"], "trace": "Removable media is a proven ingress route that bypasses network countermeasures." },
-    { "id": "many-conduits",     "label": "Many conduits to less-trusted zones", "effect": "consider +1 likelihood", "affectsFR": ["RDF", "SI"], "trace": "Each conduit to a less-trusted zone is an attack path to broker or reduce." }
+    { "id": "remote-access",     "label": "Permanent or routine remote access (vendor or staff)", "effect": "Expect +1 likelihood", "affectsFR": ["IAC", "UC", "RDF"], "trace": "Standing remote access makes a compromise of authentication, use control or data flow more likely." },
+    { "id": "internet-adjacent", "label": "Internet-reachable or connected to internet-facing zones", "effect": "Expect +1 likelihood", "affectsFR": ["IAC", "SI", "RDF", "RA"], "trace": "A zone next to the internet is open to opportunistic and targeted attacks." },
+    { "id": "wireless",          "label": "Wireless links into or within the zone", "effect": "Consider +1 likelihood", "affectsFR": ["IAC", "RDF"], "trace": "Wireless links take the zone boundary beyond the site's physical control." },
+    { "id": "removable-media",   "label": "Routine removable media use", "effect": "Consider +1 likelihood", "affectsFR": ["SI", "RDF"], "trace": "Removable media is a known way in that bypasses network countermeasures." },
+    { "id": "many-conduits",     "label": "Many conduits to less trusted zones", "effect": "Consider +1 likelihood", "affectsFR": ["RDF", "SI"], "trace": "Each conduit to a less trusted zone is another attack path to control or remove." }
   ],
   "specialRules": [
     {
       "id": "sis-present",
-      "label": "Zone contains SIS / safety instrumented function",
+      "label": "Zone contains a SIS or safety instrumented function",
       "floorSL": 3,
       "floorFR": ["IAC", "UC", "SI", "DC", "RDF", "TRE", "RA"],
       "_floorFR": "The foundational requirements the safety floor applies to. HOUSE default: all seven. A project can narrow it (project.safetyFloorFR), never widen it.",
       "actions": [
-        "Prompt: safety systems normally warrant their own zone, separated from basic process control.",
+        "Prompt: safety systems normally need their own zone, separate from basic process control.",
         "Apply an SL3 floor to every foundational requirement for any zone containing a safety function.",
         "Mark zone safetyRelated: true (carried into the interchange export)."
       ],
-      "trace": "Compromise of a safety function is a direct physical-harm path; common practice treats SL3 as the working floor and separation as the default architecture."
+      "trace": "A compromised safety function can cause physical harm directly. Common practice is to give safety systems their own zone and to treat SL3 as their minimum."
     },
     {
       "id": "adversary-mismatch",
       "label": "Assumed adversary class exceeds suggested SL",
       "actions": [
-        "If the consultant's threat context assumes an attacker class above a suggested per-FR SL, flag the mismatch rather than silently raising."
+        "If the consultant's threat context assumes an attacker class above a suggested per-FR SL, flag the mismatch and leave the suggestion unchanged."
       ],
-      "trace": "The SL should resist the adversary you actually expect; a mismatch needs a conscious decision, not an automatic bump."
+      "trace": "The SL should resist the adversary you expect. The tool does not raise the suggestion, so decide whether the SL-T should be higher."
     }
   ],
   "hardRules": [
-    "Suggestion never exceeds SL4 and never silently changes after consultant override.",
-    "The rule trace (which rules fired and why) is always shown alongside the suggestion.",
-    "The consultant sets the final SL-T per foundational requirement; a justification is mandatory and is the primary deliverable text.",
-    "Unmitigated risk is impact x likelihood, rated before any cyber security countermeasure is considered (countermeasures built into the components, and protection that is not cyber security such as controlled site access, hardwired interlocks and relief devices, still count); a threat whose risk exceeds tolerable risk needs a recorded treatment decision and is never silently accepted.",
-    "Where the client organisation has its own risk matrix/criteria, those take precedence over this heuristic; record that the client matrix was used."
+    "A suggestion never exceeds SL4 and never overwrites an SL-T you have set.",
+    "Each suggestion shows, under Why, the rules that produced it.",
+    "You set the final SL-T for each foundational requirement. A justification is required, and it is the main text the deliverables give for the SL-T.",
+    "Unmitigated risk is impact × likelihood, rated before any cyber security countermeasure. Countermeasures built into the components still count, and so does protection outside cyber security, such as controlled site access, hardwired interlocks and relief devices. A threat above tolerable risk needs a recorded treatment decision and is never accepted by default.",
+    "Where the client has its own risk matrix or criteria, they take precedence over the house method. Record that the client's matrix was used."
   ]
 };

@@ -65,12 +65,12 @@ window.SPT_TOUR_PROJECT = {
   },
   "suc": {
     "name": "Acme Petrochemicals - Unit 300 Alkylation Control System",
-    "description": "The basic process control system, safety instrumented system and supporting OT infrastructure for the Unit 300 alkylation unit at the Teesport refinery: redundant SCADA/DCS servers and operator HMIs in the central control room, unit PLCs and remote I/O in the field auxiliary rooms, the SIS performing the unit's safety instrumented functions, engineering workstations, and the plant DMZ carrying the historian and vendor access paths.",
-    "scopeStatement": "In scope: all Unit 300 control, safety and engineering systems from the field controllers up to (and including) the plant DMZ, plus the conduits that cross the boundary (historian replication, vendor remote access, corporate reporting). Out of scope: the corporate IT network beyond the DMZ firewall, other process units, and the terminal loading systems (separately assessed).",
+    "description": "The basic process control system, safety instrumented system and supporting OT infrastructure for the Unit 300 alkylation unit at the Teesport refinery. The system comprises redundant SCADA/DCS servers and operator HMIs in the central control room, unit PLCs and remote I/O in the field auxiliary rooms, the SIS that performs the unit's safety instrumented functions, the engineering workstations, and the plant DMZ, which carries the historian and the vendor access paths.",
+    "scopeStatement": "The scope covers all Unit 300 control, safety and engineering systems from the field controllers up to and including the plant DMZ, and the conduits that cross the boundary for historian replication, vendor remote access and corporate reporting. The corporate IT network beyond the DMZ firewall, the other process units and the terminal loading systems are out of scope. The loading systems are assessed separately.",
     "assumptions": [
       "Physical access to the control room and field auxiliary rooms is badge-controlled and logged",
-      "The corporate network is assumed compromised for the purposes of this assessment (untrusted)",
-      "Unit 300 operates continuously; a control-system outage forces a manual unit shutdown within 30 minutes",
+      "The corporate network is treated as untrusted and assumed compromised for this assessment",
+      "Unit 300 runs continuously, and a control system outage forces a manual shutdown of the unit within 30 minutes",
       "Vendor support for the DCS is contractually required and uses the remote access path assessed here"
     ],
     "accessPoints": [
@@ -92,16 +92,16 @@ window.SPT_TOUR_PROJECT = {
   "srs": {
     "adversaryClass": 3,
     "essentialFunctions": "Continuous closed-loop control of the alkylation reaction (temperature, acid ratio, pressure), operator view and command from the central control room, and the SIS safety instrumented functions (emergency depressurisation, acid feed isolation).",
-    "worstCase": "Loss or manipulation of control or safety functions leading to an acid release or reactor overpressure: potential for multiple serious injuries on-site, off-site public exposure at the fence line, a COMAH-reportable event and multi-week unit outage.",
+    "worstCase": "An acid release or reactor overpressure from lost or manipulated control or safety functions, with potential for multiple serious injuries on site, off-site public exposure at the fence line, a COMAH-reportable event and a unit outage lasting weeks.",
     "tolerableRisk": "medium",
     "tolerableConfirmed": "medium",
     "highLevelAssets": [
-      { "id": "A1", "name": "Unit 300 BPCS (DCS servers, HMIs, unit PLCs)", "functionLocation": "Closed-loop control and operator interface - control room / field aux rooms", "consequence": "serious", "consequenceSource": "HAZOP revalidation, 2025", "likelihood": "medium", "note": "Primary control layer; loss forces manual shutdown, manipulation is the acid-release path. Assigned to Z1, assessed in detail." },
-      { "id": "A2", "name": "Safety Instrumented System (SIS)", "functionLocation": "Emergency depressurisation and acid isolation - field aux room 2", "consequence": "severe", "consequenceSource": "LOPA and SIL determination", "likelihood": "low", "note": "Last line of defence; any compromise is intolerable regardless of likelihood. Assigned to Z2, assessed in detail." },
-      { "id": "A3", "name": "Plant DMZ & process historian", "functionLocation": "Data brokerage between OT and corporate - server room", "consequence": "serious", "likelihood": "medium", "note": "Every external path transits here; a foothold pivots into the BPCS. Assigned to Z3, assessed in detail." },
-      { "id": "A4", "name": "Engineering workstations & config management", "functionLocation": "DCS/PLC/SIS configuration - control building office", "consequence": "serious", "likelihood": "medium", "note": "Holds the keys to every controller; removable media and legacy tooling in routine use. Assigned to Z4, assessed in detail." },
-      { "id": "A5", "name": "Laboratory information system link", "functionLocation": "Sample results feed to the historian - lab", "consequence": "serious", "likelihood": "low", "note": "One-way feed, no control path; ranked medium. The feed ends at the historian, which Z3 covers.", "inSuc": false },
-      { "id": "A6", "name": "CCTV & physical security systems", "functionLocation": "Site perimeter and unit cameras - site-wide", "consequence": "negligible", "likelihood": "high", "note": "Commodity IP kit, frequently probed, but no process consequence; ranked low.", "inSuc": false }
+      { "id": "A1", "name": "Unit 300 BPCS (DCS servers, HMIs, unit PLCs)", "functionLocation": "Closed-loop control and operator interface - control room / field aux rooms", "consequence": "serious", "consequenceSource": "HAZOP revalidation, 2025", "likelihood": "medium", "note": "The primary control layer. Its loss forces a manual shutdown, and its manipulation is the path to an acid release. Assigned to Z1 and assessed in detail." },
+      { "id": "A2", "name": "Safety Instrumented System (SIS)", "functionLocation": "Emergency depressurisation and acid isolation - field aux room 2", "consequence": "severe", "consequenceSource": "LOPA and SIL determination", "likelihood": "low", "note": "The last layer of protection, so any compromise is intolerable whatever its likelihood. Assigned to Z2 and assessed in detail." },
+      { "id": "A3", "name": "Plant DMZ & process historian", "functionLocation": "Data brokerage between OT and corporate - server room", "consequence": "serious", "likelihood": "medium", "note": "Every external path passes through the DMZ, and a foothold here gives a route into the BPCS. Assigned to Z3 and assessed in detail." },
+      { "id": "A4", "name": "Engineering workstations & config management", "functionLocation": "DCS/PLC/SIS configuration - control building office", "consequence": "serious", "likelihood": "medium", "note": "These workstations can change every controller, and removable media and legacy tools are in routine use. Assigned to Z4 and assessed in detail." },
+      { "id": "A5", "name": "Laboratory information system link", "functionLocation": "Sample results feed to the historian - lab", "consequence": "serious", "likelihood": "low", "note": "A one-way feed with no control path, ranked medium. The feed ends at the historian, which Z3 covers.", "inSuc": false },
+      { "id": "A6", "name": "CCTV & physical security systems", "functionLocation": "Site perimeter and unit cameras - site-wide", "consequence": "negligible", "likelihood": "high", "note": "Commodity IP equipment that is often probed but has no process consequence. It is ranked low.", "inSuc": false }
     ],
     "threatSources": [
       "NCSC threat reports and advisories",
@@ -110,10 +110,10 @@ window.SPT_TOUR_PROJECT = {
       "Acme group security operations centre monthly threat brief"
     ],
     "knownThreats": [
-      "Capable criminal/ransomware adversary reaching OT via corporate IT or vendor access",
-      "State-capable adversary interest in refining sector (assumed class 3 for this SUC)",
-      "Insider misuse of engineering access (contractor churn on turnarounds)",
-      "Commodity malware ingress via removable media and engineering laptops"
+      "Capable criminal and ransomware groups reaching OT through corporate IT or vendor access",
+      "State-capable adversaries with an interest in the refining sector (adversary class 3 assumed for this SUC)",
+      "Insider misuse of engineering access, with a high turnover of contractors at turnarounds",
+      "Commodity malware brought in on removable media and engineering laptops"
     ],
     "emergingThreats": [
       "Ransomware groups targeting remote access appliances used by OT vendors",
@@ -153,7 +153,7 @@ window.SPT_TOUR_PROJECT = {
     "observations": [
       { "id": "O1", "description": "Control room and field auxiliary room walkdown", "location": "Unit 300", "date": "2026-07-01", "notes": "Badge control verified; unlocked engineering cabinet noted and raised" },
       { "id": "O2", "description": "DMZ firewall rule review at the console", "location": "Server room", "date": "2026-07-02", "notes": "Rules match diagram; two stale vendor rules removed during review" },
-      { "id": "O3", "description": "Vendor remote access session demonstration", "location": "Control building", "date": "2026-07-02", "notes": "Session activation, attribution and recording observed end-to-end" }
+      { "id": "O3", "description": "Vendor remote access session demonstration", "location": "Control building", "date": "2026-07-02", "notes": "Session activation, attribution and recording observed from start to finish" }
     ]
   },
   "approval": {
@@ -164,8 +164,8 @@ window.SPT_TOUR_PROJECT = {
     "approved": true
   },
   "approvals": [
-    { "scope": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the two recorded risk acceptances (legacy configuration tooling, and the remaining risk on the SIS until its dedicated engineering workstation is in place), the one transferred risk (lost production, through business interruption insurance), and the per-FR SL-T vectors as the target for the security programme.", "name": "R. Calder", "role": "Asset Owner - Unit 300", "organisation": "Acme Petrochemicals Ltd", "date": "2026-07-04", "revision": "1.0", "approved": true, "fingerprint": "a3-9c820478-e0918985-e6b02e7f-b4157737-e0ca2180-c616e426-72e6be75-09ee5f64" },
-    { "scope": "The SL-T of the Safety Instrumented System zone (Z2), and the remaining risk on the SIS accepted until its dedicated engineering workstation is in place.", "name": "D. Hargreaves", "role": "Operations Manager, Teesport Refinery", "organisation": "Acme Petrochemicals Ltd", "date": "2026-07-04", "revision": "1.0", "approved": true, "fingerprint": "a3-9c820478-e0918985-e6b02e7f-b4157737-e0ca2180-c616e426-72e6be75-09ee5f64" }
+    { "scope": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the two recorded risk acceptances (legacy configuration tooling, and the remaining risk on the SIS until its dedicated engineering workstation is in place), the one transferred risk (lost production, through business interruption insurance), and the per-FR SL-T vectors as the target for the security programme.", "name": "R. Calder", "role": "Asset Owner - Unit 300", "organisation": "Acme Petrochemicals Ltd", "date": "2026-07-04", "revision": "1.0", "approved": true, "fingerprint": "a3-9c820478-e0918985-e6b02e7f-0de5a838-e0ca2180-c616e426-72e6be75-09ee5f64" },
+    { "scope": "The SL-T of the Safety Instrumented System zone (Z2), and the remaining risk on the SIS accepted until its dedicated engineering workstation is in place.", "name": "D. Hargreaves", "role": "Operations Manager, Teesport Refinery", "organisation": "Acme Petrochemicals Ltd", "date": "2026-07-04", "revision": "1.0", "approved": true, "fingerprint": "a3-9c820478-e0918985-e6b02e7f-0de5a838-e0ca2180-c616e426-72e6be75-09ee5f64" }
   ],
   "consequences": [
     { "id": "K1", "title": "Loss of containment of HF acid from an unsafe process state", "description": "The reactor or acid settler is driven outside its safe operating envelope while the SIS is defeated or fails on demand, and acid is released.", "impact": "severe", "impactByCategory": { "safety": "severe", "environmental": "severe", "operational": "severe", "regulatory": "serious" }, "source": "HAZOP revalidation, 2025; LOPA and SIL determination", "hlaIds": ["A1", "A2"], "notes": "The process safety engineer confirmed the scenario from the COMAH safety report." },
@@ -206,7 +206,7 @@ window.SPT_TOUR_PROJECT = {
         "The control network carries no traffic from outside the zone other than C1 and C2"
       ],
       "separation": {
-        "external": { "answer": "met", "reason": "Vendor sessions end at the DMZ jump host; nothing in Z1 connects to an external network directly." }
+        "external": { "answer": "met", "reason": "Vendor sessions end at the DMZ jump host, and nothing in Z1 connects to an external network directly." }
       },
       "externalDependencies": [
         "DCS vendor support contract (remote diagnostics)",
@@ -230,12 +230,12 @@ window.SPT_TOUR_PROJECT = {
         { "id": "M3", "description": "Retire OPC DA: migrate the two remaining clients to OPC UA through the DMZ broker", "addressesFR": ["RDF", "SI", "RA"], "reference": "Roadmap item R-12", "existing": false, "owner": "J. Whitmore", "priority": "high", "dueDate": "2027-03-31", "status": "agreed", "srRefs": ["SR 5.1", "SR 7.7"] }
       ],
       "threats": [
-        { "id": "T1", "consequenceId": "K1", "via": ["Z3", "C2"], "statement": "An external attacker hijacks or rides the vendor remote access path to reach the DCS servers and issue control changes.", "source": "External attacker via vendor access", "entryPoint": "Vendor VPN and jump host (C2)", "consequence": "Unauthorised setpoint or logic changes on the reactor loops, with a credible path to an acid release.", "assetIds": ["AS1"], "vulnerabilityIds": ["V1"], "countermeasureIds": ["M1"], "affectedFR": ["IAC", "RDF"], "likelihood": "high", "impact": "serious", "impactByCategory": { "safety": "serious", "operational": "serious", "financial": "minor" }, "likelihoodRationale": "A standing remote path into a sector that is actively targeted.", "currentLikelihood": "low", "currentImpact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "acceptanceDetail": { "by": "", "role": "", "date": "", "reviewDate": "" }, "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } },
-        { "id": "T2", "consequenceId": "K2", "via": ["Z4", "C4"], "statement": "Malware introduced through an engineering connection executes on a DCS server and corrupts control logic or displays.", "source": "Commodity malware via engineering path", "entryPoint": "Engineering VLAN from Z4, and the two OPC DA clients", "consequence": "Loss of view or corrupted control logic, forcing a manual shutdown of the unit.", "assetIds": ["AS1", "AS2"], "vulnerabilityIds": ["V1", "V2"], "countermeasureIds": ["M2", "M3"], "affectedFR": ["SI"], "likelihood": "medium", "impact": "serious", "likelihoodRationale": "Commodity malware reaches plant networks through engineering paths a few times a year across the sector; allow-listing (M2) stops unknown programs but not a corrupted logic download or the OPC DA path, so it does not lower the likelihood.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "low", "residualImpact": "serious", "acceptance": "Lost production from a cyber-caused shutdown of the unit is covered by the group's business interruption insurance, which has a cyber extension (policy GBI-2026-114). The cover is reviewed annually at the policy renewal.", "transferTo": "Acme group insurers, through the group business interruption policy", "acceptanceDetail": { "by": "H. Okafor", "role": "Group Insurance Manager", "date": "2026-07-03", "reviewDate": "2027-03-31" }, "treatment": { "decision": "accept", "transfer": true, "confirmed": true, "reason": "" } },
-        { "id": "T3", "consequenceId": "K3", "statement": "A flooding or resource-exhaustion event on the control network degrades operator view of the unit.", "source": "Network fault or deliberate DoS", "entryPoint": "Any host on the control network", "consequence": "Operator view degraded; the unit is shut down by hand within 30 minutes if it is not restored.", "assetIds": ["AS2"], "vulnerabilityIds": [], "countermeasureIds": [], "affectedFR": ["RA"], "likelihood": "low", "impact": "serious", "likelihoodRationale": "No external path reaches the control network directly.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "acceptanceDetail": { "by": "", "role": "", "date": "", "reviewDate": "" }, "treatment": { "decision": null, "confirmed": false, "reason": "" } }
+        { "id": "T1", "consequenceId": "K1", "via": ["Z3", "C2"], "statement": "An external attacker hijacks or rides the vendor remote access path to reach the DCS servers and issue control changes.", "source": "External attacker via vendor access", "entryPoint": "Vendor VPN and jump host (C2)", "consequence": "Unauthorised setpoint or logic changes on the reactor loops, with a credible path to an acid release.", "assetIds": ["AS1"], "vulnerabilityIds": ["V1"], "countermeasureIds": ["M1"], "affectedFR": ["IAC", "RDF"], "likelihood": "high", "impact": "serious", "impactByCategory": { "safety": "serious", "operational": "serious", "financial": "minor" }, "likelihoodRationale": "The remote access path is permanently in place, and the sector is actively targeted.", "currentLikelihood": "low", "currentImpact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "acceptanceDetail": { "by": "", "role": "", "date": "", "reviewDate": "" }, "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } },
+        { "id": "T2", "consequenceId": "K2", "via": ["Z4", "C4"], "statement": "Malware introduced through an engineering connection executes on a DCS server and corrupts control logic or displays.", "source": "Commodity malware via engineering path", "entryPoint": "Engineering VLAN from Z4, and the two OPC DA clients", "consequence": "Loss of view or corrupted control logic, forcing a manual shutdown of the unit.", "assetIds": ["AS1", "AS2"], "vulnerabilityIds": ["V1", "V2"], "countermeasureIds": ["M2", "M3"], "affectedFR": ["SI"], "likelihood": "medium", "impact": "serious", "likelihoodRationale": "Across the sector, commodity malware reaches plant networks through engineering paths a few times a year. Allow-listing (M2) stops unknown programs from running, but it does not stop a corrupted logic download or the OPC DA path, so it does not lower the likelihood.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "low", "residualImpact": "serious", "acceptance": "Lost production from a cyber-caused shutdown of the unit is covered by the group's business interruption insurance, which has a cyber extension (policy GBI-2026-114). The cover is reviewed annually at the policy renewal.", "transferTo": "Acme group insurers, through the group business interruption policy", "acceptanceDetail": { "by": "H. Okafor", "role": "Group Insurance Manager", "date": "2026-07-03", "reviewDate": "2027-03-31" }, "treatment": { "decision": "accept", "transfer": true, "confirmed": true, "reason": "" } },
+        { "id": "T3", "consequenceId": "K3", "statement": "A flooding or resource-exhaustion event on the control network degrades operator view of the unit.", "source": "Network fault or deliberate DoS", "entryPoint": "Any host on the control network", "consequence": "Operator view is degraded, and the unit is shut down by hand within 30 minutes if view is not restored.", "assetIds": ["AS2"], "vulnerabilityIds": [], "countermeasureIds": [], "affectedFR": ["RA"], "likelihood": "low", "impact": "serious", "likelihoodRationale": "No external path reaches the control network directly.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "acceptanceDetail": { "by": "", "role": "", "date": "", "reviewDate": "" }, "treatment": { "decision": null, "confirmed": false, "reason": "" } }
       ],
       "slTargetByFR": { "IAC": 3, "UC": 2, "SI": 3, "DC": 1, "RDF": 3, "TRE": 2, "RA": 2 },
-      "justification": "The worst unmitigated risks in this zone are High (an attacker riding the vendor remote access path, and malware brought in over an engineering connection) against a Medium tolerable risk, and the standing remote access materially raises likelihood on IAC/UC/RDF, so IAC, SI and RDF are set to SL3. UC is held at SL2 because use control inside the control room is procedurally constrained and no High risk hits it directly. DC reflects the low confidentiality consequence of process data (SL1). TRE and RA at SL2 support forensics and the 30-minute manual-shutdown resilience requirement."
+      "justification": "The worst unmitigated risks in this zone are High against a Medium tolerable risk (an attacker riding the vendor remote access path, and malware brought in over an engineering connection). The permanent remote access path also raises the likelihood of attacks on IAC, UC and RDF. IAC, SI and RDF are therefore set to SL3. UC stays at SL2 because procedures limit use control inside the control room and no High risk bears on it directly. DC is set to SL1, as process data has a low confidentiality consequence. TRE and RA at SL2 support forensic investigation and the resilience the unit needs, as an outage forces a manual shutdown within 30 minutes."
     },
     {
       "id": "Z2",
@@ -279,20 +279,20 @@ window.SPT_TOUR_PROJECT = {
         { "id": "V3", "description": "SIS engineering software runs on a Z4 workstation that also carries DCS tooling (shared engineering asset)", "reference": "Interview I3, process safety engineer" }
       ],
       "countermeasures": [
-        { "id": "M4", "description": "Hardwired keyswitch required for SIS program mode; position alarmed to the control room", "addressesFR": ["IAC", "UC", "SI"], "reference": "C&E U300-CE-014", "existing": true, "owner": "", "priority": "", "dueDate": "", "status": "", "srRefs": ["SR 2.1", "SR 3.4"] },
+        { "id": "M4", "description": "Hardwired keyswitch required for SIS program mode, with its position alarmed in the control room", "addressesFR": ["IAC", "UC", "SI"], "reference": "C&E U300-CE-014", "existing": true, "owner": "", "priority": "", "dueDate": "", "status": "", "srRefs": ["SR 2.1", "SR 3.4"] },
         { "id": "M8", "description": "Move the SIS engineering software to a dedicated workstation kept in field auxiliary room 2, off the shared engineering workstation", "addressesFR": ["IAC", "UC", "SI"], "reference": "MoC to be raised", "existing": false, "owner": "S. Adeyemi", "priority": "medium", "dueDate": "2027-06-30", "status": "proposed", "srRefs": ["SR 1.1", "SR 2.1", "SR 3.2"] }
       ],
       "threats": [
-        { "id": "T4", "consequenceId": "K1", "via": ["Z4", "C5"], "statement": "An unauthorised or malicious logic change to the SIS defeats or degrades a safety instrumented function.", "source": "Insider or attacker with engineering access", "entryPoint": "The shared engineering workstation in Z4, through the keyed engineering connection", "consequence": "A safety instrumented function fails on demand: acid release or reactor overpressure with potential for serious injury.", "assetIds": ["AS4"], "vulnerabilityIds": ["V3"], "countermeasureIds": ["M4", "M8"], "affectedFR": ["IAC", "SI"], "likelihood": "low", "impact": "severe", "impactByCategory": { "safety": "severe", "environmental": "severe", "operational": "severe", "regulatory": "serious" }, "likelihoodRationale": "Needs engineering access and SIS knowledge; no remote path reaches the SIS.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "", "residualImpact": "", "acceptance": "No countermeasure brings the risk within tolerable risk, as the consequence stays severe. Until the dedicated SIS engineering workstation is in place, process safety authorisation, the keyed bypass record and the program-mode keyswitch bound the remaining risk, which is accepted at High until the review.", "acceptanceDetail": { "by": "R. Calder", "role": "Asset Owner - Unit 300", "date": "2026-07-04", "reviewDate": "2027-06-30" }, "treatment": { "decision": "slt", "confirmed": true, "reason": "The consequence stays severe whatever is added, so no countermeasure brings this threat within tolerable risk. The zone is held at SL3 on every foundational requirement, and the 62443-3-3 programme builds that capability." } }
+        { "id": "T4", "consequenceId": "K1", "via": ["Z4", "C5"], "statement": "An unauthorised or malicious logic change to the SIS defeats or degrades a safety instrumented function.", "source": "Insider or attacker with engineering access", "entryPoint": "The shared engineering workstation in Z4, through the keyed engineering connection", "consequence": "A safety instrumented function fails on demand, leading to an acid release or reactor overpressure and possible serious injury.", "assetIds": ["AS4"], "vulnerabilityIds": ["V3"], "countermeasureIds": ["M4", "M8"], "affectedFR": ["IAC", "SI"], "likelihood": "low", "impact": "severe", "impactByCategory": { "safety": "severe", "environmental": "severe", "operational": "severe", "regulatory": "serious" }, "likelihoodRationale": "The attack needs engineering access and knowledge of the SIS, and no remote path reaches the SIS.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "", "residualImpact": "", "acceptance": "The consequence stays severe, so no countermeasure brings the risk within tolerable risk. Until the dedicated SIS engineering workstation is in place, process safety authorisation, the keyed bypass record and the program-mode keyswitch limit the remaining risk. It is accepted at High until the review.", "acceptanceDetail": { "by": "R. Calder", "role": "Asset Owner - Unit 300", "date": "2026-07-04", "reviewDate": "2027-06-30" }, "treatment": { "decision": "slt", "confirmed": true, "reason": "The consequence stays severe whatever is added, so no countermeasure brings this threat within tolerable risk. The zone is held at SL3 on every foundational requirement, and the 62443-3-3 programme builds that capability." } }
       ],
       "slTargetByFR": { "IAC": 3, "UC": 3, "SI": 3, "DC": 3, "RDF": 3, "TRE": 3, "RA": 3 },
-      "justification": "The SIS floor applies: a zone containing safety instrumented functions takes SL3 across every foundational requirement regardless of the per-threat arithmetic, because the SIS is the last line of defence and severe-consequence/low-likelihood events dominate. An unauthorised change to the safety logic is treated through these targets, with the hardwired keyswitch for program mode in place and a dedicated SIS engineering workstation planned. This vector is deliberately not averaged down: any relaxation requires the asset owner to re-open the sign-off."
+      "justification": "A zone containing safety instrumented functions takes the SIS floor of SL3 on every foundational requirement, whatever the individual threat ratings would suggest. The SIS is the last layer of protection, and its risk is dominated by events of severe consequence and low likelihood. An unauthorised change to the safety logic is treated through these targets, with the hardwired keyswitch for program mode in place and a dedicated SIS engineering workstation planned. The vector is not averaged down, and any relaxation requires the asset owner to reopen the sign-off."
     },
     {
       "id": "Z3",
       "name": "Plant DMZ & historian",
-      "description": "The brokered exchange layer between OT and corporate: process historian, patch/AV staging, NTP, and the vendor jump host.",
-      "fn": "Data brokerage and controlled external access; no control function.",
+      "description": "The brokered exchange layer between OT and the corporate network. It holds the process historian, patch and antivirus staging, NTP and the vendor jump host.",
+      "fn": "Data brokerage and controlled external access, with no control function.",
       "fromHLA": "A3",
       "assessment": { "depth": "detailed" },
       "assets": [
@@ -327,7 +327,7 @@ window.SPT_TOUR_PROJECT = {
         "Vendor VPN concentrator availability"
       ],
       "securityPolicies": [
-        "All OT-corporate exchange transits the DMZ; no direct paths",
+        "All exchange between OT and corporate passes through the DMZ, with no direct paths",
         "DMZ hosts patched monthly (IT window)"
       ],
       "securityRequirements": [
@@ -335,7 +335,7 @@ window.SPT_TOUR_PROJECT = {
         "Acme OT security standard GS-104, section 7 (OT DMZ)"
       ],
       "vulnerabilities": [
-        { "id": "V4", "description": "Historian web interface reachable from the whole corporate network, not just the reporting subnet", "reference": "DMZ firewall rule review, O2" }
+        { "id": "V4", "description": "Historian web interface reachable from the whole corporate network, where only the reporting subnet needs it", "reference": "DMZ firewall rule review, O2" }
       ],
       "countermeasures": [
         { "id": "M5", "description": "Restrict historian web access to the reporting subnet and put it behind the corporate SSO proxy", "addressesFR": ["IAC", "RDF"], "reference": "Firewall change FW-2026-041", "existing": false, "owner": "M. Kowalski", "priority": "high", "dueDate": "2026-09-30", "status": "in-progress", "srRefs": ["SR 5.2", "SR 1.1"] }
@@ -345,7 +345,7 @@ window.SPT_TOUR_PROJECT = {
         { "id": "T6", "statement": "Process data is exfiltrated from the historian (recipe and throughput confidentiality).", "source": "Attacker on corporate network", "entryPoint": "Historian web interface, from the corporate network (C3)", "consequence": "Loss of commercially sensitive throughput and recipe data.", "assetIds": ["AS6"], "vulnerabilityIds": ["V4"], "countermeasureIds": [], "affectedFR": ["DC"], "likelihood": "low", "impact": "serious", "impactByCategory": { "financial": "serious", "regulatory": "minor" }, "likelihoodRationale": "The data has limited value outside Acme.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "acceptanceDetail": { "by": "", "role": "", "date": "", "reviewDate": "" }, "treatment": { "decision": null, "confirmed": false, "reason": "" } }
       ],
       "slTargetByFR": { "IAC": 2, "UC": 2, "SI": 2, "DC": 2, "RDF": 2, "TRE": 2, "RA": 1 },
-      "justification": "The zone's worst unmitigated risk is High (a compromised corporate client using the historian as a pivot toward the BPCS), with internet adjacency and exposure through many conduits bearing on RDF and SI, but the DMZ exists precisely to absorb that exposure, and the planned restriction of historian web access to the reporting subnet addresses the driving vulnerability. SL2 across the access, integrity and data-flow FRs reflects the brokerage role; RA stays at SL1 because loss of the DMZ does not remove operator view or control (a security function that must be kept: the unit runs through a DMZ outage). Exfiltration of process data from the historian sits within tolerable risk and needs no treatment decision. IAC stays at SL2 although the vendor remote access scenarios pass through this zone on their way to the BPCS, because C2 and Z1, which they reach, already hold SL3 on IAC."
+      "justification": "The zone's worst unmitigated risk is High (a compromised corporate client using the historian as a pivot toward the BPCS), and internet adjacency and exposure through many conduits bear on RDF and SI. The DMZ is there to absorb that exposure, and the planned restriction of historian web access to the reporting subnet addresses the vulnerability behind the risk. SL2 on the access, integrity and data-flow FRs reflects the zone's brokerage role. RA stays at SL1 because losing the DMZ does not remove operator view or control, and the unit runs through a DMZ outage. Operator view and manual command are among the security functions that must be kept. Exfiltration of process data from the historian is within tolerable risk and needs no treatment decision. IAC stays at SL2 although the vendor remote access scenarios pass through this zone on their way to the BPCS, because C2 and Z1, which they reach, already hold SL3 on IAC."
     },
     {
       "id": "Z4",
@@ -395,7 +395,7 @@ window.SPT_TOUR_PROJECT = {
       ],
       "vulnerabilities": [
         { "id": "V5", "description": "Legacy configuration tool for the depropaniser PLCs requires a shared local account and runs unsupported", "reference": "Interview I2, lead control systems engineer" },
-        { "id": "V6", "description": "Vendor laptops are built and patched by the vendor, not by Acme, and arrive with the vendor's own tooling", "reference": "Interview I2, lead control systems engineer" }
+        { "id": "V6", "description": "Vendor laptops are built and patched by the vendor, outside Acme's control, and arrive with the vendor's own tools", "reference": "Interview I2, lead control systems engineer" }
       ],
       "countermeasures": [
         { "id": "M6", "description": "Media kiosk scanning plus workstation allow-listing for engineering tools", "addressesFR": ["SI", "RDF"], "reference": "HB-EWS-02", "existing": true, "owner": "", "priority": "", "dueDate": "", "status": "", "srRefs": ["SR 3.2"] },
@@ -403,10 +403,10 @@ window.SPT_TOUR_PROJECT = {
       ],
       "threats": [
         { "id": "T7", "consequenceId": "K2", "statement": "Malware carried on removable media or a vendor laptop executes on an engineering workstation and spreads to controllers.", "source": "Commodity malware via media/laptops", "entryPoint": "USB media kiosk, and vendor laptops joining the engineering VLAN", "consequence": "Controller logic corrupted across the unit, forcing a shutdown and a controlled restore.", "assetIds": ["AS9", "AS11"], "vulnerabilityIds": ["V6"], "countermeasureIds": ["M6", "M9"], "affectedFR": ["SI", "RDF"], "likelihood": "medium", "impact": "serious", "likelihoodRationale": "Removable media and vendor laptops are in routine use at every turnaround.", "currentLikelihood": "low", "currentImpact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "acceptanceDetail": { "by": "", "role": "", "date": "", "reviewDate": "" }, "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } },
-        { "id": "T8", "statement": "The legacy depropaniser configuration tool's shared account is misused, making an unauthorised controller change unattributable.", "source": "Insider misuse / contractor churn", "entryPoint": "The legacy configuration tool on an engineering workstation", "consequence": "An unauthorised change to the depropaniser PLCs that cannot be traced to a person.", "assetIds": ["AS9"], "vulnerabilityIds": ["V5"], "countermeasureIds": [], "affectedFR": ["UC"], "likelihood": "medium", "impact": "serious", "likelihoodRationale": "Contractor churn at turnarounds, and an account several people know.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "", "residualImpact": "", "acceptance": "The tool is retired at the Q2-2027 turnaround with the PLC upgrade. Until then the workstation is isolated on the engineering VLAN, and the account password is held by the shift supervisor and issued per use with a written record. Risk accepted at High for this bounded period.", "acceptanceDetail": { "by": "R. Calder", "role": "Asset Owner - Unit 300", "date": "2026-07-04", "reviewDate": "2027-06-30" }, "treatment": { "decision": "accept", "confirmed": true, "reason": "" } }
+        { "id": "T8", "statement": "The legacy depropaniser configuration tool's shared account is misused, making an unauthorised controller change unattributable.", "source": "Insider misuse / contractor churn", "entryPoint": "The legacy configuration tool on an engineering workstation", "consequence": "An unauthorised change to the depropaniser PLCs that cannot be traced to a person.", "assetIds": ["AS9"], "vulnerabilityIds": ["V5"], "countermeasureIds": [], "affectedFR": ["UC"], "likelihood": "medium", "impact": "serious", "likelihoodRationale": "Contractors change often at turnarounds, and several people know the account.", "currentLikelihood": "", "currentImpact": "", "residualLikelihood": "", "residualImpact": "", "acceptance": "The tool is retired at the Q2-2027 turnaround with the PLC upgrade. Until then the workstation is isolated on the engineering VLAN, and the account password is held by the shift supervisor and issued per use with a written record. The risk is accepted at High for this limited period.", "acceptanceDetail": { "by": "R. Calder", "role": "Asset Owner - Unit 300", "date": "2026-07-04", "reviewDate": "2027-06-30" }, "treatment": { "decision": "accept", "confirmed": true, "reason": "" } }
       ],
       "slTargetByFR": { "IAC": 2, "UC": 2, "SI": 3, "DC": 1, "RDF": 2, "TRE": 1, "RA": 1 },
-      "justification": "SI is set to SL3: the engineering zone is the integrity chokepoint for every controller, and malware carried on removable media or a vendor laptop is a High risk, held in day-to-day terms by the existing media kiosk and workstation allow-listing. Misuse of the legacy configuration tool's shared account exceeds tolerable risk, and the asset owner accepts it until its review at the end of June 2027 rather than raising the SL-T: a compensating procedure covers the risk until the shared account is retired. IAC stays at SL2 although the engineering scenario against the SIS passes through this zone and suggests SL3, because the SIS zone already holds SL3 on IAC. The other FRs sit at SL1 or SL2, consistent with no external paths into this zone."
+      "justification": "SI is set to SL3 because every controller change passes through the engineering zone, and malware carried on removable media or a vendor laptop is a High risk there. The existing media kiosk and workstation allow-listing reduce that risk in day-to-day operation. Misuse of the legacy configuration tool's shared account exceeds tolerable risk. The asset owner accepts it until its review at the end of June 2027, and the SL-T is not raised for it, because a compensating procedure covers the risk until the shared account is retired. IAC stays at SL2 although the engineering scenario against the SIS passes through this zone and suggests SL3, because the SIS zone already holds SL3 on IAC. The other FRs sit at SL1 or SL2, consistent with no external paths into this zone."
     }
   ],
   "conduits": [
@@ -416,7 +416,7 @@ window.SPT_TOUR_PROJECT = {
       "toZone": "Z3",
       "name": "Historian replication",
       "channels": ["OPC UA"],
-      "notes": "One-way logical replication from the BPCS to the DMZ historian via the OPC UA broker; no writes toward Z1.",
+      "notes": "One-way logical replication from the BPCS to the DMZ historian through the OPC UA broker. Nothing is written toward Z1.",
       "direction": "from-to",
       "boundaryDevices": ["OPC UA broker", "DMZ firewall pair"],
       "accountableOrg": "Acme Petrochemicals, OT network team",
@@ -425,7 +425,7 @@ window.SPT_TOUR_PROJECT = {
       "accessPoints": ["OPC UA broker service", "DMZ firewall pair, BPCS-facing interface"],
       "physicalAccessPoints": ["Patch panels in the central control room and OT rack 4"],
       "dataFlows": ["Process values and alarms, BPCS to historian, one way"],
-      "securityPolicies": ["All OT-corporate exchange transits the DMZ; no direct paths"],
+      "securityPolicies": ["All exchange between OT and corporate passes through the DMZ, with no direct paths"],
       "assumptions": ["The broker enforces one-way replication and is managed with the DMZ hosts"],
       "externalDependencies": ["Time sync from DMZ NTP"],
       "securityRequirements": ["IEC 62443-3-3 system requirements and requirement enhancements at its SL-T", "Acme OT security standard GS-104, section 7 (OT DMZ)"],
@@ -433,7 +433,7 @@ window.SPT_TOUR_PROJECT = {
       "vulnerabilities": [],
       "countermeasures": [],
       "slTargetByFR": { "IAC": 3, "UC": 2, "SI": 3, "DC": 2, "RDF": 3, "TRE": 2, "RA": 2 },
-      "justification": "Grouped with Z3: the conduit is the data-flow path a pivot from the DMZ historian toward the BPCS would take. IAC, SI and RDF are set to SL3 to match the BPCS targets it connects to, so the replication path is not the weak link, and the broker enforces one-way replication. DC at SL2 follows the historian's process data, RA at SL2 the 30-minute manual-shutdown requirement, and UC and TRE at SL2 match the zones either side.",
+      "justification": "The conduit is assessed with Z3 because a pivot from the DMZ historian toward the BPCS would follow this data flow. IAC, SI and RDF are set to SL3 to match the BPCS targets it connects to, so that the replication path is not the weak link. The broker also enforces one-way replication. DC at SL2 follows the historian's process data, and RA at SL2 follows the 30-minute window before a manual shutdown. UC and TRE at SL2 match the zones on either side.",
       "assessment": { "depth": "grouped", "withId": "Z3" }
     },
     {
@@ -442,7 +442,7 @@ window.SPT_TOUR_PROJECT = {
       "toZone": "Z1",
       "name": "Vendor remote access",
       "channels": ["VPN", "RDP through the jump host"],
-      "notes": "Vendor VPN terminates in the DMZ. Sessions are always started from the recorded jump host in Z3, activated per ticket, and carry traffic both ways while open; nothing in Z1 can start a session outward.",
+      "notes": "Vendor VPN terminates in the DMZ. Sessions are always started from the recorded jump host in Z3, activated per ticket, and carry traffic both ways while open. Nothing in Z1 can start a session outward.",
       "direction": "both",
       "boundaryDevices": ["Vendor VPN concentrator", "Vendor jump host", "DMZ firewall pair"],
       "accountableOrg": "Acme Petrochemicals, OT network team; the DCS vendor for its own end",
@@ -461,13 +461,13 @@ window.SPT_TOUR_PROJECT = {
         { "id": "T9", "consequenceId": "K1", "via": ["Z3"], "statement": "A vendor credential or session is hijacked and replayed to reach the DCS outside an authorised window.", "source": "External attacker via vendor access chain", "entryPoint": "Vendor VPN concentrator, then the jump host", "consequence": "An unattributed session on the DCS servers able to change control settings.", "assetIds": ["AS7", "AS1"], "vulnerabilityIds": ["V7"], "countermeasureIds": ["M7"], "affectedFR": ["IAC", "RDF"], "likelihood": "medium", "impact": "serious", "likelihoodRationale": "Vendor credentials are a common target, and Acme cannot see when the vendor's staff change.", "currentLikelihood": "low", "currentImpact": "serious", "residualLikelihood": "", "residualImpact": "", "acceptance": "", "acceptanceDetail": { "by": "", "role": "", "date": "", "reviewDate": "" }, "treatment": { "decision": "reduce", "confirmed": true, "reason": "" } }
       ],
       "vulnerabilities": [
-        { "id": "V7", "description": "Vendor support accounts are issued by the vendor; Acme learns of a leaver only when the vendor reports one", "reference": "Vendor remote access session demonstration, O3" }
+        { "id": "V7", "description": "Vendor support accounts are issued by the vendor, and Acme learns of a leaver only when the vendor reports one", "reference": "Vendor remote access session demonstration, O3" }
       ],
       "countermeasures": [
         { "id": "M7", "description": "MFA on VPN and jump host, per-ticket session activation, session recording, auto-disconnect at window end", "addressesFR": ["IAC", "UC", "RDF"], "reference": "OPS-PROC-118", "existing": true, "owner": "", "priority": "", "dueDate": "", "status": "", "srRefs": ["SR 1.1", "SR 1.13", "SR 2.6"] }
       ],
       "slTargetByFR": { "IAC": 3, "UC": 2, "SI": 3, "DC": 2, "RDF": 3, "TRE": 2, "RA": 2 },
-      "justification": "This conduit is the highest-exposure path into the BPCS: a hijacked vendor credential or session starts High, and the existing per-session controls (MFA, per-ticket activation, recording and auto-disconnect) bring it within tolerable risk today, but the SL-T is held at SL3 on IAC/RDF to match the Z1 targets it lands in, so the conduit is not the weak link. SI at SL3 matches the BPCS as well, UC at SL2 matches both zones, DC at SL2 follows the DMZ and RA at SL2 the BPCS. TRE at SL2 preserves the session-recording evidence chain.",
+      "justification": "This conduit is the most exposed path into the BPCS. A hijacked vendor credential or session starts at High, and the existing per-session controls (MFA, per-ticket activation, recording and auto-disconnect) bring it within tolerable risk today. The SL-T is still held at SL3 on IAC and RDF to match the Z1 targets it reaches, so that the conduit is not the weak link. SI at SL3 also matches the BPCS, UC at SL2 matches both zones, DC at SL2 follows the DMZ and RA at SL2 follows the BPCS. TRE at SL2 keeps the session recordings usable as evidence.",
       "assessment": { "depth": "detailed" }
     },
     {
@@ -476,7 +476,7 @@ window.SPT_TOUR_PROJECT = {
       "toZone": "EXT",
       "name": "Corporate reporting",
       "channels": ["HTTPS"],
-      "notes": "Corporate clients request read-only reports over HTTPS; process data flows one way, Z3 to corporate. The corporate side is out of scope (untrusted by assumption).",
+      "notes": "Corporate clients request read-only reports over HTTPS, and process data flows one way, from Z3 to corporate. The corporate side is out of scope and assumed untrusted.",
       "direction": "from-to",
       "boundaryDevices": ["DMZ firewall pair"],
       "externalParty": "Acme corporate reporting clients",
@@ -486,7 +486,7 @@ window.SPT_TOUR_PROJECT = {
       "accessPoints": ["DMZ firewall pair, corporate-facing interface", "Historian reporting service (HTTPS)"],
       "physicalAccessPoints": ["Server room, OT rack 5"],
       "dataFlows": ["Throughput and quality reports, historian to corporate clients, read only"],
-      "securityPolicies": ["All OT-corporate exchange transits the DMZ; no direct paths"],
+      "securityPolicies": ["All exchange between OT and corporate passes through the DMZ, with no direct paths"],
       "assumptions": ["The corporate network is untrusted"],
       "externalDependencies": ["Corporate network services run by Acme group IT"],
       "securityRequirements": ["IEC 62443-3-3 system requirements and requirement enhancements at its SL-T", "Acme OT security standard GS-104, section 7 (OT DMZ)"],
@@ -494,8 +494,8 @@ window.SPT_TOUR_PROJECT = {
       "vulnerabilities": [],
       "countermeasures": [],
       "slTargetByFR": { "IAC": 2, "UC": 2, "SI": 2, "DC": 2, "RDF": 2, "TRE": 2, "RA": 1 },
-      "justification": "Boundary conduit to the untrusted corporate network, with no control traffic. Its targets match the DMZ it serves: SL2 on every foundational requirement but RA, for the read-only brokerage and the confidentiality of throughput data, and SL1 on RA, as loss of corporate reporting does not affect operator view or control. The SL3 the house method suggests on IAC, SI and RDF comes from the DMZ's own suggestion, which the DMZ holds at SL2 for the reasons in its justification.",
-      "assessment": { "depth": "proportionate", "considered": "Read-only reporting to the out-of-scope corporate network: a compromised corporate client using the reporting service as a foothold, and exfiltration of throughput data. Both are assessed at the Z3 boundary as T5 and T6." }
+      "justification": "C3 is the boundary conduit to the untrusted corporate network and carries no control traffic. Its targets match the DMZ it serves. It is SL2 on every foundational requirement except RA, for the read-only brokerage and the confidentiality of throughput data, and SL1 on RA, because losing corporate reporting does not affect operator view or control. The house method suggests SL3 on IAC, SI and RDF because the DMZ's own suggestion is SL3, and the DMZ holds those at SL2 for the reasons in its justification.",
+      "assessment": { "depth": "proportionate", "considered": "A compromised client on the out-of-scope corporate network using the read-only reporting service as a foothold, and exfiltration of throughput data. Both are assessed at the Z3 boundary as T5 and T6." }
     },
     {
       "id": "C4",
@@ -520,7 +520,7 @@ window.SPT_TOUR_PROJECT = {
       "vulnerabilities": [],
       "countermeasures": [],
       "slTargetByFR": { "IAC": 3, "UC": 2, "SI": 3, "DC": 1, "RDF": 3, "TRE": 2, "RA": 2 },
-      "justification": "The engineering VLAN carries configuration downloads into the BPCS, so it takes the BPCS targets: SL3 on IAC, SI and RDF, as malware brought in over an engineering connection is a High risk there and the path into the controllers must not be the weak link. UC is held at SL2, as on both zones it joins: misuse of the legacy configuration tool's shared account is accepted until it is retired. DC at SL1 reflects the low confidentiality of configuration data, and TRE and RA at SL2 follow the BPCS.",
+      "justification": "The engineering VLAN carries configuration downloads into the BPCS, so it takes the BPCS targets. IAC, SI and RDF are SL3, because malware brought in over an engineering connection is a High risk there and the path into the controllers must not be the weak link. UC stays at SL2, as on both zones it joins, and misuse of the shared account on the legacy configuration tool is accepted until that tool is retired. DC at SL1 reflects the low confidentiality of configuration data, and TRE and RA at SL2 follow the BPCS.",
       "assessment": { "depth": "grouped", "withId": "Z4" }
     },
     {
@@ -529,7 +529,7 @@ window.SPT_TOUR_PROJECT = {
       "toZone": "Z2",
       "name": "Keyed SIS engineering connection",
       "channels": ["SIS engineering protocol"],
-      "notes": "Patched in only for an authorised SIS change, with the program-mode keyswitch turned and a keyed bypass record; disconnected otherwise.",
+      "notes": "Patched in only for an authorised SIS change, with the program-mode keyswitch turned and a keyed bypass record, and disconnected at all other times.",
       "direction": "both",
       "temporary": true,
       "safetyRelated": true,
@@ -548,7 +548,7 @@ window.SPT_TOUR_PROJECT = {
       "vulnerabilities": [],
       "countermeasures": [],
       "slTargetByFR": { "IAC": 3, "UC": 3, "SI": 3, "DC": 3, "RDF": 3, "TRE": 3, "RA": 3 },
-      "justification": "The keyed engineering connection reaches the SIS, so it takes the SIS zone's SL3 on every foundational requirement and is not the weak link. It is connected only for an authorised change, with the program-mode keyswitch turned and a keyed bypass record.",
+      "justification": "The keyed engineering connection reaches the SIS, so it takes the SIS zone's SL3 on every foundational requirement and does not become the weak link. It is connected only for an authorised change, with the program-mode keyswitch turned and a keyed bypass record.",
       "assessment": { "depth": "grouped", "withId": "Z2" }
     }
   ],

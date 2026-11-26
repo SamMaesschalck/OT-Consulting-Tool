@@ -92,19 +92,19 @@
     ok(E.completeness(base).length === 0, "the demo has nothing open", texts(base).join(" | "));
 
     // ---- 1. unmitigated: before any cyber security countermeasure ------------------------------
-    ok(M.RULES.hardRules.some(function (r) { return /before any cyber security countermeasure is considered \(countermeasures built into the components, and protection that is not cyber security such as controlled site access, hardwired interlocks and relief devices, still count\)/.test(r); }) &&
+    ok(M.RULES.hardRules.some(function (r) { return /before any cyber security countermeasure\. Countermeasures built into the components still count, and so does protection outside cyber security, such as controlled site access, hardwired interlocks and relief devices\./.test(r); }) &&
       !M.RULES.hardRules.some(function (r) { return /before any countermeasure/.test(r); }), "the hard rule: before any cyber security countermeasure, built-in and non-cyber protection still counting");
 
     // ---- 2. separating business and control system assets -------------------------------------
     var sp = clone(base), z1 = ownerIn(sp, "Z1");
     z1.assets.push({ id: "AS90", name: "Production reporting PC", type: "business" });
     var rows = E.separationRows(z1, sp), br = rows.filter(function (r) { return r.id === "business"; })[0];
-    ok(br && br.required && !br.departure && br.open && has(texts(sp), /^Z1 \(Unit 300 BPCS\): record whether business and control system assets are kept separate\.$/), "a business system beside control system assets raises the row, a requirement, to answer");
+    ok(br && br.required && !br.departure && br.open && has(texts(sp), /^Z1 \(Unit 300 BPCS\): it is not recorded whether business and control system assets are kept separate\.$/), "a business system beside control system assets raises the row, a requirement, to answer");
     z1.separation.business = { answer: "not-separated", reason: "" };
     br = E.separationRows(z1, sp).filter(function (r) { return r.id === "business"; })[0];
-    ok(br.departure && has(texts(sp), /^Z1 \(Unit 300 BPCS\): business and control system assets are not kept separate, which the standard requires, with no justification\.$/), "not separated with no justification: the warning says it departs from a requirement", texts(sp).join(" | "));
+    ok(br.departure && has(texts(sp), /^Z1 \(Unit 300 BPCS\): business and control system assets are not kept separate\. The standard requires the separation, and no justification is recorded\.$/), "not separated with no justification: the warning says it departs from a requirement", texts(sp).join(" | "));
     var z4 = ownerIn(sp, "Z4"); z4.separation.temporary.reason = "";
-    ok(has(texts(sp), /^Z4 \(Engineering workstations\): temporarily connected devices are not kept separate, with no reason\.$/), "a recommendation keeps its neutral warning");
+    ok(has(texts(sp), /^Z4 \(Engineering workstations\): temporarily connected devices are not kept separate and no reason is recorded\.$/), "a recommendation keeps its neutral warning");
     z1.separation.business.reason = "The reporting PC is being moved to the DMZ at the next outage.";
     z4.separation.temporary.reason = DEMO.zones[3].separation.temporary.reason;
     ok(!has(texts(sp), /kept separate/), "with the justification, nothing is open, yet the row is still a departure", texts(sp).join(" | "));
@@ -114,7 +114,7 @@
     ok(sr && sr.wholeZone && !sr.departure, "safety related assets kept with others: the whole zone is safety related, not a departure");
 
     return wordParas(sp, {}).then(function (det) {
-      ok(det.indexOf("Business and control system assets are not kept separate, which IEC 62443-3-2 requires. The reporting PC is being moved to the DMZ at the next outage.") > 0, "Word: not separated reads as a departure from a requirement, with the justification");
+      ok(det.indexOf("Business and control system assets are not kept separate. IEC 62443-3-2 requires this separation. The reporting PC is being moved to the DMZ at the next outage.") > 0, "Word: not separated reads as a departure from a requirement, with the justification");
       ok(det.indexOf("Temporarily connected devices are not kept separate. " + DEMO.zones[3].separation.temporary.reason) > 0, "the recommendations keep their neutral words");
       var xs = sheetRows(RX.buildWorkbook(sp), "Zones"), col = xs[0].indexOf("Separation not in place"), r1 = xs.filter(function (r) { return r[0] === "Z1"; })[0];
       ok(/^Business and control system assets \(a departure from IEC 62443-3-2\): The reporting PC/.test(r1[col]), "Excel: the departure is named", r1[col]);
@@ -125,10 +125,10 @@
       // ---- 3. the threat environment --------------------------------------------------------
       ok(M.listOf(base.srs.threatSources).length === 4 && M.listOf(base.srs.emergingThreats).length === 2, "the demo names its sources of threat intelligence and its emerging threats");
       var ns = clone(base); delete ns.srs.threatSources;
-      ok(has(texts(ns), /^Requirements specification: no source of threat intelligence recorded\.$/) && E.completeness(ns).filter(function (i) { return /no source of threat intelligence/.test(i.text); })[0].target.id === "threats",
+      ok(has(texts(ns), /^Requirements specification: no source of threat intelligence is recorded\.$/) && E.completeness(ns).filter(function (i) { return /no source of threat intelligence/.test(i.text); })[0].target.id === "threats",
         "a threat environment with no source warns, aimed at its block");
       ns.srs.knownThreats = []; ns.srs.adversaryClass = null;
-      ok(has(texts(ns), /^Requirements specification: no assumed adversary, known threats or source of threat intelligence recorded\.$/), "with nothing at all, one warning says both");
+      ok(has(texts(ns), /^Requirements specification: no assumed adversary, known threats or source of threat intelligence are recorded\.$/), "with nothing at all, one warning says both");
       ok(E.specBlocks(base).filter(function (b) { return b.id === "threats"; })[0].done, "the demo's block is done");
       var odd = clone(base); odd.srs.threatSources = "NCSC"; odd.srs.emergingThreats = ["x", 3, ""];
       var on = MG.normaliseProject(odd);
@@ -161,8 +161,8 @@
       ok(det.filter(function (x) { return /^The initial risk of the system under consideration is High/.test(x); }).length === 1, "the full statement is under Risk comparison, once");
       ok(det.indexOf("Mandatory security countermeasures") < 0, "the detailed report does not print the specification's countermeasure list (its treatment plan has them)");
       // 9. the demo's ranking notes.
-      ok(det.some(function (x) { return x === "Primary control layer; loss forces manual shutdown, manipulation is the acid-release path. Assigned to Z1, assessed in detail."; }) &&
-        /* step 5: the outside-the-SUC mark is the ranking's own, so the note no longer says it */ det.some(function (x) { return /^Commodity IP kit, frequently probed, but no process consequence; ranked low\.$/.test(x); }) && det.indexOf("Outside the SUC") > 0 &&
+      ok(det.some(function (x) { return x === "The primary control layer. Its loss forces a manual shutdown, and its manipulation is the path to an acid release. Assigned to Z1 and assessed in detail."; }) &&
+        /* step 5: the outside-the-SUC mark is the ranking's own, so the note no longer says it */ det.some(function (x) { return /^Commodity IP equipment that is often probed but has no process consequence. It is ranked low\.$/.test(x); }) && det.indexOf("Outside the SUC") > 0 &&
         !det.some(function (x) { return /where a detailed assessment is required|not taken to a detailed assessment/.test(x); }), "the demo's ranking notes fit the model: assessed in detail, or outside the SUC");
       return wordParas(base, { spec: true });
     }).then(function (spec) {
@@ -173,7 +173,7 @@
       var at = spec.indexOf("Mandatory security countermeasures"), sl = spec.indexOf("Target security levels (SL-T, per foundational requirement)");
       ok(at > sl && at < spec.indexOf("Sign-off"), "the specification prints them after the SL-T, before the sign-off");
       var sec = spec.slice(at + 1);
-      ok(/^By the house reading, the countermeasures that the decisions to reduce a risk or to treat it through the SL-T programme rest on are mandatory\./.test(sec[0]) && sec.slice(1, 6).join("|") === "Countermeasure|Zone or conduit|In place or planned|Owner and due date|SR references", "with what they are and a table", sec.slice(0, 6).join(" | "));
+      ok(/^Under the house reading, a countermeasure is mandatory when a decision to reduce a risk, or to treat it through the SL-T programme, rests on it\./.test(sec[0]) && sec.slice(1, 6).join("|") === "Countermeasure|Zone or conduit|In place or planned|Owner and due date|SR references", "with what they are and a table", sec.slice(0, 6).join(" | "));
       var e0 = mc[0];
       ok(sec.indexOf(e0.m.id + "  " + e0.m.description) > 0 && sec.indexOf(e0.m.existing ? "In place" : "Planned") > 0, "each one, by id, with its zone and whether in place or planned");
       ok(!DASH.test(spec.join("\n")), "no dashes");
@@ -192,9 +192,9 @@
       // ---- 7. vulnerabilities ------------------------------------------------------------------
       nv = clone(base); ownerIn(nv, "Z3").vulnerabilities = [];
       var it = E.completeness(nv).filter(function (i) { return /no vulnerabilities recorded/.test(i.text); });
-      ok(it.length === 1 && it[0].text === "Z3 (Plant DMZ & historian): no vulnerabilities recorded." && it[0].stage === "risk" && it[0].target.part === "vulns", "a zone assessed in detail with no vulnerability warns, aimed at its vulnerabilities", JSON.stringify(it));
+      ok(it.length === 1 && it[0].text === "Z3 (Plant DMZ & historian) has no vulnerabilities recorded." && it[0].stage === "risk" && it[0].target.part === "vulns", "a zone assessed in detail with no vulnerability warns, aimed at its vulnerabilities", JSON.stringify(it));
       ownerIn(nv, "Z3").vulnerabilities = [{ id: "V9", description: "  ", reference: "" }];
-      ok(has(texts(nv), /^Z3 .*: no vulnerabilities recorded\.$/), "an empty one does not count");
+      ok(has(texts(nv), /^Z3 .* has no vulnerabilities recorded\.$/), "an empty one does not count");
       var ex = clone(base);
       ["proportionate", "grouped", "reused", "deferred"].forEach(function (dp) {
         var z = ownerIn(ex, "Z3"); z.vulnerabilities = []; z.assessment = { depth: dp, withId: dp === "grouped" ? "Z1" : "", reuseSource: "RD-1", considered: "x", reason: "later" };
@@ -214,7 +214,7 @@
       hl = clone(base); hl.assessmentType = "high-level";
       return wordParas(hl, { highLevelOnly: true });
     }).then(function (hlw) {
-      ok(hlw.indexOf("Whether each system goes forward to a detailed assessment is decided by the house method, from its own comparison with the tolerable risk. IEC 62443-3-2 compares the initial risk of the system under consideration as a whole.") > 0,
+      ok(hlw.indexOf("Under the house method, each system's own comparison with the tolerable risk decides whether it goes forward to a detailed assessment. IEC 62443-3-2 compares the initial risk of the system under consideration as a whole.") > 0,
         "high-level only: the decision per system is the house method, never the standard's rule");
 
       // ---- the screens ------------------------------------------------------------------------
@@ -222,10 +222,10 @@
       // 1. the hint and About.
       RT.navigate("about");
       var um = main().querySelector('[data-method="unmitigated"]'), dm = main().querySelector('[data-method="decisions"]');
-      ok(!!um && /before any cyber security countermeasure/.test(um.textContent) && /controlled site access, hardwired interlocks and relief devices, still count/.test(um.textContent)
+      ok(!!um && /before any cyber security countermeasure/.test(um.textContent) && /built into the components still count\. So does protection outside cyber security, such as controlled site access, hardwired interlocks and relief devices/.test(um.textContent)
 , "About: unmitigated, as the standard means it");
-      ok(!!dm && /transferred to another party/.test(dm.textContent) && /house option that mitigates it through the SL-T/.test(dm.textContent), "About: the four decisions, the SL-T programme as the house option");
-      ok(/requirement wording against the published edition/.test(main().textContent) && /before any cyber security countermeasure is considered/.test(main().textContent), "About: the wording checked, and the hard rule");
+      ok(!!dm && /transferred to another party/.test(dm.textContent) && /Treating a risk through the SL-T programme is a house method/.test(dm.textContent), "About: the four decisions, the SL-T programme as the house option");
+      ok(/requirement wording against the published edition/.test(main().textContent) && /Unmitigated risk is impact × likelihood, rated before any cyber security countermeasure\./.test(main().textContent), "About: the wording checked, and the hard rule");
       // 4. step 2's fields.
       RT.navigate("srs");
       var src = main().querySelector('[data-field-block="threat-sources"] textarea'), em = main().querySelector('[data-field-block="emerging-threats"] textarea');
@@ -267,10 +267,10 @@
       zd.querySelector('[data-separation="business:not-separated"]').click();
       zd = main().querySelector('[data-detail="zone"]');
       var dep = zd.querySelector('[data-departure="business"]'), rin = zd.querySelector('[data-reason="sep-business"]');
-      ok(!!dep && dep.textContent === "A departure from a requirement of the standard: give the justification." && rin.getAttribute("placeholder") === "Why not, and what makes up for it", "step 3: not separated reads as a departure, asking for the justification");
+      ok(!!dep && dep.textContent === "This departs from a requirement of the standard. Give the justification." && rin.getAttribute("placeholder") === "Why not, and what makes up for it", "step 3: not separated reads as a departure, asking for the justification");
       type(rin, "The laptop moves to a maintenance zone at the next outage.");
       RT.render();
-      ok(main().querySelector('[data-detail="zone"] [data-departure="business"]').textContent === "A departure from a requirement of the standard.", "justified, it is still said to be a departure");
+      ok(main().querySelector('[data-detail="zone"] [data-departure="business"]').textContent === "This departs from a requirement of the standard.", "justified, it is still said to be a departure");
       // (A business system in the safety zone raises the safety row too: answered, nothing is open.)
       main().querySelector('[data-detail="zone"] [data-separation="safety:met"]').click();
       ok(!!main().querySelector('[data-zone-row="Z2"] [data-departure="zone"]') || /departure/.test(main().querySelector('[data-zone-row="Z2"]').textContent), "and the zone's row says so");
@@ -309,10 +309,10 @@
       ok(main().querySelector('[data-covers="deferred"]').textContent === "The approval does not cover Z5, deferred to a later assessment." && /asset owner's managers accountable for the process the SUC controls/.test(main().querySelector('[data-hint="approvers"]').textContent),
         "step 7 says what the approval does not cover, and who approves");
       load(hl); RT.navigate("srs");
-      ok(/decide by the house method which go forward to a detailed assessment/.test(main().querySelector(".page-sub").textContent), "high-level only: step 2 names the decision as the house method");
+      ok(/use the house method to decide which go forward to a detailed assessment/.test(main().querySelector(".page-sub").textContent), "high-level only: step 2 names the decision as the house method");
       // 7. Go to on a vulnerability item opens the list.
       load(nv); RT.navigate("review");
-      var li = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return /Z3 \(Plant DMZ & historian\): no vulnerabilities recorded/.test(x.textContent); })[0];
+      var li = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return /Z3 \(Plant DMZ & historian\) has no vulnerabilities recorded/.test(x.textContent); })[0];
       ok(!!li, "Check and issue lists the missing vulnerabilities");
       li.querySelector('[data-action="goto"]').click();
       ok(RT.state.stage === "risk" && !!main().querySelector('[data-owner-id="Z3"] [data-part="vulns"]'), "and Go to opens step 5 at the zone's vulnerabilities");

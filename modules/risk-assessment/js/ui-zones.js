@@ -70,7 +70,7 @@
     if (E.zoneSafety(z)) bits.push(h("span", { class: "pill flag", text: "Safety related" }));
     var open = rows.filter(function (r) { return r.open || r.reasonMissing; }).length;
     if (open) bits.push(h("span", { class: "pill neutral val-warn", text: open + " to answer" }));
-    else if (rows.some(function (r) { return r.departure; })) bits.push(h("span", { class: "pill flag", "data-departure": "zone", text: "Not separated, a departure" }));
+    else if (rows.some(function (r) { return r.departure; })) bits.push(h("span", { class: "pill flag", "data-departure": "zone", text: "Not separated (departure)" }));
     else if (rows.some(function (r) { return r.answer === "not-separated"; })) bits.push(h("span", { class: "pill neutral", text: "Not separated" }));
     var stone = stonePill(p, z);
     if (stone) bits.push(stone);
@@ -123,7 +123,7 @@
       body.push(h("table", { class: "tbl compact" }, [h("thead", null, [h("tr", null, [
         h("th", { text: "Conduit", style: "width:64px" }), h("th", { text: "Ends", style: "width:110px" }), h("th", { text: "Name" }), h("th", { text: "" })
       ])]), tb]));
-    } else body.push(h("p", { class: "muted", text: "No conduits yet: add one for each connection between zones or to EXT." }));
+    } else body.push(h("p", { class: "muted", text: "No conduits yet. Add one for each connection between zones, or to EXT." }));
     body.push(h("div", { class: "btn-row", style: "margin-top:10px" }, [
       h("button", { type: "button", class: "btn", "data-action": "add-conduit", text: "+ Add conduit", onClick: function () {
         p.counters.conduit += 1; var c = M.emptyConduit(p.counters.conduit); p.conduits.push(c); select("conduit", c.id); touched(); rerender();
@@ -170,7 +170,7 @@
         onInput: function (e) { sel.pasteText = e.target.value; } });
       box.appendChild(h("div", { class: "paste-box" }, [
         ta,
-        h("div", { class: "hint", text: "One per line. Optional tab-separated columns: type, connection." }),
+        h("div", { class: "hint", text: "One asset per line, optionally followed by its type and connection, separated by tabs." }),
         h("div", { class: "btn-row", style: "margin-top:6px" }, [
           h("button", { type: "button", class: "btn sm primary", "data-action": "paste-add", text: "Add", onClick: function () {
             var mk = A.undoMark(); var list = E.parseAssets(sel.pasteText), first = z.assets.length;
@@ -223,7 +223,7 @@
       // zone not designated safety related as a whole: the standard requires
       // them kept apart, so not separating them is a departure, said as one.
       // The other rows are recommendations and keep their neutral wording.
-      if (r.departure) kids.push(h("div", { class: "hint val-warn", "data-departure": r.id, text: r.reasonMissing ? "A departure from a requirement of the standard: give the justification." : "A departure from a requirement of the standard." }));
+      if (r.departure) kids.push(h("div", { class: "hint val-warn", "data-departure": r.id, text: r.reasonMissing ? "This departs from a requirement of the standard. Give the justification." : "This departs from a requirement of the standard." }));
       else if (r.reasonMissing) kids.push(h("div", { class: "hint val-warn", text: "Give a reason." }));
       return h("div", { class: "sep-row", "data-part": "sep-" + r.id, "data-sep-state": r.answer || "open" }, kids);
     })));
@@ -254,7 +254,7 @@
         row.appendChild(h("button", { type: "button", class: "btn sm", "data-action": "level-right", text: "Move right →", "aria-label": "Move " + z.id + " right in its band", disabled: at >= band.length - 1 ? "disabled" : null, onClick: function () { nudge(p, z, 1); } }));
       }
     }
-    kids.push(h("div", { class: "hint", text: "House layering; sets the zone's row on the drawing." }));
+    kids.push(h("div", { class: "hint", text: "The SolutionsPT zone level sets the zone's row on the drawing." }));
     return h("div", { class: "field" }, kids);
   }
   // Swaps the zone with its neighbour in the band; the band's order is then
@@ -273,7 +273,7 @@
   // The safety floor's reach, narrowed on step 5's SL-T strip (phase 5b).
   function floorHint(p) {
     var fw = E.safetyFloorWords(p), sl = SIS_RULE ? SIS_RULE.floorSL : 3;
-    return fw.none ? "No SL" + sl + " floor in this assessment." : "Sets an SL" + sl + " floor on " + fw.words + ".";
+    return fw.none ? "A safety related zone has no SL" + sl + " floor in this assessment." : "A safety related zone has an SL" + sl + " floor on " + fw.words + ".";
   }
 
   function zoneDetail(p, z) {
@@ -316,7 +316,7 @@
     ];
     return card(z.id + (z.name ? ": " + z.name : ""), E.zoneSafety(z) ? "safety related" : null, kids,
       h("button", { type: "button", class: "btn sm danger", text: "Remove zone", onClick: function () {
-        if (!confirm("Remove zone " + z.id + (z.name ? " (" + z.name + ")" : "") + "? Conduits referencing it will also be removed.")) return;
+        if (!confirm("Remove zone " + z.id + (z.name ? " (" + z.name + ")" : "") + "? Conduits that connect to it are removed too.")) return;
         var mk = A.undoMark();
         p.zones.splice(p.zones.indexOf(z), 1);
         p.conduits = p.conduits.filter(function (c) { return c.fromZone !== z.id && c.toZone !== z.id; });
@@ -362,7 +362,7 @@
             marker("external", "External network", extByEnd ? { disabled: "disabled" } : null),
             marker("temporary", "Temporarily connected")
           ]),
-          extByEnd ? h("div", { class: "hint", text: "External: one end is EXT." }) : null
+          extByEnd ? h("div", { class: "hint", text: "Set because one end is EXT." }) : null
         ]),
         external ? textField("External party", c.externalParty, function (v) { setText(c, "externalParty", v); }, { placeholder: "e.g. Control system vendor support" }) : null,
         // The characteristics a zone has, as far as they apply to a conduit.
@@ -425,7 +425,7 @@
   function renderZones(main) {
     var p = state.project;
     main.appendChild(h("h1", { class: "page-title", text: "Zones and conduits" }));
-    main.appendChild(pageSub("zones", "Partition the SUC into zones and conduits, and answer the separation rows raised."));
+    main.appendChild(pageSub("zones", "Partition the SUC into zones and conduits, and answer the separation questions the tool raises."));
     main.appendChild(stepTabs(p));
     if (sel.view === "assets" && R.AssetsPage) { R.AssetsPage.render(main); return; }
     main.appendChild(card("Zone and conduit drawing", p.zones.length ? "select a zone to open it" : null, [renderZoneMap(p, function (id) { pick("zone", id); A.focusAfter('[data-detail="zone"] h2'); })], null, { "data-drawing": "" }));

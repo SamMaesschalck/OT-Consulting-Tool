@@ -128,7 +128,7 @@
         ok(pointers.length === 0 && own.length === 0, "and no line sends the reader to the report", pointers.concat(own).join(" | "));
         ok(now.indexOf("About this specification") > now.indexOf("Document control") && now.indexOf("Sign-off") > now.indexOf("Justification for Z1 Unit 300 BPCS") && now.indexOf("Appendix: risk criteria") > now.indexOf("Sign-off"),
           "it opens with what it is, after document control, and closes with the sign-off, the method and the criteria appendix");
-        ok(now.indexOf("Signed off as below. An approval covers the tolerable risk, the zones and conduits, the target security levels and the mandatory security countermeasures in this specification, within the scope given for it.") > now.indexOf("Sign-off"), "its sign-off says what an approval of it covers (step 5: the zones and conduits and the mandatory countermeasures too)");
+        ok(now.indexOf("The approvals are recorded below. An approval covers the tolerable risk, the zones and conduits, the target security levels and the mandatory security countermeasures in this specification, within the scope given for it.") > now.indexOf("Sign-off"), "its sign-off says what an approval of it covers (step 5: the zones and conduits and the mandatory countermeasures too)");
         // Phase 6 review: its own kicker, method sentence and categories sentence; its opening shares a page with what follows.
         ok(now[0] === "OT CYBER SECURITY" && window.RISK_WORD_BASELINE.detailed[0] === "OT CYBER RISK ASSESSMENT" && window.RISK_WORD_BASELINE.highLevel[0] === "OT CYBER RISK ASSESSMENT", "its cover's kicker is OT CYBER SECURITY; the reports keep theirs");
         ok(now.indexOf("The targets rest on risk ratings made with the evidence available at the time of the engagement. The assessment sets targets and does not test security capability, which is measured against the SL-T in an IEC 62443-3-3 assessment.") > now.indexOf("Method and limitations") &&
@@ -136,7 +136,7 @@
           "its method and categories sentences speak of risks, not of the threats and systems it does not list");
         var aboutAt = xml.indexOf(">About this specification<"), sucAt = xml.indexOf(">System under consideration and requirements<", aboutAt);
         ok(aboutAt > 0 && sucAt > aboutAt && xml.slice(aboutAt, sucAt).indexOf('w:type="page"') < 0, "no forced page break after its three-paragraph opening");
-        ok(now.indexOf("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. It states the tolerable risk and the target security level (SL-T) of each zone and conduit: the protection it is to be engineered and maintained to. It lists the mandatory security countermeasures that come out of the risk assessment.") > 0 &&
+        ok(now.indexOf("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. The tolerable risk is stated, with the target security level (SL-T) of each zone and conduit, which is the protection it is to be engineered and maintained to. The specification also lists the mandatory security countermeasures that come out of the risk assessment.") > 0 &&
            now.indexOf("The risk criteria behind the tolerable risk and the targets are in the appendix. Sign-off records who approves them and the scope of each approval.") > 0, "its opening, as reworded in the phase 6 review, naming the mandatory security countermeasures (the 3-2 fixes)");
 
         // ---- the page ---------------------------------------------------------------
@@ -320,14 +320,14 @@
         return openReport(0);
       }).then(function () {
         var c = edit("what-happens-next"), box = cardOwn("what-happens-next", ".sect-prose-input")[0];
-        ok(/Consultant note: tailor this summary/.test(box.value), "the red consultant note is in the box, to be deleted there");
+        ok(/Consultant note: adapt this summary/.test(box.value), "the red consultant note is in the box, to be deleted there");
         ok(!/signed off/.test(box.value), "the sign-off statement is not");
         ok(cardOwn("what-happens-next", "p.rp-p").some(function (p) { return /signed off/.test(p.textContent); }), "it stays on the page beside the box");
         return type(box, box.value.replace(/^The highest target/, "An edited target"));
       }).then(function () {
         return wordBlocks({});
       }).then(function (bl) {
-        var note = DB.flatten(bl).filter(function (b) { return /^Consultant note: tailor/.test(b.text); })[0];
+        var note = DB.flatten(bl).filter(function (b) { return /^Consultant note: adapt/.test(b.text); })[0];
         ok(!!note && note.red === true, "left in a rewrite, it still prints red, as what it is");
         reset();
         ok(cardOwn("what-happens-next", ".sect-prose-input").length === 1, "the box is still open after the rebuild");
@@ -348,7 +348,7 @@
       }).then(function (bl) {
         var sec = bl.filter(function (b) { return b.sectionKey === "sign-off"; });
         // (Phase 3b review: the signature table's first column is Approver, as a row may not be signed yet.)
-        ok(sec[0].text === "Asset owner approval" && /Signed off|signed off/.test(sec.slice(1).map(function (b) { return b.text; }).join(" ")), "and what it records still prints under the new title");
+        ok(sec[0].text === "Asset owner approval" && /approvals are recorded below|signed off/.test(sec.slice(1).map(function (b) { return b.text; }).join(" ")), "and what it records still prints under the new title");
         reset();
         return openReport(0);
       }).then(function () {

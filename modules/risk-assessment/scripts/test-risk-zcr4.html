@@ -103,7 +103,7 @@
 
     return wordParas(base, {}).then(function (det) {
       var tr = after(det, "Transferred risks");
-      ok(tr[0] === "Each risk above tolerable risk that has been transferred to another party, with its rating today, how and to whom it was transferred, who agreed it and when it is to be reviewed. A transfer moves who bears the consequence, so the rating does not change.",
+      ok(tr[0] === "The table lists each risk above tolerable risk that has been transferred to another party, with its rating today, how and to whom it was transferred, who agreed it and when it is to be reviewed. A transfer moves who bears the consequence, so the rating does not change.",
         "Word: the lead-in says the rating is today's, and that a transfer does not change it", tr[0]);
       ok(tr[3] === "Risk today", "Word: the column is Risk today", tr.slice(1, 10).join("|"));
       ok(rowRating(tr, "T2").join("|") === "High|Medium × Serious", "Word: T2 is High (Medium × Serious) today, not its planned Medium", rowRating(tr, "T2").join("|"));

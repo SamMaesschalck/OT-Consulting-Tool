@@ -398,7 +398,7 @@ window.RiskApp.Model = (function () {
   // and cells are the tool's own (a band from the sum of the two positions on
   // their scales), not any published example matrix.
   var PRESETS = [
-    { id: "house", label: "SolutionsPT house criteria" },
+    { id: "house", label: "SolutionsPT default criteria" },
     { id: "3x3", label: "Three levels each" },
     { id: "4x4", label: "Four levels each" },
     { id: "5x5", label: "Five levels each" }

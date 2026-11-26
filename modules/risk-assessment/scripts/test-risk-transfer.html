@@ -166,15 +166,15 @@
     ok(st.length && st.every(function (s) { return s.changed && s.parts.indexOf("accepted") >= 0; }) && has(texts(V), /approved before the accepted and transferred risks, /), "the demo's approvals say the accepted and transferred risks changed", texts(V).join(" | "));
     ok(E.approvalPartWords(["accepted"], false, base) === "the accepted risks", "with no transfer, the words are as before");
     var sig = RX.signOffTexts(V);
-    ok(sig[2] === "Signed off as below. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted and transferred risks in this report, within the scope given for it.", "the report's approval sentence names the transferred risks", sig[2]);
-    ok(RX.signOffTexts(base)[2] === "Signed off as below. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted risks in this report, within the scope given for it.", "and is unchanged with none");
+    ok(sig[2] === "The approvals are recorded below. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted and transferred risks in this report, within the scope given for it.", "the report's approval sentence names the transferred risks", sig[2]);
+    ok(RX.signOffTexts(base)[2] === "The approvals are recorded below. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted risks in this report, within the scope given for it.", "and is unchanged with none");
 
     // ---- E. the comparison with a previous assessment ---------------------------------------------
     var dd = CMP.diff(CMP.freeze(base), CMP.freeze(V)), dl = [].concat.apply([], CMP.lines(dd).map(function (gp) { return gp.items; }));
-    ok(has(dl, /^T8 \(Z4\) no longer accepted; the decision is now risk transferred\.$/), "an acceptance turned into a transfer is reported", dl.join(" | "));
+    ok(has(dl, /^T8 \(Z4\) is no longer accepted\. The decision is now risk transferred\.$/), "an acceptance turned into a transfer is reported", dl.join(" | "));
     var V2 = clone(V); M.setDecision(threatIn(V2, "Z4", "T8"), "reduce", true); threatIn(V2, "Z4", "T8").countermeasureIds = ["M7"];
     var dl2 = [].concat.apply([], CMP.lines(CMP.diff(CMP.freeze(V), CMP.freeze(V2))).map(function (gp) { return gp.items; }));
-    ok(has(dl2, /^T8 \(Z4\): was risk transferred; now reduce with countermeasures\.$/), "and a transfer turned into another decision", dl2.join(" | "));
+    ok(has(dl2, /^T8 \(Z4\): now reduce with countermeasures \(was risk transferred\)\.$/), "and a transfer turned into another decision", dl2.join(" | "));
     var rows = CMP.rows(CMP.diff(CMP.freeze(V), CMP.freeze(V2))).filter(function (r) { return r.change === "Changed" && r.area === "Treatment decisions"; });
     ok(rows.length === 1 && rows[0].before === "Risk transferred" && rows[0].now === "Reduce with countermeasures", "and on the workbook's Changes sheet", JSON.stringify(rows));
 
@@ -188,11 +188,11 @@
     return wordParas(V, {}).then(function (det) {
       var all = det.join("\n");
       ok(det.some(function (x) { return /^The treatment decisions are: .* and 1 transferred to another party\./.test(x); }), "Word: the summary's tally counts the transfer", det.filter(function (x) { return /treatment decisions are/.test(x); }).join(" | "));
-      ok(det.some(function (x) { return /^Nothing is waiting on a decision: .*the transferred risk is approved/.test(x) || /^The asset owner has not yet approved the transferred risk T8 \(Z4\)\.$/.test(x); }), "Decisions required says whether the transferred risk is approved");
+      ok(det.some(function (x) { return /^No decision is outstanding\. .*the transferred risk is approved/.test(x) || /^The asset owner has not yet approved the transferred risk T8 \(Z4\)\.$/.test(x); }), "Decisions required says whether the transferred risk is approved");
       ok(det.indexOf("Transferred risks") > det.indexOf("Accepted risks") && !det.slice(det.indexOf("Accepted risks"), det.indexOf("Transferred risks")).some(function (x) { return /^T8  /.test(x); }), "a Transferred risks section after Accepted risks, which no longer lists T8 (step 5: T4's remaining risk is listed there)");
       var tr = after(det, "Transferred risks");
       // Step 4: a transfer shows its rating today (was: with the rating that stands; the column was Rating).
-      ok(/^Each risk above tolerable risk that has been transferred to another party, with its rating today, how and to whom it was transferred, who agreed it and when it is to be reviewed\. A transfer moves who bears the consequence, so the rating does not change\.$/.test(tr[0]), "it says what it holds, and that the rating is unchanged", tr[0]);
+      ok(/^The table lists each risk above tolerable risk that has been transferred to another party, with its rating today, how and to whom it was transferred, who agreed it and when it is to be reviewed\. A transfer moves who bears the consequence, so the rating does not change\.$/.test(tr[0]), "it says what it holds, and that the rating is unchanged", tr[0]);
       ok(tr.slice(1, 10).join("|") === "Threat scenario|Zone or conduit|Risk today|How it is transferred|Transferred to|Agreed by|Role|Date|Review date", "its table's header", tr.slice(1, 10).join("|"));
       ok(/^T8  The legacy depropaniser/.test(tr[10]) && tr.indexOf(HOW) > 0 && tr.indexOf("Example Mutual Insurance") > 0 && tr.indexOf("R. Calder") > 0, "with the threat, how, to whom and who agreed it");
       ok(det.filter(function (x) { return x === "Risk transferred"; }).length >= 1, "the register prints the decision");

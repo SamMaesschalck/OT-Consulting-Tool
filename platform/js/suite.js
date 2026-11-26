@@ -296,7 +296,7 @@
       h("div", { class: "modal", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "close-h", "aria-describedby": "close-b" }, [
         h("div", { class: "modal-h" }, [h("h2", { id: "close-h", text: "Close the " + name + "?" })]),
         h("div", { class: "modal-b", id: "close-b" }, [
-          h("p", { text: "It has unsaved changes, which closing it loses. To keep them, cancel and save in the tool first." })
+          h("p", { text: "Closing it now loses its unsaved changes. To keep them, cancel and save in the tool first." })
         ]),
         h("div", { class: "modal-f" }, [close, cancel])
       ])
@@ -501,7 +501,7 @@
         if (!m || !moduleAvailable(m)) {
           var docs = modulesById.documents && moduleAvailable(modulesById.documents) ? modulesById.documents : null;
           if (g.tooBig) {
-            notes.push(g.name + " is too large to pass on from here (over " + Math.round(FILE_MAX / 1048576) + " MB). Open it with Load in " +
+            notes.push(g.name + " is too large to open from here (over " + Math.round(FILE_MAX / 1048576) + " MB). Open it with Load in " +
               (g.isDocument && docs ? "the " + docs.name : "its own tool") + ".");
             return;
           }
@@ -512,7 +512,7 @@
         }
         if (!byTool[m.id]) { byTool[m.id] = []; order.push(m.id); }
         if (m.id !== "report-review" && !toAuthor) {
-          if (projects[m.id]) { notes.push(g.name + " was left out: open one " + k.what + " at a time."); return; }
+          if (projects[m.id]) { notes.push(g.name + " was not opened. Open one " + k.what + " at a time."); return; }
           projects[m.id] = true;
         }
         byTool[m.id].push(g);
@@ -642,7 +642,7 @@
           h("p", { class: "licence-version muted small",
             text: D.product + " " + V.label + " (version " + V.number + "). The licence covers every tool in the suite." }),
           D.licence ? h("pre", { class: "licence-text", text: D.licence })
-                    : h("p", { text: LEGAL_NOTICE + " The full licence text is missing from this copy; ask your SolutionsPT engagement contact for it." })
+                    : h("p", { text: LEGAL_NOTICE + " This copy does not include the full licence text. Ask your SolutionsPT engagement contact for it." })
         ]),
         h("div", { class: "modal-f" }, [close])
       ])
@@ -998,16 +998,16 @@
     }
     var flow = [];
     if (risk) {
-      flow.push(step(risk, "Zones, conduits and their target security levels."));
-      if (assess) flow.push(link("down", "Risk context file", "Brought into a 62443-3-3 assessment with Import risk context."));
+      flow.push(step(risk, "Set the target security level for each zone and conduit."));
+      if (assess) flow.push(link("down", "Risk context file", "You bring it into a 62443-3-3 assessment with Import risk context."));
     }
-    if (assess) flow.push(step(assess, "The assessment, its Word report and Excel tracker."));
+    if (assess) flow.push(step(assess, "Run the assessment and export its Word report and Excel tracker."));
     if (review && (risk || assess)) {
-      flow.push(link("down", "Review pack", "Made with Send for review."));
+      flow.push(link("down", "Review pack", "You make it with Send for review."));
       flow.push(step(review, "A colleague comments and gives a verdict."));
-      flow.push(link("back", "Review file", "Sent back to the author, who uses Import review files."));
+      flow.push(link("back", "Review file", "The colleague sends it back, and you bring it in with Import review files."));
     }
-    if (docs) flow.push(step(docs, "Proposals, method statements and other documents in the SolutionsPT template. No files pass between it and the other tools.", true));
+    if (docs) flow.push(step(docs, "Write proposals, method statements and other documents in the SolutionsPT template. No files pass between it and the other tools.", true));
     // Dropping files is said by the empty Recent files; once the list has
     // entries, this is the only place that says it.
     var tips = [];
@@ -1019,7 +1019,7 @@
       h("div", { class: "card-b" }, [
         h("ol", { class: "flow" }, flow),
         h("ul", { class: "help-tips" }, tips.map(function (t) { return h("li", { text: t }); })),
-        BUNDLE ? null : h("p", { class: "help-dev muted small", text: "Developer copy: Save downloads a new file each time." })
+        BUNDLE ? null : h("p", { class: "help-dev muted small", text: "In this developer copy, Save downloads a new file each time." })
       ])
     ]);
   }

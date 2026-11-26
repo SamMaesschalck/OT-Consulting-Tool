@@ -148,11 +148,11 @@
     ok(snap() === before, "a preview changes nothing");
     ok(pv.length === 6, "one preview row per data row", String(pv.length));
     ok(pv[0].action === "add" && pv[0].zoneId === "Z1" && !pv[0].problems.length, "a row with a known zone is added there, with no problem");
-    ok(pv[1].action === "add" && pv[1].zoneId === "Z4" && /Zone “Z9” not found; goes to Z4\./.test(pv[1].problems.join(" ")), "an unknown zone is a problem, and the row goes to the zone chosen for rows without one", pv[1].problems.join(" "));
-    ok(pv[2].action === "add" && pv[2].zoneId === "Z4" && /Type “Widget” not known; set to Other\./.test(pv[2].problems.join(" ")) && pv[2].values.typeId === "other", "no zone: the chosen one; a type not known is set to Other and said", pv[2].problems.join(" "));
-    ok(pv[3].action === "skip" && /Repeats the tag of row 1; left out\./.test(pv[3].problems.join(" ")), "a tag repeated in the paste is a problem and the repeat is left out", pv[3].problems.join(" "));
-    ok(pv[4].zoneId === zone("Z3").id && pv[4].values.typeId === "network" && /Criticality “super” not known; left blank\./.test(pv[4].problems.join(" ")), "a zone named rather than numbered is found; a criticality not known is left blank and said", pv[4].problems.join(" "));
-    ok(pv[5].action === "skip" && /No name/.test(pv[5].problems.join(" ")), "a row with no name is left out");
+    ok(pv[1].action === "add" && pv[1].zoneId === "Z4" && /Zone “Z9” was not found, so the row goes to Z4\./.test(pv[1].problems.join(" ")), "an unknown zone is a problem, and the row goes to the zone chosen for rows without one", pv[1].problems.join(" "));
+    ok(pv[2].action === "add" && pv[2].zoneId === "Z4" && /Type “Widget” is not recognised, so it is set to Other\./.test(pv[2].problems.join(" ")) && pv[2].values.typeId === "other", "no zone: the chosen one; a type not known is set to Other and said", pv[2].problems.join(" "));
+    ok(pv[3].action === "skip" && /Row 1 has the same tag, so this row is left out\./.test(pv[3].problems.join(" ")), "a tag repeated in the paste is a problem and the repeat is left out", pv[3].problems.join(" "));
+    ok(pv[4].zoneId === zone("Z3").id && pv[4].values.typeId === "network" && /Criticality “super” is not recognised, so it is left blank\./.test(pv[4].problems.join(" ")), "a zone named rather than numbered is found; a criticality not known is left blank and said", pv[4].problems.join(" "));
+    ok(pv[5].action === "skip" && /The row has no name/.test(pv[5].problems.join(" ")), "a row with no name is left out");
     ok(pv[1].values.criticalityId === "medium" && pv[2].values.criticalityId === "low", "criticality words are read (med, Low)");
 
     // ==== 3. Apply, and the tag already on an asset ===========================================
@@ -166,10 +166,10 @@
       "an added asset carries what the paste gave, and no field it did not", JSON.stringify(np && np.a));
     var exParsed = RT.readAssetPaste("Tag\tName\tModel\tZone\nplc-new\tRenamed PLC\tS7-1518\tZ3\nFRESH-1\tFresh\t\t");
     var pvSkip = RT.previewAssetPaste(exParsed, exParsed.mapping, { zoneId: "Z1" });
-    ok(pvSkip[0].action === "skip" && pvSkip[0].target && pvSkip[0].target.a === np.a && /Tag already on AS\d+ in Z1; left out unless Update existing is ticked\./.test(pvSkip[0].problems.join(" ")),
+    ok(pvSkip[0].action === "skip" && pvSkip[0].target && pvSkip[0].target.a === np.a && /AS\d+ in Z1 already has this tag, so the row is left out unless Update existing is ticked\./.test(pvSkip[0].problems.join(" ")),
       "a tag an asset already has (any case) is left out unless Update existing is ticked", pvSkip[0].problems.join(" "));
     var pvUpd = RT.previewAssetPaste(exParsed, exParsed.mapping, { zoneId: "Z1", updateExisting: true });
-    ok(pvUpd[0].action === "update" && /updated there, not moved/.test(pvUpd[0].problems.join(" ")), "ticked, it updates that asset where it is and says it is not moved");
+    ok(pvUpd[0].action === "update" && /It is updated there and stays in /.test(pvUpd[0].problems.join(" ")), "ticked, it updates that asset where it is and says it is not moved");
     RT.applyAssetPaste(pvUpd);
     ok(np.a.name === "Renamed PLC" && np.a.model === "S7-1518" && np.a.vendor === "Siemens" && np.a.criticality === "high" && asset(np.a.id).zone.id === "Z1",
       "an update writes only the fields the paste gives, and leaves the zone", JSON.stringify(np.a));
@@ -191,17 +191,17 @@
     // An update row whose zone is not found: updated in place, not sent elsewhere.
     var z99 = RT.readAssetPaste("Tag\tZone\tModel\nPLC-NEW\tZ99\tS7-1516");
     var pvZ = RT.previewAssetPaste(z99, z99.mapping, { zoneId: "Z4", updateExisting: true });
-    ok(pvZ[0].action === "update" && pvZ[0].problems.join(" ") === "Zone “Z99” not found; updated in place.", "an update row naming a zone not found says it is updated in place", pvZ[0].problems.join(" "));
+    ok(pvZ[0].action === "update" && pvZ[0].problems.join(" ") === "Zone “Z99” was not found, so the asset is updated where it is.", "an update row naming a zone not found says it is updated in place", pvZ[0].problems.join(" "));
     // A row left out does not take its tag from a later row.
     var lo = RT.readAssetPaste("Name\tTag\tZone\nA\tT-LO\tZ99\nB\tT-LO\tZ1");
     var pvL = RT.previewAssetPaste(lo, lo.mapping, { zoneId: "" });
-    ok(pvL[0].action === "skip" && /No zone to add it to\./.test(pvL[0].problems.join(" ")) && pvL[1].action === "add" && !pvL[1].problems.length,
+    ok(pvL[0].action === "skip" && /There is no zone to add it to\./.test(pvL[0].problems.join(" ")) && pvL[1].action === "add" && !pvL[1].problems.length,
       "a row left out (no zone) does not block a later row with the same tag", JSON.stringify(pvL.map(function (r) { return [r.action, r.problems.join(" ")]; })));
     // Two columns mapped to the same field: the first is read, and the row says so.
     var dupP = RT.readAssetPaste("Name\tTag\tHost\nPLC-D\tTAG-1\tHOST-1");
     var dupMap = ["name", "tag", "tag"];
     var pvD = RT.previewAssetPaste(dupP, dupMap, { zoneId: "Z1" });
-    ok(pvD[0].values.tag === "TAG-1" && pvD[0].problems.indexOf("Two columns are read as tag or hostname; the first is used.") >= 0, "two columns read as one field: the first is used, and the row says so", JSON.stringify(pvD[0]));
+    ok(pvD[0].values.tag === "TAG-1" && pvD[0].problems.indexOf("Two columns map to tag or hostname. Only the first is read.") >= 0, "two columns read as one field: the first is used, and the row says so", JSON.stringify(pvD[0]));
     ok(JSON.stringify(AS.duplicates(dupMap)) === '{"2":1}', "the mapping knows which column repeats which");
     // An opening quote with no closing one is read as a plain character, not as the rest of the paste.
     var uq = RT.parseAssetTable('Name\tNotes\nPLC-1\t"6 inch display\nPLC-2\tok\n');
@@ -231,8 +231,8 @@
     ok(d.activeElement === q('[data-map-col="1"]') && q("table.asset-register") === tbl0, "a mapping chosen redraws the panel only, the keyboard back on that column");
     // Phase 6 review: a field chosen for two columns is marked, and the preview says the first is read.
     change(q('[data-map-col="2"]'), "tag");
-    ok(q('[data-map-col="2"]').hasAttribute("data-map-dup") && !q('[data-map-col="1"]').hasAttribute("data-map-dup") && /Also chosen for Column 2 \(gw-01\); that column is read\./.test(q('[data-map-col="2"]').parentNode.textContent) &&
-       /Two columns are read as tag or hostname; the first is used\./.test(q('tr[data-preview-row="1"]').textContent), "two columns mapped to the same field: the second is marked, and the preview says so", q('[data-map-col="2"]').parentNode.textContent);
+    ok(q('[data-map-col="2"]').hasAttribute("data-map-dup") && !q('[data-map-col="1"]').hasAttribute("data-map-dup") && /Also chosen for Column 2 \(gw-01\), which is the one read\./.test(q('[data-map-col="2"]').parentNode.textContent) &&
+       /Two columns map to tag or hostname\. Only the first is read\./.test(q('tr[data-preview-row="1"]').textContent), "two columns mapped to the same field: the second is marked, and the preview says so", q('[data-map-col="2"]').parentNode.textContent);
     change(q('[data-map-col="2"]'), "location");
     ok(!q("[data-map-dup]"), "mapped apart again, the mark goes");
     var sum0 = q("[data-paste-summary]");

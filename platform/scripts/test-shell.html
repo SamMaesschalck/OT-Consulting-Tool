@@ -117,7 +117,7 @@
     var dc = d.querySelector(".tool-card[data-module='documents']");
     ok(dc && dc.querySelector("h2").textContent === "OT Cyber Document Tool" && /SolutionsPT template/.test(dc.querySelector(".tool-summary").textContent) &&
        /Word file/.test(dc.querySelector(".tool-summary").textContent), "its card names it and says what it does", dc && dc.textContent);
-    ok(dc && /not an assessment or risk report/.test(dc.querySelector(".help-tool p").textContent) &&
+    ok(dc && /any other document that should look like a SolutionsPT assessment or risk report/.test(dc.querySelector(".help-tool p").textContent) &&
        dc.querySelector(".tool-tour") && /demo proposal/.test(dc.querySelector(".tool-tour").title), "with when to use it and its tour");
     var cols = S.getComputedStyle(d.querySelector(".tool-grid")).gridTemplateColumns.split(" ");
     var tops = Array.prototype.map.call(cards, function (c) { return Math.round(c.getBoundingClientRect().top); });
@@ -131,7 +131,7 @@
     ok(d.querySelectorAll(".help-card .flow-step").length === 4 && last.getAttribute("data-module") === "documents" && last.classList.contains("flow-apart") &&
        !last.querySelector(".flow-arrow") && steps[steps.length - 2].classList.contains("flow-link") && /Review file/.test(steps[steps.length - 2].textContent),
       "How the tools fit together ends with the Document Tool, apart from the flow and with no arrow of its own");
-    ok(/Proposals, method statements and other documents in the SolutionsPT template/.test(last.textContent) && /No files pass between it and the other tools/.test(last.textContent),
+    ok(/Write proposals, method statements and other documents in the SolutionsPT template/.test(last.textContent) && /No files pass between it and the other tools/.test(last.textContent),
       "and says it works on its own", last.textContent);
     ok(!/[–—]/.test(d.getElementById("home").textContent), "no en or em dashes anywhere on the home page");
     // ---- the rail ------------------------------------------------------------
@@ -255,9 +255,9 @@
             };
             var two = dropEvent(S, "drop", [{ name: "first-doc.json", text: docFile("First") }, { name: "second-doc.json", text: docFile("Second") }]);
             S.document.body.dispatchEvent(two);
-            return until(function () { return /second-doc\.json was left out/.test(toastText()); }, 5000, "the one at a time note");
+            return until(function () { return /second-doc\.json was not opened/.test(toastText()); }, 5000, "the one at a time note");
           }).then(function () {
-            ok(/second-doc\.json was left out: open one document file at a time\.$/.test(toastText()), "of two document files dropped together the second is left out, in the document's own words", toastText());
+            ok(/second-doc\.json was not opened\. Open one document file at a time\.$/.test(toastText()), "of two document files dropped together the second is left out, in the document's own words", toastText());
             ok(Sh.current() === "documents", "and the first opens the Document Tool");
             return tool("documents");
           }).then(function (dt) {

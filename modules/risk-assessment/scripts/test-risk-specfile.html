@@ -59,16 +59,16 @@
       ok(has(texts("spec", pj), /^The SUC has no name\.$/) && has(texts("detailed", pj), /^The SUC has no name\.$/), "the SUC with no name is open in the specification and the detailed report");
       pj = copy();
       owner(pj, "Z1").threats[0].likelihood = "";
-      ok(has(texts("detailed", pj), /T1: likelihood or impact not set/) && !has(texts("spec", pj), /T1:/), "a threat not rated is the detailed report's only: the specification lists no threats");
+      ok(has(texts("detailed", pj), /T1: the likelihood or impact is not set/) && !has(texts("spec", pj), /T1:/), "a threat not rated is the detailed report's only: the specification lists no threats");
       pj = copy();
       owner(pj, "Z3").justification = "";
-      ok(has(texts("spec", pj), /^Z3 .*: SL-T set but no justification\.$/), "an SL-T with no justification is open in the specification", texts("spec", pj).join(" | "));
+      ok(has(texts("spec", pj), /^Z3 .* has no SL-T justification\.$/), "an SL-T with no justification is open in the specification", texts("spec", pj).join(" | "));
       pj = copy();
       pj.srs.regulatory = [];
       ok(has(texts("spec", pj), /^Requirements specification: /), "one of its blocks left empty is open in it", texts("spec", pj).join(" | "));
       pj = copy();
       pj.srs.highLevelAssets[0].consequence = "";
-      ok(has(texts("highLevel", pj), /impact not rated/) && !has(texts("spec", pj), /impact not rated/), "the ranking is not in it");
+      ok(has(texts("highLevel", pj), /has no impact rating/) && !has(texts("spec", pj), /has no impact rating/), "the ranking is not in it");
       pj = copy();
       pj.srs.tolerableConfirmed = "";
       ok(has(texts("spec", pj), /Tolerable risk is not confirmed/), "the tolerable risk, not confirmed, is");
@@ -85,7 +85,7 @@
       ok(JSON.stringify(RT.APPROVAL_DOC_PARTS ? RT.APPROVAL_DOC_PARTS.spec : w.RiskApp.Engine.APPROVAL_DOC_PARTS.spec) === '["tolerable","slt","partition","mandatory"]', "an approval of the specification covers the tolerable risk and the SL-T (step 5: and the zones and conduits and the mandatory countermeasures)");
       pj = copy();
       pj.approvals.forEach(function (a) { a.approved = false; a.fingerprint = ""; }); pj.approval.approved = false;
-      ok(has(texts("spec", pj), /approval not yet recorded/), "and an approval not yet recorded is open in it");
+      ok(has(texts("spec", pj), /approval is not yet recorded/), "and an approval not yet recorded is open in it");
       // Every item it lists is one of the list's own, never a list of its own.
       var all = RT.completeness(pj);
       ok(RT.readiness("spec", pj).every(function (i) { return all.some(function (x) { return x.text === i.text && x.stage === i.stage; }); }), "every item is on the one completeness list");
@@ -94,7 +94,7 @@
       owner(pj, "Z1").justification = "Set to SL3 for T1 and T2, with M1 in place; T99 and SR 1.13 are not ids of this project.";
       owner(pj, "C2").justification = "Held at SL3 for T9.";
       var jt = texts("spec", pj);
-      ok(has(jt, /^Z1 Unit 300 BPCS: the justification names T1, T2, which the specification does not list\.$/) &&has(jt, /^C2\b.*: the justification names T9, which the specification does not list\.$/),
+      ok(has(jt, /^Z1 Unit 300 BPCS: the justification names T1 and T2, which the specification does not list\.$/) &&has(jt, /^C2\b.*: the justification names T9, which the specification does not list\.$/),
         "a justification naming a threat or countermeasure by id is open in the specification, each id once in the order named (an id the project lacks is not, nor M1, a mandatory countermeasure the specification now lists)", jt.join(" | "));
       var jItems = RT.completeness(pj).filter(function (i) { return /the justification names/.test(i.text); });
       ok(jItems.length === 2 && jItems.every(function (i) { return i.spec === true && i.stage === "slt" && !i.doc; }) && jItems[0].target.kind === "zone" && jItems[1].target.kind === "conduit" && jItems[1].target.id === "C2",
@@ -153,7 +153,7 @@
       // ---- high-level only: not part of it ---------------------------------------------------
       var before = P().assessmentType;
       P().assessmentType = "high-level"; RT.touched(); RT.navigate("review");
-      ok(/Not part of a high-level-only assessment/.test(main.querySelector('[data-readiness="spec"]').textContent), "on a high-level-only assessment its card is set aside, like the detailed report's");
+      ok(/A high-level-only assessment does not include this document/.test(main.querySelector('[data-readiness="spec"]').textContent), "on a high-level-only assessment its card is set aside, like the detailed report's");
       if (before) P().assessmentType = before; else delete P().assessmentType;
       RT.touched();
 

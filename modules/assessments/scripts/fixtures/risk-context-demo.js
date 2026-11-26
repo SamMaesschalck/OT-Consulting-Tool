@@ -21,16 +21,16 @@ window.RiskContextFixtures["demo"] =
   "generatedOn": "2026-11-14",
   "suc": {
     "name": "Acme Petrochemicals - Unit 300 Alkylation Control System",
-    "description": "The basic process control system, safety instrumented system and supporting OT infrastructure for the Unit 300 alkylation unit at the Teesport refinery: redundant SCADA/DCS servers and operator HMIs in the central control room, unit PLCs and remote I/O in the field auxiliary rooms, the SIS performing the unit's safety instrumented functions, engineering workstations, and the plant DMZ carrying the historian and vendor access paths.",
-    "scopeStatement": "In scope: all Unit 300 control, safety and engineering systems from the field controllers up to (and including) the plant DMZ, plus the conduits that cross the boundary (historian replication, vendor remote access, corporate reporting). Out of scope: the corporate IT network beyond the DMZ firewall, other process units, and the terminal loading systems (separately assessed)."
+    "description": "The basic process control system, safety instrumented system and supporting OT infrastructure for the Unit 300 alkylation unit at the Teesport refinery. The system comprises redundant SCADA/DCS servers and operator HMIs in the central control room, unit PLCs and remote I/O in the field auxiliary rooms, the SIS that performs the unit's safety instrumented functions, the engineering workstations, and the plant DMZ, which carries the historian and the vendor access paths.",
+    "scopeStatement": "The scope covers all Unit 300 control, safety and engineering systems from the field controllers up to and including the plant DMZ, and the conduits that cross the boundary for historian replication, vendor remote access and corporate reporting. The corporate IT network beyond the DMZ firewall, the other process units and the terminal loading systems are out of scope. The loading systems are assessed separately."
   },
   "securityRequirements": {
     "tolerableRisk": "medium",
     "knownThreats": [
-      "Capable criminal/ransomware adversary reaching OT via corporate IT or vendor access",
-      "State-capable adversary interest in refining sector (assumed class 3 for this SUC)",
-      "Insider misuse of engineering access (contractor churn on turnarounds)",
-      "Commodity malware ingress via removable media and engineering laptops"
+      "Capable criminal and ransomware groups reaching OT through corporate IT or vendor access",
+      "State-capable adversaries with an interest in the refining sector (adversary class 3 assumed for this SUC)",
+      "Insider misuse of engineering access, with a high turnover of contractors at turnarounds",
+      "Commodity malware brought in on removable media and engineering laptops"
     ],
     "mandatorySecurityFunctions": [
       "SIS must remain capable of safe shutdown independent of BPCS state",
@@ -50,7 +50,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "medium",
       "risk": "high",
-      "note": "Primary control layer; loss forces manual shutdown, manipulation is the acid-release path. Assigned to Z1, assessed in detail."
+      "note": "The primary control layer. Its loss forces a manual shutdown, and its manipulation is the path to an acid release. Assigned to Z1 and assessed in detail."
     },
     {
       "id": "A2",
@@ -59,7 +59,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "severe",
       "likelihood": "low",
       "risk": "high",
-      "note": "Last line of defence; any compromise is intolerable regardless of likelihood. Assigned to Z2, assessed in detail."
+      "note": "The last layer of protection, so any compromise is intolerable whatever its likelihood. Assigned to Z2 and assessed in detail."
     },
     {
       "id": "A3",
@@ -68,7 +68,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "medium",
       "risk": "high",
-      "note": "Every external path transits here; a foothold pivots into the BPCS. Assigned to Z3, assessed in detail."
+      "note": "Every external path passes through the DMZ, and a foothold here gives a route into the BPCS. Assigned to Z3 and assessed in detail."
     },
     {
       "id": "A4",
@@ -77,7 +77,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "medium",
       "risk": "high",
-      "note": "Holds the keys to every controller; removable media and legacy tooling in routine use. Assigned to Z4, assessed in detail."
+      "note": "These workstations can change every controller, and removable media and legacy tools are in routine use. Assigned to Z4 and assessed in detail."
     },
     {
       "id": "A5",
@@ -86,7 +86,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "low",
       "risk": "medium",
-      "note": "One-way feed, no control path; ranked medium. The feed ends at the historian, which Z3 covers."
+      "note": "A one-way feed with no control path, ranked medium. The feed ends at the historian, which Z3 covers."
     },
     {
       "id": "A6",
@@ -95,7 +95,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "negligible",
       "likelihood": "high",
       "risk": "low",
-      "note": "Commodity IP kit, frequently probed, but no process consequence; ranked low."
+      "note": "Commodity IP equipment that is often probed but has no process consequence. It is ranked low."
     }
   ],
   "basisOfAssessment": {
@@ -186,14 +186,14 @@ window.RiskContextFixtures["demo"] =
         "description": "Vendor remote access session demonstration",
         "location": "Control building",
         "date": "2026-07-02",
-        "notes": "Session activation, attribution and recording observed end-to-end"
+        "notes": "Session activation, attribution and recording observed from start to finish"
       }
     ]
   },
   "assumptions": [
     "Physical access to the control room and field auxiliary rooms is badge-controlled and logged",
-    "The corporate network is assumed compromised for the purposes of this assessment (untrusted)",
-    "Unit 300 operates continuously; a control-system outage forces a manual unit shutdown within 30 minutes",
+    "The corporate network is treated as untrusted and assumed compromised for this assessment",
+    "Unit 300 runs continuously, and a control system outage forces a manual shutdown of the unit within 30 minutes",
     "Vendor support for the DCS is contractually required and uses the remote access path assessed here"
   ],
   "approval": {
@@ -245,7 +245,7 @@ window.RiskContextFixtures["demo"] =
       },
       "slTarget": 3,
       "worstUnmitigatedRisk": "high",
-      "justification": "The worst unmitigated risks in this zone are High (an attacker riding the vendor remote access path, and malware brought in over an engineering connection) against a Medium tolerable risk, and the standing remote access materially raises likelihood on IAC/UC/RDF, so IAC, SI and RDF are set to SL3. UC is held at SL2 because use control inside the control room is procedurally constrained and no High risk hits it directly. DC reflects the low confidentiality consequence of process data (SL1). TRE and RA at SL2 support forensics and the 30-minute manual-shutdown resilience requirement.",
+      "justification": "The worst unmitigated risks in this zone are High against a Medium tolerable risk (an attacker riding the vendor remote access path, and malware brought in over an engineering connection). The permanent remote access path also raises the likelihood of attacks on IAC, UC and RDF. IAC, SI and RDF are therefore set to SL3. UC stays at SL2 because procedures limit use control inside the control room and no High risk bears on it directly. DC is set to SL1, as process data has a low confidentiality consequence. TRE and RA at SL2 support forensic investigation and the resilience the unit needs, as an outage forces a manual shutdown within 30 minutes.",
       "assets": [
         {
           "id": "AS1",
@@ -423,7 +423,7 @@ window.RiskContextFixtures["demo"] =
       },
       "slTarget": 3,
       "worstUnmitigatedRisk": "high",
-      "justification": "The SIS floor applies: a zone containing safety instrumented functions takes SL3 across every foundational requirement regardless of the per-threat arithmetic, because the SIS is the last line of defence and severe-consequence/low-likelihood events dominate. An unauthorised change to the safety logic is treated through these targets, with the hardwired keyswitch for program mode in place and a dedicated SIS engineering workstation planned. This vector is deliberately not averaged down: any relaxation requires the asset owner to re-open the sign-off.",
+      "justification": "A zone containing safety instrumented functions takes the SIS floor of SL3 on every foundational requirement, whatever the individual threat ratings would suggest. The SIS is the last layer of protection, and its risk is dominated by events of severe consequence and low likelihood. An unauthorised change to the safety logic is treated through these targets, with the hardwired keyswitch for program mode in place and a dedicated SIS engineering workstation planned. The vector is not averaged down, and any relaxation requires the asset owner to reopen the sign-off.",
       "assets": [
         {
           "id": "AS4",
@@ -465,7 +465,7 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": null,
           "exceedsTolerable": true,
           "disposition": "sl-t",
-          "acceptance": "No countermeasure brings the risk within tolerable risk, as the consequence stays severe. Until the dedicated SIS engineering workstation is in place, process safety authorisation, the keyed bypass record and the program-mode keyswitch bound the remaining risk, which is accepted at High until the review.",
+          "acceptance": "The consequence stays severe, so no countermeasure brings the risk within tolerable risk. Until the dedicated SIS engineering workstation is in place, process safety authorisation, the keyed bypass record and the program-mode keyswitch limit the remaining risk. It is accepted at High until the review.",
           "consequenceId": "K1",
           "via": [
             "Z4",
@@ -482,7 +482,7 @@ window.RiskContextFixtures["demo"] =
       "countermeasures": [
         {
           "id": "M4",
-          "description": "Hardwired keyswitch required for SIS program mode; position alarmed to the control room",
+          "description": "Hardwired keyswitch required for SIS program mode, with its position alarmed in the control room",
           "addressesFR": [
             "IAC",
             "UC",
@@ -536,7 +536,7 @@ window.RiskContextFixtures["demo"] =
       },
       "slTarget": 2,
       "worstUnmitigatedRisk": "high",
-      "justification": "The zone's worst unmitigated risk is High (a compromised corporate client using the historian as a pivot toward the BPCS), with internet adjacency and exposure through many conduits bearing on RDF and SI, but the DMZ exists precisely to absorb that exposure, and the planned restriction of historian web access to the reporting subnet addresses the driving vulnerability. SL2 across the access, integrity and data-flow FRs reflects the brokerage role; RA stays at SL1 because loss of the DMZ does not remove operator view or control (a security function that must be kept: the unit runs through a DMZ outage). Exfiltration of process data from the historian sits within tolerable risk and needs no treatment decision. IAC stays at SL2 although the vendor remote access scenarios pass through this zone on their way to the BPCS, because C2 and Z1, which they reach, already hold SL3 on IAC.",
+      "justification": "The zone's worst unmitigated risk is High (a compromised corporate client using the historian as a pivot toward the BPCS), and internet adjacency and exposure through many conduits bear on RDF and SI. The DMZ is there to absorb that exposure, and the planned restriction of historian web access to the reporting subnet addresses the vulnerability behind the risk. SL2 on the access, integrity and data-flow FRs reflects the zone's brokerage role. RA stays at SL1 because losing the DMZ does not remove operator view or control, and the unit runs through a DMZ outage. Operator view and manual command are among the security functions that must be kept. Exfiltration of process data from the historian is within tolerable risk and needs no treatment decision. IAC stays at SL2 although the vendor remote access scenarios pass through this zone on their way to the BPCS, because C2 and Z1, which they reach, already hold SL3 on IAC.",
       "assets": [
         {
           "id": "AS6",
@@ -567,7 +567,7 @@ window.RiskContextFixtures["demo"] =
         "Vendor VPN concentrator availability"
       ],
       "securityPolicies": [
-        "All OT-corporate exchange transits the DMZ; no direct paths",
+        "All exchange between OT and corporate passes through the DMZ, with no direct paths",
         "DMZ hosts patched monthly (IT window)"
       ],
       "threats": [
@@ -610,7 +610,7 @@ window.RiskContextFixtures["demo"] =
       "vulnerabilities": [
         {
           "id": "V4",
-          "description": "Historian web interface reachable from the whole corporate network, not just the reporting subnet"
+          "description": "Historian web interface reachable from the whole corporate network, where only the reporting subnet needs it"
         }
       ],
       "countermeasures": [
@@ -658,7 +658,7 @@ window.RiskContextFixtures["demo"] =
       },
       "slTarget": 3,
       "worstUnmitigatedRisk": "high",
-      "justification": "SI is set to SL3: the engineering zone is the integrity chokepoint for every controller, and malware carried on removable media or a vendor laptop is a High risk, held in day-to-day terms by the existing media kiosk and workstation allow-listing. Misuse of the legacy configuration tool's shared account exceeds tolerable risk, and the asset owner accepts it until its review at the end of June 2027 rather than raising the SL-T: a compensating procedure covers the risk until the shared account is retired. IAC stays at SL2 although the engineering scenario against the SIS passes through this zone and suggests SL3, because the SIS zone already holds SL3 on IAC. The other FRs sit at SL1 or SL2, consistent with no external paths into this zone.",
+      "justification": "SI is set to SL3 because every controller change passes through the engineering zone, and malware carried on removable media or a vendor laptop is a High risk there. The existing media kiosk and workstation allow-listing reduce that risk in day-to-day operation. Misuse of the legacy configuration tool's shared account exceeds tolerable risk. The asset owner accepts it until its review at the end of June 2027, and the SL-T is not raised for it, because a compensating procedure covers the risk until the shared account is retired. IAC stays at SL2 although the engineering scenario against the SIS passes through this zone and suggests SL3, because the SIS zone already holds SL3 on IAC. The other FRs sit at SL1 or SL2, consistent with no external paths into this zone.",
       "assets": [
         {
           "id": "AS9",
@@ -726,7 +726,7 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": null,
           "exceedsTolerable": true,
           "disposition": "accepted",
-          "acceptance": "The tool is retired at the Q2-2027 turnaround with the PLC upgrade. Until then the workstation is isolated on the engineering VLAN, and the account password is held by the shift supervisor and issued per use with a written record. Risk accepted at High for this bounded period."
+          "acceptance": "The tool is retired at the Q2-2027 turnaround with the PLC upgrade. Until then the workstation is isolated on the engineering VLAN, and the account password is held by the shift supervisor and issued per use with a written record. The risk is accepted at High for this limited period."
         }
       ],
       "vulnerabilities": [
@@ -736,7 +736,7 @@ window.RiskContextFixtures["demo"] =
         },
         {
           "id": "V6",
-          "description": "Vendor laptops are built and patched by the vendor, not by Acme, and arrive with the vendor's own tooling"
+          "description": "Vendor laptops are built and patched by the vendor, outside Acme's control, and arrive with the vendor's own tools"
         }
       ],
       "countermeasures": [
@@ -798,7 +798,7 @@ window.RiskContextFixtures["demo"] =
         "RA": 2
       },
       "slTarget": 3,
-      "justification": "Grouped with Z3: the conduit is the data-flow path a pivot from the DMZ historian toward the BPCS would take. IAC, SI and RDF are set to SL3 to match the BPCS targets it connects to, so the replication path is not the weak link, and the broker enforces one-way replication. DC at SL2 follows the historian's process data, RA at SL2 the 30-minute manual-shutdown requirement, and UC and TRE at SL2 match the zones either side.",
+      "justification": "The conduit is assessed with Z3 because a pivot from the DMZ historian toward the BPCS would follow this data flow. IAC, SI and RDF are set to SL3 to match the BPCS targets it connects to, so that the replication path is not the weak link. The broker also enforces one-way replication. DC at SL2 follows the historian's process data, and RA at SL2 follows the 30-minute window before a manual shutdown. UC and TRE at SL2 match the zones on either side.",
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
@@ -839,7 +839,7 @@ window.RiskContextFixtures["demo"] =
         "RA": 2
       },
       "slTarget": 3,
-      "justification": "This conduit is the highest-exposure path into the BPCS: a hijacked vendor credential or session starts High, and the existing per-session controls (MFA, per-ticket activation, recording and auto-disconnect) bring it within tolerable risk today, but the SL-T is held at SL3 on IAC/RDF to match the Z1 targets it lands in, so the conduit is not the weak link. SI at SL3 matches the BPCS as well, UC at SL2 matches both zones, DC at SL2 follows the DMZ and RA at SL2 the BPCS. TRE at SL2 preserves the session-recording evidence chain.",
+      "justification": "This conduit is the most exposed path into the BPCS. A hijacked vendor credential or session starts at High, and the existing per-session controls (MFA, per-ticket activation, recording and auto-disconnect) bring it within tolerable risk today. The SL-T is still held at SL3 on IAC and RDF to match the Z1 targets it reaches, so that the conduit is not the weak link. SI at SL3 also matches the BPCS, UC at SL2 matches both zones, DC at SL2 follows the DMZ and RA at SL2 follows the BPCS. TRE at SL2 keeps the session recordings usable as evidence.",
       "threats": [
         {
           "id": "T9",
@@ -867,7 +867,7 @@ window.RiskContextFixtures["demo"] =
       "vulnerabilities": [
         {
           "id": "V7",
-          "description": "Vendor support accounts are issued by the vendor; Acme learns of a leaver only when the vendor reports one"
+          "description": "Vendor support accounts are issued by the vendor, and Acme learns of a leaver only when the vendor reports one"
         }
       ],
       "countermeasures": [
@@ -918,13 +918,13 @@ window.RiskContextFixtures["demo"] =
         "RA": 1
       },
       "slTarget": 2,
-      "justification": "Boundary conduit to the untrusted corporate network, with no control traffic. Its targets match the DMZ it serves: SL2 on every foundational requirement but RA, for the read-only brokerage and the confidentiality of throughput data, and SL1 on RA, as loss of corporate reporting does not affect operator view or control. The SL3 the house method suggests on IAC, SI and RDF comes from the DMZ's own suggestion, which the DMZ holds at SL2 for the reasons in its justification.",
+      "justification": "C3 is the boundary conduit to the untrusted corporate network and carries no control traffic. Its targets match the DMZ it serves. It is SL2 on every foundational requirement except RA, for the read-only brokerage and the confidentiality of throughput data, and SL1 on RA, because losing corporate reporting does not affect operator view or control. The house method suggests SL3 on IAC, SI and RDF because the DMZ's own suggestion is SL3, and the DMZ holds those at SL2 for the reasons in its justification.",
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
       "assessment": {
         "depth": "proportionate",
-        "considered": "Read-only reporting to the out-of-scope corporate network: a compromised corporate client using the reporting service as a foothold, and exfiltration of throughput data. Both are assessed at the Z3 boundary as T5 and T6."
+        "considered": "A compromised client on the out-of-scope corporate network using the read-only reporting service as a foothold, and exfiltration of throughput data. Both are assessed at the Z3 boundary as T5 and T6."
       },
       "initialRisk": {
         "risk": "high",
@@ -959,7 +959,7 @@ window.RiskContextFixtures["demo"] =
         "RA": 2
       },
       "slTarget": 3,
-      "justification": "The engineering VLAN carries configuration downloads into the BPCS, so it takes the BPCS targets: SL3 on IAC, SI and RDF, as malware brought in over an engineering connection is a High risk there and the path into the controllers must not be the weak link. UC is held at SL2, as on both zones it joins: misuse of the legacy configuration tool's shared account is accepted until it is retired. DC at SL1 reflects the low confidentiality of configuration data, and TRE and RA at SL2 follow the BPCS.",
+      "justification": "The engineering VLAN carries configuration downloads into the BPCS, so it takes the BPCS targets. IAC, SI and RDF are SL3, because malware brought in over an engineering connection is a High risk there and the path into the controllers must not be the weak link. UC stays at SL2, as on both zones it joins, and misuse of the shared account on the legacy configuration tool is accepted until that tool is retired. DC at SL1 reflects the low confidentiality of configuration data, and TRE and RA at SL2 follow the BPCS.",
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
@@ -999,7 +999,7 @@ window.RiskContextFixtures["demo"] =
         "RA": 3
       },
       "slTarget": 3,
-      "justification": "The keyed engineering connection reaches the SIS, so it takes the SIS zone's SL3 on every foundational requirement and is not the weak link. It is connected only for an authorised change, with the program-mode keyswitch turned and a keyed bypass record.",
+      "justification": "The keyed engineering connection reaches the SIS, so it takes the SIS zone's SL3 on every foundational requirement and does not become the weak link. It is connected only for an authorised change, with the program-mode keyswitch turned and a keyed bypass record.",
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],

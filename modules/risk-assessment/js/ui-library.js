@@ -182,7 +182,7 @@
         filterSel("tag", "Tag", [{ v: "", t: "Any tag" }].concat(tags.map(function (t) { return { v: t, t: tagName(t) }; }))),
         filterSel("fr", "Foundational requirement", [{ v: "", t: "Any requirement" }].concat(FRS.map(function (f) { return { v: f.id, t: f.id + " " + f.name }; }))),
         count]),
-      h("p", { class: "hint", style: "margin:0 0 6px", text: "Added unrated, for you to edit and rate." }),
+      h("p", { class: "hint", style: "margin:0 0 6px", text: "Scenarios are added unrated, for you to edit and rate." }),
       h("div", { class: "lib-list" }, items.map(function (it) { return it.el; })),
       h("div", { class: "btn-row", style: "margin-top:8px" }, [addBtn,
         h("button", { type: "button", class: "btn sm", "data-action": "lib-cancel", text: "Cancel", onClick: function () { close(); cb.onClose(); } })])

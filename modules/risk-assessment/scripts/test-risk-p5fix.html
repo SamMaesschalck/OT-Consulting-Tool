@@ -243,21 +243,21 @@
     // ---- 8. A matrix cell not set is a completeness item ----
     var pj8 = fresh(); pj8.criteria = M.presetCriteria("3x3"); delete pj8.criteria.matrix.I2.L2;
     pj8 = MG.normaliseProject(pj8);
-    ok(texts(pj8).indexOf("The risk matrix has cells not set.") >= 0 && RT.completeness(pj8).filter(function (i) { return i.text === "The risk matrix has cells not set."; })[0].target.kind === "criteria", "a matrix with a cell not set says so in the completeness list, with a Go to the criteria");
-    ok(texts(fresh()).indexOf("The risk matrix has cells not set.") < 0, "a file on the house criteria does not");
+    ok(texts(pj8).indexOf("The risk matrix has cells with no band.") >= 0 && RT.completeness(pj8).filter(function (i) { return i.text === "The risk matrix has cells with no band."; })[0].target.kind === "criteria", "a matrix with a cell not set says so in the completeness list, with a Go to the criteria");
+    ok(texts(fresh()).indexOf("The risk matrix has cells with no band.") < 0, "a file on the house criteria does not");
 
     // ---- Wording: the generic preset, the approval note, the method, the Criteria sheet ----
     var pjG = fresh(); pjG.criteria = M.presetCriteria("5x5"); pjG.zones[0].threats.forEach(function (x) { x.likelihood = "L3"; x.impact = "I2"; });
     pjG.srs.highLevelAssets[0].consequence = "I2"; pjG.srs.highLevelAssets[0].likelihood = "L3";
     var pjGc = clone(pjG); pjGc.srs.clientMatrix = true;
     ok(M.genericPresetOf(pjG) === "5x5" && RT.criteriaWords(pjG).generic === "5x5", "criteria still a generic preset are known as such");
-    ok(texts(pjGc).indexOf("The client's criteria are marked in use, but step 1 holds a generic preset.") >= 0 && texts(pjG).indexOf("The client's criteria are marked in use, but step 1 holds a generic preset.") < 0, "marked as the client's while still a generic preset: a completeness item");
+    ok(texts(pjGc).indexOf("The client's risk criteria are marked as in use, but the criteria recorded are a generic preset.") >= 0 && texts(pjG).indexOf("The client's risk criteria are marked as in use, but the criteria recorded are a generic preset.") < 0, "marked as the client's while still a generic preset: a completeness item");
     var pjGe = clone(pjGc); pjGe.criteria.matrix.I1.L1 = "medium";
-    ok(M.genericPresetOf(pjGe) === "" && texts(pjGe).indexOf("The client's criteria are marked in use, but step 1 holds a generic preset.") < 0, "changed, it is the client's own and asks nothing");
+    ok(M.genericPresetOf(pjGe) === "" && texts(pjGe).indexOf("The client's risk criteria are marked as in use, but the criteria recorded are a generic preset.") < 0, "changed, it is the client's own and asks nothing");
     ok(RT.approvalPartWords(["tolerable"]) === "the tolerable risk or the risk criteria" && RT.approvalPartWords(["tolerable", "slt"]) === "the risk criteria and the SL-T", "the approval note names the tolerable risk or the risk criteria, and just the risk criteria in a list");
     load(pj6);
     var wb = RX.buildWorkbook(P()), cr = wb.getWorksheet("Criteria");
-    ok(!!findRow(cr, "Suggested SL-T (SolutionsPT house mapping)") && !!findRow(cr, "Security levels (SolutionsPT house summary)"), "Excel: the Criteria sheet names the SL mapping and the security levels as the house's");
+    ok(!!findRow(cr, "Suggested SL-T (house method)") && !!findRow(cr, "Security levels (SolutionsPT summary)"), "Excel: the Criteria sheet names the SL mapping and the security levels as the house's");
     ok(!!findRow(cr, "A threat or system rated per category is compared with the tolerable risk of each category it is rated in.") && findRow(cr, "Environmental release / damage").getCell(2).value === "Medium (general tolerable risk)", "and says how the categories are compared, the general tolerable risk named so");
 
     // ---- Usability: the toast ----
@@ -305,7 +305,7 @@
     change(crit().querySelector('select[data-action="criteria-preset"]'), "4x4");
     crit().querySelector('[data-action="criteria-apply"]').click();
     var mp = crit().querySelector("[data-criteria-map]");
-    ok(!!mp && /^Choose where each level's ratings go; any left stay open\.$/.test(mp.querySelector(".criteria-map-h").textContent), "the mapping panel's help is one sentence");
+    ok(!!mp && /^Choose where each level's ratings go, or leave them as they are to rate again later\.$/.test(mp.querySelector(".criteria-map-h").textContent), "the mapping panel's help is one sentence");
     var bEsc = JSON.stringify(P());
     mp.querySelector("select").dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     ok(!crit().querySelector("[data-criteria-map]") && !w.RiskApp.CriteriaUI.pending() && JSON.stringify(P()) === bEsc && d.activeElement === crit().querySelector('[data-action="criteria-apply"]'), "Escape in the mapping panel does what Cancel does, the keyboard back on Apply");
@@ -336,7 +336,7 @@
       var c = M.presetCriteria(id);
       ok(c.likelihood.concat(c.impact).every(function (l) { return l.note.indexOf(":") < 0; }), "the " + id + " preset's definitions have no colon in them");
     });
-    ok(/^SolutionsPT house risk matrix; the standard prescribes none\. Tolerable risk is medium \(step 1\)\.$/.test(main().querySelector(".framing-note").textContent), "step 5's framing note", main().querySelector(".framing-note").textContent);
+    ok(/^House method: SolutionsPT's risk matrix, as the standard does not prescribe one\. Tolerable risk is medium \(step 1\)\.$/.test(main().querySelector(".framing-note").textContent), "step 5's framing note", main().querySelector(".framing-note").textContent);
     var LIB = RT.scenarioLibrary.scenarios;
     function hs(id) { return LIB.filter(function (s) { return s.id === id; })[0]; }
     ok(same(hs("HS04").countermeasures[2].srRefs, ["SR 3.4"]) && same(hs("HS08").countermeasures[2].srRefs, ["SR 7.6", "SR 7.7"]) && same(hs("HS15").countermeasures[1].srRefs, ["SR 6.2"]) &&
@@ -358,7 +358,7 @@
       function method(px) { return px.filter(function (x) { return /^The assessment follows/.test(x) && /prescribes no matrix/.test(x); })[0] || ""; }
       var hl = method(r[0]), det = method(r[1]);
       ok(/were agreed for this assessment\. The standard prescribes no matrix\./.test(hl) && !/risk-to-SL/.test(hl), "the high-level method says nothing of the risk-to-SL mapping", hl);
-      ok(/and the risk-to-SL mapping is a SolutionsPT house default\./.test(det), "the detailed one still does", det);
+      ok(/and the risk-to-SL mapping is the SolutionsPT default and part of the house method./.test(det), "the detailed one still does", det);
       ok(r[1].indexOf("The risk criteria agreed for this assessment (from a SolutionsPT generic preset).") >= 0, "the appendix says agreed criteria still a generic preset come from one");
       try { w.localStorage.removeItem(KEY); } catch (e2) {}
     });

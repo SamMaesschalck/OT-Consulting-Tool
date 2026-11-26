@@ -159,7 +159,7 @@
       h("summary", { text: "Scales" }),
       h("div", { class: "scales-pop-body" }, [list("Impact", crit.impact), list("Likelihood", crit.likelihood),
         byCat ? h("p", { class: "hint", text: "Tolerable risk by category: " + byCat + "." }) : null,
-        h("p", { class: "hint", text: "Unmitigated likelihood is rated before any cyber security countermeasure; built-in and non-cyber safeguards still count." })])
+        h("p", { class: "hint", text: "Rate unmitigated likelihood with built-in and non-cyber safeguards but without any cyber security countermeasure, even existing ones." })])
     ]);
     if (ui.scalesOpen) d.setAttribute("open", "");
     d.addEventListener("toggle", function () { if (d.isConnected) ui.scalesOpen = d.open; });
@@ -199,7 +199,7 @@
   }
   function statusText(T) {
     if (T.state === "none") return { text: "No decision yet.", warn: true };
-    if (T.state === "suggested") return { text: "Suggested, not confirmed.", warn: false };
+    if (T.state === "suggested") return { text: "Suggested. Click the choice to confirm it.", warn: false };
     if (T.gap) return { text: cap(T.gap) + ".", warn: true };
     if (T.decision === "reduce") return { text: "Addressed by " + T.covering.map(function (m) { return m.id; }).join(", ") + "." + (T.residual && !T.residualWithin ? " Planned risk is still above tolerable risk." : ""), warn: false };
     return { text: "", warn: false };
@@ -264,7 +264,7 @@
         liveText("Date", rd.date, function (v) { rd.date = v; }, { type: "date", attrs: { "data-field": "acc-date" } }),
         liveText("Review date", rd.reviewDate, function (v) { rd.reviewDate = v; }, { type: "date", attrs: { "data-field": "acc-review" } })
       ]));
-      if (T.remainingAbove) box.appendChild(h("p", { class: "hint", "data-hint": "remaining", text: "The planned rating stays above tolerable risk. Recording the asset owner's acceptance of what remains is optional." }));
+      if (T.remainingAbove) box.appendChild(h("p", { class: "hint", "data-hint": "remaining", text: "The planned rating stays above tolerable risk, and you can record the asset owner's acceptance of what remains." }));
     } else if (T.decision === "accept" || (t.acceptance || "").trim()) {
       if (!t.acceptanceDetail || typeof t.acceptanceDetail !== "object") t.acceptanceDetail = M.emptyAcceptanceDetail();
       var ad = t.acceptanceDetail;
@@ -342,7 +342,7 @@
           // The keyboard goes to the linked row's Unlink.
           A.focusAfter('[data-threat-id="' + t.id + '"] [data-action="unlink-' + m.id + '"]');
         },
-          { cls: sug ? "suggested" : (match.indexOf(m.id) >= 0 ? "matches" : ""), title: sug ? "Suggested link, not confirmed" : (match.indexOf(m.id) >= 0 ? "On a requirement this threat affects" : null) });
+          { cls: sug ? "suggested" : (match.indexOf(m.id) >= 0 ? "matches" : ""), title: sug ? "Suggested link from an earlier file" : (match.indexOf(m.id) >= 0 ? "On a requirement this threat affects" : null) });
       })));
     }
     kids.push(h("div", { class: "btn-row" }, [
@@ -471,12 +471,12 @@
     var catBox = keptDetails({ class: "owner-sec cat-sec", "data-part": "impact-categories" }, catKids, "sec", "cat:" + o.id + "/" + t.id, cats.length > 0);
     ed.appendChild(section("Unmitigated risk", [
       h("div", { class: "threat-grid" }, [
-        pick("Unmitigated likelihood", t.likelihood, lik, function (v) { t.likelihood = v; }, { attrs: { "data-field": "likelihood" }, hint: "Before any cyber security countermeasure, existing ones included; built-in and non-cyber safeguards still count." }),
+        pick("Unmitigated likelihood", t.likelihood, lik, function (v) { t.likelihood = v; }, { attrs: { "data-field": "likelihood" }, hint: "Rate it with built-in and non-cyber safeguards but without any cyber security countermeasure, even existing ones." }),
         impactField
       ]),
       catBox,
       liveText("Likelihood rationale", t.likelihoodRationale, function (v) { t.likelihoodRationale = v; }, { attrs: { "data-field": "likelihoodRationale" },
-        placeholder: "One line: why this likelihood." }),
+        placeholder: "Why this likelihood, in one line." }),
       h("div", { class: "rating-line" }, [h("strong", { text: "Unmitigated risk: " }), riskPill(x.risk),
         x.risk ? h("span", { class: "muted", text: "  = impact × likelihood" + (x.exceeds ? ", above tolerable risk" : "") }) : h("span", { class: "muted", text: "  (set likelihood and impact)" })]),
       impactNote(t, p)
@@ -638,7 +638,7 @@
 
   function decisionWords(x) {
     if (!x.exceeds) return x.risk ? "Within tolerable risk" : "Not rated";
-    if (x.treatment.state === "suggested") return "Suggested, not confirmed";
+    if (x.treatment.state === "suggested") return "Suggested, unconfirmed";
     return x.label;
   }
   function scenarioTable(row, p, tol, open) {
@@ -748,7 +748,7 @@
     var jHint = h("div", { class: "hint" });
     function hint() {
       var need = E.maxDefined(o.slTargetByFR) != null && !(o.justification || "").trim();
-      jHint.textContent = need ? "SL-T set but not justified: say why, especially for any FR below its suggestion." : "Required.";
+      jHint.textContent = need ? "Say why you set this SL-T, especially for any FR below its suggestion." : "Required.";
       jHint.className = "hint" + (need ? " val-warn" : "");
     }
     hint(); live(hint);
@@ -757,7 +757,7 @@
     kids.push(tbl);
     kids.push(h("div", { class: "btn-row strip-actions no-print" }, [
       h("button", { type: "button", class: "btn sm", "data-action": "accept-all-suggested", text: "Accept all suggested" + (fill ? " (" + fill + ")" : ""), disabled: fill ? null : "disabled",
-        title: "Sets each requirement not yet set to its suggestion.", onClick: function () {
+        title: "Each requirement not yet set takes its suggestion.", onClick: function () {
           var mk = A.undoMark(); var n = acceptSuggested(o, sug); touched(); rerender();
           // The button is now disabled: the keyboard goes to the first SL-T.
           A.focusAfter("[data-slt-strip] select[data-slt-fr]");
@@ -1116,7 +1116,7 @@
     var unrated = vm.threats.filter(function (x) { var li = stateLI(x.t, st); return !(li.L && li.I); }).length;
     main.appendChild(card("Heat map", vm.threats.length + " scenario" + (vm.threats.length === 1 ? "" : "s"), [
       toggle,
-      h("p", { class: "hint", text: "Outlined cells are above tolerable risk; a rating not given takes the one before it." }),
+      h("p", { class: "hint", text: "Outlined cells are above tolerable risk, and a scenario not rated in this state is placed by its previous rating." }),
       t,
       unrated ? h("p", { class: "muted", text: unrated + " not rated." }) : null
     ], null, { "data-view": "heatmap" }));
@@ -1130,7 +1130,7 @@
     main.appendChild(h("h1", { class: "page-title", text: "SL-T assignment" }));
     main.appendChild(pageSub("slt", "Set one target security level per foundational requirement, and justify it."));
     main.appendChild(stepTabs("slt"));
-    main.appendChild(h("div", { class: "framing-note", text: "Suggestions are a SolutionsPT house heuristic, not the standard's; an SL-T below one is fine if justified." }));
+    main.appendChild(h("div", { class: "framing-note", text: "House method: the suggestions are SolutionsPT's and do not come from the standard. You can set an SL-T below a suggestion if you justify it." }));
     if (!p.zones.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
     var all = owners(p), sugs = {};
     all.forEach(function (o) { sugs[o.id] = suggestionOf(o, p); });
@@ -1157,7 +1157,7 @@
       })).concat([
         h("td", { class: set && !just ? "val-warn" : "muted", text: !set ? "SL-T not set" : (just ? "Justified" : "Set, needs justification") }),
         h("td", null, [
-          fill ? h("button", { type: "button", class: "btn xs", "data-action": "accept-row", text: "Accept (" + fill + ")", title: "Sets each requirement not yet set to its suggestion.",
+          fill ? h("button", { type: "button", class: "btn xs", "data-action": "accept-row", text: "Accept (" + fill + ")", title: "Each requirement not yet set takes its suggestion.",
             "aria-label": "Accept " + fill + " suggestion" + (fill === 1 ? "" : "s") + " for " + o.id,
             onClick: function () {
               var mk = A.undoMark(); var n = acceptSuggested(o, sug); touched(); rerender();
@@ -1174,7 +1174,7 @@
     if (safe.length && SIS_RULE) body.push(floorBox(p, safe));
     body.push(h("div", { class: "btn-row no-print", style: "margin-bottom:8px" }, [
       h("button", { type: "button", class: "btn sm", "data-action": "accept-all-grid", text: "Accept all suggested" + (fillAll ? " (" + fillAll + ")" : ""), disabled: fillAll ? null : "disabled",
-        title: "Sets each requirement not yet set to its suggestion, in every zone and conduit.",
+        title: "Each requirement not yet set, in every zone and conduit, takes its suggestion.",
         onClick: function () {
           var mk = A.undoMark(); var n = 0; all.forEach(function (o) { n += acceptSuggested(o, sugs[o.id]); }); touched(); rerender();
           // The button is now disabled: the keyboard goes to the grid's first SL-T.
@@ -1225,12 +1225,12 @@
     var p = project();
     var view = ui.view;
     main.appendChild(h("h1", { class: "page-title", text: "Detailed risk assessment" }));
-    main.appendChild(pageSub("risk", "Work through each zone and conduit: its scenarios, their ratings and a treatment decision where tolerable risk is exceeded."));
+    main.appendChild(pageSub("risk", "For each zone and conduit, rate its scenarios and record a treatment decision wherever a risk is above tolerable risk."));
     main.appendChild(stepTabs(view === "zone" ? "risk" : view));
     var cw = E.criteriaWords(p);
-    var tolWords = "tolerable risk is " + BAND_NAME[E.tolerableOf(p)].toLowerCase() + " (step 1).";
-    main.appendChild(h("div", { class: "framing-note", text: cw.source === "client" ? "The client's risk matrix; " + tolWords :
-      cw.source === "project" ? "The risk matrix agreed for this assessment; " + tolWords : "SolutionsPT house risk matrix; the standard prescribes none. " + cap(tolWords) }));
+    var tolWords = "Tolerable risk is " + BAND_NAME[E.tolerableOf(p)].toLowerCase() + " (step 1).";
+    main.appendChild(h("div", { class: "framing-note", text: cw.source === "client" ? "This assessment uses the client's risk matrix. " + tolWords :
+      cw.source === "project" ? "This assessment uses the risk matrix agreed for it. " + tolWords : "House method: SolutionsPT's risk matrix, as the standard does not prescribe one. " + tolWords }));
     // By consequence works before there are zones: a consequence needs none.
     if (view === "consequence") { R.ConsequenceUI.render(main, p, R.ViewModel.build(p), openMap(p)); return; }
     if (!p.zones.length && !p.conduits.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }

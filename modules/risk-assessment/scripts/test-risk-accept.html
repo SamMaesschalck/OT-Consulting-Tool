@@ -79,7 +79,7 @@
         var zh = d0.blocks.filter(function (b) { return b.type === "heading" && /^Z1: /.test(b.text); })[0];
         ok(zh.sectionKey === "", "a zone's own heading has no section key", zh.sectionKey);
         p = RR.acceptPlan(thread(0, zh, "Z1: A new name"));
-        ok(!p.can && /a name from the assessment, not a section title/.test(p.why), "a zone's heading is refused: it is a name", p.why);
+        ok(!p.can && /a name taken from the assessment, so it has no section title to change/.test(p.why), "a zone's heading is refused: it is a name", p.why);
         var zp = d0.blocks.filter(function (b) { return b.type === "paragraph" && b.sectionKey === "" && !b.front && b.text.length > 30; })[0];
         p = RR.acceptPlan(thread(0, zp, zp.text + " Changed."));
         ok(!p.can && /written from the zones and threats/.test(p.why), "and so is the text under it", p.why);

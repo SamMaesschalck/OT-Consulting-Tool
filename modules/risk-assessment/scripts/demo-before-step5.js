@@ -30,6 +30,10 @@ window.RiskTestDemo.beforeStep5 = function (p) {
   // The routes. T4's remaining risk stays accepted: since step 5 the SL-T
   // decision it rests on is incomplete without it.
   threat("Z1", "T2").via = ["Z4"]; threat("Z2", "T4").via = ["Z4"];
+  // T4's and T8's acceptances as they were worded before the wording pass
+  // (Nov 2026) reworded them, which the a2 fingerprints below were taken on.
+  threat("Z2", "T4").acceptance = "No countermeasure brings the risk within tolerable risk, as the consequence stays severe. Until the dedicated SIS engineering workstation is in place, process safety authorisation, the keyed bypass record and the program-mode keyswitch bound the remaining risk, which is accepted at High until the review.";
+  threat("Z4", "T8").acceptance = "The tool is retired at the Q2-2027 turnaround with the PLC upgrade. Until then the workstation is isolated on the engineering VLAN, and the account password is held by the shift supervisor and issued per use with a written record. Risk accepted at High for this bounded period.";
   // The zones' characteristics before C4 and C5.
   var z1 = owner("Z1"), z2 = owner("Z2"), z4 = owner("Z4");
   z1.accessPoints = ["Vendor VPN via jump host (C2)", "Historian replication to DMZ (C1)"];

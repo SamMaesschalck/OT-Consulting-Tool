@@ -301,7 +301,7 @@ window.RiskZoneMap = (function () {
     if (hasExt) items.push({ kind: "ext", text: "Outside the SUC" });
     if (shows.slt || notes.some(function (n) { return /SL-T/.test(n.text); })) items.push({ kind: "text", term: "SL-T", text: "SL-T: highest on any foundational requirement" });
     if (shows.sug) items.push({ kind: "text", term: "Suggested SL", text: "Suggested SL: no SL-T set yet" });
-    if (G.banded) items.push({ kind: "stripe", text: "Shaded rows: SolutionsPT house layering" });
+    if (G.banded) items.push({ kind: "stripe", text: "Shaded rows: SolutionsPT zone levels" });
     var legend = [], lx = M, ly = keysEnd + 14;
     items.forEach(function (it) {
       var w = (it.kind === "text" ? 0 : 24) + legendWidth(it.text) + 18;

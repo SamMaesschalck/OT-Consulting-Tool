@@ -202,24 +202,24 @@ window.RiskApp.Assets = (function () {
         if (dup[c] != null) { if (twice.indexOf(f) < 0) twice.push(f); return; }
         v[f] = String(cells[c]).trim();
       });
-      twice.forEach(function (f) { problems.push("Two columns are read as " + labelOf(f) + "; the first is used."); });
+      twice.forEach(function (f) { problems.push("Two columns map to " + labelOf(f) + ". Only the first is read."); });
       // Not named: a new asset takes its tag as its name; an update keeps its own.
       var named = !!v.name;
       if (!v.name && v.tag) v.name = v.tag;
-      if (!v.name) { problems.push("No name; left out."); out.action = "skip"; return out; }
+      if (!v.name) { problems.push("The row has no name, so it is left out."); out.action = "skip"; return out; }
       if (v.type != null) {
         var t = E.assetTypeFrom(v.type);
-        if (t === "other" && normHead(v.type) !== "other") problems.push("Type " + q(v.type) + " not known; set to Other.");
+        if (t === "other" && normHead(v.type) !== "other") problems.push("Type " + q(v.type) + " is not recognised, so it is set to Other.");
         v.typeId = t;
       }
       if (v.link != null) {
         var lk = E.assetLinkFrom(v.link);
-        if (!lk && FIXED_WORDS.indexOf(normHead(v.link)) < 0) problems.push("Connection " + q(v.link) + " not known; set to Fixed.");
+        if (!lk && FIXED_WORDS.indexOf(normHead(v.link)) < 0) problems.push("Connection " + q(v.link) + " is not recognised, so it is set to Fixed.");
         v.linkId = lk || "";
       }
       if (v.criticality != null) {
         var cr = critFrom(v.criticality);
-        if (!cr) problems.push("Criticality " + q(v.criticality) + " not known; left blank.");
+        if (!cr) problems.push("Criticality " + q(v.criticality) + " is not recognised, so it is left blank.");
         v.criticalityId = cr || "";
       }
       // The zone: the one named, else the one chosen for the paste.
@@ -234,25 +234,25 @@ window.RiskApp.Assets = (function () {
       var ex = k && existing[k] ? existing[k] : null;
       if (ex && opts.updateExisting) {
         out.target = ex;
-        if (k && tagSeen[k]) { problems.push("Repeats the tag of row " + tagSeen[k] + "; left out."); out.action = "skip"; return out; }
+        if (k && tagSeen[k]) { problems.push("Row " + tagSeen[k] + " has the same tag, so this row is left out."); out.action = "skip"; return out; }
         out.action = "update";
         // An update writes only what the paste gives: a row with no name
         // keeps the asset's own.
         if (!named) delete v.name;
         tagSeen[k] = out.n;
-        if (zoneMissing) problems.push("Zone " + q(v.zone) + " not found; updated in place.");
-        else if (v.zone != null && z && z !== ex.zone) problems.push("Already in " + ex.zone.id + " as " + ex.a.id + "; updated there, not moved.");
+        if (zoneMissing) problems.push("Zone " + q(v.zone) + " was not found, so the asset is updated where it is.");
+        else if (v.zone != null && z && z !== ex.zone) problems.push("The asset is already in " + ex.zone.id + " as " + ex.a.id + ". It is updated there and stays in " + ex.zone.id + ".");
         if (v.name && String(ex.a.name || "") !== v.name) problems.push("Renames " + ex.a.id + (ex.a.name ? " from " + ex.a.name : "") + ".");
         return out;
       }
-      if (zoneMissing) problems.push("Zone " + q(v.zone) + " not found" + (chosen ? "; goes to " + chosen.id + "." : "."));
-      if (k && tagSeen[k]) { problems.push("Repeats the tag of row " + tagSeen[k] + "; left out."); out.action = "skip"; return out; }
+      if (zoneMissing) problems.push("Zone " + q(v.zone) + " was not found" + (chosen ? ", so the row goes to " + chosen.id + "." : "."));
+      if (k && tagSeen[k]) { problems.push("Row " + tagSeen[k] + " has the same tag, so this row is left out."); out.action = "skip"; return out; }
       if (ex) {
         out.target = ex; out.action = "skip";
-        problems.push("Tag already on " + ex.a.id + " in " + ex.zone.id + "; left out unless Update existing is ticked.");
+        problems.push(ex.a.id + " in " + ex.zone.id + " already has this tag, so the row is left out unless Update existing is ticked.");
         return out;
       }
-      if (!z) { problems.push("No zone to add it to."); out.action = "skip"; return out; }
+      if (!z) { problems.push("There is no zone to add it to."); out.action = "skip"; return out; }
       if (k) tagSeen[k] = out.n;
       return out;
     });

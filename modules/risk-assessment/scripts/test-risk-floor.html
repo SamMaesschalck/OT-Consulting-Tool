@@ -135,8 +135,8 @@
       M.setSafetyFloorFR(pj, ["IAC", "SI"]);
       return Promise.all([words(pj), words(none)]).then(function (r) {
         var a = r[0].join("\n"), b = r[1].join("\n");
-        ok(a.indexOf("A zone marked safety related holds safety functions. The house method sets a floor of SL3 for it; in this assessment the floor covers IAC and SI.") >= 0, "Word's SL-T section names the requirements the floor covers");
-        ok(b.indexOf("A zone marked safety related holds safety functions. The house floor of SL3 is not applied in this assessment.") >= 0, "and says when it covers none");
+        ok(a.indexOf("A zone marked safety related holds safety functions. The house method sets a floor of SL3 for it. In this assessment the floor covers IAC and SI.") >= 0, "Word's SL-T section names the requirements the floor covers");
+        ok(b.indexOf("A zone marked safety related holds safety functions. The house method's floor of SL3 is not applied in this assessment.") >= 0, "and says when it covers none");
         var demoW = MG.normaliseProject(clone(window.SPT_TOUR_PROJECT));
         return words(demoW).then(function (c) {
           ok(c.join("\n").indexOf("The house method sets a floor of SL3 on every foundational requirement for it.") >= 0, "with the default list the sentence is as it was");
@@ -166,7 +166,7 @@
       // Step 3's hint.
       w.RiskApp.ZonesPage.select("zone", "Z1"); RT.navigate("zones");
       main().querySelector('[data-detail="zone"] [data-action="safety"]').click();
-      ok(/Sets an SL3 floor on IAC, SI, DC, RDF, TRE and RA\./.test(main().querySelector('[data-detail="zone"]').textContent), "step 3's safety hint follows the narrowed list");
+      ok(/A safety related zone has an SL3 floor on IAC, SI, DC, RDF, TRE and RA\./.test(main().querySelector('[data-detail="zone"]').textContent), "step 3's safety hint follows the narrowed list");
       RT.navigate("slt");
       main().querySelector('[data-floor] [data-chip="floor-UC"]').click();
       ok(!("safetyFloorFR" in P()), "putting the requirement back stores nothing again");

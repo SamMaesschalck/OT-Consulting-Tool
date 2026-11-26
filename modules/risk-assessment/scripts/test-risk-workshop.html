@@ -106,7 +106,7 @@
     ["Threat statement", "Threat source", "Entry point", "Assets", "Vulnerabilities", "Consequence", "Affected foundational requirements"].forEach(function (k) { if (sc.textContent.indexOf(k) < 0) ok(false, "the scenario section has " + k); });
     ok(true, "the scenario section has the statement, source, entry point, assets, vulnerabilities, consequence and affected requirements");
     ok(!!editor().querySelector('[data-field="likelihoodRationale"]') && editor().querySelectorAll(".ed-section")[1].textContent.indexOf("Likelihood rationale") >= 0, "the unmitigated rating has a one-line likelihood rationale");
-    ok(/^Before any cyber security countermeasure, existing ones included; built-in and non-cyber safeguards still count\.$/.test(editor().querySelector('select[data-field="likelihood"]').parentNode.querySelector(".hint").textContent), "and the unmitigated likelihood is worded to set existing cyber security countermeasures aside, and no other protection");
+    ok(/^Rate it with built-in and non-cyber safeguards but without any cyber security countermeasure, even existing ones\.$/.test(editor().querySelector('select[data-field="likelihood"]').parentNode.querySelector(".hint").textContent), "and the unmitigated likelihood is worded to set existing cyber security countermeasures aside, and no other protection");
     var add = editor().querySelector('[data-part="additional"]');
     // Phase 4b: T1 has no planned rating in the demo now, so the section shows the prompt to rate it in place of the rating line.
     ok(!!add.querySelector('[data-field="residualLikelihood"]') && (/Planned risk/.test(add.textContent) || /Rate it for when the additional countermeasures are in place\./.test(add.textContent)), "the planned rating sits after the additional countermeasures");
@@ -119,7 +119,7 @@
     var nt = owner("Z1").threats[nBefore];
     ok(owner("Z1").threats.length === nBefore + 1 && scen(nt.id).classList.contains("open") && d.activeElement === scen(nt.id).querySelector('[data-field="statement"]'), "+ Add scenario opens it with the keyboard in the statement");
     var its = RT.completeness().filter(function (i) { return i.target && i.target.id === nt.id; }).map(function (i) { return i.text.replace(/^.* \/ /, ""); });
-    ok(its.length === 2 && /likelihood or impact not set/.test(its[0]) && /no affected foundational requirements/.test(its[1]), "an empty scenario asks only for the minimum: likelihood, impact and affected requirements", its.join(" | "));
+    ok(its.length === 2 && /the likelihood or impact is not set/.test(its[0]) && /no affected foundational requirement is marked/.test(its[1]), "an empty scenario asks only for the minimum: likelihood, impact and affected requirements", its.join(" | "));
     type(scen(nt.id).querySelector('[data-field="statement"]'), "Rogue device on the control LAN.");
     change(scen(nt.id).querySelector('select[data-field="likelihood"]'), "low");
     ok(d.activeElement === scen(nt.id).querySelector('select[data-field="likelihood"]'), "a rating chosen keeps the keyboard on its select after the redraw");
@@ -232,7 +232,7 @@
     var j = panel().querySelector('[data-slt-strip] [data-field="justification"]');
     var jHint = j.parentNode.querySelector(".hint");
     type(j, "");
-    ok(/not justified/.test(jHint.textContent) && j.isConnected && d.activeElement === j, "emptying the justification warns in place");
+    ok(/Say why you set this SL-T/.test(jHint.textContent) && /val-warn/.test(jHint.className) && j.isConnected && d.activeElement === j, "emptying the justification warns in place");
     type(j, "Matches Z2.");
     ok(jHint.textContent === "Required." && c2o.justification === "Matches Z2." && d.activeElement === j, "and writing it clears the warning, the keyboard staying in it");
 

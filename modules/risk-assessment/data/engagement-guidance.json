@@ -2,32 +2,32 @@
   "id": "engagement-guidance",
   "_note": "Preparation guidance for a 62443-3-2 zones-and-conduits risk assessment: the documents a consultant most commonly needs, the ones clients often forget, and the stakeholders worth interviewing. ADVISORY ONLY, not a fixed checklist, and it must never pre-populate the basis-of-assessment register; the consultant records what was actually reviewed/observed there.",
   "commonDocuments": [
-    "Network architecture diagrams (current, not as-designed)",
+    "Network architecture diagrams of the network as it is now",
     "Asset inventory for the systems in scope",
-    "P&IDs / process descriptions for the operations the SUC controls",
-    "PHA / HAZOP results (the usual source for worst-credible impact)",
-    "Existing segmentation or zone/conduit documentation, if any",
-    "The client's corporate risk matrix and tolerable-risk criteria",
-    "Remote access register: routes, vendors, standing tunnels",
-    "Interface / dataflow lists between OT, DMZ and corporate IT"
+    "P&IDs and process descriptions for the processes the SUC controls",
+    "PHA or HAZOP results, the usual source for the worst credible impact",
+    "Any existing segmentation or zone and conduit documentation",
+    "The client's corporate risk matrix and tolerable risk criteria",
+    "The remote access register, with routes, vendors and standing tunnels",
+    "Interface and data flow lists between OT, the DMZ and corporate IT"
   ],
   "oftenForgotten": [
-    "Safety requirements specification for the SIS (drives the safety-zone decisions)",
-    "Vendor connection contracts: what access was contractually promised",
-    "Wireless site survey / list of wireless links into the estate",
-    "Portable and mobile device practice (engineering laptops, USB): 3-2 expects them zoned separately",
+    "The safety requirements specification for the SIS, which drives the safety zone decisions",
+    "Vendor contracts that promise remote access",
+    "A wireless site survey or a list of the wireless links into the site",
+    "How engineering laptops, USB drives and other portable devices are used, since 3-2 expects them in a zone of their own",
     "Regulatory or insurance constraints that set risk criteria",
     "Previous cyber risk assessments and what happened to their actions",
-    "Who owns the tolerable-risk decision: it is the asset owner's, not the consultant's"
+    "Who in the asset owner's organisation decides the tolerable risk"
   ],
   "keyStakeholders": [
-    "Asset owner senior management (they own tolerable risk and SL-T sign-off)",
-    "Process safety engineer (consequence severity, SIS context)",
-    "Control systems engineer (how the system actually works)",
-    "SIS / functional safety engineer",
-    "OT / plant network engineer (and corporate network counterpart)",
-    "Operations manager (essential functions and worst-case framing)",
-    "System integrator or key vendor representative",
-    "IT security / SOC lead (threat context, monitoring reality)"
+    "Asset owner senior management, who decide the tolerable risk and sign off the SL-T",
+    "Process safety engineer, for consequence severity and the SIS",
+    "Control systems engineer, for how the system works in practice",
+    "SIS or functional safety engineer",
+    "OT or plant network engineer, and their corporate network counterpart",
+    "Operations manager, for the essential functions and the worst-case outcomes",
+    "System integrator or main vendor representative",
+    "IT security or SOC lead, for the threat context and the monitoring in place"
   ]
 }

@@ -171,7 +171,7 @@
       var row = tr.slice(10, 20);
       ok(/^T2  Malware introduced through an engineering connection/.test(row[0]) && row[1] === "Z1 Unit 300 BPCS" && row.indexOf(threatIn(DEMO, "Z1", "T2").acceptance) > 0 && row.indexOf(threatIn(DEMO, "Z1", "T2").transferTo) > 0 &&
         row.slice(-4).join("|") === "H. Okafor|Group Insurance Manager|2026-07-03|2027-03-31", "with T2: how, to whom, who agreed it, their role, the date and the review date", row.join("|"));
-      ok(det.some(function (x) { return /^Signed off as below. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted and transferred risks in this report/.test(x); }), "Word: the approval covers the accepted and transferred risks (step 5: and what else it covers)");
+      ok(det.some(function (x) { return /^The approvals are recorded below\. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted and transferred risks in this report/.test(x); }), "Word: the approval covers the accepted and transferred risks (step 5: and what else it covers)");
 
       // ---- C. the demo's asset classification and business value in Word --------------------------
       var ar = det.indexOf("Asset register");

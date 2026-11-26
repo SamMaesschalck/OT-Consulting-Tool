@@ -31,6 +31,8 @@
 <script src="fixtures/slt-suggestions-v0.7.0.js"></script>
 <script src="fixtures/word-v0.7.0.js"></script>
 <script src="demo-before-step5.js"></script>
+<script src="traces-v070.js"></script>
+<script src="word-wording-pass.js"></script>
 <script>
 (function () {
   "use strict";
@@ -189,10 +191,9 @@
     // ---- C. SL-T: the house method for a zone or conduit on a path -------------------------------
     var REF = FX["slt-suggestions-v0.7.0"];
     // The 3-2 fixes, step 5, reworded the house traces for SL1 and SL2 (they echoed the standard's
-    // wording): they are read back as v0.7.0 had them, so every other word still compares.
-    var TRACE_STEP5 = [["Unmitigated risk low: protection against mistakes and chance misuse (SL1) is a reasonable target for this foundational requirement.", "Unmitigated risk low: casual-violation protection (SL1) is a reasonable target for this foundational requirement."],
-      ["Unmitigated risk medium: protect against a deliberate attacker with general IT skills and simple tools (SL2).", "Unmitigated risk medium: protect against intentional violation with simple means (SL2)."]];
-    function asV070(x) { var s = JSON.stringify(x); TRACE_STEP5.forEach(function (r) { s = s.split(r[0]).join(r[1]); }); return JSON.parse(s); }
+    // wording), and the wording pass (Nov 2026) reworded every trace: they are read back as v0.7.0
+    // had them (traces-v070.js), so every suggestion, count and driver still compares.
+    function asV070(x) { return window.RiskTestTraces.asV070(x); }
     function suggestions(p) {
       var o = {};
       p.zones.concat(p.conduits).forEach(function (x) { o[x.id] = { sug: ("fromZone" in x) ? E.suggestConduit(x, p) : E.suggestZone(x, p), drivers: E.sltDrivers(x, p) }; });
@@ -208,7 +209,7 @@
     ok(!badD.length, "the demo without its paths: the same as v0.7.0", badD.join());
     var withVia = suggestions(nd);
     ok(withVia.Z3.sug.byFR.IAC.sl === 3 && REF.demo.Z3.sug.byFR.IAC.sl == null, "a path through Z3 suggests SL3 on IAC there (it had none)", String(withVia.Z3.sug.byFR.IAC.sl));
-    ok(withVia.Z3.sug.byFR.IAC.trace.some(function (x) { return /^House method for a scenario that passes through this zone: T1 through Z3 and C2 to K1 \(acting in Z1\) and T9 through Z3 to K1 \(acting in C2\) have a high unmitigated risk on IAC, which maps to SL3\.$/.test(x); }),
+    ok(withVia.Z3.sug.byFR.IAC.trace.some(function (x) { return /^By the house method, a scenario that passes through this zone counts towards its suggestion\. T1 through Z3 and C2 to K1 \(acting in Z1\) and T9 through Z3 to K1 \(acting in C2\) have a high unmitigated risk on IAC, which maps to SL3\.$/.test(x); }),
       "the Why trace says it is the house method and names the paths", withVia.Z3.sug.byFR.IAC.trace.join(" | "));
     ok(withVia.Z3.sug.byFR.IAC.risk == null, "the zone's own unmitigated risk on it is still none");
     var dz3 = withVia.Z3.drivers.filter(function (x) { return x.fr === "IAC"; })[0];
@@ -235,7 +236,7 @@
     ok(same(E.steppingStones(ps), { C3: ["K1"] }), "a conduit a path passes through with no threat of its own is a stepping stone", JSON.stringify(E.steppingStones(ps)));
     ok(same(E.steppingStones(nd), {}), "the demo's paths pass only through zones and conduits with threats of their own");
     var c3 = E.suggestConduit(ps.conduits[2], ps);
-    ok(c3.byFR.RDF.sl === 3 && c3.byFR.RDF.trace.some(function (x) { return /^House method for a scenario that passes through this conduit: T5 through C3 to K1 \(acting in Z3\) has a high unmitigated risk on RDF, which maps to SL3\.$/.test(x); }), "its suggestion takes the path's mapped SL, said as the house method (one path: has)", c3.byFR.RDF.trace.join(" | "));
+    ok(c3.byFR.RDF.sl === 3 && c3.byFR.RDF.trace.some(function (x) { return /^By the house method, a scenario that passes through this conduit counts towards its suggestion\. T5 through C3 to K1 \(acting in Z3\) has a high unmitigated risk on RDF, which maps to SL3\.$/.test(x); }), "its suggestion takes the path's mapped SL, said as the house method (one path: has)", c3.byFR.RDF.trace.join(" | "));
     // Logic 6: any via counts, with or without a consequence.
     var pn = clone(ps); delete threatOf(pn, "Z3", "T5").consequenceId;
     ok(E.suggestConduit(pn.conduits[2], pn).byFR.RDF.sl === 3 && same(E.steppingStones(pn), { C3: [] }), "a via with no consequence counts the same, its stepping stone on a path");
@@ -243,7 +244,7 @@
     var pv = clone(nd); threatOf(pv, "Z1", "T1").impact = "severe"; delete threatOf(pv, "Z1", "T1").impactByCategory; threatOf(pv, "Z1", "T1").likelihood = "high";
     var vb = E.threatRisk(threatOf(pv, "Z1", "T1"), pv);
     var z3v = E.suggestZone(pv.zones[2], pv).byFR.IAC.trace;
-    ok(vb === "very-high" && z3v.some(function (x) { return /^Escalation to SL4 available for IAC only if a nation-state-grade adversary is in scope\.$/.test(x); }), "a very high path through a zone carries the SL4 escalation note", vb + " | " + z3v.join(" | "));
+    ok(vb === "very-high" && z3v.some(function (x) { return /^Raising IAC to SL4 is an option only if a nation-state-grade adversary is in scope\.$/.test(x); }), "a very high path through a zone carries the SL4 escalation note", vb + " | " + z3v.join(" | "));
 
     // ---- D. completeness (warns only) ---------------------------------------------------------
     ok(RT.completeness(nd).length === 0, "the demo has nothing open", RT.completeness(nd).map(function (i) { return i.text; }).join(" | "));
@@ -259,7 +260,7 @@
     // Wording 2: a consequence with no title is open, named by its id.
     var pt = clone(nd); pt.consequences[2].title = "  ";
     var tItems = RT.completeness(pt).map(function (i) { return i.text; });
-    ok(tItems.indexOf("K3: no title.") >= 0 && tItems.length === 1, "a consequence with no title is open, by its id", tItems.join(" | "));
+    ok(tItems.indexOf("K3 has no title.") >= 0 && tItems.length === 1, "a consequence with no title is open, by its id", tItems.join(" | "));
 
     // ---- E. step 5: By consequence ------------------------------------------------------------
     load(DEMO);
@@ -477,7 +478,7 @@
     // Wording 2: the title and description are left for the consultant (was: filled with the system's name).
     ok(K4b && K4b.impact === "serious" && same(K4b.hlaIds, ["A3"]) && K4b.title === "" && K4b.description === "" && RT.state.stage === "risk" && RP.ui.view === "consequence", "it starts K4 from A3's worst credible consequence, on By consequence, title and description left empty", JSON.stringify(K4b));
     ok(d.activeElement === kCard("K4").querySelector('[data-k-field="title"]'), "the keyboard in its title");
-    ok(RT.completeness().some(function (i) { return i.text === "K4: no title."; }), "and until it has one, completeness says so");
+    ok(RT.completeness().some(function (i) { return i.text === "K4 has no title."; }), "and until it has one, completeness says so");
     RT.undo();
     ok(!M.consequenceById(P(), "K4") && RT.state.stage === "srs" && d.activeElement === main().querySelector('[data-hla-id="A3"] [data-action="start-consequence"]'), "Undo takes it back, the keyboard on step 2's button");
     start = main().querySelector('[data-hla-id="A3"] [data-action="start-consequence"]'); start.click();
@@ -522,14 +523,14 @@
     ok(!!st3 && st3.textContent === "On the route to K1", "and so does step 3's conduit table");
     RP.select("C3"); RT.navigate("risk");
     var why = main().querySelector('[data-owner-id="C3"] [data-why="RDF"]');
-    ok(!!why && /House method for a scenario that passes through this conduit: T5 through C3 to K1/.test(why.textContent), "its Why trace names the path and the method");
+    ok(!!why && /By the house method, a scenario that passes through this conduit counts towards its suggestion\. T5 through C3 to K1/.test(why.textContent), "its Why trace names the path and the method");
     // UX 4: the stepping stone shows as a small pill on a path's Via.
     RP.showConsequence("K1"); RT.navigate("risk");
     var sn = kCard("K1").querySelector('tr[data-threat-id="T5"] [data-stone-note]');
     ok(sn && /pill/.test(sn.className) && sn.textContent === "No threats recorded in C3", "a path's stepping stone shows as a pill", sn && sn.textContent);
     // Logic 6 and 8 / wording 6: About states the method as the house's, any via, the route as recorded.
     RT.navigate("about");
-    ok(/House method: a scenario's unmitigated risk also suggests an SL-T for each zone or conduit it passes through, on the FRs it affects\. A route that crosses two zones no conduit joins is flagged\./.test(main().textContent), "About says it is the house method (step 5: and that the route is checked)");
+    ok(/By the house method, a scenario's unmitigated risk also suggests an SL-T for each zone or conduit it passes through, on the FRs it affects\. The tool flags a route that crosses between two zones with no conduit joining them\./.test(main().textContent), "About says it is the house method (step 5: and that the route is checked)");
 
     // Go to a consequence from the completeness list.
     var gk = clone(DEMO); gk.consequences.push({ id: "K4", title: "Loss of the historian record", description: "", impact: "minor", source: "", hlaIds: [], notes: "" });
@@ -581,7 +582,7 @@
     var t2opt = [].filter.call(lk1.options, function (o) { return o.value === "Z1/T2"; })[0];
     ok(t2opt && t2opt.textContent === "T2 (Z1) Malware introduced through an engineering connection… [leads to K2]", "a long statement is cut at the last word before 60 characters, with …", t2opt && t2opt.textContent);
     change(lk1, "Z1/T2"); kCard("K1").querySelector('[data-action="link-threat"]').click();
-    ok(threat("Z1", "T2").consequenceId === "K1" && /T2 now leads to K1, not K2\./.test(toastText()), "linking a path from K2 says it no longer leads there", toastText());
+    ok(threat("Z1", "T2").consequenceId === "K1" && /T2 now leads to K1 \(was K2\)\./.test(toastText()), "linking a path from K2 says it no longer leads there", toastText());
     // Ranked systems chips.
     kCard("K1").querySelector('[data-action="edit-consequence"]').click();
     var chA3 = kCard("K1").querySelector('[data-chip="khla-A3"]');
@@ -666,7 +667,7 @@
     // SL-T lead-in is true whether or not every target is set; an approval covers more; the high-level
     // report names the standard's term once and labels its candidates as the house method. They are
     // counted with step 2's, so the zone-depth step's own lines stay as they were.
-    var T4ACC = DEMO.zones[1].threats[0].acceptance;
+    var T4ACC = window.RiskTestDemo.beforeStep5(clone(DEMO)).zones[1].threats[0].acceptance; // as step 5 worded it (demo-before-step5.js)
     var STEP5_WAS = [/^Each risk above tolerable risk that has been accepted, with the rating that stands, the reason, who accepted it and when it is to be reviewed\.$/, /^No threats registered\.$/,
       /^Each zone and conduit has one target per foundational requirement, set by the consultant from the risk assessment\.$/, /^Signed off as below\. An approval covers the tolerable risk/,
       /^This is the first tier of an IEC 62443-3-2 risk assessment, the high-level cyber security risk assessment, carried out /, /\) are the candidates for a detailed assessment; /,
@@ -679,6 +680,11 @@
       /^Signed off as below\. An approval covers the tolerable risk, /, /^Signed off as below\. An approval covers the tolerable risk and the ranking in this report, within the scope given for it\. The scopes below were given for the full assessment/,
       /, the high-level cyber security risk assessment, which the standard calls the initial cyber security risk assessment, carried out /, /\) are, by the house method, the candidates for a detailed assessment; /,
       /: by the house method, a system rated there is a candidate for a detailed assessment\.$/];
+    // The strict wording pass (Nov 2026) reworded more lines on purpose, the demo's prose and the
+    // reports' own: word-wording-pass.js lists each, as v0.7.0 had it and as it reads now. They are
+    // counted with step 2's too.
+    var WP = window.RiskTestWordingPass;
+    STEP2_WAS = STEP2_WAS.concat(WP.was.map(exact)); STEP2_NOW = STEP2_NOW.concat(WP.now.map(exact));
     STEP2_WAS = STEP2_WAS.concat(STEP5_WAS); STEP2_NOW = STEP2_NOW.concat(STEP5_NOW);
     DEPTH_WAS = DEPTH_WAS.concat(STEP2_WAS); DEPTH_NOW = DEPTH_NOW.concat(STEP2_NOW);
 
@@ -723,7 +729,7 @@
       var imp = wt.filter(function (x) { return /^Impact: Severe\. By category: Safety \(injury \/ loss of life\) Severe; Environmental release \/ damage Severe; Loss of production \/ essential function Severe; Regulatory \/ legal exposure Serious\. Source: HAZOP revalidation, 2025; LOPA and SIL determination\. Ranked systems: Unit 300 BPCS \(DCS servers, HMIs, unit PLCs\); Safety Instrumented System \(SIS\)\.$/.test(x); });
       ok(imp.length === 1, "its impact by category, source and ranked systems", wt[s + 3]);
       // Wording 22 / UX 10: the lead-in says what Risk today is, the column is Risk today as in Excel, via an "and" list.
-      ok(wt[s + 1] === "Each consequence was worked back to the threat scenarios that could cause it. A scenario sits in the zone or conduit where it acts and is rated and decided as in the risk register. Passes through lists, in order, the zones and conduits it crosses to get there. Risk today is the current rating. Where none is given, it is the planned rating if the scenario has no planned countermeasures, otherwise the unmitigated rating.", "the lead-in says what Risk today is", wt[s + 1]);
+      ok(wt[s + 1] === "Each consequence was worked back to the threat scenarios that could cause it. A scenario sits in the zone or conduit where it acts and is rated and decided as in the risk register. The Passes through column lists, in order, the zones and conduits it crosses to get there. Risk today is the current rating. Where none is given, it is the planned rating if the scenario has no planned countermeasures, otherwise the unmitigated rating.", "the lead-in says what Risk today is", wt[s + 1]);
       var hdr = wt.slice(s).join("|");
       ok(/Scenario\|Zone or conduit\|Passes through\|Threat source\|Entry point\|Unmitigated\|Risk today\|Treatment decision\|T1\|Z1 Unit 300 BPCS\|Z3 and C2\|External attacker via vendor access\|Vendor VPN and jump host \(C2\)\|High\|Medium\|Reduced to within tolerable risk\|T4\|/.test(hdr),
         "then a table of its paths", hdr.slice(0, 400));
@@ -732,7 +738,7 @@
       var rh = wt.slice(reg, reg + 12).join("|");
       ok(/Treatment decision\|Leads to\|/.test(rh), "the register gains a Leads to column", rh);
       ok(wt.some(function (x) { return x === "T1 through Z3 and C2 to K1 (High), T9 through Z3 to K1 (High)"; }), "Driving scenarios name the paths for a zone they pass through");
-      ok(wt.some(function (x) { return /By the house method, a scenario also sets the suggestion for each zone or conduit it passes through on its way to where it acts\.$/.test(x); }), "and their lead-in says how (wording 7)");
+      ok(wt.some(function (x) { return /Under the house method, these threats set the suggested SL-T\. .*By the house method, a scenario also sets the suggestion for each zone or conduit it passes through on its way to where it acts\.$/.test(x); }), "and their lead-in says how (wording 7)");
       ok(wt.indexOf("Leads to") > 0 && wt.some(function (x) { return x === "K1 Loss of containment of HF acid from an unsafe process state"; }) && wt.some(function (x) { return x === "Z3 and C2"; }), "a threat's detail says what it leads to, and its via as an and list");
       ok(wt.some(function (x) { return x.indexOf("By the house method, a threat scenario&apos;s unmitigated risk also suggests an SL-T for each zone or conduit it passes through on its way to where it acts, on the foundational requirements it affects. Each step of the route is checked against the conduits.") >= 0; }), "the appendix names the house method, any via, and (step 5) that the route is checked")
 ;
@@ -803,7 +809,7 @@
       var d2 = w.RiskApp.Compare.diff(bl2.facts, w.RiskApp.Compare.freeze(MG.normaliseProject(later)));
       var g2 = RT.comparisonLines(d2).filter(function (x) { return x.key === "consequences"; })[0];
       ok(g2 && g2.items.indexOf("K2: impact changed from Serious to Severe.") >= 0 && g2.items.indexOf("K3 Loss of view of the unit at the control room removed.") >= 0 &&
-        g2.items.indexOf("K1 was Loss of containment of HF acid from an unsafe process state; now Release of HF acid.") >= 0 && g2.items.indexOf("T3 (Z1) now leads to K2; was K3.") >= 0,
+        g2.items.indexOf("K1 was titled Loss of containment of HF acid from an unsafe process state and is now titled Release of HF acid.") >= 0 && g2.items.indexOf("T3 (Z1) now leads to K2 (was K3).") >= 0,
         "consequences removed, renamed, their impact changed, and a path's consequence changed", g2 ? g2.items.join(" | ") : "none");
       var rows2 = RT.comparisonRows(d2).filter(function (x) { return x.area === "Consequences"; });
       ok(rows2.some(function (x) { return x.change === "Impact changed" && x.before === "Serious" && x.now === "Severe"; }) && rows2.some(function (x) { return x.item === "T3" && x.before === "K3" && x.now === "K2"; }), "and as rows for the Changes sheet");
@@ -814,7 +820,7 @@
       threatOf(later3, "Z1", "T3").consequenceId = "K2";
       var d4 = w.RiskApp.Compare.diff(bl2.facts, w.RiskApp.Compare.freeze(MG.normaliseProject(later3)));
       var g4 = RT.comparisonLines(d4).filter(function (x) { return x.key === "consequences"; })[0];
-      ok(g4 && g4.items.indexOf("T3 (Z1) now leads to K2; was K4.") >= 0 && g4.items.indexOf("K4 Loss of view of the unit at the control room was numbered K3.") >= 0, "a path's previous consequence in today's numbering", g4 ? g4.items.join(" | ") : "none");
+      ok(g4 && g4.items.indexOf("T3 (Z1) now leads to K2 (was K4).") >= 0 && g4.items.indexOf("K4 Loss of view of the unit at the control room was numbered K3.") >= 0, "a path's previous consequence in today's numbering", g4 ? g4.items.join(" | ") : "none");
       ok(RT.comparisonRows(d4).some(function (x) { return x.item === "T3" && x.before === "K4" && x.now === "K2"; }), "and in the Changes sheet's row");
       var d3 = w.RiskApp.Compare.diff(bl2.facts, w.RiskApp.Compare.freeze(MG.normaliseProject(clone(DEMO))));
       ok(d3.empty, "the demo against itself: nothing changed");

@@ -256,7 +256,7 @@
       o.vulnerabilities.length ? h("div", { class: "field" }, [h("div", { class: "lbl", text: "Vulnerabilities" }), h("div", { class: "chip-row", role: "group", "aria-label": "Vulnerabilities" }, o.vulnerabilities.map(function (v) {
         return chip(v.id + " " + (v.description || ""), f.vulns.indexOf(v.id) >= 0, "pvuln-" + v.id, function () { toggleIn(f.vulns, v.id); rerender(); });
       }))]) : null,
-      h("p", { class: "hint", text: "The impact is copied from the consequence. Mark the affected FRs in By zone." }),
+      h("p", { class: "hint", text: "The scenario takes its impact from the consequence, and you mark its affected FRs in By zone." }),
       h("div", { class: "btn-row" }, [
         h("button", { type: "button", class: "btn sm primary", "data-action": "path-add", text: "Add scenario", onClick: function () {
           var mk = A.undoMark(), t = addPath(k, f);
@@ -318,7 +318,7 @@
       if (!t) return;
       touched(); rerender();
       A.focusAfter(kSel(k, '[data-threat-id="' + t.id + '"] [data-action="open-path"]'));
-      A.offerUndo(t.id + " now leads to " + k.id + (was && was !== k.id ? ", not " + was : "") + ".", backTo(k.id, kSel(k, '[data-k-field="link-threat"]')), mk);
+      A.offerUndo(t.id + " now leads to " + k.id + (was && was !== k.id ? " (was " + was + ")" : "") + ".", backTo(k.id, kSel(k, '[data-k-field="link-threat"]')), mk);
     } });
     return h("span", { class: "inline-add" }, [sel, btn]);
   }
