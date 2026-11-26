@@ -22,7 +22,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                      "title":  "Achieved security level (SL-A)",
                                      "label":  "SL-A",
                                      "qualifier":  "system",
-                                     "note":  "The security level the system achieves for each Foundational Requirement, set by its weakest applicable requirement, expressed as the SL vector used in ISA/IEC 62443-3-3 Annex A. Read it against the target SL vector for the zone: a value below target means that Foundational Requirement is protected against a weaker class of threat than the environment calls for, and a 0 means it does not reach SL 1. This is the achieved level for the system as configured and operated, not a capability claim about any individual product."
+                                     "note":  "This is the security level the system achieves for each Foundational Requirement, set by its weakest applicable requirement and written as the SL vector used in ISA/IEC 62443-3-3 Annex A. It is read against the zone\u0027s target SL vector. A value below target means that Foundational Requirement is protected against a weaker class of threat than the environment calls for, and a 0 means it does not reach SL 1. The vector describes the system as configured and operated and makes no claim about the capability of any single product."
                                  }
                 },
     "requirements":  [
@@ -31,7 +31,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                              "frId":  "FR1",
                              "code":  "SR 1.1",
                              "title":  "Human user identification and authentication",
-                             "question":  "Are all human users uniquely identified and authenticated before access is granted on every interface (local, network and remote)?",
+                             "question":  "Are all human users uniquely identified and authenticated before they are given access on every interface (local, network and remote)?",
                              "applicableSLs":  [
                                                    1,
                                                    2,
@@ -84,7 +84,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Knowing which human is acting is the basis of all accountability and access control. Shared and generic operator logins are common in OT and convenient on a 24/7 plant, which is exactly why establishing individual human identity is both valuable and difficult here."
+                             "rationale":  "Knowing which person is acting is the basis of accountability and access control. Shared and generic operator logins are common in OT because they are convenient on a plant that runs 24/7, so individual logins take effort to introduce."
                          },
                          {
                              "id":  "SR1.2",
@@ -139,7 +139,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Software processes and devices act on the control system as much as people do, and an unauthenticated device is an open door. Authenticating non-human actors stops rogue or spoofed components being trusted simply because they are on the network."
+                             "rationale":  "Software processes and devices act on the control system just as people do, and an unauthenticated device can connect without being challenged. Authenticating them stops a rogue or spoofed component being trusted because it is on the network."
                          },
                          {
                              "id":  "SR1.3",
@@ -162,7 +162,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Account management",
-                                                          "hint":  "Manage accounts under a defined process: create, enable, modify, disable, remove.",
+                                                          "hint":  "Create, enable, modify, disable and remove accounts under a defined process.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -195,7 +195,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Accounts that are created and never managed accumulate into standing risk, dormant logins, departed staff, shared credentials. Disciplined account management keeps the set of who-can-log-in aligned with who should, closing a route attackers routinely exploit."
+                             "rationale":  "Accounts that are created and then left unmanaged build up into dormant logins, accounts for staff who have left and shared credentials. A defined account process keeps the list of people who can log in in line with those who should, and closes a route attackers often use."
                          },
                          {
                              "id":  "SR1.4",
@@ -249,7 +249,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Identifiers must be unique and not silently reused, or actions get attributed to the wrong actor and revoked access quietly returns. Managing identifiers keeps the link between a name and a real person or device trustworthy over time."
+                             "rationale":  "Identifiers must be unique and must not be reused without control. Otherwise actions are attributed to the wrong person or device, and access that was revoked can come back. Managing identifiers keeps each name tied to one real person or device over time."
                          },
                          {
                              "id":  "SR1.5",
@@ -305,7 +305,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Authenticators, passwords, keys, tokens, are what prove identity, so their handling determines whether authentication means anything. Weak generation, storage or revocation undermines every control that depends on knowing who is acting."
+                             "rationale":  "Authenticators such as passwords, keys and tokens are what prove identity, so the way they are handled decides whether authentication means anything. Weak generation, storage or revocation undermines every control that relies on knowing who is acting."
                          },
                          {
                              "id":  "SR1.6",
@@ -362,7 +362,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Wireless extends the network beyond the physical boundary, where an attacker need not be on site to reach it. Managing wireless access controls who can associate with the control environment through a medium that is invisible and hard to contain."
+                             "rationale":  "Wireless extends the network beyond the site boundary, so an attacker does not need to be on site to reach it. Wireless access management controls who can join the control network over a medium that cannot be seen and is hard to contain."
                          },
                          {
                              "id":  "SR1.7",
@@ -419,7 +419,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Where passwords are used, their strength sets how easily authentication can be defeated by guessing or cracking. In OT this must be balanced against operational reality, but weak password rules leave the front door barely latched."
+                             "rationale":  "Where passwords are used, their strength sets how easily authentication can be defeated by guessing or cracking. In OT the password rules have to fit the way the plant is operated, but weak rules make authentication easy to defeat."
                          },
                          {
                              "id":  "SR1.8",
@@ -450,7 +450,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "PKI certificates",
-                                                          "hint":  "Where PKI is used, manage certificates per a defined policy: validate, track, revoke.",
+                                                          "hint":  "Where PKI is used, validate, track and revoke certificates under a defined policy.",
                                                           "verbatimText":  ""
                                                       },
                                                 "3":  {
@@ -472,7 +472,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "PKI certificates underpin strong authentication and trusted communication, and their value rests entirely on how the certificates are issued, validated and revoked. Mismanaged certificates create false trust that an attacker can exploit."
+                             "rationale":  "PKI certificates support strong authentication and trusted communication, and they are only as trustworthy as the way they are issued, validated and revoked. Badly managed certificates create misplaced trust that an attacker can exploit."
                          },
                          {
                              "id":  "SR1.9",
@@ -527,7 +527,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Public-key authentication is only as strong as its key lengths, algorithms and handling. Specifying that strength stops the mechanism being technically present but practically weak, which is a common way strong-looking authentication fails."
+                             "rationale":  "Public key authentication is only as strong as its key lengths, algorithms and key handling. A mechanism can be in place and still be weak in practice, which is a common way for strong-looking authentication to fail."
                          },
                          {
                              "id":  "SR1.10",
@@ -581,7 +581,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Hiding authenticator feedback, such as masking passwords and not revealing why a login failed, denies an attacker easy clues. Verbose feedback helps legitimate users slightly and helps attackers enumerate accounts considerably more."
+                             "rationale":  "Masking passwords and withholding the reason a login failed deny an attacker easy clues. Detailed feedback helps legitimate users a little and helps an attacker enumerate accounts a great deal more."
                          },
                          {
                              "id":  "SR1.11",
@@ -635,7 +635,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Limiting repeated failed logins blunts brute-force and guessing attacks. In OT the response must avoid locking out a genuine operator who needs urgent access, so the balance with availability is part of getting this right."
+                             "rationale":  "Limiting repeated failed logins slows brute-force and guessing attacks. In OT the response must not lock out an operator who needs urgent access, so the lockout has to be balanced against availability."
                          },
                          {
                              "id":  "SR1.12",
@@ -689,7 +689,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "A system-use notification establishes, before access, that use is monitored and conditional. It is a modest control but it supports later enforcement and removes the defence that an intruder did not know access was restricted."
+                             "rationale":  "A system use notification tells users before they log in that use is monitored and subject to conditions. It is a modest control, but it supports later enforcement and removes the defence that an intruder did not know access was restricted."
                          },
                          {
                              "id":  "SR1.13",
@@ -746,7 +746,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Access from untrusted networks, remote and cross-boundary connections, is among the highest-impact routes into OT. Controlling it tightly addresses the path that vendor access, remote support and internet exposure most often open."
+                             "rationale":  "Remote and cross-boundary connections from untrusted networks are among the highest-impact routes into OT. Vendor access, remote support and internet exposure most often open this route, so it needs tight control."
                          },
                          {
                              "id":  "SR2.1",
@@ -769,7 +769,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Authorization enforcement",
-                                                          "hint":  "Restrict each user/process to its assigned privileges on all interfaces.",
+                                                          "hint":  "Restrict each user or process to its assigned privileges on all interfaces.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -813,7 +813,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Authentication establishes who you are; authorisation governs what you may do. Enforcing authorisation is what stops an authenticated user, or a compromised account, from acting beyond what their role legitimately needs."
+                             "rationale":  "Authentication establishes who someone is, and authorisation governs what they may do. Enforcing authorisation stops an authenticated user, or a compromised account, from acting beyond what the role needs."
                          },
                          {
                              "id":  "SR2.2",
@@ -869,7 +869,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Even where wireless access is permitted, what may be done over it should be controlled, because wireless carries higher risk than wired. Use control over wireless limits the damage achievable through a medium that is harder to physically secure."
+                             "rationale":  "Where wireless access is permitted, what can be done over it should still be controlled, because wireless carries more risk than a wired connection. Use control limits the damage possible over a medium that is harder to secure physically."
                          },
                          {
                              "id":  "SR2.3",
@@ -892,7 +892,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Use control for portable and mobile devices",
-                                                          "hint":  "Control portable/mobile device use: authorise, restrict, monitor on connection.",
+                                                          "hint":  "Authorise, restrict and monitor portable and mobile devices when they connect.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -925,7 +925,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Portable and mobile devices move between environments and carry whatever they collected elsewhere. Controlling their use addresses the well-known OT risk of a USB device or engineering laptop bridging an air gap and carrying malware in."
+                             "rationale":  "Portable and mobile devices move between environments and carry whatever they picked up elsewhere. A USB stick or engineering laptop that bridges an air gap and brings malware in is a well-known OT risk."
                          },
                          {
                              "id":  "SR2.4",
@@ -948,7 +948,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Mobile code",
-                                                          "hint":  "Control mobile code: restrict to authorised, verified code.",
+                                                          "hint":  "Restrict mobile code to authorised, verified code.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -981,7 +981,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Mobile code runs with the privileges of whatever invoked it, so unrestricted mobile code is a path to silent execution. Controlling it limits a route by which malicious logic can run inside an otherwise trusted system."
+                             "rationale":  "Mobile code runs with the privileges of whatever invoked it, so unrestricted mobile code can run without anyone noticing. Controlling it closes a route for malicious logic to run inside a trusted system."
                          },
                          {
                              "id":  "SR2.5",
@@ -1035,7 +1035,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "An unattended, unlocked session is an open authenticated session anyone can use. Session lock guards against that, though in OT it must respect operations, since locking an active operator screen mid-task can itself be unsafe."
+                             "rationale":  "Anyone who walks up to an unattended, unlocked session can use it. Session lock prevents this, but in OT it has to fit operations, because locking an operator screen during a task can itself be unsafe."
                          },
                          {
                              "id":  "SR2.6",
@@ -1088,7 +1088,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Remote sessions left open are a route back in that is easily forgotten. Reliable remote-session termination ensures that access granted for a task does not silently persist as a standing exposure after the task is done."
+                             "rationale":  "A remote session left open is an easily forgotten route back in. Terminating remote sessions reliably means that access granted for a task ends when the task is done."
                          },
                          {
                              "id":  "SR2.7",
@@ -1140,7 +1140,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Uncontrolled concurrent sessions can mask misuse and cause confusion over who is actually in control of the system. Limiting concurrency reduces both the security and the operational ambiguity of multiple simultaneous logins."
+                             "rationale":  "Uncontrolled concurrent sessions can hide misuse and cause confusion over who is in control of the system. Limiting them reduces both the security risk and the operational confusion of several simultaneous logins."
                          },
                          {
                              "id":  "SR2.8",
@@ -1196,7 +1196,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "If security-relevant events are not recorded as auditable, there is nothing to detect, investigate or prove afterwards. Defining what must be audited is the foundation that monitoring, forensics and accountability all build on."
+                             "rationale":  "If security-relevant events are not recorded, there is nothing to detect, investigate or prove afterwards. Monitoring, forensics and accountability all depend on deciding which events are audited."
                          },
                          {
                              "id":  "SR2.9",
@@ -1252,7 +1252,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Audit data that overruns its storage is lost exactly when it may be most needed. Ensuring sufficient capacity keeps the record intact through a sustained incident, when log volume spikes and gaps would otherwise appear."
+                             "rationale":  "Audit data that overruns its storage is lost when it may be needed most. Enough capacity keeps the record intact through a long incident, when log volume rises and gaps would otherwise appear."
                          },
                          {
                              "id":  "SR2.10",
@@ -1306,7 +1306,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "How the system behaves when auditing itself fails determines whether an attacker can blind it. A defined response to audit failures stops the loss of logging passing unnoticed, which is often an early sign of tampering."
+                             "rationale":  "How the system behaves when auditing fails decides whether an attacker can blind it. A defined response means a loss of logging is noticed, and that loss is often an early sign of tampering."
                          },
                          {
                              "id":  "SR2.11",
@@ -1362,7 +1362,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Without trustworthy, synchronised timestamps, events cannot be correlated and a sequence of attack steps cannot be reconstructed. Reliable time is what lets scattered logs be assembled into a coherent account of what happened."
+                             "rationale":  "Without reliable, synchronised timestamps, events from different sources cannot be correlated and the steps of an attack cannot be put in order. Consistent time lets scattered logs be assembled into one account of what happened."
                          },
                          {
                              "id":  "SR2.12",
@@ -1401,7 +1401,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Non-repudiation",
-                                                          "hint":  "Attribute actions to the user/process so they cannot plausibly be denied.",
+                                                          "hint":  "Attribute actions to the user or process that took them, so they cannot plausibly be denied.",
                                                           "verbatimText":  ""
                                                       },
                                                 "4":  {
@@ -1415,7 +1415,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Non-repudiation ties an action firmly to the actor who took it, so it cannot later be denied. For consequential operations on a control system, that binding supports both accountability and any subsequent investigation."
+                             "rationale":  "Non-repudiation ties an action to the person or process that took it, so it cannot later be denied. For high-consequence operations on a control system, this supports accountability and any later investigation."
                          },
                          {
                              "id":  "SR3.1",
@@ -1471,7 +1471,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Communication integrity ensures messages are not altered in transit, and in OT an altered command or setpoint has physical consequences. Protecting integrity matters more here than confidentiality, because a changed instruction can move equipment."
+                             "rationale":  "Communication integrity protects messages from being altered in transit. In OT an altered command or setpoint can move equipment, so integrity usually matters more than confidentiality."
                          },
                          {
                              "id":  "SR3.2",
@@ -1530,7 +1530,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Malicious code protection addresses one of the most common ways control systems are compromised. In OT it often means allow-listing or other approaches rather than conventional antivirus, but the goal, keeping hostile code from running, is the same."
+                             "rationale":  "Malicious code is one of the most common ways control systems are compromised. In OT the protection is often application allow-listing or a similar approach, with conventional antivirus less common, and the aim is still to stop hostile code from running."
                          },
                          {
                              "id":  "SR3.3",
@@ -1553,7 +1553,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Security functionality verification",
-                                                          "hint":  "Be able to verify that security functions operate correctly.",
+                                                          "hint":  "Provide a way to verify that security functions operate correctly.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -1587,7 +1587,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Verifying that security functions actually work confirms the protections are real rather than assumed. Controls can silently fail or be disabled, and without verification an organisation believes it is protected until an incident shows it was not."
+                             "rationale":  "Verifying that security functions work confirms that the protection is in place. Controls can fail or be disabled without any sign, and without verification an organisation may believe it is protected until an incident shows otherwise."
                          },
                          {
                              "id":  "SR3.4",
@@ -1610,7 +1610,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Software and information integrity",
-                                                          "hint":  "Protect and be able to verify integrity of software, configuration and information.",
+                                                          "hint":  "Protect the integrity of software, configuration and information, and provide a way to verify it.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -1643,7 +1643,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "The integrity of software and information determines whether the system is running what it should. Detecting unauthorised changes to firmware, logic or configuration catches tampering that could alter how the process physically behaves."
+                             "rationale":  "Software and information integrity decides whether the system is running what it should. Detecting unauthorised changes to firmware, logic or configuration catches tampering that could change how the process behaves."
                          },
                          {
                              "id":  "SR3.5",
@@ -1697,14 +1697,14 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Unvalidated input is a classic route to crashing or subverting a system, and a control system processes input from many sources. Input validation stops malformed or malicious data causing unintended, possibly physical, effects."
+                             "rationale":  "Unvalidated input is a common way to crash or subvert a system, and a control system takes input from many sources. Input validation stops malformed or malicious data causing unintended effects, some of which may be physical."
                          },
                          {
                              "id":  "SR3.6",
                              "frId":  "FR3",
                              "code":  "SR 3.6",
                              "title":  "Deterministic output",
-                             "question":  "Does the system set outputs to a defined safe state on failure rather than an unpredictable one?",
+                             "question":  "Does the system set its outputs to a defined safe state when it fails?",
                              "applicableSLs":  [
                                                    1,
                                                    2,
@@ -1720,7 +1720,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Deterministic output",
-                                                          "hint":  "Set outputs to a defined safe state on failure rather than an unpredictable one.",
+                                                          "hint":  "Set outputs to a defined safe state on failure.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -1751,7 +1751,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Control systems must produce correct outputs even under stress or attack, because the output drives physical equipment. Deterministic output ensures the system behaves predictably rather than failing into an unsafe or unknown state."
+                             "rationale":  "A control system\u0027s outputs drive physical equipment, so they must stay correct under stress or attack. Deterministic output keeps the system\u0027s behaviour predictable when it fails, so it does not fall into an unsafe or unknown state."
                          },
                          {
                              "id":  "SR3.7",
@@ -1804,7 +1804,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "How a system handles errors determines whether a fault becomes a foothold or a safe stop. Sound error handling stops failures leaking information or dropping the system into an exploitable state."
+                             "rationale":  "Error handling decides whether a fault becomes a foothold for an attacker or a safe stop. Good error handling keeps failures from leaking information or leaving the system in an exploitable state."
                          },
                          {
                              "id":  "SR3.8",
@@ -1866,7 +1866,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Once a session is authenticated, its integrity must hold or an attacker can hijack or inject into it. Protecting session integrity stops a legitimate, trusted session being turned into an attack channel."
+                             "rationale":  "Once a session is authenticated, its integrity has to hold, or an attacker can hijack it or inject traffic into it. Protecting session integrity stops a trusted session being turned into an attack channel."
                          },
                          {
                              "id":  "SR3.9",
@@ -1920,7 +1920,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Audit information is the record an attacker most wants to alter to hide their tracks. Protecting it ensures the logs can be trusted as evidence and that tampering with them is itself detectable."
+                             "rationale":  "Audit records are what an attacker most wants to change to cover their tracks. Protecting them means the logs can be relied on as evidence and any tampering with them can be detected."
                          },
                          {
                              "id":  "SR4.1",
@@ -1978,7 +1978,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Some control-system data, credentials, keys, configuration, network detail, aids an attacker if exposed, even though confidentiality is usually a lower OT priority than integrity. Protecting it where it matters denies reconnaissance and reuse."
+                             "rationale":  "Some control system data, such as credentials, keys, configuration and network details, helps an attacker if it is exposed. Confidentiality is usually a lower priority in OT than integrity, but protecting this data limits an attacker\u0027s reconnaissance and reuse of it."
                          },
                          {
                              "id":  "SR4.2",
@@ -2033,7 +2033,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Information persists on media and equipment after its useful life, ready to be recovered by whoever obtains the hardware. Managing that persistence ensures decommissioned or repurposed kit does not hand over sensitive data."
+                             "rationale":  "Information stays on media and equipment after its useful life, and anyone who obtains the hardware can recover it. Clearing it stops decommissioned or reused equipment handing over sensitive data."
                          },
                          {
                              "id":  "SR4.3",
@@ -2087,7 +2087,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Cryptography underpins confidentiality, integrity and authentication, but only if used correctly. Specifying its proper use stops weak or misapplied cryptography giving the appearance of protection without the substance, within OT\u0027s performance constraints."
+                             "rationale":  "Cryptography supports confidentiality, integrity and authentication only when it is used correctly. Weak or misapplied cryptography gives a false sense of protection, and in OT its use also has to fit the performance limits of the equipment."
                          },
                          {
                              "id":  "SR5.1",
@@ -2147,7 +2147,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Network segmentation limits how far a compromise can spread from the routes attackers usually arrive by. It is among the most effective OT controls, because a flat network lets a single foothold reach the entire control environment."
+                             "rationale":  "Network segmentation limits how far a compromise can spread from the routes attackers usually come in by. It is among the most effective OT controls, because on a flat network a single foothold can reach the whole control environment."
                          },
                          {
                              "id":  "SR5.2",
@@ -2212,7 +2212,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Zone boundary protection enforces the segmentation that design intends, controlling what actually crosses between zones. Without enforced boundaries, segmentation exists only on the diagram and not in the traffic."
+                             "rationale":  "Zone boundary protection enforces the intended segmentation by controlling what crosses between zones. If the boundaries are not enforced, the segmentation exists on the drawings only."
                          },
                          {
                              "id":  "SR5.3",
@@ -2268,7 +2268,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "General person-to-person services such as email and messaging are common malware entry points and have little place inside the control environment. Restricting them removes a frequent initial-access route into OT."
+                             "rationale":  "Email, messaging and similar person-to-person services are common malware entry points and have little place inside the control environment. Restricting them removes a frequent route for an attacker\u0027s first access into OT."
                          },
                          {
                              "id":  "SR5.4",
@@ -2322,7 +2322,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Partitioning applications stops a weakness in one from undermining others sharing the same system. It contains the blast radius, so a single compromised application does not become a route to everything alongside it."
+                             "rationale":  "Partitioning applications stops a weakness in one from undermining others on the same system. A single compromised application then cannot be used to reach everything running alongside it."
                          },
                          {
                              "id":  "SR6.1",
@@ -2378,7 +2378,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Logs are only useful if the right people can actually reach and read them when needed. Ensuring audit-log accessibility turns recorded data into something usable for detection and investigation rather than data that exists but cannot be consulted."
+                             "rationale":  "Audit logs help detection and investigation only if the right people can reach and read them when they are needed."
                          },
                          {
                              "id":  "SR6.2",
@@ -2431,7 +2431,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Continuous monitoring is the precondition for noticing an attack while it is happening rather than discovering it long after. Many OT incidents go undetected for want of monitoring, so this is what gives the response clock a chance to start."
+                             "rationale":  "Continuous monitoring makes it possible to notice an attack while it is under way. Many OT incidents go undetected for long periods for lack of monitoring, and the response cannot start until the attack is noticed."
                          },
                          {
                              "id":  "SR7.1",
@@ -2490,7 +2490,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Denial-of-service protection keeps the control system available under load or attack, and in OT availability is the top priority because the system runs a physical process. Losing availability can mean losing control of that process."
+                             "rationale":  "Denial-of-service protection keeps the control system available under load or attack. Availability is usually the first priority in OT because the system runs a physical process, and losing availability can mean losing control of that process."
                          },
                          {
                              "id":  "SR7.2",
@@ -2544,7 +2544,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Managing resources ensures essential functions retain what they need even when something else is consuming or starving them. It stops a fault or attack in one area degrading the availability of the functions that matter most."
+                             "rationale":  "Resource management keeps essential functions supplied when another task or an attack is consuming resources. A fault or attack in one area then cannot degrade the functions that matter most."
                          },
                          {
                              "id":  "SR7.3",
@@ -2603,7 +2603,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Backups are the basis of recovery from destructive attacks, ransomware and serious error, and in OT they must include controller logic and configuration, not just data. A backup regime is what makes recovery possible rather than hoped-for."
+                             "rationale":  "Backups are the basis of recovery from destructive attacks, ransomware and serious errors. In OT they must cover controller logic and configuration as well as data, and recovery depends on a backup routine that is followed."
                          },
                          {
                              "id":  "SR7.4",
@@ -2657,7 +2657,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Recovery and reconstitution is the ability to actually restore the system to a known good state and resume operation. Backups without a proven recovery capability give false assurance; this is the control that limits how long the function stays down."
+                             "rationale":  "Recovery and reconstitution is the ability to restore the system to a known good state and resume operation. Backups give false assurance unless recovery from them has been proven, and a proven recovery limits how long the function stays down."
                          },
                          {
                              "id":  "SR7.5",
@@ -2680,7 +2680,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Emergency power",
-                                                          "hint":  "Provide emergency/backup power to maintain or safely shut down essential functions.",
+                                                          "hint":  "Provide emergency or backup power to keep essential functions running or shut them down safely.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -2711,7 +2711,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Emergency power keeps the control system running through supply disruption, which for a physical process can itself be a safety matter. It ensures that a power event does not cascade into loss of control at the worst moment."
+                             "rationale":  "Emergency power keeps the control system running through a supply disruption, which for a physical process can be a safety matter. It stops a power event leading to loss of control at the worst moment."
                          },
                          {
                              "id":  "SR7.6",
@@ -2767,7 +2767,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Network and security configuration settings define the system\u0027s actual security posture, and drift or default settings quietly erode it. Managing these settings keeps the hardening real and current rather than as-shipped."
+                             "rationale":  "Network and security configuration settings define the system\u0027s security posture in practice, and drift or default settings weaken it over time. Managing these settings keeps the hardening in place and up to date, so the system does not run on its factory defaults."
                          },
                          {
                              "id":  "SR7.7",
@@ -2790,7 +2790,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                                              "base"
                                                                          ],
                                                           "reTitle":  "Least functionality",
-                                                          "hint":  "Provide only required functions; disable unnecessary services and ports.",
+                                                          "hint":  "Provide only the required functions and disable unnecessary services and ports.",
                                                           "verbatimText":  ""
                                                       },
                                                 "2":  {
@@ -2821,7 +2821,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "Least functionality removes services, ports and features the function does not need, shrinking the attack surface. It is one of the few hardening measures broadly applicable even to legacy OT devices that cannot be patched."
+                             "rationale":  "Least functionality removes the services, ports and features the function does not need, which leaves an attacker fewer ways in. It is one of the few hardening measures that can be applied to legacy OT devices that cannot be patched."
                          },
                          {
                              "id":  "SR7.8",
@@ -2874,7 +2874,7 @@ window.App.Data.instruments["iec-62443-3-3"].instrument = {
                                                           "verbatimText":  ""
                                                       }
                                             },
-                             "rationale":  "You cannot protect, patch or monitor what you do not know is connected. A current component inventory underpins almost every other control and is frequently the weakest area in OT, where undocumented and legacy equipment accumulates."
+                             "rationale":  "Equipment that nobody knows is connected cannot be protected, patched or monitored. A current component inventory supports almost every other control, and it is often the weakest area in OT, where undocumented and legacy equipment builds up."
                          }
                      ],
     "_slGuidanceNote":  "slGuidance gives, per SR and per SL: the factual requirement composition (base / which REs, derived from the standard\u0027s SL-C vectors), a short RE title, and a paraphrased memory-jog hint. Titles and hints are paraphrased, NOT IEC verbatim text. \u0027verbatimText\u0027 is an empty slot for the licence holder to paste official wording into their own copy if desired; the tool shows it when present and falls back to the hint when empty. All seven FRs complete.",
