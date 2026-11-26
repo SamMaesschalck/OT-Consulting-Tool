@@ -65,7 +65,7 @@ H.test(function (ok) {
     // ---- engagement page shows NIST wording, not CAF ----
     A.UI.go("engagement");
     var mainTxt = document.getElementById("main").textContent;
-    ok(mainTxt.indexOf("control-by-control gap assessment") !== -1, "getting-started card shows the NIST intro");
+    ok(mainTxt.indexOf("NIST SP 800-53 Rev 5 catalog (Release 5.2.0)") !== -1, "getting-started card shows the NIST intro");
     ok(mainTxt.indexOf("NCSC CAF 4.0") === -1, "no leftover CAF wording on the NIST page");
     ok(mainTxt.indexOf("Baseline") !== -1 && mainTxt.indexOf("Moderate baseline") !== -1, "baseline picker present with the three baselines");
 

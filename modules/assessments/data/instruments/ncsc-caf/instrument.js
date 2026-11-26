@@ -14,7 +14,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
     "targetDimension":  "site",
     "targetDimensionLabel":  "Site",
     "scoringProfileRef":  "caf-achieved",
-    "framing":  "This is an alignment and gap analysis against the NCSC CAF 4.0 indicators of good practice, with an OT focus. It is not a formal CAF assessment and is not a regulatory submission. Contributing outcomes are judged Achieved / Partially Achieved / Not Achieved by the consultant against the IGPs.",
+    "framing":  "This assessment checks alignment with the NCSC CAF 4.0 indicators of good practice and identifies the gaps, with a focus on operational technology. The consultant judges each contributing outcome as Achieved, Partially Achieved or Not Achieved against the indicators. The assessment is not a formal CAF assessment or a regulatory submission.",
     "sourceNote":  "Structure and the verbatim Indicators of Good Practice (Achieved / Partially Achieved / Not Achieved) are transcribed from the NCSC Cyber Assessment Framework version 4.0. Contains public sector information licensed under the Open Government Licence v3.0. NCSC CAF material is Crown copyright. The IGP statements are reproduced verbatim as the authoritative reference the consultant judges against; the OT lens, state summaries and rationale are SolutionsPT commentary and are not part of the CAF.",
     "attribution":  "Contains public sector information licensed under the Open Government Licence v3.0. Cyber Assessment Framework (CAF) v4.0, National Cyber Security Centre (Crown copyright).",
     "states":  [
@@ -162,7 +162,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Board ownership must explicitly cover OT/safety risk, not just IT. In many orgs OT risk never reaches the board.",
+                                        "framing":  "Board ownership must cover OT and safety risk explicitly, as well as IT risk. In many organisations OT risk never reaches the board.",
                                         "relatedSRs":  [
 
                                                        ],
@@ -170,7 +170,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "PM-1",
                                                              "PM-2"
                                                          ],
-                                        "gotchas":  "OT risk is often owned by engineering/operations, not the CISO; board sight of it is frequently absent."
+                                        "gotchas":  "OT risk often sits with engineering or operations, outside the CISO's remit, and the board frequently has no view of it."
                                     },
                          "response":  {
                                           "state":  null,
@@ -178,12 +178,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Board sets and owns the cyber/resilience approach; it is discussed and drives decisions at board level.",
-                                              "partially":  "Some board awareness and ownership, but not consistent or not translated into decisions.",
-                                              "notAchieved":  "Little or no board-level ownership or discussion of cyber risk to the essential function.",
+                                              "achieved":  "The board sets and owns the approach to cyber security and resilience. The board discusses it, and it drives board decisions.",
+                                              "partially":  "The board has some awareness and ownership of cyber risk, but this is inconsistent or does not carry through into decisions.",
+                                              "notAchieved":  "The board has little or no ownership of cyber risk to the essential function and rarely discusses it.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Board-level ownership is what gives cyber and resilience work its mandate, funding and priority. Without direction from the top, OT security competes for attention and loses; in many organisations OT risk never reaches the board at all, so it is never genuinely owned."
+                         "rationale":  "Board ownership gives cyber and resilience work its mandate, funding and priority. Without direction from the board, OT security tends to lose out to other demands. In many organisations OT risk never reaches the board, so nobody at that level owns it."
                      },
                      {
                          "id":  "A1.b",
@@ -205,7 +205,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Clarify who owns OT security specifically, and the engineering/security split.",
+                                        "framing":  "Establish who owns OT security, and how responsibility is split between engineering and security.",
                                         "relatedSRs":  [
 
                                                        ],
@@ -221,11 +221,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Security roles and responsibilities are defined, resourced and held by competent people.",
-                                              "partially":  "Roles exist but are unclear, under-resourced, or competence is not assured.",
+                                              "partially":  "Security roles exist, but they are unclear or under-resourced, or the competence of the people in them is not assured.",
                                               "notAchieved":  "Roles and responsibilities for security are not established.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Clear roles stop security falling into the gap between IT and engineering, which is the single most common organisational weakness in OT. When everyone assumes someone else owns a control, no one does, and accountability evaporates exactly when an incident needs decisive action."
+                         "rationale":  "Clear roles stop security falling into the gap between IT and engineering, which is the most common organisational weakness in OT. When everyone assumes someone else owns a control, nobody owns it, and accountability is missing when an incident calls for quick decisions."
                      },
                      {
                          "id":  "A1.c",
@@ -251,14 +251,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Decisions affecting OT (e.g. connectivity, remote access) need risk-informed senior sign-off.",
+                                        "framing":  "Decisions that affect OT, such as new connectivity or remote access, need senior sign-off informed by risk.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "PM-1"
                                                          ],
-                                        "gotchas":  "OT change decisions are often made on operational grounds with security absent from the table."
+                                        "gotchas":  "OT changes are often decided on operational grounds without anyone from security involved."
                                     },
                          "response":  {
                                           "state":  null,
@@ -266,12 +266,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Senior accountability for the essential function\u0027s security, with decision-making informed by risk.",
-                                              "partially":  "Accountability exists but decision-making is not consistently risk-informed.",
-                                              "notAchieved":  "No clear senior accountability for decisions affecting the essential function\u0027s security.",
+                                              "achieved":  "Senior people are accountable for the security of the essential function, and their decisions are informed by risk.",
+                                              "partially":  "Accountability exists, but decisions are not consistently informed by risk.",
+                                              "notAchieved":  "Nobody at senior level is clearly accountable for decisions that affect the security of the essential function.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Decisions about the essential function must be made by people who understand both the cyber risk and the operational consequence. Where security decisions are taken without operational input, or operational changes without security input, the result is controls that don\u0027t fit the plant or risks no one signed off."
+                         "rationale":  "Decisions about the essential function must be made by people who understand both the cyber risk and the operational consequences. When security decisions are taken without operational input, or operational changes are made without security input, the result is controls that do not fit the plant or risks that nobody has accepted."
                      },
                      {
                          "id":  "A2.a",
@@ -308,7 +308,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Risk assessment must use OT consequence thinking (safety, availability), not IT CIA priorities.",
+                                        "framing":  "Risk assessment must judge consequence in OT terms, chiefly safety and availability, and should not reuse the IT ordering of confidentiality, integrity and availability.",
                                         "relatedSRs":  [
 
                                                        ],
@@ -317,7 +317,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "RA-3",
                                                              "Section 5 (Risk Management)"
                                                          ],
-                                        "gotchas":  "Generic IT risk methods understate physical/safety consequence; use consequence-driven OT methods."
+                                        "gotchas":  "Generic IT risk methods understate physical and safety consequences. Use a consequence-driven OT method."
                                     },
                          "response":  {
                                           "state":  null,
@@ -326,11 +326,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "A defined, repeated risk management process identifies and prioritises risks to the essential function.",
-                                              "partially":  "Risk process exists but is incomplete, ad hoc, or not maintained.",
-                                              "notAchieved":  "No effective risk management process for the essential function.",
+                                              "partially":  "A risk management process exists, but it is incomplete, applied ad hoc or not maintained.",
+                                              "notAchieved":  "There is no effective risk management process for the essential function.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "A defined risk process is what turns a list of possible threats into prioritised, justified action. Without it, effort goes wherever the loudest voice points rather than where the consequence is greatest, and in OT the greatest consequence is usually safety and availability, not data loss."
+                         "rationale":  "A defined risk process turns a list of possible threats into prioritised, justified action. Without one, effort goes where the loudest voice points and can miss where the consequences are greatest. In OT the most serious consequences usually concern safety and availability more than data loss."
                      },
                      {
                          "id":  "A2.b",
@@ -362,14 +362,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Include OT-specific threats (ICS malware, vendor compromise, safety targeting).",
+                                        "framing":  "The threat picture should include threats specific to OT, such as ICS malware, compromise of a vendor and attacks aimed at safety systems.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "RA-3"
                                                          ],
-                                        "gotchas":  "OT threat intel is sparser than IT; reference ICS-relevant sources and historical ICS incidents."
+                                        "gotchas":  "There is less threat intelligence for OT than for IT. Use ICS-specific sources and past ICS incidents."
                                     },
                          "response":  {
                                           "state":  null,
@@ -378,11 +378,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Threats to the essential function are understood and inform risk decisions.",
-                                              "partially":  "Some threat understanding, but partial or not current.",
+                                              "partially":  "Threats are partly understood, or the picture is out of date.",
                                               "notAchieved":  "Threats to the essential function are not understood.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "You cannot defend against threats you don\u0027t understand. Maintaining a current picture of who might target the essential function and how lets the organisation prepare for the attacks it will actually face rather than generic IT threats that may not apply to a control environment."
+                         "rationale":  "An organisation cannot defend against threats it does not understand. A current picture of who might target the essential function, and how, lets it prepare for the attacks it is likely to face. Generic IT threats may not apply to a control environment."
                      },
                      {
                          "id":  "A2.c",
@@ -406,7 +406,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Assurance in OT must avoid disrupting live process; favour passive/validated methods.",
+                                        "framing":  "Assurance in OT must not disrupt the live process. Use passive methods, or methods already shown to be safe.",
                                         "relatedSRs":  [
                                                            "SR3.3"
                                                        ],
@@ -414,7 +414,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "CA-2",
                                                              "CA-7"
                                                          ],
-                                        "gotchas":  "Active testing on live OT can cause outages; assurance methods must respect availability."
+                                        "gotchas":  "Active testing on live OT systems can cause outages, so assurance methods must protect availability."
                                     },
                          "response":  {
                                           "state":  null,
@@ -422,12 +422,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Assurance that controls work as intended, through testing/validation appropriate to the function.",
-                                              "partially":  "Some assurance activity but gaps or unverified areas.",
-                                              "notAchieved":  "Little or no assurance that controls are effective.",
+                                              "achieved":  "Testing or validation suited to the function gives assurance that controls work as intended.",
+                                              "partially":  "Some assurance takes place, but there are gaps or areas that have not been verified.",
+                                              "notAchieved":  "There is little or no assurance that controls are effective.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Assurance confirms that the risk picture is real rather than assumed. Without independent challenge, an organisation can believe its risk is well managed right up until an incident proves otherwise; assurance is what catches the gap between the paper position and the operational reality."
+                         "rationale":  "Assurance tests whether the risk picture holds in practice. Without independent challenge, an organisation can believe its risk is well managed until an incident shows otherwise. Assurance finds the gaps between what is documented and what happens on site."
                      },
                      {
                          "id":  "A3.a",
@@ -453,7 +453,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "OT asset inventory is foundational and often the weakest area; include firmware/PLC detail.",
+                                        "framing":  "The OT asset inventory underpins other controls and is often the weakest area. It should include firmware and PLC detail.",
                                         "relatedSRs":  [
                                                            "SR7.8"
                                                        ],
@@ -461,7 +461,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "CM-8",
                                                              "Section 6.2"
                                                          ],
-                                        "gotchas":  "Passive discovery preferred; active scanning can disrupt fragile OT devices."
+                                        "gotchas":  "Use passive discovery where possible, because active scanning can disrupt fragile OT devices."
                                     },
                          "response":  {
                                           "state":  null,
@@ -470,11 +470,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Assets supporting the essential function are identified, inventoried and managed through life.",
-                                              "partially":  "Partial or outdated asset knowledge.",
+                                              "partially":  "Knowledge of the assets is incomplete or out of date.",
                                               "notAchieved":  "Assets are not adequately identified or managed.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "You cannot protect, patch or monitor what you don\u0027t know is there. A complete, current asset inventory underpins almost every other control, and in OT it is frequently the weakest area, because legacy, undocumented and vendor-installed equipment accumulates over decades."
+                         "rationale":  "Assets that nobody knows about cannot be protected, patched or monitored. A complete, current asset inventory underpins almost every other control. In OT it is often the weakest area, because legacy, undocumented and vendor-installed equipment builds up over decades."
                      },
                      {
                          "id":  "A4.a",
@@ -511,7 +511,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "OT vendors often have deep remote access; integrator and OEM risk is central.",
+                                        "framing":  "OT vendors often have deep remote access, so integrator and OEM risk is central to this outcome.",
                                         "relatedSRs":  [
 
                                                        ],
@@ -528,11 +528,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Supply chain risk to the essential function is understood and managed.",
-                                              "partially":  "Some supplier risk management but incomplete.",
+                                              "partially":  "Some supplier risk management is in place, but it is incomplete.",
                                               "notAchieved":  "Supply chain risk is not managed.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Suppliers and integrators often hold deep, standing access to OT and supply the firmware and software the asset owner cannot fully inspect. Supply chain compromise turns a trusted route into an attack path, so managing supplier risk is managing one of the most direct ways into the environment."
+                         "rationale":  "Suppliers and integrators often have deep, standing access to OT, and they supply firmware and software that the asset owner cannot fully inspect. A supply chain compromise turns a trusted route into an attack path, and that route is one of the most direct ways into the environment."
                      },
                      {
                          "id":  "A4.b",
@@ -566,7 +566,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Covers OEM firmware and application support; patch availability and support lifecycle matter.",
+                                        "framing":  "This covers OEM firmware and application support, including patch availability and the support lifecycle.",
                                         "relatedSRs":  [
 
                                                        ],
@@ -574,7 +574,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "SA-3",
                                                              "SA-10"
                                                          ],
-                                        "gotchas":  "Many OT products are end-of-support yet still in service; document compensating controls."
+                                        "gotchas":  "Many OT products are still in service after their support has ended. Record the compensating controls."
                                     },
                          "response":  {
                                           "state":  null,
@@ -582,12 +582,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Software/products are developed and supported securely across the supply relationship.",
-                                              "partially":  "Partial secure development/support assurance.",
-                                              "notAchieved":  "No assurance of secure development or support.",
+                                              "achieved":  "Software and products are developed and supported securely across the supply relationship.",
+                                              "partially":  "There is some assurance of secure development and support, but it is incomplete.",
+                                              "notAchieved":  "There is no assurance of secure development or support.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Software built or maintained without security in mind ships vulnerabilities straight into the control system. Secure development and support practices, whether in-house or demanded of suppliers, stop weaknesses being introduced through the very process meant to keep the system running."
+                         "rationale":  "Software built or maintained without regard to security brings vulnerabilities straight into the control system. Secure development and support practices, in-house or required of suppliers, stop weaknesses entering through the work that keeps the system running."
                      },
                      {
                          "id":  "B1.a",
@@ -618,14 +618,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Policies must address OT realities (patching constraints, remote access, removable media).",
+                                        "framing":  "Policies must deal with conditions in OT, such as limits on patching, remote access and removable media.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "Section 6 (Program)"
                                                          ],
-                                        "gotchas":  "IT policies copied to OT often cannot be followed and get ignored; tailor them."
+                                        "gotchas":  "IT policies copied across to OT often cannot be followed, so staff ignore them. Adapt them to OT."
                                     },
                          "response":  {
                                           "state":  null,
@@ -634,11 +634,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Security policies, processes and procedures are developed to protect the essential function.",
-                                              "partially":  "Policies exist but are incomplete or not OT-specific.",
-                                              "notAchieved":  "Inadequate security policies/processes.",
+                                              "partially":  "Policies exist, but they are incomplete or do not address OT.",
+                                              "notAchieved":  "Security policies and processes are inadequate.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Policy is where the organisation decides, in advance and consistently, how it will protect the essential function. Without developed policy, protection depends on individual memory and goodwill, which varies by person and shift and cannot be assured or audited."
+                         "rationale":  "Policy sets out in advance how the organisation will protect the essential function, so the approach is consistent. Without it, protection depends on individual memory and goodwill, which varies by person and shift and cannot be assured or audited."
                      },
                      {
                          "id":  "B1.b",
@@ -668,14 +668,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Check real practice on the plant floor, not just documented intent.",
+                                        "framing":  "Check what happens on the plant floor as well as what the documents say.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
 
                                                          ],
-                                        "gotchas":  "Plant practice frequently diverges from corporate policy; verify on site."
+                                        "gotchas":  "Plant practice often differs from corporate policy, so verify it on site."
                                     },
                          "response":  {
                                           "state":  null,
@@ -684,11 +684,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Policies and processes are followed and embedded in practice.",
-                                              "partially":  "Partial adherence; gaps between policy and practice.",
+                                              "partially":  "Policies are partly followed, and there are gaps between policy and practice.",
                                               "notAchieved":  "Policies are not followed in practice.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "A policy that exists only on paper protects nothing. Implementation, embedding the policy into how people actually work, is what turns intent into protection, and the gap between written and practised is where many assessments find the real exposure."
+                         "rationale":  "A policy that exists only on paper protects nothing. It starts to protect the function once it is built into how people work. Many assessments find the main exposure in the gap between written policy and practice."
                      },
                      {
                          "id":  "B2.a",
@@ -722,7 +722,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Shared HMI/engineering logins are the norm in OT and the key weakness here.",
+                                        "framing":  "Shared HMI and engineering logins are normal in OT and are the main weakness for this outcome.",
                                         "relatedSRs":  [
                                                            "SR1.1",
                                                            "SR1.2",
@@ -732,7 +732,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "IA-2",
                                                              "AC-3"
                                                          ],
-                                        "gotchas":  "Individual auth is hard on legacy HMIs; note compensating controls where MFA is impossible."
+                                        "gotchas":  "Individual authentication is hard on legacy HMIs. Where MFA is impossible, note the compensating controls."
                                     },
                          "response":  {
                                           "state":  null,
@@ -740,12 +740,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Access is robustly verified, authenticated and authorised for the essential function\u0027s systems.",
-                                              "partially":  "Authentication/authorisation partial or inconsistent.",
-                                              "notAchieved":  "Weak or absent identity verification/authentication.",
+                                              "achieved":  "Access to the essential function\u0027s systems is reliably verified, authenticated and authorised.",
+                                              "partially":  "Authentication and authorisation are incomplete or inconsistent.",
+                                              "notAchieved":  "Identity verification and authentication are weak or absent.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Verifying who and what is connecting is the foundation of access control. In OT, shared logins and unauthenticated access are common and convenient, which is exactly why establishing real identity, authentication and authorisation is both important and hard."
+                         "rationale":  "Access control rests on verifying who and what is connecting. In OT, shared logins and unauthenticated access are common because they are convenient, which makes identity, authentication and authorisation both important and hard to put in place."
                      },
                      {
                          "id":  "B2.b",
@@ -773,7 +773,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Covers engineering laptops, transient and vendor devices on the OT network.",
+                                        "framing":  "This covers engineering laptops and transient and vendor devices on the OT network.",
                                         "relatedSRs":  [
                                                            "SR1.2",
                                                            "SR2.3"
@@ -781,7 +781,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "CM-8"
                                                          ],
-                                        "gotchas":  "Transient/contractor devices are a major OT vector and often unmanaged."
+                                        "gotchas":  "Transient and contractor devices are a common route into OT and are often unmanaged."
                                     },
                          "response":  {
                                           "state":  null,
@@ -790,7 +790,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Devices accessing the essential function are managed and trusted.",
-                                              "partially":  "Partial device management.",
+                                              "partially":  "Devices are only partly managed.",
                                               "notAchieved":  "Devices are not managed.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
@@ -832,7 +832,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "AC-6"
                                                          ],
-                                        "gotchas":  "Standing admin on engineering workstations is common; least privilege is rare in OT."
+                                        "gotchas":  "Standing admin rights on engineering workstations are common, and least privilege is rare in OT."
                                     },
                          "response":  {
                                           "state":  null,
@@ -841,11 +841,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Privileged access is tightly controlled and monitored.",
-                                              "partially":  "Some privileged access control but gaps.",
+                                              "partially":  "Privileged access is partly controlled, with gaps.",
                                               "notAchieved":  "Privileged access is uncontrolled.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Privileged accounts can change the process itself, so their compromise is among the most serious outcomes in OT. Tight management of who holds elevated rights, and when, limits both external attackers who seek those accounts and the damage a single mistake can cause."
+                         "rationale":  "Privileged accounts can change the process itself, so their compromise is among the most serious events in OT. Tight control over who holds elevated rights, and when, makes those accounts harder for an attacker to obtain and limits the damage a single mistake can cause."
                      },
                      {
                          "id":  "B2.d",
@@ -874,7 +874,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "OT often lacks central IdAM; accounts are local to devices.",
+                                        "framing":  "OT often has no central IdAM, and accounts are held locally on each device.",
                                         "relatedSRs":  [
                                                            "SR1.3",
                                                            "SR1.4",
@@ -884,7 +884,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "AC-2",
                                                              "IA-4"
                                                          ],
-                                        "gotchas":  "Centralised IdAM may be impractical for legacy OT; document the realistic target."
+                                        "gotchas":  "Central IdAM may be impractical for legacy OT. Record a realistic target."
                                     },
                          "response":  {
                                           "state":  null,
@@ -893,11 +893,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Identity and access management is coherent and managed across the function.",
-                                              "partially":  "IdAM partial or fragmented.",
-                                              "notAchieved":  "No coherent IdAM.",
+                                              "partially":  "IdAM is incomplete or fragmented.",
+                                              "notAchieved":  "There is no coherent IdAM.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Access that is granted and never reviewed accumulates into a standing risk, with old accounts and excess rights lingering for years. Managing identity and access across its whole lifecycle keeps the set of who-can-do-what aligned with who actually needs it."
+                         "rationale":  "Access that is granted and never reviewed builds into a standing risk, with old accounts and excess rights left in place for years. Managing identity and access across the whole lifecycle keeps each person's rights in line with what they need."
                      },
                      {
                          "id":  "B3.a",
@@ -931,7 +931,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "OT \u0027data\u0027 includes process values, recipes, logic, configuration, historian data.",
+                                        "framing":  "In OT, data includes process values, recipes, logic, configuration and historian records.",
                                         "relatedSRs":  [
                                                            "SR4.1"
                                                        ],
@@ -947,11 +947,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "The data important to the essential function is understood and its protection needs known.",
-                                              "partially":  "Partial understanding of important data.",
+                                              "partially":  "The important data is only partly understood.",
                                               "notAchieved":  "Important data is not understood.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "You cannot protect data appropriately until you know what you hold and why it matters. In OT this includes process values, configuration and logic whose integrity affects physical operation, not just conventional records, and mis-judging their importance leads to either over- or under-protection."
+                         "rationale":  "Data cannot be protected properly until the organisation knows what it holds and why it matters. In OT this includes process values, configuration and logic whose integrity affects physical operation, as well as conventional records. Misjudging their importance leads to too much or too little protection."
                      },
                      {
                          "id":  "B3.b",
@@ -974,7 +974,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Many OT protocols are unauthenticated/cleartext; protection is often at the network layer.",
+                                        "framing":  "Many OT protocols are unauthenticated and send data in clear text, so protection is often applied at the network layer.",
                                         "relatedSRs":  [
                                                            "SR3.1",
                                                            "SR4.1"
@@ -982,7 +982,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "SC-8"
                                                          ],
-                                        "gotchas":  "Legacy protocols (Modbus, DNP3) lack native protection; segment rather than encrypt in place."
+                                        "gotchas":  "Legacy protocols such as Modbus and DNP3 have no built-in protection. Segmenting the network is usually more practical than encrypting these protocols in place."
                                     },
                          "response":  {
                                           "state":  null,
@@ -991,11 +991,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Data in transit is protected appropriately.",
-                                              "partially":  "Partial protection of data in transit.",
+                                              "partially":  "Data in transit is only partly protected.",
                                               "notAchieved":  "Data in transit is not protected.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Data moving across the network can be read or altered in transit, and in OT an altered setpoint or command has physical consequences. Protecting data in transit guards both its confidentiality where that matters and, more importantly for control systems, its integrity."
+                         "rationale":  "Data moving across the network can be read or altered in transit, and in OT an altered setpoint or command has physical consequences. Protection in transit covers confidentiality where that matters, and integrity, which matters more for control systems."
                      },
                      {
                          "id":  "B3.c",
@@ -1022,7 +1022,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Covers historian, engineering stores, backups of logic/config.",
+                                        "framing":  "This covers the historian, engineering file stores and backups of logic and configuration.",
                                         "relatedSRs":  [
                                                            "SR4.1",
                                                            "SR3.4"
@@ -1030,7 +1030,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "SC-28"
                                                          ],
-                                        "gotchas":  "Config/logic backups are sensitive; protect their storage and integrity."
+                                        "gotchas":  "Backups of configuration and logic are sensitive. Protect where they are stored and check their integrity."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1039,11 +1039,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Stored data is protected appropriately.",
-                                              "partially":  "Partial protection of stored data.",
+                                              "partially":  "Stored data is only partly protected.",
                                               "notAchieved":  "Stored data is not protected.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Stored data, configuration, credentials, historian records, is a target both for theft and for tampering that could mask or enable an attack. Protecting it at rest limits what an intruder gains from reaching a store and what they can quietly change."
+                         "rationale":  "Stored data, such as configuration, credentials and historian records, is a target for theft and for tampering that could hide or enable an attack. Protecting it at rest limits what an intruder gains from reaching a data store and what they can change without being noticed."
                      },
                      {
                          "id":  "B3.d",
@@ -1067,14 +1067,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Engineering laptops carrying project files/logic off-site are the main concern.",
+                                        "framing":  "The main concern is engineering laptops that carry project files and logic off site.",
                                         "relatedSRs":  [
                                                            "SR4.1"
                                                        ],
                                         "related80082":  [
                                                              "MP-5"
                                                          ],
-                                        "gotchas":  "Project files on engineering laptops are a quiet exfiltration/loss risk."
+                                        "gotchas":  "Project files on engineering laptops are an easily overlooked route for data loss or theft."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1083,11 +1083,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Mobile data is protected.",
-                                              "partially":  "Partial mobile data protection.",
+                                              "partially":  "Mobile data is only partly protected.",
                                               "notAchieved":  "Mobile data is not protected.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Data on mobile and removable media leaves the controlled environment and travels where the organisation\u0027s controls don\u0027t reach. Managing it limits both loss of sensitive configuration and the well-known OT risk of removable media carrying malware back in."
+                         "rationale":  "Data on mobile devices and removable media leaves the controlled environment and goes where the organisation\u0027s controls do not reach. Managing it limits the loss of sensitive configuration and the familiar OT risk of removable media bringing malware back in."
                      },
                      {
                          "id":  "B3.e",
@@ -1106,14 +1106,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Decommissioned controllers/drives may retain logic, credentials, network detail.",
+                                        "framing":  "Decommissioned controllers and drives may still hold logic, credentials and network detail.",
                                         "relatedSRs":  [
                                                            "SR4.2"
                                                        ],
                                         "related80082":  [
                                                              "MP-6"
                                                          ],
-                                        "gotchas":  "Old OT kit sold/scrapped with config intact is a real leakage path."
+                                        "gotchas":  "Old OT kit that is sold or scrapped with its configuration intact can leak information."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1121,12 +1121,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Media and equipment are sanitised before disposal/reuse.",
-                                              "partially":  "Partial sanitisation practice.",
-                                              "notAchieved":  "No reliable sanitisation.",
+                                              "achieved":  "Media and equipment are sanitised before disposal or reuse.",
+                                              "partially":  "Sanitisation is carried out inconsistently.",
+                                              "notAchieved":  "Media and equipment are not reliably sanitised.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Equipment and media reach end of life still holding configuration, credentials and network detail useful to an attacker. Proper sanitisation ensures that decommissioned kit doesn\u0027t hand over a map of the environment when it leaves the organisation\u0027s control."
+                         "rationale":  "Equipment and media reach end of life still holding configuration, credentials and network detail that would help an attacker. Proper sanitisation stops decommissioned kit from giving away a map of the environment when it leaves the organisation\u0027s control."
                      },
                      {
                          "id":  "B4.a",
@@ -1156,7 +1156,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Covers segmentation, zones/conduits, secure architecture (Purdue).",
+                                        "framing":  "This covers segmentation, zones and conduits, and secure architecture such as the Purdue model.",
                                         "relatedSRs":  [
                                                            "SR5.1",
                                                            "SR5.2"
@@ -1165,7 +1165,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "SA-8",
                                                              "Section 5"
                                                          ],
-                                        "gotchas":  "Brownfield OT is rarely securely designed; assess against a realistic target architecture."
+                                        "gotchas":  "Brownfield OT is rarely designed securely, so assess it against a realistic target architecture."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1174,11 +1174,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Systems are designed to be secure for the essential function.",
-                                              "partially":  "Partial secure design.",
+                                              "partially":  "Security is only partly designed into the systems.",
                                               "notAchieved":  "Systems are not securely designed.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Security designed in from the start is far cheaper and more effective than security bolted on later, and in OT, where systems run for decades, early design choices persist for a very long time. Secure-by-design, including sound segmentation, shapes the resilience of everything built on top of it."
+                         "rationale":  "Security designed in from the start costs far less and works better than security added later. In OT, systems run for decades, so early design choices stay in place for a long time. Secure design, including sound segmentation, sets the resilience of everything built on it."
                      },
                      {
                          "id":  "B4.b",
@@ -1213,7 +1213,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Least functionality on OT hosts; disable unused services/ports.",
+                                        "framing":  "OT hosts should run only the functions they need, with unused services and ports disabled.",
                                         "relatedSRs":  [
                                                            "SR7.6",
                                                            "SR7.7"
@@ -1222,7 +1222,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "CM-6",
                                                              "CM-7"
                                                          ],
-                                        "gotchas":  "Vendor-default builds are common in OT; hardening may be constrained by support terms."
+                                        "gotchas":  "Vendor-default builds are common in OT, and support terms may limit hardening."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1231,11 +1231,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Systems are securely configured and hardened.",
-                                              "partially":  "Partial hardening.",
-                                              "notAchieved":  "Systems run default/insecure configurations.",
+                                              "partially":  "Systems are only partly hardened.",
+                                              "notAchieved":  "Systems run default or insecure configurations.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Default configurations are built for ease of setup, not security, and leave services and access enabled that the function never needs. Secure configuration reduces the attack surface to what is actually required, which is one of the few hardening measures broadly achievable even on constrained OT devices."
+                         "rationale":  "Default configurations favour ease of setup over security and leave enabled services and access that the function never needs. Secure configuration cuts the attack surface down to what is required. It is one of the few hardening measures that can be applied widely, even on constrained OT devices."
                      },
                      {
                          "id":  "B4.c",
@@ -1258,7 +1258,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Remote access and change control for OT are central here.",
+                                        "framing":  "Remote access and change control are central to this outcome in OT.",
                                         "relatedSRs":  [
                                                            "SR1.13",
                                                            "SR2.6"
@@ -1267,7 +1267,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "MA-4",
                                                              "CM-3"
                                                          ],
-                                        "gotchas":  "Vendor remote access and uncontrolled change are the dominant OT management risks."
+                                        "gotchas":  "The main management risks in OT are vendor remote access and uncontrolled change."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1275,12 +1275,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Systems are securely managed (changes, maintenance, remote access).",
-                                              "partially":  "Partial secure management.",
-                                              "notAchieved":  "Insecure management practices.",
+                                              "achieved":  "Systems are managed securely, including changes, maintenance and remote access.",
+                                              "partially":  "Systems are only partly managed securely.",
+                                              "notAchieved":  "Systems are managed insecurely.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "The management and administration plane is how the system is configured and controlled, so its compromise hands an attacker the keys. Securing management access, especially remote and cross-network access, protects the most powerful routes into the environment."
+                         "rationale":  "The system is configured and controlled through its management and administration interfaces, so an attacker who compromises them gains control of the system. Securing management access, especially remote access and access across networks, protects the most powerful routes into the environment."
                      },
                      {
                          "id":  "B4.d",
@@ -1309,7 +1309,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "OT patching is constrained; risk-based mitigation and compensating controls matter most.",
+                                        "framing":  "Patching in OT is limited, so risk-based mitigation and compensating controls matter most.",
                                         "relatedSRs":  [
                                                            "SR2.3",
                                                            "SR3.2"
@@ -1318,7 +1318,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "RA-5",
                                                              "SI-2"
                                                          ],
-                                        "gotchas":  "Patching often impossible without outages; assess the mitigation strategy, not just patch rate."
+                                        "gotchas":  "Patching is often impossible without an outage. Assess the mitigation strategy as well as the patch rate."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1327,11 +1327,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Vulnerabilities are managed across the function\u0027s systems.",
-                                              "partially":  "Partial vulnerability management.",
+                                              "partially":  "Vulnerabilities are only partly managed.",
                                               "notAchieved":  "Vulnerabilities are not managed.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Most breaches exploit known, unpatched vulnerabilities. A managed process to find, assess and address them shrinks the window attackers rely on, and in OT, where patching is often constrained, the assessment and mitigation steps carry as much weight as patching itself."
+                         "rationale":  "Most breaches exploit known, unpatched vulnerabilities. A managed process to find, assess and address them shortens the window that attackers rely on. In OT, where patching is often limited, assessment and mitigation carry as much weight as the patching itself."
                      },
                      {
                          "id":  "B5.a",
@@ -1353,7 +1353,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Resilience of the physical process, not just IT systems.",
+                                        "framing":  "This covers the resilience of the physical process as well as the IT systems.",
                                         "relatedSRs":  [
                                                            "SR7.1",
                                                            "SR7.2"
@@ -1361,7 +1361,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "CP-2"
                                                          ],
-                                        "gotchas":  "OT resilience includes safe-state and manual fallback, not just system redundancy."
+                                        "gotchas":  "OT resilience includes safe states and manual fallback as well as system redundancy."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1369,12 +1369,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "The organisation is prepared for resilience of the essential function.",
-                                              "partially":  "Partial resilience preparation.",
-                                              "notAchieved":  "Not prepared for resilience.",
+                                              "achieved":  "The organisation has prepared to keep the essential function resilient.",
+                                              "partially":  "Preparation for resilience is incomplete.",
+                                              "notAchieved":  "The organisation has not prepared for resilience.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Resilience depends on having prepared before the disruption, not improvising during it. Knowing in advance what the essential function needs to keep running, and what to do when it can\u0027t, is the difference between a contained event and a crisis."
+                         "rationale":  "Resilience depends on preparation before a disruption. Knowing in advance what the essential function needs to keep running, and what to do when it cannot, helps keep an event contained so that it does not become a crisis."
                      },
                      {
                          "id":  "B5.b",
@@ -1400,7 +1400,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Redundancy, island-mode, fail-safe behaviour.",
+                                        "framing":  "This covers redundancy, island-mode operation and fail-safe behaviour.",
                                         "relatedSRs":  [
                                                            "SR5.2",
                                                            "SR7.1"
@@ -1408,7 +1408,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "CP-2"
                                                          ],
-                                        "gotchas":  "Ability to run isolated (island mode) is a key OT resilience property."
+                                        "gotchas":  "The ability to run isolated, in island mode, is an important resilience property in OT."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1417,11 +1417,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Systems are designed for resilience.",
-                                              "partially":  "Partial resilience design.",
-                                              "notAchieved":  "Not designed for resilience.",
+                                              "partially":  "Systems are only partly designed for resilience.",
+                                              "notAchieved":  "Systems are not designed for resilience.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "A system designed to fail safe and degrade gracefully limits how far any single failure or attack can spread. In OT this includes the ability to keep the process running or bring it to a safe state independent of compromised or unavailable supporting systems."
+                         "rationale":  "A system designed to fail safe and degrade gracefully limits how far any single failure or attack can spread. In OT this includes keeping the process running, or bringing it to a safe state, without relying on supporting systems that are compromised or unavailable."
                      },
                      {
                          "id":  "B5.c",
@@ -1443,7 +1443,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Backups of controller logic, configs and HMI, stored securely and restore-tested.",
+                                        "framing":  "Backups of controller logic, configurations and HMIs should be stored securely and tested by restoring them.",
                                         "relatedSRs":  [
                                                            "SR7.3",
                                                            "SR7.4"
@@ -1452,7 +1452,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "CP-9",
                                                              "CP-10"
                                                          ],
-                                        "gotchas":  "Logic/config backups are often missing or never restore-tested in OT."
+                                        "gotchas":  "In OT, backups of logic and configuration are often missing or have never been tested by a restore."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1460,12 +1460,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Comprehensive, secured, tested backups enable recovery from extreme events.",
-                                              "partially":  "Backups exist but incomplete, unsecured, or untested.",
-                                              "notAchieved":  "Backups inadequate or absent.",
+                                              "achieved":  "Complete, secured and tested backups allow recovery from extreme events.",
+                                              "partially":  "Backups exist, but they are incomplete, unsecured or untested.",
+                                              "notAchieved":  "Backups are inadequate or absent.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Backups are the last line of defence against ransomware, destructive attacks and serious error, and in OT the backups most often missing are controller logic and configuration, not just data. Sound, verified, restorable backups are what make recovery possible rather than hoped-for."
+                         "rationale":  "Backups are the last line of defence against ransomware, destructive attacks and serious error. In OT, the backups most often missing are of controller logic and configuration. Recovery can only be relied on when backups are sound, verified and restorable."
                      },
                      {
                          "id":  "B6.a",
@@ -1495,14 +1495,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Culture must bridge engineering and security mindsets.",
+                                        "framing":  "The culture has to bring the engineering and security outlooks together.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "AT-2"
                                                          ],
-                                        "gotchas":  "Engineering culture prioritises uptime; security framing must respect that."
+                                        "gotchas":  "Engineering culture puts uptime first, and security messages need to take account of that."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1511,11 +1511,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "A positive cyber security culture supports the essential function.",
-                                              "partially":  "Partial/uneven culture.",
-                                              "notAchieved":  "Poor security culture.",
+                                              "partially":  "The security culture is uneven across the organisation.",
+                                              "notAchieved":  "The security culture is poor.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Culture determines what people do when no one is watching and no procedure quite fits. A workforce that genuinely values security catches what controls miss, whereas a culture that treats it as someone else\u0027s problem undermines even well-designed defences."
+                         "rationale":  "Culture determines what people do when nobody is watching and no procedure fits. A workforce that values security catches what controls miss. Where staff treat security as someone else\u0027s problem, even well-designed defences are weakened."
                      },
                      {
                          "id":  "B6.b",
@@ -1543,14 +1543,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "OT staff need OT-relevant training, not generic IT awareness.",
+                                        "framing":  "OT staff need training relevant to OT. Generic IT awareness training is not enough.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "AT-3"
                                                          ],
-                                        "gotchas":  "Generic phishing training misses OT-specific risks; tailor for operators/engineers."
+                                        "gotchas":  "Generic phishing training misses risks specific to OT. Adapt it for operators and engineers."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1559,11 +1559,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Staff have appropriate cyber security training for their roles.",
-                                              "partially":  "Partial/role-incomplete training.",
-                                              "notAchieved":  "Inadequate training.",
+                                              "partially":  "Training is incomplete or does not cover every role.",
+                                              "notAchieved":  "Training is inadequate.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "People act safely when they know how, and OT staff need training framed around the operational environment rather than generic office-IT material. Training is what converts good intentions into the right action during the routine moments and the critical ones."
+                         "rationale":  "People act securely when they know how. OT staff need training set in the operational environment they work in, which generic office IT material does not cover. Training turns good intentions into the right action, in routine work and in an emergency."
                      },
                      {
                          "id":  "C1.a",
@@ -1604,7 +1604,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "OT-aware monitoring; IT SIEM alone rarely sees OT protocols.",
+                                        "framing":  "Monitoring needs to understand OT. An IT SIEM on its own rarely sees OT protocols.",
                                         "relatedSRs":  [
                                                            "SR6.2"
                                                        ],
@@ -1621,11 +1621,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Monitoring covers the systems supporting the essential function.",
-                                              "partially":  "Partial monitoring coverage.",
-                                              "notAchieved":  "Inadequate monitoring coverage.",
+                                              "partially":  "Monitoring covers only some of these systems.",
+                                              "notAchieved":  "Monitoring coverage is inadequate.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "You cannot detect what you cannot see. Monitoring coverage across the parts of the environment that matter is the precondition for noticing an attack at all, and gaps in coverage are blind spots an intruder can move through unobserved."
+                         "rationale":  "Attacks cannot be detected in parts of the environment that are not monitored. Monitoring coverage of the parts that matter is a precondition for noticing an attack, and gaps in coverage are blind spots an intruder can move through unseen."
                      },
                      {
                          "id":  "C1.b",
@@ -1662,7 +1662,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "AU-9"
                                                          ],
-                                        "gotchas":  "Many OT devices log poorly or not at all; capture what is feasible."
+                                        "gotchas":  "Many OT devices log poorly or not at all, so capture what is feasible."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1671,11 +1671,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Logs are securely collected and protected.",
-                                              "partially":  "Partial log security.",
-                                              "notAchieved":  "Logs not secured.",
+                                              "partially":  "Logs are only partly secured.",
+                                              "notAchieved":  "Logs are not secured.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Logs are only useful if they are complete and trustworthy, and an attacker\u0027s early move is often to alter or delete them. Securing logs preserves both the evidence needed to investigate and the integrity that lets you trust what they show."
+                         "rationale":  "Logs are useful only if they are complete and trustworthy, and attackers often alter or delete them early on. Securing logs preserves the evidence needed for an investigation and the integrity that makes the logs trustworthy."
                      },
                      {
                          "id":  "C1.c",
@@ -1714,14 +1714,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Alerting tuned to OT baselines and anomalies.",
+                                        "framing":  "Alerting should be tuned to OT baselines and anomalies.",
                                         "relatedSRs":  [
                                                            "SR6.2"
                                                        ],
                                         "related80082":  [
                                                              "SI-4"
                                                          ],
-                                        "gotchas":  "OT traffic is repetitive; anomaly-based alerting can work well once baselined."
+                                        "gotchas":  "OT traffic is repetitive, so anomaly-based alerting can work well once a baseline is set."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1730,11 +1730,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Alerts are generated from monitoring data.",
-                                              "partially":  "Partial alerting.",
-                                              "notAchieved":  "No effective alerting.",
+                                              "partially":  "Alerting is only partly in place.",
+                                              "notAchieved":  "There is no effective alerting.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Collecting data achieves nothing if nothing prompts a human to look. Turning monitoring into timely, meaningful alerts is what converts visibility into the chance to respond before an intrusion becomes an incident."
+                         "rationale":  "Collecting monitoring data achieves nothing unless something prompts a person to look at it. Timely, meaningful alerts give the organisation a chance to respond before an intrusion becomes an incident."
                      },
                      {
                          "id":  "C1.d",
@@ -1765,14 +1765,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Triage needs OT context (what is normal for this process).",
+                                        "framing":  "Triage needs OT context, meaning knowledge of what is normal for the process.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "IR-4"
                                                          ],
-                                        "gotchas":  "IT analysts without OT context misjudge OT alerts; pair with engineering knowledge."
+                                        "gotchas":  "IT analysts without OT context misjudge OT alerts. Pair them with people who know the engineering."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1781,11 +1781,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Security alerts are triaged with context.",
-                                              "partially":  "Partial triage.",
-                                              "notAchieved":  "Alerts not triaged.",
+                                              "partially":  "Only some alerts are triaged.",
+                                              "notAchieved":  "Alerts are not triaged.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Distinguishing a real security incident from the constant background of events is what makes monitoring actionable. Without reliable identification, genuine attacks are lost in noise and the response clock never starts."
+                         "rationale":  "Monitoring is only useful if real security incidents can be picked out from the constant background of events. Without reliable identification, real attacks are lost in the noise and the response never starts."
                      },
                      {
                          "id":  "C1.e",
@@ -1821,14 +1821,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "OT detection needs blended OT+security skills, often scarce.",
+                                        "framing":  "OT detection needs a mix of OT and security skills, which is often scarce.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "IR-2"
                                                          ],
-                                        "gotchas":  "OT-capable detection staff are rare; flag the resourcing gap honestly."
+                                        "gotchas":  "Detection staff who understand OT are rare. Record any resourcing gap."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1837,11 +1837,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Personnel have the skills for monitoring and detection.",
-                                              "partially":  "Partial skills.",
-                                              "notAchieved":  "Inadequate monitoring skills.",
+                                              "partially":  "The necessary skills are only partly available.",
+                                              "notAchieved":  "Monitoring skills are inadequate.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Monitoring is only as good as the tools deployed and the people reading them. Adequate tooling and skilled analysts are what make detection effective rather than a box ticked, and in OT the skills must span both security and process understanding."
+                         "rationale":  "Monitoring is only as good as the tools deployed and the people reading them. Detection works when the tooling is adequate and the analysts are skilled. In OT, those skills must cover both security and the process."
                      },
                      {
                          "id":  "C1.f",
@@ -1882,7 +1882,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                         "related80082":  [
                                                              "SI-4"
                                                          ],
-                                        "gotchas":  "Deterministic OT behaviour makes baselining effective; exploit that."
+                                        "gotchas":  "OT behaviour is predictable, which makes baselining effective."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1890,12 +1890,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "User/system behaviour is understood and threat intelligence informs monitoring.",
-                                              "partially":  "Partial behavioural understanding/threat intel use.",
-                                              "notAchieved":  "Behaviour not understood; intel not used.",
+                                              "achieved":  "User and system behaviour is understood, and threat intelligence informs monitoring.",
+                                              "partially":  "Behaviour is partly understood, or threat intelligence is used only in part.",
+                                              "notAchieved":  "Behaviour is not understood, and threat intelligence is not used.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Continuously refining detection in light of new threats keeps monitoring relevant as the adversary changes. Detection tuned once and never revisited steadily loses ground to attackers who adapt, so ongoing improvement is what keeps it effective."
+                         "rationale":  "Refining detection as new threats emerge keeps monitoring relevant as attackers change their methods. Detection that is tuned once and never revisited falls behind attackers who adapt."
                      },
                      {
                          "id":  "C2.a",
@@ -1925,14 +1925,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "New in CAF 4.0. Hunting in OT must be non-disruptive and data-driven.",
+                                        "framing":  "This outcome is new in CAF 4.0. Threat hunting in OT must not disrupt operations and should be driven by data.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "Section 6"
                                                          ],
-                                        "gotchas":  "Threat hunting is mature in IT but nascent in OT; expect this to be low for most operators."
+                                        "gotchas":  "Threat hunting is mature in IT but new in OT. Expect most operators to be at a low level here."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1941,11 +1941,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Proactive threat hunting is carried out, documented and drives improvement.",
-                                              "partially":  "Some hunting but ad hoc/undocumented.",
-                                              "notAchieved":  "No threat hunting.",
+                                              "partially":  "Some threat hunting takes place, but it is ad hoc or undocumented.",
+                                              "notAchieved":  "No threat hunting is carried out.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Proactive threat hunting looks for the intruder who has evaded automated detection, on the assumption that prevention sometimes fails. It is nascent in OT and demanding to do well, but it is what finds the quiet, capable attacker who is specifically trying not to trip an alert."
+                         "rationale":  "Threat hunting looks for intruders who have evaded automated detection, on the assumption that prevention sometimes fails. It is still new in OT and hard to do well, but it can find a capable attacker who is deliberately avoiding alerts."
                      },
                      {
                          "id":  "D1.a",
@@ -1971,7 +1971,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Plan must cover OT/safety scenarios and engineering involvement.",
+                                        "framing":  "The plan must cover OT and safety scenarios and involve engineering.",
                                         "relatedSRs":  [
                                                            "SR6.1"
                                                        ],
@@ -1979,7 +1979,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "IR-1",
                                                              "IR-8"
                                                          ],
-                                        "gotchas":  "IT IR plans rarely cover plant shutdown/safe-state decisions; OT scenarios needed."
+                                        "gotchas":  "IT incident response plans rarely cover plant shutdown or safe-state decisions, so OT scenarios need to be added."
                                     },
                          "response":  {
                                           "state":  null,
@@ -1988,11 +1988,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "A response plan covers incidents affecting the essential function.",
-                                              "partially":  "Plan partial or not OT-specific.",
-                                              "notAchieved":  "No adequate response plan.",
+                                              "partially":  "The plan is incomplete or does not address OT.",
+                                              "notAchieved":  "There is no adequate response plan.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "A response plan made in advance is what allows fast, coordinated action under pressure, when there is no time to invent one. In OT the plan must include engineering and safe-state decisions that an IT-only playbook never covers, such as whether and how to take the process down."
+                         "rationale":  "A response plan prepared in advance allows fast, coordinated action under pressure, when there is no time to write one. In OT the plan must include engineering and safe-state decisions that an IT playbook does not cover, such as whether and how to shut the process down."
                      },
                      {
                          "id":  "D1.b",
@@ -2017,7 +2017,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Who has authority to stop a process? Engineering/security coordination is key.",
+                                        "framing":  "Establish who has authority to stop a process. Engineering and security need to coordinate closely.",
                                         "relatedSRs":  [
                                                            "SR7.4"
                                                        ],
@@ -2025,7 +2025,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "IR-4",
                                                              "CP-10"
                                                          ],
-                                        "gotchas":  "Authority to halt production in an incident is often unclear; clarify it."
+                                        "gotchas":  "Authority to halt production during an incident is often unclear and should be settled in advance."
                                     },
                          "response":  {
                                           "state":  null,
@@ -2033,12 +2033,12 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                           "notes":  ""
                                       },
                          "stateSummary":  {
-                                              "achieved":  "Capability and roles exist to respond and recover, with authority to act.",
-                                              "partially":  "Partial capability/authority.",
-                                              "notAchieved":  "Inadequate response/recovery capability.",
+                                              "achieved":  "The capability and roles to respond and recover are in place, with authority to act.",
+                                              "partially":  "The capability or the authority to act is only partly in place.",
+                                              "notAchieved":  "Response and recovery capability is inadequate.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Plans only help if the organisation can actually execute them. A real response and recovery capability, people, tools and rehearsed procedures, is what turns the plan into restored operation, and the recovery side is what limits how long the essential function stays degraded."
+                         "rationale":  "Plans help only if the organisation can carry them out. Response and recovery need people, tools and rehearsed procedures to restore operation, and the recovery capability limits how long the essential function stays degraded."
                      },
                      {
                          "id":  "D1.c",
@@ -2062,7 +2062,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Exercises should include OT/safety scenarios and engineering staff.",
+                                        "framing":  "Exercises should include OT and safety scenarios and engineering staff.",
                                         "relatedSRs":  [
 
                                                        ],
@@ -2070,7 +2070,7 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                                              "IR-3",
                                                              "CP-4"
                                                          ],
-                                        "gotchas":  "OT-inclusive tabletops are uncommon; their absence is a frequent finding."
+                                        "gotchas":  "Tabletop exercises that include OT are uncommon, and their absence is a frequent finding."
                                     },
                          "response":  {
                                           "state":  null,
@@ -2079,11 +2079,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Response and recovery are tested and exercised.",
-                                              "partially":  "Partial/limited exercising.",
-                                              "notAchieved":  "Not tested.",
+                                              "partially":  "Exercising is partial or limited.",
+                                              "notAchieved":  "Response and recovery are not tested.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "A plan never tested is a plan that fails on first use. Exercising the response under realistic conditions surfaces the gaps, wrong assumptions and missing contacts while it is still cheap to fix them, rather than during a live incident."
+                         "rationale":  "An untested plan tends to fail the first time it is used. Exercising the response under realistic conditions exposes gaps, wrong assumptions and missing contacts while they are still cheap to fix."
                      },
                      {
                          "id":  "D2.a",
@@ -2108,14 +2108,14 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                               ]
                                   },
                          "otLens":  {
-                                        "framing":  "Root cause must consider OT/process factors, not just IT.",
+                                        "framing":  "Root cause analysis must consider OT and process factors as well as IT.",
                                         "relatedSRs":  [
 
                                                        ],
                                         "related80082":  [
                                                              "IR-4"
                                                          ],
-                                        "gotchas":  "OT incidents need engineering input to root-cause properly."
+                                        "gotchas":  "Finding the root cause of an OT incident needs engineering input."
                                     },
                          "response":  {
                                           "state":  null,
@@ -2124,11 +2124,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Incident root causes are analysed.",
-                                              "partially":  "Partial root-cause analysis.",
-                                              "notAchieved":  "Root causes not analysed.",
+                                              "partially":  "Root causes are analysed only in part.",
+                                              "notAchieved":  "Root causes are not analysed.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "Understanding why an incident happened is what stops it happening again. Root cause analysis turns a single event into a systemic fix, whereas treating only the symptom leaves the underlying weakness in place for the next attacker to find."
+                         "rationale":  "Understanding why an incident happened helps stop it happening again. Root cause analysis leads to a fix for the underlying weakness. Treating only the symptom leaves that weakness in place for the next attacker."
                      },
                      {
                          "id":  "D2.b",
@@ -2172,11 +2172,11 @@ window.App.Data.instruments["ncsc-caf"].instrument = {
                                       },
                          "stateSummary":  {
                                               "achieved":  "Lessons from incidents drive improvements.",
-                                              "partially":  "Partial improvement loop.",
-                                              "notAchieved":  "Lessons not used.",
+                                              "partially":  "Lessons are only partly used to drive improvement.",
+                                              "notAchieved":  "Lessons from incidents are not used.",
                                               "_note":  "Paraphrased memory-jog, NOT verbatim CAF text. Judge against the authoritative CAF IGPs."
                                           },
-                         "rationale":  "An organisation that learns from incidents matures its defences; one that doesn\u0027t repeats the same failures. Feeding lessons back into controls and the response capability is what turns painful experience into lasting improvement."
+                         "rationale":  "An organisation that learns from incidents improves its defences, and one that does not tends to repeat the same failures. Lessons need to be fed back into controls and the response capability."
                      }
                  ],
     "_contentNote":  "State summaries are paraphrased memory-jogs (NOT verbatim CAF IGPs); each outcome retains empty \u0027igps\u0027 verbatim slots for the licence holder to populate from the authoritative CAF 4.0. OT lens (framing, related 62443-3-3 SRs, NIST 800-82 areas, gotchas) is a consultant-refinable first draft. Source: CAF 4.0 (NCSC, Crown copyright, OGL).",

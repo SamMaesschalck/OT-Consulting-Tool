@@ -16,7 +16,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
     "targetDimension":  "organisation",
     "targetDimensionLabel":  "Entity",
     "status":  "active",
-    "framing":  "A conformance and gap assessment against the cybersecurity risk-management and reporting obligations of the EU NIS2 Directive (Directive (EU) 2022/2555), focused on governance (Article 20), the cybersecurity risk-management measures (Article 21(2)(a)-(j)) and incident-reporting obligations (Article 23). Each obligation is judged Achieved / Partially Achieved / Not Achieved by the consultant. This is a readiness and gap analysis to support improvement; it is not a determination of legal compliance with NIS2 or with the national law that transposes it in any given Member State.",
+    "framing":  "This assessment checks the entity against the cybersecurity risk-management and reporting obligations of the EU NIS2 Directive (Directive (EU) 2022/2555). It covers governance (Article 20), the risk-management measures in Article 21(2)(a)-(j) and incident reporting (Article 23). The consultant judges each obligation as Achieved, Partially Achieved or Not Achieved. The results support readiness and improvement work. They do not determine legal compliance with NIS2, or with the national law that transposes it in a Member State.",
     "sourceNote":  "Items are paraphrased from the Articles of Directive (EU) 2022/2555 (NIS2). Article and clause references are given per item. NIS2 is transposed into national law by each Member State, which may add or detail requirements; confirm scope against the applicable national transposition. Verify the paraphrased wording against the official Official Journal text before relying on it. Version-stamp when finalised. The \u0027rationale\u0027 (why this matters) given for each obligation is best-practice interpretation drawing on recognised frameworks (e.g. ISO/IEC 27001, NIST CSF, ENISA guidance) to explain the security intent; it is not text from, or a legal interpretation of, the Directive.",
     "states":  [
                    {
@@ -114,8 +114,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "GOV.1",
                       "title":  "Management approval of measures",
                       "requirement":  "The management body approves the cybersecurity risk-management measures taken by the entity to comply with Article 21.",
-                      "rationale":  "Senior approval turns cybersecurity from an IT issue into a governed business risk: it gives the measures the mandate, funding and authority to be enforced, and ensures someone owns the residual risk. NIS2 places this responsibility explicitly on management.",
-                      "evidencePrompt":  "Record evidence of management-body approval (minutes, sign-off) and the basis for the state selected.",
+                      "rationale":  "When the management body approves the measures, cybersecurity is governed as a business risk. The approval gives the measures the authority and funding to be enforced, and it makes someone answerable for the residual risk. NIS2 places this responsibility on management explicitly.",
+                      "evidencePrompt":  "Record evidence that the management body approved the measures, such as minutes or a sign-off, and why you chose this state.",
                       "articleRef":  "Art 20(1)",
                       "allowNA":  true
                   },
@@ -125,8 +125,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "GOV.2",
                       "title":  "Oversight of implementation",
                       "requirement":  "The management body oversees the implementation of the cybersecurity risk-management measures.",
-                      "rationale":  "Approval without oversight lets controls decay. Regular management review of progress, KPIs and exceptions keeps the programme on track and surfaces slippage before it becomes an incident.",
-                      "evidencePrompt":  "Record how management oversees implementation (reporting, reviews, KPIs).",
+                      "rationale":  "Controls that are approved but never overseen tend to decay. When management regularly reviews progress, KPIs and exceptions, slippage is found and dealt with before it leads to an incident.",
+                      "evidencePrompt":  "Record how management oversees implementation, for example through reporting, reviews or KPIs.",
                       "articleRef":  "Art 20(1)",
                       "allowNA":  true
                   },
@@ -135,8 +135,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "categoryId":  "GOV",
                       "code":  "GOV.3",
                       "title":  "Management accountability",
-                      "requirement":  "Accountability of the management body for compliance with the cybersecurity risk-management measures is established and understood.",
-                      "rationale":  "Clear, understood accountability at board level sets the tone from the top and ensures security decisions are owned rather than diffused. It is increasingly what regulators and insurers expect to see evidenced.",
+                      "requirement":  "The management body's accountability for compliance with the cybersecurity risk-management measures is established and understood.",
+                      "rationale":  "When accountability at board level is clear and understood, each security decision has an owner. Regulators and insurers increasingly expect to see this accountability evidenced.",
                       "evidencePrompt":  "Record how accountability is assigned and understood at management level.",
                       "articleRef":  "Art 20(1)",
                       "allowNA":  true
@@ -147,8 +147,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "GOV.4",
                       "title":  "Management training",
                       "requirement":  "Members of the management body follow training to gain sufficient knowledge and skills to identify risks and assess cybersecurity risk-management practices and their impact on the entity.",
-                      "rationale":  "A board cannot oversee a risk it does not understand. Management training builds the literacy needed to challenge assumptions, prioritise investment and judge whether the measures are proportionate to the threat.",
-                      "evidencePrompt":  "Record management training undertaken and its scope.",
+                      "rationale":  "A board cannot oversee a risk it does not understand. Training gives its members enough knowledge to question assumptions and to judge whether the measures, and the spending on them, are proportionate to the threat.",
+                      "evidencePrompt":  "Record the training management has completed and what it covered.",
                       "articleRef":  "Art 20(2)",
                       "allowNA":  true
                   },
@@ -158,8 +158,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "GOV.5",
                       "title":  "Staff training offered",
                       "requirement":  "The entity offers similar cybersecurity training to its employees on a regular basis.",
-                      "rationale":  "People are the most frequently exploited attack surface. Regular, role-relevant training measurably reduces susceptibility to phishing and social engineering and reinforces a security-aware culture.",
-                      "evidencePrompt":  "Record the staff training programme, cadence and coverage.",
+                      "rationale":  "Attackers target staff more often than any other route in. Regular training matched to each role measurably reduces how often staff fall for phishing and other social engineering.",
+                      "evidencePrompt":  "Record the staff training programme, how often it runs and who it reaches.",
                       "articleRef":  "Art 20(2)",
                       "allowNA":  true
                   },
@@ -169,8 +169,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "A.1",
                       "title":  "Risk analysis policy",
                       "requirement":  "Policies on risk analysis are in place, based on an all-hazards approach to protecting network and information systems and their physical environment.",
-                      "rationale":  "Risk-based prioritisation is the foundation of every credible security programme. An all-hazards risk analysis directs effort and spend at the threats that matter most, rather than spreading them thinly or chasing the latest headline.",
-                      "evidencePrompt":  "Record the risk analysis policy/methodology and how risks are identified and treated.",
+                      "rationale":  "A security programme needs risk analysis to set its priorities. An all-hazards analysis directs effort and spending at the threats that matter most to the entity. Without it, resources tend to be spread thinly or to follow the latest headline.",
+                      "evidencePrompt":  "Record the risk analysis policy or method, and how risks are identified and treated.",
                       "articleRef":  "Art 21(2)(a)",
                       "allowNA":  true
                   },
@@ -180,7 +180,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "A.2",
                       "title":  "Information system security policy",
                       "requirement":  "An information system security policy is established, approved by management, and communicated.",
-                      "rationale":  "A management-approved, communicated security policy sets the expected baseline and the authority behind it. Without one, controls are applied inconsistently and staff have no clear standard to follow.",
+                      "rationale":  "An approved and communicated security policy sets the baseline staff are expected to meet, with management's authority behind it. Without one, controls are applied inconsistently and staff have no clear standard to follow.",
                       "evidencePrompt":  "Record the security policy, its approval and how it is communicated and maintained.",
                       "articleRef":  "Art 21(2)(a)",
                       "allowNA":  true
@@ -191,7 +191,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "B.1",
                       "title":  "Incident handling capability",
                       "requirement":  "An incident handling capability covering detection, analysis, containment, response and recovery is in place.",
-                      "rationale":  "Serious incidents are a matter of when, not if. A defined detect-analyse-contain-respond-recover capability limits dwell time and impact; ad-hoc response typically multiplies the damage, cost and recovery time.",
+                      "rationale":  "Every entity should expect a serious incident at some point. A defined capability to detect, analyse, contain, respond and recover shortens the time an attacker goes unnoticed and limits the impact. An improvised response usually makes the damage worse and recovery slower.",
                       "evidencePrompt":  "Record the incident handling process, roles and tooling.",
                       "articleRef":  "Art 21(2)(b)",
                       "allowNA":  true
@@ -202,8 +202,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "B.2",
                       "title":  "Incident logging and lessons learned",
                       "requirement":  "Incidents are logged and post-incident review feeds improvements to controls and the response capability.",
-                      "rationale":  "Logging and post-incident review turn incidents into improvement. Without that feedback loop the same root causes recur and the organisation never matures its defences.",
-                      "evidencePrompt":  "Record incident records and examples of lessons-learned changes.",
+                      "rationale":  "Logging incidents and reviewing them afterwards shows what needs to change in the controls and the response. Without that review, the same root causes recur and the defences do not improve.",
+                      "evidencePrompt":  "Record the incident log and examples of changes made after a lessons-learned review.",
                       "articleRef":  "Art 21(2)(b)",
                       "allowNA":  true
                   },
@@ -213,8 +213,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "C.1",
                       "title":  "Backup management",
                       "requirement":  "Backups of critical systems and data are taken, protected and tested for restoration.",
-                      "rationale":  "Tested, protected (offline or immutable) backups are the single most effective control against ransomware and destructive attacks. Untested or online-only backups routinely fail exactly when they are needed.",
-                      "evidencePrompt":  "Record backup scope, protection (offline/immutable) and last restoration test.",
+                      "rationale":  "Backups that are protected (offline or immutable) and tested are the most effective control against ransomware and destructive attacks. Backups that are untested or kept only online often fail when they are needed.",
+                      "evidencePrompt":  "Record what is backed up, how the backups are protected (offline or immutable) and when a restore was last tested.",
                       "articleRef":  "Art 21(2)(c)",
                       "allowNA":  true
                   },
@@ -224,7 +224,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "C.2",
                       "title":  "Disaster recovery",
                       "requirement":  "Disaster recovery plans exist for critical systems and services, with defined recovery objectives.",
-                      "rationale":  "Defined recovery objectives and tested DR plans decide whether a major outage is an inconvenience or an existential event. Recovery time and point objectives must be known and proven, not assumed.",
+                      "rationale":  "Recovery objectives and tested disaster recovery plans largely decide how much harm a major outage does. The entity needs to know its recovery time and recovery point objectives, and to have shown in testing that it can meet them.",
                       "evidencePrompt":  "Record DR plans, recovery objectives and test history.",
                       "articleRef":  "Art 21(2)(c)",
                       "allowNA":  true
@@ -235,7 +235,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "C.3",
                       "title":  "Crisis management",
                       "requirement":  "Crisis management arrangements (roles, decision-making and communications) are defined and exercised.",
-                      "rationale":  "Technical recovery is only half of a crisis. Pre-agreed roles, decision rights and communications prevent paralysis and reputational damage when senior, legal and external stakeholders must act under pressure.",
+                      "rationale":  "A crisis needs decisions and communication as well as technical recovery. When roles, decision rights and communications are agreed in advance, senior, legal and external stakeholders can act quickly under pressure, which limits reputational damage.",
                       "evidencePrompt":  "Record crisis management arrangements and exercises.",
                       "articleRef":  "Art 21(2)(c)",
                       "allowNA":  true
@@ -246,7 +246,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "D.1",
                       "title":  "Supplier risk management",
                       "requirement":  "Security risks arising from relationships with direct suppliers and service providers are assessed and addressed.",
-                      "rationale":  "Attackers increasingly enter through trusted third parties. Assessing supplier and service-provider risk closes a blind spot that perimeter controls cannot, and is central to NIS2\u0027s emphasis on supply-chain security.",
+                      "rationale":  "Attackers increasingly get in through trusted suppliers and service providers, a route that perimeter controls do not cover. Assessing that risk is central to the NIS2 requirements on supply chain security.",
                       "evidencePrompt":  "Record supplier risk assessments and how risks are addressed in relationships and contracts.",
                       "articleRef":  "Art 21(2)(d)",
                       "allowNA":  true
@@ -257,7 +257,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "D.2",
                       "title":  "Supplier security requirements",
                       "requirement":  "Security requirements are set for suppliers, including the security of products and services, and adherence is monitored.",
-                      "rationale":  "Security expectations that are not contracted and monitored are not enforceable. Setting and checking supplier requirements ensures third parties uphold the same baseline and that product and service security is maintained over time.",
+                      "rationale":  "A security expectation can only be enforced if it is in the contract and someone checks it. Setting supplier requirements and monitoring adherence holds third parties to the entity's baseline and keeps their products and services secure over time.",
                       "evidencePrompt":  "Record supplier security requirements and monitoring of adherence.",
                       "articleRef":  "Art 21(2)(d)",
                       "allowNA":  true
@@ -268,8 +268,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "E.1",
                       "title":  "Secure acquisition, development and maintenance",
                       "requirement":  "Security is addressed in the acquisition, development and maintenance of network and information systems.",
-                      "rationale":  "Building and buying securely is far cheaper than retrofitting. Addressing security across acquisition, development and maintenance prevents weaknesses being designed in and carried through the system lifecycle.",
-                      "evidencePrompt":  "Record secure development/acquisition practices and maintenance controls.",
+                      "rationale":  "Security built in when a system is bought or developed costs far less than security added later. Treating it as part of acquisition, development and maintenance stops weaknesses being designed in and carried through the life of the system.",
+                      "evidencePrompt":  "Record the secure development and acquisition practices and the maintenance controls.",
                       "articleRef":  "Art 21(2)(e)",
                       "allowNA":  true
                   },
@@ -279,8 +279,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "E.2",
                       "title":  "Vulnerability handling and disclosure",
                       "requirement":  "Vulnerabilities are identified, triaged and remediated, and there is a route for vulnerability disclosure.",
-                      "rationale":  "Most breaches exploit known, unpatched vulnerabilities. A managed identify-triage-remediate process, plus a disclosure route, shrinks the window of exposure that attackers depend on.",
-                      "evidencePrompt":  "Record vulnerability management process and disclosure handling.",
+                      "rationale":  "Most breaches exploit vulnerabilities that were known and not patched. A managed process to identify, triage and remediate vulnerabilities, with a route for disclosure, shortens the time a known weakness stays open to attackers.",
+                      "evidencePrompt":  "Record the vulnerability management process and how disclosures are handled.",
                       "articleRef":  "Art 21(2)(e)",
                       "allowNA":  true
                   },
@@ -290,7 +290,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "F.1",
                       "title":  "Effectiveness assessment",
                       "requirement":  "Policies and procedures are in place to assess the effectiveness of the cybersecurity risk-management measures.",
-                      "rationale":  "Controls that are never tested give false assurance. Assessment, testing and metrics confirm that measures work as intended and provide the evidence needed for governance and continual improvement.",
+                      "rationale":  "Controls that are never tested can give false assurance. Audits, tests and metrics show whether the measures work as intended, and they give management the evidence it needs to oversee and improve them.",
                       "evidencePrompt":  "Record how the effectiveness of measures is assessed (audits, testing, metrics).",
                       "articleRef":  "Art 21(2)(f)",
                       "allowNA":  true
@@ -300,8 +300,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "categoryId":  "M-G",
                       "code":  "G.1",
                       "title":  "Basic cyber hygiene",
-                      "requirement":  "Basic cyber hygiene practices are defined and applied (e.g. updates, configuration, least privilege, awareness).",
-                      "rationale":  "A large share of attacks are stopped by fundamentals: patching, secure configuration, least privilege and awareness. A defined hygiene baseline removes the easy wins attackers rely on.",
+                      "requirement":  "Basic cyber hygiene practices are defined and applied (for example updates, configuration, least privilege and awareness).",
+                      "rationale":  "Patching, secure configuration, least privilege and staff awareness stop a large share of attacks. A defined hygiene baseline removes the easy openings that many attackers rely on.",
                       "evidencePrompt":  "Record the cyber hygiene baseline and how it is applied.",
                       "articleRef":  "Art 21(2)(g)",
                       "allowNA":  true
@@ -312,7 +312,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "G.2",
                       "title":  "Cybersecurity training",
                       "requirement":  "Cybersecurity training is provided to relevant staff.",
-                      "rationale":  "Sustained, relevant training keeps the human layer resilient as threats evolve. One-off awareness fades; regular reinforcement is what actually changes behaviour.",
+                      "rationale":  "Awareness from a single session fades. Regular training that stays relevant to each role changes behaviour and keeps pace with new threats.",
                       "evidencePrompt":  "Record the training programme and coverage.",
                       "articleRef":  "Art 21(2)(g)",
                       "allowNA":  true
@@ -323,8 +323,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "H.1",
                       "title":  "Cryptography and encryption",
                       "requirement":  "Policies and procedures on the use of cryptography and, where appropriate, encryption are in place.",
-                      "rationale":  "Encryption protects confidentiality and integrity when other controls fail: in transit, at rest and on lost devices. A clear policy ensures it is applied consistently and with sound key management rather than piecemeal.",
-                      "evidencePrompt":  "Record cryptography/encryption policy and where encryption is applied.",
+                      "rationale":  "Encryption protects confidentiality and integrity in transit, at rest and on lost devices, including when other controls fail. A clear policy means it is applied consistently, with sound key management.",
+                      "evidencePrompt":  "Record the cryptography and encryption policy and where encryption is applied.",
                       "articleRef":  "Art 21(2)(h)",
                       "allowNA":  true
                   },
@@ -333,8 +333,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "categoryId":  "M-I",
                       "code":  "I.1",
                       "title":  "Human resources security",
-                      "requirement":  "Human resources security measures are in place (e.g. screening where lawful, terms of employment, joiners/movers/leavers).",
-                      "rationale":  "Risk follows people through the employment lifecycle. Screening where lawful, clear terms and disciplined joiners/movers/leavers processes prevent orphaned accounts and reduce insider exposure.",
+                      "requirement":  "Human resources security measures are in place (for example screening where lawful, terms of employment, and joiner, mover and leaver processes).",
+                      "rationale":  "Each stage of employment carries its own risk. Screening where lawful, clear terms of employment and well-run joiner, mover and leaver processes reduce insider risk and stop accounts being left active after people leave or change role.",
                       "evidencePrompt":  "Record HR security measures across the employment lifecycle.",
                       "articleRef":  "Art 21(2)(i)",
                       "allowNA":  true
@@ -345,7 +345,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "I.2",
                       "title":  "Access control",
                       "requirement":  "Access control policies manage identities and privileges and enforce least privilege.",
-                      "rationale":  "Least-privilege access control limits how far an attacker or a mistake can spread. Unmanaged identities and excess privilege are among the most common enablers of serious breaches.",
+                      "rationale":  "Least privilege limits how far an attacker, or a mistake, can spread. Unmanaged identities and excess privileges are among the most common causes of serious breaches.",
                       "evidencePrompt":  "Record access control policy, identity lifecycle and least-privilege enforcement.",
                       "articleRef":  "Art 21(2)(i)",
                       "allowNA":  true
@@ -356,7 +356,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "I.3",
                       "title":  "Asset management",
                       "requirement":  "Assets are identified, classified and managed throughout their lifecycle.",
-                      "rationale":  "You cannot protect what you do not know you have. A maintained, classified asset inventory underpins patching, monitoring, access control and incident response; gaps in it become unmonitored entry points.",
+                      "rationale":  "An entity cannot protect assets it does not know it has. Patching, monitoring, access control and incident response all depend on a maintained, classified asset inventory. An asset missing from it is unlikely to be monitored and can become a way in.",
                       "evidencePrompt":  "Record the asset inventory, classification and management process.",
                       "articleRef":  "Art 21(2)(i)",
                       "allowNA":  true
@@ -367,8 +367,8 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "J.1",
                       "title":  "Multi-factor authentication",
                       "requirement":  "Multi-factor or continuous authentication solutions are used where appropriate, in particular for remote and privileged access.",
-                      "rationale":  "Passwords alone are routinely phished or stolen. MFA (especially for remote and privileged access) blocks the overwhelming majority of account-takeover attacks and is among the highest-value controls available.",
-                      "evidencePrompt":  "Record where MFA/continuous authentication is enforced and any gaps.",
+                      "rationale":  "Passwords on their own are often phished or stolen. MFA, especially on remote and privileged access, blocks the great majority of account-takeover attacks, which makes it one of the most effective controls available.",
+                      "evidencePrompt":  "Record where MFA or continuous authentication is enforced, and any gaps.",
                       "articleRef":  "Art 21(2)(j)",
                       "allowNA":  true
                   },
@@ -378,7 +378,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "J.2",
                       "title":  "Secured communications",
                       "requirement":  "Secured voice, video and text communications and secured emergency communication systems are used within the entity, where appropriate.",
-                      "rationale":  "Secured and resilient communications protect sensitive exchanges from interception and keep the organisation able to coordinate during an incident, when normal channels may themselves be compromised.",
+                      "rationale":  "Secured communications protect sensitive conversations from interception. Resilient channels, including emergency ones, let the entity coordinate during an incident when its normal channels may be compromised.",
                       "evidencePrompt":  "Record secured and emergency communications arrangements.",
                       "articleRef":  "Art 21(2)(j)",
                       "allowNA":  true
@@ -389,7 +389,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "REP.1",
                       "title":  "Significant-incident identification",
                       "requirement":  "The entity can identify significant incidents against the Article 23 criteria (significant operational disruption or financial loss, or impact on others through considerable material or non-material damage).",
-                      "rationale":  "If an entity cannot recognise a significant incident against the criteria, every downstream reporting deadline is missed by default. Correct, timely identification is the trigger for the entire reporting obligation.",
+                      "rationale":  "Every reporting deadline runs from the point the entity becomes aware of a significant incident. If it cannot recognise one against the criteria, it will miss all of the deadlines that follow.",
                       "evidencePrompt":  "Record how significant incidents are identified and the criteria used.",
                       "articleRef":  "Art 23(3)",
                       "allowNA":  true
@@ -400,7 +400,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "REP.2",
                       "title":  "Early warning (24 hours)",
                       "requirement":  "A process exists to submit an early warning to the CSIRT or competent authority without undue delay and within 24 hours of becoming aware of a significant incident.",
-                      "rationale":  "The 24-hour early warning is a hard regulatory deadline. A rehearsed process and known contact routes are essential, because 24 hours is far too short to improvise under incident pressure.",
+                      "rationale":  "The early warning has a fixed deadline of 24 hours. That is too short to work out the process and the contacts during an incident, so both need to be agreed and rehearsed in advance.",
                       "evidencePrompt":  "Record the early-warning process and contact routes.",
                       "articleRef":  "Art 23(4)(a)",
                       "allowNA":  true
@@ -411,7 +411,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "REP.3",
                       "title":  "Incident notification (72 hours)",
                       "requirement":  "A process exists to submit an incident notification within 72 hours, updating the early warning with an initial assessment of the incident, its severity and impact, and indicators of compromise where available.",
-                      "rationale":  "The 72-hour notification commits the entity to an initial severity and impact assessment. Pre-defined content and clear ownership ensure a timely, credible submission rather than a scramble.",
+                      "rationale":  "The 72-hour notification commits the entity to an initial assessment of severity and impact. Agreeing the content and the owner in advance makes a timely and credible submission much more likely.",
                       "evidencePrompt":  "Record the 72-hour notification process and content.",
                       "articleRef":  "Art 23(4)(b)",
                       "allowNA":  true
@@ -422,7 +422,7 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "REP.4",
                       "title":  "Final report (one month)",
                       "requirement":  "A process exists to submit a final report within one month, with a detailed description, severity and impact, root cause, mitigations applied, and any cross-border impact.",
-                      "rationale":  "The one-month final report demonstrates root-cause understanding and effective mitigation to the authority. A defined process ensures the analysis is complete and defensible rather than retrofitted.",
+                      "rationale":  "The final report, due within one month, shows the authority that the entity understands the root cause and has mitigated it. A defined process helps make the analysis complete and defensible.",
                       "evidencePrompt":  "Record the final-report process and content.",
                       "articleRef":  "Art 23(4)(d)",
                       "allowNA":  true
@@ -433,12 +433,12 @@ window.App.Data.instruments["nis2-assessment"].instrument = {
                       "code":  "REP.5",
                       "title":  "Recipient notification",
                       "requirement":  "Where appropriate, recipients of the entity\u0027s services are notified of significant incidents and of any measures or remedies they can take in response.",
-                      "rationale":  "Promptly informing affected service recipients (and telling them what they can do) limits downstream harm and protects trust, and may be required where the incident affects the services they rely on.",
+                      "rationale":  "Telling affected service recipients promptly, and telling them what they can do, limits the harm to them and protects their trust. It may also be required where the incident affects the services they rely on.",
                       "evidencePrompt":  "Record how and when service recipients are notified.",
                       "articleRef":  "Art 23(1)",
                       "allowNA":  true
                   }
               ],
     "_contentNote":  "Categories follow NIS2 Article 20 (governance), Article 21(2)(a)-(j) (the ten risk-management measures) and Article 23 (reporting). Items paraphrase the obligations into assessable statements; they are not verbatim Directive text. Confirm against the official Official Journal text and the relevant national transposition.",
-    "seriesContext":  "The NIS2 Directive (EU) 2022/2555 is European law. It does not apply directly: each member state transposes it into national law, so the obligations an entity actually faces are set nationally and can differ between states, as can the supervisory regime and penalties. This assessment reads the Directive\u0027s own obligations. It is a gap analysis to support preparation, not a legal opinion and not a determination by a competent authority."
+    "seriesContext":  "The NIS2 Directive (EU) 2022/2555 is European law, but it does not apply directly. Each member state transposes it into national law, so the obligations an entity faces are set nationally and can differ between states. The supervisory regime and the penalties can differ too. This assessment works from the obligations in the Directive itself. It is a gap analysis to help the entity prepare. It is not a legal opinion and is not a determination by a competent authority."
 };
