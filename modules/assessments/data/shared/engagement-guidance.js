@@ -172,7 +172,7 @@ window.App.Data.shared.engagementGuidance = {
         "Access control policy and privileged access arrangements",
         "Security monitoring / SOC documentation and alerting examples",
         "Incident response plan and exercise records",
-        "Supply chain security policy and key supplier list"
+        "Supply chain security policy and the list of critical suppliers"
       ],
       "oftenForgotten": [
         "Regulator correspondence (designation, previous CAF submissions, improvement plans)",
