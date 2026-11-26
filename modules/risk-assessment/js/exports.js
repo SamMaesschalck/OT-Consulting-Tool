@@ -27,6 +27,9 @@ window.RiskExports = (function () {
 
   function RT() { return window.RiskTool; }
   function RULES() { return window.App.Data.sltRules; }
+  // A conduit's characteristics (js/model.js, the 3-2 fixes).
+  var M_CONDUIT_TEXT = ["accountableOrg", "logicalBoundary", "physicalBoundary"];
+  var M_CONDUIT_LIST = ["accessPoints", "physicalAccessPoints", "dataFlows", "securityPolicies", "assumptions", "externalDependencies", "securityRequirements"];
   function FRS() { return RULES().foundationalRequirements; }
 
   // ---- palette & type: this app's copy of the Assessments report design ----
@@ -87,8 +90,9 @@ window.RiskExports = (function () {
   function assetLinkWords(id) { return id === "wireless" ? "Wireless" : id === "temporary" ? "Temporarily connected" : "Fixed"; }
   function critWords(id) { return (RT().ASSET_CRITICALITY_LABEL || {})[id] || ""; }
   // The register's own attributes, in the order the asset tables print them.
-  var ASSET_EXTRA = [["tag", "Tag or hostname"], ["vendor", "Vendor"], ["model", "Model"], ["version", "Firmware or software version"], ["location", "Location"], ["criticality", "Criticality"], ["owner", "Owner"], ["notes", "Notes"]];
-  function assetValue(a, k) { return k === "criticality" ? critWords(a.criticality) : String(a[k] || "").trim(); }
+  var ASSET_EXTRA = [["tag", "Tag or hostname"], ["vendor", "Vendor"], ["model", "Model"], ["version", "Firmware or software version"], ["location", "Location"], ["criticality", "Criticality"], ["classification", "Classification"], ["businessValue", "Business value"], ["owner", "Owner"], ["notes", "Notes"]];
+  function valueWords(id) { return { high: "High", medium: "Medium", low: "Low" }[id] || ""; }
+  function assetValue(a, k) { return k === "criticality" ? critWords(a.criticality) : k === "businessValue" ? valueWords(a.businessValue) : String(a[k] || "").trim(); }
 
   // The sentences the asset owner's sign-off prints outside the Sign-off
   // section and document control: [executive summary, Sign-off section when not
@@ -104,13 +108,21 @@ window.RiskExports = (function () {
   // [6] and [7] open the specification's Sign-off section (phase 6b), signed
   // and not yet; its notes for an approval older than a change follow the
   // reports'.
-  var COVERS = {
-    detailed: "An approval covers the tolerable risk, the target security levels and the accepted risks in this report, within the scope given for it.",
-    highLevel: "An approval covers the tolerable risk and the ranking in this report, within the scope given for it.",
-    spec: "An approval covers the tolerable risk and the target security levels in this specification, within the scope given for it."
-  };
+  // What an approval covers, per report. The transferred risks are approved
+  // with the accepted ones, and named when there is one; a zone or conduit
+  // deferred was not assessed, so the approval says it does not cover it.
+  function coversTexts(p) {
+    var rt = RT(), deferred = deferredOf(p).map(function (o) { return o.id; });
+    var acc = rt.hasTransfer(p) ? "the accepted and transferred risks" : "the accepted risks";
+    var notDef = deferred.length ? " It does not cover " + (deferred.length > 1 ? deferred.slice(0, -1).join(", ") + " and " + deferred[deferred.length - 1] : deferred[0]) + ", deferred to a later assessment." : "";
+    return {
+      detailed: "An approval covers the tolerable risk, the target security levels and " + acc + " in this report, within the scope given for it." + notDef,
+      highLevel: "An approval covers the tolerable risk and the ranking in this report, within the scope given for it.",
+      spec: "An approval covers the tolerable risk and the target security levels in this specification, within the scope given for it." + notDef
+    };
+  }
   function signOffTexts(p) {
-    var states = RT().approvalStates(p);
+    var states = RT().approvalStates(p), COVERS = coversTexts(p);
     var signed = states.filter(function (s) { return s.signed; });
     return [
       signed.length ? signedSentence(signed) : NOT_SIGNED,
@@ -121,7 +133,7 @@ window.RiskExports = (function () {
       "For approval by the people below. " + COVERS.highLevel,
       "Signed off as below. " + COVERS.spec,
       "For approval by the people below. " + COVERS.spec
-    ].concat([].concat.apply([], states.map(function (s) { return [changedText(s, "detailed"), changedText(s, "highLevel"), changedText(s, "spec")]; })).filter(Boolean));
+    ].concat([].concat.apply([], states.map(function (s) { return [changedText(s, "detailed", p), changedText(s, "highLevel", p), changedText(s, "spec", p)]; })).filter(Boolean));
   }
   // "This assessment was signed off by R. Calder (Asset Owner) and S. Adeyemi
   // (Process Safety Engineer) on 2026-07-04; the scope of each approval is
@@ -140,10 +152,10 @@ window.RiskExports = (function () {
   }
   // The note one report prints for an approval older than a change to what
   // that report says it covers, or null when nothing it covers moved.
-  function changedText(s, doc) {
+  function changedText(s, doc, p) {
     var parts = RT().approvalChangedFor(s, doc);
     if (!parts.length) return null;
-    return "Consultant note: " + RT().approvalPartWords(parts, s.legacy) + " changed after " + (s.entry.name || "this approver") + " approved. Confirm the approval before issue.";
+    return "Consultant note: " + RT().approvalPartWords(parts, s.legacy, p) + " changed after " + (s.entry.name || "this approver") + " approved. Confirm the approval before issue.";
   }
   // Who has approved, for document control and the workbook's Front sheet.
   function signOffLine(p, none) {
@@ -198,14 +210,40 @@ window.RiskExports = (function () {
   // A route or a list of ids in order, "Z3 and C2".
   function viaList(via) { return via.length > 1 ? via.slice(0, -1).join(", ") + " and " + via[via.length - 1] : (via[0] || ""); }
 
+  // How a zone or conduit was assessed, in the deliverables' words:
+  // { d (js/engine.js depthOf), words ("Detailed", "Grouped with Z3"),
+  //   basis (what the depth rests on; "" when nothing is recorded) }.
+  function scenarioCount(n) { return n + " threat scenario" + (n === 1 ? "" : "s"); }
+  function depthCells(o, p) {
+    var rt = RT(), d = rt.depthOf(o, p), n = (o.threats || []).length;
+    var basis = d.depth === "detailed" ? (n ? scenarioCount(n) : "No threat scenarios")
+      : (d.depth === "proportionate" && !d.considered && n) ? scenarioCount(n)
+      : rt.depthBasis(d);
+    return { d: d, words: rt.depthWords(d), basis: basis };
+  }
+  // A zone or conduit with no driving scenario, in words, by its depth.
+  function noDriverWords(d, o) {
+    var t = o.slTargetByFR || {}, hasSLT = Object.keys(t).some(function (k) { return typeof t[k] === "number"; });
+    if (d.depth === "deferred") return hasSLT ? "Deferred. The SL-T rests on the justification." : "Deferred. No SL-T yet.";
+    var lead = d.depth === "grouped" ? (d.withId ? "Assessed with " + d.withId + ". " : "Grouped. ")
+      : d.depth === "reused" ? (d.reuseSource ? "Reused from " + noStop(d.reuseSource) + ". " : "Reused. ")
+      : d.depth === "proportionate" ? "Proportionate review. " : "No rated threat. ";
+    return lead + "The SL-T rests on the justification.";
+  }
+  // The zones and conduits deferred, each with its record.
+  function deferredOf(p) {
+    var rt = RT();
+    return p.zones.concat(p.conduits).filter(function (o) { return rt.depthOf(o, p).depth === "deferred"; });
+  }
+
   // The ranked systems the recorded decisions take to a detailed assessment:
   // on a high-level-only assessment each system's own decision, otherwise a
-  // system assigned to a zone recorded as needing one. Suggestions are not
-  // decisions and count for nothing here.
+  // system assigned to a zone, as every zone is assessed, unless the zone
+  // is deferred. Suggestions are not decisions and count for nothing here.
   function systemsForDetail(p) {
     var rt = RT(), hlOnly = rt.assessmentType(p) === "high-level";
     var byZone = {};
-    p.zones.forEach(function (z) { if (rt.comparison(z, p).required === true) rt.hlaIdsOf(z).forEach(function (id) { byZone[id] = true; }); });
+    p.zones.forEach(function (z) { if (rt.depthOf(z, p).depth !== "deferred") rt.hlaIdsOf(z).forEach(function (id) { byZone[id] = true; }); });
     return p.srs.highLevelAssets.filter(function (a) {
       if (!a.name) return false;
       return hlOnly ? rt.hlaComparison(a, p).required === true : !!byZone[a.id];
@@ -224,6 +262,12 @@ window.RiskExports = (function () {
     if (st === "current" || st === "planned") { L = t.currentLikelihood || L; I = t.currentImpact || I; }
     if (st === "planned") { L = t.residualLikelihood || L; I = t.residualImpact || I; }
     return { L: L, I: I };
+  }
+  // The state a threat row's rating today comes from (the engine's one
+  // "today" rule): current where rated, else planned when no planned
+  // countermeasure is linked, else unmitigated.
+  function todayState(x) {
+    return x.current ? "current" : (x.planned && !x.treatment.plannedLinked.length ? "planned" : "unmitigated");
   }
   // The additional (planned) countermeasures across every zone and conduit,
   // in the order a plan is read: priority, then due date, then as entered.
@@ -291,7 +335,7 @@ window.RiskExports = (function () {
     // The sections printed on landscape pages (see the end of this builder).
     // A table there is 14438 wide: A4 landscape less the margins.
     var LAND_KEYS = {};
-    ["Risk register", "Consequences and how they could arise", "Treatment plan", "Accepted risks"].forEach(function (t) { LAND_KEYS[RS.sectionKey(t)] = true; });
+    ["Risk register", "Consequences and how they could arise", "Treatment plan", "Accepted risks", "Transferred risks"].forEach(function (t) { LAND_KEYS[RS.sectionKey(t)] = true; });
 
     // ---- primitives (this app's copy of the Assessments idiom) ----
     // The __tags are read back by the section pass (shared/report-sections.js):
@@ -412,6 +456,7 @@ window.RiskExports = (function () {
           ["Data flows", lines(o.dataFlows)],
           ["Conduits", conds.map(function (c) { return c.id + (c.name ? " " + c.name : "") + " to " + endName(c.fromZone === o.id ? c.toZone : c.fromZone); }).join("; ")],
           ["External dependencies", lines(o.externalDependencies)], ["Security policies", lines(o.securityPolicies)],
+          ["Applicable security requirements", lines(o.securityRequirements)],
           ["Assumptions", lines(o.assumptions)], ["Exposure", cap(flagNames(o, true).join(", "))]
         ];
       } else {
@@ -421,16 +466,35 @@ window.RiskExports = (function () {
         if (o.wireless) marks.push("wireless");
         if (rt.conduitExternal(o)) marks.push("external network" + (o.externalParty ? " (" + o.externalParty + ")" : ""));
         if (o.temporary) marks.push("temporarily connected");
+        // A conduit's characteristics, as a zone's as far as they apply. The
+        // safety designation is printed once anything of them is recorded
+        // beyond the ends, so an older file's tables read as before.
+        var more = M_CONDUIT_TEXT.some(function (k) { return String(o[k] || "").trim(); }) || M_CONDUIT_LIST.some(function (k) { return (o[k] || []).length; }) || o.safetyRelated === true;
         pairs = [
           ["Ends", cap(endName(o.fromZone) + " and " + endName(o.toZone))], ["Direction", dir],
+          ["Logical boundary", o.logicalBoundary], ["Physical boundary", o.physicalBoundary],
+          ["Accountable organisation", o.accountableOrg],
+          ["Safety designation", more ? (o.safetyRelated ? "Safety related" : "Not safety related") : ""],
           ["Channels and protocols", (o.channels || []).join(", ")], ["Boundary devices", lines(o.boundaryDevices)],
-          ["Connection", marks.length ? cap(marks.join(", ")) : ""], ["Notes", o.notes]
+          ["Logical access points", lines(o.accessPoints)], ["Physical access points", lines(o.physicalAccessPoints)],
+          ["Data flows", lines(o.dataFlows)],
+          ["Connection", marks.length ? cap(marks.join(", ")) : ""],
+          ["External dependencies", lines(o.externalDependencies)], ["Security policies", lines(o.securityPolicies)],
+          ["Applicable security requirements", lines(o.securityRequirements)],
+          ["Assumptions", lines(o.assumptions)], ["Notes", o.notes]
         ];
       }
       out.push(para([run(o.id + ": " + (o.name || "(unnamed " + row.kind.toLowerCase() + ")"), { bold: true })], { spacing: { before: 160, after: 80 } }));
       out.push(kvTable(pairs.filter(function (kv) { return kv[1] && String(kv[1]).trim(); })));
       if (row.isZone) rt.separationRows(o, p).forEach(function (r) {
-        if (r.answer === "not-separated") out.push(para([run(r.label + " are not kept separate. ", { bold: true }), run(r.reason || "No reason recorded.", r.reason ? {} : { color: COLOR.note })], { spacing: { before: 80, after: 80 } }));
+        // Business and control system assets kept together depart from a
+        // requirement of the standard, and say so; safety related assets kept
+        // with others make the whole zone safety related, as the table says;
+        // the other rows are recommendations, in neutral words.
+        var said = r.departure ? r.label + " are not kept separate, which IEC 62443-3-2 requires. "
+          : r.wholeZone ? r.label + " are not kept separate, so the whole zone is treated as safety related. "
+          : r.label + " are not kept separate. ";
+        if (r.answer === "not-separated") out.push(para([run(said, { bold: true }), run(r.reason || (r.departure ? "No justification recorded." : "No reason recorded."), r.reason ? {} : { color: COLOR.note })], { spacing: { before: 80, after: 80 } }));
         else if (!r.answer) out.push(para([run("Consultant note: whether " + r.label.toLowerCase() + " are kept separate is not yet recorded.", { color: COLOR.note, italics: true })], { spacing: { before: 80, after: 80 } }));
       });
       return out;
@@ -443,7 +507,7 @@ window.RiskExports = (function () {
       var tables = p.zones.filter(function (z) { return (z.assets || []).length; }).map(function (z) {
         var cols = [["name", "Name", 3], ["type", "Type", 2]];
         if (z.assets.some(function (a) { return !!a.link; })) cols.push(["link", "Connection", 2]);
-        ASSET_EXTRA.forEach(function (c) { if (z.assets.some(function (a) { return !!assetValue(a, c[0]); })) cols.push([c[0], c[1], c[0] === "notes" ? 3 : c[0] === "criticality" ? 1.5 : 2]); });
+        ASSET_EXTRA.forEach(function (c) { if (z.assets.some(function (a) { return !!assetValue(a, c[0]); })) cols.push([c[0], c[1], c[0] === "notes" ? 3 : c[0] === "criticality" || c[0] === "businessValue" ? 1.5 : 2]); });
         return { z: z, cols: cols };
       });
       var wide = tables.some(function (t) { return t.cols.length > 6; }), total = wide ? 14438 : 9506;
@@ -947,7 +1011,7 @@ window.RiskExports = (function () {
         }
         progressSection(["criteria", "ranked"]);
         children.push(h2("What happens next"));
-        children.push(body("Next, the systems are grouped into security zones and conduits, and the initial risk of each zone and conduit is compared with the tolerable risk to decide where a detailed assessment is needed. There, threats are registered and treated, and target security levels are set to scope the engineering work. Systems below the threshold should be re-ranked if their connectivity, criticality or threat exposure changes."));
+        children.push(body("Next, the systems are grouped into security zones and conduits. Where the initial risk of the system under consideration is above the tolerable risk, every zone and conduit then has a detailed risk assessment, at a depth that matches its risk: threats are registered and treated, and target security levels are set to scope the engineering work. Systems below the threshold should be re-ranked if their connectivity, criticality or threat exposure changes."));
       } else {
         var exceed = S.threats.filter(function (x) { return x.exceeds; });
         function nOf(n, one, many) { return n + " " + (n === 1 ? one : many); }
@@ -955,6 +1019,8 @@ window.RiskExports = (function () {
         function lower(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
         function andList(list) { return list.length > 1 ? list.slice(0, -1).join(", ") + " and " + list[list.length - 1] : (list[0] || ""); }
         var accepted = exceed.filter(function (x) { return x.disposition === "accepted"; });
+        // A transfer passes the consequence to another party; the approval covers it with the accepted risks.
+        var transferred = exceed.filter(function (x) { return x.disposition === "transferred"; });
         var undecided = exceed.filter(function (x) { return !x.decided && !x.incomplete; });
         var incomplete = exceed.filter(function (x) { return x.incomplete; });
 
@@ -971,16 +1037,17 @@ window.RiskExports = (function () {
           // Once the plan is done counts only the threats a planned
           // countermeasure is linked to: with nothing planned, nothing changes.
           var withinToday = S.counts.withinToday, withinPlanned = S.counts.withinAfterPlan;
-          children.push(body("Of the " + nOf(exceed.length, "threat", "threats") + " above tolerable risk before any countermeasure, " + (withinToday ? isAre(withinToday) : "none is") + " within it with today's countermeasures" +
+          children.push(body("Of the " + nOf(exceed.length, "threat", "threats") + " above tolerable risk before any cyber security countermeasure, " + (withinToday ? isAre(withinToday) : "none is") + " within it with today's countermeasures" +
             (withinPlanned > withinToday ? " and " + withinPlanned + " will be once the planned countermeasures are complete" : "") + "."));
           // Only decisions that stand are counted: dispositionCounts leaves out
           // an unconfirmed decision and one recorded without what it rests on.
           // A count of none is left out.
-          var bits = [], nDec = c.mitigated + c.countermeasure + c["sl-t"] + c.accepted;
+          var bits = [], nDec = c.mitigated + c.countermeasure + c["sl-t"] + c.accepted + c.transferred;
           if (c.mitigated) bits.push(c.mitigated + " reduced to within tolerable risk");
           if (c.countermeasure) bits.push(c.countermeasure + " being reduced with countermeasures");
           if (c["sl-t"]) bits.push(c["sl-t"] + " treated through the SL-T programme");
           if (c.accepted) bits.push(c.accepted + " accepted by the asset owner");
+          if (c.transferred) bits.push(c.transferred + " transferred to another party");
           var cmBits = [];
           if (cmEx) cmBits.push(String(cmEx) + " existing");
           if (cmPl) cmBits.push(String(cmPl) + " planned");
@@ -1025,10 +1092,12 @@ window.RiskExports = (function () {
         var unplanned = planned.filter(function (e) { return !String(e.m.owner || "").trim() || !String(e.m.dueDate || "").trim(); });
         var acceptApproved = rt.approvalStates(p).some(function (s) { return s.signed && rt.approvalChangedFor(s, "detailed").indexOf("accepted") < 0; });
         var awaiting = acceptApproved ? [] : accepted;
+        var awaitingT = acceptApproved ? [] : transferred;
         // A review date that has passed is a fact about today, said whether or
         // not a previous assessment is set.
         var todayX = opts.today || todayISO();
-        var expired = accepted.filter(function (x) { var rd = String((x.t.acceptanceDetail || {}).reviewDate || "").trim(); return rd && rd < todayX; });
+        function pastReview(x) { var rd = String((x.t.acceptanceDetail || {}).reviewDate || "").trim(); return rd && rd < todayX; }
+        var expired = accepted.filter(pastReview), expiredT = transferred.filter(pastReview);
         if (undecided.length) {
           children.push(body(undecided.length + " threat" + (undecided.length > 1 ? "s" : "") + " above tolerable risk " + (undecided.length > 1 ? "have" : "has") + " no treatment decision recorded: " + undecided.map(function (x) { return x.t.id + " (" + x.owner.id + ")"; }).join(", ") + ".", { bold: true, color: COLOR.note }));
         }
@@ -1043,6 +1112,14 @@ window.RiskExports = (function () {
             ? "The review date of the accepted risk " + expired[0].t.id + " (" + expired[0].owner.id + "), " + expired[0].t.acceptanceDetail.reviewDate.trim() + ", has passed."
             : "The review dates of these accepted risks have passed: " + andList(expired.map(function (x) { return x.t.id + " (" + x.owner.id + ") on " + x.t.acceptanceDetail.reviewDate.trim(); })) + "."));
         }
+        if (awaitingT.length) {
+          children.push(body("The asset owner has not yet approved the transferred risk" + (awaitingT.length > 1 ? "s " : " ") + andList(awaitingT.map(function (x) { return x.t.id + " (" + x.owner.id + ")"; })) + "."));
+        }
+        if (expiredT.length) {
+          children.push(body(expiredT.length === 1
+            ? "The review date of the transferred risk " + expiredT[0].t.id + " (" + expiredT[0].owner.id + "), " + expiredT[0].t.acceptanceDetail.reviewDate.trim() + ", has passed."
+            : "The review dates of these transferred risks have passed: " + andList(expiredT.map(function (x) { return x.t.id + " (" + x.owner.id + ") on " + x.t.acceptanceDetail.reviewDate.trim(); })) + "."));
+        }
         if (unplanned.length) {
           children.push(body(nOf(unplanned.length, "planned countermeasure has", "planned countermeasures have") + " no owner or due date agreed: " + andList(unplanned.map(function (e) { return e.m.id + " (" + e.owner.id + ")"; })) + "."));
         }
@@ -1051,10 +1128,11 @@ window.RiskExports = (function () {
         if (proposed.length) {
           children.push(body(nOf(proposed.length, "planned countermeasure is", "planned countermeasures are") + " proposed and not yet agreed: " + andList(proposed.map(function (e) { return e.m.id + " (" + e.owner.id + ")"; })) + "."));
         }
-        if (!undecided.length && !incomplete.length && !awaiting.length && !expired.length && !unplanned.length && !proposed.length) {
+        if (!undecided.length && !incomplete.length && !awaiting.length && !expired.length && !awaitingT.length && !expiredT.length && !unplanned.length && !proposed.length) {
           var settled = [];
           if (exceed.length) settled.push("every threat above tolerable risk has a treatment decision");
           if (accepted.length) settled.push(accepted.length === 1 ? "the accepted risk is approved" : "the accepted risks are approved");
+          if (transferred.length) settled.push(transferred.length === 1 ? "the transferred risk is approved" : "the transferred risks are approved");
           if (planned.length) settled.push("each planned countermeasure has an owner and a due date");
           children.push(body(settled.length ? "Nothing is waiting on a decision: " + andList(settled) + "." : "Nothing is waiting on a decision."));
         }
@@ -1063,17 +1141,25 @@ window.RiskExports = (function () {
         children.push(body("A cyber incident on a plant can stop production, damage equipment and put people at risk. Regulators and insurers increasingly expect an asset owner to show where that risk sits and that the protection in place is proportionate to it. " + notSet(eng.client) + " commissioned this assessment of " + (p.suc.name || "the system under consideration") + (eng.assessmentDate ? " (" + eng.assessmentDate + ")" : "") + " to establish that."));
         children = children.concat(stakesKids());
         children.push(h2("What this report is"));
-        // The method used: each zone and conduit is compared with tolerable
-        // risk first (the risk comparison), and only those recorded as needing
-        // a detailed assessment have their threats rated.
+        // The method used: the SUC's initial risk is compared with tolerable
+        // risk once, and every zone and conduit is then assessed, at the
+        // depth recorded for it (the Risk comparison section has the table);
+        // a deferred one is named, its reason being under that table.
         function ratedSentence() {
-          var skip = p.zones.concat(p.conduits).filter(function (o) { return rt.comparison(o, p).required === false; }).map(function (o) { return o.id; });
+          var suc = rt.sucComparison(p), all = p.zones.concat(p.conduits);
+          var deferred = deferredOf(p).map(function (o) { return o.id; });
+          var allDetailed = all.every(function (o) { return rt.depthOf(o, p).depth === "detailed"; });
+          var who = "every zone and conduit" + (deferred.length ? " apart from " + andList(deferred) : "");
+          var tail = (allDetailed ? " in detail" : ", at the depth shown under Risk comparison") + ".";
+          // One line of outcome; the full statement is under Risk comparison.
+          var lead = suc.exceeds === true ? "Its initial risk is above the tolerable risk, so " + who + " was assessed" + tail
+            : suc.exceeds === false ? "Its initial risk is within the tolerable risk. To set the SL-T, " + who + " was still assessed" + tail
+            : cap(who) + " was assessed" + tail;
+          if (deferred.length && deferred.length === all.length) return "No zone or conduit was assessed: each was deferred.";
           // What a decision is needed for is the residual position's to say, so it is not said here too.
-          if (!skip.length) return "Threats to each zone and conduit were rated for likelihood and impact and compared with the tolerable risk of " + tolName + ".";
-          var list = skip.length > 1 ? skip.slice(0, -1).join(", ") + " and " + skip[skip.length - 1] : skip[0];
-          return "The initial risk of each zone and conduit was compared with the tolerable risk of " + tolName + ". " + list + (skip.length === 1 ? " was" : " were") + " found not to need a detailed assessment, and " + (skip.length === 1 ? "its" : "their") + " SL-T rests on the written justification. Threats to the others were rated for likelihood and impact.";
+          return lead + " Threats were rated for likelihood and impact and compared with the tolerable risk of " + tolName + ".";
         }
-        children.push(body("The assessment follows IEC 62443-3-2. " + (ranked.length ? nOf(ranked.length, "system was", "systems were") + " first ranked for relative risk, and the system under consideration was" : "The system under consideration was") + " divided into " + nOf(p.zones.length, "security zone", "security zones") + " (each a group of assets with the same security requirements) and " + nOf(p.conduits.length, "conduit", "conduits") + " (the communication paths between them). " + ratedSentence() + " Each zone and conduit then has a target security level (SL-T), the protection it must be engineered and maintained to."));
+        children.push(body("The assessment follows IEC 62443-3-2. " + (ranked.length ? nOf(ranked.length, "system was", "systems were") + " first ranked for relative risk, and the system under consideration was" : "The system under consideration was") + " divided into " + nOf(p.zones.length, "security zone", "security zones") + " (each a group of assets with the same security requirements) and " + nOf(p.conduits.length, "conduit", "conduits") + " (the communication paths between them). " + ratedSentence() + " Each zone and conduit " + (deferredOf(p).length ? "assessed " : "") + "then has a target security level (SL-T), the protection it must be engineered and maintained to."));
         var bSent = basisSentence();
         if (bSent) children.push(body(bSent));
         children.push(h2("What we found"));
@@ -1103,6 +1189,10 @@ window.RiskExports = (function () {
         var accNamed = accepted.filter(function (x) { return inTop.indexOf(x) < 0; });
         if (accNamed.length) {
           children.push(body((accNamed.length > 1 ? "Accepted risks: " : "Accepted risk ") + accNamed.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + noStop(x.t.statement); }).join("; ") + ". The reason, who accepted " + (accNamed.length > 1 ? "each" : "it") + " and when " + (accNamed.length > 1 ? "each is" : "it is") + " to be reviewed are under Accepted risks."));
+        }
+        var trNamed = transferred.filter(function (x) { return inTop.indexOf(x) < 0; });
+        if (trNamed.length) {
+          children.push(body((trNamed.length > 1 ? "Transferred risks: " : "Transferred risk ") + trNamed.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + noStop(x.t.statement); }).join("; ") + ". How " + (trNamed.length > 1 ? "each was" : "it was") + " transferred, to whom, who agreed it and when it is to be reviewed are under Transferred risks."));
         }
         // The outcome: the SL-T vector and what happens next.
         children.push(h2("What happens next"));
@@ -1136,7 +1226,7 @@ window.RiskExports = (function () {
       // what it holds, so it reads without the report beside it ----
       children.push(heading("About this specification", docx.HeadingLevel.HEADING_1, { before: 0 }));
       children.push(body("This is the cyber security requirements specification for " + (p.suc.name || "the system under consideration") + ", from the IEC 62443-3-2 risk assessment" + (eng.assessmentDate ? " carried out " + eng.assessmentDate : "") + "."));
-      children.push(body("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. It states the tolerable risk and the target security level (SL-T) of each zone and conduit: the protection it is to be engineered and maintained to."));
+      children.push(body("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. It states the tolerable risk and the target security level (SL-T) of each zone and conduit: the protection it is to be engineered and maintained to. It lists the mandatory security countermeasures that come out of the risk assessment."));
       children.push(body("The risk criteria behind the tolerable risk and the targets are in the appendix. Sign-off records who approves them and the scope of each approval."));
       // No page break: three paragraphs alone on a page read as a gap.
     }
@@ -1208,8 +1298,23 @@ window.RiskExports = (function () {
     // The same key as "Operating-environment assumptions": a slug reads a
     // hyphen and a space alike.
     listSection("Operating environment assumptions", p.suc.assumptions);
-    // The threat environment: the assumed adversary, then the known threats.
-    listSection("Known or presumed threats", p.srs.knownThreats, p.srs.adversaryClass ? para([run("Assumed adversary: ", { bold: true }), run("SL" + p.srs.adversaryClass + "-grade")]) : null);
+    // The threat environment: the assumed adversary, where the threat picture
+    // comes from, then the current threats and the emerging ones. (Its key
+    // was "known-or-presumed-threats"; js/model.js maps the old one.)
+    (function () {
+      var r = p.srs, src = Array.isArray(r.threatSources) ? r.threatSources : [], em = Array.isArray(r.emergingThreats) ? r.emergingThreats : [];
+      if (!r.adversaryClass && !src.length && !r.knownThreats.length && !em.length) return;
+      children.push(h2("Threat environment"));
+      if (r.adversaryClass) children.push(para([run("Assumed adversary: ", { bold: true }), run("SL" + r.adversaryClass + "-grade")]));
+      function sub(title, items) {
+        if (!items.length) return;
+        children.push(para([run(title, { bold: true })], { spacing: { before: 120, after: 60 } }));
+        children = children.concat(bulletList(items));
+      }
+      sub("Sources of threat intelligence", src);
+      sub("Current threats, known or presumed", r.knownThreats);
+      sub("Emerging threats", em);
+    }());
     listSection("Organisational security policies", Array.isArray(p.suc.policies) ? p.suc.policies : []);
     children.push(h2("Tolerable risk"));
     children.push(para([run("Tolerable risk: ", { bold: true }), run(bandStyle(S.tolerable).name, { bold: true, color: bandStyle(S.tolerable).text })]));
@@ -1261,6 +1366,9 @@ window.RiskExports = (function () {
         // On a high-level-only assessment the comparison with tolerable risk is
         // recorded per system, so the table carries the decision.
         var hlDecide = rt.assessmentType(p) === "high-level";
+        // The decision per system is the house method for what goes forward to a
+        // detailed assessment, never the standard's rule, which compares the SUC once.
+        if (hlDecide) children.push(body("Whether each system goes forward to a detailed assessment is decided by the house method, from its own comparison with the tolerable risk. IEC 62443-3-2 compares the initial risk of the system under consideration as a whole."));
         var rw = hlDecide ? [2100, 1900, 1150, 1150, 1000, 1350, 1856] : [2500, 2400, 1300, 1300, 1200, 2006];
         var rows = [headerRow(["System", "Function / location", "Consequence", "Likelihood", "Risk"].concat(hlDecide ? ["Detailed assessment", "Note"] : ["Note"]), rw)];
         ranked.slice().sort(function (a, b2) {
@@ -1285,21 +1393,30 @@ window.RiskExports = (function () {
         children.push(fixedTable(rows, rw));
       }
 
-      // ---- the risk comparison: each zone's and conduit's initial risk
-      // against tolerable risk, and the decision on a detailed assessment ----
+      // ---- the risk comparison: the SUC's initial risk against tolerable
+      // risk, once; then how each zone and conduit was assessed, with the
+      // house method that suggests its depth ----
       if (!opts.highLevelOnly && (p.zones.length || p.conduits.length)) {
         children.push(h1("Risk comparison"));
-        children.push(body("The initial risk of each zone and conduit was compared with the tolerable risk of " + tolName + " to decide where a detailed risk assessment is needed. Comparing each zone and conduit is the method used in this assessment. A zone's initial risk is the worst of the ranked systems assigned to it, or the rating entered for it. A conduit takes the higher initial risk of the zones it joins, unless a rating is entered for it."));
-        var cw = [2500, 1200, 1700, 1500, 2506];
-        var crows = [headerRow(["Zone or conduit", "Initial risk", "Against tolerable risk", "Detailed assessment", "Reason"], cw)];
+        var suc = rt.sucComparison(p);
+        children.push(body(!suc.band
+          ? "The initial risk of the system under consideration was not rated, so there was nothing to compare with the tolerable risk of " + tolName + "."
+          : "The initial risk of the system under consideration is " + bandStyle(suc.band).name + ", " + (suc.source === "systems" ? "the worst of its ranked systems" : "the worst initial risk entered for its zones and conduits") + ". " +
+            (suc.exceeds ? "It is above the tolerable risk of " + tolName + ", so a detailed risk assessment of every zone and conduit was required."
+              : "It is within the tolerable risk of " + tolName + ", so a detailed risk assessment was not required.")));
+        children.push(h2("How each zone and conduit was assessed"));
+        children.push(body("The consultant chose the depth of each: in detail on its own threat scenarios, grouped with another that shares its threats, reused from a standard design or an earlier assessment, a proportionate review, or deferred to a later assessment. By the house method, each one's own initial risk suggests its depth: in detail above the tolerable risk, a proportionate review within it. A zone's initial risk is the worst of the ranked systems assigned to it, or the rating entered for it. A conduit takes the higher initial risk of the zones it joins, unless a rating is entered for it."));
+        var cw = [2300, 1100, 1300, 1700, 3006];
+        var crows = [headerRow(["Zone or conduit", "Initial risk", "Against tolerable risk", "Depth", "Basis"], cw)];
         S.owners.forEach(function (row) {
-          var o = row.o, c = rt.comparison(o, p);
+          var o = row.o, c = rt.comparison(o, p), dc = depthCells(o, p);
           crows.push(new docx.TableRow({ children: [
             textCell(o.id + (o.name ? " " + o.name : ""), cw[0], { bold: true }),
             c.initial ? bandCell(c.initial, cw[1]) : textCell("Not rated", cw[1], { color: COLOR.muted }),
             textCell(c.suggested === null ? "Nothing to compare" : (c.suggested ? "Above" : "Within"), cw[2]),
-            decisionCell(c, cw[3]),
-            textCell(c.reason || "", cw[4])
+            textCell(dc.words, cw[3], { bold: true }),
+            // What the depth rests on; not recorded is a prompt, in red.
+            dc.basis ? textCell(dc.basis, cw[4]) : textCell("Not recorded", cw[4], { bold: true, color: COLOR.note })
           ] }));
         });
         children.push(fixedTable(crows, cw));
@@ -1311,7 +1428,7 @@ window.RiskExports = (function () {
       // ratings and its treatment decision, on a landscape page, with the
       // treatment plan and the accepted risks after it ----
       children.push(h1("Risk register"));
-      children.push(body("Each threat scenario is rated before any countermeasure (unmitigated), with the countermeasures in place today (current) and after the planned ones (planned). Under each risk is its likelihood × impact. A blank current or planned rating means the rating before it stands. The tolerable risk is " + tolName + "."));
+      children.push(body("Each threat scenario is rated before any cyber security countermeasure (unmitigated), with the countermeasures in place today (current) and after the planned ones (planned). The unmitigated rating still counts countermeasures built into the components and protection that is not cyber security, such as physical security, mechanical safeguards and emergency procedures. Under each risk is its likelihood × impact. A blank current or planned rating means the rating before it stands. The tolerable risk is " + tolName + "."));
       if (!S.threats.length) {
         children.push(body("No threats registered.", { color: COLOR.muted, italics: true }));
       } else {
@@ -1419,6 +1536,28 @@ window.RiskExports = (function () {
         })), aw));
       }
 
+      // ---- transferred risks, a section of their own after the accepted
+      // ones, only when there is one: how, to whom, who agreed it. The rating
+      // is today's, with no planned countermeasure applied: a transfer moves
+      // who bears the consequence, and the risk itself does not change ----
+      var trf = S.threats.filter(function (x) { return x.disposition === "transferred"; });
+      if (trf.length) {
+        children.push(h1("Transferred risks"));
+        children.push(body("Each risk above tolerable risk that has been transferred to another party, with its rating today, how and to whom it was transferred, who agreed it and when it is to be reviewed. A transfer moves who bears the consequence, so the rating does not change."));
+        var tw = [2600, 1200, 1150, 2900, 1588, 1300, 1300, 1200, 1200];
+        children.push(fixedTable([headerRow(["Threat scenario", "Zone or conduit", "Risk today", "How it is transferred", "Transferred to", "Agreed by", "Role", "Date", "Review date"], tw)].concat(trf.map(function (x) {
+          var ad = x.t.acceptanceDetail || {};
+          function said(v, wd) { return String(v || "").trim() ? textCell(v, wd) : textCell("Not recorded", wd, { color: COLOR.muted }); }
+          return new docx.TableRow({ children: [
+            textCell(x.t.id + "  " + (x.t.statement || "No statement"), tw[0]),
+            textCell(x.owner.id + (x.owner.name ? " " + x.owner.name : ""), tw[1]),
+            ratingCell(x.today, stateLI(x.t, todayState(x)), tw[2], false),
+            textCell(x.treatment.reason, tw[3]),
+            said(x.t.transferTo, tw[4]), said(ad.by, tw[5]), said(ad.role, tw[6]), said(ad.date, tw[7]), said(ad.reviewDate, tw[8])
+          ] });
+        })), tw));
+      }
+
       // ---- zones & conduits: each threat's scenario in detail ----
       children.push(h1("Zones, conduits and the detailed risk assessment"));
       children.push(body("Each threat is rated for likelihood and impact on " + CWD.matrix + " and compared with the tolerable risk of " + tolName + ". The ratings and treatment decisions are in the risk register. The drawing and each zone's and conduit's characteristics are under System under consideration and requirements."));
@@ -1433,9 +1572,15 @@ window.RiskExports = (function () {
         if (vulns.length) {
           children.push(body("Vulnerabilities: " + vulns.map(function (v) { return v.id + " " + noStop(v.description) + (String(v.reference || "").trim() ? " (source: " + noStop(v.reference) + ")" : ""); }).join(" · "), { color: COLOR.muted }));
         }
+        // How it was assessed, when not in detail on its own scenarios.
+        var od = rt.depthOf(o, p), depthLine = od.depth === "grouped" ? (od.withId ? "Assessed with " + od.withId + ", whose threat scenarios it shares." : "Grouped, with no record of the zone or conduit it is assessed with.")
+          : od.depth === "reused" ? (od.reuseSource ? "Results reused from " + noStop(od.reuseSource) + "." : "Results reused; the source is not recorded.")
+          : od.depth === "proportionate" ? "A proportionate review." + (od.considered ? " Threats considered: " + noStop(od.considered) + "." : "")
+          : od.depth === "deferred" ? "Deferred to a later assessment (see Method and limitations)." : "";
+        if (depthLine) children.push(body(depthLine, { color: COLOR.muted }));
         var oThreats = row.threats;
         if (!oThreats.length) {
-          children.push(body("No threats registered.", { color: COLOR.muted, italics: true }));
+          if (!depthLine || (od.depth === "proportionate" && !od.considered)) children.push(body("No threats registered.", { color: COLOR.muted, italics: true }));
         } else {
           oThreats.forEach(function (x) {
             var t = x.t, T = x.treatment;
@@ -1483,6 +1628,8 @@ window.RiskExports = (function () {
         if (safety) anySafety = true;
         var nameKids = [para([run(o.id + " " + (o.name || ""), { bold: true })], { spacing: { after: 0 } })];
         if (safety) nameKids.push(para([run("Safety related", { color: COLOR.gap, size: 16, bold: true })], { spacing: { after: 0 } }));
+        // Deferred: not assessed, so no SL-T yet unless one was set.
+        if (rt.depthOf(o, p).depth === "deferred") nameKids.push(para([run(frs.some(function (f) { return o.slTargetByFR[f.id] != null; }) ? "Deferred" : "Deferred, no SL-T yet", { color: COLOR.muted, size: 16 })], { spacing: { after: 0 } }));
         mrows.push(new docx.TableRow({ children: [cellDxa(nameKids, mw[0])].concat(frs.map(function (f, i) {
           var v = o.slTargetByFR[f.id];
           return textCell(v == null ? "Not set" : "SL" + v, mw[i + 1], v != null ? { bold: true } : { color: COLOR.muted });
@@ -1514,15 +1661,14 @@ window.RiskExports = (function () {
         var drows = [headerRow(["Zone or conduit", "Foundational requirements", "Driving scenarios"], dw)];
         S.owners.forEach(function (row) {
           var o = row.o, groups = [], bySig = {};
-          var skip = rt.comparison(o, p).skip;
+          var dd = rt.depthOf(o, p);
           rt.sltDrivers(o, p).forEach(function (d) {
-            // A zone or conduit not assessed in detail has no driving scenario.
-            if (skip) return;
             var bits = d.drivers.map(function (id) { return id + " (" + bandStyle(d.band).name + ")"; });
             // A path through the zone or conduit sets it (house method): the path named.
             if (d.raisedBy === "via") bits = bits.concat((d.via || []).map(function (v) { return v.words + " (" + bandStyle(v.band).name + ")"; }));
             var why = d.raisedBy === "floor" ? "SL" + d.sl + " from the safety floor"
-              : d.raisedBy === "inherited" ? "SL" + d.sl + " inherited from " + (d.from.length > 1 ? d.from.slice(0, -1).join(", ") + " and " + d.from[d.from.length - 1] : d.from[0]) : "";
+              : d.raisedBy === "inherited" ? "SL" + d.sl + " inherited from " + (d.from.length > 1 ? d.from.slice(0, -1).join(", ") + " and " + d.from[d.from.length - 1] : d.from[0])
+              : d.raisedBy === "grouped" ? "SL" + d.sl + " from " + d.from[0] + ", assessed with it" : "";
             var text = bits.length ? bits.join(", ") + (why ? "; " + why : "") : cap(why);
             if (!bySig[text]) { bySig[text] = { frs: [], text: text }; groups.push(bySig[text]); }
             bySig[text].frs.push(d.fr);
@@ -1530,7 +1676,7 @@ window.RiskExports = (function () {
           var label = o.id + (o.name ? " " + o.name : "");
           if (!groups.length) {
             drows.push(new docx.TableRow({ children: [textCell(label, dw[0], { bold: true }), textCell("None", dw[1], { color: COLOR.muted }),
-              textCell(skip ? "Not assessed in detail. The SL-T rests on the justification." : "No rated threat. The SL-T rests on the justification.", dw[2], { color: COLOR.muted })] }));
+              textCell(noDriverWords(dd, o), dw[2], { color: COLOR.muted })] }));
             return;
           }
           groups.forEach(function (g, i) {
@@ -1551,6 +1697,32 @@ window.RiskExports = (function () {
           children.push(body(o.justification));
         }
       });
+    }
+
+    // ---- the mandatory security countermeasures: the specification's own
+    // section, after the SL-T they follow from. The countermeasures the
+    // decisions to reduce a risk rest on, in place (kept) or planned (with
+    // the plan). The reports have them in the treatment plan and each zone's
+    // section, so they do not print this. ----
+    if (isSpec) {
+      children.push(h1("Mandatory security countermeasures"));
+      var mcs = rt.mandatoryCountermeasures(p);
+      if (!mcs.length) {
+        children.push(body("No treatment decision in the detailed risk assessment rests on a countermeasure. The requirements here are the SL-T above and the policies and regulatory requirements under System under consideration and requirements."));
+      } else {
+        children.push(body("The detailed risk assessment makes these countermeasures mandatory, because the decisions to reduce a risk rest on them. One in place must be kept; a planned one is to be put in place by its owner and due date. Each zone's and conduit's SL-T applies as well."));
+        var cw = [3306, 1700, 1300, 1500, 1700];
+        children.push(fixedTable([headerRow(["Countermeasure", "Zone or conduit", "In place or planned", "Owner and due date", "SR references"], cw)].concat(mcs.map(function (e) {
+          var m = e.m, plan = [String(m.owner || "").trim(), String(m.dueDate || "").trim() ? "due " + String(m.dueDate).trim() : ""].filter(Boolean).join(", ");
+          return new docx.TableRow({ children: [
+            textCell(m.id + "  " + m.description, cw[0]),
+            textCell(e.owner.id + (e.owner.name ? " " + e.owner.name : ""), cw[1]),
+            textCell(m.existing ? "In place" : "Planned", cw[2]),
+            m.existing ? textCell("Kept as it is", cw[3], { color: COLOR.muted }) : (plan ? textCell(cap(plan), cw[3]) : textCell("Not set", cw[3], { color: COLOR.muted })),
+            textCell((m.srRefs || []).join(", "), cw[4])
+          ] });
+        })), cw));
+      }
     }
 
     // ---- sign-off + limitations ----
@@ -1578,13 +1750,32 @@ window.RiskExports = (function () {
       approvals.forEach(function (s) { var note = changedText(s, docId); if (note) children.push(pinned(body(note, { color: COLOR.note, italics: true }))); });
     }
     children.push(h1("Method and limitations"));
-    children.push(body("The assessment follows " + rt.zcrMap.standard.id + ". " + (houseWords ? (opts.highLevelOnly ? "The risk matrix and likelihood scale are SolutionsPT house defaults." : "The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults.") + " The standard prescribes no matrix, so a client corporate matrix takes precedence where one exists." : "The risk matrix and its scales " + (CWD.source === "client" ? "are the client's" : "were agreed for this assessment") + (opts.highLevelOnly ? "." : ", and the risk-to-SL mapping is a SolutionsPT house default.") + " The standard prescribes no matrix.") + (opts.highLevelOnly ? "" : " Each SL-T is the consultant's judgement, informed by the house mapping.")));
+    children.push(body("The assessment follows " + rt.zcrMap.standard.id + ". " + (houseWords ? (opts.highLevelOnly ? "The risk matrix and likelihood scale are SolutionsPT house defaults." : "The risk matrix, likelihood scale and risk-to-SL mapping are SolutionsPT house defaults.") + " The standard prescribes no matrix" + (opts.highLevelOnly ? "" : " and no method for setting an SL-T") + ", so a client corporate matrix takes precedence where one exists." : "The risk matrix and its scales " + (CWD.source === "client" ? "are the client's" : "were agreed for this assessment") + (opts.highLevelOnly ? "." : ", and the risk-to-SL mapping is a SolutionsPT house default.") + " The standard prescribes no matrix" + (opts.highLevelOnly ? "" : " and no method for setting an SL-T") + ".") + (opts.highLevelOnly ? "" : " Each SL-T is the consultant's judgement, informed by the house mapping.")));
     children.push(body(opts.highLevelOnly
       ? "Consequence and likelihood ratings reflect the evidence available at the time of the engagement. The assessment does not test security capability."
       : isSpec
       // The specification lists no ratings: what the targets rest on.
       ? "The targets rest on risk ratings made with the evidence available at the time of the engagement. The assessment sets targets and does not test security capability, which is measured against the SL-T in an IEC 62443-3-3 assessment."
       : "Likelihood and impact ratings reflect the evidence available at the time of the engagement. The assessment sets targets and does not test security capability, which is measured against the SL-T in an IEC 62443-3-3 assessment."));
+    if (!opts.highLevelOnly) {
+      // The method: one comparison for the SUC, then every zone and conduit
+      // at its depth (the detailed report has the table).
+      if (!isSpec && (p.zones.length || p.conduits.length)) {
+        children.push(body("The comparison with the tolerable risk, and the depth each zone and conduit was assessed at, are under Risk comparison."));
+      }
+      // A deferred zone or conduit is a limitation of the assessment, said
+      // here once; the detailed report's table holds each one's reason, and
+      // the specification, which has no table, says it here.
+      var defer = deferredOf(p);
+      if (defer.length) {
+        var noSLT = defer.filter(function (o) { return !FRS().some(function (f) { return o.slTargetByFR[f.id] != null; }); });
+        var one = defer.length === 1, dIds = defer.map(function (o) { return o.id; });
+        var dList = isSpec ? defer.map(function (o) { var r = rt.depthOf(o, p).reason; return o.id + (r ? " (" + noStop(r) + ")" : ""); }) : dIds;
+        children.push(body(viaList(dList) + (one ? " was" : " were") + " deferred, so this assessment does not cover " + (one ? "it" : "them") +
+          (!noSLT.length ? "" : noSLT.length === defer.length ? ", and " + (one ? "it has" : "they have") + " no SL-T yet" : ", and " + viaList(noSLT.map(function (o) { return o.id; })) + (noSLT.length === 1 ? " has" : " have") + " no SL-T yet") + "." +
+          (isSpec ? "" : " The reason for " + (one ? "it" : "each") + " is under Risk comparison.")));
+      }
+    }
 
     // ---- appendix: the risk criteria every rating above rests on ----
     children = children.concat(criteriaAppendix());
@@ -1708,14 +1899,15 @@ window.RiskExports = (function () {
     su.addRow(["Summary"]).getCell(1).font = { bold: true, size: 14, color: { argb: argb(COLOR.headBg) } };
     [["Tolerable risk", bandStyle(S.tolerable).name],
      ["Threats registered", S.threats.length],
-     ["Above tolerable risk before any countermeasure", exceedX.length],
+     ["Above tolerable risk before any cyber security countermeasure", exceedX.length],
      ["Of those, with a treatment decision", S.counts.decided],
      // Today and once the plan is complete: the engine's one rule, as the Word summary counts them.
      ["Of those, within tolerable risk with today's countermeasures", S.counts.withinToday],
      ["Of those, within tolerable risk once the plan is complete", S.counts.withinAfterPlan],
-     ["Accepted risks", S.dispositionCounts.accepted],
+     ["Accepted risks", S.dispositionCounts.accepted]
+    ].concat(S.dispositionCounts.transferred ? [["Transferred risks", S.dispositionCounts.transferred]] : []).concat([
      ["Additional countermeasures planned", plan.length]
-    ].forEach(function (kv) { var r = su.addRow(kv); r.getCell(1).font = { bold: true, size: 10 }; r.getCell(2).alignment = { horizontal: "left" }; });
+    ]).forEach(function (kv) { var r = su.addRow(kv); r.getCell(1).font = { bold: true, size: 10 }; r.getCell(2).alignment = { horizontal: "left" }; });
     var heavy = { style: "medium", color: { argb: "FF" + COLOR.text } };
     [["unmitigated", "Unmitigated"], ["current", "Current"], ["planned", "Planned"]].forEach(function (st) {
       su.addRow([]);
@@ -1896,6 +2088,23 @@ window.RiskExports = (function () {
     });
     freezeTop(ar);
 
+    // ---- Transferred risks, only when there is one, each rated as it
+    // stands today (a transfer does not change the risk) ----
+    var trX = S.threats.filter(function (x) { return x.disposition === "transferred"; });
+    if (trX.length) {
+      var ts = wb.addWorksheet("Transferred risks", { properties: { tabColor: { argb: argb(COLOR.deep) } } });
+      ts.columns = [{ width: 14 }, { width: 8 }, { width: 60 }, { width: 12 }, { width: 50 }, { width: 28 }, { width: 18 }, { width: 24 }, { width: 12 }, { width: 12 }];
+      ts.addRow(["Zone/Conduit", "ID", "Threat statement", "Risk today", "How it is transferred", "Transferred to", "Agreed by", "Role", "Date", "Review date"]);
+      styleHeader(ts, 1, 10);
+      trX.forEach(function (x) {
+        var ad = x.t.acceptanceDetail || {};
+        var r = ts.addRow([x.owner.id + (x.owner.name ? " " + x.owner.name : ""), x.t.id, x.t.statement, "", x.treatment.reason, x.t.transferTo || "", ad.by || "", ad.role || "", ad.date || "", ad.reviewDate || ""]);
+        bandFillCell(r.getCell(4), x.today);
+        r.alignment = { vertical: "top", wrapText: true };
+      });
+      freezeTop(ts);
+    }
+
     // ---- Vulnerabilities, with where each is known from and the threats that link it ----
     var vs = wb.addWorksheet("Vulnerabilities", { properties: { tabColor: { argb: argb(COLOR.gap) } } });
     vs.columns = [{ width: 14 }, { width: 8 }, { width: 70 }, { width: 40 }, { width: 18 }];
@@ -1912,34 +2121,36 @@ window.RiskExports = (function () {
     freezeTop(vs);
 
     // ---- Zones / Conduits ----
-    // The risk comparison's decision, as the report prints it.
-    function decisionText(c) { return c.required === true ? "Required" : (c.required === false ? "Not required" : "Not decided"); }
+    // How each was assessed, as the report prints it (blank where nothing is recorded).
+    function depthRow(o) { var dc = depthCells(o, p); return [dc.words, dc.basis]; }
     function lines(v) { return (Array.isArray(v) ? v : []).join("; "); }
     var zs = wb.addWorksheet("Zones", { properties: { tabColor: { argb: argb(COLOR.met) } } });
     zs.columns = [{ width: 8 }, { width: 28 }, { width: 34 }, { width: 50 }, { width: 30 }, { width: 40 }, { width: 40 },
-      { width: 30 }, { width: 34 }, { width: 34 }, { width: 40 }, { width: 50 }, { width: 18 }, { width: 50 }];
+      { width: 30 }, { width: 34 }, { width: 34 }, { width: 40 }, { width: 50 }, { width: 18 }, { width: 50 }, { width: 40 }];
     zs.addRow(["ID", "Name", "Function", "Description", "Exposure flags", "Assets", "Access points",
-      "Accountable organisation", "Physical boundary", "Physical access points", "Data flows", "Separation not in place", "Detailed assessment", "Reason"]);
-    styleHeader(zs, 1, 14);
+      "Accountable organisation", "Physical boundary", "Physical access points", "Data flows", "Separation not in place", "Assessment depth", "Basis", "Applicable security requirements"]);
+    styleHeader(zs, 1, 15);
     p.zones.forEach(function (z) {
-      var cmp = rt.comparison(z, p);
-      var notSep = rt.separationRows(z, p).filter(function (r) { return r.answer === "not-separated"; }).map(function (r) { return r.label + (r.reason ? ": " + r.reason : ""); });
+      var notSep = rt.separationRows(z, p).filter(function (r) { return r.answer === "not-separated"; }).map(function (r) { return r.label + (r.departure ? " (a departure from IEC 62443-3-2)" : "") + (r.reason ? ": " + r.reason : ""); });
       var r = zs.addRow([z.id, z.name, z.fn || "", z.description || "",
         flagNames(z).join(", "),
         (z.assets || []).map(function (a) { return assetText(a) + (a.link ? ", " + rt.assetLinkLabel(a.link) : ""); }).join("; "),
         (z.accessPoints || []).join("; "),
         z.accountableOrg || "", z.physicalBoundary || "", lines(z.physicalAccessPoints), lines(z.dataFlows),
-        notSep.join("; "), decisionText(cmp), cmp.reason || ""]);
+        notSep.join("; ")].concat(depthRow(z), [lines(z.securityRequirements)]));
       r.alignment = { vertical: "top", wrapText: true };
     });
     freezeTop(zs);
     var cs = wb.addWorksheet("Conduits", { properties: { tabColor: { argb: argb(COLOR.met) } } });
     cs.columns = [{ width: 8 }, { width: 26 }, { width: 10 }, { width: 10 }, { width: 22 }, { width: 60 },
-      { width: 22 }, { width: 34 }, { width: 30 }, { width: 30 }, { width: 18 }, { width: 50 }];
-    cs.addRow(["ID", "Name", "From", "To", "Channels and protocols", "Notes", "Direction", "Boundary devices", "Connection", "External party", "Detailed assessment", "Reason"]);
-    styleHeader(cs, 1, 12);
+      { width: 22 }, { width: 34 }, { width: 30 }, { width: 30 }, { width: 18 }, { width: 50 },
+      { width: 30 }, { width: 34 }, { width: 34 }, { width: 18 }, { width: 34 }, { width: 34 }, { width: 40 }, { width: 34 }, { width: 34 }, { width: 34 }, { width: 40 }];
+    cs.addRow(["ID", "Name", "From", "To", "Channels and protocols", "Notes", "Direction", "Boundary devices", "Connection", "External party", "Assessment depth", "Basis",
+      "Accountable organisation", "Logical boundary", "Physical boundary", "Safety designation", "Logical access points", "Physical access points", "Data flows",
+      "External dependencies", "Security policies", "Assumptions", "Applicable security requirements"]);
+    styleHeader(cs, 1, 23);
     p.conduits.forEach(function (c) {
-      var cmp = rt.comparison(c, p), marks = [];
+      var marks = [];
       if (c.wireless) marks.push("wireless");
       if (rt.conduitExternal(c)) marks.push("external network");
       if (c.temporary) marks.push("temporarily connected");
@@ -1947,7 +2158,9 @@ window.RiskExports = (function () {
         : c.direction === "from-to" ? "One way, " + (c.fromZone || "?") + " to " + (c.toZone || "?")
         : c.direction === "to-from" ? "One way, " + (c.toZone || "?") + " to " + (c.fromZone || "?") : "";
       var r = cs.addRow([c.id, c.name || "", c.fromZone || "", c.toZone || "", (c.channels || []).join(", "), c.notes || "",
-        dir, lines(c.boundaryDevices), marks.join(", "), c.externalParty || "", decisionText(cmp), cmp.reason || ""]);
+        dir, lines(c.boundaryDevices), marks.join(", "), c.externalParty || ""].concat(depthRow(c), [c.accountableOrg || "", c.logicalBoundary || "", c.physicalBoundary || "",
+        c.safetyRelated ? "Safety related" : "", lines(c.accessPoints), lines(c.physicalAccessPoints), lines(c.dataFlows),
+        lines(c.externalDependencies), lines(c.securityPolicies), lines(c.assumptions), lines(c.securityRequirements)]));
       r.alignment = { vertical: "top", wrapText: true };
     });
     freezeTop(cs);
@@ -1955,14 +2168,14 @@ window.RiskExports = (function () {
     // ---- Assets: the project-wide asset register (phase 6a), one way like
     // every sheet. A field not recorded is blank; the connection reads Fixed. ----
     var asx = wb.addWorksheet("Assets", { properties: { tabColor: { argb: argb(COLOR.met) } } });
-    var AS_HEAD = ["Zone", "ID", "Name", "Type", "Connection", "Tag or hostname", "Vendor", "Model", "Firmware or software version", "Location", "Criticality", "Owner", "Notes"];
-    asx.columns = [{ width: 22 }, { width: 8 }, { width: 40 }, { width: 22 }, { width: 20 }, { width: 20 }, { width: 18 }, { width: 18 }, { width: 22 }, { width: 24 }, { width: 12 }, { width: 20 }, { width: 40 }];
+    var AS_HEAD = ["Zone", "ID", "Name", "Type", "Connection", "Tag or hostname", "Vendor", "Model", "Firmware or software version", "Location", "Criticality", "Classification", "Business value", "Owner", "Notes"];
+    asx.columns = [{ width: 22 }, { width: 8 }, { width: 40 }, { width: 22 }, { width: 20 }, { width: 20 }, { width: 18 }, { width: 18 }, { width: 22 }, { width: 24 }, { width: 12 }, { width: 22 }, { width: 14 }, { width: 20 }, { width: 40 }];
     asx.addRow(AS_HEAD);
     styleHeader(asx, 1, AS_HEAD.length);
     p.zones.forEach(function (z) {
       (z.assets || []).forEach(function (a) {
         var r = asx.addRow([z.id + (z.name ? " " + z.name : ""), a.id || "", a.name || "", rt.assetTypeLabel(a.type), assetLinkWords(a.link),
-          a.tag || "", a.vendor || "", a.model || "", a.version || "", a.location || "", critWords(a.criticality), a.owner || "", a.notes || ""]);
+          a.tag || "", a.vendor || "", a.model || "", a.version || "", a.location || "", critWords(a.criticality), a.classification || "", valueWords(a.businessValue), a.owner || "", a.notes || ""]);
         r.alignment = { vertical: "top", wrapText: true };
       });
     });

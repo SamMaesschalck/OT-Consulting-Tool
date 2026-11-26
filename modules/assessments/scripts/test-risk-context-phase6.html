@@ -88,16 +88,16 @@ H.test(function (ok) {
   ok(conform(old, tpl, "file", []).length === 0, "as does the file v0.7 wrote");
   ok(Array.isArray(demo.approvals) && demo.approvals.length === 2 && demo.approvals.every(function (a) { return !!a.name && !!a.role && !!a.organisation && !!a.date && !!a.scope; }),
     "it carries the approvals list", JSON.stringify(demo.approvals));
-  ok(demo.zones.every(function (z) { return z.riskComparison && typeof z.riskComparison.required === "boolean" && z.initialRisk && !!z.initialRisk.risk && !!z.initialRisk.source; }) &&
-     demo.conduits.every(function (c) { return c.riskComparison && c.initialRisk; }),
-    "each zone and conduit carries its risk comparison decision and initial risk");
+  ok(demo.zones.every(function (z) { return z.assessment && typeof z.assessment.depth === "string" && z.initialRisk && !!z.initialRisk.risk && !!z.initialRisk.source; }) &&
+     demo.conduits.every(function (c) { return c.assessment && c.initialRisk; }),
+    "each zone and conduit carries its assessment depth (which replaced the per-zone risk comparison decision) and initial risk");
   ok(demo.zones.every(function (z) { return z.assets.every(function (a) { return /^AS\d+$/.test(a.id) && typeof a.name === "string" && typeof a.type === "string"; }); }),
     "each asset carries its id beside name and type");
   ok(consumedOk(demo), "the six consumed zone fields and the conduit fields are there, with their types");
   ok(consumedOk(old), "as they were in the file v0.7 wrote");
   ok(demo.conduits.some(function (c) { return c.toZone === "EXT" || c.fromZone === "EXT"; }), "and the outside is still EXT");
   // Consequence first adds a top-level consequences list (provenance, the demo has three).
-  var NEW = ["approvals", "riskComparison", "initialRisk", "consequences"];
+  var NEW = ["approvals", "riskComparison", "assessment", "initialRisk", "consequences"];
   function without(o) { return Object.keys(o).filter(function (k) { return NEW.indexOf(k) < 0; }); }
   ok(same(without(demo), Object.keys(old)) && same(without(demo.zones[0]), Object.keys(old.zones[0])) && same(without(demo.conduits[0]), Object.keys(old.conduits[0])),
     "apart from the new fields, its keys are the ones v0.7 wrote");
@@ -125,7 +125,7 @@ H.test(function (ok) {
   ok(same(Object.keys(rc), KEYS_V07.concat(["approvals"])), "it keeps what it kept before, plus the approvals, and nothing else new", Object.keys(rc).join(","));
   ok(same(rc.approvals, demo.approvals), "the approvals are kept as the file has them");
   ok(same(rc.zones, demo.zones) && same(rc.conduits, demo.conduits), "the zones and conduits are kept whole, the new fields with them");
-  ok(rc.zones[0].riskComparison.required === true && rc.zones[0].initialRisk.risk === demo.zones[0].initialRisk.risk && rc.zones[0].assets[0].id === "AS1", "for example the first zone's decision, initial risk and asset id");
+  ok(rc.zones[0].assessment.depth === "detailed" && rc.zones[0].initialRisk.risk === demo.zones[0].initialRisk.risk && rc.zones[0].assets[0].id === "AS1", "for example the first zone's depth, initial risk and asset id");
   var scopedNew = targetsByZone();
   ok(E.state.engagement.targets.length === demo.zones.length, "one target per zone", String(E.state.engagement.targets.length));
   ok(demo.zones.every(function (z) {
@@ -195,6 +195,30 @@ H.test(function (ok) {
   var mine = clone(rc), theirs = clone(frc);
   delete mine.approvals; delete mine.importedOn; delete theirs.importedOn;
   ok(same(mine, theirs), "this build keeps what v0.7 keeps, plus the approvals list");
+
+  // ---- F. a transferred risk (the 3-2 fixes) ----
+  // The risk tool writes a transfer as the legacy disposition 'accepted',
+  // with how it is transferred in acceptance, and the decision and to whom
+  // beside them as provenance. The contract's example carries one.
+  var exT = [].concat.apply([], contract.example.zones.map(function (z) { return z.threats || []; })).filter(function (x) { return x.decision === "transfer"; });
+  ok(exT.length === 1 && exT[0].disposition === "accepted" && !!exT[0].acceptance && typeof exT[0].transferTo === "string", "the contract's example carries a transfer: disposition accepted, with the decision and to whom beside it");
+  ok(/decision 'transfer' and transferTo/.test(contract._note), "and its note says how a transfer is written");
+  var tf = clone(demo), tz = tf.zones.filter(function (z) { return (z.threats || []).some(function (x) { return x.disposition === "accepted"; }); })[0];
+  var tt = tz.threats.filter(function (x) { return x.disposition === "accepted"; })[0];
+  tt.acceptance = "Business interruption insurance covering cyber events, policy BI-2231."; tt.decision = "transfer"; tt.transferTo = "Example Mutual Insurance";
+  ok(conform(tf, tpl, "file", []).length === 0, "a file with a transfer conforms to the contract", conform(tf, tpl, "file", []).slice(0, 4).join(" | "));
+  var hT = frozen();
+  ok(hT.api.accepts(clone(tf)) === null, "v0.7's file checks accept it");
+  var tRows = null, tErr = null;
+  try { tRows = tf.zones.map(hT.api.modalRow); } catch (e) { tErr = e.message; }
+  ok(tErr === null && tRows.every(function (r) { return r.name && /^SL \d$/.test(r.slTarget); }), "v0.7's import modal reads every zone", tErr || "");
+  var tThrew = null;
+  try { hT.api.setRiskContext(clone(tf), { scope: true, zoneIds: tf.zones.map(function (z) { return z.id; }), fileName: "acme-transfer.json" }); } catch (e) { tThrew = e.message; }
+  var hrc = hT.api.getRiskContext(), kept = hrc && hrc.zones.filter(function (z) { return z.id === tz.id; })[0].threats.filter(function (x) { return x.id === tt.id; })[0];
+  ok(tThrew === null && hT.events.indexOf("targets-changed") >= 0 && same(frozenTargets(hT), scopedNew), "v0.7 takes it without error and scopes the same targets", tThrew);
+  ok(kept && kept.disposition === "accepted" && kept.decision === "transfer" && kept.transferTo === "Example Mutual Insurance" && kept.acceptance === tt.acceptance,
+    "and keeps the threat whole: v0.7 reads an accepted risk whose acceptance is the arrangement, with the transfer beside it");
+  ok(importInto(tf, "acme-transfer.json") === null && same(E.getRiskContext().zones, tf.zones), "this build imports it and keeps it whole too");
 });
 </script>
 </body></html>

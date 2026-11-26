@@ -101,7 +101,7 @@
         ok(of(res, "no-evidence").length === 0, "and no-evidence stays out of a risk pack");
 
         // ---- a confirmed decision that lacks what it rests on ----------------------------
-        // Reduce with a tolerable residual rating and no countermeasure (Z1's T1, and T2),
+        // Reduce with a tolerable residual rating and no countermeasure (Z1's T1; step 3: T2 is transferred now, so it is not one),
         // and an acceptance with no reason (Z4's T8): neither is a treatment yet.
         var p = fresh();
         p.zones[0].countermeasures = [];
@@ -112,7 +112,7 @@
       }).then(function (P) {
         var nd = of(RK.run(P, {}), "risk-no-disposition");
         nd.forEach(function (x) { lines.push("flagged incomplete " + x.check + ": " + x.message); });
-        ok(ids(nd) === "Z1:T1,Z1:T2,Z4:T8", "a reduce with no countermeasure and an acceptance with no reason are raised, whatever the residual rating", ids(nd));
+        ok(ids(nd) === "Z1:T1,Z4:T8", "a reduce with no countermeasure and an acceptance with no reason are raised, whatever the residual rating", ids(nd));
         var t1 = P.items.filter(function (i) { return i.itemId === "Z1:T1"; })[0], t8 = P.items.filter(function (i) { return i.itemId === "Z4:T8"; })[0];
         function todo(i) { return i.details.filter(function (r) { return r[0] === "Decision still to complete"; }).map(function (r) { return r[1]; }).join(); }
         ok(t1.status === "finding" && t1.priority === "" && todo(t1) === "Reduce with countermeasures (none recorded)" && t8.priority === "" && todo(t8) === "Accept (no reason recorded)",

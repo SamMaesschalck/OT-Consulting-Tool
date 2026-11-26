@@ -24,8 +24,8 @@
   var h = U.h, card = U.card, textField = U.textField, lineListField = U.lineListField, pageSub = U.pageSub,
     riskPill = U.riskPill, renderZoneMap = U.renderZoneMap, confirmRemove = U.confirmRemove;
 
-  var STEP_OF = { suc: "1", srs: "2", zones: "3" };
-  var STEP_NAME = { suc: "Scope and risk criteria", srs: "High-level risk", zones: "Zones and conduits" };
+  var STEP_OF = { suc: "1", srs: "2", zones: "3", risk: "5" };
+  var STEP_NAME = { suc: "Scope and risk criteria", srs: "High-level risk", zones: "Zones and conduits", risk: "Detailed risk" };
   // The block's own title is in its name, so several "Go to step 1" buttons
   // on the page can be told apart.
   function stepLink(stage, anchor, what) {
@@ -53,6 +53,19 @@
     var s = p.suc, r = p.srs, what = b.title.charAt(0).toLowerCase() + b.title.slice(1);
     function go(stage, anchor) { return stepLink(stage, anchor, what); }
     switch (b.id) {
+      case "countermeasures":
+        // The countermeasures the decisions to reduce a risk rest on: in place
+        // (to be kept) or planned, with the plan.
+        var mc = E.mandatoryCountermeasures(p);
+        if (!mc.length) return [h("p", { class: "muted", text: "No treatment decision rests on a countermeasure yet." }), h("div", { class: "btn-row" }, [go("risk")])];
+        var t = h("table", { class: "tbl compact", "data-mandatory": "" }, [h("thead", null, [h("tr", null, ["Countermeasure", "Zone or conduit", "In place or planned"].map(function (x) { return h("th", { text: x }); }))])]);
+        var tb = h("tbody");
+        mc.forEach(function (e) {
+          var m = e.m, plan = m.existing ? "In place" : "Planned" + (m.owner ? ", " + m.owner : "") + (m.dueDate ? ", due " + m.dueDate : "");
+          tb.appendChild(h("tr", { "data-cm-id": m.id }, [h("td", { text: m.id + " " + m.description }), h("td", { text: ownerName(e.owner) }), h("td", { text: plan })]));
+        });
+        t.appendChild(tb);
+        return [t, h("div", { class: "btn-row" }, [go("risk")])];
       case "suc":
         return [kv([["SUC", s.name], ["Description", s.description], ["Scope and boundary", s.scopeStatement], ["Essential functions", r.essentialFunctions]]),
           r.mandatorySecurityFunctions.length ? h("div", null, [h("strong", { text: "Security functions that must be kept" }), list(r.mandatorySecurityFunctions)]) : null,
@@ -65,10 +78,13 @@
         return [list(s.assumptions.concat(perZone(p, "assumptions"))), h("div", { class: "btn-row" }, [go("suc", "suc"), go("zones")])];
       case "threats":
         return [kv([["Assumed adversary", r.adversaryClass ? "SL" + r.adversaryClass + "-grade: " + RULES.slDefinitions[String(r.adversaryClass)] : ""], ["Worst-case consequences", r.worstCase]]),
-          h("strong", { text: "Known or presumed threats" }), list(r.knownThreats), h("div", { class: "btn-row" }, [go("srs")])];
+          h("strong", { text: "Sources of threat intelligence" }), h("div", { "data-threat-list": "sources" }, [list(M.listOf(r.threatSources))]),
+          h("strong", { text: "Current threats, known or presumed" }), h("div", { "data-threat-list": "current" }, [list(r.knownThreats)]),
+          h("strong", { text: "Emerging threats" }), h("div", { "data-threat-list": "emerging" }, [list(M.listOf(r.emergingThreats))]),
+          h("div", { class: "btn-row" }, [go("srs")])];
       case "policies":
         var zp = perZone(p, "securityPolicies");
-        return [lineListField("Policies", M.listOf(s.policies), function (a) { if (a.length) s.policies = a; else delete s.policies; touched(); refreshStatus(p); }, "e.g. Group OT security standard GS-104"),
+        return [lineListField("Policies", M.listOf(s.policies), function (a) { if (a.length) s.policies = a; else delete s.policies; touched(); refreshStatus(p); }, "e.g. Group OT standard GS-104: remote access only through the DMZ jump host"),
           zp.length ? h("div", null, [h("strong", { text: "Zone policies" }), list(zp)]) : null,
           zp.length ? h("div", { class: "btn-row" }, [go("zones")]) : null];
       case "tolerable":
@@ -98,7 +114,7 @@
   }
   function characteristicsTables(p) {
     if (!p.zones.length) return h("p", { class: "muted", text: "No zones yet." });
-    var zt = h("table", { class: "tbl compact" }, [h("thead", null, [h("tr", null, ["Zone", "Accountable organisation", "Assets", "Access points", "Separation"].map(function (t) { return h("th", { text: t }); }))])]);
+    var zt = h("table", { class: "tbl compact" }, [h("thead", null, [h("tr", null, ["Zone", "Accountable organisation", "Assets", "Access points", "Separation", "Security requirements"].map(function (t) { return h("th", { text: t }); }))])]);
     var tb = h("tbody");
     p.zones.forEach(function (z) {
       var rows = E.separationRows(z, p);
@@ -109,13 +125,14 @@
         h("td", { text: z.accountableOrg || "" }),
         h("td", { class: "center", text: String(z.assets.length) }),
         h("td", { class: "center", text: String(z.accessPoints.length + M.listOf(z.physicalAccessPoints).length) }),
-        h("td", { class: open ? "val-warn" : "", text: !rows.length ? "None raised" : (open ? open + " to answer" : (notSep ? notSep + " not separated" : "Met")) })
+        h("td", { class: open || rows.some(function (r) { return r.departure; }) ? "val-warn" : "", text: !rows.length ? "None raised" : (open ? open + " to answer" : (notSep ? notSep + " not separated" + (rows.some(function (r) { return r.departure; }) ? ", a departure from the standard" : "") : "Met")) }),
+        h("td", { "data-sec-req": z.id, text: M.listOf(z.securityRequirements).join("; ") })
       ]));
     });
     zt.appendChild(tb);
     var kids = [zt];
     if (p.conduits.length) {
-      var ct = h("table", { class: "tbl compact", style: "margin-top:10px" }, [h("thead", null, [h("tr", null, ["Conduit", "Ends", "Direction", "Connection"].map(function (t) { return h("th", { text: t }); }))])]);
+      var ct = h("table", { class: "tbl compact", style: "margin-top:10px" }, [h("thead", null, [h("tr", null, ["Conduit", "Ends", "Direction", "Connection", "Accountable organisation", "Security requirements"].map(function (t) { return h("th", { text: t }); }))])]);
       var cb = h("tbody");
       p.conduits.forEach(function (c) {
         var dir = c.direction === "both" ? "Both ways" : c.direction === "from-to" ? "One way, " + c.fromZone + " to " + c.toZone : c.direction === "to-from" ? "One way, " + c.toZone + " to " + c.fromZone : "";
@@ -123,7 +140,8 @@
         if (c.wireless) marks.push("wireless");
         if (E.conduitExternal(c)) marks.push("external" + (c.externalParty ? " (" + c.externalParty + ")" : ""));
         if (c.temporary) marks.push("temporarily connected");
-        cb.appendChild(h("tr", null, [h("td", { text: ownerName(c) }), h("td", { text: (c.fromZone || "?") + " ↔ " + (c.toZone || "?") }), h("td", { text: dir }), h("td", { text: marks.join(", ") })]));
+        cb.appendChild(h("tr", null, [h("td", { text: ownerName(c) + (c.safetyRelated ? " (safety related)" : "") }), h("td", { text: (c.fromZone || "?") + " ↔ " + (c.toZone || "?") }), h("td", { text: dir }), h("td", { text: marks.join(", ") }),
+          h("td", { text: c.accountableOrg || "" }), h("td", { "data-sec-req": c.id, text: M.listOf(c.securityRequirements).join("; ") })]));
       });
       ct.appendChild(cb);
       kids.push(ct);
@@ -156,10 +174,18 @@
       });
       t.appendChild(tb);
       kids.push(t);
+      // What was not assessed is not approved as assessed.
+      var deferred = vm.owners.filter(function (row) { return E.depthOf(row.o, p).depth === "deferred"; });
+      if (deferred.length) kids.push(h("p", { "data-covers": "deferred", class: "muted", style: "margin-top:8px",
+        text: "The approval does not cover " + E.andList(deferred.map(function (row) { return row.o.id; })) + ", deferred to a later assessment." }));
     }
     var acc = vm.threats.filter(function (x) { return x.disposition === "accepted"; });
     kids.push(h("div", { "data-covers": "accepted", style: "margin-top:10px" }, [h("strong", { text: "Accepted risks" }),
       list(acc.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + (x.t.statement || "").replace(/[.\s]+$/, "") + ". " + x.treatment.reason; }), "None.")]));
+    // The transferred risks are approved with the accepted ones; listed only when there is one.
+    var trf = vm.threats.filter(function (x) { return x.disposition === "transferred"; });
+    if (trf.length) kids.push(h("div", { "data-covers": "transferred", style: "margin-top:10px" }, [h("strong", { text: "Transferred risks" }),
+      list(trf.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + (x.t.statement || "").replace(/[.\s]+$/, "") + ". " + x.treatment.reason.replace(/[.\s]+$/, "") + ", to " + String(x.t.transferTo || "").trim() + "."; }))]));
     // The ranking, which the high-level report's approval covers.
     var ranked = p.srs.highLevelAssets.filter(function (a) { return a.name || a.consequence || a.likelihood; });
     var hlOnly = M.assessmentType(p) === "high-level";
@@ -236,6 +262,8 @@
     main.appendChild(pageSub("approval", "Record who approved the assessment, and what."));
     main.appendChild(coveredCard(p));
     var kids = states.length ? states.map(function (st) { return approverCard(p, st, now); }) : [h("p", { class: "muted", text: "No approvers recorded." })];
+    // Who approves, in one line.
+    kids.unshift(h("p", { class: "hint", "data-hint": "approvers", style: "margin-top:0", text: "Approvers are the asset owner's managers accountable for the process the SUC controls." }));
     kids.push(h("div", { class: "btn-row", style: "margin-top:10px" }, [h("button", { type: "button", class: "btn", "data-action": "add-approver", text: "+ Add approver", onClick: function () {
       var l = entries(p); l.push(M.emptyApprovalEntry()); sync(p); rerender(); A.focusAfter('[data-approval="' + (l.length - 1) + '"] [data-approval-field="name"]');
     } })]));

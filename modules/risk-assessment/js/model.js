@@ -77,7 +77,8 @@ window.RiskApp.Model = (function () {
   // review's comments (js/review.js). The old slugs are kept as written.
   var SECTION_KEY_ALIASES = {
     "high-level-risk-ranking-4-2": "high-level-risk-ranking",
-    "mandatory-security-functions": "security-functions-that-must-be-kept"
+    "mandatory-security-functions": "security-functions-that-must-be-kept",
+    "known-or-presumed-threats": "threat-environment"
   };
   function sectionKeyAlias(key) {
     return Object.prototype.hasOwnProperty.call(SECTION_KEY_ALIASES, key) ? SECTION_KEY_ALIASES[key] : key;
@@ -153,11 +154,13 @@ window.RiskApp.Model = (function () {
   //   suggestedCountermeasureIds  links a file from before 0.3 implied (the old
   //       requirement match), unconfirmed until the consultant confirms them;
   //       absent when there are none.
-  //   likelihood, impact          the unmitigated rating (before any countermeasure)
+  //   likelihood, impact          the unmitigated rating (before any cyber security
+  //                               countermeasure; built-in and non-cyber protection counts)
   //   currentLikelihood/Impact    the rating with the linked existing countermeasures
   //   residualLikelihood/Impact   the rating after the planned measures as well
-  //   acceptance                  the reason a risk is accepted; acceptanceDetail
-  //                               who accepted it, their role, when, and when to review
+  //   acceptance                  the reason a risk is accepted (for a transfer, how
+  //                               it is transferred); acceptanceDetail who accepted
+  //                               or agreed it, their role, when, and when to review
   function emptyThreat(n) {
     return { id: "T" + n, statement: "", source: "", entryPoint: "", consequence: "",
       assetIds: [], vulnerabilityIds: [], countermeasureIds: [],
@@ -171,11 +174,39 @@ window.RiskApp.Model = (function () {
   var ACCEPTANCE_FIELDS = ["by", "role", "date", "reviewDate"];
   function emptyAcceptanceDetail() { return { by: "", role: "", date: "", reviewDate: "" }; }
   // The consultant's treatment decision for a threat above tolerable risk.
-  // decision: "reduce" | "accept" | "slt" | null. An unconfirmed decision is
-  // only a suggestion and is never printed or exported as fact. The reason
-  // for "accept" is the threat's acceptance text; reason holds any other.
+  // decision: "reduce" | "accept" | "slt" | null, as stored. An unconfirmed
+  // decision is only a suggestion and is never printed or exported as fact.
+  // The reason for "accept" is the threat's acceptance text; reason holds
+  // any other.
   var TREATMENT_DECISIONS = ["reduce", "accept", "slt"];
   function emptyTreatment() { return { decision: null, confirmed: false, reason: "" }; }
+
+  // ---------- Transfer (Nov 2026) ----------
+  // A fourth decision: the consequence is passed to another party (insurance,
+  // or a contract), so the risk is not mitigated and its rating does not
+  // change. Stored as an acceptance marked as a transfer, so a released
+  // v0.7.0 copy, which knows only the three stored decisions, keeps it and
+  // reads it as an acceptance whose reason is the arrangement:
+  //   threat.treatment.transfer   true, on decision "accept"; absent otherwise
+  //   threat.acceptance           for a transfer, how it is transferred
+  //   threat.transferTo           to whom (text), written once typed and kept
+  //                               when another decision is chosen
+  //   threat.acceptanceDetail     who agreed the transfer, their role, the
+  //                               date and the review date, as for an acceptance
+  // DECISIONS is what the decision control offers; decisionOf and setDecision
+  // read and write the stored shape.
+  var DECISIONS = ["reduce", "accept", "transfer", "slt"];
+  function decisionOf(tr) {
+    if (!tr || TREATMENT_DECISIONS.indexOf(tr.decision) < 0) return null;
+    return tr.decision === "accept" && tr.transfer === true ? "transfer" : tr.decision;
+  }
+  function setDecision(t, decision, confirmed) {
+    if (!t.treatment || typeof t.treatment !== "object" || Array.isArray(t.treatment)) t.treatment = emptyTreatment();
+    var tr = t.treatment;
+    tr.decision = decision === "transfer" ? "accept" : (TREATMENT_DECISIONS.indexOf(decision) >= 0 ? decision : null);
+    if (decision === "transfer") tr.transfer = true; else delete tr.transfer;
+    tr.confirmed = !!(tr.decision && confirmed);
+  }
 
   // ---------- Fields a later build added (phase 3a) ----------
   // None is in the empty records above: a file saved by v0.7 must load and
@@ -190,11 +221,44 @@ window.RiskApp.Model = (function () {
   //   zone.initialRisk         a band entered on the risk comparison when the zone
   //                            has no ranked system; conduit.initialRisk likewise
   //   zone/conduit.detailed    { required: true | false | null, reason } the
-  //                            risk comparison's decision; a ranked system carries
-  //                            the same on a high-level-only assessment
+  //                            risk comparison's decision as v0.7.0 recorded it
+  //                            per zone (this build records the depth instead,
+  //                            below); a ranked system carries the same on a
+  //                            high-level-only assessment, where it is still used
   var ASSESSMENT_TYPES = ["full", "high-level"];
   function assessmentType(pj) { return pj && pj.assessmentType === "high-level" ? "high-level" : "full"; }
   function emptyDetailed() { return { required: null, reason: "" }; }
+
+  // ---------- How each zone and conduit was assessed ----------
+  // Every zone and conduit is assessed once the SUC's initial risk is above
+  // tolerable risk, at a depth the consultant chooses. Written only once set,
+  // and read through js/engine.js depthOf, which gives the reading of a file
+  // without it.
+  //
+  //   zone/conduit.assessment  { depth, withId, reuseSource, considered, reason }
+  //     depth        "detailed": its own threat scenarios (a file without the
+  //                  field reads so, unless an older build recorded it as not
+  //                  needing a detailed assessment and it has no threats:
+  //                  then "proportionate")
+  //                  "grouped": assessed with withId (a detailed zone or
+  //                  conduit), whose threat scenarios it shares
+  //                  "reused": results reused from reuseSource (a standard
+  //                  design or an earlier assessment)
+  //                  "proportionate": a short review; considered notes the
+  //                  threats considered, scenarios may be added as well
+  //                  "deferred": not assessed in this assessment, for reason
+  //   zone/conduit.detailed is what an older build recorded on the risk
+  //   comparison; this build reads it only for the reading above.
+  var ASSESSMENT_DEPTHS = ["detailed", "grouped", "reused", "proportionate", "deferred"];
+  var DEPTH_LABEL = { detailed: "Detailed", grouped: "Grouped", reused: "Reused", proportionate: "Proportionate", deferred: "Deferred" };
+  var ASSESSMENT_TEXT_FIELDS = ["withId", "reuseSource", "considered", "reason"];
+  function emptyAssessment(depth) { return { depth: depth || "detailed", withId: "", reuseSource: "", considered: "", reason: "" }; }
+  // Sets the depth, keeping what was typed for the others, so going back restores it.
+  function setDepth(owner, depth) {
+    var a = owner.assessment;
+    if (!a || typeof a !== "object" || Array.isArray(a)) owner.assessment = emptyAssessment(depth);
+    else a.depth = depth;
+  }
 
   // The ranked systems assigned to a zone, first one first.
   function hlaIdsOf(zone) {
@@ -239,9 +303,13 @@ window.RiskApp.Model = (function () {
   // The separation rows, in the order the zones page and the report show them.
   // Each is raised only when the zone's data shows a mix (js/engine.js
   // separationRows); one not raised asks nothing. answer: "met" | "not-separated".
+  // required: the standard requires the separation (business and control
+  // system assets), so not separating is a departure from it; the others are
+  // recommendations, and safety related assets not separated make the whole
+  // zone safety related (wholeZone), as the tool already treats it.
   var SEPARATION_ROWS = [
-    { id: "business", label: "Business and control system assets" },
-    { id: "safety", label: "Safety related assets" },
+    { id: "business", label: "Business and control system assets", required: true },
+    { id: "safety", label: "Safety related assets", wholeZone: true },
     { id: "temporary", label: "Temporarily connected devices" },
     { id: "wireless", label: "Wireless devices" },
     { id: "external", label: "Devices connected via external networks" }
@@ -522,12 +590,36 @@ window.RiskApp.Model = (function () {
   // The register's columns, in the order the register and Word print them.
   var ASSET_FIELD_LABEL = {
     zone: "Zone", name: "Name", type: "Type", link: "Connection", tag: "Tag or hostname", vendor: "Vendor", model: "Model",
-    version: "Firmware or software version", location: "Location", criticality: "Criticality", owner: "Owner", notes: "Notes"
+    version: "Firmware or software version", location: "Location", criticality: "Criticality",
+    classification: "Classification", businessValue: "Business value", owner: "Owner", notes: "Notes"
   };
   // Whether an asset has any of the register's own attributes.
   function assetExtended(a) {
-    return !!a && (ASSET_TEXT_FIELDS.some(function (k) { return typeof a[k] === "string" && a[k].trim(); }) || ASSET_CRITICALITY.indexOf(a.criticality) >= 0);
+    return !!a && (ASSET_TEXT_FIELDS.some(function (k) { return typeof a[k] === "string" && a[k].trim(); }) || ASSET_CRITICALITY.indexOf(a.criticality) >= 0 ||
+      (typeof a.classification === "string" && !!a.classification.trim()) || ["high", "medium", "low"].indexOf(a.businessValue) >= 0);
   }
+
+  // ---------- The 3-2 fixes, step 2 (Nov 2026) ----------
+  // Optional and written only once set, like the fields above; the schema
+  // stays spt-risk-project/0.3 and a file without them reads as before.
+  //
+  //   srs.threatSources        where the threat picture comes from (lines);
+  //                            the threat environment names at least one
+  //   srs.emergingThreats      threats emerging beside the current ones
+  //                            (lines); srs.knownThreats are the current ones
+  //   conduit: accountableOrg, logicalBoundary, physicalBoundary (text);
+  //         accessPoints, physicalAccessPoints, dataFlows, securityPolicies,
+  //         assumptions, externalDependencies (lines); safetyRelated (true,
+  //         absent when not): a conduit's characteristics, as a zone's
+  //   zone/conduit.securityRequirements  the security requirements that apply
+  //                            to it (lines), e.g. "62443-3-3 SRs at the SL-T"
+  //   asset.classification     the owner's classification of the asset (text)
+  //   asset.businessValue      "high" | "medium" | "low"
+  var SRS_LIST_FIELDS = ["threatSources", "emergingThreats"];
+  var CONDUIT_TEXT_FIELDS = ["accountableOrg", "logicalBoundary", "physicalBoundary"];
+  var CONDUIT_LIST_FIELDS = ["accessPoints", "physicalAccessPoints", "dataFlows", "securityPolicies", "assumptions", "externalDependencies", "securityRequirements"];
+  var ASSET_VALUES = ["high", "medium", "low"];
+  var ASSET_VALUE_LABEL = { high: "High", medium: "Medium", low: "Low" };
 
   // ---------- Consequence first (Nov 2026) ----------
   // Optional and written only once set, like the fields above; the schema
@@ -580,7 +672,7 @@ window.RiskApp.Model = (function () {
       any(b.interviews) || any(b.documents) || any(b.observations) ||
       eng.client || eng.consultant || eng.assessmentDate ||
       any(pj.zones) || any(pj.conduits) ||
-      any(s.policies) || r.tolerableConfirmed || any(approvalsOf(pj)) ||
+      any(s.policies) || any(r.threatSources) || any(r.emergingThreats) || r.tolerableConfirmed || any(approvalsOf(pj)) ||
       pj.assessmentType || sectionEdits(pj.reportCustom) || (pj.review && any(pj.review.rounds)) ||
       criteriaUsable(pj.criteria) || Array.isArray(pj.safetyFloorFR) ||
       !!(pj.baseline && typeof pj.baseline === "object") || any(pj.consequences)
@@ -607,12 +699,14 @@ window.RiskApp.Model = (function () {
     emptyDocument: emptyDocument, emptyObservation: emptyObservation, emptyFRVector: emptyFRVector,
     emptyZone: emptyZone, emptyConduit: emptyConduit, emptyThreat: emptyThreat,
     TREATMENT_DECISIONS: TREATMENT_DECISIONS, emptyTreatment: emptyTreatment,
+    DECISIONS: DECISIONS, decisionOf: decisionOf, setDecision: setDecision,
     emptyVulnerability: emptyVulnerability, emptyCountermeasure: emptyCountermeasure,
     COUNTER_KEYS: COUNTER_KEYS, THREAT_TEXT_FIELDS: THREAT_TEXT_FIELDS, THREAT_LINK_FIELDS: THREAT_LINK_FIELDS,
     ACCEPTANCE_FIELDS: ACCEPTANCE_FIELDS, emptyAcceptanceDetail: emptyAcceptanceDetail,
     CM_PRIORITIES: CM_PRIORITIES, CM_STATUSES: CM_STATUSES, CM_STATUS_LABEL: CM_STATUS_LABEL, CM_PRIORITY_LABEL: CM_PRIORITY_LABEL,
     nextAssetId: nextAssetId, newAsset: newAsset,
     ASSESSMENT_TYPES: ASSESSMENT_TYPES, assessmentType: assessmentType, emptyDetailed: emptyDetailed,
+    ASSESSMENT_DEPTHS: ASSESSMENT_DEPTHS, DEPTH_LABEL: DEPTH_LABEL, ASSESSMENT_TEXT_FIELDS: ASSESSMENT_TEXT_FIELDS, emptyAssessment: emptyAssessment, setDepth: setDepth,
     hlaIdsOf: hlaIdsOf, setHlaIds: setHlaIds,
     LEVEL_MIN: LEVEL_MIN, LEVEL_MAX: LEVEL_MAX, PRESETS: PRESETS, CONSEQUENCE_SOURCES: CONSEQUENCE_SOURCES,
     houseCriteria: houseCriteria, presetCriteria: presetCriteria, criteriaUsable: criteriaUsable,
@@ -622,6 +716,8 @@ window.RiskApp.Model = (function () {
     ZONE_LEVELS: ZONE_LEVELS, zoneLevel: zoneLevel, LIBRARY: LIBRARY,
     ASSET_TEXT_FIELDS: ASSET_TEXT_FIELDS, ASSET_CRITICALITY: ASSET_CRITICALITY, ASSET_CRITICALITY_LABEL: ASSET_CRITICALITY_LABEL,
     ASSET_FIELD_LABEL: ASSET_FIELD_LABEL, assetExtended: assetExtended,
+    SRS_LIST_FIELDS: SRS_LIST_FIELDS, CONDUIT_TEXT_FIELDS: CONDUIT_TEXT_FIELDS, CONDUIT_LIST_FIELDS: CONDUIT_LIST_FIELDS,
+    ASSET_VALUES: ASSET_VALUES, ASSET_VALUE_LABEL: ASSET_VALUE_LABEL,
     CONSEQUENCE_TEXT_FIELDS: CONSEQUENCE_TEXT_FIELDS, emptyConsequence: emptyConsequence, consequencesOf: consequencesOf,
     consequenceById: consequenceById, nextConsequenceId: nextConsequenceId, viaOf: viaOf, setVia: setVia, setConsequenceId: setConsequenceId,
     projectHasContent: projectHasContent

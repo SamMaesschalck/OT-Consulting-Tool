@@ -34,7 +34,7 @@
     main.appendChild(pageSub("suc", "Define the SUC, its boundary and every access point."));
     main.appendChild(card("SUC definition", null, [
       textField("SUC name", p.suc.name, function (v) { p.suc.name = v; touched(); }, { placeholder: "e.g. Riverside Works process control system" }),
-      textField("Description", p.suc.description, function (v) { p.suc.description = v; touched(); }, { textarea: true, placeholder: "Function and intended usage of the SUC." }),
+      textField("Description", p.suc.description, function (v) { p.suc.description = v; touched(); }, { textarea: true, placeholder: "Function and intended use of the SUC, and the equipment or process it controls." }),
       textField("Scope statement / boundary", p.suc.scopeStatement, function (v) { p.suc.scopeStatement = v; touched(); }, { textarea: true, placeholder: "What is inside and outside the boundary, and the access points across it.", hint: "Name the exclusions, e.g. corporate IT or third-party packages." }),
       lineListField("Operating-environment assumptions", p.suc.assumptions, function (a) { p.suc.assumptions = a; touched(); }, "e.g. Physical access to the equipment room is controlled")
     ], null, { "data-check-anchor": "suc" }));
@@ -43,7 +43,7 @@
     // tolerable risk afterwards leaves it unconfirmed until confirmed again.
     var confirmed = M.tolerableConfirmed(p), staleBand = s.tolerableConfirmed && !confirmed ? s.tolerableConfirmed : null;
     var body = [
-      selectField("Tolerable risk", s.tolerableRisk, BANDS.map(function (b) { return { value: b.id, text: b.name }; }), function (v) { s.tolerableRisk = v || RULES.tolerableRisk.default; touched(); rerender(); }, { placeholder: false, hint: "The highest unmitigated risk accepted without a treatment decision." }),
+      selectField("Tolerable risk", s.tolerableRisk, BANDS.map(function (b) { return { value: b.id, text: b.name }; }), function (v) { s.tolerableRisk = v || RULES.tolerableRisk.default; touched(); rerender(); }, { placeholder: false, hint: "The highest risk the asset owner accepts; risk above it needs a treatment decision." }),
       h("div", { class: "field" }, [
         h("label", { class: "check-line" }, [
           h("input", { type: "checkbox", "data-action": "tolerable-confirmed", checked: confirmed, onChange: function (e) {
@@ -209,7 +209,7 @@
   function renderSrs(main) {
     var p = state.project, s = p.srs, hlOnly = M.assessmentType(p) === "high-level";
     main.appendChild(h("h1", { class: "page-title", text: "High-level risk" }));
-    main.appendChild(pageSub("srs", hlOnly ? "Rank the systems and decide where a detailed assessment is needed." : "Rank the systems to frame the zoning, and assign them to zones."));
+    main.appendChild(pageSub("srs", hlOnly ? "Rank the systems, and decide by the house method which go forward to a detailed assessment." : "Rank the systems to frame the zoning, and assign them to zones."));
 
     main.appendChild(card("High-level risk assessment", "context for the zoning; nothing here is calculated", [
       selectField("Assumed adversary class (threat context)", s.adversaryClass, Object.keys(RULES.slDefinitions).filter(function (k) { return k !== "_note"; }).map(function (k) { return { value: k, text: "SL" + k + "-grade: " + RULES.slDefinitions[k] }; }), function (v) { s.adversaryClass = v ? Number(v) : null; touched(); rerender(); }, { hint: "Per-FR suggestions below this class are flagged as a mismatch." }),
@@ -240,7 +240,7 @@
     // A high-level-only assessment shows the column only when zones exist.
     if (!hlOnly || p.zones.length) cols.push({ key: "__zone", label: "Zone", kind: "computed", width: "200px", render: assignCell });
     main.appendChild(card("Asset / system risk ranking", "HSE & financial impact by function/location, ranked to guide zoning", [
-      h("p", { class: "hint", style: "margin-top:0", text: "Rate each system's worst-credible impact and, where known, its likelihood." }),
+      h("p", { class: "hint", style: "margin-top:0", text: "Rate each system's worst-credible impact and, where known, its likelihood, before cyber security countermeasures." }),
       registerTable(s.highLevelAssets, cols, {
         empty: "No assets ranked yet. Add the systems in scope to build the relative risk ranking.", addLabel: "+ Add asset / system", rowLabel: "ranked system",
         rowAttrs: function (it) { return { "data-hla-id": it.id }; },
@@ -255,12 +255,21 @@
 
     // Known threats can go to step 5 as draft scenarios (js/ui-library.js);
     // the list there follows what is typed here.
-    var known = lineListField("Known or presumed threats", s.knownThreats, function (a) { s.knownThreats = a; touched(); }, "e.g. Capable criminal adversary; insider misuse of engineering access");
+    var known = lineListField("Current threats, known or presumed", s.knownThreats, function (a) { s.knownThreats = a; touched(); }, "e.g. Capable criminal adversary; insider misuse of engineering access");
     var knownBox = known.querySelector("textarea");
     if (knownBox) knownBox.addEventListener("input", function () { R.LibraryUI.refreshSend(); });
+    // The threat environment (the specification's): where the threat
+    // picture comes from, and what is emerging. Written only once typed.
+    function optList(k) { return function (a) { if (a.length) s[k] = a; else delete s[k]; touched(); A.refreshNav(); }; }
+    var sources = lineListField("Sources of threat intelligence", M.listOf(s.threatSources), optList("threatSources"), "e.g. NCSC advisories; vendor security bulletins; sector ISAC");
+    sources.setAttribute("data-field-block", "threat-sources");
+    var emerging = lineListField("Emerging threats", M.listOf(s.emergingThreats), optList("emergingThreats"), "e.g. Ransomware groups turning to OT remote access");
+    emerging.setAttribute("data-field-block", "emerging-threats");
     main.appendChild(card("Threats and requirements", null, [
+      sources,
       known,
       hlOnly ? null : R.LibraryUI.sendPanel(p),
+      emerging,
       lineListField("Security functions that must be kept", s.mandatorySecurityFunctions, function (a) { s.mandatorySecurityFunctions = a; touched(); }, "e.g. Hard-wired ESD independent of the BPCS")
     ]));
   }
@@ -345,10 +354,12 @@
 
   // ---------- Stage 4: risk comparison ----------
   //
-  // One table: each zone's and conduit's initial risk against tolerable risk,
-  // and the decision whether it needs a detailed assessment (js/engine.js
-  // comparison). Comparing per zone and conduit is the method this tool
-  // uses; the page says so, and does not present it as the standard's words.
+  // The standard's comparison, once: the SUC's initial risk against
+  // tolerable risk, and whether a detailed risk assessment is required
+  // (js/engine.js sucComparison). Then the house method for each zone's and
+  // conduit's depth: its own initial risk against tolerable risk suggests
+  // detailed or proportionate (js/engine.js depthSuggestion). The page says
+  // which is which. The depth itself is set on step 5; nothing here fills it.
 
   function initialCell(o, cmp, isZone) {
     var p = state.project, kids = [riskPill(cmp.initial)];
@@ -377,43 +388,59 @@
     return h("td", null, kids);
   }
 
+  // The SUC's one comparison, in words.
+  function sucResultWords(suc) {
+    if (suc.exceeds === null) return "No initial risk yet: rate the ranked systems in step 2.";
+    return suc.exceeds
+      ? "Above tolerable risk: a detailed risk assessment of every zone and conduit is required."
+      : "Within tolerable risk: no detailed risk assessment is required, though the zones and conduits can still be assessed to set their SL-T.";
+  }
+  function sucSourceWords(suc) {
+    if (suc.source === "systems") return "The worst of the ranked systems: " + suc.systems.map(function (a) { return a.id; }).join(", ") + ".";
+    if (suc.source === "zones") return "The worst initial risk entered for a zone or conduit.";
+    return "";
+  }
+
   function renderCompare(main) {
-    var p = state.project, tol = E.tolerableOf(p);
+    var p = state.project, tol = E.tolerableOf(p), suc = E.sucComparison(p);
     main.appendChild(h("h1", { class: "page-title", text: "Risk comparison" }));
-    main.appendChild(pageSub("compare", "Compare each zone's and conduit's initial risk with tolerable risk, and decide where a detailed assessment is needed."));
-    main.appendChild(h("div", { class: "framing-note", text: "The method used here compares each zone and conduit; " + E.CONDUIT_RULE + "." }));
+    main.appendChild(pageSub("compare", "Compare the SUC's initial risk with tolerable risk."));
+    var src = sucSourceWords(suc);
+    main.appendChild(card("The SUC against tolerable risk", "tolerable risk: " + BAND_NAME[tol].toLowerCase(), [
+      h("div", { class: "suc-cmp" }, [h("span", { class: "muted", text: "Initial risk " }), riskPill(suc.band)]),
+      src ? h("div", { class: "muted cmp-source", text: src }) : null,
+      h("p", { class: "suc-cmp-result" + (suc.exceeds ? " val-warn" : ""), "data-suc-result": suc.exceeds === null ? "none" : (suc.exceeds ? "required" : "not-required"), text: sucResultWords(suc) })
+    ], null, { "data-check-anchor": "suc-compare" }));
     if (!p.zones.length && !p.conduits.length) { main.appendChild(card("No zones", null, [h("p", { class: "muted", text: "Define zones in step 3 first." })])); return; }
 
     var owners = p.zones.map(function (z) { return { o: z, isZone: true }; }).concat(p.conduits.map(function (c) { return { o: c, isZone: false }; }));
-    var rows = owners.map(function (x) { x.cmp = E.comparison(x.o, p); return x; });
-    var suggested = rows.filter(function (x) { return x.cmp.state === "suggested"; });
+    var rows = owners.map(function (x) { x.cmp = E.comparison(x.o, p); x.d = E.depthOf(x.o, p); x.sug = E.depthSuggestion(x.o, p); return x; });
     var tbl = h("table", { class: "tbl cmp-table" }, [h("thead", null, [h("tr", null, [
       h("th", { text: "Zone or conduit" }), h("th", { text: "Initial risk", style: "width:170px" }),
-      h("th", { text: "Against tolerable", style: "width:130px" }), h("th", { text: "Detailed assessment", style: "width:300px" })
+      h("th", { text: "Against tolerable", style: "width:130px" }), h("th", { text: "Suggested depth", style: "width:130px" }),
+      h("th", { text: "Depth", style: "width:190px" })
     ])])]);
     var tb = h("tbody");
     rows.forEach(function (x) {
-      var o = x.o, cmp = x.cmp;
+      var o = x.o, cmp = x.cmp, d = x.d, differs = !!x.sug && x.sug !== d.depth;
       var name = o.id + (o.name ? ": " + o.name : "") + (x.isZone ? "" : " (" + (o.fromZone || "?") + " ↔ " + (o.toZone || "?") + ")");
-      tb.appendChild(h("tr", { "data-owner-id": o.id, "data-compare-state": cmp.state }, [
+      tb.appendChild(h("tr", { "data-owner-id": o.id, "data-depth": d.depth, "data-depth-suggested": x.sug || "" }, [
         h("td", { text: name }),
         initialCell(o, cmp, x.isZone),
         h("td", { class: cmp.suggested ? "val-warn" : "muted", text: comparisonWords(cmp) }),
-        h("td", null, [decisionControl(o, cmp)])
+        h("td", { class: x.sug ? (differs ? "sug-depth differs" : "sug-depth") : "muted", text: x.sug ? M.DEPTH_LABEL[x.sug] : "None" }),
+        h("td", null, [h("span", { class: "depth-now", text: E.depthWords(d) + " " }),
+          h("button", { type: "button", class: "btn xs", "data-action": "set-depth", "aria-label": "Set the depth of " + o.id, text: "Set", onClick: function () {
+            R.RiskPage.select(o.id, null);
+            A.navigate("risk", '[data-owner-id="' + o.id + '"] select[data-field="depth"]');
+          } })])
       ]));
     });
     tbl.appendChild(tb);
-    var open = rows.filter(function (x) { return x.cmp.open; }).length;
-    main.appendChild(card("Initial risk against tolerable risk", "tolerable risk: " + BAND_NAME[tol].toLowerCase() + (open ? ", " + open + " to decide" : ""), [
-      suggested.length ? h("div", { class: "btn-row no-print", style: "margin-bottom:10px" }, [
-        h("button", { type: "button", class: "btn sm", "data-action": "confirm-compare", text: "Confirm suggested (" + suggested.length + ")", onClick: function () {
-          suggested.forEach(function (x) { setDetailed(x.o, x.cmp.suggested); });
-          touched(); rerender();
-        } })
-      ]) : null,
-      tbl,
-      h("p", { class: "hint", style: "margin-top:8px", text: "Not required skips step 5: set the SL-T by hand and give its basis in the justification." })
-    ]));
+    main.appendChild(card("Depth for each zone and conduit", "house method", [
+      h("div", { class: "framing-note", text: "House method: each one's own initial risk suggests its depth, detailed above tolerable risk and proportionate within it; " + E.CONDUIT_RULE + "." }),
+      tbl
+    ], null, { "data-check-anchor": "depth-compare" }));
   }
 
   // ---------- Home ----------

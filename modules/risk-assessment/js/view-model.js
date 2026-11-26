@@ -15,7 +15,7 @@
  *   owners             [ownerRow], zones then conduits; zones and conduits: each kind alone
  *   threats            [threatRow], every threat, owner by owner
  *   dispositionCounts  over threats above tolerable risk: mitigated, countermeasure,
- *                      accepted, sl-t, and none (no complete decision)
+ *                      accepted, transferred, sl-t, and none (no complete decision)
  *   worst              the threatRow with the highest unmitigated risk (the first of equals), or null
  *   sltMax             FR id -> the highest SL-T set on any zone or conduit, or null
  *   counts             threats, exceeding, decided, incomplete, open, suggested,
@@ -109,7 +109,7 @@ window.RiskApp.ViewModel = (function () {
     var conduits = p.conduits.map(function (c) { return ownerRow("Conduit", c); });
     var owners = zones.concat(conduits);
 
-    var counts = { mitigated: 0, countermeasure: 0, accepted: 0, "sl-t": 0, none: 0 };
+    var counts = { mitigated: 0, countermeasure: 0, accepted: 0, transferred: 0, "sl-t": 0, none: 0 };
     threats.forEach(function (x) { if (x.exceeds) counts[x.disposition || "none"] += 1; });
     var worst = null, worstRank = -1;
     threats.forEach(function (x) { if (x.risk && (bandRank[x.risk] || 0) > worstRank) { worstRank = bandRank[x.risk] || 0; worst = x; } });
@@ -139,7 +139,7 @@ window.RiskApp.ViewModel = (function () {
         linkSuggested: threats.filter(function (x) { return x.treatment.linkSuggested.length > 0; }).length,
         countermeasuresExisting: cmEx,
         countermeasuresPlanned: cmPl,
-        // Of the threats above tolerable risk before any countermeasure, those
+        // Of the threats above tolerable risk before any cyber security countermeasure, those
         // within it today and once the planned countermeasures are complete.
         withinToday: exceeding.filter(function (x) { return !x.todayExceeds; }).length,
         withinAfterPlan: exceeding.filter(function (x) { return !x.afterPlanExceeds; }).length,

@@ -64,7 +64,8 @@
         var d0 = r.pack.documents[0], d1 = r.pack.documents[1];
         var ren = d0.blocks.filter(function (b) { return b.type === "heading" && b.text === "How this was done"; })[0];
         ok(!!ren && ren.sectionKey === "method-and-limitations" && ren.sectionTitle === "How this was done", "a pack prints the new title, under the section's own key", ren && ren.sectionKey);
-        ok(d0.blocks.filter(function (b) { return b.sectionKey === "method-and-limitations" && b.type === "paragraph"; }).length === 2, "with its body under it");
+        // Three paragraphs since the zone-depth step: the method now says the SUC was compared once.
+        ok(d0.blocks.filter(function (b) { return b.sectionKey === "method-and-limitations" && b.type === "paragraph"; }).length === 3, "with its body under it");
         ok(!d0.blocks.some(function (b) { return b.sectionKey === "basis-of-assessment"; }), "a hidden section is not in the pack");
         ok(d1.blocks.some(function (b) { return b.sectionKey === "basis-of-assessment"; }), "but is still in the other report's");
         ok(d1.blocks.some(function (b) { return b.type === "heading" && b.text === "Board summary" && b.sectionKey === "executive-summary"; }), "and that report's own rename is in it");

@@ -1,0 +1,363 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool zone and conduit depth</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The 3-2 fixes, step 1: every zone and conduit is assessed, at a depth.
+  - The risk comparison is the SUC's, once: its initial risk (the worst of
+    the ranked systems and of the zones' and conduits' initial risk) against
+    tolerable risk says whether a detailed risk assessment is required. Each
+    zone's and conduit's own comparison only suggests its depth (house
+    method), and nothing is filled from it.
+  - zone/conduit.assessment { depth, withId, reuseSource, considered, reason }:
+    detailed (the default, and a file without the field), grouped (with a
+    detailed zone or conduit, whose suggestion it takes where higher),
+    reused, proportionate, deferred. The migration (a v0.7.0 zone recorded as
+    not needing a detailed assessment, with no threats, reads as a
+    proportionate review with nothing noted), the prune of a dangling or
+    self withId, the released v0.7.0 normaliser keeping the field, and a file
+    with no depth fields scoring and suggesting exactly as before.
+  - Completeness for every depth (warns, never blocks), step 4 and step 5
+    (the depth bar, its focus and Undo), the approval page, Word (the
+    summary, the risk comparison's table, the zone sections, the SL-T table,
+    a deferred zone said once in Method and limitations, the
+    specification), Excel, the risk context, the review pack and the
+    comparison with a previous assessment.
+-->
+<iframe id="f" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/tour-phase3-0.2.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script src="fixtures/v0.7.0-migrate.js"></script>
+<script src="fixtures/slt-suggestions-v0.7.0.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  var DASH = /[–—]/;
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var t = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+      if (t.replace(/\s+/g, "")) out.push(t.replace(/&apos;/g, "'").replace(/&quot;/g, "\"").replace(/&amp;/g, "&"));
+    }
+    return out;
+  }
+
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, tries = 0;
+    var t = setInterval(function () {
+      if (!w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks || !w.RiskTool.state.project.zones.length) { if (++tries > 400) { clearInterval(t); ok(false, "the app exposed RiskTool with the demo"); done(); } return; }
+      clearInterval(t);
+      var r = null;
+      try { r = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+      if (r && typeof r.then === "function") r.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+      else done();
+    }, 50);
+  };
+  frame.src = "../index.html?tour=1";
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks;
+    var CMP = w.RiskApp.Compare, VMOD = w.RiskApp.ViewModel, d = w.document;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    w.confirm = function () { return true; }; w.alert = function () {};
+    var DEMO = window.SPT_TOUR_PROJECT, FX = window.RiskFixtures;
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function load(p) { RT.loadProjectText(JSON.stringify(p)); }
+    function ownerIn(p, id) { return p.zones.concat(p.conduits).filter(function (o) { return o.id === id; })[0]; }
+    function owner(id) { return ownerIn(P(), id); }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    function toastUndo() { return d.getElementById("toast").querySelector('[data-action="toast-undo"]'); }
+    function texts(p) { return E.completeness(p).map(function (i) { return i.text; }); }
+    function has(list, re) { return list.some(function (x) { return re.test(x); }); }
+    function sugOf(o, p) { return ("fromZone" in o) ? E.suggestConduit(o, p) : E.suggestZone(o, p); }
+    function vec(s) { var v = {}; M.FR_IDS.forEach(function (fr) { v[fr] = s.byFR[fr].sl; }); return v; }
+
+    var base = MG.normaliseProject(clone(DEMO));
+    // The demo with every depth: Z4 reused, a new Z5 deferred (no SL-T), C1
+    // grouped with Z3 and C3 a proportionate review (as the demo has them).
+    function variant() {
+      var q = MG.normaliseProject(clone(DEMO));
+      ownerIn(q, "Z4").assessment = { depth: "reused", withId: "", reuseSource: "Reference design ENG-1, assessed 2025", considered: "", reason: "" };
+      var z5 = M.emptyZone(5); z5.name = "Packaging line"; z5.assessment = { depth: "deferred", withId: "", reuseSource: "", considered: "", reason: "Not reachable until the 2027 outage." };
+      q.zones.push(z5); q.counters.zone = 5;
+      return q;
+    }
+    var V = variant();
+
+    // ---- A. the model and the migration ------------------------------------------------------
+    ok(same(M.ASSESSMENT_DEPTHS, ["detailed", "grouped", "reused", "proportionate", "deferred"]) && same(Object.keys(M.emptyAssessment()), ["depth", "withId", "reuseSource", "considered", "reason"]) && M.emptyAssessment().depth === "detailed",
+      "five depths, and an empty record is detailed");
+    ok(!("assessment" in M.emptyZone(1)) && !("assessment" in M.emptyConduit(1)), "a new zone or conduit has no depth field until one is set");
+    var mz = M.emptyZone(7); M.setDepth(mz, "reused"); mz.assessment.reuseSource = "RD-2"; M.setDepth(mz, "deferred"); M.setDepth(mz, "reused");
+    ok(mz.assessment.depth === "reused" && mz.assessment.reuseSource === "RD-2", "setting the depth keeps what was typed for another, so going back restores it");
+    ["tour-v0.7-saved", "tour-phase3-0.2", "hand-made-v0.1"].forEach(function (k) {
+      var n = MG.normaliseProject(clone(FX[k]));
+      ok(!n.zones.concat(n.conduits).some(function (o) { return "assessment" in o; }), "the frozen " + k + " file gains no depth field");
+    });
+    // v0.7.0's per-zone decision: not required, with no threats, reads as a proportionate review with nothing noted.
+    var lg = MG.normaliseProject(clone(DEMO));
+    lg.zones.concat(lg.conduits).forEach(function (o) { delete o.assessment; });
+    ownerIn(lg, "C1").detailed = { required: false, reason: "Assessed with Z3." };
+    ownerIn(lg, "Z3").detailed = { required: false, reason: "Low." };
+    ownerIn(lg, "C2").detailed = { required: true, reason: "" };
+    var dC1 = E.depthOf(ownerIn(lg, "C1"), lg), dZ3 = E.depthOf(ownerIn(lg, "Z3"), lg), dC3 = E.depthOf(ownerIn(lg, "C3"), lg);
+    ok(dC1.depth === "proportionate" && dC1.legacy && !dC1.set && dC1.considered === "", "a v0.7.0 zone or conduit recorded as not needing a detailed assessment, with no threats, reads as a proportionate review with nothing noted");
+    ok(dZ3.depth === "detailed" && E.depthOf(ownerIn(lg, "C2"), lg).depth === "detailed" && dC3.depth === "detailed" && !dC3.set, "with threats, or required, or with no decision, it reads as detailed");
+    ok(has(texts(lg), /^C1 \(Historian replication\): proportionate, with no note of the threats considered\.$/) && !has(texts(lg), /^C1 \(Historian replication\): no threats/), "so the completeness list asks for the note, not for threats");
+    var lgN = MG.normaliseProject(clone(lg));
+    ok(!lgN.zones.concat(lgN.conduits).some(function (o) { return "assessment" in o; }) && same(lgN.conduits[0].detailed, { required: false, reason: "Assessed with Z3." }), "and nothing is written: the reading is made each time, from the file as it is");
+    // Odd values, and the prune.
+    var odd = clone(V);
+    ownerIn(odd, "Z1").assessment = "deep"; ownerIn(odd, "Z2").assessment = { depth: "shallow" }; ownerIn(odd, "Z3").assessment = { depth: "grouped", withId: "Z9", reuseSource: 4 };
+    ownerIn(odd, "C2").assessment = { depth: "grouped", withId: "C2" }; ownerIn(odd, "C1").assessment = { depth: "grouped", withId: "Z3" };
+    var on = MG.normaliseProject(odd);
+    ok(!("assessment" in ownerIn(on, "Z1")) && !("assessment" in ownerIn(on, "Z2")), "a depth record that is not one, or a depth this build does not know, goes (the file then reads as one without it)");
+    ok(same(ownerIn(on, "Z3").assessment, { depth: "grouped", withId: "", reuseSource: "", considered: "", reason: "" }), "a dangling withId is pruned and the text fields are filled, never invented", JSON.stringify(ownerIn(on, "Z3").assessment));
+    ok(ownerIn(on, "C2").assessment.withId === "" && ownerIn(on, "C1").assessment.withId === "Z3", "a zone or conduit grouped with itself loses the link; one grouped with a zone in the file keeps it");
+    ok(same(MG.normaliseProject(clone(on)), on), "and a second pass changes nothing");
+    var del = clone(V); del.zones = del.zones.filter(function (z) { return z.id !== "Z3"; });
+    ok(MG.normaliseProject(del).conduits[0].assessment.withId === "" && has(texts(MG.normaliseProject(clone(del))), /^C1 \(Historian replication\): grouped, with no zone or conduit named to share threats with\.$/), "a zone removed leaves no group pointing at it, and the completeness list asks for one");
+    // The released v0.7.0 normaliser keeps the field.
+    var OLD = FX["v0.7.0-migrate"](M, E);
+    var viaOld = OLD.normaliseProject(clone(V));
+    ok(OLD.accepts(V.schema) && V.zones.concat(V.conduits).every(function (o) { return same(ownerIn(viaOld, o.id).assessment, o.assessment); }), "a file with depths opens in the released v0.7.0 with every depth kept, unchanged");
+    ok(same(MG.normaliseProject(clone(viaOld)), MG.normaliseProject(clone(V))), "and saved from there, this build reads it as before");
+
+    // ---- B. a file with no depth fields: scoring and suggestions as before -------------------
+    var REF = FX["slt-suggestions-v0.7.0"];
+    ["tour-v0.7-saved", "tour-phase3-0.2", "hand-made-v0.1"].forEach(function (k) {
+      var p = MG.normaliseProject(clone(FX[k])), bad = [];
+      p.zones.concat(p.conduits).forEach(function (o) { if (!same({ sug: sugOf(o, p), drivers: E.sltDrivers(o, p) }, REF[k][o.id])) bad.push(o.id); });
+      ok(!bad.length, "the frozen " + k + " file: every suggestion and driver as v0.7.0 gave it", bad.join());
+    });
+    function facts(p) {
+      var vm = VMOD.build(p);
+      return { threats: vm.threats.map(function (x) { return [x.owner.id, x.t.id, x.risk, x.current, x.planned, x.exceeds, x.disposition, x.label]; }),
+        sug: p.zones.concat(p.conduits).map(function (o) { return [o.id, sugOf(o, p), E.sltDrivers(o, p)]; }), open: texts(p) };
+    }
+    var none = MG.normaliseProject(clone(DEMO)); none.zones.concat(none.conduits).forEach(function (o) { delete o.assessment; });
+    var expl = clone(none); expl.zones.concat(expl.conduits).forEach(function (o) { o.assessment = M.emptyAssessment("detailed"); });
+    ok(same(facts(none), facts(expl)), "no depth field reads exactly as detailed: the same ratings, decisions, suggestions, drivers and completeness");
+    var withG = MG.normaliseProject(clone(DEMO)), noG = clone(withG); delete ownerIn(noG, "C1").assessment;
+    ok(same(vec(E.suggestConduit(ownerIn(withG, "C1"), withG)), vec(E.suggestConduit(ownerIn(noG, "C1"), noG))), "the demo's C1, grouped with Z3 (which it joins), suggests what it did before");
+
+    // ---- C. grouped: the lead's suggestion, no chains or loops -------------------------------
+    var g = MG.normaliseProject(clone(DEMO));
+    var z6 = M.emptyZone(6); z6.name = "Lab"; g.zones.push(z6);
+    ok(M.FR_IDS.every(function (fr) { return E.suggestZone(z6, g).byFR[fr].sl == null; }), "a zone with nothing behind it has no suggestion");
+    z6.assessment = M.emptyAssessment("grouped"); z6.assessment.withId = "Z2";
+    var s6 = E.suggestZone(z6, g), s2 = vec(E.suggestZone(ownerIn(g, "Z2"), g));
+    ok(same(vec(s6), s2) && s6.byFR.IAC.trace.some(function (x) { return /^Assessed with Z2: takes its suggested SL3 for IAC \(house method\)\.$/.test(x); }), "grouped with the safety zone, it takes that zone's suggestion, said as the house method", JSON.stringify(vec(s6)) + " " + s6.byFR.IAC.trace.join(" | "));
+    var d6 = E.sltDrivers(z6, g);
+    ok(d6.length === 7 && d6.every(function (x) { return x.raisedBy === "grouped" && same(x.from, ["Z2"]); }), "its driving scenarios say where it comes from", JSON.stringify(d6.map(function (x) { return x.raisedBy; })));
+    ownerIn(g, "Z2").assessment = M.emptyAssessment("proportionate"); ownerIn(g, "Z2").assessment.considered = "x";
+    ok(M.FR_IDS.every(function (fr) { return E.suggestZone(z6, g).byFR[fr].sl == null; }) && has(texts(g), /^Z6 \(Lab\): grouped with Z2, which is not assessed in detail\.$/), "a lead not assessed in detail gives nothing, and the completeness list says so (no chains)");
+    delete ownerIn(g, "Z2").assessment;
+    var c9 = M.emptyConduit(9); c9.fromZone = "Z6"; c9.toZone = "Z2"; g.conduits.push(c9);
+    z6.assessment.withId = "C9";
+    var loopOk = true, s69; try { s69 = vec(E.suggestZone(z6, g)); E.sltDrivers(z6, g); E.sltDrivers(c9, g); } catch (e) { loopOk = false; }
+    ok(loopOk && s69.IAC === 3, "a zone grouped with a conduit that joins it: no loop, and the conduit's suggestion (from Z2) comes through", JSON.stringify(s69));
+    c9.assessment = M.emptyAssessment("grouped"); c9.assessment.withId = "Z6";
+    var loop2 = true; try { E.suggestZone(z6, g); E.suggestConduit(c9, g); E.completeness(g); } catch (e) { loop2 = false; }
+    ok(loop2 && !E.depthOf(z6, g).leadOk && !E.depthOf(c9, g).leadOk, "two grouped with each other: neither leads, and nothing loops");
+    ok(E.groupLeads(z6, g).every(function (o) { return E.depthOf(o, g).depth === "detailed" && o !== z6; }) && E.groupLeads(z6, g).indexOf(c9) < 0, "only a zone or conduit assessed in detail, not itself, can hold the threats");
+
+    // ---- D. completeness, every depth -------------------------------------------------------
+    // (A new zone moves the SL-T the two approvals cover, so they say so too.)
+    var vOpen = E.completeness(V).filter(function (i) { return i.stage !== "approval"; });
+    ok(E.completeness(base).length === 0 && vOpen.length === 1, "the demo has nothing open; with every depth, only the deferred zone's missing SL-T", texts(V).join(" | "));
+    ok(has(texts(V), /^Z5 \(Packaging line\): deferred, with no SL-T yet\.$/) && !has(texts(V), /^Z5 .*(no threats|no SL-T set for any FR)/), "a deferred zone gets its own warning that it has no SL-T, and is not asked for threats");
+    ok(E.completeness(V).filter(function (i) { return /^Z5 /.test(i.text); })[0].stage === "slt", "on the SL-T");
+    var c = clone(V);
+    ownerIn(c, "Z5").assessment.reason = "";
+    ownerIn(c, "Z4").assessment.reuseSource = "  ";
+    ownerIn(c, "C3").assessment.considered = "";
+    ownerIn(c, "C1").assessment.withId = "";
+    var ct = texts(c);
+    ok(has(ct, /^Z5 \(Packaging line\): deferred, with no reason\.$/), "deferred asks for its reason");
+    ok(has(ct, /^Z4 \(Engineering workstations\): reused, with no source named\.$/), "reused asks for its source", ct.join(" | "));
+    ok(has(ct, /^C3 \(Corporate reporting\): proportionate, with no note of the threats considered\.$/), "proportionate asks for the threats considered");
+    ok(has(ct, /^C1 \(Historian replication\): grouped, with no zone or conduit named to share threats with\.$/), "grouped asks which zone or conduit holds the threats");
+    ok(!has(ct, /^C1 .*no threats|^C3 .*no threats|^Z5 .*no threats/), "none of them is asked for threat scenarios of its own");
+    var item = E.completeness(c).filter(function (i) { return /^C3 /.test(i.text); })[0];
+    ok(item.stage === "risk" && item.target.kind === "conduit" && item.target.id === "C3" && item.target.part === "depth", "each opens step 5 at the zone's or conduit's depth");
+    ownerIn(c, "C3").threats.push(M.emptyThreat(90));
+    ok(!has(texts(c), /^C3 \(Corporate reporting\): proportionate/), "a proportionate review with a scenario of its own needs no note");
+    ownerIn(c, "Z5").slTargetByFR.IAC = 1;
+    ok(has(texts(c), /^Z5 \(Packaging line\): SL-T set but no justification\.$/) && !has(texts(c), /^Z5 .*no SL-T yet/), "a deferred zone given an SL-T needs its justification, like any other");
+    var dz = clone(base); delete ownerIn(dz, "Z2").assessment; ownerIn(dz, "Z2").threats = [];
+    ok(has(texts(dz), /^Z2 \(Safety Instrumented System\): SL-T set with no threats\. Give the basis in the justification\.$/), "a zone assessed in detail still needs a threat scenario (today's check)");
+    // The SUC's comparison: nothing rated, then within tolerable risk.
+    var un = clone(base);
+    un.srs.highLevelAssets.forEach(function (a) { a.likelihood = ""; }); un.zones.concat(un.conduits).forEach(function (o) { delete o.initialRisk; });
+    var su = E.sucComparison(un);
+    ok(su.band === null && su.exceeds === null && !su.required && has(texts(un), /^The SUC has no initial risk to compare with tolerable risk: rate a ranked system, or enter a zone's initial risk\.$/) &&
+      E.completeness(un).filter(function (i) { return /^The SUC/.test(i.text); })[0].target.kind === "suc-compare", "with nothing rated, the SUC's comparison is the one item on step 4");
+    ownerIn(un, "Z1").initialRisk = "medium";
+    su = E.sucComparison(un);
+    ok(su.band === "medium" && su.source === "zones" && su.exceeds === false && !su.required, "an initial risk entered for a zone gives the SUC's when nothing is ranked, within tolerable risk here");
+    var sb = E.sucComparison(base);
+    ok(sb.band === "high" && sb.source === "systems" && sb.required === true && sb.systems.length >= 1, "the demo's SUC: High, from its ranked systems, above tolerable risk", JSON.stringify([sb.band, sb.systems.map(function (a) { return a.id; })]));
+    ok(texts(un).filter(function (x) { return /initial risk/.test(x); }).length === 0, "no zone is asked for a comparison of its own");
+
+    // ---- E. the risk context -----------------------------------------------------------------
+    var ctx = RT.buildRiskContext(V), cz = {}; ctx.zones.concat(ctx.conduits).forEach(function (o) { cz[o.id] = o; });
+    ok(same(cz.Z1.assessment, { depth: "detailed" }) && same(cz.Z4.assessment, { depth: "reused", reuseSource: "Reference design ENG-1, assessed 2025" }) &&
+      same(cz.Z5.assessment, { depth: "deferred", reason: "Not reachable until the 2027 outage." }) && same(cz.C1.assessment, { depth: "grouped", withId: "Z3" }) && cz.C3.assessment.depth === "proportionate" && /^Read-only reporting/.test(cz.C3.assessment.considered),
+      "the risk context gives each zone's and conduit's depth, with what it rests on", JSON.stringify([cz.Z4.assessment, cz.Z5.assessment]));
+    ok(cz.Z5.slTarget === null && M.FR_IDS.every(function (fr) { return cz.Z5.slTargetByFR[fr] === null; }) && ctx.schema === "spt-risk-context/1.4" && !ctx.zones.concat(ctx.conduits).some(function (o) { return "riskComparison" in o; }),
+      "a deferred zone exports no SL-T, on the same 1.4 string, and no zone writes the old per-zone decision");
+
+    // ---- F. the comparison with a previous assessment -----------------------------------------
+    var prevF = CMP.freeze(base), curF = CMP.freeze(V);
+    ok(curF.owners.filter(function (o) { return o.id === "C1"; })[0].depth === "grouped" && curF.owners.filter(function (o) { return o.id === "C1"; })[0].withId === "Z3", "a frozen copy keeps each depth, and a group's partner");
+    var df = CMP.diff(prevF, curF), dl = [].concat.apply([], CMP.lines(df).map(function (gp) { return gp.items; }));
+    ok(has(dl, /^Z4 Engineering.*: now reused from earlier results; was assessed in detail\.$/) && !has(dl, /^Z5 .*: now /) && has(dl, /^Z5 Packaging line added\.$/), "a depth that changed is reported; an added zone is said as added", dl.join(" | "));
+    var rows = CMP.rows(df).filter(function (r) { return r.change === "Assessment depth changed"; });
+    ok(rows.length === 1 && rows[0].where === "Z4" && rows[0].before === "Assessed in detail" && rows[0].now === "Reused from earlier results", "and on the workbook's Changes sheet", JSON.stringify(rows));
+    var v2 = clone(V); ownerIn(v2, "C1").assessment.withId = "Z1";
+    var dl2 = [].concat.apply([], CMP.lines(CMP.diff(curF, CMP.freeze(v2))).map(function (gp) { return gp.items; }));
+    ok(has(dl2, /^C1 Historian replication: now grouped with Z1; was grouped with Z3\.$/), "a group moved to another zone is reported", dl2.join(" | "));
+    var oldF = clone(prevF); oldF.owners.forEach(function (o) { delete o.depth; delete o.withId; });
+    ok(!CMP.diff(oldF, curF).owners.depth.length && !CMP.diff(prevF, CMP.freeze(base)).owners.depth.length && CMP.diff(prevF, CMP.freeze(base)).empty, "a copy frozen before the depth was kept reports no depth change, and the same file none at all");
+
+    // ---- G. Word, Excel and the review pack -------------------------------------------------
+    function wordParas(p, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    function after(list, s) { var i = list.indexOf(s); return i < 0 ? [] : list.slice(i + 1); }
+    var REASON = "Not reachable until the 2027 outage.";
+    return wordParas(V, {}).then(function (det) {
+      var all = det.join("\n");
+      ok(det.some(function (x) { return /^The assessment follows IEC 62443-3-2\. .*Its initial risk is above the tolerable risk, so every zone and conduit apart from Z5 was assessed, at the depth shown under Risk comparison\. .* Each zone and conduit assessed then has a target security level/.test(x); }),
+        "the summary: one line of outcome, every zone and conduit assessed at its depth, the deferred one named apart (the full statement is under Risk comparison)");
+      var rc = after(det, "Risk comparison");
+      ok(/^The initial risk of the system under consideration is High, the worst of its ranked systems\. It is above the tolerable risk of Medium, so a detailed risk assessment of every zone and conduit was required\.$/.test(rc[0]), "the risk comparison states the SUC's comparison first", rc[0]);
+      var tb = after(det, "How each zone and conduit was assessed");
+      ok(/By the house method, each one's own initial risk suggests its depth/.test(tb[0]) && tb[1] === "Zone or conduit" && tb.slice(1, 6).join("|") === "Zone or conduit|Initial risk|Against tolerable risk|Depth|Basis", "then How each zone and conduit was assessed: the house method, and the table's header", tb.slice(0, 6).join(" | "));
+      var z4 = tb.indexOf("Z4 Engineering workstations"), z5 = tb.indexOf("Z5 Packaging line");
+      ok(z4 > 0 && tb[z4 + 3] === "Reused" && tb[z4 + 4] === "Reused from Reference design ENG-1, assessed 2025", "reused: its source", tb.slice(z4, z4 + 5).join(" | "));
+      ok(z5 > 0 && tb[z5 + 1] === "Not rated" && tb[z5 + 2] === "Nothing to compare" && tb[z5 + 3] === "Deferred" && tb[z5 + 4] === REASON, "deferred: its reason, in the table", tb.slice(z5, z5 + 5).join(" | "));
+      ok(tb.indexOf("Grouped with Z3") > 0 && tb.indexOf("Proportionate") > 0, "grouped and proportionate, as the demo has them");
+      ok(det.filter(function (x) { return x.indexOf(REASON.replace(/\.$/, "")) >= 0; }).length === 1, "the reason for deferring is said once");
+      var ml = after(det, "Method and limitations");
+      ok(ml[2] === "The comparison with the tolerable risk, and the depth each zone and conduit was assessed at, are under Risk comparison." && det.filter(function (x) { return /house method/.test(x) && /depth/.test(x); }).length === 1,
+        "Method and limitations: refers back to Risk comparison in one sentence, the house method for the depth named once, there", ml[2]);
+      ok(ml[3] === "Z5 was deferred, so this assessment does not cover it, and it has no SL-T yet. The reason for it is under Risk comparison." && det.filter(function (x) { return /was deferred, so this assessment does not cover/.test(x); }).length === 1,
+        "and the deferred zone as a limitation, said once", ml[3]);
+      var zs = det.slice(det.lastIndexOf("Z5: Packaging line") + 1);
+      ok(zs[0] === "Deferred to a later assessment (see Method and limitations)." && det.indexOf("Assessed with Z3, whose threat scenarios it shares.") > 0 && det.indexOf("Results reused from Reference design ENG-1, assessed 2025.") > 0,
+        "each zone's section says how it was assessed when not in detail on its own", zs.slice(0, 2).join(" | "));
+      var st = after(det, "Target security levels (SL-T, per foundational requirement)");
+      ok(st.indexOf("Deferred, no SL-T yet") > 0 && st.indexOf("Deferred, no SL-T yet") > st.indexOf("Z5 Packaging line"), "the SL-T table marks the deferred zone as having none yet");
+      var drv = after(det, "Driving scenarios");
+      ok(drv.indexOf("Deferred. No SL-T yet.") > 0, "and its driving scenarios say so");
+      ok(!/found not to need a detailed assessment|Not required|Detailed assessment\b/.test(all) && !DASH.test(all), "nothing says a zone needed no detailed assessment, and no dashes");
+      return wordParas(V, { spec: true });
+    }).then(function (spec) {
+      var ml = after(spec, "Method and limitations");
+      ok(spec.indexOf("How each zone and conduit was assessed") < 0 && ml.indexOf("Z5 (Not reachable until the 2027 outage) was deferred, so this assessment does not cover it, and it has no SL-T yet.") >= 0,
+        "the specification: no depth table, and the deferred zone with its reason, said once in its method", ml.join(" | ").slice(0, 400));
+      ok(spec.indexOf("Deferred, no SL-T yet") > 0 && spec.filter(function (x) { return x.indexOf("Not reachable until the 2027 outage") >= 0; }).length === 1 && !/compared once with the tolerable risk/.test(spec.join("\n")),
+        "it marks the deferred zone as having no SL-T yet, and leaves the report's method sentence to the report");
+      return wordParas(base, {});
+    }).then(function (det) {
+      ok(det.some(function (x) { return /so every zone and conduit was assessed, at the depth shown under Risk comparison\. Threats were rated/.test(x); }) && det.indexOf("Each zone and conduit then has a target security level (SL-T), the protection it must be engineered and maintained to.") < 0 &&
+        !det.some(function (x) { return /was deferred/.test(x); }), "the demo, with nothing deferred, says no limitation");
+      var allD = clone(base); allD.zones.concat(allD.conduits).forEach(function (o) { o.assessment = M.emptyAssessment("detailed"); });
+      ownerIn(allD, "C1").threats = []; ownerIn(allD, "C3").threats = [];
+      return wordParas(allD, {});
+    }).then(function (det) {
+      ok(det.some(function (x) { return /so every zone and conduit was assessed in detail\. Threats were rated/.test(x); }), "with every zone and conduit in detail, the summary says so");
+      var wi = clone(base); wi.srs.tolerableRisk = "very-high";
+      return wordParas(wi, {});
+    }).then(function (det) {
+      ok(det.some(function (x) { return /Its initial risk is within the tolerable risk\. To set the SL-T, every zone and conduit was still assessed, at the depth shown under Risk comparison\./.test(x); }) &&
+        det.some(function (x) { return /^The initial risk of the system under consideration is High, the worst of its ranked systems\. It is within the tolerable risk of Very high, so a detailed risk assessment was not required\.$/.test(x); }),
+        "within tolerable risk: the report says a detailed assessment was not required, and that the zones were still assessed");
+      // Excel.
+      var wb = RX.buildWorkbook(V), zsh = wb.getWorksheet("Zones"), csh = wb.getWorksheet("Conduits");
+      function col(ws, name) { var n = 0; ws.getRow(1).eachCell(function (c, i) { if (c.value === name) n = i; }); return n; }
+      function rowOf(ws, id) { var r = 0; ws.eachRow(function (row, i) { if (row.getCell(1).value === id) r = i; }); return r; }
+      var dcz = col(zsh, "Assessment depth"), bcz = col(zsh, "Basis"), dcc = col(csh, "Assessment depth"), bcc = col(csh, "Basis");
+      ok(dcz && bcz === dcz + 1 && dcc && bcc === dcc + 1 && !col(zsh, "Detailed assessment") && !col(csh, "Detailed assessment"), "Excel: the Zones and Conduits sheets carry the depth and its basis");
+      ok(zsh.getCell(rowOf(zsh, "Z4"), dcz).value === "Reused" && zsh.getCell(rowOf(zsh, "Z4"), bcz).value === "Reused from Reference design ENG-1, assessed 2025" &&
+        zsh.getCell(rowOf(zsh, "Z5"), dcz).value === "Deferred" && zsh.getCell(rowOf(zsh, "Z5"), bcz).value === REASON && zsh.getCell(rowOf(zsh, "Z1"), dcz).value === "Detailed",
+        "with each zone's depth and what it rests on");
+      ok(csh.getCell(rowOf(csh, "C1"), dcc).value === "Grouped with Z3" && csh.getCell(rowOf(csh, "C3"), dcc).value === "Proportionate" && /^Threats considered: Read-only reporting/.test(csh.getCell(rowOf(csh, "C3"), bcc).value), "and each conduit's");
+      // The review pack and the approval page: the live project.
+      load(V);
+      var items = RR.packItems().items;
+      function depthRow(id) { var it = items.filter(function (x) { return x.itemId === id + ":slt"; })[0]; return it ? it.details[0] : null; }
+      ok(same(depthRow("Z1"), ["Assessment depth", "Detailed"]) && same(depthRow("C1"), ["Assessment depth", "Grouped with Z3"]) && same(depthRow("Z4"), ["Assessment depth", "Reused from Reference design ENG-1, assessed 2025"]) &&
+        same(depthRow("Z5"), ["Assessment depth", "Deferred: " + REASON]) && /^Proportionate. Threats considered: /.test(depthRow("C3")[1]), "the review pack gives each zone's and conduit's depth with its SL-T", JSON.stringify([depthRow("Z4"), depthRow("Z5")]));
+      RT.navigate("approval");
+      var cov = main().querySelector('[data-covers="deferred"]');
+      ok(!!cov && cov.textContent === "The approval does not cover Z5, deferred to a later assessment.", "the approval page says what was not assessed, so an approval does not read as covering it");
+      // Step 4.
+      RT.navigate("compare");
+      var card = main().querySelector('[data-check-anchor="suc-compare"]');
+      ok(!!card && card.querySelector("[data-suc-result]").getAttribute("data-suc-result") === "required" && /Above tolerable risk: a detailed risk assessment of every zone and conduit is required\./.test(card.textContent) && /The worst of the ranked systems: /.test(card.textContent),
+        "step 4: the SUC's initial risk against tolerable risk, once, and what it means");
+      var r1 = main().querySelector('.cmp-table [data-owner-id="C1"]'), r5 = main().querySelector('.cmp-table [data-owner-id="Z5"]');
+      ok(r1.getAttribute("data-depth") === "grouped" && r1.getAttribute("data-depth-suggested") === "detailed" && /Grouped with Z3/.test(r1.textContent) && r1.querySelector(".sug-depth.differs"), "each row: the suggested depth beside the depth set, marked where they differ");
+      ok(r5.getAttribute("data-depth") === "deferred" && r5.getAttribute("data-depth-suggested") === "" && /None/.test(r5.textContent), "a zone with no initial risk has no suggestion");
+      P().srs.tolerableRisk = "very-high"; RT.render();
+      ok(main().querySelector("[data-suc-result]").getAttribute("data-suc-result") === "not-required" && /no detailed risk assessment is required, though the zones and conduits can still be assessed to set their SL-T\./.test(main().querySelector('[data-check-anchor="suc-compare"]').textContent),
+        "within tolerable risk, step 4 says so plainly, and that the zones can still be assessed");
+      P().srs.tolerableRisk = "medium";
+      // Step 5: the rail and the depth bar.
+      RT.navigate("risk");
+      var rail = [].slice.call(main().querySelectorAll(".risk-rail [data-rail-id]"));
+      ok(rail.every(function (b) { return !!b.querySelector("[data-depth]"); }) && /Deferred/.test(main().querySelector('[data-rail-id="Z5"]').textContent) && /Reused/.test(main().querySelector('[data-rail-id="Z4"]').textContent), "step 5's rail shows every zone's and conduit's depth");
+      main().querySelector('[data-rail-id="Z5"]').click();
+      var bar = main().querySelector('[data-owner-id="Z5"] [data-part="depth"]');
+      ok(bar.querySelector('select[data-field="depth"]').value === "deferred" && bar.querySelector('[data-field="depth-reason"]').value === REASON, "the depth bar: the depth, and the reason beside it");
+      ok(bar.querySelectorAll(".hint").length === 0 && bar.textContent.split(/[.!?]\s/).length <= 2, "with no more than one short sentence of help");
+      main().querySelector('[data-rail-id="C3"]').click();
+      var sel = main().querySelector('[data-owner-id="C3"] select[data-field="depth"]');
+      change(sel, "grouped");
+      ok(owner("C3").assessment.depth === "grouped" && /^Read-only reporting/.test(owner("C3").assessment.considered) && d.activeElement === main().querySelector('[data-owner-id="C3"] select[data-field="depth-with"]'),
+        "a new depth keeps what was typed for the old one, and the keyboard lands on what the new one needs");
+      var opts = [].map.call(main().querySelectorAll('[data-owner-id="C3"] select[data-field="depth-with"] option'), function (o) { return o.value; }).filter(Boolean);
+      ok(same(opts, ["Z1", "Z2", "Z3", "Z4", "C2"].filter(function (id) { return E.depthOf(owner(id), P()).depth === "detailed"; })) && opts.indexOf("C3") < 0 && opts.indexOf("C1") < 0, "it can be grouped only with one assessed in detail", opts.join());
+      change(main().querySelector('[data-owner-id="C3"] select[data-field="depth-with"]'), "Z3");
+      ok(owner("C3").assessment.withId === "Z3" && /Threat scenarios on Z3/.test(main().querySelector('[data-owner-id="C3"] [data-part="depth"]').textContent) && d.activeElement === main().querySelector('[data-owner-id="C3"] select[data-field="depth-with"]'),
+        "grouped, it shows which zone holds the threats, and the keyboard stays");
+      main().querySelector('[data-owner-id="C3"] [data-action="open-lead"]').click();
+      ok(!!main().querySelector('[data-owner-id="Z3"]') && d.activeElement === main().querySelector('[data-owner-id="Z3"] select[data-field="depth"]') && /Shared with C1 and C3/.test(main().querySelector('[data-owner-id="Z3"] [data-part="depth"]').textContent),
+        "Open goes to that zone, which says who shares its threats");
+      main().querySelector('[data-rail-id="C3"]').click();
+      change(main().querySelector('[data-owner-id="C3"] select[data-field="depth"]'), "deferred");
+      ok(owner("C3").assessment.depth === "deferred" && d.activeElement === main().querySelector('[data-owner-id="C3"] [data-field="depth-reason"]') && !!toastUndo(), "deferring it puts the keyboard in the reason, and offers Undo");
+      toastUndo().click();
+      ok(owner("C3").assessment.depth === "grouped" && owner("C3").assessment.withId === "Z3" && d.activeElement === main().querySelector('[data-owner-id="C3"] select[data-field="depth"]'), "Undo puts the depth back, with the keyboard on it");
+      // Go to on a depth item opens step 5 at the depth.
+      owner("C3").assessment.withId = "";
+      RT.navigate("review");
+      var li = [].filter.call(main().querySelectorAll(".readiness li"), function (x) { return /C3 \(Corporate reporting\): grouped, with no zone or conduit named/.test(x.textContent); })[0];
+      ok(!!li, "Check and issue lists it");
+      li.querySelector('[data-action="goto"]').click();
+      ok(RT.state.stage === "risk" && main().querySelector('[data-owner-id="C3"] [data-part="depth"]').classList.contains("check-flash"), "and Go to opens step 5 at the conduit's depth");
+      load(DEMO);
+      ok(E.completeness(P()).length === 0, "the demo, loaded again, has nothing open");
+    });
+  }
+})();
+</script>
+</body>
+</html>

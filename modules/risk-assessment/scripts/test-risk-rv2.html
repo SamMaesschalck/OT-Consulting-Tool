@@ -108,8 +108,9 @@
       var t1 = item(pack, "Z1:T1"), t2 = item(pack, "Z1:T2");
       ok(/^(Low|Medium|High|Very high)(, (low|medium|high|very high) after countermeasures)?$/.test(t1.answer) && t1.expected === "Medium", "risk and tolerable risk are band names, not ids", t1.answer + " / " + t1.expected);
       // The words of a confirmed decision, from the tool's one treatment state.
-      var TL = w.RiskTool.TREATMENT_LABEL, labels = [TL.reduced, TL.reduce, TL.reduceNone, TL.accept, TL.slt];
-      ok(pack.items.filter(function (i) { return i.code !== "SL-T"; }).every(function (i) { return !i.priority || labels.indexOf(i.priority) >= 0; }) && t1.priority === TL.reduced && t2.priority === TL.reduce && item(pack, "Z4:T8").priority === TL.accept && item(pack, "Z1:T3").priority === "",
+      // Step 3: the demo transfers T2, so its words are Risk transferred, one of the labels (was: T2 Reduce with countermeasures).
+      var TL = w.RiskTool.TREATMENT_LABEL, labels = [TL.reduced, TL.reduce, TL.reduceNone, TL.accept, TL.transfer, TL.slt];
+      ok(pack.items.filter(function (i) { return i.code !== "SL-T"; }).every(function (i) { return !i.priority || labels.indexOf(i.priority) >= 0; }) && t1.priority === TL.reduced && t2.priority === TL.transfer && item(pack, "Z4:T8").priority === TL.accept && item(pack, "Z1:T3").priority === "",
         "the treatment decision is in the words the report prints, and a threat within tolerable risk has none", t1.priority + " / " + t2.priority);
       ok(/M2 /.test(t2.action) && /M3 /.test(t2.action) && !/M1 /.test(t2.action), "a threat on SI lists only the countermeasures that address SI (not M1, which covers IAC, UC and RDF)", t2.action);
       ok(/\[existing\]|\[planned\]/.test(t2.action), "each marked existing or planned");

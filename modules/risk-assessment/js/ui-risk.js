@@ -3,8 +3,9 @@
  *
  * Tabs: By zone (risk), Register and Heat map (views of the risk page) and
  * SL-T grid (slt). By zone has a rail of the zones and conduits (scenario
- * count, worst unmitigated risk, n open, Not required from step 4) and one
- * of them at a time: its SL-T strip (Use suggestion, Accept all suggested,
+ * count, worst unmitigated risk, its assessment depth, n open) and one
+ * of them at a time: its depth bar (the depth, what it rests on, the house
+ * method's suggestion), its SL-T strip (Use suggestion, Accept all suggested,
  * Copy from, the Why trace and the justification), its scenario table with
  * one editor open, and its vulnerabilities and countermeasures. The editor
  * follows the order of the work: the scenario, the unmitigated rating with
@@ -186,13 +187,15 @@
   var TREATMENT_CHOICES = [
     { id: "reduce", text: "Reduce with countermeasures" },
     { id: "accept", text: "Accept" },
+    { id: "transfer", text: "Transfer" },
     { id: "slt", text: "Treat through the SL-T" }
   ];
+  // A transfer is stored as a marked acceptance (js/model.js setDecision).
   function setTreatment(t, decision) {
     if (!t.treatment) t.treatment = M.emptyTreatment();
     // Clicking the confirmed choice again takes the decision back.
-    if (t.treatment.decision === decision && t.treatment.confirmed) { t.treatment.decision = null; t.treatment.confirmed = false; }
-    else { t.treatment.decision = decision; t.treatment.confirmed = true; }
+    if (M.decisionOf(t.treatment) === decision && t.treatment.confirmed) M.setDecision(t, null, false);
+    else M.setDecision(t, decision, true);
   }
   function statusText(T) {
     if (T.state === "none") return { text: "No decision yet.", warn: true };
@@ -230,7 +233,24 @@
       })),
       status
     ]));
-    if (T.decision === "accept" || (t.acceptance || "").trim()) {
+    if (T.decision === "transfer") {
+      // The arrangement: how, to whom, and who agreed it. The rating stays.
+      if (!t.acceptanceDetail || typeof t.acceptanceDetail !== "object") t.acceptanceDetail = M.emptyAcceptanceDetail();
+      var td = t.acceptanceDetail;
+      var hIn = h("input", { type: "text", "data-reason": "transfer", value: t.acceptance, placeholder: "e.g. Business interruption insurance, policy BI-2231.",
+        onInput: function (e) { t.acceptance = e.target.value; edited(); } });
+      box.appendChild(h("div", { class: "grid-2", style: "margin:8px 0 0" }, [
+        h("div", { class: "field" }, [labelFor("How it is transferred", hIn), hIn]),
+        liveText("Transferred to", t.transferTo || "", function (v) { if (v) t.transferTo = v; else delete t.transferTo; }, { attrs: { "data-field": "transfer-to" }, placeholder: "e.g. Insurer, or the operations contractor" })
+      ]));
+      box.appendChild(h("div", { class: "grid-4 acc-detail" }, [
+        liveText("Agreed by", td.by, function (v) { td.by = v; }, { attrs: { "data-field": "acc-by" } }),
+        liveText("Role", td.role, function (v) { td.role = v; }, { attrs: { "data-field": "acc-role" } }),
+        liveText("Date", td.date, function (v) { td.date = v; }, { type: "date", attrs: { "data-field": "acc-date" } }),
+        liveText("Review date", td.reviewDate, function (v) { td.reviewDate = v; }, { type: "date", attrs: { "data-field": "acc-review" } })
+      ]));
+      box.appendChild(h("p", { class: "hint", "data-hint": "transfer", text: "A transfer moves who bears the consequence, so the rating does not change." }));
+    } else if (T.decision === "accept" || (t.acceptance || "").trim()) {
       if (!t.acceptanceDetail || typeof t.acceptanceDetail !== "object") t.acceptanceDetail = M.emptyAcceptanceDetail();
       var ad = t.acceptanceDetail;
       var rIn = h("input", { type: "text", "data-reason": "accept", value: t.acceptance, placeholder: "e.g. Production constraint until the Q2 turnaround; compensating procedure in place.",
@@ -436,7 +456,7 @@
     var catBox = keptDetails({ class: "owner-sec cat-sec", "data-part": "impact-categories" }, catKids, "sec", "cat:" + o.id + "/" + t.id, cats.length > 0);
     ed.appendChild(section("Unmitigated risk", [
       h("div", { class: "threat-grid" }, [
-        pick("Unmitigated likelihood", t.likelihood, lik, function (v) { t.likelihood = v; }, { attrs: { "data-field": "likelihood" }, hint: "Before any countermeasure, existing ones included." }),
+        pick("Unmitigated likelihood", t.likelihood, lik, function (v) { t.likelihood = v; }, { attrs: { "data-field": "likelihood" }, hint: "Before any cyber security countermeasure, existing ones included; built-in and non-cyber safeguards still count." }),
         impactField
       ]),
       catBox,
@@ -507,7 +527,7 @@
     var p = project(); p.counters.threat += 1;
     var n = JSON.parse(JSON.stringify(t)); n.id = "T" + p.counters.threat;
     // Who accepted the original did not accept the copy: the detail is
-    // cleared, and an acceptance is left a suggestion to confirm.
+    // cleared, and an acceptance or a transfer is left a suggestion to confirm.
     n.acceptanceDetail = M.emptyAcceptanceDetail();
     if (n.treatment && n.treatment.decision === "accept") n.treatment.confirmed = false;
     o.threats.splice(o.threats.indexOf(t) + 1, 0, n);
@@ -762,7 +782,7 @@
       ]);
     });
     // Open to start with; its state is kept across redraws, and Add opens it.
-    return keptDetails({ class: "owner-sec", "data-sec": "vuln" }, [h("summary", { text: "Vulnerabilities (" + o.vulnerabilities.length + ")" }),
+    return keptDetails({ class: "owner-sec", "data-sec": "vuln", "data-part": "vulns" }, [h("summary", { text: "Vulnerabilities (" + o.vulnerabilities.length + ")" }),
       o.vulnerabilities.length ? h("table", { class: "tbl compact" }, [h("thead", null, [h("tr", null, [h("th", { text: "ID", style: "width:56px" }), h("th", { text: "Vulnerability" }), h("th", { text: "Source", style: "width:30%" }), h("th", { text: "", style: "width:40px" })])]), h("tbody", null, rows)]) : null,
       h("button", { type: "button", class: "btn sm", "data-action": "add-vulnerability", text: "+ Add vulnerability", onClick: function () {
         p.counters.vuln += 1; var v = M.emptyVulnerability(p.counters.vuln); o.vulnerabilities.push(v); ui.sec["vuln:" + o.id] = true; touched(); rerender(); A.focusAfter('[data-field="vuln-' + v.id + '"]');
@@ -809,7 +829,7 @@
   function rail(vm, p, open, selO) {
     var stones = E.steppingStones(p);
     function item(row) {
-      var o = row.o, skip = E.comparison(o, p).skip, on = o === selO, n = open.owner[o.id] || 0;
+      var o = row.o, d = E.depthOf(o, p), on = o === selO, n = open.owner[o.id] || 0;
       var nEl = h("span", { class: "rail-open" + (n ? " val-warn" : ""), text: n ? n + " open" : "" });
       live(function (vm2, op) { var k = op.owner[o.id] || 0; nEl.textContent = k ? k + " open" : ""; nEl.className = "rail-open" + (k ? " val-warn" : ""); });
       return h("button", { type: "button", class: "rail-item" + (on ? " on" : ""), "data-rail-id": o.id, "aria-current": on ? "true" : "false",
@@ -818,7 +838,7 @@
         h("span", { class: "rail-meta" }, [
           h("span", { class: "muted", text: o.threats.length + " scenario" + (o.threats.length === 1 ? "" : "s") }),
           row.worstRisk ? riskPill(row.worstRisk) : null,
-          skip ? h("span", { class: "pill neutral", text: "Not required" }) : null,
+          h("span", { class: "rail-depth" + (d.depth === "detailed" ? " muted" : " pill neutral"), "data-depth": d.depth, text: E.depthWords(d) }),
           stones[o.id] ? h("span", { class: "pill flag stone-pill", "data-stone": o.id, text: stoneWords(stones[o.id]) }) : null,
           nEl
         ])
@@ -847,11 +867,63 @@
     ui.railScroll = nav.scrollTop;
   }
 
+  // How the zone or conduit is assessed (js/engine.js depthOf): the depth,
+  // what it rests on beside it, and the house method's suggestion. A change
+  // of depth keeps what was typed for the others and offers Undo.
+  var DEPTH_FIELD = {
+    grouped: { key: "withId", field: "depth-with" },
+    reused: { key: "reuseSource", field: "depth-reuse", label: "Reused from", placeholder: "e.g. Reference design RD-2, assessed March 2025" },
+    proportionate: { key: "considered", field: "depth-considered", label: "Threats considered", placeholder: "e.g. Malware on removable media; misuse of a shared account" },
+    deferred: { key: "reason", field: "depth-reason", label: "Reason for deferring", placeholder: "e.g. Not reachable until the 2027 outage" }
+  };
+  function depthFocus(o, depth) {
+    var f = DEPTH_FIELD[depth];
+    return '[data-owner-id="' + o.id + '"] [data-field="' + (f ? f.field : "depth") + '"]';
+  }
+  function setDepthTo(o, depth) {
+    var mk = A.undoMark();
+    M.setDepth(o, depth); touched(); rerender(); A.focusAfter(depthFocus(o, depth));
+    A.offerUndo(o.id + ": depth set to " + M.DEPTH_LABEL[depth].toLowerCase() + ".", backTo(o.id, null, '[data-owner-id="' + o.id + '"] [data-field="depth"]'), mk);
+  }
+  function depthBar(o, p) {
+    var d = E.depthOf(o, p), sug = E.depthSuggestion(o, p), f = DEPTH_FIELD[d.depth];
+    var sel = h("select", { "data-field": "depth", "aria-label": "Assessment depth of " + o.id, onChange: function (e) { setDepthTo(o, e.target.value); } });
+    M.ASSESSMENT_DEPTHS.forEach(function (x) { var op = h("option", { value: x, text: M.DEPTH_LABEL[x] }); if (x === d.depth) op.setAttribute("selected", "selected"); sel.appendChild(op); });
+    var kids = [h("span", { class: "muted", text: "Assessment depth" }), sel];
+    if (d.depth === "grouped") {
+      // Only a zone or conduit assessed in detail can hold the threats; one
+      // already named stays in the list, so the choice reads as it is.
+      var leads = E.groupLeads(o, p);
+      if (d.lead && leads.indexOf(d.lead) < 0) leads = [d.lead].concat(leads);
+      var ws = h("select", { "data-field": "depth-with", "aria-label": o.id + " is assessed with", onChange: function (e) {
+        M.setDepth(o, "grouped"); o.assessment.withId = e.target.value; touched(); rerender(); A.focusAfter(depthFocus(o, "grouped"));
+      } });
+      ws.appendChild(h("option", { value: "", text: "Assessed with" }));
+      leads.forEach(function (x) { var op = h("option", { value: x.id, text: x.id + (x.name ? " " + x.name : "") }); if (x.id === d.withId) op.setAttribute("selected", "selected"); ws.appendChild(op); });
+      kids.push(ws);
+      if (d.lead) kids.push(h("span", { class: "muted", "data-threats-on": d.lead.id, text: "Threat scenarios on " + d.lead.id }));
+      if (d.lead) kids.push(h("button", { type: "button", class: "btn xs", "data-action": "open-lead", text: "Open", "aria-label": "Open " + d.lead.id, onClick: function () {
+          ui.sel = d.lead.id; ui.selObj = d.lead; ui.reveal = true; rerender(); A.focusAfter('[data-owner-id="' + d.lead.id + '"] [data-field="depth"]');
+        } }));
+    } else if (f) {
+      var a = o.assessment || {};
+      kids.push(h("input", { type: "text", class: "depth-text", "data-field": f.field, value: a[f.key] || "", "aria-label": f.label + " (" + o.id + ")", placeholder: f.placeholder,
+        onInput: function (e) { o.assessment[f.key] = e.target.value; edited(); } }));
+    }
+    // The zones and conduits that share this one's threat scenarios.
+    var shared = d.depth === "detailed" ? E.groupedWith(p, o.id) : [];
+    if (shared.length) kids.push(h("span", { class: "muted", "data-shared-with": o.id, text: "Shared with " + E.andList(shared.map(function (x) { return x.id; })) }));
+    if (sug && sug !== d.depth) {
+      kids.push(h("span", { class: "muted", "data-depth-suggested": sug, text: "Suggested: " + M.DEPTH_LABEL[sug].toLowerCase() }));
+      kids.push(h("button", { type: "button", class: "btn xs", "data-action": "use-depth-suggestion", text: "Use", "aria-label": "Use the suggested depth, " + M.DEPTH_LABEL[sug].toLowerCase(),
+        onClick: function () { setDepthTo(o, sug); } }));
+    }
+    return h("div", { class: "depth-bar", "data-part": "depth", "data-depth": d.depth }, kids);
+  }
+
   function ownerPanel(row, p, vm, open) {
     var o = row.o, tol = vm.tolerable;
-    var skip = E.comparison(o, p).skip;
     var head = [];
-    if (skip) head.push(h("span", { class: "pill neutral", text: "Not required" }));
     var stone = E.steppingStones(p)[o.id];
     if (stone) head.push(h("span", { class: "pill flag stone-pill", "data-stone": o.id, style: "margin-left:6px", text: stoneWords(stone) }));
     if (row.worstRisk) head.push(riskPill(row.worstRisk));
@@ -861,7 +933,7 @@
       ? openT.length + " of " + exceeding.length + " threat" + (exceeding.length === 1 ? "" : "s") + " above tolerable risk need" + (openT.length === 1 ? "s" : "") + " a treatment decision."
       : "Every threat above tolerable risk has a treatment decision." }) : null;
     var body = [
-      skip ? h("p", { class: "hint no-print", style: "margin-top:0", text: "No detailed assessment needed (step 4): set its SL-T and give the basis in the justification." }) : null,
+      depthBar(o, p),
       sltStrip(o, p),
       h("div", { class: "scen-bar" }, [
         h("h3", { class: "ed-h", text: "Scenarios" }),
@@ -911,7 +983,7 @@
 
   var DECISION_FILTERS = [
     { id: "", text: "Any decision" }, { id: "none", text: "No decision" }, { id: "suggested", text: "Suggested" },
-    { id: "reduce", text: "Reduce" }, { id: "accept", text: "Accept" }, { id: "slt", text: "SL-T programme" }, { id: "within", text: "Within tolerable" }
+    { id: "reduce", text: "Reduce" }, { id: "accept", text: "Accept" }, { id: "transfer", text: "Transfer" }, { id: "slt", text: "SL-T programme" }, { id: "within", text: "Within tolerable" }
   ];
   var HEAT_STATES = [{ id: "unmitigated", text: "Unmitigated" }, { id: "current", text: "Current" }, { id: "planned", text: "Planned" }];
   // A scenario's likelihood and impact in a state; a state not rated takes
@@ -931,7 +1003,7 @@
       if (f.decision === "within" && x.exceeds) return false;
       if (f.decision === "none" && !(x.exceeds && T.state === "none")) return false;
       if (f.decision === "suggested" && T.state !== "suggested") return false;
-      if (["reduce", "accept", "slt"].indexOf(f.decision) >= 0 && !(T.confirmed && T.decision === f.decision)) return false;
+      if (M.DECISIONS.indexOf(f.decision) >= 0 && !(T.confirmed && T.decision === f.decision)) return false;
     }
     if (f.cell) { var li = stateLI(x.t, f.cell.state); if (li.L !== f.cell.L || li.I !== f.cell.I) return false; }
     if (f.consequence) {
@@ -1055,11 +1127,11 @@
       .concat([h("th", { text: "Justification", style: "width:150px" }), h("th", { text: "", style: "width:120px" })]))])]);
     var tb = h("tbody");
     all.forEach(function (o) {
-      var sug = sugs[o.id], skip = E.comparison(o, p).skip, fill = FR_IDS.filter(function (fr) { return sug.byFR[fr].sl != null && o.slTargetByFR[fr] == null; }).length;
+      var sug = sugs[o.id], dd = E.depthOf(o, p), fill = FR_IDS.filter(function (fr) { return sug.byFR[fr].sl != null && o.slTargetByFR[fr] == null; }).length;
       var set = E.maxDefined(o.slTargetByFR) != null, just = !!(o.justification || "").trim();
       tb.appendChild(h("tr", { "data-owner-id": o.id }, [
         h("td", null, [h("div", { text: ownerLabel(o) }),
-          skip ? h("div", { class: "muted cmp-source", text: "No detailed assessment needed" }) : null,
+          dd.depth !== "detailed" ? h("div", { class: "muted cmp-source", "data-depth": dd.depth, text: E.depthWords(dd) }) : null,
           sug.safetyRelated ? h("div", { class: "muted cmp-source", text: "Safety related" }) : null])
       ].concat(FRS.map(function (f) {
         var s = sug.byFR[f.id].sl, cur = o.slTargetByFR[f.id];

@@ -60,6 +60,9 @@ window.RiskApp.Assets = (function () {
     if (key === "type") { a.type = M.ASSET_TYPES.indexOf(v) >= 0 ? v : "other"; return; }
     if (key === "link") { if (M.ASSET_LINKS.indexOf(v) >= 0) a.link = v; else delete a.link; return; }
     if (key === "criticality") { if (M.ASSET_CRITICALITY.indexOf(v) >= 0) a.criticality = v; else delete a.criticality; return; }
+    // The 3-2 fixes: the owner's classification (text) and a business value.
+    if (key === "businessValue") { if (M.ASSET_VALUES.indexOf(v) >= 0) a.businessValue = v; else delete a.businessValue; return; }
+    if (key === "classification") { if (v.trim()) a.classification = v; else delete a.classification; return; }
     if (M.ASSET_TEXT_FIELDS.indexOf(key) >= 0) { if (v.trim()) a[key] = v; else delete a[key]; }
   }
 

@@ -33,12 +33,19 @@
  *     in its band, a threat's library id), and phase 6a's (an asset's
  *     register attributes, the previous assessment compared with), and the
  *     consequence-first fields (the consequences, a threat's consequenceId
- *     and via; the consequence counter kept above every K id).
+ *     and via; the consequence counter kept above every K id), and the
+ *     depth each zone and conduit was assessed at (assessment). A file
+ *     without a depth reads as js/engine.js depthOf says; nothing is added.
+ *     So are the later fields of the 3-2 fixes: a transfer's mark and to
+ *     whom (treatment.transfer, transferTo), the threat environment's
+ *     sources and emerging threats, the conduits' characteristics, each
+ *     zone's and conduit's applicable security requirements, and an asset's
+ *     classification and business value.
  *  3. The dangling-id prune: a reference to a record that is not in the file
  *     (a zone's ranked systems, a conduit's end, a threat's linked assets,
  *     vulnerabilities and countermeasures, its consequence and the zones and
- *     conduits its path passes through, a consequence's ranked systems) is
- *     cleared, never invented.
+ *     conduits its path passes through, a consequence's ranked systems, the
+ *     zone or conduit one is grouped with) is cleared, never invented.
  *     An older build edits a file without maintaining the links a newer one
  *     added, so a link can outlive what it pointed at. A zone's fromHLA is
  *     kept the first of its hlaIds; one an older build wrote goes first.
@@ -168,6 +175,8 @@ window.RiskApp.Migrate = (function () {
     var ad = isObj(t.acceptanceDetail) ? t.acceptanceDetail : {};
     M.ACCEPTANCE_FIELDS.forEach(function (k) { if (typeof ad[k] !== "string") ad[k] = ""; });
     t.acceptanceDetail = ad;
+    // To whom a risk is transferred: text, absent until typed.
+    if ("transferTo" in t && typeof t.transferTo !== "string") delete t.transferTo;
     var tr = t.treatment;
     if (!tr || typeof tr !== "object" || Array.isArray(tr)) {
       t.treatment = M.emptyTreatment();
@@ -177,6 +186,9 @@ window.RiskApp.Migrate = (function () {
     if (TREATMENT_DECISIONS.indexOf(tr.decision) < 0) tr.decision = null;
     tr.confirmed = !!(tr.decision && tr.confirmed);
     if (typeof tr.reason !== "string") tr.reason = "";
+    // A transfer is an acceptance marked so (js/model.js); a mark on any
+    // other decision, left by an older build's edit, is dropped.
+    if ("transfer" in tr && !(tr.transfer === true && tr.decision === "accept")) delete tr.transfer;
   }
   function normCM(m) {
     if (!Array.isArray(m.addressesFR)) m.addressesFR = [];
@@ -204,6 +216,15 @@ window.RiskApp.Migrate = (function () {
   function normInitial(o) {
     if ("initialRisk" in o && !isBand(o.initialRisk)) delete o.initialRisk;
   }
+  // How a zone or conduit was assessed (js/model.js), tidied when present
+  // and never added: a depth this build does not know goes with its record,
+  // which then reads as a file without it does.
+  function normAssessment(o) {
+    if (!("assessment" in o)) return;
+    var a = o.assessment;
+    if (!isObj(a) || M.ASSESSMENT_DEPTHS.indexOf(a.depth) < 0) { delete o.assessment; return; }
+    M.ASSESSMENT_TEXT_FIELDS.forEach(function (k) { if (typeof a[k] !== "string") a[k] = ""; });
+  }
   function normNew(data) {
     if ("assessmentType" in data && M.ASSESSMENT_TYPES.indexOf(data.assessmentType) < 0) delete data.assessmentType;
     if ("lastStage" in data && (typeof data.lastStage !== "string" || !/^[a-z]+$/.test(data.lastStage))) delete data.lastStage;
@@ -211,10 +232,11 @@ window.RiskApp.Migrate = (function () {
     (data.zones || []).forEach(function (z) {
       if ("hlaIds" in z && !Array.isArray(z.hlaIds)) delete z.hlaIds;
       if (Array.isArray(z.hlaIds)) z.hlaIds = z.hlaIds.filter(function (id) { return typeof id === "string" && id; });
-      normInitial(z); normDetailed(z);
+      normInitial(z); normDetailed(z); normAssessment(z);
     });
-    (data.conduits || []).forEach(function (c) { normInitial(c); normDetailed(c); });
+    (data.conduits || []).forEach(function (c) { normInitial(c); normDetailed(c); normAssessment(c); });
     normNew3b(data);
+    normZcrFixes(data);
   }
 
   // The fields phase 3b added (js/model.js), tidied when present and never
@@ -263,6 +285,28 @@ window.RiskApp.Migrate = (function () {
         M.setApprovals(data, M.approvalsOf(data));
       }
     }
+  }
+
+  // The fields the 3-2 fixes added (js/model.js), tidied when present and
+  // never added: the threat environment's sources and emerging threats, a
+  // conduit's characteristics, each zone's and conduit's applicable security
+  // requirements, and an asset's classification and business value.
+  function normZcrFixes(data) {
+    var s = data.srs;
+    M.SRS_LIST_FIELDS.forEach(function (k) { normLines(s, k); });
+    (data.zones || []).forEach(function (z) {
+      normLines(z, "securityRequirements");
+      (z.assets || []).forEach(function (a) {
+        if (!a) return;
+        normText(a, "classification");
+        if ("businessValue" in a && M.ASSET_VALUES.indexOf(a.businessValue) < 0) delete a.businessValue;
+      });
+    });
+    (data.conduits || []).forEach(function (c) {
+      M.CONDUIT_TEXT_FIELDS.forEach(function (k) { normText(c, k); });
+      M.CONDUIT_LIST_FIELDS.forEach(function (k) { normLines(c, k); });
+      if ("safetyRelated" in c && c.safetyRelated !== true) delete c.safetyRelated;
+    });
   }
 
   // The fields phase 5 added (js/model.js), tidied when present and never
@@ -521,6 +565,12 @@ window.RiskApp.Migrate = (function () {
         if (t.consequenceId && !ks[t.consequenceId]) delete t.consequenceId;
         if (Array.isArray(t.via)) M.setVia(t, t.via.filter(function (id) { return owners[id] && id !== o.id; }));
       });
+    });
+    // The zone or conduit one is grouped with: one that is not there, or
+    // itself, goes (the depth stays, and the completeness list asks for one).
+    data.zones.concat(data.conduits).forEach(function (o) {
+      var a = o.assessment;
+      if (isObj(a) && a.withId && (typeof a.withId !== "string" || !owners[a.withId] || a.withId === o.id)) a.withId = "";
     });
     var known = {};
     data.srs.highLevelAssets.forEach(function (a) { if (a && a.id) known[a.id] = true; });

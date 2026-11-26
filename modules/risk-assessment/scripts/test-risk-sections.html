@@ -136,8 +136,8 @@
           "its method and categories sentences speak of risks, not of the threats and systems it does not list");
         var aboutAt = xml.indexOf(">About this specification<"), sucAt = xml.indexOf(">System under consideration and requirements<", aboutAt);
         ok(aboutAt > 0 && sucAt > aboutAt && xml.slice(aboutAt, sucAt).indexOf('w:type="page"') < 0, "no forced page break after its three-paragraph opening");
-        ok(now.indexOf("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. It states the tolerable risk and the target security level (SL-T) of each zone and conduit: the protection it is to be engineered and maintained to.") > 0 &&
-           now.indexOf("The risk criteria behind the tolerable risk and the targets are in the appendix. Sign-off records who approves them and the scope of each approval.") > 0, "its opening, as reworded in the phase 6 review");
+        ok(now.indexOf("It sets out the system under consideration, its zones and conduits, and the assumptions, threats, policies and regulatory requirements they were assessed against. It states the tolerable risk and the target security level (SL-T) of each zone and conduit: the protection it is to be engineered and maintained to. It lists the mandatory security countermeasures that come out of the risk assessment.") > 0 &&
+           now.indexOf("The risk criteria behind the tolerable risk and the targets are in the appendix. Sign-off records who approves them and the scope of each approval.") > 0, "its opening, as reworded in the phase 6 review, naming the mandatory security countermeasures (the 3-2 fixes)");
 
         // ---- the page ---------------------------------------------------------------
         var nav = d.querySelector('#sidebar .nav-item[data-stage="report"]');

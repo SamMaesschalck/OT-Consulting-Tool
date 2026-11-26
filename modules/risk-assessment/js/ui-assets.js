@@ -35,8 +35,8 @@
 
   // The columns: key, header, sortable value.
   var LINK_OPTS = [{ value: "", text: "Fixed" }, { value: "wireless", text: "Wireless" }, { value: "temporary", text: "Temporarily connected" }];
-  var COLS = ["id", "name", "zone", "type", "link", "tag", "vendor", "model", "version", "location", "criticality", "owner", "notes"];
-  var SELECTS = ["zone", "type", "link", "criticality"];
+  var COLS = ["id", "name", "zone", "type", "link", "tag", "vendor", "model", "version", "location", "criticality", "classification", "businessValue", "owner", "notes"];
+  var SELECTS = ["zone", "type", "link", "criticality", "businessValue"];
   function colLabel(k) { return k === "id" ? "ID" : LABEL[k]; }
   function sortValue(r, k) {
     if (k === "zone") return r.zone.id;
@@ -44,6 +44,7 @@
     if (k === "type") return E.assetTypeLabel(r.a.type);
     if (k === "link") return r.a.link || "";
     if (k === "criticality") return { high: "1", medium: "2", low: "3" }[r.a.criticality] || "4";
+    if (k === "businessValue") return { high: "1", medium: "2", low: "3" }[r.a.businessValue] || "4";
     return String(r.a[k] || "");
   }
   // Numbers inside text sort by their value (AS2 before AS10, PLC-9 before
@@ -56,7 +57,7 @@
     if (reg.crit && (reg.crit === "none" ? !!r.a.criticality : r.a.criticality !== reg.crit)) return false;
     var q = reg.text.trim().toLowerCase();
     if (q) {
-      var hay = [r.a.id, r.a.name, E.assetTypeLabel(r.a.type)].concat(M.ASSET_TEXT_FIELDS.map(function (k) { return r.a[k] || ""; })).join(" ").toLowerCase();
+      var hay = [r.a.id, r.a.name, E.assetTypeLabel(r.a.type), r.a.classification || ""].concat(M.ASSET_TEXT_FIELDS.map(function (k) { return r.a[k] || ""; })).join(" ").toLowerCase();
       if (hay.indexOf(q) < 0) return false;
     }
     return true;
@@ -86,7 +87,8 @@
       zone: tpl(zoneOpts(p)),
       type: tpl(M.ASSET_TYPES.map(function (t) { return { value: t, text: E.assetTypeLabel(t) }; })),
       link: tpl(LINK_OPTS),
-      criticality: tpl([{ value: "", text: "Not set" }].concat(M.ASSET_CRITICALITY.map(function (c) { return { value: c, text: M.ASSET_CRITICALITY_LABEL[c] }; })))
+      criticality: tpl([{ value: "", text: "Not set" }].concat(M.ASSET_CRITICALITY.map(function (c) { return { value: c, text: M.ASSET_CRITICALITY_LABEL[c] }; }))),
+      businessValue: tpl([{ value: "", text: "Not set" }].concat(M.ASSET_VALUES.map(function (c) { return { value: c, text: M.ASSET_VALUE_LABEL[c] }; })))
     };
   }
   function lineCount(s) { return String(s || "").split("\n").length; }
@@ -99,7 +101,7 @@
       if (k === "id") { td.className = "muted reg-id"; td.textContent = a.id; tr.appendChild(td); return; }
       if (SELECTS.indexOf(k) >= 0) {
         el = T[k].cloneNode(true);
-        el.value = k === "zone" ? r.zone.id : k === "type" ? a.type : k === "link" ? a.link || "" : a.criticality || "";
+        el.value = k === "zone" ? r.zone.id : k === "type" ? a.type : k === "link" ? a.link || "" : k === "businessValue" ? a.businessValue || "" : a.criticality || "";
       } else if (k === "notes") {
         el = document.createElement("textarea");
         el.className = "reg-notes";

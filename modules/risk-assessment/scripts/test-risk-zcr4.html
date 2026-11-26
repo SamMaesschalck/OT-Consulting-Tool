@@ -1,0 +1,177 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool 3-2 fixes, step 4</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The 3-2 fixes, step 4 (owner rulings after step 3):
+  1. A transfer shows today's rating: the Transferred risks table (Word) and
+     sheet (Excel) give the risk as it stands today, with no planned
+     countermeasure applied (the engine's one "today" rule). A transfer moves
+     who bears the consequence; the risk itself does not change. Accepted
+     risks keep the rating that stands once everything recorded is done.
+  2. The mandatory rule stays: the demo's insurance cover no longer rests on
+     M3, which no decision to reduce rests on, so it is not mandatory.
+  3. The demo's basis of assessment records the interview with the group
+     insurance manager the transfer was agreed with.
+-->
+<iframe id="f" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  var DASH = /[–—]/;
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var t = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+      if (t.replace(/\s+/g, "")) out.push(t.replace(/&apos;/g, "'").replace(/&quot;/g, "\"").replace(/&amp;/g, "&"));
+    }
+    return out;
+  }
+
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, tries = 0;
+    var t = setInterval(function () {
+      if (!w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks || !w.RiskTool.state.project.zones.length) { if (++tries > 400) { clearInterval(t); ok(false, "the app exposed RiskTool with the demo"); done(); } return; }
+      clearInterval(t);
+      var r = null;
+      try { r = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+      if (r && typeof r.then === "function") r.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+      else done();
+    }, 50);
+  };
+  frame.src = "../index.html?tour=1";
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    w.confirm = function () { return true; }; w.alert = function () {};
+    var DEMO = window.SPT_TOUR_PROJECT;
+    function P() { return RT.state.project; }
+    function load(p) { RT.loadProjectText(JSON.stringify(p)); }
+    function ownerIn(p, id) { return p.zones.concat(p.conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threatIn(p, oid, tid) { return ownerIn(p, oid).threats.filter(function (t) { return t.id === tid; })[0]; }
+    function TT(p, oid, tid) { return E.threatTreatment(ownerIn(p, oid), threatIn(p, oid, tid), p); }
+    function texts(p) { return E.completeness(p).map(function (i) { return i.text; }); }
+    function ctxThreat(ctx, oid, tid) { return ctx.zones.concat(ctx.conduits).filter(function (o) { return o.id === oid; })[0].threats.filter(function (x) { return x.id === tid; })[0]; }
+    function wordParas(p, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    function after(list, s, from) { var i = list.indexOf(s, from || 0); return i < 0 ? [] : list.slice(i + 1); }
+    // The rating cells of a threat's row in a Word table: the band, then likelihood × impact.
+    function rowRating(list, tid) {
+      var i = -1; list.some(function (x, k) { if (x.indexOf(tid + "  ") === 0) { i = k; return true; } return false; });
+      return i < 0 ? [] : list.slice(i + 2, i + 4);
+    }
+    function sheetRow(ws, tid) { var out = null; ws.eachRow(function (r, n) { if (n > 1 && r.getCell(2).value === tid) out = r; }); return out; }
+
+    var base = MG.normaliseProject(clone(DEMO));
+    var T2 = TT(base, "Z1", "T2");
+
+    // ---- 1. A transfer shows today's rating ------------------------------------------------------
+    ok(T2.decision === "transfer" && T2.complete && T2.today === "high" && T2.planned === "medium" && T2.plannedLinked.length > 0 && !T2.current,
+      "the demo's T2: High today, Medium only once the planned M3 is done", JSON.stringify([T2.today, T2.planned, T2.plannedLinked.map(function (m) { return m.id; })]));
+    // Excel.
+    var wb = RX.buildWorkbook(base), ts = wb.getWorksheet("Transferred risks");
+    ok(!!ts && ts.getRow(1).getCell(4).value === "Risk today" && ts.getRow(2).getCell(2).value === "T2" && ts.getRow(2).getCell(4).value === "High",
+      "Excel: the Transferred risks sheet rates T2 as it stands today (High), not after the plan", ts ? ts.getRow(2).values.slice(1, 5).join("|") : "none");
+    // Accepted risks keep their rule: the rating once everything recorded is done.
+    var acc0 = clone(base); M.setDecision(threatIn(acc0, "Z1", "T2"), "accept", true);
+    var A2 = TT(acc0, "Z1", "T2"), wbA = RX.buildWorkbook(acc0), arA = sheetRow(wbA.getWorksheet("Accepted risks"), "T2");
+    ok(A2.disposition === "accepted" && !wbA.getWorksheet("Transferred risks") && !!arA && arA.getCell(4).value === "Medium" && wbA.getWorksheet("Accepted risks").getRow(1).getCell(4).value === "Rating",
+      "Excel: the same risk accepted keeps the accepted rule (Medium, the rating once the plan is done)", arA ? arA.values.slice(1, 5).join("|") : "none");
+    // The today rule, through the table: a current rating where rated; the planned one when nothing planned is linked.
+    var cur = clone(base), c2 = threatIn(cur, "Z1", "T2"); c2.currentLikelihood = "low"; c2.currentImpact = "minor";
+    var Tc = TT(cur, "Z1", "T2"), wbC = RX.buildWorkbook(cur);
+    ok(!!Tc.current && Tc.today === Tc.current && Tc.current !== Tc.planned && Tc.current !== E.threatRisk(c2, cur) && Tc.disposition === "transferred",
+      "a transfer rated with its existing countermeasures is rated today by them", JSON.stringify([Tc.current, Tc.planned, Tc.today]));
+    var bandName = function (id) { return (M.RULES.riskBands.filter(function (b) { return b.id === id; })[0] || {}).name; };
+    ok(sheetRow(wbC.getWorksheet("Transferred risks"), "T2").getCell(4).value === bandName(Tc.current), "and the sheet prints the current rating", sheetRow(wbC.getWorksheet("Transferred risks"), "T2").getCell(4).value + " / " + Tc.current);
+    var npl = clone(base), n2 = threatIn(npl, "Z1", "T2"); n2.countermeasureIds = n2.countermeasureIds.filter(function (id) { return id !== "M3"; });
+    var Tn = TT(npl, "Z1", "T2");
+    ok(!Tn.plannedLinked.length && Tn.today === Tn.planned && sheetRow(RX.buildWorkbook(npl).getWorksheet("Transferred risks"), "T2").getCell(4).value === bandName(Tn.planned),
+      "with no planned countermeasure linked, nothing is still to come, so the planned rating is today's", Tn.today + " / " + Tn.planned);
+
+    return wordParas(base, {}).then(function (det) {
+      var tr = after(det, "Transferred risks");
+      ok(tr[0] === "Each risk above tolerable risk that has been transferred to another party, with its rating today, how and to whom it was transferred, who agreed it and when it is to be reviewed. A transfer moves who bears the consequence, so the rating does not change.",
+        "Word: the lead-in says the rating is today's, and that a transfer does not change it", tr[0]);
+      ok(tr[3] === "Risk today", "Word: the column is Risk today", tr.slice(1, 10).join("|"));
+      ok(rowRating(tr, "T2").join("|") === "High|Medium × Serious", "Word: T2 is High (Medium × Serious) today, not its planned Medium", rowRating(tr, "T2").join("|"));
+      // The same rating as the consequences table's Risk today, which reads the same rule.
+      var k2 = after(det, "K2 Unplanned shutdown of the unit and lost production");
+      var i2 = k2.indexOf("T2");
+      ok(i2 >= 0 && k2[i2 + 5] === "High" && k2[i2 + 6] === "High", "and as By consequence prints it (unmitigated and today both High)", k2.slice(i2, i2 + 8).join("|"));
+      ok(!DASH.test(det.join("\n")), "no dashes");
+      return wordParas(acc0, {});
+    }).then(function (det) {
+      var acc = after(det, "Accepted risks");
+      ok(det.indexOf("Transferred risks") < 0 && rowRating(acc, "T2").join("|") === "Medium|Low × Serious", "Word: accepted, the same risk keeps the accepted rule (Medium, Low × Serious)", rowRating(acc, "T2").join("|"));
+      ok(/with the rating that stands, the reason/.test(acc[0]), "and Accepted risks keeps its lead-in", acc[0]);
+      return wordParas(cur, {});
+    }).then(function (det) {
+      var tr = after(det, "Transferred risks");
+      ok(rowRating(tr, "T2")[1] === "Low × Minor", "Word: a transfer rated with its existing countermeasures shows them", rowRating(tr, "T2").join("|"));
+
+      // Elsewhere a transfer's rating is unchanged in meaning: the risk context's residualRisk keeps its frozen meaning
+      // (the planned rating, else the current one), and the review pack's answer reads it the same way for every threat.
+      var ctx = RT.buildRiskContext(base), c = ctxThreat(ctx, "Z1", "T2");
+      ok(c.residualRisk === "medium" && c.disposition === "accepted" && c.decision === "transfer", "the risk context keeps residualRisk as it was defined", JSON.stringify([c.residualRisk, c.disposition, c.decision]));
+
+      // ---- 2. The mandatory rule stays; the cover no longer rests on M3 -------------------------------
+      var d2 = threatIn(DEMO, "Z1", "T2");
+      ok(!/\bM\d+\b/.test(d2.acceptance) && !/OPC DA|retired/.test(d2.acceptance) && /The cover is reviewed annually at the policy renewal\.$/.test(d2.acceptance),
+        "the demo's insurance cover names no countermeasure and is reviewed at the policy renewal", d2.acceptance);
+      var mc = RT.mandatoryCountermeasures(base).map(function (e) { return e.owner.id + "/" + e.m.id; });
+      ok(mc.indexOf("Z1/M3") < 0 && mc.indexOf("Z1/M2") < 0 && threatIn(base, "Z1", "T2").countermeasureIds.indexOf("M3") >= 0,
+        "M3 stays linked to T2 but is not mandatory: no decision to reduce rests on it", mc.join());
+      ok(RT.mandatoryCountermeasures(base).every(function (e) { return e.owner.threats.some(function (t) { return (t.countermeasureIds || []).indexOf(e.m.id) >= 0 && E.threatTreatment(e.owner, t, base).decision === "reduce" && E.threatTreatment(e.owner, t, base).complete; }); }),
+        "every mandatory countermeasure is one a confirmed decision to reduce rests on");
+      return wordParas(base, { spec: true });
+    }).then(function (spec) {
+      var all = spec.join("\n");
+      ok(all.indexOf("OPC DA is retired") < 0 && all.indexOf("GBI-2026-114") < 0, "the specification says nothing of the cover");
+
+      // ---- 3. The basis of assessment records where the transfer agreement came from -------------------
+      var iv = DEMO.basisOfAssessment.interviews, i5 = iv.filter(function (x) { return x.name === "H. Okafor"; })[0];
+      ok(iv.length === 5 && !!i5 && i5.id === "I5" && i5.role === "Group Insurance Manager", "the demo interviews H. Okafor, Group Insurance Manager (I5)", JSON.stringify(i5));
+      ok(!!i5 && JSON.stringify(Object.keys(i5)) === JSON.stringify(Object.keys(iv[0])) && iv.every(function (x) { return /^\d{4}-\d{2}-\d{2}$/.test(x.date) && !!x.notes; }), "in the same format as the other interviews");
+      ok(!!i5 && i5.date >= "2026-07-01" && i5.date <= "2026-07-04" && i5.date <= threatIn(DEMO, "Z1", "T2").acceptanceDetail.date && i5.date >= iv[3].date,
+        "dated within the assessment, on or before the day the transfer was agreed", i5 && i5.date);
+      ok(DEMO.counters.interview === 5, "the counter moves on, so the next interview is I6");
+      ok(!!i5 && /transfer/.test(i5.notes) && /insurance|cover/i.test(i5.notes) && !DASH.test(i5.notes), "its notes say what was discussed", i5 && i5.notes);
+      return wordParas(base, {});
+    }).then(function (det) {
+      var b = after(det, "People interviewed"), k = b.indexOf("H. Okafor");
+      ok(k > 0 && b.slice(k, k + 4).join("|") === "H. Okafor|Group Insurance Manager|2026-07-03|Business interruption cover, cyber extension, transfer of lost production" && b.indexOf("Documents reviewed") > k,
+        "Word: the Basis of assessment lists the interview", b.slice(k, k + 4).join("|"));
+      ok(det.some(function (x) { return /^The findings are based on 5 interviews, 4 documents and 3 direct observations/.test(x); }), "and the summary counts five interviews");
+      var bs = RX.buildWorkbook(base).getWorksheet("Basis"), found = false;
+      bs.eachRow(function (r) { if (r.getCell(1).value === "H. Okafor" && r.getCell(2).value === "Group Insurance Manager" && r.getCell(3).value === "2026-07-03") found = true; });
+      ok(found, "Excel: the Basis sheet lists it");
+      var ctx = RT.buildRiskContext(base);
+      ok(ctx.basisOfAssessment.interviews.length === 5 && ctx.basisOfAssessment.interviews[4].name === "H. Okafor", "the risk context carries it");
+      load(DEMO);
+      return RR.buildPack();
+    }).then(function (r) {
+      ok(r.pack.basisOfAssessment.interviews.some(function (x) { return x.name === "H. Okafor"; }), "the review pack carries it");
+
+      // ---- the demo keeps zero problems, and its approvals stand ------------------------------------
+      ok(E.completeness(P()).length === 0, "the demo has no completeness problem", texts(P()).join(" | "));
+      ok(P().approvals.length === 2 && P().approvals.every(function (a) { return a.fingerprint === E.approvalFingerprint(P()); }) && E.approvalStates(P()).every(function (s) { return s.signed && !s.changed; }),
+        "both approvals were retaken against the reworded cover", E.approvalFingerprint(P()));
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -70,6 +70,7 @@
     if (E.zoneSafety(z)) bits.push(h("span", { class: "pill flag", text: "Safety related" }));
     var open = rows.filter(function (r) { return r.open || r.reasonMissing; }).length;
     if (open) bits.push(h("span", { class: "pill neutral val-warn", text: open + " to answer" }));
+    else if (rows.some(function (r) { return r.departure; })) bits.push(h("span", { class: "pill flag", "data-departure": "zone", text: "Not separated, a departure" }));
     else if (rows.some(function (r) { return r.answer === "not-separated"; })) bits.push(h("span", { class: "pill neutral", text: "Not separated" }));
     var stone = stonePill(p, z);
     if (stone) bits.push(stone);
@@ -213,7 +214,11 @@
           placeholder: r.answer === "not-separated" ? "Why not, and what makes up for it" : "How (optional)",
           onInput: function (e) { setSeparation(z, r.id, { reason: e.target.value }); touched(); } })));
       }
-      if (r.reasonMissing) kids.push(h("div", { class: "hint val-warn", text: "Give a reason." }));
+      // Business and control system assets: the standard requires them kept
+      // apart, so not separating them is a departure, said as one. The other
+      // rows are recommendations and keep their neutral wording.
+      if (r.departure) kids.push(h("div", { class: "hint val-warn", "data-departure": r.id, text: r.reasonMissing ? "A departure from a requirement of the standard: give the justification." : "A departure from a requirement of the standard." }));
+      else if (r.reasonMissing) kids.push(h("div", { class: "hint val-warn", text: "Give a reason." }));
       return h("div", { class: "sep-row", "data-part": "sep-" + r.id, "data-sep-state": r.answer || "open" }, kids);
     })));
   }
@@ -299,6 +304,7 @@
           lineListField("Applicable security policies", z.securityPolicies, function (a) { z.securityPolicies = a; touched(); }, "e.g. No engineering changes without MoC"),
           lineListField("Assumptions", M.listOf(z.assumptions), function (a) { setLines(z, "assumptions", a); }, "e.g. The rack room is locked outside shifts")
         ]),
+        lineListField("Applicable security requirements", M.listOf(z.securityRequirements), function (a) { setLines(z, "securityRequirements", a); }, "e.g. 62443-3-3 SRs at the SL-T; site policy P-12"),
         flagEditor(z, { noSafety: true })
       ])
     ];
@@ -353,6 +359,29 @@
           extByEnd ? h("div", { class: "hint", text: "External: one end is EXT." }) : null
         ]),
         external ? textField("External party", c.externalParty, function (v) { setText(c, "externalParty", v); }, { placeholder: "e.g. Control system vendor support" }) : null,
+        // The characteristics a zone has, as far as they apply to a conduit.
+        textField("Accountable organisation", c.accountableOrg, function (v) { setText(c, "accountableOrg", v); }, { placeholder: "e.g. Acme group IT network services" }),
+        h("div", { class: "grid-2" }, [
+          textField("Logical boundary", c.logicalBoundary, function (v) { setText(c, "logicalBoundary", v); }, { textarea: true, placeholder: "e.g. From the DMZ firewall interface to the historian" }),
+          textField("Physical boundary", c.physicalBoundary, function (v) { setText(c, "physicalBoundary", v); }, { textarea: true, placeholder: "e.g. Fibre between rack rooms A and B" })
+        ]),
+        h("div", { class: "field" }, [
+          h("label", { text: "Safety designation" }),
+          checkLine("Safety related", !!c.safetyRelated, function (v) { if (v) c.safetyRelated = true; else delete c.safetyRelated; touched(); rerender(); }, { "data-action": "conduit-safety" })
+        ]),
+        h("div", { class: "grid-2" }, [
+          lineListField("Logical access points", M.listOf(c.accessPoints), function (a) { setLines(c, "accessPoints", a); }, "e.g. Firewall management interface"),
+          lineListField("Physical access points", M.listOf(c.physicalAccessPoints), function (a) { setLines(c, "physicalAccessPoints", a); }, "e.g. Patch panel in rack room A")
+        ]),
+        h("div", { class: "grid-2" }, [
+          lineListField("Data flows", M.listOf(c.dataFlows), function (a) { setLines(c, "dataFlows", a); }, "e.g. Process values to the historian replica"),
+          lineListField("External dependencies", M.listOf(c.externalDependencies), function (a) { setLines(c, "externalDependencies", a); }, "e.g. Carrier circuit to the vendor")
+        ]),
+        h("div", { class: "grid-2" }, [
+          lineListField("Applicable security policies", M.listOf(c.securityPolicies), function (a) { setLines(c, "securityPolicies", a); }, "e.g. Firewall rule changes through MoC"),
+          lineListField("Assumptions", M.listOf(c.assumptions), function (a) { setLines(c, "assumptions", a); }, "e.g. The firewall is managed by group IT")
+        ]),
+        lineListField("Applicable security requirements", M.listOf(c.securityRequirements), function (a) { setLines(c, "securityRequirements", a); }, "e.g. 62443-3-3 SRs at the SL-T; site policy P-12"),
         textField("Notes", c.notes, function (v) { c.notes = v; touched(); })
       ])
     ];

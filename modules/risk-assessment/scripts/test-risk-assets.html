@@ -409,6 +409,9 @@
     var realDocx = w.docx;
     w.docx = mockDocx();
     demo();
+    // Step 3: the demo's assets carry a classification and a business value, so they are taken off here and
+    // these tests start, as before, from a register with no field captured (was: the demo as it is).
+    P().zones.forEach(function (z) { z.assets.forEach(function (a) { delete a.classification; delete a.businessValue; }); });
     var d0 = RX.buildWordDoc(P(), {}), t0 = docText(d0);
     ok(t0.indexOf("\nAsset register\n") < 0 && t0.indexOf("DCS server pair (redundant) (Server); Operator HMIs x4 (HMI)") >= 0 && orientations(d0) === "portrait,portrait,landscape,portrait,landscape,portrait",
       "the demo (no register field captured) prints its assets in the characteristics as before, with no asset table");
@@ -448,7 +451,7 @@
     ok(names3.indexOf("Assets") === names3.indexOf("Conduits") + 1, "the Assets sheet follows Conduits", names3.join());
     var ws = wb.getWorksheet("Assets");
     var head = []; ws.getRow(1).eachCell(function (c) { head.push(c.value); });
-    ok(head.join("|") === "Zone|ID|Name|Type|Connection|Tag or hostname|Vendor|Model|Firmware or software version|Location|Criticality|Owner|Notes", "its columns", head.join("|"));
+    ok(head.join("|") === "Zone|ID|Name|Type|Connection|Tag or hostname|Vendor|Model|Firmware or software version|Location|Criticality|Classification|Business value|Owner|Notes", "its columns (classification and business value added)", head.join("|"));
     ok(ws.rowCount === 12 && ws.getRow(2).getCell(2).value === "AS1" && ws.getRow(2).getCell(6).value === "DCS-SRV-A/B" && ws.getRow(2).getCell(7).value === "Honeywell" && ws.getRow(2).getCell(5).value === "Fixed",
       "one row per asset, with its zone and what is recorded");
     ok(ws.getRow(4).getCell(11).value === "High" && ws.getRow(12).getCell(5).value === "Temporarily connected" && !ws.getRow(3).getCell(8).value, "criticality and connection in words, blank where nothing is recorded");

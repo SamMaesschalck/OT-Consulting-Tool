@@ -118,7 +118,7 @@
       ok(!wrong.length && Z.requirements.length === Object.keys(want).length, "every sub-requirement has its clause number, and there are no others", wrong.join(", ") + " / " + Z.requirements.length);
       ok(Z.requirements.every(function (r) { return typeof r.title === "string" && r.title.length > 3; }), "each has a title");
       ok(RT.zcrOf("ZCR 2").title === "Initial cyber security risk assessment" && RT.zcrOf("ZCR 6.1").title === "Cyber security requirements specification" && RT.zcrOf("ZCR 1").title === "Identify the SUC", "the titles use the edition's terms");
-      ok(Z.verified && /contents list/.test(Z.verified.confirmed) && /line by line/.test(Z.verified.notChecked) && Z.verified.houseReading.length >= 5, "the note says what was confirmed, what was not checked and what is a house reading");
+      ok(Z.verified && /contents list/.test(Z.verified.confirmed) && /requirement wording of clauses 3 and 4/.test(Z.verified.confirmed) && /reproduces none of it/.test(Z.verified.notChecked) && Z.verified.houseReading.length >= 5, "the note says what was confirmed, that no requirement wording is left unchecked (it was checked in Nov 2026) and what is a house reading");
       var stages = Object.keys(Z.stages).filter(function (k) { return k.charAt(0) !== "_"; });
       ok(stages.length >= 5 && stages.every(function (s) { return !!RT.zcrOf(Z.stages[s]); }), "every page's ZCR is one the lookup holds", stages.join(","));
       ok(RT.stageZcr("suc").id === "ZCR 1" && RT.stageZcr("srs").id === "ZCR 2" && RT.stageZcr("zones").id === "ZCR 3" && RT.stageZcr("risk").id === "ZCR 5" && !RT.stageZcr("basis"), "the workflow pages map to ZCR 1, 2, 3 and 5");
@@ -176,7 +176,7 @@
         // Phase 3b: steps 6 and 7 cover ZCR 6 and ZCR 7, so About claims all seven and names none as missing.
         ok(/published IEC 62443-3-2:2020/.test(about) && !/ZCR 1 to ZCR 7/.test(about) && /covers ZCR 1, ZCR 2, ZCR 3, ZCR 4, ZCR 5, ZCR 6 and ZCR 7\./.test(about) && !/not yet steps? of (its|their) own/.test(about),
           "About claims only the ZCRs the tool has a page for, and names the rest as not yet steps", about.slice(0, 260));
-        ok(/checked against its contents list/.test(about) && /not been checked line by line/.test(about), "that the step references were checked, and the requirement wording was not");
+        ok(/checked against its contents list/.test(about) && /requirement wording against the published edition/.test(about) && !/not been checked line by line/.test(about), "that the step references were checked, and the requirement wording too (checked in Nov 2026)");
         ok(/risk matrix and SL mapping are SolutionsPT house defaults/.test(about), "and that the matrix and SL mapping are house defaults");
 
         // An unsigned, undecided assessment prints different sentences: check those too.

@@ -837,6 +837,9 @@ window.RiskApp.App = (function () {
       threatTreatment: function (owner, t, project) { return E.threatTreatment(owner, t, project || state.project); },
       suggestTreatment: function (owner, t, tolerable, project) { return E.suggestTreatment(owner, t, tolerable, project || state.project); },
       TREATMENT_LABEL: E.TREATMENT_LABEL,
+      // A transfer is stored as a marked acceptance (js/model.js): read and
+      // set a decision through these; the risk context writes a transfer as accepted.
+      DECISIONS: M.DECISIONS.slice(), decisionOf: M.decisionOf, setDecision: M.setDecision, contextDisposition: E.contextDisposition,
       assetTypeLabel: E.assetTypeLabel, flagLabel: E.flagLabel,
       likelihoodName: function (id, project) { return E.likelihoodName(id, project || state.project); },
       impactName: function (id, project) { return E.impactName(id, project || state.project); },
@@ -886,6 +889,12 @@ window.RiskApp.App = (function () {
       initialRiskOf: function (owner, project) { return E.initialRiskOf(owner, project || state.project); },
       comparison: function (owner, project) { return E.comparison(owner, project || state.project); },
       hlaComparison: function (a, project) { return E.hlaComparison(a, project || state.project); },
+      // The SUC's one comparison with tolerable risk, and how each zone and
+      // conduit is assessed (its depth, the house method's suggestion).
+      sucComparison: function (project) { return E.sucComparison(project || state.project); },
+      depthOf: function (owner, project) { return E.depthOf(owner, project || state.project); },
+      depthSuggestion: function (owner, project) { return E.depthSuggestion(owner, project || state.project); },
+      depthWords: E.depthWords, depthBasis: E.depthBasis, setDepth: M.setDepth, ASSESSMENT_DEPTHS: M.ASSESSMENT_DEPTHS.slice(),
       hlaIdsOf: M.hlaIdsOf, assessmentType: function (project) { return M.assessmentType(project || state.project); },
       openDemo: openDemo, isTour: function () { return TOUR_MODE; },
       // Phase 3b: the confirmed tolerable risk, a zone's separation rows, the
@@ -894,10 +903,12 @@ window.RiskApp.App = (function () {
       separationRows: function (zone, project) { return E.separationRows(zone, project || state.project); },
       conduitExternal: E.conduitExternal, parseAssets: E.parseAssets, assetLinkLabel: E.assetLinkLabel, zoneSafety: E.zoneSafety,
       specBlocks: function (project) { return E.specBlocks(project || state.project); },
+      mandatoryCountermeasures: function (project) { return E.mandatoryCountermeasures(project || state.project); },
       approvalsOf: function (project) { return M.approvalsOf(project || state.project); },
       approvalFingerprint: function (project) { return E.approvalFingerprint(project || state.project); },
       approvalStates: function (project) { return E.approvalStates(project || state.project); },
       approvalChangedFor: E.approvalChangedFor, approvalPartWords: E.approvalPartWords,
+      hasTransfer: function (project) { return E.hasTransfer(project || state.project); },
       zcrSpecBlocks: M.ZCR.specBlocks || null,
       // Phase 4b: what the deliverables need of the schema 0.3 links and plan.
       threatAssets: function (owner, project) { return E.threatAssets(owner, project || state.project); },

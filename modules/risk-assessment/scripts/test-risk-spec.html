@@ -196,10 +196,10 @@
     RT.navigate("spec");
     var blocks = [].map.call(main().querySelectorAll("[data-spec]"), function (b) { return b.getAttribute("data-spec"); }).join(",");
     var order = Object.keys(w.App.Data.zcrMap.specBlocks).filter(function (k) { return k.charAt(0) !== "_"; }).join(",");
-    ok(blocks === "suc,drawings,characteristics,assumptions,threats,policies,tolerable,regulatory" && blocks === order, "step 6 has eight blocks, in the order the ZCR lookup gives", blocks);
+    ok(blocks === "countermeasures,suc,drawings,characteristics,assumptions,threats,policies,tolerable,regulatory" && blocks === order, "step 6 has nine blocks (the mandatory security countermeasures first), in the order the ZCR lookup gives", blocks);
     ok(main().querySelector(".page-sub .zcr-ref").textContent === "ZCR 6" && (main().textContent.match(/ZCR \d/g) || []).length === 1, "it shows ZCR 6 once, and no block carries a reference");
     var tl = [].map.call(main().querySelectorAll("[data-spec] .card-h h2"), function (h) { return h.textContent; }).join("|");
-    ok(tl === "SUC description|Zone and conduit drawings|Zone and conduit characteristics|Operating environment assumptions|Threat environment|Organisational security policies|Tolerable risk|Regulatory requirements", "the blocks are named in plain words", tl);
+    ok(tl === "Mandatory security countermeasures|SUC description|Zone and conduit drawings|Zone and conduit characteristics|Operating environment assumptions|Threat environment|Organisational security policies|Tolerable risk|Regulatory requirements", "the blocks are named in plain words", tl);
     ok(main().querySelector('[data-spec="drawings"] .zone-map-wrap svg') && main().querySelector('[data-spec="characteristics"] table'), "the drawing and the characteristics are assembled from step 3");
     ok(main().querySelector('[data-spec="tolerable"] .spec-status').getAttribute("data-status") === "done" && main().querySelector('[data-spec="regulatory"] .spec-status').getAttribute("data-status") === "open", "each block has its status");
     var sp = RT.completeness().filter(function (i) { return i.stage === "spec"; }).map(function (i) { return i.text; });
@@ -300,13 +300,13 @@
       function at(list, s, from) { return list.indexOf(s, from || 0); }
       var suc = at(det, "System under consideration and requirements");
       // (Phase 3b review: the security functions that must be kept are part of the SUC description, so they come first, as on step 6.)
-      var seq = ["Security functions that must be kept", "Zone and conduit drawings", "Zone and conduit characteristics", "Operating environment assumptions", "Known or presumed threats", "Organisational security policies", "Tolerable risk", "Regulatory requirements"].map(function (s) { return at(det, s, suc); });
+      var seq = ["Security functions that must be kept", "Zone and conduit drawings", "Zone and conduit characteristics", "Operating environment assumptions", "Threat environment", "Organisational security policies", "Tolerable risk", "Regulatory requirements"].map(function (s) { return at(det, s, suc); });
       ok(suc > 0 && seq.every(function (x, i) { return x > suc && (i === 0 || x > seq[i - 1]); }) && seq[seq.length - 1] < at(det, "Basis of assessment"), "Word: the requirements specification is grouped in one section, in the order of its blocks", JSON.stringify(seq));
       var ch = at(det, "Zone and conduit characteristics");
       ok(at(det, "Accountable organisation", ch) > ch && at(det, "Acme Petrochemicals, Unit 300 operations", ch) > ch && at(det, "Data flows", ch) > ch && at(det, "C2: Vendor remote access", ch) > ch && at(det, "External network (DCS vendor support engineers)", ch) > ch, "Word: a characteristics table for each zone and conduit");
       ok(det.indexOf("Temporarily connected devices are not kept separate. Vendor laptops join the engineering VLAN during turnarounds after the media kiosk check. A separate maintenance zone is planned for the Q2-2027 turnaround.") > ch && !det.some(function (x) { return /The DMZ is the zone built to meet external networks/.test(x); }), "Word: a separation not in place prints with its reason, and one met does not");
       var rc = at(det, "Risk comparison");
-      ok(rc > at(det, "High-level risk ranking") && rc < at(det, "Zones, conduits and the detailed risk assessment") && at(det, "Against tolerable risk", rc) > rc && det.indexOf("Not required", rc) > rc && /method used in this assessment/.test(det[rc + 1]), "Word: a risk comparison table between the ranking and the detailed assessment, stated as the method used");
+      ok(rc > at(det, "High-level risk ranking") && rc < at(det, "Zones, conduits and the detailed risk assessment") && at(det, "Against tolerable risk", rc) > rc && det.indexOf("Grouped with Z3", rc) > rc && /^The initial risk of the system under consideration is /.test(det[rc + 1]) && /By the house method/.test(det[at(det, "How each zone and conduit was assessed", rc) + 1]), "Word: a risk comparison between the ranking and the detailed assessment: the SUC's, once, then a depth table stated as the house method");
       var ap = at(det, "Appendix: risk criteria");
       ok(ap > at(det, "Method and limitations") && at(det, "Risk matrix", ap) > ap && at(det, "Impact scale", ap) > ap && at(det, "Likelihood scale", ap) > ap && at(det, "Security levels", ap) > ap && at(det, "Foundational requirements", ap) > ap && at(det, "FR1 Identification and authentication control", ap) > ap, "Word: the criteria appendix, last: matrix, scales, security levels and the FR key");
       var mat = det.slice(ap).filter(function (x) { return / \(above\)$/.test(x); }).length;
@@ -360,9 +360,9 @@
       ok(wb.worksheets.map(function (s) { return s.name; }).filter(function (n) { return was3b.indexOf(n) >= 0; }).join() === was3b.join(), "Excel: no sheet of phase 3b's is renamed, dropped or moved (phase 4b adds its own)");
       var zs = wb.getWorksheet("Zones"), cs = wb.getWorksheet("Conduits");
       function col(ws, name) { var n = 0; ws.getRow(1).eachCell(function (c, i) { if (c.value === name) n = i; }); return n; }
-      ok(col(zs, "Accountable organisation") && col(zs, "Detailed assessment") && zs.getCell(2, col(zs, "Detailed assessment")).value === "Required" && zs.getCell(2, col(zs, "Accountable organisation")).value === "Acme Petrochemicals, Unit 300 operations", "Excel: the Zones sheet carries the decision and the characteristics");
+      ok(col(zs, "Accountable organisation") && col(zs, "Assessment depth") && zs.getCell(2, col(zs, "Assessment depth")).value === "Detailed" && /^\d+ threat scenarios?$/.test(zs.getCell(2, col(zs, "Basis")).value) && zs.getCell(2, col(zs, "Accountable organisation")).value === "Acme Petrochemicals, Unit 300 operations", "Excel: the Zones sheet carries the depth and the characteristics");
       ok(/Temporarily connected devices: Vendor laptops/.test(String(zs.getCell(5, col(zs, "Separation not in place")).value)), "and the separation not in place, with its reason");
-      ok(cs.getCell(2, col(cs, "Detailed assessment")).value === "Not required" && /^One-way replication/.test(cs.getCell(2, col(cs, "Reason")).value) && cs.getCell(3, col(cs, "Connection")).value === "external network" && cs.getCell(3, col(cs, "Direction")).value === "Both ways" && cs.getCell(2, col(cs, "Direction")).value === "One way, Z1 to Z3", "Excel: the Conduits sheet carries the decision, its reason, the connection and the direction");
+      ok(cs.getCell(2, col(cs, "Assessment depth")).value === "Grouped with Z3" && /^Assessed with Z3/.test(cs.getCell(2, col(cs, "Basis")).value) && cs.getCell(3, col(cs, "Connection")).value === "external network" && cs.getCell(3, col(cs, "Direction")).value === "Both ways" && cs.getCell(2, col(cs, "Direction")).value === "One way, Z1 to Z3", "Excel: the Conduits sheet carries the depth, what it rests on, the connection and the direction");
       var q = clone(P()); q.assessmentType = "high-level"; q.srs.highLevelAssets[0].detailed = { required: true, reason: "" };
       var rk = RX.buildWorkbook(q).getWorksheet("Ranking");
       ok(col(rk, "Detailed assessment") === 8 && !col(RX.buildWorkbook(P()).getWorksheet("Ranking"), "Detailed assessment"), "Excel: a high-level-only job's ranking has the decision column, a full one's does not");
@@ -529,8 +529,8 @@
         ok(!px.some(function (x) { return /Protection against|casual or coincidental/i.test(x); }), "Word: the security levels are the house summary, not the standard's wording");
         ok(px.indexOf("The SolutionsPT house risk criteria used in this assessment.") > px.indexOf("Appendix: risk criteria"), "Word: the appendix says the criteria are the house's");
         ok(px.filter(function (x) { return /^Tolerable risk: /.test(x); }).length === 1, "Word: the tolerable risk is stated once in the requirements");
-        var kt = px.indexOf("Known or presumed threats"), ad = px.indexOf("Assumed adversary: SL3-grade");
-        ok(ad > kt && kt > 0 && ad < px.indexOf("Organisational security policies", kt), "Word: the assumed adversary sits with the known threats");
+        var kt = px.indexOf("Threat environment"), ad = px.indexOf("Assumed adversary: SL3-grade");
+        ok(ad > kt && kt > 0 && ad < px.indexOf("Organisational security policies", kt), "Word: the assumed adversary sits with the known threats, under Threat environment");
         ok(!px.some(function (x) { return /[\/]/.test(x) && /First.aid|catastrophic cost/.test(x); }), "Word: the impact scale reads as sentences, with no slashes");
         p.srs.clientMatrix = true; p.srs.clientMatrixNote = "Ratings mapped from the Acme 5x5 corporate matrix";
         return docXml({});

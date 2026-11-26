@@ -5,7 +5,7 @@
  * build's shape on a copy (js/migrate.js) and frozen: freeze() keeps only
  * what is compared, worked out on that file's own criteria (each rating's
  * likelihood, impact and band in the three states, the treatment decision
- * recorded, the SL-T, the countermeasures, the ranked systems with their
+ * recorded, the SL-T, the depth each zone and conduit was assessed at, the countermeasures, the ranked systems with their
  * ratings and, on a high-level-only assessment, their decision on a detailed
  * assessment, the tolerable risk and a key of the criteria). The project
  * stores it as project.baseline, with the file's name, its date and its
@@ -60,6 +60,10 @@ window.RiskApp.Compare = (function () {
     var owners = vm.owners.map(function (row) {
       var o = row.o, f = { kind: row.isZone ? "zone" : "conduit", id: o.id, name: o.name || "", slt: {} };
       FR_IDS.forEach(function (fr) { f.slt[fr] = typeof o.slTargetByFR[fr] === "number" ? o.slTargetByFR[fr] : null; });
+      // How it was assessed: the depth, and for a group the one it is assessed with.
+      var dp = E.depthOf(o, p);
+      f.depth = dp.depth;
+      if (dp.withId) f.withId = dp.withId;
       if (!row.isZone) { f.from = o.fromZone || ""; f.to = o.toZone || ""; }
       f.threats = row.threats.map(function (x) {
         var t = x.t, st = {};
@@ -169,7 +173,7 @@ window.RiskApp.Compare = (function () {
   // The decision a threat stands on, for comparing: the one recorded, or
   // within tolerable risk (needing none), or none recorded.
   function decisionOf(t) {
-    if (t.decision === "reduce" || t.decision === "accept" || t.decision === "slt") return t.decision;
+    if (M.DECISIONS.indexOf(t.decision) >= 0) return t.decision;
     if (t.required === false || (t.required == null && str(t.label) === E.TREATMENT_LABEL.within)) return "within";
     return "none";
   }
@@ -185,7 +189,7 @@ window.RiskApp.Compare = (function () {
       criteriaChanged: !sameCriteria,
       byCategoryChanged: JSON.stringify(prev.tolerableByCategory || {}) !== JSON.stringify(cur.tolerableByCategory || {}),
       ranked: { added: [], removed: [], renumbered: [], renamed: [], ratings: [], categories: [], decisions: [] },
-      owners: { added: [], removed: [], renumbered: [], renamed: [], ends: [] },
+      owners: { added: [], removed: [], renumbered: [], renamed: [], ends: [], depth: [] },
       slt: [], threats: { added: [], removed: [], moved: [], renumbered: [] },
       ratings: [], decisions: [], cms: { added: [], removed: [], moved: [], status: [] },
       accepted: { added: [], removed: [] },
@@ -236,11 +240,20 @@ window.RiskApp.Compare = (function () {
     var addedOwners = zm.added.concat(cm.added), removedOwners = zm.removed.concat(cm.removed);
     out.owners.added = addedOwners;
     out.owners.removed = removedOwners;
+    var ownerNow = {};
+    pairs.forEach(function (pr) { ownerNow[pr.prev.id] = pr.cur.id; });
     pairs.forEach(function (pr) {
       if (pr.prev.id !== pr.cur.id) out.owners.renumbered.push({ prev: pr.prev, cur: pr.cur });
       else if (norm(pr.prev.name) !== norm(pr.cur.name)) out.owners.renamed.push({ prev: pr.prev, cur: pr.cur });
       var frs = FR_IDS.filter(function (fr) { return ((pr.prev.slt || {})[fr] == null ? null : pr.prev.slt[fr]) !== ((pr.cur.slt || {})[fr] == null ? null : pr.cur.slt[fr]); });
       if (frs.length) out.slt.push({ owner: pr.cur, changes: frs.map(function (fr) { return { fr: fr, from: pr.prev.slt[fr] == null ? null : pr.prev.slt[fr], to: pr.cur.slt[fr] == null ? null : pr.cur.slt[fr] }; }) });
+      // How it was assessed, where both copies say (one frozen before the
+      // depth was kept does not); a group's partner read in today's numbering.
+      if (typeof pr.prev.depth === "string" && typeof pr.cur.depth === "string") {
+        var was = { depth: pr.prev.depth, withId: pr.prev.withId ? (ownerNow[pr.prev.withId] || pr.prev.withId) : "" };
+        var is = { depth: pr.cur.depth, withId: pr.cur.withId || "" };
+        if (was.depth !== is.depth || (is.depth === "grouped" && was.withId !== is.withId)) out.owners.depth.push({ cur: pr.cur, from: was, to: is });
+      }
     });
     // A conduit that now joins other zones (the previous ends read in today's numbering).
     cm.pairs.forEach(function (pr) {
@@ -302,7 +315,7 @@ window.RiskApp.Compare = (function () {
     var rk = out.ranked;
     out.empty = !out.tolerable && !out.criteriaChanged && !out.byCategoryChanged &&
       !rk.added.length && !rk.removed.length && !rk.renumbered.length && !rk.renamed.length && !rk.ratings.length && !rk.categories.length && !rk.decisions.length &&
-      !out.owners.added.length && !out.owners.removed.length && !out.owners.renumbered.length && !out.owners.renamed.length && !out.owners.ends.length &&
+      !out.owners.added.length && !out.owners.removed.length && !out.owners.renumbered.length && !out.owners.renamed.length && !out.owners.ends.length && !out.owners.depth.length &&
       !out.slt.length && !out.threats.added.length && !out.threats.removed.length && !out.threats.moved.length && !out.threats.renumbered.length &&
       !out.ratings.length && !out.decisions.length && !out.cms.added.length && !out.cms.removed.length && !out.cms.moved.length && !out.cms.status.length &&
       !out.accepted.added.length && !out.accepted.removed.length &&
@@ -368,7 +381,7 @@ window.RiskApp.Compare = (function () {
     return "moved from " + cmState(a) + " to " + cmState(b);
   }
   // The decision a threat stands on, in words.
-  var DECISION_WORDS = { reduce: "reduce with countermeasures", accept: "risk accepted", slt: "treated through the SL-T programme", within: "within tolerable risk", none: "no decision recorded" };
+  var DECISION_WORDS = { reduce: "reduce with countermeasures", accept: "risk accepted", transfer: "risk transferred", slt: "treated through the SL-T programme", within: "within tolerable risk", none: "no decision recorded" };
   function decisionLine(x) {
     var id = x.cur.t.id + " (" + x.cur.owner.id + ")";
     if (x.from === "none" || x.from === "within") return id + ": decision now recorded: " + DECISION_WORDS[x.to] + ".";
@@ -388,6 +401,9 @@ window.RiskApp.Compare = (function () {
     if (x.to == null) return w + ": the decision on a detailed assessment is no longer recorded (was " + DETAILED_WORDS[String(x.from)] + ").";
     return w + ": detailed assessment now judged " + DETAILED_WORDS[String(x.to)] + " (was " + DETAILED_WORDS[String(x.from)] + ").";
   }
+  // How a zone or conduit was assessed, in words: "grouped with Z3".
+  var DEPTH_PHRASE = { detailed: "assessed in detail", grouped: "grouped", reused: "reused from earlier results", proportionate: "a proportionate review", deferred: "deferred" };
+  function depthPhrase(x) { return x.depth === "grouped" && x.withId ? "grouped with " + x.withId : (DEPTH_PHRASE[x.depth] || "assessed in detail"); }
   // A conduit's ends in words: "Z1 and Z3".
   function endWords(pair) { return pair.map(function (e) { return e === "EXT" ? "an external network" : e ? e : "an end not set"; }).join(" and "); }
   function held(o) {
@@ -433,6 +449,7 @@ window.RiskApp.Compare = (function () {
     d.owners.renumbered.forEach(function (x) { ow.push(renumberedLine(x)); });
     d.owners.renamed.forEach(function (x) { ow.push(renamedLine(x)); });
     (d.owners.ends || []).forEach(function (x) { ow.push(x.cur.id + " now joins " + endWords(x.to) + "; was " + endWords(x.from) + "."); });
+    (d.owners.depth || []).forEach(function (x) { ow.push(who(x.cur) + ": now " + depthPhrase(x.to) + "; was " + depthPhrase(x.from) + "."); });
     group("owners", "Zones and conduits", ow);
     group("slt", "SL-T", d.slt.map(function (x) {
       return who(x.owner) + ": " + x.changes.map(sltWords).join(", ") + ".";
@@ -515,6 +532,7 @@ window.RiskApp.Compare = (function () {
     d.owners.renumbered.forEach(function (x) { add("Zones and conduits", x.cur.id, x.cur.name, "Renumbered", x.prev.id, x.cur.id); });
     d.owners.renamed.forEach(function (x) { add("Zones and conduits", x.cur.id, x.cur.name, "Renamed", x.prev.name, x.cur.name); });
     (d.owners.ends || []).forEach(function (x) { add("Zones and conduits", x.cur.id, x.cur.name, "Ends changed", cap(endWords(x.from)), cap(endWords(x.to))); });
+    (d.owners.depth || []).forEach(function (x) { add("Zones and conduits", x.cur.id, x.cur.name, "Assessment depth changed", cap(depthPhrase(x.from)), cap(depthPhrase(x.to))); });
     d.slt.forEach(function (x) { x.changes.forEach(function (c) { add("SL-T", x.owner.id, c.fr, sltWord(c), sl(c.from), sl(c.to)); }); });
     d.threats.added.forEach(function (x) { add("Threat scenarios", x.owner.id, x.t.id + " " + x.t.statement, "Added", "", ""); });
     d.threats.removed.forEach(function (x) { add("Threat scenarios", x.owner.id, x.t.id + " " + x.t.statement, "Removed", "", ""); });

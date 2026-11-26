@@ -3,7 +3,8 @@
  * project (modules/risk-assessment, index.html?tour=1), as Export risk context
  * writes it, with the provenance added in phase 6 of
  * docs/risk-tool-redesign.md and the consequence-first provenance (each
- * threat's consequenceId and via, the consequences list), on the same
+ * threat's consequenceId and via, the consequences list) and the depth each
+ * zone and conduit was assessed at (assessment), on the same
  * spt-risk-context/1.4 string.
  * modules/risk-assessment/scripts/test-risk-interchange.html fails when the
  * export and this copy part (generatedOn and generatedBy aside); regenerate
@@ -46,7 +47,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "medium",
       "risk": "high",
-      "note": "Primary control layer; loss forces manual shutdown, manipulation is the acid-release path. Assigned to Z1, where a detailed assessment is required."
+      "note": "Primary control layer; loss forces manual shutdown, manipulation is the acid-release path. Assigned to Z1, assessed in detail."
     },
     {
       "id": "A2",
@@ -55,7 +56,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "severe",
       "likelihood": "low",
       "risk": "high",
-      "note": "Last line of defence; any compromise is intolerable regardless of likelihood. Assigned to Z2, where a detailed assessment is required."
+      "note": "Last line of defence; any compromise is intolerable regardless of likelihood. Assigned to Z2, assessed in detail."
     },
     {
       "id": "A3",
@@ -64,7 +65,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "medium",
       "risk": "high",
-      "note": "Every external path transits here; a foothold pivots into the BPCS. Assigned to Z3, where a detailed assessment is required."
+      "note": "Every external path transits here; a foothold pivots into the BPCS. Assigned to Z3, assessed in detail."
     },
     {
       "id": "A4",
@@ -73,7 +74,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "medium",
       "risk": "high",
-      "note": "Holds the keys to every controller; removable media and legacy tooling in routine use. Assigned to Z4, where a detailed assessment is required."
+      "note": "Holds the keys to every controller; removable media and legacy tooling in routine use. Assigned to Z4, assessed in detail."
     },
     {
       "id": "A5",
@@ -82,7 +83,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "low",
       "risk": "medium",
-      "note": "One-way feed, no control path; ranked medium, monitored at high level only."
+      "note": "One-way feed, no control path; ranked medium. Outside the system under consideration: the feed ends at the historian, which Z3 covers."
     },
     {
       "id": "A6",
@@ -91,7 +92,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "negligible",
       "likelihood": "high",
       "risk": "low",
-      "note": "Commodity IP kit, frequently probed, but no process consequence; ranked low, so not taken to a detailed assessment."
+      "note": "Commodity IP kit, frequently probed, but no process consequence; ranked low. Outside the system under consideration, so in no zone."
     }
   ],
   "basisOfAssessment": {
@@ -123,6 +124,13 @@ window.RiskContextFixtures["demo"] =
         "role": "OT/IT Network Engineer",
         "date": "2026-07-02",
         "notes": "DMZ design, firewall rules, historian replication"
+      },
+      {
+        "id": "I5",
+        "name": "H. Okafor",
+        "role": "Group Insurance Manager",
+        "date": "2026-07-03",
+        "notes": "Business interruption cover, cyber extension, transfer of lost production"
       }
     ],
     "documents": [
@@ -189,7 +197,7 @@ window.RiskContextFixtures["demo"] =
     "name": "R. Calder",
     "role": "Asset Owner - Unit 300",
     "date": "2026-07-04",
-    "statement": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), and the per-FR SL-T vectors as the target for the security programme.",
+    "statement": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), the one transferred risk (lost production, through business interruption insurance), and the per-FR SL-T vectors as the target for the security programme.",
     "approved": true
   },
   "approvals": [
@@ -198,7 +206,7 @@ window.RiskContextFixtures["demo"] =
       "role": "Asset Owner - Unit 300",
       "organisation": "Acme Petrochemicals Ltd",
       "date": "2026-07-04",
-      "scope": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), and the per-FR SL-T vectors as the target for the security programme."
+      "scope": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), the one transferred risk (lost production, through business interruption insurance), and the per-FR SL-T vectors as the target for the security programme."
     },
     {
       "name": "S. Adeyemi",
@@ -302,8 +310,10 @@ window.RiskContextFixtures["demo"] =
           "residualImpact": "serious",
           "residualRisk": "medium",
           "exceedsTolerable": true,
-          "disposition": "countermeasure",
-          "acceptance": "",
+          "disposition": "accepted",
+          "acceptance": "Lost production from a cyber-caused shutdown of the unit is covered by the group's business interruption insurance, which has a cyber extension (policy GBI-2026-114). The cover is reviewed annually at the policy renewal.",
+          "decision": "transfer",
+          "transferTo": "Acme group insurers, through the group business interruption policy",
           "consequenceId": "K2",
           "via": [
             "Z4"
@@ -372,8 +382,8 @@ window.RiskContextFixtures["demo"] =
           "existing": false
         }
       ],
-      "riskComparison": {
-        "required": true
+      "assessment": {
+        "depth": "detailed"
       },
       "initialRisk": {
         "risk": "high",
@@ -482,8 +492,8 @@ window.RiskContextFixtures["demo"] =
           "existing": false
         }
       ],
-      "riskComparison": {
-        "required": true
+      "assessment": {
+        "depth": "detailed"
       },
       "initialRisk": {
         "risk": "high",
@@ -601,8 +611,8 @@ window.RiskContextFixtures["demo"] =
           "existing": false
         }
       ],
-      "riskComparison": {
-        "required": true
+      "assessment": {
+        "depth": "detailed"
       },
       "initialRisk": {
         "risk": "high",
@@ -733,8 +743,8 @@ window.RiskContextFixtures["demo"] =
           "existing": false
         }
       ],
-      "riskComparison": {
-        "required": true
+      "assessment": {
+        "depth": "detailed"
       },
       "initialRisk": {
         "risk": "high",
@@ -774,9 +784,9 @@ window.RiskContextFixtures["demo"] =
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
-      "riskComparison": {
-        "required": false,
-        "reason": "One-way replication through the OPC UA broker. Its exposure is the Z3 pivot path, assessed there as T5, so the SL-T is set from the zones it joins."
+      "assessment": {
+        "depth": "grouped",
+        "withId": "Z3"
       },
       "initialRisk": {
         "risk": "high",
@@ -855,8 +865,8 @@ window.RiskContextFixtures["demo"] =
           "existing": true
         }
       ],
-      "riskComparison": {
-        "required": true
+      "assessment": {
+        "depth": "detailed"
       },
       "initialRisk": {
         "risk": "high",
@@ -894,9 +904,9 @@ window.RiskContextFixtures["demo"] =
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
-      "riskComparison": {
-        "required": false,
-        "reason": "Read-only reporting to the out-of-scope corporate network. The exposure is assessed at the Z3 boundary (T5, T6)."
+      "assessment": {
+        "depth": "proportionate",
+        "considered": "Read-only reporting to the out-of-scope corporate network: a compromised corporate client using the reporting service as a foothold, and exfiltration of throughput data. Both are assessed at the Z3 boundary as T5 and T6."
       },
       "initialRisk": {
         "risk": "high",

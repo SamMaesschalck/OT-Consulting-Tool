@@ -118,7 +118,7 @@
     RT.navigate("srs");
     var row1 = main().querySelector('[data-hla-id="A1"]');
     ok(!!row1 && !!row1.querySelector('[data-detailed="required"].suggested') && /Above tolerable/.test(row1.textContent), "high-level only: the ranking has the comparison as a column, the suggestion dashed");
-    ok(!main().querySelector('select[data-action="assign-zone"]') && !/Assign to zone|New zone/.test(main().textContent) && /decide where a detailed assessment is needed/.test(main().querySelector(".page-sub").textContent) && !/assign them to zones/.test(main().querySelector(".page-sub").textContent),
+    ok(!main().querySelector('select[data-action="assign-zone"]') && !/Assign to zone|New zone/.test(main().textContent) && /decide by the house method which go forward to a detailed assessment/.test(main().querySelector(".page-sub").textContent) && !/assign them to zones/.test(main().querySelector(".page-sub").textContent),
       "high-level only: no zone column with no zones, and the sub-title does not ask for zones", main().querySelector(".page-sub").textContent);
     var hl = texts("highLevel");
     ok(has(hl, /^A1 \(DCS\): the decision on a detailed assessment is not confirmed\.$/) && has(hl, /^A2 \(Lab link\): the decision on a detailed assessment is not confirmed\.$/) && has(hl, /^A3 \(CCTV\): impact not rated\.$/) && !has(hl, /^A3 .*decision/), "the high-level report's readiness lists each undecided system and the unrated one (which has nothing to compare)", hl.join(" | "));
@@ -198,51 +198,59 @@
     RT.navigate("compare");
     m = main();
     ok(active() === "compare" && m.querySelector(".page-sub .zcr-ref").textContent === "ZCR 4", "step 4 is the risk comparison, with ZCR 4 as its reference");
-    ok(/method used here/.test(m.querySelector(".framing-note").textContent) && /house rule/.test(m.querySelector(".framing-note").textContent) && !/standard requires|the standard says/i.test(m.textContent), "comparing per zone and conduit is stated as the method used, and the conduit rule as a house rule");
+    // Since the zone-depth step: the standard's comparison is the SUC's, once;
+    // each zone's and conduit's own initial risk only suggests its depth
+    // (house method), which is set on step 5.
+    ok(/House method/.test(m.querySelector(".framing-note").textContent) && /house rule/.test(m.querySelector(".framing-note").textContent) && !/standard requires|the standard says/i.test(m.textContent) &&
+      !!m.querySelector('[data-check-anchor="suc-compare"]') && /SUC against tolerable risk/.test(m.querySelector('[data-check-anchor="suc-compare"]').textContent),
+      "comparing per zone and conduit is stated as the house method for the depth, beside the SUC's one comparison, and the conduit rule as a house rule");
     var rowIds = [].map.call(m.querySelectorAll(".cmp-table tbody tr"), function (r) { return r.getAttribute("data-owner-id"); }).join(",");
     ok(rowIds === "Z1,Z2,C1,C2", "one table: every zone, then every conduit", rowIds);
     var cz1 = RT.comparison(z1);
-    ok(cz1.initial === "high" && cz1.suggested === true && cz1.state === "suggested" && m.querySelector('[data-owner-id="Z1"] [data-detailed="required"]').classList.contains("suggested") && /Above tolerable/.test(m.querySelector('[data-owner-id="Z1"]').textContent),
+    ok(cz1.initial === "high" && cz1.suggested === true && RT.depthSuggestion(z1) === "detailed" && m.querySelector('[data-owner-id="Z1"]').getAttribute("data-depth-suggested") === "detailed" && /Above tolerable/.test(m.querySelector('[data-owner-id="Z1"]').textContent),
       "a zone above tolerable risk is suggested for a detailed assessment, shown as a suggestion only");
-    ok(z1.detailed === undefined, "and nothing is recorded until the consultant chooses");
-    ok(RT.comparison(z2).suggested === null && has(texts("detailed"), /^Z2 \(Utilities\): no initial risk to compare with tolerable risk\.$/) && !!m.querySelector('[data-owner-id="Z2"] select[data-action="initial-risk"]'), "a zone with no ranked system has no initial risk until one is entered");
+    ok(z1.assessment === undefined && z1.detailed === undefined, "and nothing is recorded until the consultant chooses");
+    ok(RT.comparison(z2).suggested === null && RT.depthSuggestion(z2) === null && m.querySelector('[data-owner-id="Z2"]').getAttribute("data-depth-suggested") === "" && !!m.querySelector('[data-owner-id="Z2"] select[data-action="initial-risk"]'), "a zone with no ranked system has no initial risk, and no suggested depth, until one is entered");
     change(m.querySelector('[data-owner-id="Z2"] select[data-action="initial-risk"]'), "low");
-    ok(z2.initialRisk === "low" && RT.comparison(z2).source === "entered" && RT.comparison(z2).suggested === false, "entered directly, it is compared (low: not required is suggested)");
+    ok(z2.initialRisk === "low" && RT.comparison(z2).source === "entered" && RT.comparison(z2).suggested === false && RT.depthSuggestion(z2) === "proportionate", "entered directly, it is compared (low: a proportionate review is suggested)");
     var cc1 = RT.comparison(c1), cc2 = RT.comparison(c2);
     ok(cc1.initial === "high" && cc1.source === "zones" && cc2.initial === "low" && cc2.source === "zones", "a conduit takes the higher initial risk of the zones it joins (EXT adds nothing)", cc1.initial + " / " + cc2.initial);
     change(main().querySelector('[data-owner-id="C2"] select[data-action="initial-risk"]'), "high");
     cc2 = RT.comparison(c2);
     ok(c2.initialRisk === "high" && cc2.initial === "high" && cc2.source === "entered" && cc2.ruleBand === "low", "or the one entered for it");
-    ok(RT.stepStatus().compare.state === "open" && RT.stepStatus().compare.open === 4 && navStatus("compare") === "4 open", "step 4 shows four undecided", JSON.stringify(RT.stepStatus().compare));
-    var conf = main().querySelector('[data-action="confirm-compare"]');
-    ok(!!conf && /Confirm suggested \(4\)/.test(conf.textContent), "Confirm suggested offers the four suggestions");
-    conf.focus();
-    conf.click();
-    ok(z1.detailed.required === true && z2.detailed.required === false && c1.detailed.required === true && c2.detailed.required === true && !RT.completeness().some(function (i) { return i.stage === "compare"; }), "and records each as suggested", JSON.stringify([z1.detailed, z2.detailed, c1.detailed, c2.detailed]));
-    ok(d.activeElement === main().querySelector("[data-detailed]"), "and, gone once pressed, hands the focus to the table's first decision", d.activeElement && d.activeElement.tagName);
-    ok(navStatus("compare") === "Done", "step 4 is then Done");
-    main().querySelector('[data-owner-id="Z1"] [data-detailed="not-required"]').click();
-    ok(z1.detailed.required === false && has(texts("detailed"), /^Z1 \(DCS\): the decision differs from the comparison and has no reason\.$/) && !!main().querySelector('[data-owner-id="Z1"] input[data-reason="detailed"]'), "overriding the comparison asks for a reason");
-    type(main().querySelector('[data-owner-id="Z1"] input[data-reason="detailed"]'), "Isolated by air gap.");
-    ok(!RT.completeness().some(function (i) { return i.stage === "compare"; }) && d.activeElement === main().querySelector('[data-owner-id="Z1"] input[data-reason="detailed"]'), "a reason settles it, and the field keeps the focus");
-    main().querySelector('[data-owner-id="Z1"] [data-detailed="not-required"]').click();
-    ok(z1.detailed.required === null && RT.comparison(z1).state === "suggested", "clicking the recorded choice again takes it back");
-    main().querySelector('[data-owner-id="Z1"] [data-detailed="required"]').click();
-    // Not required skips step 5: no threat is asked for, the SL-T and its basis are.
+    var sucNow = RT.sucComparison();
+    ok(sucNow.band === "high" && sucNow.exceeds === true && sucNow.source === "systems" && main().querySelector('[data-suc-result]').getAttribute("data-suc-result") === "required" && !RT.completeness().some(function (i) { return i.stage === "compare"; }),
+      "step 4 compares the SUC's initial risk once: above tolerable risk, every zone and conduit is assessed, and none waits on a decision of its own", JSON.stringify(sucNow));
+    ok(RT.stepStatus().compare.state === "done" && navStatus("compare") === "Done", "step 4 is then Done", JSON.stringify(RT.stepStatus().compare));
+    ok(!main().querySelector('[data-action="confirm-compare"]') && main().querySelectorAll('[data-action="set-depth"]').length === 4, "nothing is filled from step 4: each row offers Set, which opens step 5");
+    main().querySelector('[data-owner-id="Z2"] [data-action="set-depth"]').click();
+    ok(RT.state.stage === "risk" && d.activeElement === main().querySelector('[data-owner-id="Z2"] select[data-field="depth"]'), "Set opens step 5 at the zone's depth, with the keyboard on it", d.activeElement && d.activeElement.outerHTML.slice(0, 80));
+    ok(z2.assessment === undefined && RT.depthOf(z2).depth === "detailed" && /Suggested: proportionate/.test(main().querySelector('[data-owner-id="Z2"] [data-part="depth"]').textContent), "the zone is detailed until chosen, with the suggestion beside it");
+    main().querySelector('[data-owner-id="Z2"] [data-action="use-depth-suggestion"]').click();
+    ok(z2.assessment.depth === "proportionate" && has(texts("detailed"), /^Z2 \(Utilities\): proportionate, with no note of the threats considered\.$/) &&
+      d.activeElement === main().querySelector('[data-owner-id="Z2"] [data-field="depth-considered"]'), "a proportionate review asks for the threats considered, with the keyboard in the note");
+    RT.undo();
+    ok(RT.depthOf(P().zones[1]).depth === "detailed" && !("assessment" in P().zones[1]) && d.activeElement === main().querySelector('[data-owner-id="Z2"] select[data-field="depth"]'), "Undo takes the depth back, with the keyboard on the depth");
+    // Undo puts the project back in place, so the records are read again.
+    z1 = P().zones[0]; z2 = P().zones[1]; c1 = P().conduits[0]; c2 = P().conduits[1];
+    main().querySelector('[data-owner-id="Z2"] [data-action="use-depth-suggestion"]').click();
+    type(main().querySelector('[data-owner-id="Z2"] [data-field="depth-considered"]'), "Loss of the utilities feed; no control traffic.");
+    ok(!has(texts("detailed"), /^Z2 \(Utilities\): proportionate/) && d.activeElement === main().querySelector('[data-owner-id="Z2"] [data-field="depth-considered"]'), "a note settles it, and the field keeps the focus");
+    // A proportionate review asks for no threat scenario: the SL-T and its basis are asked for.
     var pr = texts("detailed");
-    ok(has(pr, /^Z1 \(DCS\): no threats identified\.$/) && !has(pr, /^Z2 \(Utilities\): no threats/) && has(pr, /^Z2 \(Utilities\): no SL-T set for any FR\.$/), "a zone not needing a detailed assessment is asked for no threats, only its SL-T", pr.join(" | "));
+    ok(has(pr, /^Z1 \(DCS\): no threats identified\.$/) && !has(pr, /^Z2 \(Utilities\): no threats/) && has(pr, /^Z2 \(Utilities\): no SL-T set for any FR\.$/), "a zone given a proportionate review is asked for no threats, only its SL-T", pr.join(" | "));
     z2.slTargetByFR.IAC = 2;
     ok(has(texts("detailed"), /^Z2 \(Utilities\): SL-T set but no justification\.$/), "set by hand, the SL-T needs its basis in the justification");
     z2.justification = "Utilities only; corporate SL2 floor.";
     ok(!has(texts("detailed"), /^Z2 /), "and with it, nothing is open for that zone");
     RT.navigate("risk");
     // Phase 4: step 5 shows one zone at a time; its rail marks the zone too.
-    ok(/Not required/.test(main().querySelector('[data-rail-id="Z2"]').textContent), "step 5's rail marks the zone Not required");
+    ok(/Proportionate/.test(main().querySelector('[data-rail-id="Z2"]').textContent) && /Detailed/.test(main().querySelector('[data-rail-id="Z1"]').textContent), "step 5's rail shows each zone's depth: Z2 Proportionate, Z1 Detailed");
     main().querySelector('[data-rail-id="Z2"]').click();
     var z2card = main().querySelector('[data-owner-id="Z2"]');
-    ok(active() === "risk" && /Not required/.test(z2card.querySelector(".card-h").textContent) && /No detailed assessment needed \(step 4\)/.test(z2card.textContent), "step 5 marks it, and says what it needs");
+    ok(active() === "risk" && z2card.querySelector('select[data-field="depth"]').value === "proportionate" && z2card.querySelector('[data-field="depth-considered"]').value === "Loss of the utilities feed; no control traffic.", "step 5 marks it, and shows what it rests on");
     main().querySelector('.step-tabs [data-tab="slt"]').click();
-    ok(RT.state.stage === "slt" && active() === "risk" && main().querySelector('.step-tabs [data-tab="slt"]').classList.contains("active") && /No detailed assessment needed/.test(main().querySelector('[data-owner-id="Z2"]').textContent), "the SL-T is a tab of step 5 (slt), and says the same");
+    ok(RT.state.stage === "slt" && active() === "risk" && main().querySelector('.step-tabs [data-tab="slt"]').classList.contains("active") && /Proportionate/.test(main().querySelector('[data-owner-id="Z2"]').textContent), "the SL-T is a tab of step 5 (slt), and says the same");
     ok(d.activeElement === main().querySelector('.step-tabs [data-tab="slt"]'), "and the tab keeps the keyboard focus");
 
     // A zone whose ranked system has an impact and no likelihood: the initial risk is entered instead.
@@ -252,8 +260,10 @@
     RT.navigate("srs");
     assign(main().querySelector('[data-hla-id="A3"] select[data-action="assign-zone"]'), "Z9");
     ok(same(z9.hlaIds, ["A3"]) && RT.comparison(z9).initial === null && RT.comparison(z9).source === "systems", "a zone whose only system has no likelihood gets no initial risk from it");
+    // A decision an older build recorded per zone is read only for the depth
+    // now (detailed, as it has threats or was required), so it asks for nothing.
     z9.detailed = { required: true, reason: "" };
-    ok(has(texts("detailed"), /^Z9 \(Cameras\): the decision has no initial risk to rest on and no reason\.$/), "a decision with nothing to compare asks for its reason");
+    ok(!has(texts("detailed"), /^Z9 \(Cameras\): the decision/) && RT.depthOf(z9).depth === "detailed" && RT.depthSuggestion(z9) === null, "a decision with nothing to compare, recorded by an older build, asks for nothing, and the zone reads as detailed with no suggestion");
     delete z9.detailed;
     RT.navigate("compare");
     var r9 = main().querySelector('[data-owner-id="Z9"]');
@@ -292,10 +302,13 @@
     RT.navigate("review");
     ok(/^What is still open in each report/.test(main().querySelector(".page-sub").textContent), "Check and issue's sub-title starts with a capital when the SUC has no name");
     P().suc.name = nm0;
-    z1.detailed.required = null;
+    // The comparison is the SUC's: with nothing rated it is open, and Go to
+    // opens step 4 at the SUC's card.
+    var keepLik = P().srs.highLevelAssets.map(function (a) { return a.likelihood; }), keepIr = [z2.initialRisk, c2.initialRisk];
+    P().srs.highLevelAssets.forEach(function (a) { a.likelihood = ""; }); delete z2.initialRisk; delete c2.initialRisk;
     RT.navigate("review");
-    ok(goTo(/Z1 \(DCS\): the risk comparison's decision is not confirmed/) && RT.state.stage === "compare" && main().querySelector('[data-owner-id="Z1"]').classList.contains("check-flash"), "on a comparison, step 4 and the zone's row");
-    z1.detailed.required = true;
+    ok(goTo(/The SUC has no initial risk to compare with tolerable risk/) && RT.state.stage === "compare" && main().querySelector('[data-check-anchor="suc-compare"]').classList.contains("check-flash"), "on the comparison, step 4 and the SUC's card");
+    P().srs.highLevelAssets.forEach(function (a, i) { a.likelihood = keepLik[i]; }); z2.initialRisk = keepIr[0]; c2.initialRisk = keepIr[1];
     RT.navigate("review");
     ok(goTo(/A3 \(CCTV\): impact not rated/) && RT.state.stage === "srs" && main().querySelector('[data-hla-id="A3"]').classList.contains("check-flash"), "on a ranked system, step 2 and its row");
     RT.navigate("review");

@@ -134,7 +134,7 @@ window.RiskApp.Engine = (function () {
   }
 
   // A threat's three ratings (schema 0.3):
-  //   unmitigated  likelihood x impact, before any countermeasure, existing
+  //   unmitigated  likelihood x impact, before any cyber security countermeasure, existing
   //                ones included, is counted (threatRisk)
   //   current      with the linked existing countermeasures (currentRisk)
   //   planned      after the planned measures as well (residualRisk; the
@@ -248,24 +248,43 @@ window.RiskApp.Engine = (function () {
     // left to complete and never count as a treatment.
     reduceNone: "Reduce with countermeasures (none recorded)",
     acceptNoReason: "Accept (no reason recorded)",
+    acceptNoBy: "Accept (no record of who accepted it)",
     sltUnset: "Treat through the SL-T programme (no SL-T set)",
     sltNoReason: "Treat through the SL-T programme (no reason recorded)",
+    transferIncomplete: "Transfer (arrangement not fully recorded)",
     accept: "Risk accepted",
+    transfer: "Risk transferred",
     slt: "Treated through the SL-T programme"
   };
+  // What a transfer still lacks: how, to whom, who agreed it (in words), or [].
+  function transferMissing(t) {
+    var out = [];
+    if (!String(t.acceptance || "").trim()) out.push("how it is transferred");
+    if (!String(t.transferTo || "").trim()) out.push("to whom");
+    if (!String(((t.acceptanceDetail || {}).by) || "").trim()) out.push("who agreed it");
+    return out;
+  }
+  function orList(a) { return a.length > 1 ? a.slice(0, -1).join(", ") + " or " + a[a.length - 1] : (a[0] || ""); }
 
   // The single source for a threat's treatment state. The screen, the
   // completeness list, Word, Excel, the review pack and the risk context all
   // read this (through js/view-model.js) and nothing else. Returns:
   //   required        the unmitigated risk is above tolerable risk
   //   state           "within" | "none" | "suggested" | "confirmed"
-  //   decision        "reduce" | "accept" | "slt" | null (null when not required)
+  //   decision        "reduce" | "accept" | "transfer" | "slt" | null (null when
+  //                   not required); a transfer is stored as a marked acceptance
+  //                   (js/model.js decisionOf)
   //   confirmed       the consultant has recorded the decision
   //   open            required, and no confirmed decision
   //   complete        confirmed, and nothing the decision rests on is missing
   //   reason          the reason this decision carries: the acceptance text for
-  //                   "accept", the SL-T reason for "slt", none for "reduce"
-  //   reasonNeeded    this decision needs a reason; reasonMissing: it has none
+  //                   "accept", how it is transferred for "transfer", the SL-T
+  //                   reason for "slt", none for "reduce"
+  //   transferMissing for "transfer", what the arrangement lacks (how, to
+  //                   whom, who agreed it), in words
+  //   reasonNeeded    this decision needs a reason; reasonMissing: it has none.
+  //                   An acceptance also needs who accepted it
+  //                   (acceptanceDetail.by), as a transfer needs who agreed it
   //   covering        the countermeasures linked to the threat (the one coverage rule)
   //   covered         covering is not empty
   //   existingLinked  the linked ones already in place; plannedLinked the others
@@ -294,8 +313,9 @@ window.RiskApp.Engine = (function () {
   //   sltBelow        for "slt", affected requirements set below the suggestion
   //   sltShortfall    the two together
   //   gap             what a confirmed decision still lacks, in plain words, or ""
-  //   disposition     the risk-context value: mitigated | countermeasure | accepted | sl-t,
-  //                   or null until the decision is complete
+  //   disposition     mitigated | countermeasure | accepted | transferred | sl-t,
+  //                   or null until the decision is complete. The risk context
+  //                   writes it, a transfer as accepted (contextDisposition)
   //   label           the state in plain words, as the deliverables print it
   // A decision with a gap is never stated as a treatment: its label says what
   // is missing and its disposition is null, so the report, the workbook, the
@@ -315,7 +335,7 @@ window.RiskApp.Engine = (function () {
     // as the band, so a threat is never within tolerable risk below its band.
     var unmitAbove = aboveTolerable(project, unmit, t.likelihood, cats, t.impact || null);
     var required = unmitAbove;
-    var decision = required && TREATMENT_DECISIONS.indexOf(tr.decision) >= 0 ? tr.decision : null;
+    var decision = required && TREATMENT_DECISIONS.indexOf(tr.decision) >= 0 ? M.decisionOf(tr) : null;
     var confirmed = !!(decision && tr.confirmed);
     var resid = residualRisk(t, project), cur = currentRisk(t, project);
     var curAbove = aboveTolerable(project, cur, t.currentLikelihood || t.likelihood, cats, t.currentImpact || t.impact || null);
@@ -337,9 +357,13 @@ window.RiskApp.Engine = (function () {
     var inPlace = existingLinked.length > 0 && todayWithin;
     var sf = decision === "slt" ? sltShortfall(owner, t, project) : { unset: [], below: [] };
     var shortfall = sf.unset.concat(sf.below);
-    var reason = String((decision === "accept" ? t.acceptance : decision === "slt" ? tr.reason : "") || "").trim();
-    var reasonNeeded = decision === "accept" || (decision === "slt" && shortfall.length > 0);
+    var reason = String((decision === "accept" || decision === "transfer" ? t.acceptance : decision === "slt" ? tr.reason : "") || "").trim();
+    var reasonNeeded = decision === "accept" || decision === "transfer" || (decision === "slt" && shortfall.length > 0);
     var reasonMissing = reasonNeeded && !reason;
+    // A transfer rests on its arrangement and on who agreed it; an
+    // acceptance on its reason and on who accepted it.
+    var tMissing = decision === "transfer" ? transferMissing(t) : [];
+    var byMissing = decision === "accept" && !String(((t.acceptanceDetail || {}).by) || "").trim();
     var gap = "", label = TREATMENT_LABEL.within, disposition = null;
     if (required && !confirmed) label = TREATMENT_LABEL.none;
     else if (decision === "reduce") {
@@ -347,8 +371,14 @@ window.RiskApp.Engine = (function () {
       else if (inPlace) { label = TREATMENT_LABEL.reduced; disposition = "mitigated"; }
       else { label = TREATMENT_LABEL.reduce; disposition = "countermeasure"; }
     } else if (decision === "accept") {
-      if (reasonMissing) { gap = "accepted with no reason recorded"; label = TREATMENT_LABEL.acceptNoReason; }
+      if (reasonMissing) { gap = "accepted with no reason recorded" + (byMissing ? " and no record of who accepted it" : ""); label = TREATMENT_LABEL.acceptNoReason; }
+      else if (byMissing) { gap = "accepted with no record of who accepted it"; label = TREATMENT_LABEL.acceptNoBy; }
       else { label = TREATMENT_LABEL.accept; disposition = "accepted"; }
+    } else if (decision === "transfer") {
+      // The rating is not changed by a transfer: it moves who bears the
+      // consequence, not its likelihood or impact.
+      if (tMissing.length) { gap = "transferred with no record of " + orList(tMissing); label = TREATMENT_LABEL.transferIncomplete; }
+      else { label = TREATMENT_LABEL.transfer; disposition = "transferred"; }
     } else if (decision === "slt") {
       if (reasonMissing && sf.unset.length) { gap = "no SL-T is set" + (t.affectedFR.length ? " on a requirement it affects" : "") + " and no reason is recorded"; label = TREATMENT_LABEL.sltUnset; }
       else if (reasonMissing) { gap = "the SL-T is below the suggestion with no reason recorded"; label = TREATMENT_LABEL.sltNoReason; }
@@ -368,12 +398,18 @@ window.RiskApp.Engine = (function () {
       afterPlan: afterPlan, afterPlanWithin: afterPlanWithin,
       categories: cats,
       sltUnset: sf.unset, sltBelow: sf.below, sltShortfall: shortfall, gap: gap,
+      transferMissing: tMissing,
       disposition: disposition,
       label: label
     };
   }
   // The risk-context value alone: null until a decision is complete.
   function threatDisposition(owner, t, project) { return threatTreatment(owner, t, project).disposition; }
+  // The value the risk context writes. spt-risk-context/1.4 fixes four values
+  // and null, and the released v0.7 tools read no other: a transfer is
+  // written as accepted (the risk is not mitigated, by the organisation's
+  // decision), with the decision itself beside it as provenance.
+  function contextDisposition(d) { return d === "transferred" ? "accepted" : (d || null); }
 
   // Names for stored ids, so no deliverable prints the id itself.
   var ASSET_TYPE_LABEL = { "plc": "PLC", "safety-plc": "Safety PLC", "hmi": "HMI", "historian": "Historian", "engineering-workstation": "Engineering workstation", "server": "Server", "network": "Network device", "business": "Business system", "other": "Other" };
@@ -460,9 +496,28 @@ window.RiskApp.Engine = (function () {
       (v.paths.length === 1 ? " has" : " have") + " a " + BAND_NAME[v.band].toLowerCase() + " unmitigated risk on " + fr + ", which maps to SL" + v.sl + ".";
   }
 
+  // A zone or conduit grouped with another (assessed with it, sharing its
+  // threat scenarios) takes, per FR, the higher of its own suggestion and
+  // that one's (house method). { lead, sug } or null. The lead's own
+  // suggestion is worked out plain (no group followed), so a group never
+  // chains or loops.
+  function leadSuggestion(owner, project, plain) {
+    if (plain) return null;
+    var d = depthOf(owner, project);
+    if (d.depth !== "grouped" || !d.leadOk) return null;
+    return { lead: d.lead, sug: ("fromZone" in d.lead) ? suggestConduit(d.lead, project, true) : suggestZone(d.lead, project, true) };
+  }
+  function applyLead(ls, fr, entry) {
+    var l = ls && ls.sug.byFR[fr] ? ls.sug.byFR[fr].sl : null;
+    if (l == null) return;
+    if (entry.sl == null || l > entry.sl) { entry.sl = l; entry.trace.push("Assessed with " + ls.lead.id + ": takes its suggested SL" + l + " for " + entry.fr + " (house method)."); }
+    else entry.trace.push("Assessed with " + ls.lead.id + ", whose suggestion for " + entry.fr + " is SL" + l + ".");
+  }
+
   // Per-foundational-requirement suggestion for a zone.
   // Returns { byFR: {fr: {sl, risk, trace[]}}, safetyRelated, worstRisk }.
-  function suggestZone(zone, project) {
+  // plain: leave out a group (see leadSuggestion).
+  function suggestZone(zone, project, plain) {
     var tolerable = tolerableOf(project);
     var safety = zoneSafety(zone);
     var adv = project.srs.adversaryClass;
@@ -470,6 +525,7 @@ window.RiskApp.Engine = (function () {
     var perCategory = M.criteriaOf(project).hasCategoryTolerable;
     var floorFR = M.safetyFloorFR(project);
     var through = pathsThrough(project, zone.id);
+    var ls = leadSuggestion(zone, project, plain);
 
     FR_IDS.forEach(function (fr) {
       var trace = [];
@@ -523,6 +579,7 @@ window.RiskApp.Engine = (function () {
         else if (sl == null || sl < floor) { sl = floor; trace.push("SL" + floor + " floor applied (SIS present): " + SIS_RULE.trace); }
         else trace.push("SIS present: SL" + floor + " floor already met.");
       }
+      if (ls) { var le = { fr: fr, sl: sl, trace: trace }; applyLead(ls, fr, le); sl = le.sl; }
 
       if (sl != null && adv && MISMATCH_RULE && adv > sl) {
         trace.push("Mismatch: the assumed adversary class (SL" + adv + "-grade) exceeds the suggested SL" + sl + " for " + fr + ": " + MISMATCH_RULE.trace);
@@ -539,10 +596,11 @@ window.RiskApp.Engine = (function () {
 
   // Per-FR suggestion for a conduit: higher of its own risk-derived SL and the
   // connected zones' suggested SL, per FR (house heuristic).
-  function suggestConduit(cond, project) {
-    var ends = ["fromZone", "toZone"].map(function (k) { var z = findZone(project, cond[k]); return z ? { id: cond[k], sug: suggestZone(z, project), name: z.name } : (cond[k] === "EXT" ? { id: "EXT", sug: null, name: "external" } : null); });
+  function suggestConduit(cond, project, plain) {
+    var ends = ["fromZone", "toZone"].map(function (k) { var z = findZone(project, cond[k]); return z ? { id: cond[k], sug: suggestZone(z, project, plain), name: z.name } : (cond[k] === "EXT" ? { id: "EXT", sug: null, name: "external" } : null); });
     var result = { byFR: {}, worstRisk: worstRiskOf(cond.threats, project) };
     var through = pathsThrough(project, cond.id);
+    var ls = leadSuggestion(cond, project, plain);
 
     FR_IDS.forEach(function (fr) {
       var trace = ["House heuristic: a conduit takes the higher of its own risk-derived SL and the connected zones' suggested SL, per FR."];
@@ -564,6 +622,7 @@ window.RiskApp.Engine = (function () {
           trace.push("EXT endpoint: external party (the conduit boundary is the protection point).");
         }
       });
+      if (ls) { var le = { fr: fr, sl: sl, trace: trace }; applyLead(ls, fr, le); sl = le.sl; }
       if (sl == null) trace.push("No threats or connected-zone suggestion for " + fr + " yet.");
       result.byFR[fr] = { sl: sl, risk: band, trace: trace };
     });
@@ -577,6 +636,8 @@ window.RiskApp.Engine = (function () {
   // The drivers set the suggestion only when their mapped SL reaches it; above
   // it, a zone's suggestion comes from the safety floor and a conduit's from
   // the zones it joins. A requirement with no driver and no suggestion is left out.
+  // One set by the zone or conduit it is grouped with is raisedBy "grouped",
+  // from [that one's id] (house method).
   // A suggestion set by a path through the zone or conduit (house method)
   // is raisedBy "via", with the paths: via [{ id, ownerId, band, words }],
   // words being the path as "T1 via Z3 and C2 to K1".
@@ -585,6 +646,7 @@ window.RiskApp.Engine = (function () {
     var ends = isCond ? [owner.fromZone, owner.toZone].filter(function (id, i, a) { return id && id !== "EXT" && a.indexOf(id) === i; })
       .map(function (id) { var z = findZone(project, id); return z ? { id: id, sug: suggestZone(z, project) } : null; }).filter(Boolean) : [];
     var through = pathsThrough(project, owner.id);
+    var ls = leadSuggestion(owner, project, false);
     var out = [];
     FR_IDS.forEach(function (fr) {
       var band = null;
@@ -596,8 +658,10 @@ window.RiskApp.Engine = (function () {
       var v = through.length ? viaOnFR(through, fr, project) : null;
       if (sl != null && (mapped == null || mapped < sl)) {
         if (v && v.band && v.sl === sl) raisedBy = "via";
-        else if (isCond) { from = ends.filter(function (e) { return e.sug.byFR[fr] && e.sug.byFR[fr].sl === sl; }).map(function (e) { return e.id; }); raisedBy = from.length ? "inherited" : null; }
-        else if (zoneSafety(owner) && M.safetyFloorFR(project).indexOf(fr) >= 0) raisedBy = "floor";
+        else if (isCond && (from = ends.filter(function (e) { return e.sug.byFR[fr] && e.sug.byFR[fr].sl === sl; }).map(function (e) { return e.id; })).length) raisedBy = "inherited";
+        else if (!isCond && zoneSafety(owner) && M.safetyFloorFR(project).indexOf(fr) >= 0) raisedBy = "floor";
+        // Grouped with another (house method): its suggestion.
+        else if (ls && ls.sug.byFR[fr] && ls.sug.byFR[fr].sl === sl) { raisedBy = "grouped"; from = [ls.lead.id]; }
       }
       if (!drivers.length && !raisedBy) return;
       var entry = { fr: fr, sl: sl, band: band, drivers: drivers, mapped: mapped, raisedBy: raisedBy, from: from };
@@ -636,14 +700,18 @@ window.RiskApp.Engine = (function () {
 
   // ---------- Risk comparison (step 4) ----------
   //
-  // Initial risk set against tolerable risk, and the decision whether a
-  // detailed assessment is needed. Comparing per zone and per conduit is the
-  // method this tool uses, not a reading of the standard's words. A zone's
-  // initial risk is the worst of its assigned ranked systems, or entered
-  // directly when it has none. A conduit's follows the house rule below
-  // unless one is entered. The decision ({ required, reason }) is the
-  // consultant's: the comparison only suggests it, and a decision that
-  // differs from the suggestion needs a reason.
+  // The standard's comparison is one: the SUC's initial risk against
+  // tolerable risk (sucComparison, below). Above it, every zone and conduit
+  // is assessed in step 5, at a depth the consultant chooses (depthOf).
+  // Comparing each zone's and conduit's initial risk with tolerable risk is
+  // the house method for suggesting that depth, not a reading of the
+  // standard's words. A zone's initial risk is the worst of its assigned
+  // ranked systems, or entered directly when it has none. A conduit's
+  // follows the house rule below unless one is entered.
+  // comparison() still reads the decision an older build recorded per zone
+  // ({ required, reason }, js/model.js); on a high-level-only assessment
+  // hlaComparison() is the consultant's decision per ranked system, which
+  // the comparison only suggests, and one that differs needs a reason.
 
   var CONDUIT_RULE = "a conduit takes the higher initial risk of the zones it joins unless one is entered (house rule)";
   function isBand(v) { return typeof v === "string" && BAND_RANK[v] != null; }
@@ -725,6 +793,95 @@ window.RiskApp.Engine = (function () {
     return out;
   }
 
+  // The SUC's initial risk against tolerable risk: the worst of the ranked
+  // systems' ratings and the initial risk of the zones and conduits.
+  //   { band, tolerable, exceeds: true | false | null (nothing rated),
+  //     required (a detailed risk assessment: exceeds === true),
+  //     source: "systems" (a ranked system gives the band) | "zones" | null,
+  //     systems: the ranked systems at that band }
+  function sucComparison(project) {
+    var p = project, tol = tolerableOf(p), perCat = M.criteriaOf(p).hasCategoryTolerable;
+    var sys = p.srs.highLevelAssets.filter(function (a) { return a && hlaRisk(a, p); });
+    var owned = p.zones.concat(p.conduits).map(function (o) { return initialRiskOf(o, p); }).filter(function (ir) { return ir.band; });
+    var band = worstBand(sys.map(function (a) { return hlaRisk(a, p); }).concat(owned.map(function (ir) { return ir.band; })));
+    var exceeds = null;
+    if (band) {
+      exceeds = perCat
+        ? sys.some(function (a) { return hlaExceeds(a, p); }) || owned.some(function (ir) { return typeof ir.exceeds === "boolean" ? ir.exceeds : exceedsTolerable(ir.band, tol); })
+        : exceedsTolerable(band, tol);
+    }
+    var top = sys.filter(function (a) { return hlaRisk(a, p) === band; });
+    return { band: band, tolerable: tol, exceeds: exceeds, required: exceeds === true,
+      source: band ? (top.length ? "systems" : "zones") : null, systems: top };
+  }
+
+  // ---------- How each zone and conduit is assessed (step 5) ----------
+  //
+  // The depth is the consultant's (zone/conduit.assessment, js/model.js).
+  // A file without it reads as detailed, unless an older build recorded the
+  // zone or conduit as not needing a detailed assessment and it has no
+  // threats: that reads as a proportionate review with nothing noted yet,
+  // so the completeness list asks for the note. Nothing is written.
+  function ownerById(project, id) {
+    var all = project.zones.concat(project.conduits);
+    for (var i = 0; i < all.length; i++) if (all[i] && all[i].id === id) return all[i];
+    return null;
+  }
+  function storedAssessment(o) {
+    var a = o && o.assessment;
+    return a && typeof a === "object" && !Array.isArray(a) && M.ASSESSMENT_DEPTHS.indexOf(a.depth) >= 0 ? a : null;
+  }
+  // The depth alone, without following a group.
+  function depthName(o) {
+    var a = storedAssessment(o);
+    if (a) return a.depth;
+    var d = o && o.detailed;
+    return d && typeof d === "object" && d.required === false && !(o.threats || []).length ? "proportionate" : "detailed";
+  }
+  // { depth, set (recorded), legacy (read from an older build's decision),
+  //   withId, lead (the zone or conduit it is grouped with), leadOk (that
+  //   one exists, is not itself and is assessed in detail), reuseSource,
+  //   considered, reason }. Only the text that belongs to the depth is given.
+  function depthOf(owner, project) {
+    var a = storedAssessment(owner), depth = depthName(owner);
+    function txt(k) { return a && typeof a[k] === "string" ? a[k].trim() : ""; }
+    var out = { depth: depth, set: !!a, legacy: !a && depth === "proportionate",
+      withId: depth === "grouped" ? txt("withId") : "", lead: null, leadOk: false,
+      reuseSource: depth === "reused" ? txt("reuseSource") : "",
+      considered: depth === "proportionate" ? txt("considered") : "",
+      reason: depth === "deferred" ? txt("reason") : "" };
+    if (out.withId && out.withId !== owner.id) {
+      out.lead = ownerById(project, out.withId);
+      out.leadOk = !!out.lead && depthName(out.lead) === "detailed";
+    }
+    return out;
+  }
+  // The house method's suggestion: detailed where the zone's or conduit's
+  // initial risk is above tolerable risk, proportionate where it is within
+  // it, null with no initial risk. A suggestion only: nothing is filled.
+  function depthSuggestion(owner, project) {
+    var c = comparison(owner, project);
+    return c.suggested === null ? null : (c.suggested ? "detailed" : "proportionate");
+  }
+  // The zones and conduits another can be grouped with: assessed in detail, not itself.
+  function groupLeads(owner, project) {
+    return project.zones.concat(project.conduits).filter(function (o) { return o !== owner && depthName(o) === "detailed"; });
+  }
+  // The zones and conduits grouped with this one.
+  function groupedWith(project, id) {
+    return project.zones.concat(project.conduits).filter(function (o) { var d = depthOf(o, project); return d.depth === "grouped" && d.withId === id; });
+  }
+  // The depth in words: "Detailed", "Grouped with Z3", "Reused", ...
+  function depthWords(d) { return d.depth === "grouped" && d.withId ? "Grouped with " + d.withId : M.DEPTH_LABEL[d.depth]; }
+  // What the depth rests on, in words, or "" when there is nothing to say.
+  function depthBasis(d) {
+    if (d.depth === "detailed") return "Its own threat scenarios";
+    if (d.depth === "grouped") return d.withId ? "Assessed with " + d.withId + ", which holds the threat scenarios they share" : "";
+    if (d.depth === "reused") return d.reuseSource ? "Reused from " + d.reuseSource : "";
+    if (d.depth === "proportionate") return d.considered ? "Threats considered: " + d.considered : "";
+    return d.reason;
+  }
+
   // ---------- Separation (step 3) ----------
   //
   // A separation row is raised only when a zone's data shows a mix: business
@@ -756,7 +913,8 @@ window.RiskApp.Engine = (function () {
       var s = stored[r.id] || {};
       var answer = M.SEPARATION_ANSWERS.indexOf(s.answer) >= 0 ? s.answer : null;
       var reason = String(s.reason || "").trim();
-      out.push({ id: r.id, label: r.label, why: why[r.id], answer: answer, reason: reason,
+      out.push({ id: r.id, label: r.label, why: why[r.id], answer: answer, reason: reason, required: !!r.required, wholeZone: !!r.wholeZone,
+        departure: !!r.required && answer === "not-separated",
         open: !answer, reasonMissing: answer === "not-separated" && !reason });
     });
     return out;
@@ -814,6 +972,7 @@ window.RiskApp.Engine = (function () {
   // needs is there; four of them have no other check, so they add their own
   // item to the completeness list (stage "spec").
   var SPEC_TITLES = {
+    countermeasures: "Mandatory security countermeasures",
     suc: "SUC description", drawings: "Zone and conduit drawings", characteristics: "Zone and conduit characteristics",
     assumptions: "Operating environment assumptions", threats: "Threat environment", policies: "Organisational security policies",
     tolerable: "Tolerable risk", regulatory: "Regulatory requirements"
@@ -824,22 +983,58 @@ window.RiskApp.Engine = (function () {
     policies: "no organisational security policies recorded.",
     regulatory: "no regulatory requirements recorded."
   };
+  // What the threat environment lacks: the adversary or the threats, and a
+  // source of threat intelligence.
+  function threatGap(p) {
+    var r = p.srs, none = !r.adversaryClass && !r.knownThreats.length, noSrc = !M.listOf(r.threatSources).length;
+    if (none && noSrc) return "no assumed adversary, known threats or source of threat intelligence recorded.";
+    return none ? SPEC_GAPS.threats : "no source of threat intelligence recorded.";
+  }
   function specOrder() {
     var m = (M.ZCR && M.ZCR.specBlocks) || {};
     var ids = Object.keys(m).filter(function (k) { return k.charAt(0) !== "_"; });
     return ids.length ? ids : Object.keys(SPEC_TITLES);
+  }
+  // The mandatory security countermeasures (the specification's): those the
+  // confirmed decisions to reduce a risk rest on, existing ones to be kept
+  // and planned ones to be put in place, each once per zone or conduit:
+  // [{ m, owner, threats: [threat ids] }], in the project's order. Which
+  // countermeasures count as mandatory is the house reading.
+  function mandatoryCountermeasures(project) {
+    var vm = VM().build(project), by = {}, out = [];
+    vm.threats.forEach(function (x) {
+      var T = x.treatment;
+      if (!T.confirmed || T.decision !== "reduce") return;
+      T.covering.forEach(function (m) {
+        var k = x.owner.id + "/" + m.id;
+        if (!by[k]) by[k] = { m: m, owner: x.owner, threats: [] };
+        if (by[k].threats.indexOf(x.t.id) < 0) by[k].threats.push(x.t.id);
+      });
+    });
+    project.zones.concat(project.conduits).forEach(function (o) {
+      (o.countermeasures || []).forEach(function (m) { var e = by[o.id + "/" + m.id]; if (e) out.push(e); });
+    });
+    return out;
   }
   // [{ id, title, zcr, done, stage, has }]; has: anything captured for it.
   function specBlocks(project, items) {
     var p = project, s = p.suc, r = p.srs;
     items = items || baseItems(p);
     function anyZone(k) { return p.zones.some(function (z) { return M.listOf(z[k]).length > 0; }); }
+    // The mandatory countermeasures are settled once no decision is open and
+    // none to reduce a risk lacks its countermeasure (each its own item).
+    var vmS = VM().build(p);
+    var cmOpen = vmS.threats.some(function (x) { return x.treatment.open || (x.treatment.confirmed && x.treatment.decision === "reduce" && !x.treatment.complete); });
     var st = {
+      countermeasures: { done: p.zones.length > 0 && !cmOpen, has: mandatoryCountermeasures(p).length > 0, stage: "risk" },
       suc: { done: !!(s.name || "").trim() && !!((s.description || "").trim() || (s.scopeStatement || "").trim()), has: !!(s.name || s.description || s.scopeStatement), stage: "suc" },
       drawings: { done: p.zones.length > 0 && p.conduits.every(function (c) { return c.fromZone && c.toZone; }), has: p.zones.length > 0, stage: "zones" },
       characteristics: { done: p.zones.length > 0 && !items.some(function (i) { return i.stage === "zones"; }), has: p.zones.length > 0, stage: "zones" },
       assumptions: { done: s.assumptions.length > 0 || anyZone("assumptions"), stage: "suc" },
-      threats: { done: !!r.adversaryClass || r.knownThreats.length > 0, stage: "srs" },
+      // The threat environment names where its picture comes from (ZCR 6.6),
+      // beside the adversary or the threats themselves.
+      threats: { done: (!!r.adversaryClass || r.knownThreats.length > 0) && M.listOf(r.threatSources).length > 0,
+        has: !!r.adversaryClass || r.knownThreats.length > 0 || M.listOf(r.threatSources).length > 0 || M.listOf(r.emergingThreats).length > 0, stage: "srs" },
       policies: { done: M.listOf(s.policies).length > 0 || anyZone("securityPolicies"), stage: "spec" },
       tolerable: { done: M.tolerableConfirmed(p), has: true, stage: "suc" },
       regulatory: { done: r.regulatory.length > 0, stage: "spec" }
@@ -887,16 +1082,31 @@ window.RiskApp.Engine = (function () {
         return a.id + ":" + (a.consequence || "-") + "/" + (a.likelihood || "-") + (hlOnly ? "/" + (d === true ? "required" : d === false ? "not-required" : "-") : "");
       }),
       slt: vm.owners.map(function (row) { return row.o.id + ":" + FR_IDS.map(function (fr) { var v = row.o.slTargetByFR[fr]; return v == null ? "-" : v; }).join(""); }),
-      accepted: vm.threats.filter(function (x) { return x.disposition === "accepted"; }).map(function (x) {
+      // The transferred risks are approved with the accepted ones (neither is
+      // mitigated). A transfer is marked, with to whom, so a project with
+      // none fingerprints as before. An acceptance with its reason and no one
+      // recorded as accepting it warns (step 3) but is approved as it was, so
+      // an approval taken before "Accepted by" was asked for still matches.
+      accepted: vm.threats.filter(function (x) {
+        return x.disposition === "accepted" || x.disposition === "transferred" ||
+          (x.treatment.decision === "accept" && x.treatment.confirmed && !x.treatment.reasonMissing);
+      }).map(function (x) {
         // Who accepted it, their role, when, and when it is to be reviewed are
         // part of what was approved. Added only when one is given, so an
         // approval taken before they were recorded still matches.
         var ad = x.t.acceptanceDetail || {}, d = ACCEPT_DETAIL.map(function (k) { return String(ad[k] || "").trim(); });
-        return x.owner.id + "/" + x.t.id + ":" + (x.treatment.reason || "") + (d.some(Boolean) ? "|" + d.join("|") : "");
+        var mark = x.disposition === "transferred" ? "transfer>" + String(x.t.transferTo || "").trim() + ":" : "";
+        return mark + x.owner.id + "/" + x.t.id + ":" + (x.treatment.reason || "") + (d.some(Boolean) ? "|" + d.join("|") : "");
       })
     };
   }
   var ACCEPT_DETAIL = ["by", "role", "date", "reviewDate"];
+  // A threat whose confirmed decision is a transfer (as stored).
+  function hasTransfer(project) {
+    return project.zones.concat(project.conduits).some(function (o) {
+      return (o.threats || []).some(function (t) { return !!t.treatment && t.treatment.confirmed && M.decisionOf(t.treatment) === "transfer"; });
+    });
+  }
   function hash8(s) {
     var h = 5381;
     for (var i = 0; i < s.length; i++) { h = (h * 33) ^ s.charCodeAt(i); h |= 0; }
@@ -945,8 +1155,11 @@ window.RiskApp.Engine = (function () {
   // moved, so its parts join with "or".
   // In a list, "the risk criteria" (which hold the tolerable risk) keeps the
   // sentence from stacking a second "or".
-  function approvalPartWords(parts, or) {
-    var w = parts.map(function (k) { return k === "tolerable" && parts.length > 1 ? "the risk criteria" : APPROVAL_PART_WORDS[k]; });
+  // project, when given: one with a transferred risk says "the accepted and
+  // transferred risks" for that part.
+  function approvalPartWords(parts, or, project) {
+    var tr = !!project && hasTransfer(project);
+    var w = parts.map(function (k) { return k === "tolerable" && parts.length > 1 ? "the risk criteria" : (k === "accepted" && tr ? "the accepted and transferred risks" : APPROVAL_PART_WORDS[k]); });
     return w.length > 1 ? w.slice(0, -1).join(", ") + (or ? " or " : " and ") + w[w.length - 1] : (w[0] || "");
   }
 
@@ -1155,11 +1368,17 @@ window.RiskApp.Engine = (function () {
 
     // The detailed report.
     if (!p.zones.length) add("zones", "detailed", "No zones defined: the risk context gives the 3-3 tool nothing to scope. Define zones in step 3.", null);
+    // The risk comparison: the SUC's initial risk, once, against tolerable risk.
+    if ((p.zones.length || p.conduits.length) && !sucComparison(p).band) add("compare", "detailed", "The SUC has no initial risk to compare with tolerable risk: rate a ranked system, or enter a zone's initial risk.", { kind: "suc-compare" });
     // The separation rows the zones page raised and nobody has answered.
     p.zones.forEach(function (z) {
       separationRows(z, p).forEach(function (r) {
         var tgt = { kind: "zone", id: z.id, part: "sep-" + r.id };
         if (r.open) add("zones", "detailed", zoneLabel(z) + ": record whether " + lcFirst(r.label) + " are kept separate.", tgt);
+        // Not separating business and control system assets departs from a
+        // requirement of the standard, so its warning says so; the others are
+        // recommendations.
+        else if (r.reasonMissing && r.departure) add("zones", "detailed", zoneLabel(z) + ": " + lcFirst(r.label) + " are not kept separate, which the standard requires, with no justification.", tgt);
         else if (r.reasonMissing) add("zones", "detailed", zoneLabel(z) + ": " + lcFirst(r.label) + " are not kept separate, with no reason.", tgt);
       });
     });
@@ -1173,19 +1392,25 @@ window.RiskApp.Engine = (function () {
       var hasSLT = row.sltSet;
       var hasJust = !!(o.justification || "").trim();
       var own = { kind: isZone ? "zone" : "conduit", id: o.id };
-      var cmp = comparison(o, p);
-      if (cmp.open) add("compare", "detailed", label + (cmp.suggested === null ? ": no initial risk to compare with tolerable risk." : ": the risk comparison's decision is not confirmed."), own);
-      else if (cmp.reasonMissing) add("compare", "detailed", label + reasonText(cmp), own);
-      // A conduit often carries no threat of its own and takes its SL-T from
-      // the zones it joins: its written justification is then the basis. A
-      // zone or conduit the comparison found needs no detailed assessment is
-      // asked for no threats: its SL-T is set by hand, with its basis in the
-      // justification.
-      if (!o.threats.length && (isZone || !hasJust) && !cmp.skip) {
+      var D = depthOf(o, p), detailed = D.depth === "detailed";
+      var atDepth = { kind: own.kind, id: o.id, part: "depth" };
+      // Every zone and conduit is assessed, at the depth chosen; each depth
+      // asks for what it rests on. A conduit assessed in detail often carries
+      // no threat of its own and takes its SL-T from the zones it joins: its
+      // written justification is then the basis.
+      if (detailed && !o.threats.length && (isZone || !hasJust)) {
         add(hasSLT ? "slt" : "risk", "detailed", label + (hasSLT
           ? ": SL-T set with no threats. Give the basis in the justification."
           : ": no threats identified."), own);
       }
+      if (D.depth === "grouped" && !D.lead) add("risk", "detailed", label + ": grouped, with no zone or conduit named to share threats with.", atDepth);
+      else if (D.depth === "grouped" && !D.leadOk) add("risk", "detailed", label + ": grouped with " + D.withId + ", which is not assessed in detail.", atDepth);
+      if (D.depth === "reused" && !D.reuseSource) add("risk", "detailed", label + ": reused, with no source named.", atDepth);
+      if (D.depth === "proportionate" && !D.considered && !o.threats.length) add("risk", "detailed", label + ": proportionate, with no note of the threats considered.", atDepth);
+      if (D.depth === "deferred" && !D.reason) add("risk", "detailed", label + ": deferred, with no reason.", atDepth);
+      // A zone or conduit assessed in detail documents its known
+      // vulnerabilities; the other depths rest on their record (it only warns).
+      if (detailed && !(o.vulnerabilities || []).some(function (v) { return v && String(v.description || "").trim(); })) add("risk", "detailed", label + ": no vulnerabilities recorded.", { kind: own.kind, id: o.id, part: "vulns" });
       row.threats.forEach(function (x) {
         var t = x.t, T = x.treatment, tt = { kind: "threat", ownerId: o.id, id: t.id };
         if (!t.likelihood || !t.impact) add("risk", "detailed", label + " / " + t.id + ": likelihood or impact not set.", tt);
@@ -1205,8 +1430,10 @@ window.RiskApp.Engine = (function () {
       // The justification is the deliverable, so flag it only where there is a
       // target to justify — a zone with no SL-T yet is 'incomplete', not
       // 'unjustified'. Neither blocks export (the ruling: never hard-gate).
-      if (!hasSLT) add("slt", "detailed", label + ": no SL-T set for any FR.", own);
-      else if (!hasJust && (isZone || o.threats.length || cmp.skip)) add("slt", "detailed", label + ": SL-T set but no justification.", own);
+      // Every zone and conduit needs an SL-T; a deferred one says so in its
+      // own words.
+      if (!hasSLT) add("slt", "detailed", label + (D.depth === "deferred" ? ": deferred, with no SL-T yet." : ": no SL-T set for any FR."), own);
+      else if (!hasJust && (isZone || o.threats.length || !detailed)) add("slt", "detailed", label + ": SL-T set but no justification.", own);
     }
     vm.zones.forEach(function (row) { var z = row.o; checkOwner(row, z.id + (z.name ? " (" + z.name + ")" : "")); });
     vm.conduits.forEach(function (row) { var c = row.o; checkOwner(row, c.id + (c.name ? " (" + c.name + ")" : "")); });
@@ -1226,7 +1453,7 @@ window.RiskApp.Engine = (function () {
     function add(stage, doc, text, target) { items.push({ stage: stage, doc: doc, text: text, target: target || null }); }
     // The specification's blocks with no check of their own elsewhere.
     specBlocks(p, items).forEach(function (b) {
-      if (!b.done && SPEC_GAPS[b.id]) add("spec", "detailed", "Requirements specification: " + SPEC_GAPS[b.id], { kind: "spec", id: b.id });
+      if (!b.done && SPEC_GAPS[b.id]) add("spec", "detailed", "Requirements specification: " + (b.id === "threats" ? threatGap(p) : SPEC_GAPS[b.id]), { kind: "spec", id: b.id });
     });
     // A justification that names a threat or a countermeasure by its id: the
     // specification issued on its own lists neither, so the reader cannot
@@ -1250,7 +1477,7 @@ window.RiskApp.Engine = (function () {
     states.forEach(function (s) {
       if (!s.changed) return;
       var doc = docOf(approvalChangedFor(s, "detailed").length > 0, approvalChangedFor(s, "highLevel").length > 0) || "both";
-      add("approval", doc, (s.entry.name || "Approver " + (s.index + 1)) + ": approved before " + approvalPartWords(s.parts, s.legacy) + " changed.", { kind: "approval", id: String(s.index) });
+      add("approval", doc, (s.entry.name || "Approver " + (s.index + 1)) + ": approved before " + approvalPartWords(s.parts, s.legacy, p) + " changed.", { kind: "approval", id: String(s.index) });
       if (approvalChangedFor(s, "spec").length) items[items.length - 1].spec = true;
     });
     // What the requirements specification prints (phase 6b): the SUC and
@@ -1271,6 +1498,8 @@ window.RiskApp.Engine = (function () {
       (o.threats || []).forEach(function (t) { if (t && t.id) known[t.id] = true; });
       (o.countermeasures || []).forEach(function (m) { if (m && m.id) known[m.id] = true; });
     });
+    // The mandatory countermeasures are listed in the specification, by id.
+    mandatoryCountermeasures(project).forEach(function (e) { delete known[e.m.id]; });
     var out = [];
     project.zones.concat(project.conduits).forEach(function (o) {
       var ids = [];
@@ -1341,7 +1570,12 @@ window.RiskApp.Engine = (function () {
       var I = planned ? (t.residualImpact || t.currentImpact || t.impact) : current ? (t.currentImpact || t.impact) : null;
       var out = { id: t.id, statement: t.statement, source: t.source, affectedFR: t.affectedFR.slice(), likelihood: t.likelihood, impact: t.impact, unmitigatedRisk: x.risk,
         residualLikelihood: L || null, residualImpact: I || null,
-        residualRisk: x.residualRisk, exceedsTolerable: x.exceeds, disposition: x.disposition, acceptance: t.acceptance || "" };
+        residualRisk: x.residualRisk, exceedsTolerable: x.exceeds, disposition: contextDisposition(x.disposition), acceptance: t.acceptance || "" };
+      // A transfer (provenance only, on the same 1.4 string): disposition is
+      // written as accepted, the legacy value v0.7 reads, and acceptance holds
+      // how it is transferred; the decision and to whom are written beside
+      // them, only for a transfer that is complete.
+      if (x.disposition === "transferred") { out.decision = "transfer"; out.transferTo = String(t.transferTo || "").trim(); }
       // Consequence first (provenance only): the consequence the threat is a
       // path to and the zones and conduits it passes through, when recorded.
       if (t.consequenceId && M.consequenceById(p, t.consequenceId)) out.consequenceId = t.consequenceId;
@@ -1360,10 +1594,14 @@ window.RiskApp.Engine = (function () {
     // phase 6 and one with nothing recorded read the same.
     function filled(v) { return typeof v === "string" && v.trim() !== ""; }
     function pickText(src, keys, out) { keys.forEach(function (k) { if (filled(src[k])) out[k] = src[k].trim(); }); return out; }
-    // The risk comparison decision and the initial risk it was set against.
+    // How the zone or conduit was assessed (its depth, with what it rests
+    // on where recorded), and the initial risk the house method compared.
+    // The per-zone decision an older build recorded (riskComparison) is no
+    // longer written: every zone and conduit is assessed, at the depth given.
     function addComparison(out, owner) {
-      var c = comparison(owner, p);
-      if (c.required !== null) { out.riskComparison = { required: c.required }; if (c.reason) out.riskComparison.reason = c.reason; }
+      var c = comparison(owner, p), d = depthOf(owner, p), a = { depth: d.depth };
+      ["withId", "reuseSource", "considered", "reason"].forEach(function (k) { if (d[k]) a[k] = d[k]; });
+      out.assessment = a;
       if (c.initial) out.initialRisk = { risk: c.initial, source: c.source };
       return out;
     }
@@ -1447,10 +1685,11 @@ window.RiskApp.Engine = (function () {
     threatAssets: threatAssets, vecWords: vecWords,
     suggestTreatment: suggestTreatment, sltShortfall: sltShortfall,
     TREATMENT_LABEL: TREATMENT_LABEL, threatTreatment: threatTreatment, threatDisposition: threatDisposition,
+    contextDisposition: contextDisposition, hasTransfer: hasTransfer, orList: orList,
     assetTypeLabel: assetTypeLabel, assetLinkLabel: assetLinkLabel, flagLabel: flagLabel, scaleName: scaleName,
     conduitExternal: conduitExternal, conduitsOf: conduitsOf, separationRows: separationRows,
     assetTypeFrom: assetTypeFrom, assetLinkFrom: assetLinkFrom, parseAssets: parseAssets,
-    SPEC_TITLES: SPEC_TITLES, specBlocks: specBlocks,
+    SPEC_TITLES: SPEC_TITLES, specBlocks: specBlocks, mandatoryCountermeasures: mandatoryCountermeasures,
     approvalBasis: approvalBasis, approvalFingerprint: approvalFingerprint, approvalStates: approvalStates,
     APPROVAL_DOC_PARTS: APPROVAL_DOC_PARTS, approvalChangedFor: approvalChangedFor, approvalPartWords: approvalPartWords,
     likelihoodName: likelihoodName, impactName: impactName, zoneSafety: zoneSafety,
@@ -1464,6 +1703,8 @@ window.RiskApp.Engine = (function () {
     maxDefined: maxDefined, frSug: frSug, vecStr: vecStr,
     CONDUIT_RULE: CONDUIT_RULE, isBand: isBand, worstBand: worstBand, hlaById: hlaById, hlaRisk: hlaRisk, zonesOfHLA: zonesOfHLA,
     initialRiskOf: initialRiskOf, comparison: comparison, hlaComparison: hlaComparison,
+    sucComparison: sucComparison, depthOf: depthOf, depthSuggestion: depthSuggestion, groupLeads: groupLeads, groupedWith: groupedWith,
+    depthWords: depthWords, depthBasis: depthBasis, ownerById: ownerById,
     completeness: completeness, readiness: readiness, stepStatus: stepStatus,
     exportProblems: exportProblems, buildRiskContext: buildRiskContext
   };

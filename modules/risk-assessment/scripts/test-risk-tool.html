@@ -190,20 +190,25 @@
     cEmpty.slTargetByFR.IAC = 2;
     ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && p.indexOf("SL-T set with no threats") >= 0; }), "conduit with an SL-T, no threats and no justification asks for the basis");
     cEmpty.justification = "Takes the higher SL-T of the two zones it joins.";
-    // (Phase 3a: a conduit also needs its risk comparison decided; recorded
-    // here so this checks the justification rule alone, as it did.)
-    ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /risk comparison|initial risk/.test(p); }), "an undecided conduit is listed for its risk comparison");
+    // (Phase 3a: a conduit also needed its risk comparison decided. Since the
+    // zone-depth step the comparison is the SUC's, once, and a conduit is
+    // assessed at its depth, detailed unless set: it is asked for no decision.)
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /risk comparison|initial risk/.test(p); }) && RT.depthOf(cEmpty).depth === "detailed",
+      "a conduit is asked for no risk comparison decision of its own: it is assessed, in detail unless its depth says otherwise");
     cEmpty.detailed = { required: true, reason: "" };
-    // (Phase 3a review: a decision with no initial risk to compare needs a
-    // reason, so the conduit is given the initial risk its decision rests on.)
-    ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /no initial risk to rest on/.test(p); }), "a comparison decided with no initial risk asks for its reason");
+    // (Phase 3a review: a decision with no initial risk to compare needed a
+    // reason. A decision an older build recorded is now read only for the
+    // conduit's depth, so it asks for nothing; the conduit is still given
+    // the initial risk, as before.)
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /no initial risk to rest on/.test(p); }) && RT.depthOf(cEmpty).depth === "detailed",
+      "a comparison decided per conduit by an older build asks for nothing now, and the conduit reads as detailed");
     cEmpty.initialRisk = "high";
     // (Phase 3b review: a conduit with an end not set is open on step 3, so
     // the conduit is given the two zones it joins, and this checks the
     // justification rule alone, as it did.)
     ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /neither end is set/.test(p); }), "a conduit with no ends is listed for them");
     cEmpty.fromZone = "Z1"; cEmpty.toZone = "Z2";
-    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0; }), "a conduit's justification is the basis when it has no threat of its own");
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && !/: no vulnerabilities recorded\.$/.test(p); }), "a conduit's justification is the basis when it has no threat of its own (assessed in detail, it is still asked for its vulnerabilities)");
     proj.conduits.pop();
 
     // --- treatment decisions: recorded by the consultant, never inferred ---
@@ -238,6 +243,8 @@
     td.treatment.decision = "reduce";
     ok(RT.threatTreatment(zd, td).reason === "" && td.treatment.reason !== "", "changed to reduce, the SL-T reason is no longer the decision's reason (it is kept in case the choice is changed back)");
     td.treatment = { decision: "accept", confirmed: true, reason: "" };
+    // Step 3: an acceptance also needs who accepted it, so it is recorded here and the reason is the one thing missing (was: no one recorded).
+    td.acceptanceDetail = { by: "J. Hale", role: "Operations Director", date: "", reviewDate: "" };
     var tAcc = RT.threatTreatment(zd, td);
     ok(tAcc.disposition === null && !tAcc.complete && tAcc.gap === "accepted with no reason recorded" && tAcc.label === "Accept (no reason recorded)", "an acceptance always needs its reason, and is not a recorded acceptance without it", tAcc.label + " / " + tAcc.disposition);
     ok(RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("accepted with no reason") >= 0; }), "the list shows the acceptance with no reason");
@@ -420,8 +427,8 @@
     }
     function opt(oid, tid, d) { return threatCard(oid, tid).querySelector('.treat-opt[data-decision="' + d + '"]'); }
     var pz = RT.state.project.zones[RT.state.project.zones.length - 1], pt = pz.threats[0];
-    ok(threatCard("Z1", "T1").querySelectorAll(".treat-opt").length === 3 && /Reduce with countermeasures/.test(opt("Z1", "T1", "reduce").textContent) && /^Accept$/.test(opt(pz, pt.id, "accept").textContent) && /Treat through the SL-T/.test(opt("Z1", "T1", "slt").textContent),
-      "each threat above tolerable risk offers the three choices");
+    ok(threatCard("Z1", "T1").querySelectorAll(".treat-opt").length === 4 && /^Transfer$/.test(opt("Z1", "T1", "transfer").textContent) && /Reduce with countermeasures/.test(opt("Z1", "T1", "reduce").textContent) && /^Accept$/.test(opt(pz, pt.id, "accept").textContent) && /Treat through the SL-T/.test(opt("Z1", "T1", "slt").textContent),
+      "each threat above tolerable risk offers the four choices (transfer added)");
     ok(opt("Z1", "T1", "reduce").getAttribute("aria-pressed") === "true" && /^✓ /.test(opt("Z1", "T1", "reduce").textContent) && /Addressed by M1/.test(threatCard("Z1", "T1").textContent), "a confirmed reduce is marked in text and names its countermeasure");
     ok(opt("Z1", "T2", "slt").getAttribute("aria-pressed") === "true" && threatCard("Z1", "T2").querySelector('input[data-reason="slt"]').value.indexOf("phase 2") >= 0, "a confirmed SL-T decision below the suggestion shows its reason");
     ok(/Reason the SL-T is below the suggestion \(SI\)/.test(threatCard("Z1", "T2").textContent), "under a label that says which requirement is below the suggestion");
@@ -509,7 +516,7 @@
     clickNav("about");
     ok(/none of the standard.s text is reproduced/.test(doc.body.textContent), "About states verbatim text is not reproduced (licensing)");
     // Phase 3b: ZCR 6 and ZCR 7 are steps now, so About names all seven and no step as missing.
-    ok(/published IEC 62443-3-2:2020 and covers ZCR 1, ZCR 2, ZCR 3, ZCR 4, ZCR 5, ZCR 6 and ZCR 7\./.test(doc.body.textContent) && !/not yet steps? of (its|their) own/.test(doc.body.textContent) && !/ZCR 1 to ZCR 7/.test(doc.body.textContent) && /not been checked line by line/.test(doc.body.textContent), "About names the published edition, every step the tool covers, and says what was and was not checked");
+    ok(/published IEC 62443-3-2:2020 and covers ZCR 1, ZCR 2, ZCR 3, ZCR 4, ZCR 5, ZCR 6 and ZCR 7\./.test(doc.body.textContent) && !/not yet steps? of (its|their) own/.test(doc.body.textContent) && !/ZCR 1 to ZCR 7/.test(doc.body.textContent) && /requirement wording against the published edition/.test(doc.body.textContent) && !/not been checked line by line/.test(doc.body.textContent), "About names the published edition, every step the tool covers, and says what was checked (the requirement wording too, since Nov 2026)");
     ok(doc.body.textContent.indexOf("house default") >= 0 || doc.body.textContent.indexOf("house defaults") >= 0, "About states the house-heuristic framing");
 
     // --- #2 destructive-delete guard: a filled threat confirms before vanishing ---

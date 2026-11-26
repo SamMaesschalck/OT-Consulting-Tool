@@ -115,8 +115,8 @@ H.test(function (ok, done) {
       ok(Array.isArray(ctx.approvals) && rc && JSON.stringify(rc.approvals) === JSON.stringify(ctx.approvals),
          "the approvals list is kept through the real import path", JSON.stringify(rc && rc.approvals));
       ok(rc && JSON.stringify(rc.zones) === JSON.stringify(ctx.zones) && JSON.stringify(rc.conduits) === JSON.stringify(ctx.conduits) &&
-         !!rc.zones[0].riskComparison && !!rc.zones[0].initialRisk && !!rc.zones[0].assets[0].id,
-         "and the zones' risk comparison, initial risk and asset ids with the zones");
+         !!rc.zones[0].assessment && !!rc.zones[0].initialRisk && !!rc.zones[0].assets[0].id,
+         "and the zones' assessment depth, initial risk and asset ids with the zones");
       var mainText = document.getElementById("main").textContent || "";
       ok(ctx.approvals.every(function (a) { return mainText.indexOf(a.organisation) < 0 && mainText.indexOf(a.scope) < 0; }) &&
          mainText.indexOf(ctx.zones[0].assets[0].vendor) < 0,

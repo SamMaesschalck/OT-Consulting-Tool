@@ -12,8 +12,8 @@
   - The demo export conforms to the contract: every field it writes is in the
     contract's example, with the example's type (null allowed where a value is
     optional).
-  - It carries the new fields: each zone's and conduit's risk comparison
-    decision and initial risk (with its source), each asset's id and register
+  - It carries the new fields: each zone's and conduit's assessment depth
+    (with what it rests on) and initial risk (with its source), each asset's id and register
     attributes, and a top-level approvals list beside the single mirror.
   - Only fields that hold something are written.
   - The six consumed zone fields, the conduit fields, the FR keys and EXT are
@@ -84,11 +84,11 @@
     ok(same(contract.acceptedSchemas, ["spt-risk-context/1.0", "spt-risk-context/1.1", "spt-risk-context/1.2", "spt-risk-context/1.3", "spt-risk-context/1.4"]), "and accepts the five schemas v0.7 accepts", JSON.stringify(contract.acceptedSchemas));
     ok(same(contract.importContract.frKeys, FR), "the FR keys are frozen");
     ok(contract.importContract.consumedByAssessment === "zones[].{id,name,slTarget,slTargetByFR,justification,safetyRelated} and conduits[].{id,fromZone,toZone,slTarget,slTargetByFR}", "the consumed fields are frozen");
-    ["riskComparison", "initialRisk", "approvals", "organisation", "criticality", "vendor"].forEach(function (k) {
+    ["riskComparison", "assessment", "initialRisk", "approvals", "organisation", "criticality", "vendor"].forEach(function (k) {
       ok(contract._note.indexOf(k) >= 0, "the contract note describes " + k);
     });
     var ex = contract.example, exZ = ex.zones[0], exC = ex.conduits[2];
-    ok(Array.isArray(ex.approvals) && ex.approvals.length >= 1 && !!exZ.riskComparison && !!exZ.initialRisk && !!exZ.assets[0].id && !!exZ.assets[0].criticality && !!exC.riskComparison && !!exC.initialRisk,
+    ok(Array.isArray(ex.approvals) && ex.approvals.length >= 1 && !!exZ.assessment && !!exZ.initialRisk && !!exZ.assets[0].id && !!exZ.assets[0].criticality && !!exC.assessment && !!exC.initialRisk,
       "and the example carries every new field");
     var exProbs = conform(ex, templateOf(ex), "example", []);
     ok(exProbs.length === 0, "the example conforms to itself (the check is sound)", exProbs.join(" | "));
@@ -98,23 +98,27 @@
     ok(ctx.schema === contract.schema, "the demo exports spt-risk-context/1.4", ctx.schema);
     var probs = conform(ctx, tpl, "ctx", []);
     ok(probs.length === 0, "the demo export conforms to the contract", probs.slice(0, 6).join(" | "));
-    var wrong = clone(ctx); wrong.zones[0].riskComparison.decidedBy = "x"; wrong.approvals[0].approved = "yes";
+    var wrong = clone(ctx); wrong.zones[0].assessment.decidedBy = "x"; wrong.approvals[0].approved = "yes";
     ok(conform(wrong, tpl, "ctx", []).length === 2, "and the check finds a field the contract does not describe");
 
     // ---- C. the new fields ----
     var dz = p.zones, dc = p.conduits;
+    // The per-zone decision v0.7.0 recorded (riskComparison) gave way to the
+    // depth each zone and conduit was assessed at (assessment).
     ok(ctx.zones.length === 4 && ctx.zones.every(function (z, i) {
       var c = RT.comparison(dz[i], p);
-      return z.riskComparison && z.riskComparison.required === c.required && !("reason" in z.riskComparison) &&
+      return same(z.assessment, { depth: "detailed" }) && !("riskComparison" in z) &&
         z.initialRisk && z.initialRisk.risk === c.initial && z.initialRisk.source === "systems";
-    }), "each zone carries its risk comparison decision and its initial risk from the ranked systems", JSON.stringify(ctx.zones.map(function (z) { return [z.riskComparison, z.initialRisk]; })));
+    }), "each zone carries its assessment depth and its initial risk from the ranked systems", JSON.stringify(ctx.zones.map(function (z) { return [z.assessment, z.initialRisk]; })));
     ok(ctx.conduits.length === 3 && ctx.conduits.every(function (c, i) {
-      var d = dc[i].detailed || {};
-      return c.riskComparison && c.riskComparison.required === d.required &&
-        (d.reason ? c.riskComparison.reason === d.reason.trim() : !("reason" in c.riskComparison)) &&
+      var d = RT.depthOf(dc[i], p);
+      return c.assessment && c.assessment.depth === d.depth && !("riskComparison" in c) &&
+        (d.withId ? c.assessment.withId === d.withId : !("withId" in c.assessment)) &&
+        (d.considered ? c.assessment.considered === d.considered : !("considered" in c.assessment)) &&
         c.initialRisk && c.initialRisk.source === "zones" && c.initialRisk.risk === RT.comparison(dc[i], p).initial;
-    }), "each conduit carries its decision, with the reason where one is recorded, and its initial risk from the zones it joins", JSON.stringify(ctx.conduits.map(function (c) { return [c.riskComparison, c.initialRisk]; })));
-    ok(ctx.conduits.filter(function (c) { return c.riskComparison.required === false; }).length === 2, "the two conduits found not to need a detailed assessment say so");
+    }), "each conduit carries its depth, with what it rests on where one is recorded, and its initial risk from the zones it joins", JSON.stringify(ctx.conduits.map(function (c) { return [c.assessment, c.initialRisk]; })));
+    ok(same(ctx.conduits.map(function (c) { return c.assessment.depth; }), ["grouped", "detailed", "proportionate"]) && ctx.conduits[0].assessment.withId === "Z3",
+      "the two conduits not assessed on their own scenarios say how they were assessed: C1 with Z3, C3 as a proportionate review");
     var allAssets = [].concat.apply([], ctx.zones.map(function (z) { return z.assets; }));
     ok(allAssets.length === 11 && allAssets.every(function (a) { return /^AS\d+$/.test(a.id); }), "every asset carries its id", JSON.stringify(allAssets.map(function (a) { return a.id; })));
     ok(Array.isArray(ctx.approvals) && ctx.approvals.length === 2, "the approvals list carries both recorded approvals", JSON.stringify(ctx.approvals));
@@ -135,7 +139,7 @@
     var V07_ZONE = ["id", "name", "safetyRelated", "fromHighLevelAsset", "slSuggestedByFR", "slTargetByFR", "slTarget", "worstUnmitigatedRisk", "justification", "assets", "accessPoints", "externalDependencies", "securityPolicies", "threats", "vulnerabilities", "countermeasures"];
     var V07_CONDUIT = ["id", "fromZone", "toZone", "name", "channels", "slSuggestedByFR", "slTargetByFR", "slTarget", "justification", "threats", "vulnerabilities", "countermeasures"];
     // Consequence first adds the consequences list beside them (provenance only, written when there are any).
-    var NEW = ["approvals", "riskComparison", "initialRisk", "consequences"];
+    var NEW = ["approvals", "riskComparison", "assessment", "initialRisk", "consequences"];
     function without(o) { return Object.keys(o).filter(function (k) { return NEW.indexOf(k) < 0; }); }
     ok(same(without(ctx), V07_TOP), "the top-level keys are v0.7's, plus approvals", keys.join(","));
     ok(ctx.zones.every(function (z) { return same(without(z), V07_ZONE); }), "each zone's keys are v0.7's, plus the two new ones", Object.keys(ctx.zones[0]).join(","));
@@ -158,20 +162,20 @@
     var qa = q.zones[0].assets[0];
     qa.tag = "  DCS-SRV-A "; qa.vendor = "Example Controls"; qa.model = ""; qa.version = "   "; qa.criticality = "high"; qa.location = "Control room"; qa.owner = "J. Whitmore"; qa.notes = "Redundant pair";
     q.zones[0].assets[1].criticality = "urgent";
-    q.conduits[1].detailed = {};
-    q.conduits[0].detailed = { required: false, reason: "   " };
+    delete q.conduits[1].assessment;
+    q.conduits[0].assessment = { depth: "deferred", reason: "   " };
     var cq = RT.buildRiskContext(q), a0 = cq.zones[0].assets[0], a1 = cq.zones[0].assets[1];
     ok(same(a0, { id: qa.id, name: qa.name, type: qa.type, tag: "DCS-SRV-A", vendor: "Example Controls", criticality: "high" }), "an asset writes the attributes it has, trimmed, and leaves out the blank ones", JSON.stringify(a0));
     ok(!("location" in a0) && !("owner" in a0) && !("notes" in a0), "location, owner and notes stay in the risk tool");
     ok(!("criticality" in a1), "a criticality that is not high, medium or low is not written", JSON.stringify(a1));
-    ok(!("riskComparison" in cq.conduits[1]) && "initialRisk" in cq.conduits[1], "with no decision recorded there is no riskComparison, and the initial risk still shows");
-    ok(same(cq.conduits[0].riskComparison, { required: false }), "a blank reason is not written", JSON.stringify(cq.conduits[0].riskComparison));
+    ok(same(cq.conduits[1].assessment, { depth: "detailed" }) && !("riskComparison" in cq.conduits[1]) && "initialRisk" in cq.conduits[1], "with no depth recorded the depth is detailed and nothing else is written, and the initial risk still shows", JSON.stringify(cq.conduits[1].assessment));
+    ok(same(cq.conduits[0].assessment, { depth: "deferred" }), "a blank reason is not written", JSON.stringify(cq.conduits[0].assessment));
     // A zone with no ranked system: the initial risk entered for it, else none.
     var z5 = RT.emptyZone(5); z5.name = "Entered risk"; z5.hlaIds = []; z5.initialRisk = "low"; q.zones.push(z5);
     var z6 = RT.emptyZone(6); z6.name = "No risk yet"; z6.hlaIds = []; q.zones.push(z6);
     var cq2 = RT.buildRiskContext(q), e5 = cq2.zones[4], e6 = cq2.zones[5];
     ok(same(e5.initialRisk, { risk: "low", source: "entered" }), "an initial risk entered directly says so", JSON.stringify(e5.initialRisk));
-    ok(!("initialRisk" in e6) && !("riskComparison" in e6), "a zone with neither writes neither", JSON.stringify(Object.keys(e6)));
+    ok(!("initialRisk" in e6) && !("riskComparison" in e6) && same(e6.assessment, { depth: "detailed" }), "a zone with no initial risk writes none, and only its depth", JSON.stringify(Object.keys(e6)));
     ok(e5.assets.length === 0 && same(without(e6), V07_ZONE), "and keeps the v0.7 keys");
     // Approvals: only those given, and no list when none is.
     q.approvals[1].approved = false;

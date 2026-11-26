@@ -151,6 +151,16 @@ window.RiskReview = (function () {
     return m.id + ": " + [norm(m.owner) ? "owner " + norm(m.owner) : "no owner", pr ? pr.toLowerCase() + " priority" : "no priority",
       norm(m.dueDate) ? "due " + norm(m.dueDate) : "no due date", st ? st.toLowerCase() : "no status"].join(", ");
   }
+  // ["Assessment depth", "Detailed" | "Grouped with Z3" | "Reused from ..." |
+  //  "Proportionate. Threats considered: ..." | "Deferred: <reason>"]
+  function depthDetail(o, p) {
+    var R = RT(), d = R.depthOf(o, p);
+    var w = d.depth === "reused" && d.reuseSource ? "Reused from " + d.reuseSource
+      : d.depth === "proportionate" && d.considered ? "Proportionate. Threats considered: " + d.considered
+      : d.depth === "deferred" && d.reason ? "Deferred: " + d.reason
+      : R.depthWords(d);
+    return ["Assessment depth", w];
+  }
   function slVector(v) {
     var ids = RT().FR_IDS.filter(function (fr) { return v && v[fr] != null; });
     return ids.map(function (fr) { return fr + " SL" + v[fr]; }).join(", ");
@@ -208,6 +218,13 @@ window.RiskReview = (function () {
           var ad = t.acceptanceDetail || {}, by = norm(ad.by);
           details.push(["Accepted by", (by || "Not recorded") + (norm(ad.role) ? " (" + norm(ad.role) + ")" : "") + (norm(ad.date) ? ", " + norm(ad.date) : "") + (norm(ad.reviewDate) ? ", review by " + norm(ad.reviewDate) : "")]);
         }
+        // A transfer: how, to whom, and who agreed it (a complete one has all
+        // three). The rating stays as it is.
+        if (T.complete && T.decision === "transfer") {
+          var td = t.acceptanceDetail || {};
+          details.push(["Transferred", norm(t.acceptance).replace(/[.\s]+$/, "") + ", to " + norm(t.transferTo)]);
+          details.push(["Transfer agreed by", norm(td.by) + (norm(td.role) ? " (" + norm(td.role) + ")" : "") + (norm(td.date) ? ", " + norm(td.date) : "") + (norm(td.reviewDate) ? ", review by " + norm(td.reviewDate) : "")]);
+        }
         // A decision recorded without what it rests on: the reviewer sees what
         // was chosen and what is missing, and the decision field stays empty.
         if (T.confirmed && !T.complete) details.push(["Decision still to complete", T.label]);
@@ -218,7 +235,8 @@ window.RiskReview = (function () {
           // where it is rated per consequence category and a category has its
           // own, each rated category's (as the engine compares it).
           expected: catTolerable(x, tolerable),
-          // The acceptance text is not printed against another decision.
+          // The acceptance text is not printed against another decision (a
+          // transfer's arrangement is in its details).
           evidence: t.source || "", notes: (T.confirmed && T.decision !== "accept") ? "" : (t.acceptance || ""),
           owner: "", action: linked.map(function (m) { return m.id + " " + m.description + (m.existing ? " [existing]" : " [planned]"); }).join("; "), impact: "",
           // Empty until the consultant has confirmed a decision and it is
@@ -239,7 +257,8 @@ window.RiskReview = (function () {
         expected: "", evidence: "", notes: "", owner: "", action: "", impact: "", priority: "",
         // No Justification row when there is none: the review tool's
         // risk-slt-justification check reads a filled one as written.
-        details: [["Suggested SL-T", slVector(sugVec) || "None"]].concat((o.justification || "").trim() ? [["Justification", o.justification.trim()]] : []),
+        // How the zone or conduit was assessed comes first: its depth and what it rests on.
+        details: [depthDetail(o, p), ["Suggested SL-T", slVector(sugVec) || "None"]].concat((o.justification || "").trim() ? [["Justification", o.justification.trim()]] : []),
         status: set ? "recorded" : "unanswered", shared: false
       });
       fact[set ? "recorded" : "unanswered"]++;

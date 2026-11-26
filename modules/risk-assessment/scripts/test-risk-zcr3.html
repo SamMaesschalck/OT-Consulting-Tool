@@ -1,0 +1,201 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool 3-2 fixes, step 3</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The 3-2 fixes, step 3 (owner follow-ups on step 2):
+  - An acceptance with no "Accepted by" (acceptanceDetail.by) warns, as a
+    transfer with no one who agreed it does: the same gap on the one treatment
+    state, so the completeness list, the screen, Word, the risk context, the
+    review pack and the review tool's decision check all read it. It only warns.
+  - The demo shows step 2's features: T2's lost production is transferred
+    (business interruption insurance, to the group insurers, agreed by the
+    group insurance manager), and every asset carries a classification and a
+    business value. It keeps zero completeness problems and its approvals stand.
+-->
+<iframe id="f" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="../../report-review/js/checks.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  var DASH = /[–—]/;
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var t = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+      if (t.replace(/\s+/g, "")) out.push(t.replace(/&apos;/g, "'").replace(/&quot;/g, "\"").replace(/&amp;/g, "&"));
+    }
+    return out;
+  }
+  var RK = window.App && window.App.ReviewChecks;
+
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, tries = 0;
+    var t = setInterval(function () {
+      if (!w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks || !w.RiskTool.state.project.zones.length) { if (++tries > 400) { clearInterval(t); ok(false, "the app exposed RiskTool with the demo"); done(); } return; }
+      clearInterval(t);
+      var r = null;
+      try { r = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+      if (r && typeof r.then === "function") r.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+      else done();
+    }, 50);
+  };
+  frame.src = "../index.html?tour=1";
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks, d = w.document;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    w.confirm = function () { return true; }; w.alert = function () {};
+    var DEMO = window.SPT_TOUR_PROJECT;
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function load(p) { RT.loadProjectText(JSON.stringify(p)); }
+    function ownerIn(p, id) { return p.zones.concat(p.conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threatIn(p, oid, tid) { return ownerIn(p, oid).threats.filter(function (t) { return t.id === tid; })[0]; }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    function texts(p) { return E.completeness(p).map(function (i) { return i.text; }); }
+    function own(p) { return E.completeness(p).filter(function (i) { return i.stage !== "approval"; }); }
+    function has(list, re) { return list.some(function (x) { return re.test(x); }); }
+    function TT(p, oid, tid) { return E.threatTreatment(ownerIn(p, oid), threatIn(p, oid, tid), p); }
+    function ctxThreat(ctx, oid, tid) { return ctx.zones.concat(ctx.conduits).filter(function (o) { return o.id === oid; })[0].threats.filter(function (x) { return x.id === tid; })[0]; }
+    function wordParas(p, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    function after(list, s, from) { var i = list.indexOf(s, from || 0); return i < 0 ? [] : list.slice(i + 1); }
+    function detail(it, k) { return (it.details.filter(function (r) { return r[0] === k; })[0] || [])[1]; }
+
+    var base = MG.normaliseProject(clone(DEMO));
+
+    // ---- A. "Accepted by" on an acceptance: warns as a transfer's "Agreed by" does ----------------
+    ok(E.completeness(base).length === 0, "the demo has no completeness problem", texts(base).join(" | "));
+    var accs = []; base.zones.concat(base.conduits).forEach(function (o) { o.threats.forEach(function (t) { if (TT(base, o.id, t.id).decision === "accept") accs.push(t); }); });
+    ok(accs.length === 1 && accs.every(function (t) { return !!String(t.acceptanceDetail.by || "").trim(); }), "every acceptance in the demo records who accepted it", accs.map(function (t) { return t.id; }).join());
+    var g = clone(base), g8 = threatIn(g, "Z4", "T8");
+    g8.acceptanceDetail.by = "";
+    var G = TT(g, "Z4", "T8");
+    ok(G.decision === "accept" && G.confirmed && !G.complete && G.disposition === null && G.gap === "accepted with no record of who accepted it" && G.label === "Accept (no record of who accepted it)",
+      "an acceptance with no one recorded as accepting it is not a recorded acceptance, and says what is missing", JSON.stringify([G.gap, G.label, G.disposition]));
+    ok(has(texts(g), /^Z4 \(Engineering workstations\) \/ T8: accepted with no record of who accepted it\.$/) && own(g).length === 1, "the completeness list warns, once (beside the approvals, which covered the acceptance as it was)", texts(g).join(" | "));
+    // The same wording pattern as a transfer's.
+    var tg = clone(base), t2 = threatIn(tg, "Z1", "T2"); t2.acceptanceDetail.by = "";
+    ok(TT(tg, "Z1", "T2").gap === "transferred with no record of who agreed it" && /^(accepted|transferred) with no record of who (accepted|agreed) it$/.test(G.gap), "in the same words as a transfer with no one who agreed it", TT(tg, "Z1", "T2").gap);
+    g8.acceptanceDetail.by = "   ";
+    ok(TT(g, "Z4", "T8").gap === "accepted with no record of who accepted it", "blank space is not a name");
+    g8.acceptance = "";
+    ok(TT(g, "Z4", "T8").gap === "accepted with no reason recorded and no record of who accepted it" && TT(g, "Z4", "T8").label === "Accept (no reason recorded)" && own(g).length === 1,
+      "with no reason either, one warning names both", TT(g, "Z4", "T8").gap);
+    g8.acceptance = base.zones[3].threats[1].acceptance;
+    g8.acceptanceDetail.by = "R. Calder";
+    var G2 = TT(g, "Z4", "T8");
+    ok(G2.complete && G2.disposition === "accepted" && G2.label === "Risk accepted" && E.completeness(g).length === 0, "filled, the warning clears and the acceptance stands");
+    // An approval taken before "Accepted by" was asked for still matches: the acceptance it covered is
+    // fingerprinted as it was, its reason and no detail.
+    var q0 = clone(base), q8 = threatIn(q0, "Z4", "T8"); q8.acceptanceDetail = M.emptyAcceptanceDetail();
+    ok(TT(q0, "Z4", "T8").gap === "accepted with no record of who accepted it" && E.approvalBasis(q0).accepted.filter(function (s) { return s.indexOf("transfer>") !== 0; }).join("#") === "Z4/T8:" + q8.acceptance,
+      "an acceptance with no one recorded still counts in what an approval covered, as before", E.approvalBasis(q0).accepted.join("#").slice(0, 80));
+    // Warn only: every deliverable still builds, and none states the acceptance as fact.
+    g8.acceptanceDetail.by = "";
+    var cg = RT.buildRiskContext(g);
+    ok(ctxThreat(cg, "Z4", "T8").disposition === null && ctxThreat(RT.buildRiskContext(base), "Z4", "T8").disposition === "accepted", "the risk context exports no disposition for it until it is filled");
+    var wbG = RX.buildWorkbook(g);
+    ok(!!wbG && !!wbG.getWorksheet("Threat register"), "it never blocks: the workbook builds");
+
+    return wordParas(g, {}).then(function (det) {
+      ok(det.length > 500 && det.some(function (x) { return /T8 \(Z4\), accept \(no record of who accepted it\)/.test(x); }), "it never blocks: the report builds, and its summary names the incomplete acceptance",
+        det.filter(function (x) { return /incomplete/.test(x); }).join(" | "));
+      ok(after(det, "Accepted risks")[0] === "No risk has been accepted.", "and Accepted risks does not list it");
+      // The review pack and the review tool's decision check.
+      load(g);
+      var i8 = RR.packItems().items.filter(function (x) { return x.itemId === "Z4:T8"; })[0];
+      ok(i8.priority === "" && detail(i8, "Decision still to complete") === "Accept (no record of who accepted it)", "the review pack: no decision words, and what is still to complete", JSON.stringify(i8.details));
+      return RR.buildPack();
+    }).then(function (r) {
+      var nd = RK.run(JSON.parse(JSON.stringify(r.pack)), {}).filter(function (x) { return x.check === "risk-no-disposition"; });
+      ok(nd.length === 1 && nd[0].itemId === "Z4:T8", "the review tool flags it, as it does a transfer no one agreed", nd.map(function (x) { return x.itemId; }).join());
+      ok(/who accepted it/.test(RK.CHECKS["risk-no-disposition"].about) && !DASH.test(RK.CHECKS["risk-no-disposition"].about), "and its description says so", RK.CHECKS["risk-no-disposition"].about);
+      // The screen: the decision's status says it, and typing a name clears it.
+      RT.navigate("risk");
+      main().querySelector('[data-rail-id="Z4"]').click();
+      var tb = main().querySelector('[data-owner-id="Z4"] [data-threat-id="T8"]');
+      if (!tb.classList.contains("open")) tb.querySelector('[data-action="open-scenario"]').click();
+      var ed = main().querySelector('[data-owner-id="Z4"] [data-threat-id="T8"]'), st = ed.querySelector(".treat-status");
+      ok(st.textContent === "Accepted with no record of who accepted it." && st.classList.contains("val-warn"), "the decision shows what is missing, as a warning", st.textContent);
+      var by = ed.querySelector('[data-field="acc-by"]');
+      type(by, "R. Calder");
+      st = main().querySelector('[data-owner-id="Z4"] [data-threat-id="T8"] .treat-status');
+      ok(threatIn(P(), "Z4", "T8").acceptanceDetail.by === "R. Calder" && !st.classList.contains("val-warn") && st.textContent === "" && d.activeElement === by, "typing who accepted it clears it, with the keyboard kept", st.textContent);
+      ok(E.completeness(P()).length === 0, "and nothing is open");
+
+      // ---- B. the demo's transfer, in every deliverable ------------------------------------------
+      load(DEMO);
+      var T2 = TT(P(), "Z1", "T2"), d2 = threatIn(P(), "Z1", "T2");
+      ok(T2.decision === "transfer" && T2.complete && T2.disposition === "transferred" && T2.label === "Risk transferred" && T2.today === "high", "the demo transfers T2, complete, its rating today unchanged");
+      var ctx = RT.buildRiskContext(), c2 = ctxThreat(ctx, "Z1", "T2");
+      ok(ctx.schema === "spt-risk-context/1.4" && c2.disposition === "accepted" && c2.decision === "transfer" && c2.transferTo === d2.transferTo && c2.acceptance === d2.acceptance,
+        "the risk context: disposition accepted, with the decision transfer and to whom beside it", JSON.stringify(c2));
+      ok(ctxThreat(ctx, "Z4", "T8").disposition === "accepted" && !("decision" in ctxThreat(ctx, "Z4", "T8")), "and the acceptance stays an acceptance");
+      var wb = RX.buildWorkbook(P()), ts = wb.getWorksheet("Transferred risks"), sv = [];
+      wb.getWorksheet("Summary").eachRow(function (r) { sv.push([r.getCell(1).value, r.getCell(2).value]); });
+      ok(sv.some(function (r) { return r[0] === "Transferred risks" && r[1] === 1; }) && sv.some(function (r) { return r[0] === "Accepted risks" && r[1] === 1; }), "Excel: the Summary counts one transferred and one accepted risk", JSON.stringify(sv));
+      ok(!!ts && ts.rowCount === 2, "Excel: a Transferred risks sheet with one row", ts ? String(ts.rowCount) : "none");
+      ok(!!ts && ts.getRow(2).getCell(2).value === "T2" && ts.getRow(2).getCell(5).value === d2.acceptance && ts.getRow(2).getCell(6).value === d2.transferTo && ts.getRow(2).getCell(7).value === "H. Okafor" && ts.getRow(2).getCell(8).value === "Group Insurance Manager",
+        "with how, to whom, who agreed it and their role", ts ? ts.getRow(2).values.slice(1).join("|") : "none");
+      var items = RR.packItems().items, i2 = items.filter(function (x) { return x.itemId === "Z1:T2"; })[0];
+      ok(i2.priority === "Risk transferred" && detail(i2, "Transferred").indexOf(d2.transferTo) > 0 && /^Lost production from a cyber-caused shutdown/.test(detail(i2, "Transferred")) &&
+        detail(i2, "Transfer agreed by") === "H. Okafor (Group Insurance Manager), 2026-07-03, review by 2027-03-31", "the review pack: the decision, how, to whom and who agreed it", JSON.stringify(i2.details));
+      return RR.buildPack().then(function (r) {
+        ok(RK.run(JSON.parse(JSON.stringify(r.pack)), {}).filter(function (x) { return x.check === "risk-no-disposition"; }).length === 0, "the review tool finds no risk without a decision in the demo");
+        return wordParas(P(), {});
+      });
+    }).then(function (det) {
+      var all = det.join("\n");
+      ok(det.some(function (x) { return x === "The treatment decisions are: 3 reduced to within tolerable risk, 1 being reduced with countermeasures, 1 treated through the SL-T programme, 1 accepted by the asset owner and 1 transferred to another party. The register holds 5 existing and 4 planned countermeasures."; }),
+        "Word: the summary's tally counts the transfer", det.filter(function (x) { return /treatment decisions are/.test(x); }).join(" | "));
+      var acc = after(det, "Accepted risks");
+      ok(acc.indexOf("R. Calder") > 0 && /^T8  /.test(acc[9]), "Word: Accepted risks lists T8, with who accepted it", acc.slice(0, 12).join("|"));
+      var tr = after(det, "Transferred risks");
+      // Step 4: the rating column is Risk today (was: Rating).
+      ok(det.indexOf("Transferred risks") > det.indexOf("Accepted risks") && tr.slice(1, 10).join("|") === "Threat scenario|Zone or conduit|Risk today|How it is transferred|Transferred to|Agreed by|Role|Date|Review date", "Word: a Transferred risks table after Accepted risks", tr.slice(1, 10).join("|"));
+      var row = tr.slice(10, 20);
+      ok(/^T2  Malware introduced through an engineering connection/.test(row[0]) && row[1] === "Z1 Unit 300 BPCS" && row.indexOf(threatIn(DEMO, "Z1", "T2").acceptance) > 0 && row.indexOf(threatIn(DEMO, "Z1", "T2").transferTo) > 0 &&
+        row.slice(-4).join("|") === "H. Okafor|Group Insurance Manager|2026-07-03|2027-03-31", "with T2: how, to whom, who agreed it, their role, the date and the review date", row.join("|"));
+      ok(det.some(function (x) { return /^Signed off as below\. An approval covers the tolerable risk, the target security levels and the accepted and transferred risks in this report/.test(x); }), "Word: the approval covers the accepted and transferred risks");
+
+      // ---- C. the demo's asset classification and business value in Word --------------------------
+      var ar = det.indexOf("Asset register");
+      ok(ar > det.indexOf("Zone and conduit characteristics") && det.some(function (x) { return /Each zone's assets are listed under Asset register, after the conduits\./.test(x); }), "Word: an Asset register, which the characteristics refer to");
+      var z1 = after(det, "Z1 Unit 300 BPCS", ar);
+      ok(z1.slice(0, 8).join("|") === "Name|Type|Classification|Business value|DCS server pair (redundant)|Server|Process critical|High", "Word: each zone's assets with their classification and business value", z1.slice(0, 8).join("|"));
+      var z2 = after(det, "Z2 Safety Instrumented System", ar);
+      ok(z2.slice(4, 7).join("|") === "SIS logic solver|Safety PLC|Safety critical (SIL 2)", "the SIS logic solver is safety critical", z2.slice(0, 8).join("|"));
+      var z4 = after(det, "Z4 Engineering workstations", ar);
+      ok(z4.slice(0, 5).join("|") === "Name|Type|Connection|Classification|Business value" && z4.slice(15, 20).join("|") === "Vendor laptops (turnarounds)|Engineering workstation|Temporarily connected|Third-party equipment|Low",
+        "and the vendor laptops are third-party equipment of low business value", z4.slice(0, 20).join("|"));
+      var demoAssets = []; DEMO.zones.forEach(function (z) { z.assets.forEach(function (a) { demoAssets.push(a); }); });
+      ok(demoAssets.every(function (a) { return all.indexOf(a.classification) >= 0; }), "every asset's classification prints");
+      var as = RX.buildWorkbook(P()).getWorksheet("Assets");
+      ok(as.getRow(2).getCell(12).value === "Process critical" && as.getRow(2).getCell(13).value === "High", "Excel: the Assets sheet has them too", as.getRow(2).values.slice(1).join("|"));
+      ok(!DASH.test(all), "no dashes");
+
+      // ---- D. the demo keeps zero problems, and its approvals stand ------------------------------------
+      ok(E.completeness(P()).length === 0, "the demo has no completeness problem", texts(P()).join(" | "));
+      ok(P().approvals.every(function (a) { return a.fingerprint === E.approvalFingerprint(P()); }) && E.approvalStates(P()).every(function (s) { return s.signed && !s.changed; }), "both approvals were taken against what it holds now");
+      RT.navigate("approval");
+      var stat = [].map.call(d.querySelectorAll("#main [data-approval-status]"), function (e) { return e.textContent; });
+      ok(stat.length === 2 && stat.every(function (s) { return /Unchanged since approval/.test(s); }), "both read Unchanged since approval", stat.join(" | "));
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -37,7 +37,7 @@
     "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Empty fields in the document control table. They may be filled in at issue. QA review by is not counted." },
     "numbering": { title: "Section numbering gaps", severity: "should-fix", about: "Numbered sections that skip a number, which usually means a section was hidden." },
     "figures": { title: "Figures that disagree", severity: "must-fix", about: "Counts the report prints that do not match the assessment behind it." },
-    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat above the tolerable risk with no confirmed decision to reduce it, accept it or treat it through the target levels, or with a decision that is missing its countermeasure or reason." },
+    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat above the tolerable risk with no confirmed decision to reduce it, accept it, transfer it or treat it through the target levels, or with a decision that is missing its countermeasure, reason, arrangement or who accepted it." },
     "risk-slt-justification": { title: "Target levels with no justification", severity: "should-fix", about: "A zone or conduit with target security levels set and no justification recorded." }
   };
 
@@ -331,12 +331,13 @@
   // Read from the risk pack's items as the risk tool writes them: a threat's
   // status is a finding when it is above the tolerable risk, and its priority
   // field holds the treatment decision the consultant confirmed (reduce with
-  // countermeasures, accept, or treat through the target levels), in the words
-  // the report prints, empty when none is confirmed or the confirmed one is
-  // incomplete (reduce with no countermeasure, accept with no reason, the
+  // countermeasures, accept, transfer, or treat through the target levels),
+  // in the words the report prints, empty when none is confirmed or the
+  // confirmed one is incomplete (reduce with no countermeasure, accept with no
+  // reason or no one who accepted it, a transfer with no arrangement or no one who agreed it, the
   // target levels with none set and no reason). A complete decision with no
   // countermeasure is a legitimate position (treated through the target
-  // levels, or accepted), so it is not flagged.
+  // levels, accepted or transferred), so it is not flagged.
   function riskNoDisposition(pack, out) {
     if (!isRisk(pack) || fieldLabel(pack, "priority", "priority") === null) return;
     (pack.items || []).forEach(function (it) {

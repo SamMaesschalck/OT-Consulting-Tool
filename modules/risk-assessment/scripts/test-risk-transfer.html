@@ -1,0 +1,261 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool transfer decision</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The 3-2 fixes, step 2: transfer as a fourth treatment decision.
+  - Stored as an acceptance marked as a transfer (treatment.transfer: true),
+    how it is transferred in acceptance, to whom in transferTo, who agreed it
+    in acceptanceDetail, so the released v0.7.0 normaliser (run with the
+    three decisions v0.7.0 knows) keeps it, and reads it as an acceptance
+    whose reason is the arrangement.
+  - The rating does not change; the decision is complete only with how, to
+    whom and who agreed it, and warns (never blocks) without them.
+  - It shows on the decision control (with one short hint), the register's
+    filter, the summary tally, Word (the summary, Decisions required, a
+    Transferred risks section after Accepted risks, only when there is one),
+    Excel (a Summary row and a sheet, only when there is one), the review
+    pack and the review tool's decision check, the approval (covered with the
+    accepted risks, named), the comparison with a previous assessment and the
+    risk context (disposition accepted, with decision and transferTo beside it).
+-->
+<iframe id="f" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/v0.7.0-migrate.js"></script>
+<script src="../../report-review/js/checks.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  var DASH = /[–—]/;
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var t = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+      if (t.replace(/\s+/g, "")) out.push(t.replace(/&apos;/g, "'").replace(/&quot;/g, "\"").replace(/&amp;/g, "&"));
+    }
+    return out;
+  }
+  var RK = window.App && window.App.ReviewChecks;
+
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, tries = 0;
+    var t = setInterval(function () {
+      if (!w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks || !w.RiskTool.state.project.zones.length) { if (++tries > 400) { clearInterval(t); ok(false, "the app exposed RiskTool with the demo"); done(); } return; }
+      clearInterval(t);
+      var r = null;
+      try { r = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+      if (r && typeof r.then === "function") r.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+      else done();
+    }, 50);
+  };
+  frame.src = "../index.html?tour=1";
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks;
+    var CMP = w.RiskApp.Compare, d = w.document;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    w.confirm = function () { return true; }; w.alert = function () {};
+    var DEMO = window.SPT_TOUR_PROJECT, FX = window.RiskFixtures;
+    function main() { return d.getElementById("main"); }
+    function P() { return RT.state.project; }
+    function load(p) { RT.loadProjectText(JSON.stringify(p)); }
+    function ownerIn(p, id) { return p.zones.concat(p.conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threatIn(p, oid, tid) { return ownerIn(p, oid).threats.filter(function (t) { return t.id === tid; })[0]; }
+    function type(el, v) { el.focus(); el.value = v; el.dispatchEvent(new w.Event("input", { bubbles: true })); }
+    function toastUndo() { return d.getElementById("toast").querySelector('[data-action="toast-undo"]'); }
+    function texts(p) { return E.completeness(p).map(function (i) { return i.text; }); }
+    function has(list, re) { return list.some(function (x) { return re.test(x); }); }
+    function TT(p, oid, tid) { return E.threatTreatment(ownerIn(p, oid), threatIn(p, oid, tid), p); }
+
+    // Step 3: the demo now transfers T2. These tests start from a project with
+    // no transfer, so its T2 is taken back to the decision it had before, to
+    // reduce with countermeasures (was: the demo as it is).
+    function untransferred(q) {
+      var t2 = threatIn(q, "Z1", "T2");
+      M.setDecision(t2, "reduce", true); delete t2.transferTo;
+      t2.acceptance = ""; t2.acceptanceDetail = M.emptyAcceptanceDetail();
+      function scope(s) { return String(s).replace(" the one transferred risk (lost production, through business interruption insurance),", ""); }
+      q.approval.statement = scope(q.approval.statement);
+      q.approvals.forEach(function (a) { a.scope = scope(a.scope); });
+      return q;
+    }
+    var base = untransferred(MG.normaliseProject(clone(DEMO)));
+    var HOW = "Business interruption insurance covering cyber events, policy BI-2231.";
+    // The demo (with no transfer) with Z4's T8 transferred, not accepted.
+    function transferred() {
+      var q = untransferred(MG.normaliseProject(clone(DEMO))), t8 = threatIn(q, "Z4", "T8");
+      M.setDecision(t8, "transfer", true);
+      t8.acceptance = HOW; t8.transferTo = "Example Mutual Insurance";
+      t8.acceptanceDetail = { by: "R. Calder", role: "Asset Owner - Unit 300", date: "2026-07-04", reviewDate: "2027-06-30" };
+      return q;
+    }
+    var V = transferred();
+
+    // ---- A. the model and the stored shape -----------------------------------------------------
+    ok(same(M.DECISIONS, ["reduce", "accept", "transfer", "slt"]) && same(M.TREATMENT_DECISIONS, ["reduce", "accept", "slt"]), "four decisions are offered; the three stored are unchanged");
+    var t8 = threatIn(V, "Z4", "T8");
+    ok(same(t8.treatment, { decision: "accept", confirmed: true, reason: "", transfer: true }) && M.decisionOf(t8.treatment) === "transfer", "a transfer is stored as an acceptance marked as a transfer", JSON.stringify(t8.treatment));
+    M.setDecision(t8, "reduce", true);
+    ok(!("transfer" in t8.treatment) && t8.treatment.decision === "reduce" && t8.transferTo === "Example Mutual Insurance", "another decision drops the mark and keeps what was typed");
+    M.setDecision(t8, "transfer", true);
+    ok(!("transferTo" in M.emptyThreat(1)) && !("transfer" in M.emptyTreatment()), "a new threat has neither field until a transfer is recorded");
+    // The migration: tidied, never added.
+    var odd = clone(V);
+    threatIn(odd, "Z4", "T8").transferTo = 7;
+    var t2 = ownerIn(odd, "Z1").threats[0]; t2.treatment.transfer = true; // a mark left on a reduce by an older build's edit
+    var on = MG.normaliseProject(odd);
+    ok(!("transferTo" in threatIn(on, "Z4", "T8")) && !("transfer" in ownerIn(on, "Z1").threats[0].treatment) && threatIn(on, "Z4", "T8").treatment.transfer === true, "a transferTo that is not text goes, and a mark on another decision is dropped");
+    ok(same(MG.normaliseProject(clone(on)), on) && same(MG.normaliseProject(clone(V)), V), "a second pass changes nothing");
+    // Step 3: the demo transfers T2, so it is the one threat with the fields (was: the demo has none).
+    var nd = MG.normaliseProject(clone(DEMO));
+    ok(!nd.zones.concat(nd.conduits).some(function (o) { return o.threats.some(function (t) { return !(o.id === "Z1" && t.id === "T2") && ("transferTo" in t || "transfer" in t.treatment); }); }) &&
+      same(threatIn(nd, "Z1", "T2").treatment, threatIn(DEMO, "Z1", "T2").treatment) && threatIn(nd, "Z1", "T2").transferTo === threatIn(DEMO, "Z1", "T2").transferTo,
+      "the demo gains neither field, and its one transfer (T2) keeps both");
+    // The released v0.7.0 normaliser, with the three decisions v0.7.0 knows.
+    var M07 = Object.assign({}, M, { TREATMENT_DECISIONS: ["reduce", "accept", "slt"] });
+    var OLD = FX["v0.7.0-migrate"](M07, E);
+    var viaOld = OLD.normaliseProject(clone(V)), o8 = threatIn(viaOld, "Z4", "T8");
+    ok(OLD.accepts(V.schema) && same(o8.treatment, { decision: "accept", confirmed: true, reason: "", transfer: true }) && o8.transferTo === "Example Mutual Insurance" && o8.acceptance === HOW && o8.acceptanceDetail.by === "R. Calder",
+      "the released v0.7.0 normaliser keeps the transfer: a confirmed acceptance, the arrangement as its reason, and the mark and to whom", JSON.stringify(o8.treatment));
+    ok(E.threatTreatment(ownerIn(viaOld, "Z4"), Object.assign({}, o8, { treatment: { decision: "accept", confirmed: true, reason: "" } }), viaOld).label === "Risk accepted",
+      "so v0.7.0, which reads only the stored decision, shows it as Risk accepted, with the arrangement as its reason");
+    ok(same(MG.normaliseProject(clone(viaOld)), MG.normaliseProject(clone(V))) && TT(MG.normaliseProject(clone(viaOld)), "Z4", "T8").decision === "transfer", "and saved from there, this build reads the transfer again");
+
+    // ---- B. the treatment state: the rating stays ------------------------------------------------
+    var T = TT(V, "Z4", "T8"), A0 = TT(base, "Z4", "T8");
+    ok(T.decision === "transfer" && T.confirmed && T.complete && T.label === "Risk transferred" && T.disposition === "transferred" && T.reason === HOW && !T.gap, "a complete transfer: Risk transferred", JSON.stringify([T.label, T.gap]));
+    ok(T.today === A0.today && T.operative === A0.operative && T.afterPlan === A0.afterPlan && T.required && !T.todayWithin, "the rating that stands is as before: a transfer moves who bears the consequence, not the likelihood or impact");
+    var g = clone(V), g8 = threatIn(g, "Z4", "T8");
+    g8.acceptance = ""; delete g8.transferTo; g8.acceptanceDetail.by = "";
+    var G = TT(g, "Z4", "T8");
+    ok(!G.complete && G.disposition === null && G.label === "Transfer (arrangement not fully recorded)" && G.gap === "transferred with no record of how it is transferred, to whom or who agreed it", "with nothing recorded it is not a treatment, and says what is missing", G.gap);
+    ok(has(texts(g), /^Z4 \(Engineering workstations\) \/ T8: transferred with no record of how it is transferred, to whom or who agreed it\.$/), "the completeness list warns", texts(g).join(" | "));
+    g8.acceptance = HOW; g8.transferTo = "Example Mutual Insurance";
+    ok(TT(g, "Z4", "T8").gap === "transferred with no record of who agreed it" && has(texts(g), /T8: transferred with no record of who agreed it\.$/), "with no one who agreed it, it warns, as an acceptance with no reason does");
+    g8.acceptanceDetail.by = "R. Calder";
+    ok(TT(g, "Z4", "T8").complete && !has(texts(g), /T8:/), "and once agreed, nothing is open");
+    ok(E.completeness(V).filter(function (i) { return i.stage !== "approval"; }).length === 0, "the demo with a complete transfer has nothing open apart from the approvals", texts(V).join(" | "));
+    var vm = RT.viewModel(V);
+    ok(vm.dispositionCounts.transferred === 1 && vm.dispositionCounts.accepted === 0 && vm.counts.decided === RT.viewModel(base).counts.decided, "the counts: one transferred, none accepted, the same number decided");
+
+    // ---- C. the risk context --------------------------------------------------------------------
+    var ctx = RT.buildRiskContext(V), c8 = ctx.zones.filter(function (z) { return z.id === "Z4"; })[0].threats.filter(function (x) { return x.id === "T8"; })[0];
+    ok(ctx.schema === "spt-risk-context/1.4" && c8.disposition === "accepted" && c8.acceptance === HOW && c8.decision === "transfer" && c8.transferTo === "Example Mutual Insurance",
+      "the risk context: disposition accepted (the legacy value), how in acceptance, the decision and to whom beside them", JSON.stringify(c8));
+    ok(["mitigated", "countermeasure", "accepted", "sl-t", null].indexOf(c8.disposition) >= 0 && RT.contextDisposition("transferred") === "accepted", "the disposition stays in the four values and null the contract fixes");
+    var cb = RT.buildRiskContext(base);
+    ok(!cb.zones.concat(cb.conduits).some(function (o) { return o.threats.some(function (x) { return "decision" in x || "transferTo" in x; }); }), "a file with no transfer writes neither field");
+    var cg = RT.buildRiskContext(g); g8.acceptanceDetail.by = ""; cg = RT.buildRiskContext(g);
+    var cg8 = cg.zones.filter(function (z) { return z.id === "Z4"; })[0].threats.filter(function (x) { return x.id === "T8"; })[0];
+    ok(cg8.disposition === null && !("decision" in cg8), "an incomplete transfer is exported as no decision, never as fact");
+    g8.acceptanceDetail.by = "R. Calder";
+
+    // ---- D. the approval ------------------------------------------------------------------------
+    ok(E.approvalFingerprint(base) !== E.approvalFingerprint(V) && E.approvalFingerprint(base).split("-").slice(0, 4).join() === E.approvalFingerprint(V).split("-").slice(0, 4).join(), "a transfer moves only the part the approval covers for accepted risks", E.approvalFingerprint(V));
+    var st = E.approvalStates(V);
+    ok(st.length && st.every(function (s) { return s.changed && same(s.parts, ["accepted"]); }) && has(texts(V), /approved before the accepted and transferred risks changed\.$/), "the demo's approvals say the accepted and transferred risks changed", texts(V).join(" | "));
+    ok(E.approvalPartWords(["accepted"], false, base) === "the accepted risks", "with no transfer, the words are as before");
+    var sig = RX.signOffTexts(V);
+    ok(sig[2] === "Signed off as below. An approval covers the tolerable risk, the target security levels and the accepted and transferred risks in this report, within the scope given for it.", "the report's approval sentence names the transferred risks", sig[2]);
+    ok(RX.signOffTexts(base)[2] === "Signed off as below. An approval covers the tolerable risk, the target security levels and the accepted risks in this report, within the scope given for it.", "and is unchanged with none");
+
+    // ---- E. the comparison with a previous assessment ---------------------------------------------
+    var dd = CMP.diff(CMP.freeze(base), CMP.freeze(V)), dl = [].concat.apply([], CMP.lines(dd).map(function (gp) { return gp.items; }));
+    ok(has(dl, /^T8 \(Z4\) no longer accepted; the decision is now risk transferred\.$/), "an acceptance turned into a transfer is reported", dl.join(" | "));
+    var V2 = clone(V); M.setDecision(threatIn(V2, "Z4", "T8"), "reduce", true); threatIn(V2, "Z4", "T8").countermeasureIds = ["M7"];
+    var dl2 = [].concat.apply([], CMP.lines(CMP.diff(CMP.freeze(V), CMP.freeze(V2))).map(function (gp) { return gp.items; }));
+    ok(has(dl2, /^T8 \(Z4\): was risk transferred; now reduce with countermeasures\.$/), "and a transfer turned into another decision", dl2.join(" | "));
+    var rows = CMP.rows(CMP.diff(CMP.freeze(V), CMP.freeze(V2))).filter(function (r) { return r.change === "Changed" && r.area === "Treatment decisions"; });
+    ok(rows.length === 1 && rows[0].before === "Risk transferred" && rows[0].now === "Reduce with countermeasures", "and on the workbook's Changes sheet", JSON.stringify(rows));
+
+    // ---- F. Word, Excel, the review pack and its check --------------------------------------------
+    function wordParas(p, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    function after(list, s) { var i = list.indexOf(s); return i < 0 ? [] : list.slice(i + 1); }
+    return wordParas(V, {}).then(function (det) {
+      var all = det.join("\n");
+      ok(det.some(function (x) { return /^The treatment decisions are: .* and 1 transferred to another party\./.test(x); }), "Word: the summary's tally counts the transfer", det.filter(function (x) { return /treatment decisions are/.test(x); }).join(" | "));
+      ok(det.some(function (x) { return /^Nothing is waiting on a decision: .*the transferred risk is approved/.test(x) || /^The asset owner has not yet approved the transferred risk T8 \(Z4\)\.$/.test(x); }), "Decisions required says whether the transferred risk is approved");
+      ok(det.indexOf("Transferred risks") > det.indexOf("Accepted risks") && after(det, "Accepted risks")[0] === "No risk has been accepted.", "a Transferred risks section after Accepted risks, which now has none");
+      var tr = after(det, "Transferred risks");
+      // Step 4: a transfer shows its rating today (was: with the rating that stands; the column was Rating).
+      ok(/^Each risk above tolerable risk that has been transferred to another party, with its rating today, how and to whom it was transferred, who agreed it and when it is to be reviewed\. A transfer moves who bears the consequence, so the rating does not change\.$/.test(tr[0]), "it says what it holds, and that the rating is unchanged", tr[0]);
+      ok(tr.slice(1, 10).join("|") === "Threat scenario|Zone or conduit|Risk today|How it is transferred|Transferred to|Agreed by|Role|Date|Review date", "its table's header", tr.slice(1, 10).join("|"));
+      ok(/^T8  The legacy depropaniser/.test(tr[10]) && tr.indexOf(HOW) > 0 && tr.indexOf("Example Mutual Insurance") > 0 && tr.indexOf("R. Calder") > 0, "with the threat, how, to whom and who agreed it");
+      ok(det.filter(function (x) { return x === "Risk transferred"; }).length >= 1, "the register prints the decision");
+      ok(!DASH.test(all), "no dashes");
+      return wordParas(base, {});
+    }).then(function (det) {
+      ok(det.indexOf("Transferred risks") < 0 && !det.some(function (x) { return /transferred/.test(x); }), "with no transfer, Word says nothing of one");
+      // Excel.
+      var wb = RX.buildWorkbook(V), su = wb.getWorksheet("Summary"), ts = wb.getWorksheet("Transferred risks");
+      var sv = []; su.eachRow(function (r) { sv.push([r.getCell(1).value, r.getCell(2).value]); });
+      ok(sv.some(function (r) { return r[0] === "Transferred risks" && r[1] === 1; }) && sv.some(function (r) { return r[0] === "Accepted risks" && r[1] === 0; }), "Excel: the Summary counts the transferred risks", JSON.stringify(sv.slice(0, 10)));
+      // Step 4: the sheet's rating column is Risk today (was: Rating).
+      ok(!!ts && ts.getRow(1).values.slice(1).join("|") === "Zone/Conduit|ID|Threat statement|Risk today|How it is transferred|Transferred to|Agreed by|Role|Date|Review date" &&
+        ts.getRow(2).getCell(2).value === "T8" && ts.getRow(2).getCell(5).value === HOW && ts.getRow(2).getCell(6).value === "Example Mutual Insurance" && ts.getRow(2).getCell(7).value === "R. Calder", "and a Transferred risks sheet");
+      var wb0 = RX.buildWorkbook(base), sv0 = []; wb0.getWorksheet("Summary").eachRow(function (r) { sv0.push(r.getCell(1).value); });
+      ok(!wb0.getWorksheet("Transferred risks") && sv0.indexOf("Transferred risks") < 0, "with none, neither the row nor the sheet");
+      // The review pack, and the review tool's check on it.
+      load(V);
+      var items = RR.packItems().items, i8 = items.filter(function (x) { return x.itemId === "Z4:T8"; })[0];
+      function detail(it, k) { return (it.details.filter(function (r) { return r[0] === k; })[0] || [])[1]; }
+      ok(i8.priority === "Risk transferred" && i8.notes === "" && detail(i8, "Transferred") === "Business interruption insurance covering cyber events, policy BI-2231, to Example Mutual Insurance" &&
+        detail(i8, "Transfer agreed by") === "R. Calder (Asset Owner - Unit 300), 2026-07-04, review by 2027-06-30", "the review pack: the decision, and how, to whom and who agreed it", JSON.stringify(i8.details));
+      return RR.buildPack().then(function (r) {
+        var P1 = JSON.parse(JSON.stringify(r.pack));
+        ok(RK.run(P1, {}).filter(function (x) { return x.check === "risk-no-disposition"; }).length === 0, "the review tool counts a transfer as a decision");
+        ok(/transfer it/.test(RK.CHECKS["risk-no-disposition"].about), "and its description says so", RK.CHECKS["risk-no-disposition"].about);
+        threatIn(P(), "Z4", "T8").acceptanceDetail.by = "";
+        return RR.buildPack();
+      }).then(function (r) {
+        var P2 = JSON.parse(JSON.stringify(r.pack)), nd = RK.run(P2, {}).filter(function (x) { return x.check === "risk-no-disposition"; });
+        var j8 = P2.items.filter(function (x) { return x.itemId === "Z4:T8"; })[0];
+        ok(nd.length === 1 && nd[0].itemId === "Z4:T8" && j8.priority === "" && (j8.details.filter(function (r) { return r[0] === "Decision still to complete"; })[0] || [])[1] === "Transfer (arrangement not fully recorded)",
+          "a transfer no one agreed is flagged, and the pack says what is still to complete");
+      });
+    }).then(function () {
+      // ---- G. the screen: the decision control, the hint, Undo, the filter ------------------------
+      load(base);
+      RT.navigate("risk");
+      main().querySelector('[data-rail-id="Z4"]').click();
+      var tb = main().querySelector('[data-owner-id="Z4"] [data-threat-id="T8"]');
+      if (!tb.classList.contains("open")) tb.querySelector('[data-action="open-scenario"]').click();
+      var btns = [].map.call(main().querySelectorAll('[data-owner-id="Z4"] [data-threat-id="T8"] .treat-opts [data-decision]'), function (b) { return b.getAttribute("data-decision"); });
+      ok(same(btns, ["reduce", "accept", "transfer", "slt"]), "the decision control offers transfer", btns.join());
+      main().querySelector('[data-owner-id="Z4"] [data-threat-id="T8"] [data-decision="transfer"]').click();
+      var t = threatIn(P(), "Z4", "T8"), ed = main().querySelector('[data-owner-id="Z4"] [data-threat-id="T8"]');
+      ok(M.decisionOf(t.treatment) === "transfer" && t.treatment.confirmed && ed.querySelector('[data-decision="transfer"]').getAttribute("aria-pressed") === "true", "pressing Transfer records it");
+      var how = ed.querySelector('[data-reason="transfer"]'), to = ed.querySelector('[data-field="transfer-to"]'), by = ed.querySelector('[data-field="acc-by"]');
+      ok(!!how && !!to && !!by && !ed.querySelector('[data-reason="accept"]') && /Agreed by/.test(ed.textContent), "it asks how, to whom and who agreed it, in place of the acceptance's fields");
+      var hint = ed.querySelector('[data-hint="transfer"]');
+      ok(!!hint && hint.textContent === "A transfer moves who bears the consequence, so the rating does not change." && hint.textContent.split(/[.!?]\s/).length === 1, "one short hint says the rating does not change");
+      ok(/Transferred with no record of to whom./.test(ed.querySelector(".treat-status").textContent), "the arrangement still to record is shown", ed.querySelector(".treat-status").textContent);
+      type(to, "Example Mutual Insurance");
+      ok(t.transferTo === "Example Mutual Insurance" && d.activeElement === to, "typing records to whom, with the keyboard kept");
+      main().querySelector('[data-owner-id="Z4"] [data-threat-id="T8"] [data-decision="transfer"]').click();
+      ok(M.decisionOf(threatIn(P(), "Z4", "T8").treatment) === null, "pressing it again takes the decision back");
+      // The register's filter.
+      main().querySelector('[data-owner-id="Z4"] [data-threat-id="T8"] [data-decision="transfer"]').click();
+      var tabs = main().querySelector('.step-tabs [data-tab="register"]'); if (tabs) tabs.click();
+      var f = main().querySelector('select[data-filter="decision"]');
+      ok(!!f && [].some.call(f.options, function (o) { return o.value === "transfer" && o.textContent === "Transfer"; }), "the register can be filtered to the transfers");
+      load(DEMO);
+      ok(E.completeness(P()).length === 0, "the demo, loaded again, has nothing open");
+    });
+  }
+})();
+</script>
+</body>
+</html>

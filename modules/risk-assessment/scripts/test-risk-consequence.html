@@ -64,6 +64,33 @@
       if (Array.isArray(z.assumptions)) z.assumptions = z.assumptions.filter(function (a) { return !/not modelled as conduits/.test(a); });
       z.threats.forEach(function (t) { if (t.id === "T4") t.impactByCategory = { safety: "severe", environmental: "serious", regulatory: "serious" }; });
     });
+    // The zone-depth step replaced v0.7.0's per-zone decision with each one's
+    // depth (C1 grouped with Z3, C3 a proportionate review): v0.7.0's
+    // decisions are put back as it had them.
+    var V070_REASON = {
+      C1: "One-way replication through the OPC UA broker. Its exposure is the Z3 pivot path, assessed there as T5, so the SL-T is set from the zones it joins.",
+      C3: "Read-only reporting to the out-of-scope corporate network. The exposure is assessed at the Z3 boundary (T5, T6)."
+    };
+    q.zones.concat(q.conduits).forEach(function (o) {
+      delete o.assessment;
+      o.detailed = V070_REASON[o.id] ? { required: false, reason: V070_REASON[o.id] } : { required: true, reason: "" };
+    });
+    return q;
+  }
+  // The 3-2 fixes, step 3, gave the demo a transfer (T2, with the approval
+  // scope naming it and the approvals retaken) and an asset classification
+  // and business value. For the comparison with v0.7.0's Word text they are
+  // put back as step 2 left them.
+  function beforeStep3(p) {
+    var q = clone(p);
+    var z1 = q.zones.filter(function (z) { return z.id === "Z1"; })[0], t2 = z1.threats.filter(function (t) { return t.id === "T2"; })[0];
+    t2.treatment = { decision: "reduce", confirmed: true, reason: "" }; delete t2.transferTo;
+    t2.acceptance = ""; t2.acceptanceDetail = { by: "", role: "", date: "", reviewDate: "" };
+    q.zones.forEach(function (z) { z.assets.forEach(function (a) { delete a.classification; delete a.businessValue; }); });
+    q.basisOfAssessment.interviews = q.basisOfAssessment.interviews.filter(function (i) { return i.id !== "I5"; }); // step 4: who agreed the transfer
+    function scope(s) { return String(s).replace(" the one transferred risk (lost production, through business interruption insurance),", ""); }
+    q.approval.statement = scope(q.approval.statement);
+    q.approvals.forEach(function (a) { a.scope = scope(a.scope); a.fingerprint = "a2-9c820478-54f40a85-ca6a499d-aa206ec0"; });
     return q;
   }
 
@@ -585,17 +612,77 @@
       ws.eachRow(function (r) { var row = []; r.eachCell({ includeEmpty: true }, function (c) { row.push(String(c.value == null ? "" : c.value)); }); out.push(row); });
       return out;
     }
-    var demo = MG.normaliseProject(clone(DEMO)), plain = MG.normaliseProject(stripped(DEMO));
+    // Step 3: the demo's transfer and asset fields are put back too (was: stripped(DEMO) alone).
+    var demo = MG.normaliseProject(clone(DEMO)), plain = MG.normaliseProject(beforeStep3(stripped(DEMO)));
     var WOLD = FX["word-v0.7.0"];
+    // The zone-depth step changed some lines on purpose: the SUC compared
+    // once, every zone and conduit assessed at its depth (the table, the
+    // sections of the two conduits v0.7.0 recorded as not needing a detailed
+    // assessment, their driving scenarios), the method, and the high-level
+    // report's next step. Every other line is v0.7.0's, in order.
+    var DEPTH_WAS = [/^The assessment follows IEC 62443-3-2\. /, /^The initial risk of each zone and conduit was compared with the tolerable risk of /,
+      /^(Detailed assessment|Reason|Required|Not required|None)$/, /^One-way replication through the OPC UA broker\./, /^Read-only reporting to the out-of-scope corporate network\./,
+      /^Not assessed in detail\. The SL-T rests on the justification\.$/, /^Next, the systems are grouped into security zones and conduits, and the initial risk of each zone and conduit is compared/];
+    var DEPTH_NOW = [/^The assessment follows IEC 62443-3-2\. /, /^The initial risk of the system under consideration /, /^How each zone and conduit was assessed$/, /^The consultant chose the depth of each: /,
+      /^(Depth|Basis|Detailed|Proportionate|Not recorded)$/, /^\d+ threat scenarios?$/, /^A proportionate review\.$/,
+      /^(IAC|UC|SI|DC|RDF|TRE|RA)(, (IAC|UC|SI|DC|RDF|TRE|RA))*$/, /^SL\d inherited from Z\d( and Z\d)?$/,
+      /^Next, the systems are grouped into security zones and conduits\. Where the initial risk of the system under consideration is above the tolerable risk, every zone and conduit then has a detailed risk assessment/];
+    // The 3-2 fixes, step 2, changed more lines on purpose: unmitigated is
+    // before any cyber security countermeasure, Known or presumed threats is
+    // Threat environment (sources, current and emerging threats), each zone's
+    // and conduit's table gains its applicable security requirements and a
+    // conduit's a zone's characteristics (the demo fills them), the ranking
+    // notes fit every zone assessed, the method names no SL-T method and
+    // refers back to Risk comparison, and the specification's opening names
+    // its mandatory countermeasures, which it lists after the SL-T.
+    function exact(s) { return new RegExp("^" + String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"); }
+    function str(s) { return String(s).replace(/&/g, "&amp;").replace(/'/g, "&apos;").replace(/"/g, "&quot;"); }
+    var STEP2_WAS = [/^Of the \d+ threats? above tolerable risk before any countermeasure, /, /^Known or presumed threats$/, /^Each threat scenario is rated before any countermeasure \(unmitigated\)/,
+      /Assigned to Z\d, where a detailed assessment is required\.$/, /ranked medium, monitored at high level only\.$/, /ranked low, so not taken to a detailed assessment\.$/,
+      /^The assessment follows IEC 62443-3-2:2020\. /, /^The initial risk of the system under consideration was compared once with the tolerable risk/, /^It sets out the system under consideration, /];
+    var STEP2_NOW = [/^Of the \d+ threats? above tolerable risk before any cyber security countermeasure, /, /^(Threat environment|Sources of threat intelligence|Current threats, known or presumed|Emerging threats)$/,
+      /^Each threat scenario is rated before any cyber security countermeasure \(unmitigated\)/, /Assigned to Z\d, assessed in detail\.$/, /Outside the system under consideration/,
+      /^The assessment follows IEC 62443-3-2:2020\. .*no method for setting an SL-T/, /^The comparison with the tolerable risk, and the depth each zone and conduit was assessed at, are under Risk comparison\.$/,
+      /^It sets out the system under consideration, .*It lists the mandatory security countermeasures that come out of the risk assessment\.$/,
+      /^(Applicable security requirements|Logical boundary|Physical boundary|Accountable organisation|Safety designation|Not safety related|Logical access points|Physical access points|Data flows|External dependencies|Security policies|Assumptions)$/]
+      .concat(M.listOf(DEMO.srs.threatSources).concat(M.listOf(DEMO.srs.emergingThreats)).map(function (s) { return exact(str(s)); }))
+      .concat(DEMO.zones.concat(DEMO.conduits).map(function (o) { return exact(str(M.listOf(o.securityRequirements).join("; "))); }))
+      .concat([].concat.apply([], DEMO.conduits.map(function (c) {
+        return M.CONDUIT_TEXT_FIELDS.map(function (k) { return c[k]; }).concat(M.CONDUIT_LIST_FIELDS.map(function (k) { return M.listOf(c[k]).join("; "); })).filter(Boolean).map(function (s) { return exact(str(s)); });
+      })));
+    DEPTH_WAS = DEPTH_WAS.concat(STEP2_WAS); DEPTH_NOW = DEPTH_NOW.concat(STEP2_NOW);
+    // The specification's mandatory countermeasures: one block, after the SL-T, up to Sign-off.
+    function withoutMandatory(list) { var a = list.indexOf("Mandatory security countermeasures"), b = list.indexOf("Sign-off", a); return a < 0 ? list : list.slice(0, a).concat(list.slice(b)); }
+    // The lines only in one list or the other (a longest common subsequence apart).
+    function lcsDiff(a, b) {
+      var n = a.length, m = b.length, L = [], i, j;
+      for (i = 0; i <= n; i++) { L.push(new Int32Array(m + 1)); }
+      for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+      var gone = [], added = []; i = 0; j = 0;
+      while (i < n && j < m) { if (a[i] === b[j]) { i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) gone.push(a[i++]); else added.push(b[j++]); }
+      while (i < n) gone.push(a[i++]); while (j < m) added.push(b[j++]);
+      return { gone: gone, added: added };
+    }
+    function onPurpose(a, b) {
+      var d = lcsDiff(a, b);
+      var badGone = d.gone.filter(function (x) { return !DEPTH_WAS.some(function (re) { return re.test(x); }); });
+      var badAdded = d.added.filter(function (x) { return !DEPTH_NOW.some(function (re) { return re.test(x); }); });
+      // The zone-depth step's own lines, apart from step 2's.
+      function own(list, step2) { return list.filter(function (x) { return !step2.some(function (re) { return re.test(x); }); }).length; }
+      return { ok: !badGone.length && !badAdded.length, gone: d.gone.length, added: d.added.length, bad: badGone.concat(badAdded).slice(0, 3).join(" | "),
+        depthGone: own(d.gone, STEP2_WAS), depthAdded: own(d.added, STEP2_NOW) };
+    }
     return wordParas(plain, {}).then(function (now) {
-      var at = firstDiff(now, WOLD.detailed);
-      ok(at === -1, "the demo without consequences prints the v0.7.0 detailed report exactly (" + now.length + " paragraphs)", at < 0 ? "" : "line " + at + ": " + now[at] + " / " + WOLD.detailed[at]);
+      var dd = onPurpose(WOLD.detailed, now);
+      ok(dd.ok && dd.gone > 0, "the demo without consequences prints the v0.7.0 detailed report, apart from the lines the zone-depth step and the 3-2 fixes' step 2 changed on purpose (" + now.length + " paragraphs; " + dd.gone + " out, " + dd.added + " in)", dd.bad);
       return wordParas(plain, { highLevelOnly: true });
     }).then(function (now) {
-      ok(firstDiff(now, WOLD.highLevel) === -1, "and the high-level report");
+      var dh = onPurpose(WOLD.highLevel, now);
+      ok(dh.ok && dh.depthGone === 1 && dh.depthAdded === 1, "and the high-level report, apart from its next step (and step 2's lines)", dh.bad + " " + dh.depthGone + "/" + dh.depthAdded);
       return wordParas(plain, { spec: true });
     }).then(function (now) {
-      ok(firstDiff(now, WOLD.spec) === -1, "and the requirements specification");
+      var ds = onPurpose(WOLD.spec, withoutMandatory(now));
+      ok(ds.ok && ds.depthGone === 0 && ds.depthAdded === 0 && now.indexOf("Mandatory security countermeasures") > 0, "and the requirements specification, apart from step 2's lines and its mandatory countermeasures", ds.bad);
       return wordParas(demo, {});
     }).then(function (wt) {
       var s = wt.indexOf("Consequences and how they could arise"), reg = wt.indexOf("Risk register"), plan = wt.indexOf("Treatment plan");

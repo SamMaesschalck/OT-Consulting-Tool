@@ -12,19 +12,21 @@ window.App.Data.zcrMap = {
     "requirementsClauseTitle": "Zone, conduit and risk assessment requirements"
   },
   "verified": {
-    "on": "2026-11-13",
-    "confirmed": "Every ZCR id, title and clause number below, the standard's title, and the order of ZCR 1 to ZCR 7 (Figure 1) were checked against the printed contents list, clause 3 and Figure 1 of the published edition.",
-    "notChecked": "The detailed requirement wording beyond ZCR 1.1 and ZCR 2.1 has not been checked line by line.",
+    "on": "2026-11-26",
+    "confirmed": "Every ZCR id, title and clause number below, the standard's title, and the order of ZCR 1 to ZCR 7 (Figure 1) were checked against the printed contents list, clause 3 and Figure 1 of the published edition (13 Nov 2026), and the requirement wording of clauses 3 and 4 and the annexes was then checked against the published edition, with the tool brought into line (26 Nov 2026).",
+    "notChecked": "None: all of the requirement wording has been checked. The tool states it in its own words and reproduces none of it; the house readings below are its own interpretation.",
     "houseReading": [
       "Which ZCR each page of the tool belongs to (stages below).",
-      "Comparing initial risk with tolerable risk for each zone and conduit, and not only for the SUC as a whole.",
+      "The standard compares the SUC's initial risk with tolerable risk once, and then applies the detailed risk assessment to every zone and conduit. Comparing each zone's and conduit's own initial risk with tolerable risk to suggest the depth it is assessed at (in detail, grouped with another, reused, a proportionate review or deferred) is the house method; the depth is the consultant's choice.",
       "The order of work inside the detailed risk assessment (ZCR 5).",
       "What the cyber security requirements specification and the zone and conduit characteristics hold, item by item.",
       "How an SL-T is determined, and setting it as one target per foundational requirement.",
       "Who sets the tolerable risk and who approves what.",
       "The separation rows on the zones page (business and control system assets, safety related assets, temporarily connected devices, wireless devices, devices connected via external networks), and when the tool raises each one.",
-      "What an approval covers (the tolerable risk, the SL-T and the accepted risks) and the fingerprint that shows a change after it.",
-      "The risk matrix, the likelihood and impact scales and the risk-to-SL mapping, which are SolutionsPT house defaults. The standard prescribes no matrix."
+      "What an approval covers (the tolerable risk, the SL-T, and the accepted and transferred risks, but not a zone or conduit deferred) and the fingerprint that shows a change after it.",
+      "The risk matrix, the likelihood and impact scales and the risk-to-SL mapping, which are SolutionsPT house defaults. The standard prescribes no matrix and no method for setting an SL-T.",
+      "Treating a risk through the SL-T programme, as the house's way of mitigating it, beside reducing it with countermeasures, accepting it and transferring it; and recording a transfer so that the released v0.7 tools read it as an acceptance.",
+      "Which countermeasures the specification lists as mandatory: those the confirmed decisions to reduce a risk rest on."
     ]
   },
   "stages": {
@@ -40,7 +42,8 @@ window.App.Data.zcrMap = {
     "approval": "ZCR 7"
   },
   "specBlocks": {
-    "_note": "The blocks of the requirements specification page and the report, in this order, and the ZCR 6 element each one stands for. A house reading: the blocks are assembled from what the tool captures, not from the standard's wording.",
+    "_note": "The blocks of the requirements specification page and the report, in this order, and the ZCR 6 element each one stands for; the specification file prints the mandatory security countermeasures after the SL-T, which they follow from. A house reading: the blocks are assembled from what the tool captures, not from the standard's wording.",
+    "countermeasures": "ZCR 6.1",
     "suc": "ZCR 6.2",
     "drawings": "ZCR 6.3",
     "characteristics": "ZCR 6.4",

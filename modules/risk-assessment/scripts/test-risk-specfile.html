@@ -77,7 +77,8 @@
       var acc = pj.zones.concat(pj.conduits).reduce(function (a, o) { return a.concat(o.threats.filter(function (t) { return t.treatment && t.treatment.decision === "accept"; })); }, [])[0];
       ok(!!acc, "the demo has an accepted risk to change");
       acc.acceptanceDetail = Object.assign({}, acc.acceptanceDetail || {}, { reviewDate: "2030-01-31" });
-      ok(has(texts("detailed", pj), /approved before the accepted risks changed/) && !has(texts("spec", pj), /approved before/), "an approval older than a change to the accepted risks is not the specification's", texts("spec", pj).join(" | "));
+      // Step 3: the demo has a transferred risk, so the words name it (was: the accepted risks changed).
+      ok(has(texts("detailed", pj), /approved before the accepted and transferred risks changed/) && !has(texts("spec", pj), /approved before/), "an approval older than a change to the accepted risks is not the specification's", texts("spec", pj).join(" | "));
       pj = copy();
       owner(pj, "Z1").slTargetByFR.DC = 2;
       ok(has(texts("spec", pj), /approved before the SL-T changed/), "one older than a change to the SL-T is", texts("spec", pj).join(" | "));
@@ -93,8 +94,8 @@
       owner(pj, "Z1").justification = "Set to SL3 for T1 and T2, with M1 in place; T99 and SR 1.13 are not ids of this project.";
       owner(pj, "C2").justification = "Held at SL3 for T9.";
       var jt = texts("spec", pj);
-      ok(has(jt, /^Z1 Unit 300 BPCS: the justification names T1, T2, M1, which the specification does not list\.$/) && has(jt, /^C2\b.*: the justification names T9, which the specification does not list\.$/),
-        "a justification naming a threat or countermeasure by id is open in the specification, each id once in the order named (an id the project lacks is not)", jt.join(" | "));
+      ok(has(jt, /^Z1 Unit 300 BPCS: the justification names T1, T2, which the specification does not list\.$/) &&has(jt, /^C2\b.*: the justification names T9, which the specification does not list\.$/),
+        "a justification naming a threat or countermeasure by id is open in the specification, each id once in the order named (an id the project lacks is not, nor M1, a mandatory countermeasure the specification now lists)", jt.join(" | "));
       var jItems = RT.completeness(pj).filter(function (i) { return /the justification names/.test(i.text); });
       ok(jItems.length === 2 && jItems.every(function (i) { return i.spec === true && i.stage === "slt" && !i.doc; }) && jItems[0].target.kind === "zone" && jItems[1].target.kind === "conduit" && jItems[1].target.id === "C2",
         "on the one list, the specification's alone, going to the zone's or conduit's SL-T", JSON.stringify(jItems.map(function (i) { return [i.stage, i.doc, i.target]; })));

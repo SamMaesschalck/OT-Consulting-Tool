@@ -67,12 +67,12 @@
     ok(items.length === ownersAll.length && items.map(function (x) { return x.getAttribute("data-rail-id"); }).join() === ownersAll.map(function (o) { return o.id; }).join(), "the rail lists every zone, then every conduit", items.map(function (x) { return x.getAttribute("data-rail-id"); }).join());
     ok(/3 scenarios/.test(rail("Z1").textContent) && /1 scenario(?!s)/.test(rail("Z2").textContent) && /0 scenarios/.test(rail("C1").textContent), "each with its scenario count");
     ok(!!rail("Z1").querySelector(".risk-pill.risk-high") && !rail("C1").querySelector(".risk-pill"), "a worst-risk pill where there are scenarios");
-    ok(/Not required/.test(rail("C1").textContent) && /Not required/.test(rail("C3").textContent) && !/Not required/.test(rail("Z1").textContent), "the zones and conduits step 4 found need no detailed assessment are marked");
+    ok(/Grouped with Z3/.test(rail("C1").textContent) && /Proportionate/.test(rail("C3").textContent) && /Detailed/.test(rail("Z1").textContent) && rail("C1").querySelector("[data-depth]").getAttribute("data-depth") === "grouped", "each zone's and conduit's depth is marked: C1 grouped with Z3, C3 proportionate, Z1 detailed");
     ok(!/open/.test(rail("Z1").textContent), "with nothing open, no count");
     var zx = M.emptyThreat(80); zx.statement = "Unrated."; P().counters.threat = 80; owner("Z3").threats.push(zx); RT.render();
     ok(/\d+ open/.test(rail("Z3").textContent) && !/open/.test(rail("Z1").textContent), "a zone with something open says how many", rail("Z3").textContent);
     owner("Z3").threats.pop(); RT.render();
-    ok(!/open/.test(rail("C1").textContent) && owner("C1").threats.length === 0, "a conduit not needing a detailed assessment has no scenarios and nothing open");
+    ok(!/open/.test(rail("C1").textContent) && owner("C1").threats.length === 0, "a conduit grouped with a zone has no scenarios of its own and nothing open");
 
     // ---- one zone or conduit at a time ----
     ok(main().querySelectorAll("[data-owner-id]").length === 1 && panel().getAttribute("data-owner-id") === "Z1" && rail("Z1").getAttribute("aria-current") === "true", "one zone at a time, the first to start with, marked in the rail");
@@ -90,7 +90,8 @@
     // Phase 4 review (wording 13): the demo's T2 has no current rating now either (it equalled the unmitigated one),
     // so it is given one here to show the three.
     threat("Z1", "T2").currentLikelihood = "medium"; threat("Z1", "T2").currentImpact = "serious"; RT.render();
-    ok(!!scen("T1").querySelector(".risk-pill.risk-high") && /Reduced to within tolerable risk/.test(scen("T1").querySelector(".scen-row").textContent) && scen("T2").querySelectorAll(".scen-row .risk-pill").length === 3 && /Reduce with countermeasures/.test(scen("T2").querySelector(".scen-row").textContent), "a row shows the three ratings and the decision");
+    // Step 3: the demo transfers T2, so its row shows that decision (was: Reduce with countermeasures).
+    ok(!!scen("T1").querySelector(".risk-pill.risk-high") && /Reduced to within tolerable risk/.test(scen("T1").querySelector(".scen-row").textContent) && scen("T2").querySelectorAll(".scen-row .risk-pill").length === 3 && /Risk transferred/.test(scen("T2").querySelector(".scen-row").textContent), "a row shows the three ratings and the decision");
     threat("Z1", "T2").currentLikelihood = ""; threat("Z1", "T2").currentImpact = ""; RT.render();
     ok(scen("T2").querySelectorAll(".scen-row .risk-pill").length === 2 && scen("T2").querySelectorAll(".scen-row td")[4].textContent === "", "and a rating not given leaves its cell empty");
     var ob =scen("T2").querySelector('[data-action="open-scenario"]'); ob.focus(); ob.click();
@@ -105,7 +106,7 @@
     ["Threat statement", "Threat source", "Entry point", "Assets", "Vulnerabilities", "Consequence", "Affected foundational requirements"].forEach(function (k) { if (sc.textContent.indexOf(k) < 0) ok(false, "the scenario section has " + k); });
     ok(true, "the scenario section has the statement, source, entry point, assets, vulnerabilities, consequence and affected requirements");
     ok(!!editor().querySelector('[data-field="likelihoodRationale"]') && editor().querySelectorAll(".ed-section")[1].textContent.indexOf("Likelihood rationale") >= 0, "the unmitigated rating has a one-line likelihood rationale");
-    ok(/Before any countermeasure, existing ones included/.test(editor().querySelector('select[data-field="likelihood"]').parentNode.querySelector(".hint").textContent), "and the unmitigated likelihood is worded to set existing countermeasures aside");
+    ok(/^Before any cyber security countermeasure, existing ones included; built-in and non-cyber safeguards still count\.$/.test(editor().querySelector('select[data-field="likelihood"]').parentNode.querySelector(".hint").textContent), "and the unmitigated likelihood is worded to set existing cyber security countermeasures aside, and no other protection");
     var add = editor().querySelector('[data-part="additional"]');
     // Phase 4b: T1 has no planned rating in the demo now, so the section shows the prompt to rate it in place of the rating line.
     ok(!!add.querySelector('[data-field="residualLikelihood"]') && (/Planned risk/.test(add.textContent) || /Rate it for when the additional countermeasures are in place\./.test(add.textContent)), "the planned rating sits after the additional countermeasures");
@@ -355,23 +356,29 @@
       btn.dispatchEvent(new w.MouseEvent("mouseup", { bubbles: true }));
       btn.click();
       ok(stillThere && threat("Z4", "T7").treatment.decision === "accept" && /removable media executes/.test(threat("Z4", "T7").statement), "a click straight after typing lands: the typed text is kept and the choice is made");
-      // The same on a field that does redraw on change (step 4's reason): the redraw waits for the click.
+      // The same on a field that does redraw on change: the redraw waits for the click.
+      // (Step 4 no longer has one since the zone-depth step; the decision
+      // control it used lives on as the ranking's on a high-level-only
+      // assessment, and is checked there.)
       threat("Z4", "T7").treatment = { decision: "reduce", confirmed: true, reason: "" };
-      RT.navigate("compare");
-      var c1 = P().conduits[0];
-      var reason = main().querySelector('[data-owner-id="' + c1.id + '"] input[data-reason="detailed"]');
-      var other = main().querySelector('[data-owner-id="Z1"] [data-detailed="required"]');
-      reason.focus(); reason.value = c1.detailed.reason + " Checked."; reason.dispatchEvent(new w.Event("input", { bubbles: true }));
+      P().assessmentType = "high-level";
+      var hla = P().srs.highLevelAssets, a1 = hla[0], a2 = hla[1];
+      a1.detailed = { required: false, reason: "Isolated." };
+      RT.navigate("srs");
+      var reason = main().querySelector('[data-hla-id="' + a1.id + '"] input[data-reason="detailed"]');
+      var other = main().querySelector('[data-hla-id="' + a2.id + '"] [data-detailed="required"]');
+      reason.focus(); reason.value = a1.detailed.reason + " Checked."; reason.dispatchEvent(new w.Event("input", { bubbles: true }));
       other.dispatchEvent(new w.PointerEvent("pointerdown", { bubbles: true }));
       reason.dispatchEvent(new w.Event("change", { bubbles: true }));
       var otherThere = other.isConnected;
       other.dispatchEvent(new w.PointerEvent("pointerup", { bubbles: true }));
       other.click();
-      ok(otherThere && P().zones[0].detailed.required === null, "on step 4 too, a click right after typing a reason is not lost to the redraw");
+      ok(otherThere && P().srs.highLevelAssets[1].detailed.required === true, "on a decision with a reason too, a click right after typing the reason is not lost to the redraw");
       return wait(60);
     }).then(function () {
-      ok(!main().querySelector('[data-owner-id="Z1"] [data-detailed="required"]').classList.contains("on") && /Checked\.$/.test(P().conduits[0].detailed.reason), "and the page is redrawn once the click has run");
-      P().zones[0].detailed.required = true;
+      var hl = P().srs.highLevelAssets;
+      ok(main().querySelector('[data-hla-id="' + hl[1].id + '"] [data-detailed="required"]').classList.contains("on") && /Checked\.$/.test(hl[0].detailed.reason), "and the page is redrawn once the click has run");
+      delete hl[0].detailed; delete hl[1].detailed; P().assessmentType = "full";
 
       // ---- names and words ----
       demo(); pick("Z1"); openScen("T1");

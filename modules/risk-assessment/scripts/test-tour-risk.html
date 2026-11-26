@@ -69,14 +69,16 @@
     ok(p.zones.concat(p.conduits).every(function (o) {
       return o.threats.every(function (th) { return th.statement && th.likelihood && th.impact && th.affectedFR.length; });
     }), "every threat has a statement, likelihood, impact and affected FRs");
-    ok(p.basisOfAssessment.interviews.length === 4 && p.basisOfAssessment.documents.length === 4 && p.basisOfAssessment.observations.length === 3, "basis of assessment is populated");
+    // Step 4: the interview with the group insurance manager (I5) is added (was: 4 interviews).
+    ok(p.basisOfAssessment.interviews.length === 5 && p.basisOfAssessment.documents.length === 4 && p.basisOfAssessment.observations.length === 3, "basis of assessment is populated");
     ok(p.approval.approved === true && !!p.approval.statement && p.approval.name === "R. Calder", "asset-owner sign-off recorded");
 
     // ---- risk maths & dispositions tell the intended story ----
     var z1 = p.zones[0], z2 = p.zones[1], z4 = p.zones[3];
     ok(RT.threatRisk(z1.threats[0]) === "high", "Z1 T1 vendor-path risk is High");
     ok(RT.threatDisposition(z1, z1.threats[0]) === "mitigated", "Z1 T1 mitigated: countermeasures bring residual to Medium (tolerable)", RT.threatDisposition(z1, z1.threats[0]));
-    ok(RT.threatDisposition(z1, z1.threats[1]) === "countermeasure", "Z1 T2 covered by existing allow-listing", RT.threatDisposition(z1, z1.threats[1]));
+    // Step 3: the demo transfers T2's lost production, with its countermeasures still linked (was: countermeasure, covered by the allow-listing).
+    ok(RT.threatDisposition(z1, z1.threats[1]) === "transferred" && RT.threatTreatment(z1, z1.threats[1]).covering.map(function (m) { return m.id; }).join() === "M2,M3", "Z1 T2 transferred, with the existing allow-listing and the planned OPC DA retirement still linked", RT.threatDisposition(z1, z1.threats[1]));
     // Phase 4b: T4's consequence stays severe whatever is added, so the demo treats it through the
     // SL-T programme, with the hardwired keyswitch in place (was: reduce, covered by the keyswitch).
     ok(RT.threatDisposition(z2, z2.threats[0]) === "sl-t" && RT.threatTreatment(z2, z2.threats[0]).existingLinked.map(function (m) { return m.id; }).join() === "M4",
@@ -94,8 +96,8 @@
     });
     ok(undecided.length === 0, "every above-tolerable threat has a confirmed treatment decision", undecided.join(","));
     ok(gaps.length === 0, "and each decision has what it needs: a covering countermeasure, or its reason", gaps.join(" | "));
-    // Phase 4b: one decision of each kind (was: 6 reduce, 1 accept).
-    ok(within === 2 && decisions.reduce === 5 && decisions.slt === 1 && decisions.accept === 1, "5 reduced with countermeasures, 1 through the SL-T programme, 1 accepted, 2 within tolerable risk needing no decision", JSON.stringify(decisions) + " within " + within);
+    // Phase 4b: one decision of each kind (was: 6 reduce, 1 accept). Step 3: T2 is transferred (was: 5 reduce).
+    ok(within === 2 && decisions.reduce === 4 && decisions.transfer === 1 && decisions.slt === 1 && decisions.accept === 1, "4 reduced with countermeasures, 1 transferred, 1 through the SL-T programme, 1 accepted, 2 within tolerable risk needing no decision", JSON.stringify(decisions) + " within " + within);
     // Phase 4b: who accepted it is acceptanceDetail now, so the reason is the reason alone (was: it began "Accepted by R. Calder").
     ok(RT.threatTreatment(z4, z4.threats[1]).reason.indexOf("The tool is retired at the Q2-2027 turnaround") === 0 && z4.threats[1].acceptanceDetail.by === "R. Calder", "the acceptance carries its reason");
 
@@ -113,7 +115,15 @@
     var planned = cms.filter(function (m) { return !m.existing; });
     ok(planned.length === 4 && planned.every(function (m) { return m.owner && m.priority && /^\d{4}-\d{2}-\d{2}$/.test(m.dueDate) && m.status; }), "every additional countermeasure has an owner, a priority, a due date and a status", planned.map(function (m) { return m.id; }).join());
     ok(["T1", "T7", "T9"].every(function (id) { var x = all.filter(function (y) { return y.t.id === id; })[0]; return x.T.current === "medium" && x.T.existingLinked.length && x.T.disposition === "mitigated"; }), "the existing countermeasures bring T1, T7 and T9 within tolerable risk today, as their current ratings say");
-    ok(["T2", "T5"].every(function (id) { var x = all.filter(function (y) { return y.t.id === id; })[0]; return x.T.planned === "medium" && x.T.plannedLinked.length && x.T.disposition === "countermeasure"; }), "T2 and T5 reach tolerable risk only once the planned countermeasures are done");
+    // Step 3: T2 is transferred, so its disposition is transferred; its planned rating is as before (was: both countermeasure).
+    ok(["T2", "T5"].every(function (id) { var x = all.filter(function (y) { return y.t.id === id; })[0]; return x.T.planned === "medium" && x.T.plannedLinked.length && x.T.disposition === (id === "T2" ? "transferred" : "countermeasure"); }), "T2 and T5 reach tolerable risk only once the planned countermeasures are done");
+    // Step 3: the demo shows a transfer, and the asset register's classification and business value.
+    var trf = all.filter(function (x) { return x.T.disposition === "transferred"; });
+    ok(trf.length === 1 && trf[0].t.id === "T2" && /business interruption insurance/.test(trf[0].t.acceptance) && /insurers/.test(trf[0].t.transferTo) && ["by", "role", "date", "reviewDate"].every(function (k) { return !!trf[0].t.acceptanceDetail[k]; }) && trf[0].T.today === "high",
+      "one transferred risk, T2: how, to whom, who agreed it, their role, the date and a review date, its rating today unchanged", trf.length ? JSON.stringify(trf[0].t.acceptanceDetail) : "none");
+    ok(all.filter(function (x) { return x.T.decision === "accept"; }).every(function (x) { return !!String(x.t.acceptanceDetail.by || "").trim(); }), "every acceptance records who accepted it");
+    var demoAssets = []; p.zones.forEach(function (z) { z.assets.forEach(function (a) { demoAssets.push(a); }); });
+    ok(demoAssets.length === 11 && demoAssets.every(function (a) { return !!String(a.classification || "").trim() && ["high", "medium", "low"].indexOf(a.businessValue) >= 0; }), "every asset carries a classification and a business value");
     var acc = all.filter(function (x) { return x.T.disposition === "accepted"; });
     ok(acc.length === 1 && ["by", "role", "date", "reviewDate"].every(function (k) { return !!acc[0].t.acceptanceDetail[k]; }), "one accepted risk, with who accepted it, their role, the date and a review date");
     ok(all.every(function (x) { return !x.t.suggestedCountermeasureIds && !x.T.linkSuggested.length; }), "and no suggested link left waiting");
