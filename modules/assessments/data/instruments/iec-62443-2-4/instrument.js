@@ -40,34 +40,34 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                                          {
                                              "id":  "ML1",
                                              "name":  "Initial",
-                                             "anchor":  "Process is performed but ad hoc and often undocumented or not fully documented; consistency over time is hard to demonstrate.",
-                                             "shortAnchor":  "Performed but ad hoc, not (fully) documented.",
+                                             "anchor":  "The process is performed, but ad hoc and often without full documentation, so it is hard to show that it is done consistently over time.",
+                                             "shortAnchor":  "Performed ad hoc, with little or no documentation.",
                                              "readAs":  "ad hoc",
-                                             "glossary":  "Done ad hoc, if at all. It depends on individuals rather than on a process."
+                                             "glossary":  "The process is ad hoc, if it is performed at all, and depends on the individuals involved."
                                          },
                                          {
                                              "id":  "ML2",
                                              "name":  "Managed",
-                                             "anchor":  "Documentation exists describing how to manage and perform the capability (written procedures or training); practices are repeatable and managed to documented plans. Documentation begins at ML2.",
-                                             "shortAnchor":  "Documented procedures/training; repeatable, managed to plan.",
-                                             "readAs":  "documented and repeatable; documentation begins at ML2",
-                                             "glossary":  "Documented and repeatable. Documentation begins here."
+                                             "anchor":  "Written procedures or training describe how to manage and perform the process. Practice is repeatable and follows documented plans. ML2 is the first level that requires documentation.",
+                                             "shortAnchor":  "Documented procedures or training, repeatable and managed to plan.",
+                                             "readAs":  "documented and repeatable",
+                                             "glossary":  "The process is documented and can be repeated. ML2 is the first level that requires documentation."
                                          },
                                          {
                                              "id":  "ML3",
                                              "name":  "Defined / Practiced",
-                                             "anchor":  "An ML2 process that the provider has used to deliver the service to an asset owner at least once, and whose delivery can be shown to repeat across the provider\u0027s organisation, tailored to each contract.",
+                                             "anchor":  "The provider has used the ML2 process to deliver the service to an asset owner at least once, and can show that delivery repeats across its organisation, adapted to each contract.",
                                              "shortAnchor":  "Documented process delivered for an asset owner at least once, repeatable across the organisation.",
                                              "readAs":  "delivered for an asset owner at least once, and repeatable across the organisation",
-                                             "glossary":  "Used to deliver the service to an asset owner at least once, and shown to repeat across the organisation."
+                                             "glossary":  "The process has been used to deliver the service to an asset owner at least once and is shown to repeat across the organisation."
                                          },
                                          {
                                              "id":  "ML4",
                                              "name":  "Improving",
-                                             "anchor":  "Using process metrics, effectiveness or performance improvement of the process is demonstrated; the program improves the process through technological, procedural or management changes.",
-                                             "shortAnchor":  "Measured with metrics; process is improved over time.",
+                                             "anchor":  "Process metrics show that the process is effective or that its performance is improving. The program improves the process through technical, procedural or management changes.",
+                                             "shortAnchor":  "Measured with metrics and improved over time.",
                                              "readAs":  "metrics-driven improvement",
-                                             "glossary":  "Measured, and improved on the basis of what the measurements show."
+                                             "glossary":  "The process is measured, and the measurements are used to improve it."
                                          }
                                      ],
                           "_display":  "Show these full definitions ONCE in a help/reference panel, not inline on every requirement. The per-requirement selector uses achievedScale.ordered[].short labels only. \u0027readAs\u0027 and \u0027glossary\u0027 are the report\u0027s wording for each level."
@@ -86,62 +86,62 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                      {
                          "id":  "SP01",
                          "name":  "Solution staffing",
-                         "summary":  "How the provider vets, briefs and binds the people it puts on the asset owner\u0027s automation solution, subcontractors included, and who leads on security."
+                         "summary":  "The provider vets and briefs the people it puts on the asset owner\u0027s automation solution, subcontractors included, binds them to the owner\u0027s rules and names a lead for security."
                      },
                      {
                          "id":  "SP02",
                          "name":  "Assurance",
-                         "summary":  "How the provider shows the asset owner that the solution is secure enough: evidence for components, safe use of scanning tools and a hardening guide that is followed."
+                         "summary":  "The provider gives the asset owner evidence that the solution is secure enough, covering its components, the safe use of scanning tools and a hardening guide that its staff follow."
                      },
                      {
                          "id":  "SP03",
                          "name":  "Architecture",
-                         "summary":  "How the provider designs, hardens and protects the solution, from risk assessment and network segmentation to device administration and protection of sensitive data."
+                         "summary":  "The provider designs, hardens and protects the solution, from risk assessment and network segmentation to device administration and the protection of sensitive data."
                      },
                      {
                          "id":  "SP04",
                          "name":  "Wireless",
-                         "summary":  "How the provider documents, secures and controls any wireless networks that form part of the solution."
+                         "summary":  "The provider documents, secures and controls any wireless networks that form part of the solution."
                      },
                      {
                          "id":  "SP05",
                          "name":  "SIS",
-                         "summary":  "How the provider keeps the safety instrumented system protected from other systems and from unauthorised change, including control of its configuration mode."
+                         "summary":  "The provider protects the safety instrumented system from other systems and from unauthorised change, including control of its configuration mode."
                      },
                      {
                          "id":  "SP06",
                          "name":  "Configuration management",
-                         "summary":  "How the provider keeps drawings, as-built records, the asset register and device settings accurate and checked."
+                         "summary":  "The provider keeps drawings, as-built records, the asset register and device settings accurate, and checks them."
                      },
                      {
                          "id":  "SP07",
                          "name":  "Remote access",
-                         "summary":  "How the provider\u0027s remote access to the solution is declared, approved per session, protected and limited to accepted tools."
+                         "summary":  "The provider declares its remote access to the solution, has each session approved, protects the connection and uses only accepted tools."
                      },
                      {
                          "id":  "SP08",
                          "name":  "Event management",
-                         "summary":  "How the provider sets up detection, logging and reporting of security events, incidents and process alarms on the solution."
+                         "summary":  "The provider sets up detection, logging and reporting of security events, incidents and process alarms on the solution."
                      },
                      {
                          "id":  "SP09",
                          "name":  "Account management",
-                         "summary":  "How the provider administers accounts and passwords on the solution, from unique and default accounts to removal and password rules."
+                         "summary":  "The provider administers accounts and passwords on the solution, covering unique and default accounts, account removal and password rules."
                      },
                      {
                          "id":  "SP10",
                          "name":  "Malware protection",
-                         "summary":  "How the provider installs, maintains and proves anti-malware protection, and keeps supplied equipment and portable media clean."
+                         "summary":  "The provider installs and maintains anti-malware protection and can show that it works, and keeps the equipment and portable media it supplies free of malware."
                      },
                      {
                          "id":  "SP11",
                          "name":  "Patch management",
-                         "summary":  "How the provider qualifies, reports on, sources and installs patches, with the asset owner approving each one."
+                         "summary":  "The provider qualifies, reports on, sources and installs patches, and the asset owner approves each one."
                      },
                      {
                          "id":  "SP12",
                          "name":  "Backup/Restore",
-                         "summary":  "How the provider backs up and restores the solution, documents and verifies the process, and supports disaster recovery."
+                         "summary":  "The provider backs up and restores the solution, documents and verifies the process, and supports disaster recovery."
                      }
                  ],
     "requirements":  [
@@ -153,7 +153,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "theme":  "ORG",
                              "title":  "Staff briefed on 62443-2-4 duties",
                              "hint":  "The provider can show that its own staff on the automation solution have been told which 62443-2-4 requirements the asset owner has asked for, and that they work to them.",
-                             "rationale":  "Many incidents start with an engineer who did not know a rule existed, such as plugging in a personal USB stick. Briefed staff are less likely to weaken the system by accident.",
+                             "rationale":  "Many incidents start with an engineer who did not know a rule existed, for example one who plugs in a personal USB stick. Staff who have been briefed are less likely to weaken the system by accident.",
                              "evidencePrompt":  "Ask for the briefing or training material, attendance or acknowledgement records for staff on this job, and how new joiners are briefed before they start.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -172,7 +172,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "theme":  "ORG",
                              "title":  "Subcontractors briefed on 62443-2-4 duties",
                              "hint":  "The provider can show that subcontractors, consultants and representatives it puts on the job have been briefed on the asset owner\u0027s chosen 62443-2-4 requirements and work to them.",
-                             "rationale":  "Third parties often know the least about a site. Briefing them to the same standard as direct staff stops the owner inheriting a weaker link through the supply chain.",
+                             "rationale":  "Third parties often know the least about a site. Briefing them to the same standard as the provider\u0027s own staff means the owner does not get a lower standard of work from subcontracted people.",
                              "evidencePrompt":  "Ask for the briefing pack issued to subcontractors and consultants, signed acknowledgements, and the contract clauses that pass these duties down.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -264,7 +264,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "theme":  "ORG",
                              "title":  "Only background-checked staff assigned",
                              "hint":  "The provider can show that staff it assigns to the automation solution have passed security background checks, where these are practical and lawful in the country concerned.",
-                             "rationale":  "A check cannot prove someone is trustworthy, but it can flag a known history of concern before that person is given access to control systems.",
+                             "rationale":  "A background check cannot prove that someone is trustworthy, but it can show a known history of concern before that person is given access to control systems.",
                              "evidencePrompt":  "Ask for the vetting policy, what checks it covers (for example identity and criminal record), how often they are repeated, and the check records for staff on this job. Note any country where checks are not possible.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -356,7 +356,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Evidence that components are secure enough",
                              "hint":  "The provider can give the asset owner documents showing that the components it is responsible for have security that matches the risk they carry.",
                              "rationale":  "The owner needs grounds to trust each component beyond the vendor\u0027s word. Test results, certifications or assessments show whether the protection fits the risk.",
-                             "evidencePrompt":  "Deliverable: component security verification records, such as certificates (for example 62443-4-2), penetration, fuzz or robustness test reports, or assessment results for each component in scope.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the component security verification records for each component in scope, such as certificates (for example 62443-4-2), penetration, fuzz or robustness test reports, or assessment results.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -374,7 +374,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Recommended security tools and safe use",
                              "hint":  "The provider can recommend security analysis tools, such as network scanners, for the automation solution, and explain why to use them, how to use them and how to avoid side effects.",
                              "rationale":  "Scanning can find rogue devices and open ports, but a careless scan can upset a live control network. The owner needs to know the risks and how to limit them before anyone runs a tool.",
-                             "evidencePrompt":  "Deliverable: a tool guide listing the recommended security analysis tools, their purpose, usage instructions, known effects on performance and the settings or timing that avoid them.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the tool guide, which should list the recommended security analysis tools, their purpose, how to use them, their known effects on performance and the settings or timing that avoid those effects.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -431,7 +431,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "System proven to tolerate network scans",
                              "hint":  "The provider can demonstrate that the control system components in the automation solution keep their essential functions running while being scanned during normal operation.",
                              "rationale":  "If a scan can stall a controller, the owner cannot safely check its own network. Proof of tolerance lets the owner scan as a routine task without putting production at risk.",
-                             "evidencePrompt":  "Deliverable: test evidence that essential control functions carried on under system or network scans, for example robustness or scan-tolerance test reports referencing 62443-3-3.",
+                             "evidencePrompt":  "This is a deliverable. Ask for test evidence that essential control functions kept running during system or network scans, for example robustness or scan tolerance test reports that reference 62443-3-3.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -449,7 +449,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Hardening guide for the solution",
                              "hint":  "The provider can give the asset owner a guide describing how to harden the automation solution, covering architecture, configuration settings and the addition of new components.",
                              "rationale":  "The owner needs to know which settings and design choices protect the system, so it can govern it and connect it to other networks without undoing them.",
-                             "evidencePrompt":  "Deliverable: a hardening guide for the automation solution covering, for example, firewall placement and rules, security settings, verification steps and installing new components, with any supplier guides referenced.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the hardening guide for the automation solution. It should cover, for example, firewall placement and rules, security settings, verification steps and the installation of new components, and refer to any supplier guides.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -616,8 +616,8 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "theme":  "NET",
                              "title":  "Document known protocol weaknesses and mitigations",
                              "hint":  "The provider can give the asset owner a document describing the weaknesses already known in the communication protocols the automation solution uses, and how to mitigate each one.",
-                             "rationale":  "Many industrial protocols lack encryption or authentication by design. Knowing this up front lets the asset owner add compensating measures, such as port lockdown or physical protection of links.",
-                             "evidencePrompt":  "Deliverable: a protocol weaknesses and mitigations document for the automation solution. Ask to see it, or a sample from another project, and check it covers each protocol in use.",
+                             "rationale":  "Many industrial protocols were designed without encryption or authentication. Knowing this at the start lets the asset owner add compensating measures, such as locking down ports or physically protecting links.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the document on protocol weaknesses and mitigations for the automation solution, or a sample from another project, and check that it covers each protocol in use.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -838,7 +838,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Identify data that needs protecting",
                              "hint":  "The provider can identify and record where data needing protection is stored and how it flows in the automation solution, with what it needs in terms of confidentiality, integrity and availability.",
                              "rationale":  "Passwords, certificates, recipes, logs and backups can only be protected once someone knows where they are. The asset owner sets or approves the criteria, so the provider works from those.",
-                             "evidencePrompt":  "Deliverable: a register of sensitive data storage points and data flows with their protection requirements. Check that the asset owner set or approved the criteria used.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the register of places where sensitive data is stored and the data flows, with their protection requirements, and check that the asset owner set or approved the criteria used.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -876,7 +876,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Document data retention capabilities",
                              "hint":  "The provider can give the asset owner a description of how the automation solution stores and archives sensitive data, covering capacity, pruning and purging, and how long data is kept.",
                              "rationale":  "Historical data and events are needed for forensics and event analysis. The asset owner must know how long they are kept and whether an external archive is needed.",
-                             "evidencePrompt":  "Deliverable: a data retention description for the automation solution. Check it states capacities, retention periods, purge behaviour and any export to a history archive.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the data retention description for the automation solution, and check that it states capacities, retention periods, how data is purged and any export to a history archive.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -930,8 +930,8 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "kind":  "BR",
                              "theme":  "NET",
                              "title":  "Wireless architecture records kept current",
-                             "hint":  "The provider can keep the wireless architecture records up to date: data flows over wireless instruments and links, intruder and handheld access controls, and protection of remote wireless management.",
-                             "rationale":  "Wireless reaches past the fence line, so an out-of-date picture of what is on air and how it is guarded makes it easy to miss a way into the automation solution.",
+                             "hint":  "The provider can keep the wireless architecture records up to date, covering data flows over wireless instruments and links, access controls against intruders and for handheld devices, and protection of remote wireless management.",
+                             "rationale":  "Wireless reaches beyond the site fence. If the record of what is transmitting and how it is protected is out of date, a way into the automation solution can easily be missed.",
                              "evidencePrompt":  "Ask for current wireless architecture drawings or descriptions with revision history, showing data flows, wireless bridges and the security controls on each link, and ask what triggers an update after a change.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -987,7 +987,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Wireless protocol conformance statement",
                              "hint":  "The provider can give the asset owner a written statement of the wireless protocols the automation solution uses and whether each follows recognised industrial standards and local radio rules.",
                              "rationale":  "The asset owner needs to know the wireless technology has been vetted for industrial use and is legal to operate at the site before it carries control data.",
-                             "evidencePrompt":  "Deliverable: a wireless protocol conformance statement listing each protocol in use, the industry standard it follows (for example ISA100.11a, WirelessHART or IEEE 802.11) and its compliance with local radio regulations.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the wireless protocol conformance statement, which should list each protocol in use, the industry standard it follows (for example ISA100.11a, WirelessHART or IEEE 802.11) and its compliance with local radio regulations.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -1243,7 +1243,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "theme":  "DATA",
                              "title":  "Independent test of the SIS lock",
                              "hint":  "The provider can arrange for an independent third party to confirm that the SIS configuration cannot be changed while the keyswitch is locked in the disabled position.",
-                             "rationale":  "A test by someone outside the supplier and provider gives the asset owner extra confidence that the lock really blocks changes, whether checked before delivery or after installation.",
+                             "rationale":  "A test by someone independent of the supplier and the provider gives the asset owner more confidence that the lock blocks changes, whether the check is made before delivery or after installation.",
                              "evidencePrompt":  "Ask for a third-party verification report on the SIS configuration lock, who commissioned it, and whether it covered the delivered product or the installed system.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -1279,7 +1279,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "parentId":  "SP.06.01-BR",
                              "theme":  "CM",
                              "title":  "As-built connection and configuration records current",
-                             "hint":  "The provider can keep as-built records up to date for each installed device: what it is connected to, how, and the configuration loaded into it.",
+                             "hint":  "The provider can keep as-built records up to date for each installed device, recording what it is connected to, how, and the configuration loaded into it.",
                              "rationale":  "When a device fails or behaves oddly, the team needs to know its address, its switch port and the exact configuration it should be running.",
                              "evidencePrompt":  "Ask for as-built connection schedules and configuration records for a sample of devices (address, switch and port, configuration file), and compare them with what is installed.",
                              "deliverableDoc":  false,
@@ -1426,7 +1426,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Incident detection, reporting and response",
                              "hint":  "The provider can set up the automation solution to decide which compromises and incidents are detected, which are reported to the asset owner, and which need a response, including support to an incident team.",
                              "rationale":  "Without agreed rules on what counts as an incident and who is told, attacks on the system can go unnoticed or unanswered, and the asset owner loses sight of its security risk.",
-                             "evidencePrompt":  "Ask for the incident handling procedure for this automation solution: the detection criteria, the reporting triggers and contacts agreed with the asset owner, and records of a recent incident or exercise taken through to closure.",
+                             "evidencePrompt":  "Ask for the incident handling procedure for this automation solution, covering the detection criteria and the reporting triggers and contacts agreed with the asset owner, and for records of a recent incident or exercise taken through to closure.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
                              "otLens":  {
@@ -1556,7 +1556,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Event storm limits documented",
                              "hint":  "The provider can give the asset owner a written description of how well the automation solution copes when a very large number of events arrive at once, and where its limits lie.",
                              "rationale":  "Event storms can overload controllers, networks and consoles and act as a denial of service. Knowing the limits lets the asset owner judge the risk and plan around it.",
-                             "evidencePrompt":  "Deliverable: an event storm capability statement for the automation solution. Ask how the limits were established, for example from robustness or stress test results, and when the statement was last updated.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the event storm capability statement for the automation solution, how its limits were established (for example from robustness or stress test results) and when it was last updated.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -1573,7 +1573,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "theme":  "USER",
                              "title":  "Centralised account management",
                              "hint":  "The provider can set up a single account database, distributed or redundant if needed, for user and service accounts, managed from chosen workstations and enforced locally on each system.",
-                             "rationale":  "Managing accounts machine by machine leads to mismatches that either lock people out or leave access in place that should have gone. One central store keeps access consistent.",
+                             "rationale":  "When accounts are managed separately on each machine, they drift out of step, and people are either locked out or keep access that should have been removed. A central account store keeps access consistent.",
                              "evidencePrompt":  "Ask how account management is designed for multi-node systems (for example a domain or LDAP directory), who can create accounts, where they can be managed from, and how settings reach each node.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -1611,7 +1611,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Default accounts listed with reset instructions",
                              "hint":  "The provider can give the asset owner a list of every default user and service account installed in the automation solution, with the tools and steps to set or reset each password.",
                              "rationale":  "Hidden accounts and passwords that cannot be changed are a common way in. A full list with reset steps lets the asset owner take control of every credential, including service logons.",
-                             "evidencePrompt":  "Deliverable: a register of default user and service accounts with password change instructions. Check it also covers the services and processes that store those passwords and must be updated with them.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the register of default user and service accounts with instructions for changing their passwords, and check that it also covers the services and processes that store those passwords and must be updated with them.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -1888,7 +1888,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Anti-malware setup instructions",
                              "hint":  "The provider can give the asset owner written instructions for installing, configuring and updating the anti-malware tools it has tested and verified for this automation solution.",
                              "rationale":  "Without guidance tied to a tested product, the owner may install or tune anti-malware in a way that upsets control software, or leaves gaps the provider never checked.",
-                             "evidencePrompt":  "Deliverable: anti-malware installation, configuration and update instructions for the automation solution. Ask which products were tested, on which platforms, and when the instructions were last revised.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the instructions for installing, configuring and updating anti-malware on the automation solution, which products were tested and on which platforms, and when the instructions were last revised.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -1925,7 +1925,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Per-component anti-malware status record",
                              "hint":  "The provider can produce and maintain a record, per component, of whether anti-malware is installed or cannot be, its current settings, the approved definition level and any other measures used to limit infection.",
                              "rationale":  "The owner needs to see where protection is missing or weaker and what stands in for it, so that each unprotected device is a known, managed exception.",
-                             "evidencePrompt":  "Deliverable: an anti-malware status document covering each component. Check a sample of entries against the live systems, including components recorded as unable to run anti-malware and the compensating measures listed for them.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the anti-malware status document covering each component, and check a sample of entries against the live systems, including components recorded as unable to run anti-malware and the compensating measures listed for them.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -1961,7 +1961,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Definition file approval and status reporting",
                              "hint":  "The provider can describe how new malware definition files are assessed and approved for the automation solution, and report each file\u0027s status to the owner within an agreed number of days of release.",
                              "rationale":  "Definition files can occasionally clash with control software. The owner needs to know quickly which ones are safe to load, for which components, and which have been held back.",
-                             "evidencePrompt":  "Deliverable: a document describing how definition files are evaluated, approved and reported on. Ask for recent status reports showing applicability, approval state and date sent, against the agreed number of days.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the document describing how definition files are evaluated, approved and reported on, and for recent status reports showing applicability, approval state and the date sent, against the agreed number of days.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2035,7 +2035,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Patch evaluation and approval described",
                              "hint":  "The provider can give the owner a document explaining how it decides which security patches apply to the software it is responsible for, and how they are tested and approved. Firmware updates count as patches.",
                              "rationale":  "The owner can only rely on the provider\u0027s patch advice if it can see how that advice is reached, for control system, operating system and third-party software alike.",
-                             "evidencePrompt":  "Deliverable: a patch qualification process document. Check it covers control system, operating system and third-party software, and how it builds on the product supplier\u0027s own patch guidance.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the document describing the patch qualification process, and check that it covers control system, operating system and third-party software and how it builds on the product supplier\u0027s own patch guidance.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2053,7 +2053,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "theme":  "COMP",
                              "title":  "Patch process reviewed as risks change",
                              "hint":  "The provider can review and adjust how it evaluates and approves security patches, both periodically and when the threat picture shifts, such as when a vulnerability starts being exploited.",
-                             "rationale":  "A patch process built for routine releases may be too slow when a flaw is under active attack. Reviewing it keeps the response in step with the risk the owner actually faces.",
+                             "rationale":  "A patch process built for routine releases may be too slow when a flaw is under active attack. Regular review keeps the response in step with the risk the owner faces.",
                              "evidencePrompt":  "Ask for records of reviews of the patch evaluation process, what prompted each one and what changed as a result, and any link to incident handling where urgent patches were fast-tracked.",
                              "deliverableDoc":  false,
                              "verbatimText":  "",
@@ -2072,7 +2072,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Patch status information for the owner",
                              "hint":  "The provider can tell the owner, within an agreed time of release, which security patches apply, their approval state, any restart they need, why any were rejected, and how unapproved ones will be handled.",
                              "rationale":  "Patch decisions sit with the owner, who needs a clear and timely view of what is approved, what is not and why, and what a patch will do to a running system before scheduling it.",
-                             "evidencePrompt":  "Deliverable: patch status documentation for the automation solution. Check a recent issue for applicability, approval or lifecycle state, restart warnings, reasons for rejection and remediation plans, and that it met the agreed timeframe.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the patch status documentation for the automation solution, and check a recent issue for applicability, approval or lifecycle state, restart warnings, reasons for rejection and remediation plans, and that it was issued within the agreed time.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2145,8 +2145,8 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "theme":  "COMP",
                              "title":  "Patch installation instructions",
                              "hint":  "The provider can give the owner written instructions for installing patches by hand from portable media and through a patch management server, and for obtaining patch status reports.",
-                             "rationale":  "The owner may need to patch without the provider on site. Clear instructions for each method reduce mistakes and let the owner check what has actually gone in.",
-                             "evidencePrompt":  "Deliverable: patching instructions covering manual installation from portable media, use of the patch management server, and how to get patch status reports.",
+                             "rationale":  "The owner may need to patch without the provider on site. Clear instructions for each method reduce mistakes and let the owner check which patches have been installed.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the patching instructions, which should cover manual installation from portable media, use of the patch management server and how to obtain patch status reports.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2255,9 +2255,9 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "kind":  "BR",
                              "theme":  "AVAIL",
                              "title":  "Recommended backup procedures",
-                             "hint":  "The provider can give the owner a document on backing up the automation solution in full and in part: the method, which data to include, offsite storage advice, and holding off changes while a backup runs.",
+                             "hint":  "The provider can give the owner a document on full and partial backups of the automation solution, covering the method, the data to include, advice on offsite storage and holding off changes while a backup runs.",
                              "rationale":  "A backup that misses controller settings, keys or field parameters may not get the system running again. The owner needs to know what a complete backup holds and how to keep it safe.",
-                             "evidencePrompt":  "Deliverable: backup procedures for the automation solution. Check the backup method, the data covered (from operating system files and keys through applications, databases and logs to network, controller and field instrument settings), offsite storage advice and the rule on changes during a backup.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the backup procedures for the automation solution, and check the backup method, the data covered (from operating system files and keys through applications, databases and logs to network, controller and field instrument settings), the advice on offsite storage and the rule on changes during a backup.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2275,7 +2275,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Restore instructions",
                              "hint":  "The provider can give the owner written instructions for bringing the automation solution, or single components, back to normal operation from backup, including what to do if things have changed since.",
                              "rationale":  "Restores are often done under pressure after a failure or incident. Clear instructions, covering awkward cases too, cut downtime and warn where a restore may be incomplete.",
-                             "evidencePrompt":  "Deliverable: restore instructions for the full system and for components. Check they deal with abnormal cases, such as an architecture changed since the backup, and apply to simulators as well as live systems.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the restore instructions for the full system and for single components, and check that they deal with abnormal cases, such as an architecture that has changed since the backup, and apply to simulators as well as live systems.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2293,7 +2293,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Handling of portable backup media",
                              "hint":  "The provider can give the owner documentation on how portable backup media is controlled, stored and protected, in line with the owner\u0027s own policies and procedures.",
                              "rationale":  "Backup media holds a full copy of the system, often with credentials and configuration. Lost or tampered media can block recovery or hand an attacker what they need.",
-                             "evidencePrompt":  "Deliverable: backup media handling procedure. Ask how media is labelled, stored, moved, accessed and destroyed, and how this fits the owner\u0027s policies.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the procedure for handling backup media, including how media is labelled, stored, moved, accessed and destroyed, and how this fits the owner\u0027s policies.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2311,7 +2311,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Checking a backup succeeded",
                              "hint":  "The provider can give the owner documentation explaining how to confirm that a system backup has completed successfully and can be relied on.",
                              "rationale":  "A backup job can report success yet leave a copy that will not restore. A defined check gives the owner confidence before the copy is ever needed.",
-                             "evidencePrompt":  "Deliverable: backup verification instructions. Ask for records of recent checks and what they test, such as completion logs, checksums or trial restores.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the backup verification instructions and for records of recent checks, with what they test, such as completion logs, checksums or trial restores.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2383,7 +2383,7 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "title":  "Audit logging of backup and restore",
                              "hint":  "The provider can give the owner documentation on how to set up and keep audit logs that record every backup and restore activity on the automation solution.",
                              "rationale":  "Logs of when backups and restores ran, who ran them and with what result give the owner evidence of good practice and a trail to follow if something goes wrong.",
-                             "evidencePrompt":  "Deliverable: documentation on configuring and maintaining backup and restore audit logs. Ask to see sample log entries showing time, person and outcome.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the documentation on configuring and maintaining audit logs of backup and restore, and for sample log entries showing the time, the person and the outcome.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2399,9 +2399,9 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                              "kind":  "BR",
                              "theme":  "AVAIL",
                              "title":  "Disaster recovery plan",
-                             "hint":  "The provider can document a recommended disaster recovery plan: likely scenarios and their effect, how to recover and reintegrate failed components, and the minimum setup needed to rebuild the whole system.",
+                             "hint":  "The provider can document a recommended disaster recovery plan, covering likely scenarios and their effect, how to recover and reintegrate failed components, and the minimum setup needed to rebuild the whole system.",
                              "rationale":  "After a major cyber incident or site loss, the owner needs a worked-out route back to operation that does not depend on equipment that may itself have been lost.",
-                             "evidencePrompt":  "Deliverable: disaster recovery plan for the automation solution. Check it covers scenarios including cyber attack, recovery steps, the minimum architecture for a full rebuild, and where restore tools such as a test bench or offline engineering tools are kept.",
+                             "evidencePrompt":  "This is a deliverable. Ask for the disaster recovery plan for the automation solution, and check that it covers scenarios including cyber attack, the recovery steps, the minimum architecture for a full rebuild and where restore tools such as a test bench or offline engineering tools are kept.",
                              "deliverableDoc":  true,
                              "verbatimText":  "",
                              "otLens":  {
@@ -2475,5 +2475,5 @@ window.App.Data.instruments["iec-62443-2-4"].instrument = {
                       },
     "_contentNote":  "123 requirements (72 base requirements, 51 enhancements) across 12 functional areas, ids from the standard. Content is paraphrased from the licensed standard in our own words; verbatimText is empty by design. \u0027kind\u0027 (BR/RE), \u0027parentId\u0027 (an enhancement\u0027s base requirement) and \u0027deliverableDoc\u0027 (a document is delivered to the asset owner) are carried for the views; the scorer ignores them. Themes reuse the eight 62443-2-1:2024 themes.",
     "_scopingNote":  "elementScoping: a whole functional area can be set out of scope per target (target.elementScope). Its rows then score as N/A, and their answers are kept.",
-    "seriesContext":  "ISA/IEC 62443 is a series of standards divided by who is responsible for what. This part, 62443-2-4, covers the service provider who integrates or maintains an automation solution for an asset owner. It is the companion of 62443-2-1, which covers the asset owner\u0027s own security program, and of 62443-4-1, which covers the product supplier\u0027s development process."
+    "seriesContext":  "ISA/IEC 62443 is a series of standards divided according to who is responsible for what. This part, 62443-2-4, covers the service provider who integrates or maintains an automation solution for an asset owner. Its companions are 62443-2-1, which covers the asset owner\u0027s own security program, and 62443-4-1, which covers the product supplier\u0027s development process."
 };

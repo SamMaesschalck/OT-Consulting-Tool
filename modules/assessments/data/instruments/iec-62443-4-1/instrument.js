@@ -29,7 +29,7 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
     "targetDimension":  "supplier",
     "targetDimensionLabel":  "Supplier / product developer (development organisation or product line)",
     "status":  "active-skeleton",
-    "framing":  "ISA/IEC 62443-4-1 defines the process requirements for the secure development of products used in industrial automation and control systems. It is assessed against a SUPPLIER\u0027s product development practices, not an asset owner\u0027s environment. Requirements are grouped into eight practices and assessed at maturity levels (ML1-ML4), the same maturity model as 62443-2-1:2024.",
+    "framing":  "ISA/IEC 62443-4-1 sets out process requirements for the secure development of products used in industrial automation and control systems. The assessment looks at a supplier\u0027s product development practices, and the asset owner\u0027s environment is outside its scope. The requirements are grouped into eight practices and assessed at maturity levels ML1 to ML4, on the same maturity model as 62443-2-1:2024.",
     "sourceNote":  "Practice structure and requirement list extracted and verified from the 62443-4-1 document held in the project. Requirement titles are verified; assessor framing is paraphrased; \u0027verbatimText\u0027 and \u0027otLens\u0027 slots are empty for the licence holder to populate. ML anchors are paraphrased. Source: ISA/IEC 62443-4-1 (copyright IEC/ISA).",
     "maturityNote":  "Reuses the program-maturity-ml scoring family (ML1 Initial / ML2 Managed / ML3 Defined-Practiced / ML4 Improving) defined for 62443-2-1:2024. 4-1 itself uses a maturity model for these practices, so this is the natural fit.",
     "maturityModel":  {
@@ -38,34 +38,34 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                                          {
                                              "id":  "ML1",
                                              "name":  "Initial",
-                                             "anchor":  "Process is performed but ad hoc and often undocumented or not fully documented; consistency over time is hard to demonstrate.",
-                                             "shortAnchor":  "Performed but ad hoc, not (fully) documented.",
+                                             "anchor":  "The process is performed, but ad hoc and often without full documentation, so it is hard to show that it is done consistently over time.",
+                                             "shortAnchor":  "Performed ad hoc, with little or no documentation.",
                                              "readAs":  "ad hoc",
-                                             "glossary":  "Done ad hoc, if at all. It depends on individuals rather than on a process."
+                                             "glossary":  "The process is ad hoc, if it is performed at all, and depends on the individuals involved."
                                          },
                                          {
                                              "id":  "ML2",
                                              "name":  "Managed",
-                                             "anchor":  "Documentation exists describing how to manage and perform the capability (written procedures or training); practices are repeatable and managed to documented plans. Documentation begins at ML2.",
-                                             "shortAnchor":  "Documented procedures/training; repeatable, managed to plan.",
-                                             "readAs":  "documented and repeatable; documentation begins at ML2",
-                                             "glossary":  "Documented and repeatable. Documentation begins here."
+                                             "anchor":  "Written procedures or training describe how to manage and perform the process. Practice is repeatable and follows documented plans. ML2 is the first level that requires documentation.",
+                                             "shortAnchor":  "Documented procedures or training, repeatable and managed to plan.",
+                                             "readAs":  "documented and repeatable",
+                                             "glossary":  "The process is documented and can be repeated. ML2 is the first level that requires documentation."
                                          },
                                          {
                                              "id":  "ML3",
                                              "name":  "Defined / Practiced",
-                                             "anchor":  "An ML2 process that is actively practised in product development, with performance shown to be repeatable over time.",
+                                             "anchor":  "The ML2 process is actively practised in product development, and its performance is shown to repeat over time.",
                                              "shortAnchor":  "Documented process actively practised, repeatable over time.",
                                              "readAs":  "actively practised in product development",
-                                             "glossary":  "Actively practised on real product development work, not only written down."
+                                             "glossary":  "The documented process is used on real product development work and is shown to repeat over time."
                                          },
                                          {
                                              "id":  "ML4",
                                              "name":  "Improving",
-                                             "anchor":  "Using process metrics, effectiveness or performance improvement of the process is demonstrated; the supplier improves the process through technological, procedural or management changes.",
-                                             "shortAnchor":  "Measured with metrics; process is improved over time.",
+                                             "anchor":  "Process metrics show that the process is effective or that its performance is improving. The supplier improves the process through technical, procedural or management changes.",
+                                             "shortAnchor":  "Measured with metrics and improved over time.",
                                              "readAs":  "metrics-driven improvement",
-                                             "glossary":  "Measured, and improved on the basis of what the measurements show."
+                                             "glossary":  "The process is measured, and the measurements are used to improve it."
                                          }
                                      ],
                           "_display":  "Show these full definitions ONCE in a help/reference panel, not inline on every requirement. The per-requirement selector uses achievedScale.ordered[].short labels only."
@@ -77,42 +77,42 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                      {
                          "id":  "SM",
                          "name":  "Practice 1: Security management",
-                         "summary":  "The supplier\u0027s overall process for managing secure product development: ownership, scope, expertise, environment security and continuous improvement."
+                         "summary":  "This practice covers how the supplier manages secure product development overall, including ownership, scope, expertise, the security of the development environment and continuous improvement."
                      },
                      {
                          "id":  "SR",
                          "name":  "Practice 2: Specification of security requirements",
-                         "summary":  "Capturing the product\u0027s security context and threat model and deriving documented, reviewed security requirements."
+                         "summary":  "This practice covers capturing the product\u0027s security context and threat model and turning them into documented, reviewed security requirements."
                      },
                      {
                          "id":  "SD",
                          "name":  "Practice 3: Secure by design",
-                         "summary":  "Applying secure design principles and defence in depth, with design review, so security is built in rather than added later."
+                         "summary":  "This practice covers secure design principles, defence in depth and design review, so that security is part of the product from the start."
                      },
                      {
                          "id":  "SI",
                          "name":  "Practice 4: Secure implementation",
-                         "summary":  "Implementing the design securely, with secure coding standards and implementation review to catch weaknesses as code is written."
+                         "summary":  "This practice covers implementing the design securely, with secure coding standards and implementation review to catch weaknesses as the code is written."
                      },
                      {
                          "id":  "SVV",
                          "name":  "Practice 5: Security verification and validation testing",
-                         "summary":  "Testing that security requirements are met and threats mitigated, including vulnerability and penetration testing by suitably independent testers."
+                         "summary":  "This practice covers testing that security requirements are met and threats are mitigated, including vulnerability and penetration testing by suitably independent testers."
                      },
                      {
                          "id":  "DM",
                          "name":  "Practice 6: Management of security-related issues",
-                         "summary":  "Receiving, reviewing, assessing, addressing and disclosing security issues found in the product after development."
+                         "summary":  "This practice covers receiving, reviewing, assessing, fixing and disclosing security issues found in the product after development."
                      },
                      {
                          "id":  "SUM",
                          "name":  "Practice 7: Security update management",
-                         "summary":  "Qualifying, documenting and delivering security updates and patches in a timely, dependable way."
+                         "summary":  "This practice covers qualifying, documenting and delivering security updates and patches in good time and reliably."
                      },
                      {
                          "id":  "SG",
                          "name":  "Practice 8: Security guidelines",
-                         "summary":  "Providing the documentation users need to deploy, harden, operate and dispose of the product securely."
+                         "summary":  "This practice covers the documentation users need to deploy, harden, operate and dispose of the product securely."
                      }
                  ],
     "requirements":  [
@@ -122,15 +122,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-1",
                              "title":  "Development process",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Maintain a defined, documented secure development process covering the product\u0027s lifecycle, rather than relying on ad hoc practice.",
-                             "rationale":  "A documented process is what makes secure development repeatable rather than dependent on whoever happens to be on the team. Without it, security quality varies product to product and cannot be assured to a customer or regulator."
+                             "hint":  "The supplier follows a defined, documented secure development process that covers the product\u0027s lifecycle.",
+                             "rationale":  "A documented process lets secure development be repeated whoever is on the team. Without one, security quality varies from product to product and the supplier cannot give a customer or regulator assurance about it."
                          },
                          {
                              "id":  "SM2",
@@ -138,15 +138,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-2",
                              "title":  "Identification of responsibilities",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Assign clear responsibilities for security within the development organisation so ownership is explicit, not assumed.",
-                             "rationale":  "Security with no named owner is security no one maintains. Clear responsibilities stop secure-development tasks falling through the gaps between engineering, QA and product management."
+                             "hint":  "Responsibilities for security within the development organisation are assigned and written down.",
+                             "rationale":  "Security work with no named owner tends not to get done. Clear responsibilities stop secure development tasks falling between engineering, QA and product management."
                          },
                          {
                              "id":  "SM3",
@@ -154,15 +154,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-3",
                              "title":  "Identification of applicability",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Identify which parts of the process apply to which products and components, so scope is deliberate.",
-                             "rationale":  "Applying the full process to everything is wasteful; applying it to nothing is dangerous. Defining applicability ensures effort lands where the product risk actually warrants it."
+                             "hint":  "The supplier has decided which parts of the process apply to which products and components.",
+                             "rationale":  "Applying the full process to everything wastes effort, and applying it to nothing leaves products exposed. Defining applicability puts the effort where the product risk calls for it."
                          },
                          {
                              "id":  "SM4",
@@ -170,15 +170,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-4",
                              "title":  "Security expertise",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Ensure the people doing the work have the security expertise the process needs, through training or hiring.",
-                             "rationale":  "A secure-development process run by people without security skills produces the appearance of rigour without the substance. Expertise is what makes the process find real weaknesses rather than tick boxes."
+                             "hint":  "The people doing the work have the security expertise the process needs, through training or recruitment.",
+                             "rationale":  "A secure development process run by people without security skills looks rigorous on paper and finds little. Staff with the right expertise find real weaknesses."
                          },
                          {
                              "id":  "SM5",
@@ -186,15 +186,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-5",
                              "title":  "Process scoping",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Define the scope of the development process: what products, versions and components it covers.",
-                             "rationale":  "Undefined scope leads to gaps where parts of a product are assumed to be someone else\u0027s problem. Explicit scoping ensures the whole product is covered and nothing falls outside the process by default."
+                             "hint":  "The scope of the development process is defined, including which products, versions and components it covers.",
+                             "rationale":  "Where scope is undefined, parts of a product end up treated as someone else\u0027s problem. Explicit scoping brings the whole product inside the process."
                          },
                          {
                              "id":  "SM6",
@@ -202,15 +202,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-6",
                              "title":  "File integrity",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Protect the integrity of files and artefacts in development so they cannot be tampered with undetected.",
-                             "rationale":  "If development artefacts can be altered undetected, an attacker can inject weaknesses upstream of every later control. File integrity protects the supply chain from the inside, where tampering is hardest to spot later."
+                             "hint":  "Files and artefacts in development are protected so that tampering would be detected.",
+                             "rationale":  "If development artefacts can be altered without anyone noticing, an attacker can plant weaknesses before any later control applies. Protecting file integrity guards the supply chain at the point where tampering is hardest to spot afterwards."
                          },
                          {
                              "id":  "SM7",
@@ -218,15 +218,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-7",
                              "title":  "Development environment security",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Secure the development environment itself (tools, build systems, repositories) against compromise.",
-                             "rationale":  "A compromised build system or repository can poison every product that passes through it, the most damaging form of supply-chain attack. Securing the development environment protects everything built in it."
+                             "hint":  "The development environment, including tools, build systems and repositories, is protected against compromise.",
+                             "rationale":  "A compromised build system or repository can poison every product that passes through it, which makes it one of the most damaging forms of supply chain attack. Securing the development environment protects everything built in it."
                          },
                          {
                              "id":  "SM8",
@@ -234,15 +234,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-8",
                              "title":  "Controls for private keys",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Control the private keys used for signing and protection so they cannot be misused or stolen.",
-                             "rationale":  "Signing keys are what let users trust that a product or update is genuine; stolen keys let an attacker sign malware as legitimate. Controlling private keys protects the trust the whole update mechanism depends on."
+                             "hint":  "Private keys used for signing and protection are controlled so they cannot be misused or stolen.",
+                             "rationale":  "Signing keys let users trust that a product or update is genuine. A stolen key lets an attacker sign malware so that it passes as legitimate, so the whole update mechanism depends on these keys being controlled."
                          },
                          {
                              "id":  "SM9",
@@ -250,15 +250,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-9",
                              "title":  "Security requirements for externally provided components",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Apply security requirements to externally provided components, not just to code developed in-house.",
-                             "rationale":  "Third-party and open-source components carry their own vulnerabilities straight into the product. Applying security requirements to them stops the developer\u0027s good practice being undone by what they didn\u0027t write."
+                             "hint":  "Security requirements apply to externally provided components as well as to code developed in house.",
+                             "rationale":  "Third-party and open source components bring their own vulnerabilities into the product. Applying security requirements to them stops weaknesses in code the supplier did not write from undoing its own good practice."
                          },
                          {
                              "id":  "SM10",
@@ -266,15 +266,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-10",
                              "title":  "Custom developed components from third-party suppliers",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Manage the security of custom components built by third-party suppliers on the developer\u0027s behalf.",
-                             "rationale":  "Work outsourced to third-party suppliers can reintroduce the very risks the process exists to control. Managing their security ensures custom-built components meet the same bar as in-house code."
+                             "hint":  "The supplier manages the security of custom components that third-party suppliers build for it.",
+                             "rationale":  "Outsourced development can bring back the risks the process exists to control. Managing the third party\u0027s security holds custom components to the same standard as in-house code."
                          },
                          {
                              "id":  "SM11",
@@ -282,15 +282,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-11",
                              "title":  "Assessing and addressing security-related issues",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Have a route to assess and address security issues discovered during development.",
-                             "rationale":  "Issues found during development are cheapest to fix then and most dangerous if shipped. A defined route to assess and address them stops known problems reaching the customer."
+                             "hint":  "There is a defined way to assess and deal with security issues found during development.",
+                             "rationale":  "An issue found during development is cheapest to fix then and does most harm if it ships. A defined route for assessing and fixing these issues stops known problems reaching the customer."
                          },
                          {
                              "id":  "SM12",
@@ -298,15 +298,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-12",
                              "title":  "Process verification",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Verify that the development process is actually being followed, not just documented.",
-                             "rationale":  "A process that is documented but not followed gives false assurance. Verifying that it is actually applied is what makes the documentation mean something."
+                             "hint":  "The supplier checks that the development process is followed in practice.",
+                             "rationale":  "A process that is written down and not followed gives false assurance. Checking that it is applied shows whether the documentation reflects real practice."
                          },
                          {
                              "id":  "SM13",
@@ -314,15 +314,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SM-13",
                              "title":  "Continuous improvement",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Continuously improve the development process using what is learned over time.",
-                             "rationale":  "Threats and techniques change, so a development process frozen in time steadily loses ground. Continuous improvement keeps it matched to the risks the product will actually face."
+                             "hint":  "The development process is improved over time using lessons learned.",
+                             "rationale":  "Threats and attack techniques change, and a development process that stays the same falls behind them. Regular improvement keeps the process in step with the risks the product will face."
                          },
                          {
                              "id":  "SR1",
@@ -330,15 +330,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SR-1",
                              "title":  "Product security context",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Establish the product\u0027s security context: how and where it will be used, and the assumptions that follow.",
-                             "rationale":  "Security requirements only make sense against how and where the product will be used; the same product needs different protection in different contexts. Establishing the security context is the foundation the requirements are built on."
+                             "hint":  "The product\u0027s security context is established, covering how and where the product will be used and the assumptions that follow from that.",
+                             "rationale":  "The same product needs different protection in different settings, so security requirements depend on how and where it will be used. The security context is the basis for the requirements."
                          },
                          {
                              "id":  "SR2",
@@ -346,15 +346,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SR-2",
                              "title":  "Threat model",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Develop and maintain a threat model for the product to drive its security requirements.",
-                             "rationale":  "You cannot require protection against threats you have not identified. A threat model is what makes the security requirements address real attack paths rather than a generic checklist."
+                             "hint":  "The supplier develops and maintains a threat model for the product and uses it to drive the security requirements.",
+                             "rationale":  "A product cannot be required to resist threats nobody has identified. The threat model ties the security requirements to the attack paths the product will face."
                          },
                          {
                              "id":  "SR3",
@@ -362,15 +362,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SR-3",
                              "title":  "Product security requirements",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Derive documented product security requirements from the context and threat model.",
-                             "rationale":  "Undocumented security expectations are not requirements; they are hopes. Deriving explicit requirements from the threat model is what makes security something the product can be designed and tested against."
+                             "hint":  "Documented product security requirements are derived from the security context and the threat model.",
+                             "rationale":  "Security expectations that are not written down cannot be designed or tested against. Deriving explicit requirements from the threat model gives the design and test teams something to work to."
                          },
                          {
                              "id":  "SR4",
@@ -378,15 +378,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SR-4",
                              "title":  "Product security requirements content",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Ensure the security requirements have sufficient content and detail to be implementable and testable.",
-                             "rationale":  "Requirements too vague to implement or test achieve nothing. Sufficient content is what lets designers build to them and testers verify them, rather than interpret them differently."
+                             "hint":  "The security requirements are detailed enough to be implemented and tested.",
+                             "rationale":  "A requirement too vague to implement or test has little effect, and designers and testers may read it differently. Requirements with enough detail can be built to and verified."
                          },
                          {
                              "id":  "SR5",
@@ -394,15 +394,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SR-5",
                              "title":  "Security requirements review",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Review the security requirements to confirm they are complete, correct and consistent.",
-                             "rationale":  "Requirements written once and never reviewed carry gaps and contradictions into the design. Review catches those while they are still cheap to fix, before they are built in."
+                             "hint":  "The security requirements are reviewed to confirm they are complete, correct and consistent.",
+                             "rationale":  "Requirements that are never reviewed carry their gaps and contradictions into the design. A review catches them while they are still cheap to fix."
                          },
                          {
                              "id":  "SD1",
@@ -410,15 +410,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SD-1",
                              "title":  "Secure design principles",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Apply established secure design principles when designing the product.",
-                             "rationale":  "Security designed in from the start is far cheaper and more effective than security retrofitted later. Applying secure design principles shapes the product\u0027s resilience at the point where it is easiest to influence."
+                             "hint":  "The product is designed using established secure design principles.",
+                             "rationale":  "Building security into the design costs far less than adding it later, and works better. Design is the stage where the product\u0027s resilience is easiest to influence."
                          },
                          {
                              "id":  "SD2",
@@ -426,15 +426,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SD-2",
                              "title":  "Defense in depth design",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Design defence in depth so the product does not rely on a single protective measure.",
-                             "rationale":  "A product that relies on one protective measure fails completely when that measure is defeated. Defence in depth ensures a single bypass does not mean total compromise."
+                             "hint":  "The product\u0027s design uses defence in depth, so it does not depend on a single protective measure.",
+                             "rationale":  "A product that relies on one protective measure is fully exposed once that measure is defeated. With defence in depth, bypassing one control does not compromise the whole product."
                          },
                          {
                              "id":  "SD3",
@@ -442,15 +442,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SD-3",
                              "title":  "Security design review",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Review the design for security before implementation, to catch flaws early.",
-                             "rationale":  "Design flaws found after implementation are expensive to fix and often shipped anyway. Reviewing the design for security catches the most structural weaknesses at the cheapest point to address them."
+                             "hint":  "The design is reviewed for security before implementation, so flaws are caught early.",
+                             "rationale":  "Design flaws found after implementation are expensive to fix and are often shipped anyway. A security review of the design finds structural weaknesses when they are cheapest to correct."
                          },
                          {
                              "id":  "SD4",
@@ -458,15 +458,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SD-4",
                              "title":  "Secure design best practices",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Follow secure design best practices appropriate to the product and its technologies.",
-                             "rationale":  "Established best practices encode lessons learned from others\u0027 failures. Following them avoids repeating well-known design mistakes in a new product."
+                             "hint":  "The supplier follows secure design practices suited to the product and its technologies.",
+                             "rationale":  "Established design practices capture lessons from other people\u0027s failures. Following them avoids repeating well-known design mistakes in a new product."
                          },
                          {
                              "id":  "SI1",
@@ -474,15 +474,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SI-1",
                              "title":  "Security implementation review",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Review the implementation for security, checking that the secure design is correctly realised in code.",
-                             "rationale":  "A secure design can be undone by insecure implementation. Reviewing the implementation confirms the code actually realises the design\u0027s security intent rather than quietly departing from it."
+                             "hint":  "The implementation is reviewed for security to check that the code matches the secure design.",
+                             "rationale":  "Insecure implementation can undo a secure design. Reviewing the code confirms that it does what the design intended for security."
                          },
                          {
                              "id":  "SI2",
@@ -490,15 +490,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SI-2",
                              "title":  "Secure coding standards",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Implement against secure coding standards to avoid known classes of vulnerability.",
-                             "rationale":  "Most code-level vulnerabilities come from a known set of mistakes. Secure coding standards steer developers away from those classes before the weaknesses are ever written."
+                             "hint":  "Code is written to secure coding standards to avoid known classes of vulnerability.",
+                             "rationale":  "Most code-level vulnerabilities come from a familiar set of mistakes. Secure coding standards steer developers away from those mistakes before the code is written."
                          },
                          {
                              "id":  "SVV1",
@@ -506,15 +506,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SVV-1",
                              "title":  "Security requirements testing",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Test that the product\u0027s security requirements are actually met.",
-                             "rationale":  "A security requirement never tested is a requirement that may not be met. Testing against the requirements is what turns intended security into demonstrated security."
+                             "hint":  "The product is tested to show that its security requirements are met.",
+                             "rationale":  "An untested security requirement may not be met. Testing against the requirements shows that the intended security is present in the product."
                          },
                          {
                              "id":  "SVV2",
@@ -522,15 +522,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SVV-2",
                              "title":  "Threat mitigation testing",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Test that the threats identified in the threat model are mitigated.",
-                             "rationale":  "The threat model only protects the product if its threats are actually mitigated in the finished article. Threat-mitigation testing confirms the defences work against the attacks they were designed for."
+                             "hint":  "The product is tested to show that the threats in the threat model are mitigated.",
+                             "rationale":  "The threat model protects the product only if the finished product mitigates the threats it lists. Threat mitigation testing confirms the defences work against the attacks they were designed for."
                          },
                          {
                              "id":  "SVV3",
@@ -538,15 +538,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SVV-3",
                              "title":  "Vulnerability testing",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Test for vulnerabilities, including with automated tooling.",
-                             "rationale":  "Vulnerabilities the developer does not find, an attacker will. Vulnerability testing, including with tooling, surfaces weaknesses before release rather than after exploitation."
+                             "hint":  "The product is tested for vulnerabilities, including with automated tools.",
+                             "rationale":  "Vulnerabilities the supplier misses are left for an attacker to find. Vulnerability testing, including automated scanning, finds weaknesses before release."
                          },
                          {
                              "id":  "SVV4",
@@ -554,15 +554,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SVV-4",
                              "title":  "Penetration testing",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Carry out penetration testing of the product.",
-                             "rationale":  "Penetration testing probes the product as an attacker would, finding what requirement-by-requirement testing misses. It is the adversarial check that the product holds up in practice, not just on paper."
+                             "hint":  "The product undergoes penetration testing.",
+                             "rationale":  "Penetration testing probes the product as an attacker would and finds problems that testing against each requirement misses. It shows whether the product holds up under attack."
                          },
                          {
                              "id":  "SVV5",
@@ -570,15 +570,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SVV-5",
                              "title":  "Independence of testers",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Ensure the testers are sufficiently independent of the developers for the testing to be credible.",
-                             "rationale":  "Developers testing only their own work miss what they were blind to when building it. Independent testers provide the fresh adversarial perspective that makes the testing credible."
+                             "hint":  "The testers are independent enough from the developers for the results to be credible.",
+                             "rationale":  "Developers who test only their own work tend to miss what they overlooked while building it. Independent testers bring a fresh view and make the results credible."
                          },
                          {
                              "id":  "DM1",
@@ -586,15 +586,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "DM-1",
                              "title":  "Receiving notifications of security-related issues",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Have a defined way to receive notifications of security issues from any source.",
-                             "rationale":  "Issues you never hear about, you cannot fix. A defined channel to receive notifications ensures vulnerabilities reported by researchers, customers or others actually reach the people who can act."
+                             "hint":  "There is a defined way to receive reports of security issues from any source.",
+                             "rationale":  "A supplier cannot fix issues it never hears about. A defined reporting channel gets vulnerabilities reported by researchers, customers and others to the people who can act on them."
                          },
                          {
                              "id":  "DM2",
@@ -602,15 +602,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "DM-2",
                              "title":  "Reviewing security-related issues",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Review reported security issues to understand them.",
-                             "rationale":  "Reports that are received but not reviewed pile up unaddressed. Reviewing them is the step that turns an inbox of reports into understood issues."
+                             "hint":  "Reported security issues are reviewed so they are understood.",
+                             "rationale":  "Reports that are received and never reviewed pile up with nothing done. Review turns incoming reports into issues the supplier understands."
                          },
                          {
                              "id":  "DM3",
@@ -618,15 +618,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "DM-3",
                              "title":  "Assessing security-related issues",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Assess the severity and impact of security issues.",
-                             "rationale":  "Not every issue is equally serious, and treating them all the same wastes effort or misses the critical one. Assessment is what prioritises the issues that genuinely matter."
+                             "hint":  "The severity and impact of each security issue are assessed.",
+                             "rationale":  "Issues differ in seriousness, and treating them all the same either wastes effort or lets a serious one slip. Assessing them sets the order in which they are dealt with."
                          },
                          {
                              "id":  "DM4",
@@ -634,15 +634,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "DM-4",
                              "title":  "Addressing security-related issues",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Address security issues through fixes or mitigations.",
-                             "rationale":  "An assessed issue left unfixed is a known vulnerability shipped to every user. Addressing them through fixes or mitigations is the point of the whole defect-management practice."
+                             "hint":  "Security issues are dealt with through fixes or mitigations.",
+                             "rationale":  "An assessed issue left unfixed is a known vulnerability shipped to every user. Fixing or mitigating issues is the purpose of the defect management practice."
                          },
                          {
                              "id":  "DM5",
@@ -650,15 +650,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "DM-5",
                              "title":  "Disclosing security-related issues",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Disclose security issues responsibly to those who need to know.",
-                             "rationale":  "How an issue is disclosed affects whether users can protect themselves before attackers exploit it. Responsible disclosure balances warning users against arming adversaries."
+                             "hint":  "Security issues are disclosed responsibly to the people who need to know.",
+                             "rationale":  "The way an issue is disclosed affects whether users can protect themselves before attackers exploit it. Responsible disclosure weighs warning users against giving attackers a head start."
                          },
                          {
                              "id":  "DM6",
@@ -666,15 +666,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "DM-6",
                              "title":  "Periodic review of security defect management practices",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Periodically review the defect-management practice itself to keep it effective.",
-                             "rationale":  "A defect-management practice that is never reviewed drifts and decays like any other process. Periodic review keeps it effective as the product and threat landscape change."
+                             "hint":  "The defect management practice is reviewed periodically to keep it effective.",
+                             "rationale":  "A defect management practice that is never reviewed drifts over time like any other process. Periodic review keeps it effective as the product and the threats change."
                          },
                          {
                              "id":  "SUM1",
@@ -682,15 +682,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SUM-1",
                              "title":  "Security update qualification",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Qualify security updates so they are known to work and not introduce new problems.",
-                             "rationale":  "An update that breaks the product or introduces new flaws can be worse than the vulnerability it fixes. Qualifying updates ensures the fix is safe to apply, which matters especially in OT where stability is critical."
+                             "hint":  "Security updates are qualified so they are known to work and do not introduce new problems.",
+                             "rationale":  "An update that breaks the product or brings in new flaws can do more harm than the vulnerability it fixes. Qualification shows the fix is safe to apply, which matters most in OT, where stability comes first."
                          },
                          {
                              "id":  "SUM2",
@@ -698,15 +698,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SUM-2",
                              "title":  "Security update documentation",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Document security updates so users understand what they fix and how to apply them.",
-                             "rationale":  "Users cannot apply an update sensibly if they do not know what it changes. Documentation is what lets an operator assess and schedule a patch rather than fear it."
+                             "hint":  "Security updates are documented so users understand what they fix and how to apply them.",
+                             "rationale":  "Users cannot apply an update sensibly without knowing what it changes. Good documentation lets an operator assess a patch and schedule it with confidence."
                          },
                          {
                              "id":  "SUM3",
@@ -714,15 +714,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SUM-3",
                              "title":  "Dependent component or operating system security update",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Account for updates to dependent components and operating systems, not just the product\u0027s own code.",
-                             "rationale":  "A product is only as secure as its dependencies and underlying OS, which have their own vulnerabilities. Accounting for their updates stops the product being exposed through components the developer did not write."
+                             "hint":  "Updates to dependent components and operating systems are handled as well as updates to the product\u0027s own code.",
+                             "rationale":  "A product inherits the vulnerabilities of its dependencies and operating system. Handling their updates stops the product being exposed through components the supplier did not write."
                          },
                          {
                              "id":  "SUM4",
@@ -730,15 +730,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SUM-4",
                              "title":  "Security update delivery",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Deliver security updates to users through a dependable mechanism.",
-                             "rationale":  "A fix that cannot be delivered reliably protects no one. A dependable delivery mechanism is what gets the patch from the developer to the deployed product."
+                             "hint":  "Security updates reach users through a dependable delivery mechanism.",
+                             "rationale":  "A fix that cannot be delivered reliably protects no one. A dependable delivery mechanism gets the patch from the supplier to the installed product."
                          },
                          {
                              "id":  "SUM5",
@@ -746,15 +746,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SUM-5",
                              "title":  "Timely delivery of security patches",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Deliver security patches in a timely way relative to the risk they address.",
-                             "rationale":  "A patch that arrives long after the risk is known leaves a window attackers exploit. Timely delivery relative to severity is what keeps the protection ahead of the threat, balanced against OT\u0027s need to test before applying."
+                             "hint":  "Security patches are delivered in a time that reflects the risk they address.",
+                             "rationale":  "A patch that arrives long after a risk becomes known leaves attackers a window to exploit it. Delivery timed to severity keeps protection ahead of the threat, balanced against the need in OT to test before applying."
                          },
                          {
                              "id":  "SG1",
@@ -762,15 +762,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SG-1",
                              "title":  "Product defense in depth",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Provide guidance on the product\u0027s own defence-in-depth features.",
-                             "rationale":  "Users cannot use protective features they do not know exist. Documenting the product\u0027s own defence-in-depth helps operators actually deploy the security that was built in."
+                             "hint":  "The supplier provides guidance on the product\u0027s own defence in depth features.",
+                             "rationale":  "Users cannot use protective features they do not know about. Documenting the product\u0027s defence in depth features helps operators use the security that was built in."
                          },
                          {
                              "id":  "SG2",
@@ -778,15 +778,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SG-2",
                              "title":  "Defense in depth measures expected in the environment",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Document the defence-in-depth measures the product expects the operating environment to provide.",
-                             "rationale":  "A product makes assumptions about what the surrounding environment will protect; if users do not know them, those protections may be absent. Stating the expected environmental measures closes the gap between the product\u0027s assumptions and the operator\u0027s reality."
+                             "hint":  "The supplier documents the defence in depth measures the product expects its operating environment to provide.",
+                             "rationale":  "Every product assumes the surrounding environment will provide some protection. If users are not told what those assumptions are, the protection may be missing. Stating the expected measures lets the operator check its environment against them."
                          },
                          {
                              "id":  "SG3",
@@ -794,15 +794,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SG-3",
                              "title":  "Security hardening guidelines",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Provide hardening guidelines so users can configure the product securely.",
-                             "rationale":  "A product shipped in its default state is rarely in its most secure one. Hardening guidelines are what let an operator close that gap, which for OT is often the main feasible security improvement."
+                             "hint":  "The supplier provides hardening guidelines so users can configure the product securely.",
+                             "rationale":  "A product in its default configuration is rarely as secure as it can be. Hardening guidelines let an operator close that gap, and in OT this is often the most practical security improvement available."
                          },
                          {
                              "id":  "SG4",
@@ -810,15 +810,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SG-4",
                              "title":  "Secure disposal guidelines",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Provide secure disposal guidance so the product can be retired without leaking sensitive data.",
-                             "rationale":  "Equipment retired without proper disposal still holds configuration, credentials and data useful to an attacker. Disposal guidance ensures decommissioned product does not become a leak."
+                             "hint":  "The supplier provides guidance on disposing of the product securely, so that retiring it does not leak sensitive data.",
+                             "rationale":  "Equipment retired without proper disposal still holds configuration, credentials and data useful to an attacker. Disposal guidance stops decommissioned products becoming a source of leaks."
                          },
                          {
                              "id":  "SG5",
@@ -826,15 +826,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SG-5",
                              "title":  "Secure operation guidelines",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Provide secure operation guidance for running the product safely in service.",
-                             "rationale":  "Securely built products can still be operated insecurely. Secure operation guidance is what helps the operator keep the product safe in day-to-day service, not just at deployment."
+                             "hint":  "The supplier provides guidance on operating the product securely once it is in service.",
+                             "rationale":  "A securely built product can still be operated insecurely. Operating guidance helps the operator keep the product secure in day-to-day service as well as at installation."
                          },
                          {
                              "id":  "SG6",
@@ -842,15 +842,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SG-6",
                              "title":  "Account management guidelines",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Provide account management guidance for the product\u0027s users and roles.",
-                             "rationale":  "Default and unmanaged accounts are a common way into otherwise sound products. Account management guidance helps operators avoid the shared and standing credentials that plague OT."
+                             "hint":  "The supplier provides guidance on managing the product\u0027s user accounts and roles.",
+                             "rationale":  "Default and unmanaged accounts are a common way into otherwise sound products. Account management guidance helps operators avoid the shared and standing credentials that are common in OT."
                          },
                          {
                              "id":  "SG7",
@@ -858,15 +858,15 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                              "theme":  "sdl",
                              "code":  "SG-7",
                              "title":  "Documentation review",
-                             "evidencePrompt":  "Record the documented process, evidence of practice, and the basis for the maturity level selected.",
+                             "evidencePrompt":  "Record the documented process, the evidence that it is followed, and why you chose this maturity level.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Review the user documentation to confirm the security guidance is accurate and complete.",
-                             "rationale":  "Security guidance that is wrong or incomplete misleads the very users trying to do the right thing. Reviewing the documentation ensures the guidance an operator relies on is actually accurate."
+                             "hint":  "The user documentation is reviewed to confirm that its security guidance is accurate and complete.",
+                             "rationale":  "Wrong or incomplete security guidance misleads the users who are trying to follow it. Reviewing the documentation confirms that operators can rely on it."
                          }
                      ],
     "achievedScale":  {
@@ -933,5 +933,5 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                       },
     "_contentNote":  "47 requirements across 8 practices, verified from the standard. Paraphrased hint (what it is) and rationale (why it matters) on each; verbatimText and otLens empty for population from the licensed standard. Supplier-side instrument; pairs with the supplier-advisory references.",
     "_relatedWork":  "Designed to sit alongside the supplier discovery references and question banks as the scored core of the supplier-evaluation toolkit. Also the authoritative target for \u0027secure development\u0027 cross-references currently pointing loosely at 2-1 ORG 2.3 (CAF A4.b, NIS2 measure (e)).",
-    "seriesContext":  "ISA/IEC 62443 is a series of standards rather than a single document, divided by who is responsible for what. This part, 62443-4-1, addresses the PRODUCT SUPPLIER: the development process behind a product. Its companion 62443-4-2 addresses the security capability of the product itself, and the 3-x parts address the system built from those products."
+    "seriesContext":  "ISA/IEC 62443 is a series of standards divided according to who is responsible for what. This part, 62443-4-1, covers the product supplier and the development process behind a product. Its companion 62443-4-2 covers the security capabilities of the product itself, and the 3-x parts cover the system built from those products."
 };

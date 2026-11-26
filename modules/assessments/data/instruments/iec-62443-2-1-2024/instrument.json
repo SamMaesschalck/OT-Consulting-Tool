@@ -18,7 +18,7 @@
     "targetDimension":  "site",
     "targetDimensionLabel":  "Site",
     "status":  "active",
-    "framing":  "ISA/IEC 62443-2-1:2024 defines Security Program Requirements (SPRs) for IACS asset owners, organised into Security Program Elements (SPEs). Each requirement is assessed at a maturity level (ML1-ML4), selected per requirement based on risk. This replaces the 2010 CSMS structure with a maturity-based Security Program.",
+    "framing":  "ISA/IEC 62443-2-1:2024 sets out Security Program Requirements (SPRs) for IACS asset owners, grouped into Security Program Elements (SPEs). Each requirement is assessed at a maturity level from ML1 to ML4, and the level required for each one is chosen according to risk. The 2024 edition replaces the CSMS structure of the 2010 edition with a maturity-based security programme.",
     "sourceNote":  "SPE structure and the ML maturity model are extracted and verified from the 62443-2-1:2024 document held in the project. The full per-requirement list (codes, titles, requirement text) is to be populated in a verified extraction pass; theme groups are known but individual requirements are not yet complete. ML anchors are paraphrased (single-user licensed source); not verbatim IEC text. Source: ISA/IEC 62443-2-1:2024 (copyright IEC).",
     "maturityModel":  {
                           "basis":  "CMMI-SVC; MLs apply independently per requirement; documentation required from ML2 upward",
@@ -26,34 +26,34 @@
                                          {
                                              "id":  "ML1",
                                              "name":  "Initial",
-                                             "anchor":  "Process is performed but ad hoc and often undocumented or not fully documented; consistency over time is hard to demonstrate.",
-                                             "shortAnchor":  "Performed but ad hoc, not (fully) documented.",
+                                             "anchor":  "The process is performed, but ad hoc and often without full documentation, so it is hard to show that it is done consistently over time.",
+                                             "shortAnchor":  "Performed ad hoc, with little or no documentation.",
                                              "readAs":  "ad hoc",
-                                             "glossary":  "Done ad hoc, if at all. It depends on individuals rather than on a process."
+                                             "glossary":  "The process is ad hoc, if it is performed at all, and depends on the individuals involved."
                                          },
                                          {
                                              "id":  "ML2",
                                              "name":  "Managed",
-                                             "anchor":  "Documentation exists describing how to manage and perform the capability (written procedures or training); practices are repeatable and managed to documented plans. Documentation begins at ML2.",
-                                             "shortAnchor":  "Documented procedures/training; repeatable, managed to plan.",
-                                             "readAs":  "documented and repeatable; documentation begins at ML2",
-                                             "glossary":  "Documented and repeatable. Documentation begins here."
+                                             "anchor":  "Written procedures or training describe how to manage and perform the process. Practice is repeatable and follows documented plans. ML2 is the first level that requires documentation.",
+                                             "shortAnchor":  "Documented procedures or training, repeatable and managed to plan.",
+                                             "readAs":  "documented and repeatable",
+                                             "glossary":  "The process is documented and can be repeated. ML2 is the first level that requires documentation."
                                          },
                                          {
                                              "id":  "ML3",
                                              "name":  "Defined / Practiced",
-                                             "anchor":  "An ML2 process that is actively practised on the IACS, with performance shown to be repeatable over time.",
+                                             "anchor":  "The ML2 process is actively practised on the IACS, and its performance is shown to repeat over time.",
                                              "shortAnchor":  "Documented process actively practised on the IACS, repeatable over time.",
                                              "readAs":  "actively practised on the IACS",
-                                             "glossary":  "Actively practised on the industrial automation and control system, not only written down."
+                                             "glossary":  "The documented process is practised on the industrial automation and control system and is shown to repeat over time."
                                          },
                                          {
                                              "id":  "ML4",
                                              "name":  "Improving",
-                                             "anchor":  "Using process metrics, effectiveness or performance improvement of the process is demonstrated; the program improves the process through technological, procedural or management changes.",
-                                             "shortAnchor":  "Measured with metrics; process is improved over time.",
+                                             "anchor":  "Process metrics show that the process is effective or that its performance is improving. The programme improves the process through technical, procedural or management changes.",
+                                             "shortAnchor":  "Measured with metrics and improved over time.",
                                              "readAs":  "metrics-driven improvement",
-                                             "glossary":  "Measured, and improved on the basis of what the measurements show."
+                                             "glossary":  "The process is measured, and the measurements are used to improve it."
                                          }
                                      ],
                           "_display":  "Show these full definitions ONCE in a help/reference panel, not inline on every requirement. The per-requirement selector uses achievedScale.ordered[].short labels only."
@@ -65,7 +65,7 @@
                          "themes":  [
                                         "ORG"
                                     ],
-                         "summary":  "The organisational foundation of the security program: governance, roles, risk handling, personnel security, training, supply chain and physical access. The processes that make security an owned, sustained activity rather than ad hoc effort."
+                         "summary":  "This element covers the organisational side of the security programme, including governance, roles, risk handling, personnel security, training, the supply chain and physical access. These processes give security named owners and keep it going."
                      },
                      {
                          "id":  "SPE2",
@@ -73,7 +73,7 @@
                          "themes":  [
                                         "CM"
                                     ],
-                         "summary":  "Knowing and controlling the IACS configuration: an accurate asset inventory, current infrastructure documentation, defined configuration settings, and change control over them."
+                         "summary":  "This element covers knowing and controlling the IACS configuration through an accurate asset inventory, current infrastructure documentation, defined configuration settings and change control."
                      },
                      {
                          "id":  "SPE3",
@@ -81,7 +81,7 @@
                          "themes":  [
                                         "NET"
                                     ],
-                         "summary":  "How the IACS network is segmented and its communications protected: separation from non-IACS and safety networks, zone documentation, control of external connections and accessible services, wireless, and remote access."
+                         "summary":  "This element covers segmentation of the IACS network and protection of its communications, including separation from non-IACS and safety networks, zone documentation, external connections, accessible services, wireless and remote access."
                      },
                      {
                          "id":  "SPE4",
@@ -89,7 +89,7 @@
                          "themes":  [
                                         "COMP"
                                     ],
-                         "summary":  "Securing the components themselves: hardening, control of portable media, malware protection, and the practical realities of security patching in an OT environment."
+                         "summary":  "This element covers securing the components themselves through hardening, control of portable media, malware protection and security patching that works in an OT environment."
                      },
                      {
                          "id":  "SPE5",
@@ -97,7 +97,7 @@
                          "themes":  [
                                         "DATA"
                                     ],
-                         "summary":  "Protecting the data important to the IACS: classification, confidentiality, integrity, safety-related configuration data, retention, and the use and management of cryptography."
+                         "summary":  "This element covers protection of the data important to the IACS, including classification, confidentiality, integrity, safety-related configuration data, retention and the use of cryptography."
                      },
                      {
                          "id":  "SPE6",
@@ -105,7 +105,7 @@
                          "themes":  [
                                         "USER"
                                     ],
-                         "summary":  "Controlling who and what can access the IACS: identity assignment and lifecycle, authentication (including MFA), least privilege, session handling, and authorisation including separation of duties."
+                         "summary":  "This element covers control of access to the IACS by people and systems, including identities and their lifecycle, authentication with MFA, least privilege, sessions and authorisation with separation of duties."
                      },
                      {
                          "id":  "SPE7",
@@ -113,7 +113,7 @@
                          "themes":  [
                                         "EVENT"
                                     ],
-                         "summary":  "Detecting, recording and acting on events: event detection and reporting, logging and log access, event analysis, incident handling and response, and vulnerability handling."
+                         "summary":  "This element covers detecting, recording and acting on events, including event reporting, logging and log access, event analysis, incident response and vulnerability handling."
                      },
                      {
                          "id":  "SPE8",
@@ -121,7 +121,7 @@
                          "themes":  [
                                         "AVAIL"
                                     ],
-                         "summary":  "Keeping the IACS running and recoverable: continuity and resource availability, safe failure states, and a sound, verified, restorable backup regime."
+                         "summary":  "This element covers keeping the IACS running and recoverable through continuity planning, resource availability, safe failure states and backups that are verified and can be restored."
                      }
                  ],
     "themeNames":  {
@@ -141,15 +141,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 1.1",
                              "title":  "Information security management system (ISMS)",
-                             "evidencePrompt":  "Capture whether an ISMS exists and its documented scope, then check whether that scope actually reaches the IACS. Record how the security programme and the ISMS are coordinated at the shared interfaces, or, where there is no ISMS, how the equivalent management processes are carried in the programme itself. The basis for the ML is how deliberate and maintained that coordination is.",
+                             "evidencePrompt":  "Record whether an ISMS exists and its documented scope, and check whether that scope includes the IACS. Record how the security programme and the ISMS are coordinated where they share interfaces or, if there is no ISMS, how the programme carries the equivalent management processes. Base the ML on how deliberately that coordination is set up and maintained.",
                              "verbatimText":  "",
                              "otLens":  {
-                                            "framing":  "Assess the coordination, not the existence of a certificate. The question is whether the IACS is genuinely inside a management system with owned scope, roles and a review cycle, and whether the interfaces it shares with corporate IT are jointly managed.",
-                                            "gotchas":  "A corporate 27001 ISMS frequently excludes the OT environment by scope, so a \u0027yes, we have an ISMS\u0027 answer can mask an IACS that no management system actually covers. Note also the version mismatch: the 2024 standard\u0027s Annex A cross-references map to ISO/IEC 27001:2013, not the 2022 edition, so any mapping to a current 27001:2022 ISMS has to be re-bridged by hand."
+                                            "framing":  "Assess how the programme and the ISMS are coordinated. A certificate on its own proves little. Check that the IACS sits inside a management system with an owned scope, roles and a review cycle, and that the interfaces it shares with corporate IT are managed jointly.",
+                                            "gotchas":  "A corporate ISO/IEC 27001 ISMS often excludes the OT environment from its scope, so \"yes, we have an ISMS\" can hide an IACS that no management system covers. The standard\u0027s Annex A cross-references point to ISO/IEC 27001:2013, so mapping to a current 27001:2022 ISMS has to be done by hand."
                                         },
                              "allowNA":  true,
-                             "hint":  "If the organisation already runs an ISMS (typically corporate, often ISO/IEC 27001), coordinate the IACS security programme with it rather than building a parallel one: align scope, ownership and review cycles, and jointly manage the shared interfaces such as firewalls, the DMZ, remote access and cross-domain user access. If there is no ISMS, the programme itself has to carry those management processes. The catch in OT is that a corporate ISMS usually stops at the IT boundary, so \u0027we are 27001 certified\u0027 does not on its own mean the IACS is covered.",
-                             "rationale":  "ORG 1.1 is the joint that connects OT security to whatever management system the organisation already runs. Done well, it stops the programme duplicating or contradicting the ISMS and gives IT and OT an agreed interface. Left undone, the plant either sits outside the ISMS entirely or gets governed by IT rules that were never written with availability and safety in mind."
+                             "hint":  "Where the organisation already runs an ISMS, often ISO/IEC 27001, the IACS security programme is coordinated with it on scope, ownership, review cycles and shared interfaces such as firewalls, the DMZ and remote access. Where there is no ISMS, the programme carries those management processes itself.",
+                             "rationale":  "This requirement links OT security to the management system the organisation already runs. Done well, it keeps the programme from duplicating or contradicting the ISMS and gives IT and OT an agreed interface. Without it, the plant either sits outside the ISMS altogether or is governed by IT rules written without availability and safety in mind."
                          },
                          {
                              "id":  "ORG1.2",
@@ -157,15 +157,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 1.2",
                              "title":  "Background checks",
-                             "evidencePrompt":  "Capture the vetting policy and evidence that it is applied to contractors and vendor staff, not only direct employees. Check whether checks happen before access and how third-party personnel are covered. The ML reflects how consistently and how early the vetting is done across all access holders.",
+                             "evidencePrompt":  "Record the vetting policy and evidence that it is applied to contractors and vendor staff as well as employees. Check whether checks are done before access is granted and how third-party staff are covered. Base the ML on how consistently and how early vetting is done for everyone with access.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Vet everyone before they get IACS access, employees, contractors, sub-contractors, consultants and supplier or service-provider staff alike. Where the law allows, that means identity verification and criminal records checks, applied before access is granted rather than after.",
-                             "rationale":  "Most OT compromise starts with legitimate access, so who you let near the plant matters as much as any technical control. Vendors and contractors often get the deepest access with the least scrutiny, which is exactly the gap background checks are meant to close."
+                             "hint":  "Everyone is vetted before they get IACS access, including employees, contractors, subcontractors, consultants and supplier staff. Where the law allows, vetting includes identity verification and criminal record checks.",
+                             "rationale":  "Most OT compromise starts with legitimate access, so the choice of who is allowed near the plant matters as much as any technical control. Vendors and contractors often get the deepest access with the least scrutiny, and background checks are meant to close that gap."
                          },
                          {
                              "id":  "ORG1.3",
@@ -173,15 +173,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 1.3",
                              "title":  "Security roles and responsibilities",
-                             "evidencePrompt":  "Capture the documented security roles and who holds them, and check the assignees are competent for the role. Record how responsibilities extend to third parties. The ML reflects whether roles are named, understood and kept current rather than nominal.",
+                             "evidencePrompt":  "Record the documented security roles and who holds them, and check that each person is competent for the role. Record how responsibilities extend to third parties. Base the ML on whether roles are named, understood and kept up to date.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Define who owns which security responsibilities and assign them to people qualified to hold them, across employees and third parties. This is about named accountability for the programme, not a generic org chart.",
-                             "rationale":  "When roles are vague, OT security becomes whatever the one engaged engineer happens to do, and it lapses the day they leave. Clear, assigned responsibilities are what keep the programme running through staff turnover and shift changes."
+                             "hint":  "Security responsibilities are defined and assigned to people qualified to hold them, both employees and third parties, so each one has a named owner.",
+                             "rationale":  "When roles are vague, OT security comes down to whatever one committed engineer does, and it lapses when that person leaves. Assigned responsibilities keep the programme running through staff turnover and shift changes."
                          },
                          {
                              "id":  "ORG1.4",
@@ -189,15 +189,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 1.4",
                              "title":  "Security awareness training",
-                             "evidencePrompt":  "Capture the awareness training content, its audience and the refresh cycle, with records showing contractors and vendor staff are included. The ML reflects coverage, currency and whether completion is actually tracked.",
+                             "evidencePrompt":  "Record the awareness training content, its audience and how often it is refreshed, with records showing that contractors and vendor staff take part. Base the ML on coverage, how current the training is and whether completion is tracked.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Give everyone who touches the IACS regular cyber security awareness training, refreshed on a schedule. This is the general awareness level, aimed at all personnel including contractors and vendor staff.",
-                             "rationale":  "Awareness is the cheapest control that reaches the widest population, and in OT that population includes contractors and operators who are prime targets for phishing and social engineering. Training that is one-off or IT-only leaves the plant floor exposed."
+                             "hint":  "Everyone who works on the IACS, contractors and vendor staff included, receives general cyber security awareness training that is refreshed on a schedule.",
+                             "rationale":  "Awareness training is the cheapest control that reaches the most people. In OT those people include contractors and operators, who are frequent targets of phishing and social engineering. One-off or IT-only training leaves the plant floor exposed."
                          },
                          {
                              "id":  "ORG1.5",
@@ -205,15 +205,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 1.5",
                              "title":  "Security responsibilities training",
-                             "evidencePrompt":  "Capture the role-specific training provided or accepted for each IACS security responsibility, and check it maps to the roles in ORG 1.3. The ML reflects whether the right people are trained for their actual duties and how that is verified.",
+                             "evidencePrompt":  "Record the role-specific training provided or accepted for each IACS security responsibility, and check that it matches the roles defined under ORG 1.3. Base the ML on whether people are trained for the duties they hold and how that is checked.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Beyond general awareness, train people for the specific IACS security duties their role carries, and either provide that training or formally accept training they already hold. This is role-specific competence, not the awareness baseline.",
-                             "rationale":  "An operator, an engineer and a vendor technician each need different security skills, and generic awareness does not build them. Role-specific training is what turns assigned responsibilities into something people can actually perform."
+                             "hint":  "People receive training for the IACS security duties of their role, or training they already hold is formally accepted. This is in addition to general awareness training.",
+                             "rationale":  "An operator, an engineer and a vendor technician each need different security skills, and general awareness training does not provide them. Role-specific training gives people the skills to carry out the responsibilities assigned to them."
                          },
                          {
                              "id":  "ORG1.6",
@@ -221,15 +221,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 1.6",
                              "title":  "Supply chain security",
-                             "evidencePrompt":  "Capture the supplier security requirements and where they live (contracts, RFQs, purchase orders), and check whether recursive flow-down is required. The ML reflects how consistently requirements are set and whether supplier conformance is followed up.",
+                             "evidencePrompt":  "Record the security requirements set for suppliers and where they appear, such as contracts, RFQs and purchase orders, and check whether suppliers must pass them on to their own suppliers. Base the ML on how consistently requirements are set and whether supplier conformance is followed up.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Set cyber security requirements for the suppliers of your products and services, and, where you can, require them to push equivalent requirements down to their own suppliers. This is the flow-down of security expectations into procurement and contracts.",
-                             "rationale":  "Most OT kit and much of its maintenance comes through a supply chain you do not control, so your security is only as good as the requirements you place on it. Recursive requirements matter because the real risk often sits two or three tiers down, in a sub-supplier you never see."
+                             "hint":  "Cyber security requirements are set for suppliers of products and services and, where possible, suppliers must pass equivalent requirements on to their own suppliers.",
+                             "rationale":  "Most OT equipment, and much of its maintenance, comes through a supply chain the asset owner does not control, so the requirements placed on that chain set the level of protection. Passing requirements down matters because the risk often sits two or three tiers away, with a sub-supplier the owner never deals with."
                          },
                          {
                              "id":  "ORG2.1",
@@ -237,15 +237,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 2.1",
                              "title":  "Security risk mitigation",
-                             "evidencePrompt":  "Capture the risk methodology, a current risk register or equivalent, the defined tolerable-risk level, and evidence that out-of-tolerance risks are being treated. The ML reflects whether risk management is a live, repeatable practice or a one-off document.",
+                             "evidencePrompt":  "Record the risk method, a current risk register or equivalent, the defined tolerable risk level, and evidence that risks above it are being treated. Base the ML on whether risk management is a repeated, current practice or a one-off document.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Run a real risk process: identify, document and treat IACS cyber security risks, set a tolerable risk level, and act on anything above it. This is the core risk engine the rest of the programme feeds from.",
-                             "rationale":  "Everything else in the programme is meant to reduce risk, so without an owned method for judging what is tolerable, control decisions become arbitrary. In OT the tolerability line has to account for safety and availability, not just data loss, which is what sets it apart from an IT risk register."
+                             "hint":  "IACS cyber security risks are identified, documented and treated against a defined tolerable risk level, and anything above that level is acted on.",
+                             "rationale":  "The rest of the programme exists to reduce risk, and without an owned method for judging what is tolerable, control decisions become arbitrary. In OT the tolerable level has to account for safety and availability as well as data loss, which sets it apart from an IT risk register."
                          },
                          {
                              "id":  "ORG2.2",
@@ -253,15 +253,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 2.2",
                              "title":  "Processes for discovery of security anomalies",
-                             "evidencePrompt":  "Capture how anomaly discovery is performed and how often, covering unauthorised components, unexpected traffic and undocumented vulnerabilities, with examples of findings and follow-up. The ML reflects whether discovery is scheduled and acted on rather than incidental.",
+                             "evidencePrompt":  "Record how and how often anomaly discovery is done, covering unauthorised components, unexpected traffic and undocumented vulnerabilities, with examples of findings and the follow-up. Base the ML on whether discovery is scheduled and its findings acted on.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Periodically hunt for what should not be there: undocumented or unauthorised devices and software, unexpected network traffic, new or undocumented vulnerabilities, and other anomalies, by manual or automated means. This is active discovery against your baseline, not passive hope.",
-                             "rationale":  "OT environments drift, with rogue laptops, forgotten remote links and quietly added kit, and none of it shows up unless someone looks. Regular discovery is how you find the gap between the documented system and the real one before an attacker does."
+                             "hint":  "The asset owner periodically searches, manually or with tools, for undocumented or unauthorised devices and software, unexpected network traffic, new vulnerabilities and other anomalies.",
+                             "rationale":  "OT environments drift. Rogue laptops, forgotten remote links and equipment added without record go unseen unless someone looks for them. Regular discovery finds the difference between the documented system and the real one before an attacker does."
                          },
                          {
                              "id":  "ORG2.3",
@@ -269,15 +269,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 2.3",
                              "title":  "Secure development and support",
-                             "evidencePrompt":  "Capture whether an SDL process exists for in-house development and support, and how it is applied. Where development is outsourced, record how the requirement is placed on suppliers. The ML reflects how formal and consistently followed the lifecycle is.",
+                             "evidencePrompt":  "Record whether a secure development lifecycle exists for in-house development and support, and how it is applied. Where development is outsourced, record how the requirement is placed on suppliers. Base the ML on how formal the lifecycle is and how consistently it is followed.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Require a secure development lifecycle for the systems and components you develop or support yourselves, and expect it of what you procure. This applies SDL discipline to anything the asset owner builds or maintains in-house.",
-                             "rationale":  "Where the asset owner develops or maintains its own IACS software, the same secure-development weaknesses that plague vendors apply. A defined lifecycle is what stops locally-built tooling and integrations becoming the soft entry point."
+                             "hint":  "Systems and components that the asset owner develops or supports itself follow a secure development lifecycle, and the same is expected of what it buys in.",
+                             "rationale":  "Where the asset owner develops or maintains its own IACS software, it faces the same secure development weaknesses as vendors do. A defined lifecycle stops locally built tools and integrations becoming the easiest way in."
                          },
                          {
                              "id":  "ORG2.4",
@@ -285,15 +285,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 2.4",
                              "title":  "SP reviews",
-                             "evidencePrompt":  "Capture the review cadence, what the review covers, and evidence of improvements made as a result. The ML reflects whether reviews are regular, substantive and closed out, or nominal.",
+                             "evidencePrompt":  "Record how often the programme is reviewed, what the review covers and the improvements made as a result. Base the ML on whether reviews are regular, cover substance and lead to closed actions.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Review the security programme itself on a schedule: check it is being applied, that its controls still meet the security requirements, and that it keeps pace with organisational, technical and threat changes, then improve it. This is the programme\u0027s own audit and improvement loop.",
-                             "rationale":  "A programme that is never reviewed decays as the plant, the organisation and the threats around it change. Periodic review is what keeps the paperwork matching reality and stops maturity quietly slipping back."
+                             "hint":  "The security programme is reviewed on a schedule to check that it is applied, that its controls still meet the security requirements and that it keeps up with organisational, technical and threat changes. The findings are used to improve it.",
+                             "rationale":  "A programme that is never reviewed falls behind as the plant, the organisation and the threats change. Periodic review keeps the documentation in line with what happens on site and stops maturity slipping back unnoticed."
                          },
                          {
                              "id":  "ORG3.1",
@@ -301,15 +301,15 @@
                              "theme":  "ORG",
                              "code":  "ORG 3.1",
                              "title":  "Physical access control",
-                             "evidencePrompt":  "Capture how physical access to IACS areas, equipment and cabling is controlled and monitored, and check it reflects the assessed risk. The ML reflects whether physical controls are defined, enforced and matched to the sensitivity of what they protect.",
+                             "evidencePrompt":  "Record how physical access to IACS areas, equipment and cabling is controlled and monitored, and check that it reflects the assessed risk. Base the ML on whether physical controls are defined, enforced and matched to the sensitivity of what they protect.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Control physical access to the IACS, including facilities, equipment and cabling, to meet your risk targets. Physical reach to a controller or a network cable often defeats every logical control, so treat this as a first-class security requirement rather than a facilities afterthought.",
-                             "rationale":  "In OT, physical access usually means total access: a USB port, a console, a spare switch port or an exposed cable run can bypass segmentation and authentication entirely. Controlling who can physically reach the kit is one of the most effective protections available."
+                             "hint":  "Physical access to IACS facilities, equipment and cabling is controlled to meet the asset owner\u0027s risk targets.",
+                             "rationale":  "In OT, physical access usually means full access. A USB port, a console, a spare switch port or an exposed cable run can bypass segmentation and authentication altogether. Controlling who can reach the equipment is one of the most effective protections available."
                          },
                          {
                              "id":  "CM1.1",
@@ -317,15 +317,15 @@
                              "theme":  "CM",
                              "code":  "CM 1.1",
                              "title":  "Asset inventory baseline",
-                             "evidencePrompt":  "Capture the inventory itself and how it is maintained, and test its completeness against what is actually on the network. The ML reflects accuracy, coverage and whether the baseline is kept current through change, not just built once.",
+                             "evidencePrompt":  "Record the inventory and how it is maintained, and test its completeness against what is on the network. Base the ML on accuracy, coverage and whether change keeps the baseline current after it is first built.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Build and maintain, for the whole IACS lifecycle, an inventory baseline of every device, hardware and software component, protocol and open port, with ownership, make, model, versions, serials and network details. You cannot protect or patch what you do not know you have.",
-                             "rationale":  "The asset inventory is the foundation the rest of the programme stands on, from patching to segmentation to incident response. In OT it is also the hardest thing to get right, because legacy kit, undocumented additions and passive-only visibility all work against a complete picture."
+                             "hint":  "An inventory baseline of every IACS device and hardware and software component, protocol and open port is built and maintained for the whole lifecycle. It records ownership, make, model, versions, serial numbers and network details.",
+                             "rationale":  "Patching, segmentation, incident response and most other parts of the programme depend on the asset inventory. In OT it is also the hardest thing to get right, because legacy equipment, undocumented additions and passive-only visibility all get in the way of a complete record."
                          },
                          {
                              "id":  "CM1.2",
@@ -333,15 +333,15 @@
                              "theme":  "CM",
                              "code":  "CM 1.2",
                              "title":  "Infrastructure drawings/documentation",
-                             "evidencePrompt":  "Capture the current drawings and documentation and check them against the real topology. The ML reflects how accurate and how actively maintained they are, especially after changes.",
+                             "evidencePrompt":  "Record the current drawings and documentation and check them against the real topology. Base the ML on how accurate they are and how well they are maintained, especially after changes.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Keep current drawings and documentation showing the physical and logical connectivity of every IACS device and software component. These are the maps you and your responders navigate by, so they have to match the live system.",
-                             "rationale":  "Out-of-date network diagrams are worse than none, because people trust them during an incident when there is no time to verify. Accurate connectivity documentation is what makes segmentation decisions and incident response possible under pressure."
+                             "hint":  "Current drawings and documentation show the physical and logical connectivity of every IACS device and software component, and they match the live system.",
+                             "rationale":  "Out-of-date network diagrams can be worse than none, because people rely on them during an incident when there is no time to check. Accurate connectivity documentation lets staff make segmentation decisions and respond to incidents under pressure."
                          },
                          {
                              "id":  "CM1.3",
@@ -349,15 +349,15 @@
                              "theme":  "CM",
                              "code":  "CM 1.3",
                              "title":  "Configuration settings",
-                             "evidencePrompt":  "Capture the documented configuration baselines and the process for verifying operational compliance against them. The ML reflects whether verification is routine and drift is detected and corrected.",
+                             "evidencePrompt":  "Record the documented configuration baselines and the process for checking running systems against them. Base the ML on whether the checks are routine and whether drift is found and corrected.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Document the configuration settings of IACS devices and applications, and verify that the running configuration still matches. This is the known-good baseline you compare against to spot drift or tampering.",
-                             "rationale":  "Undocumented, unverified configuration is where silent drift and quiet compromise both hide. Being able to compare live settings against a documented baseline turns a vague \u0027it looks fine\u0027 into an actual assurance."
+                             "hint":  "Configuration settings for IACS devices and applications are documented, and the running configuration is checked against them to detect drift or tampering.",
+                             "rationale":  "Configuration that is undocumented and unchecked is where drift and compromise both go unnoticed. Comparing live settings with a documented baseline gives evidence that a system is configured as intended."
                          },
                          {
                              "id":  "CM1.4",
@@ -365,15 +365,15 @@
                              "theme":  "CM",
                              "code":  "CM 1.4",
                              "title":  "Change control",
-                             "evidencePrompt":  "Capture the change-control workflow and records of changes going through it, and check whether separation of duties is applied. The ML reflects how consistently changes are authorised, validated and documented rather than made ad hoc.",
+                             "evidencePrompt":  "Record the change control workflow and records of changes that went through it, and check whether separation of duties is applied. Base the ML on how consistently changes are authorised, validated and documented.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Have a real change-control process that authorises, validates and approves changes to the configuration baseline, drawings and documentation, including revision and patch levels. Separation of duties between who makes, checks and approves a change is the good-practice target.",
-                             "rationale":  "Uncontrolled change is the most common way an OT system slips out of its known-good state, whether through a well-meant tweak or a malicious one. Change control is what keeps the inventory, the drawings and the baselines meaning anything over time."
+                             "hint":  "Changes to the configuration baseline, drawings and documentation, including revision and patch levels, are authorised, validated and approved through a change control process. The good practice target is that different people make, check and approve each change.",
+                             "rationale":  "Uncontrolled change is the most common way an OT system moves away from its known good state, whether the change is well meant or malicious. Change control keeps the inventory, drawings and baselines accurate over time."
                          },
                          {
                              "id":  "NET1.1",
@@ -381,15 +381,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.1",
                              "title":  "Segmentation from non-IACS zones",
-                             "evidencePrompt":  "Capture how the IACS is segmented from non-IACS zones, the interconnections that exist and why each is justified. The ML reflects how minimal, documented and enforced the segmentation is.",
+                             "evidencePrompt":  "Record how the IACS is segmented from non-IACS zones, which interconnections exist and the justification for each. Base the ML on how few, how well documented and how well enforced the interconnections are.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Segment the IACS from non-IACS zones and cut interconnections to the minimum the operation genuinely needs, within tolerable risk. This is the primary boundary between the plant and everything else, IT and beyond.",
-                             "rationale":  "The IT/OT boundary is where most external threats have to cross, so a small, controlled number of well-understood interconnections is one of the strongest protections you have. Flat or loosely-connected networks give an attacker who lands anywhere a clear run at the process."
+                             "hint":  "The IACS is segmented from non-IACS zones, and interconnections are kept to the minimum the operation needs within tolerable risk.",
+                             "rationale":  "Most external threats have to cross the IT/OT boundary, so a small number of controlled, well-understood interconnections is one of the strongest protections available. On a flat or loosely connected network, an attacker who gets in anywhere has a clear path to the process."
                          },
                          {
                              "id":  "NET1.2",
@@ -397,15 +397,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.2",
                              "title":  "Documentation of zones and network zone interconnections",
-                             "evidencePrompt":  "Capture the zone and conduit baseline with risk and trust designations, and check it matches the deployed architecture. The ML reflects completeness, accuracy and maintenance of that picture.",
+                             "evidencePrompt":  "Record the zone and conduit baseline with its risk and trust designations, and check it against the deployed architecture. Base the ML on how complete, accurate and well maintained that baseline is.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Maintain a baseline of all IACS zones, their interconnections or conduits, the risk attached to each, and whether each is trusted or untrusted. This is the zones-and-conduits picture that segmentation decisions rest on.",
-                             "rationale":  "Zones and conduits only protect you if you know where they are and which you can rely on. Documenting the trust designation of each interconnection is what lets you reason about where an attacker could move and where to watch."
+                             "hint":  "A baseline is maintained of all IACS zones and their interconnections or conduits, with the risk attached to each and whether each is trusted or untrusted.",
+                             "rationale":  "Zones and conduits protect the IACS only if the asset owner knows where they are and which can be relied on. Recording the trust designation of each interconnection shows where an attacker could move and where monitoring is needed."
                          },
                          {
                              "id":  "NET1.3",
@@ -413,15 +413,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.3",
                              "title":  "Network segmentation from safety systems",
-                             "evidencePrompt":  "Capture how the safety system network is separated from non-safety networks and how that separation is enforced and verified. Flag any path by which a non-safety device could affect the SIS. The ML reflects the strength and assurance of that separation. Mark not applicable if there is no safety system network.",
+                             "evidencePrompt":  "Record how the safety system network is separated from other networks and how the separation is enforced and verified. Flag any path by which a non-safety device could affect the SIS. Base the ML on the strength of the separation and the assurance behind it. Mark not applicable if there is no safety system network.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Where a safety system network exists, protect it from interference by non-safety networks and their devices. Keep the safety instrumented systems separated so ordinary network problems and attacks cannot reach them. Safety-critical.",
-                             "rationale":  "Safety systems are the last line before physical harm, so anything that lets a compromised control or business network reach them raises the stakes from outage to injury. This is a safety-critical requirement, and interference does not have to be malicious to be dangerous."
+                             "hint":  "Where a safety system network exists, it is protected from interference by non-safety networks and devices, so that ordinary network faults and attacks cannot reach the safety instrumented systems.",
+                             "rationale":  "Safety systems are the last protection before physical harm. A path from a compromised control or business network to the safety system turns a possible outage into a possible injury. Interference can be dangerous even when nobody intends harm."
                          },
                          {
                              "id":  "NET1.4",
@@ -429,15 +429,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.4",
                              "title":  "Network autonomy",
-                             "evidencePrompt":  "Capture how the IACS behaves when isolated from external networks and whether the intended operating modes hold. The ML reflects how well autonomy is designed, tested and understood.",
+                             "evidencePrompt":  "Record how the IACS behaves when isolated from external networks and whether it keeps to the intended operating modes. Base the ML on how well autonomy is designed, tested and understood.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Make sure the IACS can still operate as designed when cut off from external networks, whether that means normal running, restricted operation, safe shutdown or fail-safe. Autonomy is what lets you disconnect without losing the plant.",
-                             "rationale":  "If pulling the external connection breaks the process, you can never use disconnection as a defence, which removes one of the most decisive responses to an active attack. Designed-in autonomy keeps that option open."
+                             "hint":  "The IACS keeps operating as designed when cut off from external networks, whether that means normal running, restricted operation, safe shutdown or a fail-safe state.",
+                             "rationale":  "If removing the external connection stops the process, disconnection cannot be used as a defence, and that is one of the most effective responses to an active attack. Building autonomy into the design keeps the option open."
                          },
                          {
                              "id":  "NET1.5",
@@ -445,15 +445,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.5",
                              "title":  "Network disconnection from external networks",
-                             "evidencePrompt":  "Capture the means and procedure for disconnecting from external networks, who can invoke it and under what conditions. The ML reflects whether the capability is defined, practised and readily usable.",
+                             "evidencePrompt":  "Record the means and procedure for disconnecting from external networks, who can trigger it and in what circumstances. Base the ML on whether the capability is defined, rehearsed and ready to use.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Be able to disconnect the IACS from external networks to protect itself or those networks when a threat is real or suspected. This is the deliberate \u0027pull the cord\u0027 capability, ideally quick and rehearsed.",
-                             "rationale":  "When an attack is underway, the ability to cleanly sever external connectivity can be the difference between a contained incident and a spreading one. It only helps if the mechanism exists, is known and can be used without a scramble."
+                             "hint":  "The IACS can be disconnected from external networks to protect itself or those networks when a threat is confirmed or suspected.",
+                             "rationale":  "During an attack, cutting external connections cleanly can keep an incident contained. This works only if the mechanism exists, people know about it and it can be used quickly."
                          },
                          {
                              "id":  "NET1.6",
@@ -461,15 +461,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.6",
                              "title":  "Internal network access control",
-                             "evidencePrompt":  "Capture how internal segment-to-segment communication is controlled and how its risks are assessed and treated. The ML reflects how deliberately internal flows are restricted and reviewed.",
+                             "evidencePrompt":  "Record how communication between internal segments is controlled and how its risks are assessed and treated. Base the ML on how deliberately internal flows are restricted and reviewed.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Manage the risks of communication between internal IACS segments the same way you manage the external boundary: identify, document and treat them, set a tolerable level and act on what exceeds it. This is east-west control inside the plant, not just the perimeter.",
-                             "rationale":  "Once an attacker is inside, internal segmentation is what stops one compromised device becoming the whole plant. Treating internal flows as risks to be managed, rather than implicitly trusted, is what limits lateral movement."
+                             "hint":  "Risks from communication between internal IACS segments are identified, documented and treated against a tolerable level, in the same way as risks at the external boundary.",
+                             "rationale":  "Once an attacker is inside, internal segmentation stops one compromised device leading to the whole plant. Managing internal flows as risks, with no implicit trust, limits lateral movement."
                          },
                          {
                              "id":  "NET1.7",
@@ -477,15 +477,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.7",
                              "title":  "Network accessible services",
-                             "evidencePrompt":  "Capture how accessible services are inventoried and protected from unauthorised access. The ML reflects how well exposure is understood and controlled.",
+                             "evidencePrompt":  "Record how network-accessible services are inventoried and protected from unauthorised access. Base the ML on how well the exposure is understood and controlled.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Protect network-accessible services from unauthorised network access. Know what is listening, and make sure only what should reach it can.",
-                             "rationale":  "Every exposed service is a potential door, and OT systems accumulate listening services that no one remembers enabling. Restricting access to them shrinks the attack surface directly."
+                             "hint":  "Network-accessible services are known and protected from unauthorised network access.",
+                             "rationale":  "Every exposed service is a possible way in, and OT systems collect listening services that nobody remembers enabling. Restricting access to them reduces the attack surface directly."
                          },
                          {
                              "id":  "NET1.8",
@@ -493,15 +493,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.8",
                              "title":  "User messaging",
-                             "evidencePrompt":  "Capture how messaging on IACS networks is restricted from carrying active or executable payloads. The ML reflects how consistently that restriction is applied.",
+                             "evidencePrompt":  "Record how messaging on IACS networks is prevented from carrying active or executable content. Base the ML on how consistently that restriction is applied.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Stop user-to-user messages on IACS networks from carrying payloads such as attachments, links or scripts that could be used to attack the IACS. Keep active content off the plant\u0027s messaging paths.",
-                             "rationale":  "Messaging that can carry executable content turns an ordinary communication channel into a delivery route for malware. On OT networks, where endpoints are fragile and slow to patch, that route is worth closing."
+                             "hint":  "User-to-user messages on IACS networks cannot carry content such as attachments, links or scripts that could be used to attack the IACS.",
+                             "rationale":  "Messaging that can carry executable content becomes a delivery route for malware. On OT networks, where endpoints are fragile and slow to patch, that route is worth closing."
                          },
                          {
                              "id":  "NET1.9",
@@ -509,15 +509,15 @@
                              "theme":  "NET",
                              "code":  "NET 1.9",
                              "title":  "Network time distribution",
-                             "evidencePrompt":  "Capture how time is sourced, distributed and protected across the IACS. The ML reflects how reliable and trustworthy the time distribution is.",
+                             "evidencePrompt":  "Record how time is sourced, distributed and protected across the IACS. Base the ML on how reliable and trustworthy the time source and distribution are.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Distribute and synchronise trusted time across the IACS. Reliable, common time is what makes logs correlate and lets some security mechanisms work at all.",
-                             "rationale":  "Without synchronised time, scattered logs cannot be assembled into a coherent account of an incident, and time-dependent security functions misbehave. Trusted time is quiet infrastructure that detection and response both depend on."
+                             "hint":  "Trusted time is distributed and synchronised across the IACS, so logs can be correlated and time-dependent security functions work.",
+                             "rationale":  "Without synchronised time, logs from different systems cannot be pieced together into an account of an incident, and time-dependent security functions fail. Detection and response both depend on a trusted time source."
                          },
                          {
                              "id":  "NET2.1",
@@ -525,15 +525,15 @@
                              "theme":  "NET",
                              "code":  "NET 2.1",
                              "title":  "Wireless protocols",
-                             "evidencePrompt":  "Capture whether wireless is authorised, which protocols, and the documented baseline and security features for each. Where wireless is not used, record that. The ML reflects how deliberately wireless use is decided and documented.",
+                             "evidencePrompt":  "Record whether wireless is authorised, which protocols are allowed, and the documented baseline and security features for each. Where wireless is not used, record that. Base the ML on how deliberately wireless use is decided and documented.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Decide whether wireless is used in the IACS at all, and which industry-accepted protocols are authorised if so, then document each one: baseline configuration, cross-segment data exchanges and the security features in use. If wireless is not authorised, that is a legitimate and clean answer.",
-                             "rationale":  "Wireless removes the physical-access barrier that protects much of OT, so its use has to be a conscious, documented decision rather than something that appears organically. Knowing exactly which protocols are sanctioned is the precondition for securing or excluding them."
+                             "hint":  "The asset owner decides whether wireless is used in the IACS and which industry-accepted protocols are authorised. Each authorised protocol is documented with its baseline configuration, data exchanges between segments and security features. Not authorising wireless at all is a valid answer.",
+                             "rationale":  "Wireless removes the physical barrier that protects much of OT, so using it has to be a conscious, documented decision. Knowing which protocols are allowed is the starting point for securing or excluding them."
                          },
                          {
                              "id":  "NET2.2",
@@ -541,15 +541,15 @@
                              "theme":  "NET",
                              "code":  "NET 2.2",
                              "title":  "Wireless network segmentation",
-                             "evidencePrompt":  "Capture how authorised wireless is segmented from other IACS segments. The ML reflects the strength of that separation. Mark not applicable if wireless is not authorised.",
+                             "evidencePrompt":  "Record how authorised wireless is segmented from other IACS segments. Base the ML on the strength of that separation. Mark not applicable if wireless is not authorised.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "If wireless is authorised, segment it from other IACS network segments. Treat the wireless domain as its own zone rather than letting it bridge straight into the plant.",
-                             "rationale":  "Wireless is reachable from outside the fence, so a wireless segment that connects directly into control networks hands an attacker a way past physical and perimeter controls. Segmenting it contains that exposure."
+                             "hint":  "Where wireless is authorised, it is segmented from other IACS network segments and treated as a zone of its own.",
+                             "rationale":  "Wireless can be reached from outside the site fence, so a wireless segment connected directly to control networks gives an attacker a way past physical and perimeter controls. Segmenting it contains that exposure."
                          },
                          {
                              "id":  "NET2.3",
@@ -557,15 +557,15 @@
                              "theme":  "NET",
                              "code":  "NET 2.3",
                              "title":  "Wireless properties and addresses",
-                             "evidencePrompt":  "Capture how authorised wireless is configured to limit information exposure. The ML reflects how deliberately that hardening is applied. Mark not applicable if wireless is not authorised.",
+                             "evidencePrompt":  "Record how authorised wireless is configured to limit the information it exposes. Base the ML on how deliberately that hardening is applied. Mark not applicable if wireless is not authorised.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "If wireless is authorised, configure it with properties and network addresses that give away as little useful information as possible to attackers. Reduce the reconnaissance value of the wireless footprint.",
-                             "rationale":  "Wireless networks broadcast, so default names, revealing addresses and chatty configurations hand reconnaissance to anyone in range. Minimising that information raises the effort needed to target the network."
+                             "hint":  "Where wireless is authorised, its properties and network addresses are set to give attackers as little useful information as possible.",
+                             "rationale":  "Wireless networks broadcast, so default names, revealing addresses and verbose configurations help anyone in range plan an attack. Limiting that information makes the network harder to target."
                          },
                          {
                              "id":  "NET3.1",
@@ -573,15 +573,15 @@
                              "theme":  "NET",
                              "code":  "NET 3.1",
                              "title":  "Remote access applications",
-                             "evidencePrompt":  "Capture which remote-access applications are authorised and how that is enforced. The ML reflects how tightly the toolset is controlled. Mark not applicable if remote access is not authorised.",
+                             "evidencePrompt":  "Record which remote access applications are authorised and how that is enforced. Base the ML on how tightly the set of tools is controlled. Mark not applicable if remote access is not authorised.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "If remote access is used, restrict it to commonly accepted, appropriate remote-access applications. Standardise on known, supportable tools rather than whatever each vendor brings.",
-                             "rationale":  "Remote access is one of the most common OT compromise routes, and a sprawl of ad hoc vendor tools multiplies the risk. Limiting the applications in use is the first step to controlling the channel."
+                             "hint":  "Where remote access is used, it is limited to commonly accepted remote access applications suited to the purpose.",
+                             "rationale":  "Remote access is one of the most common routes into OT, and each extra vendor tool adds to the risk. Limiting the applications in use is the first step in controlling the channel."
                          },
                          {
                              "id":  "NET3.2",
@@ -589,15 +589,15 @@
                              "theme":  "NET",
                              "code":  "NET 3.2",
                              "title":  "Remote access connections",
-                             "evidencePrompt":  "Capture how remote connections are authorised, authenticated, encrypted, logged and monitored, and check the per-connection documentation. The ML reflects how completely and consistently these controls are applied. Mark not applicable if remote access is not authorised.",
+                             "evidencePrompt":  "Record how remote connections are authorised, authenticated, encrypted, logged and monitored, and check the documentation for each connection. Base the ML on how completely and consistently these controls are applied. Mark not applicable if remote access is not authorised.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "If remote access is used, authorise, authenticate, encrypt, document, log and monitor every interactive remote connection, with each connection\u0027s purpose, tooling, crypto and authentication recorded. This is the full control set around remote access, not just a VPN.",
-                             "rationale":  "Remote access gives an outside party hands on the plant, so every connection needs to be accountable end to end. Logging and monitoring turn remote access from a blind trust into something you can supervise and later reconstruct."
+                             "hint":  "Where remote access is used, every interactive remote connection is authorised, authenticated, encrypted, documented, logged and monitored. The record for each connection gives its purpose, tools, encryption and authentication.",
+                             "rationale":  "Remote access lets an outside party operate on the plant, so each connection has to be accountable from end to end. Logging and monitoring let the asset owner supervise remote sessions and reconstruct them later."
                          },
                          {
                              "id":  "NET3.3",
@@ -605,15 +605,15 @@
                              "theme":  "NET",
                              "code":  "NET 3.3",
                              "title":  "Remote access termination",
-                             "evidencePrompt":  "Capture the inactivity timeout for remote sessions and how it is enforced. The ML reflects whether termination is reliably automatic. Mark not applicable if remote access is not authorised.",
+                             "evidencePrompt":  "Record the inactivity timeout for remote sessions and how it is enforced. Base the ML on whether sessions are reliably ended automatically. Mark not applicable if remote access is not authorised.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "If remote access is used, terminate interactive remote sessions after a configured period of inactivity. Do not leave open doors idling.",
-                             "rationale":  "An idle remote session is an unattended way in, and OT sessions are often left connected for convenience. Automatic termination closes that window without relying on people to remember."
+                             "hint":  "Where remote access is used, interactive remote sessions end automatically after a set period of inactivity.",
+                             "rationale":  "An idle remote session is an unattended way in, and OT sessions are often left connected for convenience. Ending them automatically closes that gap without relying on people to remember."
                          },
                          {
                              "id":  "COMP1.1",
@@ -621,15 +621,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 1.1",
                              "title":  "Component hardening",
-                             "evidencePrompt":  "Capture the hardening standards used, evidence they are applied before deployment, and how the hardened state is maintained and documented. The ML reflects consistency of hardening and whether it survives maintenance.",
+                             "evidencePrompt":  "Record the hardening standards used, evidence that they are applied before deployment, and how the hardened state is maintained and documented. Base the ML on how consistently hardening is applied and whether it survives maintenance.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Harden components before they go into the IACS, protecting their software and hardware features, keep them hardened for their whole life, and document what hardening was done and how. Removing what you do not need shrinks the attack surface of each device.",
-                             "rationale":  "Every unused service, port and default left enabled is a way in, and OT components ship with plenty of them. Hardening, and keeping it in place through maintenance, is one of the most direct per-device protections available."
+                             "hint":  "Components are hardened before they go into the IACS and stay hardened for their whole life, and the hardening applied is documented.",
+                             "rationale":  "Each unused service, open port and default setting left in place is a possible way in, and OT components ship with many of them. Hardening each device, and keeping it hardened through maintenance, is one of the most direct protections available."
                          },
                          {
                              "id":  "COMP1.2",
@@ -637,15 +637,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 1.2",
                              "title":  "Dedicated portable media",
-                             "evidencePrompt":  "Capture the portable-media policy and how approved and disapproved use is enforced technically. The ML reflects how clearly and strictly media use is controlled.",
+                             "evidencePrompt":  "Record the portable media policy and the technical controls that enforce approved and prohibited uses. Base the ML on how clearly and strictly media use is controlled.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Define what portable media use and functions are approved or disapproved within the IACS. Removable media is a classic OT infection route, so its handling needs a clear policy, not custom and habit.",
-                             "rationale":  "USB and other removable media have carried some of the most damaging OT infections precisely because they cross air gaps that networks cannot. Deciding deliberately what is allowed is the control that governs that route."
+                             "hint":  "The asset owner defines which uses and functions of portable media are approved or prohibited in the IACS.",
+                             "rationale":  "USB sticks and other removable media have carried some of the most damaging OT infections because they cross air gaps that networks cannot. A clear decision on what is allowed is the control for that route."
                          },
                          {
                              "id":  "COMP2.1",
@@ -653,15 +653,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 2.1",
                              "title":  "Malware free",
-                             "evidencePrompt":  "Capture how components and media are checked for malware before use and what tools or process is used. The ML reflects how consistently the check is done and recorded.",
+                             "evidencePrompt":  "Record how components and media are checked for malware before use, and the tools or process used. Base the ML on how consistently the check is done and recorded.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Verify that components and, where authorised, portable media are free of known malware before they are used in the IACS. Clean on entry, so nothing arrives pre-infected.",
-                             "rationale":  "Kit and media can arrive compromised from suppliers, staging or a technician\u0027s laptop, and once inside the IACS the chance to catch it cheaply is gone. Checking before use is the last clean point in the chain."
+                             "hint":  "Components, and portable media where its use is authorised, are checked for known malware before they are used in the IACS.",
+                             "rationale":  "Equipment and media can arrive already infected from a supplier, a staging area or a technician\u0027s laptop. Once inside the IACS, the infection is far harder and costlier to catch, so the check before use is the last cheap opportunity."
                          },
                          {
                              "id":  "COMP2.2",
@@ -669,15 +669,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 2.2",
                              "title":  "Malware protection",
-                             "evidencePrompt":  "Capture where malware protection is deployed, where it is not feasible and why, and what compensates for the gaps. The ML reflects coverage of the feasible estate and how the rest is handled.",
+                             "evidencePrompt":  "Record where malware protection is deployed, where it is not feasible and why, and what compensates for the gaps. Base the ML on coverage of the systems where it is feasible and how the rest are handled.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Install, run and maintain malware protection where it is feasible. The \u0027where feasible\u0027 matters in OT: some devices cannot host it, so protection goes where it can and is compensated for where it cannot.",
-                             "rationale":  "Anti-malware is standard in IT but only partly transferable to OT, where controllers and legacy hosts often cannot run it. The requirement is to protect what you can and be honest about the gaps, not to pretend blanket coverage."
+                             "hint":  "Malware protection is installed, running and maintained wherever it is feasible. Where a device cannot host it, other measures compensate.",
+                             "rationale":  "Anti-malware software is standard in IT but only partly usable in OT, where controllers and legacy hosts often cannot run it. The requirement is to protect what can be protected and to record the gaps honestly."
                          },
                          {
                              "id":  "COMP2.3",
@@ -685,15 +685,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 2.3",
                              "title":  "Malware protection software validation and installation",
-                             "evidencePrompt":  "Capture how anti-malware updates are tested, approved and rolled out, and how timely that is. The ML reflects whether updates are both controlled and current.",
+                             "evidencePrompt":  "Record how anti-malware updates are tested, approved and rolled out, and how quickly. Base the ML on whether updates are both controlled and current.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Test malware protection software and its signature updates for compatibility, approve them, and install them promptly after release. Update discipline that respects the risk of breaking fragile systems.",
-                             "rationale":  "Signature and engine updates that go straight onto OT hosts have caused their own outages, so blind auto-update is not safe here, but stale protection is nearly useless. The balance is tested, approved, timely updates."
+                             "hint":  "Malware protection software and its signature updates are tested for compatibility, approved and installed promptly after release.",
+                             "rationale":  "Signature and engine updates pushed straight onto OT hosts have caused outages of their own, so automatic updating without testing is unsafe. Out-of-date protection does little, so updates have to be both tested and timely."
                          },
                          {
                              "id":  "COMP3.1",
@@ -701,15 +701,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 3.1",
                              "title":  "Security patch authenticity/integrity",
-                             "evidencePrompt":  "Capture how patch authenticity and integrity are verified before installation. The ML reflects whether verification is routine and applied to all patches.",
+                             "evidencePrompt":  "Record how the authenticity and integrity of patches are verified before installation. Base the ML on whether verification is routine and covers every patch.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Verify that patches are authentic and intact before you install them. Confirm the source and that nothing has been tampered with in transit.",
-                             "rationale":  "A patch is code with deep access, so a forged or altered one is a direct path to compromise. Checking authenticity and integrity first is what stops the update mechanism becoming the attack."
+                             "hint":  "Patches are checked for authenticity and integrity before installation, confirming their source and that they have not been altered in transit.",
+                             "rationale":  "A patch is code with deep access, so a forged or altered patch leads directly to compromise. Checking authenticity and integrity first stops the update process being used for an attack."
                          },
                          {
                              "id":  "COMP3.2",
@@ -717,15 +717,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 3.2",
                              "title":  "Security patch validation and installation",
-                             "evidencePrompt":  "Capture the patch testing, approval and deployment process, typical timelines and how operational windows are used. The ML reflects how controlled and how current patching is.",
+                             "evidencePrompt":  "Record the patch testing, approval and deployment process, typical timescales and how operational windows are used. Base the ML on how controlled and how current patching is.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Test security patches for compatibility, approve them, and install them in a timely manner after release. Patching in OT is a managed activity around operational windows, not a background auto-update.",
-                             "rationale":  "Patching a running plant carries real risk of disruption, so it has to be tested and scheduled, but leaving known-vulnerable components unpatched indefinitely is its own hazard. The requirement is a disciplined, timely process, not perfection."
+                             "hint":  "Security patches are tested for compatibility, approved and installed in good time after release, scheduled around operational windows.",
+                             "rationale":  "Patching a running plant can disrupt it, so patches have to be tested and scheduled. Leaving known vulnerable components unpatched indefinitely is also a hazard. The requirement is for a disciplined, timely process."
                          },
                          {
                              "id":  "COMP3.3",
@@ -733,15 +733,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 3.3",
                              "title":  "Security patch status",
-                             "evidencePrompt":  "Capture how patch status is recorded and kept current across the component estate. The ML reflects the completeness and currency of that record.",
+                             "evidencePrompt":  "Record how patch status is recorded and kept current for every component. Base the ML on how complete and current that record is.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Document and maintain the security patch status of every component. Know, at any time, what is patched, what is not and what is deferred.",
-                             "rationale":  "You cannot judge or defend your exposure if you do not know each component\u0027s patch level. Maintained patch status is what turns patching from a guess into a managed risk decision."
+                             "hint":  "The security patch status of every component is documented and kept current, showing what is patched, what is not and what has been deferred.",
+                             "rationale":  "The asset owner cannot judge its exposure without knowing each component\u0027s patch level. An up-to-date patch status record turns patching into a managed risk decision."
                          },
                          {
                              "id":  "COMP3.4",
@@ -749,15 +749,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 3.4",
                              "title":  "Security patching retention of security",
-                             "evidencePrompt":  "Capture how the security state of a component is checked after patching to confirm nothing was weakened. The ML reflects whether this check is part of the routine or an afterthought.",
+                             "evidencePrompt":  "Record how the security state of a component is checked after patching to confirm nothing was weakened. Base the ML on whether this check is routine.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Verify that installing a security patch does not itself reduce the security of the component. Confirm a patch does not silently re-enable services, reset hardening or open something that was closed.",
-                             "rationale":  "Patches sometimes undo hardening or restore defaults, quietly weakening a component while appearing to fix it. Checking the security posture after patching is what catches that regression."
+                             "hint":  "After a security patch is installed, the component is checked to confirm the patch has not reduced its security, for example by re-enabling services or resetting hardening.",
+                             "rationale":  "Patches sometimes undo hardening or restore default settings, so a component can be weaker after a patch that was meant to fix it. A check after patching catches this."
                          },
                          {
                              "id":  "COMP3.5",
@@ -765,15 +765,15 @@
                              "theme":  "COMP",
                              "code":  "COMP 3.5",
                              "title":  "Security patch mitigation",
-                             "evidencePrompt":  "Capture how the risk of not patching is assessed and how intolerable cases are mitigated and recorded. The ML reflects whether deferral decisions are deliberate, justified and documented.",
+                             "evidencePrompt":  "Record how the risk of not patching is assessed and how cases above the tolerable level are mitigated and recorded. Base the ML on whether decisions to defer are deliberate, justified and documented.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Where a patch will not be installed, assess the risk of leaving it out, and if that risk is not tolerable, treat it another way and document how. This is the compensating-control path for the patches you cannot apply.",
-                             "rationale":  "Much of OT cannot be patched on any normal timeline, so the real discipline is deciding, per unpatched vulnerability, whether the residual risk is acceptable and what mitigates it if not. Undocumented deferral is how known holes stay open for years."
+                             "hint":  "Where a patch will not be installed, the risk of leaving it out is assessed. If that risk is not tolerable, it is treated another way and the treatment is documented.",
+                             "rationale":  "Much of OT cannot be patched on a normal timetable, so the discipline lies in deciding, for each unpatched vulnerability, whether the remaining risk is acceptable and how to mitigate it if not. Deferrals that nobody records are how known vulnerabilities stay open for years."
                          },
                          {
                              "id":  "DATA1.1",
@@ -781,15 +781,15 @@
                              "theme":  "DATA",
                              "code":  "DATA 1.1",
                              "title":  "Data classification",
-                             "evidencePrompt":  "Capture the data classification scheme and how IACS data has been classified against it. The ML reflects how complete and how consistently applied the classification is.",
+                             "evidencePrompt":  "Record the data classification scheme and how IACS data has been classified under it. Base the ML on how complete the classification is and how consistently it is applied.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Identify and classify all IACS data that needs safeguarding, according to its protection requirements. This is the classification baseline that later confidentiality, integrity and retention controls key off.",
-                             "rationale":  "You cannot protect data proportionately if you have not decided what matters and how much. In OT, classification has to weigh the integrity and availability of operational and safety data, not just confidentiality, which is where IT-style schemes often miss the point."
+                             "hint":  "All IACS data that needs protecting is identified and classified according to its protection requirements.",
+                             "rationale":  "Data cannot be protected in proportion to its value until someone has decided what matters and how much. In OT, classification has to consider the integrity and availability of operational and safety data as well as confidentiality, which IT-style schemes often overlook."
                          },
                          {
                              "id":  "DATA1.2",
@@ -797,15 +797,15 @@
                              "theme":  "DATA",
                              "code":  "DATA 1.2",
                              "title":  "Data confidentiality",
-                             "evidencePrompt":  "Capture how confidentiality is protected for data of each classification. The ML reflects whether protection matches classification and is applied consistently.",
+                             "evidencePrompt":  "Record how confidentiality is protected for each classification of data. Base the ML on whether protection matches the classification and is applied consistently.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Protect the confidentiality of IACS data in line with its classification and the risk of it being exposed. Apply confidentiality controls where the classification says they are warranted.",
-                             "rationale":  "Some OT data, from network diagrams to logic and credentials, is exactly what an attacker needs to plan an attack. Protecting it in proportion to its classification denies that reconnaissance value."
+                             "hint":  "The confidentiality of IACS data is protected in line with its classification and the risk of disclosure.",
+                             "rationale":  "Some OT data, such as network diagrams, control logic and credentials, is exactly what an attacker needs to plan an attack. Protecting it in line with its classification denies the attacker that information."
                          },
                          {
                              "id":  "DATA1.3",
@@ -813,15 +813,15 @@
                              "theme":  "DATA",
                              "code":  "DATA 1.3",
                              "title":  "Safety system configuration mode",
-                             "evidencePrompt":  "Capture how safety configuration mode is controlled, who can enable it and under what conditions, and how it is returned to run state. Flag any way configuration could be changed with the mode disabled. The ML reflects the strength of that control. Mark not applicable if there are no safety systems.",
+                             "evidencePrompt":  "Record how the safety configuration mode is controlled, who can enable it and when, and how the system is returned to its run state. Flag any way configuration could be changed with the mode disabled. Base the ML on the strength of that control. Mark not applicable if there are no safety systems.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Where safety systems are used, only allow safety configuration changes when configuration mode is enabled, and only enable that mode when a change is genuinely needed. Keep the safety system out of a changeable state by default. Safety-critical.",
-                             "rationale":  "A safety system that can be reconfigured at any moment is a safety system that can be subverted or fat-fingered into a dangerous state. Gating configuration behind a deliberately-enabled mode is a direct safety protection."
+                             "hint":  "Where safety systems are used, safety configuration can be changed only while configuration mode is enabled, and the mode is enabled only when a change is needed.",
+                             "rationale":  "A safety system that can be reconfigured at any time can be pushed into a dangerous state, whether by an attacker or by mistake. Allowing changes only in a deliberately enabled mode protects safety directly."
                          },
                          {
                              "id":  "DATA1.4",
@@ -829,15 +829,15 @@
                              "theme":  "DATA",
                              "code":  "DATA 1.4",
                              "title":  "Data retention policy",
-                             "evidencePrompt":  "Capture the retention policy, including purging, and how it is applied through the lifecycle. The ML reflects whether retention and disposal are governed rather than incidental.",
+                             "evidencePrompt":  "Record the retention policy, including purging, and how it is applied through the data lifecycle. Base the ML on whether retention and disposal are managed deliberately.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Manage IACS data retention across the whole lifecycle, including secure purging when data is no longer needed. Keep what you must, dispose of the rest deliberately.",
-                             "rationale":  "Data kept forever becomes a liability, and data purged carelessly can leak sensitive operational detail through decommissioned kit and media. A retention policy makes both ends deliberate."
+                             "hint":  "IACS data retention is managed across the whole lifecycle, and data that is no longer needed is purged securely.",
+                             "rationale":  "Data kept indefinitely becomes a liability, and data purged carelessly can leak operational detail through decommissioned equipment and media. A retention policy puts both keeping and disposing of data under control."
                          },
                          {
                              "id":  "DATA1.5",
@@ -845,15 +845,15 @@
                              "theme":  "DATA",
                              "code":  "DATA 1.5",
                              "title":  "Cryptographic mechanisms",
-                             "evidencePrompt":  "Capture where cryptographic mechanisms are used, whether they are current and accepted, and how OT constraints shaped the choices. The ML reflects appropriateness and consistency of use.",
+                             "evidencePrompt":  "Record where cryptographic mechanisms are used, whether they are current and accepted, and how OT constraints affected the choices. Base the ML on whether the mechanisms suit their use and are applied consistently.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Use commonly accepted cryptographic mechanisms in the IACS where they are warranted. Choices have to respect OT constraints, since not every device can carry strong crypto without a performance or compatibility cost.",
-                             "rationale":  "Cryptography protects data and authenticates parties, but OT devices vary widely in what they can support, and forcing it can break real-time behaviour. The requirement is appropriate, accepted mechanisms applied where they fit, not crypto everywhere for its own sake."
+                             "hint":  "Commonly accepted cryptographic mechanisms are used in the IACS where they are warranted, chosen with the performance and compatibility limits of OT devices in mind.",
+                             "rationale":  "Cryptography protects data and authenticates the parties to a connection. OT devices vary widely in what they can support, and forcing cryptography onto them can disrupt real-time behaviour. The requirement is for accepted mechanisms used where they fit."
                          },
                          {
                              "id":  "DATA1.6",
@@ -861,15 +861,15 @@
                              "theme":  "DATA",
                              "code":  "DATA 1.6",
                              "title":  "Key management",
-                             "evidencePrompt":  "Capture how keys are generated, protected, rotated and retired. The ML reflects how disciplined key management is. Mark not applicable if keyed cryptography is not used.",
+                             "evidencePrompt":  "Record how keys are generated, protected, rotated and retired. Base the ML on how disciplined key management is. Mark not applicable if keyed cryptography is not used.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Where cryptography using keys is approved, manage those keys properly: use, protection and enforced lifetime, following practices accepted by both the industrial and security communities. Weak key handling undoes the crypto it supports.",
-                             "rationale":  "Encryption is only as strong as the keys behind it, and poorly stored or never-rotated keys are a common quiet failure. Sound key management is what makes the cryptographic controls actually worth anything."
+                             "hint":  "Where keyed cryptography is approved, the keys are managed through their use, protection and enforced lifetime, following practices accepted in both the industrial and security communities.",
+                             "rationale":  "Encryption is only as strong as its keys, and badly stored or never-rotated keys are a common failure that often goes unnoticed. Without sound key management, the cryptographic controls give little protection."
                          },
                          {
                              "id":  "DATA1.7",
@@ -877,15 +877,15 @@
                              "theme":  "DATA",
                              "code":  "DATA 1.7",
                              "title":  "Data integrity",
-                             "evidencePrompt":  "Capture how data integrity is protected and how tampering would be detected, for data at rest and in motion. The ML reflects coverage and how well integrity is assured where it matters most.",
+                             "evidencePrompt":  "Record how the integrity of data at rest and in transit is protected and how tampering would be detected. Base the ML on coverage and on how well integrity is protected where it matters most.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Protect IACS data integrity against compromise, at rest and in motion, whether electronically or physically, in line with the risks. This is about trusting that data has not been altered, which in OT often matters more than keeping it secret.",
-                             "rationale":  "In control systems, altered data can drive wrong actions with physical consequences, so integrity frequently outranks confidentiality. Protecting it, and being able to detect tampering, is central to trusting what the system tells you and does."
+                             "hint":  "The integrity of IACS data, at rest and in transit, is protected against electronic and physical compromise in line with the risks. In OT this often matters more than keeping data secret.",
+                             "rationale":  "In control systems, altered data can drive wrong actions with physical consequences, so integrity often comes before confidentiality. Operators can trust what the system reports and does only if integrity is protected and tampering can be detected."
                          },
                          {
                              "id":  "USER1.1",
@@ -893,15 +893,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.1",
                              "title":  "User identity assignment",
-                             "evidencePrompt":  "Capture how identities are assigned to human users, software processes and devices. The ML reflects how consistently distinct identities are issued and managed rather than shared.",
+                             "evidencePrompt":  "Record how identities are assigned to human users, software processes and devices. Base the ML on how consistently each one receives its own identity and how well identities are managed.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Assign IACS-specific identifiers, authenticators and roles to users, and treat \u0027users\u0027 broadly: human users, software processes and devices. Every actor on the system needs its own identity to be accountable.",
-                             "rationale":  "Accountability starts with identity, and OT is full of shared and anonymous accounts that make it impossible to say who did what. Distinct identities for people, services and devices are the base that all access control builds on."
+                             "hint":  "IACS-specific identifiers, authenticators and roles are assigned to every user, where users include people, software processes and devices.",
+                             "rationale":  "Accountability starts with identity. OT has many shared and anonymous accounts that make it impossible to say who did what. Separate identities for people, services and devices are the basis for all access control."
                          },
                          {
                              "id":  "USER1.2",
@@ -909,15 +909,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.2",
                              "title":  "User identity removal",
-                             "evidencePrompt":  "Capture the joiner-mover-leaver process for IACS access and evidence that removal actually happens, including for contractors and services. The ML reflects how promptly and reliably access is revoked.",
+                             "evidencePrompt":  "Record the joiner, mover and leaver process for IACS access and evidence that access is removed in practice, including for contractors and services. Base the ML on how promptly and reliably access is revoked.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Remove or disable identifiers, authenticators, roles and access rights for any user, service or device that no longer needs access. Close accounts promptly when people leave or roles change.",
-                             "rationale":  "Orphaned accounts are a favourite way in, and OT environments are notorious for leaving old operator, contractor and vendor accounts live long after they are needed. Timely removal cuts that standing exposure."
+                             "hint":  "Identifiers, authenticators, roles and access rights are removed or disabled promptly for any user, service or device that no longer needs access.",
+                             "rationale":  "Orphaned accounts are a common way in, and OT environments often leave old operator, contractor and vendor accounts active long after they are needed. Removing them promptly reduces that standing exposure."
                          },
                          {
                              "id":  "USER1.3",
@@ -925,15 +925,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.3",
                              "title":  "User identity persistence",
-                             "evidencePrompt":  "Capture how essential operational accounts are protected from automatic disablement while still being controlled. The ML reflects whether the balance between lockout controls and operational availability is handled deliberately.",
+                             "evidencePrompt":  "Record how essential operational accounts are protected from automatic disabling while still being controlled. Base the ML on whether the trade-off between lockout controls and operational availability has been worked through.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Make sure identities and access rights that essential operations depend on, such as operator accounts, are configured so they are not disabled automatically. Availability of the right access is itself a requirement here.",
-                             "rationale":  "Security controls that auto-disable accounts can lock operators out at the worst moment, which in OT is a safety and availability problem, not just an inconvenience. This requirement protects the accounts the process cannot run without."
+                             "hint":  "Identities and access rights that essential operations depend on, such as operator accounts, are set up so they are not disabled automatically.",
+                             "rationale":  "Controls that disable accounts automatically can lock operators out at the worst moment, and in OT that is a safety and availability problem. This requirement protects the accounts the process cannot run without."
                          },
                          {
                              "id":  "USER1.4",
@@ -941,15 +941,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.4",
                              "title":  "Access rights assignment",
-                             "evidencePrompt":  "Capture how access rights are granted, periodically reviewed and removed. The ML reflects whether entitlement management is an ongoing, evidenced practice.",
+                             "evidencePrompt":  "Record how access rights are granted, reviewed periodically and removed. Base the ML on whether entitlement management is an ongoing practice with evidence behind it.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Assign, review and remove access rights to and from IACS roles and users through a defined process. Keep entitlements matched to what each role actually needs over time.",
-                             "rationale":  "Access accumulates as people move around, and unreviewed entitlements drift into over-provisioning. A real assignment-and-review cycle is what keeps rights aligned to need rather than history."
+                             "hint":  "Access rights are assigned to and removed from IACS roles and users through a defined process, and reviewed so they stay matched to what each role needs.",
+                             "rationale":  "Access builds up as people change jobs, and entitlements that are never reviewed grow beyond what people need. A regular assignment and review cycle keeps rights in line with current duties."
                          },
                          {
                              "id":  "USER1.5",
@@ -957,15 +957,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.5",
                              "title":  "Least privilege",
-                             "evidencePrompt":  "Capture how least privilege is applied and verified against actual task requirements. The ML reflects how tightly and how routinely privilege is minimised.",
+                             "evidencePrompt":  "Record how least privilege is applied and checked against the tasks each role performs. Base the ML on how tightly and how routinely privilege is kept to the minimum.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Grant users only the access rights they need for their assigned tasks, and no more. Least privilege applied to people, services and devices alike.",
-                             "rationale":  "Over-broad access turns any single compromise into a bigger one, and OT accounts are often far more privileged than the task requires. Constraining rights to need limits the blast radius of both mistakes and attacks."
+                             "hint":  "Users, including services and devices, hold only the access rights they need for their assigned tasks.",
+                             "rationale":  "Excess access makes any compromise worse, and OT accounts often hold far more privilege than their tasks require. Limiting rights to what is needed reduces the harm that mistakes and attacks can do."
                          },
                          {
                              "id":  "USER1.6",
@@ -973,15 +973,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.6",
                              "title":  "Software service authentication",
-                             "evidencePrompt":  "Capture how software services are identified and authenticated before execution. The ML reflects how consistently service authentication is enforced.",
+                             "evidencePrompt":  "Record how software services are identified and authenticated before they run. Base the ML on how consistently service authentication is enforced.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Identify and authenticate software services before they run. Services need proven identities too, not just people.",
-                             "rationale":  "Unauthenticated services are a way for malicious code to masquerade as legitimate function. Authenticating services before execution closes that impersonation route."
+                             "hint":  "Software services are identified and authenticated before they run.",
+                             "rationale":  "An unauthenticated service lets malicious code pass itself off as a legitimate function. Authenticating services before they run removes that route."
                          },
                          {
                              "id":  "USER1.7",
@@ -989,15 +989,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.7",
                              "title":  "Software services interactive login rights",
-                             "evidencePrompt":  "Capture how interactive login is denied to service accounts. The ML reflects how consistently this is enforced across services.",
+                             "evidencePrompt":  "Record how interactive login is denied to service accounts. Base the ML on how consistently this is enforced across services.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Deny software services the ability to log in interactively. Service accounts should run services, not double as a way for a person to get a session.",
-                             "rationale":  "Service accounts with interactive login rights are a well-worn path for attackers to gain a foothold under a trusted identity. Removing those rights takes the path away."
+                             "hint":  "Software services cannot log in interactively, so a service account cannot be used to open a session for a person.",
+                             "rationale":  "Service accounts with interactive login rights are a well-known way for attackers to gain a foothold under a trusted identity. Removing those rights closes it."
                          },
                          {
                              "id":  "USER1.8",
@@ -1005,15 +1005,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.8",
                              "title":  "Human user authentication",
-                             "evidencePrompt":  "Capture which human-usable interfaces exist and how each authenticates users, including application and remote interfaces. The ML reflects how complete the authentication coverage is.",
+                             "evidencePrompt":  "Record which interfaces people can use and how each one authenticates them, including application and remote interfaces. Base the ML on how complete the authentication coverage is.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Identify and authenticate every human user on every interface they can use to reach the IACS: device logins, application interfaces such as web services, file transfer and OPC, and remote desktop. No unauthenticated human access anywhere it can be avoided.",
-                             "rationale":  "Every unauthenticated interface is an anonymous door, and OT systems expose many beyond the obvious console login. Covering all of them is what makes user accountability real rather than partial."
+                             "hint":  "Every human user is identified and authenticated on every interface they can use to reach the IACS, including device logins, application interfaces such as web services, file transfer and OPC, and remote desktop.",
+                             "rationale":  "Every unauthenticated interface allows anonymous access, and OT systems expose many interfaces beyond the console login. Covering all of them is needed for full accountability."
                          },
                          {
                              "id":  "USER1.9",
@@ -1021,15 +1021,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.9",
                              "title":  "Multifactor authentication (MFA)",
-                             "evidencePrompt":  "Capture where MFA is applied for remote and public-area interactive login. The ML reflects coverage of those exposed entry points and how strong the second factor is.",
+                             "evidencePrompt":  "Record where MFA is used for remote interactive login and for devices in public areas. Base the ML on coverage of those entry points and the strength of the second factor.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Use multifactor authentication on devices supporting interactive human login for remote access, and where devices sit in public-access areas. MFA aimed at the highest-exposure entry points.",
-                             "rationale":  "Remote and publicly-reachable logins are where stolen single credentials do the most damage, and these are exactly the points this requirement hardens. MFA there raises the bar an attacker has to clear well beyond a password."
+                             "hint":  "Multifactor authentication is used for remote interactive login to devices that support it, and for devices in publicly accessible areas.",
+                             "rationale":  "Stolen single credentials do the most damage at remote and publicly reachable logins, and these are the points this requirement covers. MFA there makes a stolen password far less useful to an attacker."
                          },
                          {
                              "id":  "USER1.10",
@@ -1037,15 +1037,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.10",
                              "title":  "Mutual authentication",
-                             "evidencePrompt":  "Capture where mutual authentication is used for server access. The ML reflects how widely and how well it is applied.",
+                             "evidencePrompt":  "Record where mutual authentication is used for access to servers. Base the ML on how widely and how well it is applied.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Use mutual authentication for access to server applications hosted on IACS devices, including web-based servers. Both ends prove who they are, not just the client.",
-                             "rationale":  "One-way authentication lets a client be fooled by an impostor server, enabling interception and spoofing. Mutual authentication protects against connecting to something pretending to be a legitimate service."
+                             "hint":  "Access to server applications hosted on IACS devices, including web servers, uses mutual authentication, so the server proves its identity as well as the client.",
+                             "rationale":  "With one-way authentication, a client can be fooled by an impostor server, which opens the way to interception and spoofing. Mutual authentication stops clients connecting to a fake service."
                          },
                          {
                              "id":  "USER1.11",
@@ -1053,15 +1053,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.11",
                              "title":  "Password protection",
-                             "evidencePrompt":  "Capture the password rules in force and where device limitations constrain them. The ML reflects how consistently strong password practice is applied given the estate.",
+                             "evidencePrompt":  "Record the password rules in force and where device limitations restrict them. Base the ML on how consistently strong password practice is applied across the systems in use.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Where passwords are used, make them harder to compromise through complexity, lifetime and reuse rules, applied in a way OT devices can actually support.",
-                             "rationale":  "Passwords remain the default in much of OT, including on devices with real constraints, so the practical goal is to strengthen them within what each device allows. Weak, shared or eternal passwords are among the most exploited OT weaknesses."
+                             "hint":  "Where passwords are used, complexity, lifetime and reuse rules make them harder to compromise, within what each OT device supports.",
+                             "rationale":  "Passwords are still the norm in much of OT, including on devices with real limitations, so the practical aim is to make them as strong as each device allows. Weak, shared and never-changed passwords are among the most exploited weaknesses in OT."
                          },
                          {
                              "id":  "USER1.12",
@@ -1069,15 +1069,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.12",
                              "title":  "Shared and disclosed/compromised passwords",
-                             "evidencePrompt":  "Capture how shared passwords are managed and how disclosed or compromised passwords are handled and rotated. The ML reflects whether there is a real, exercised process.",
+                             "evidencePrompt":  "Record how shared passwords are managed and how disclosed or compromised passwords are handled and changed. Base the ML on whether the process exists and has been used.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Have a process for managing shared passwords and for handling passwords that are disclosed or compromised. Know how you would rotate and contain when a credential leaks.",
-                             "rationale":  "Shared passwords are widespread in OT and rarely changed, so a single disclosure can expose many systems at once. A defined response to compromise is what limits the damage when it happens."
+                             "hint":  "There is a process for managing shared passwords and for changing and containing passwords that are disclosed or compromised.",
+                             "rationale":  "Shared passwords are common in OT and rarely changed, so one disclosure can expose many systems at once. A defined response to a compromised password limits the damage."
                          },
                          {
                              "id":  "USER1.13",
@@ -1085,15 +1085,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.13",
                              "title":  "User login display information",
-                             "evidencePrompt":  "Capture whether and how login information is presented to users to aid detection of misuse. The ML reflects how useful and consistent that display is.",
+                             "evidencePrompt":  "Record whether and how login information is shown to users to help them detect misuse. Base the ML on how useful and consistent that information is.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Show users login information, such as last-login details, to help them spot fraudulent use of their account. Give the user a chance to notice a login that was not them.",
-                             "rationale":  "The account holder is often the first person who could recognise misuse, if the system tells them enough to notice. Displaying recent login information turns users into a cheap detection layer."
+                             "hint":  "Users are shown login information, such as details of their last login, so they can spot use of their account that was not theirs.",
+                             "rationale":  "The account holder is often the first person able to recognise misuse, provided the system shows enough to notice it. Showing recent login details gives the asset owner a cheap means of detection."
                          },
                          {
                              "id":  "USER1.14",
@@ -1101,15 +1101,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.14",
                              "title":  "User login failure displays",
-                             "evidencePrompt":  "Capture what is shown on login failure and whether it avoids leaking useful detail. The ML reflects how consistently minimal that feedback is.",
+                             "evidencePrompt":  "Record what is shown when a login fails and whether it avoids giving away useful detail. Base the ML on how consistently that feedback is kept minimal.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "After a failed login, display as little as possible that would help an attacker. Do not reveal whether the username or the password was the part that was wrong.",
-                             "rationale":  "Verbose failure messages hand attackers a way to enumerate valid accounts and refine guesses. Keeping failure feedback uninformative slows that reconnaissance."
+                             "hint":  "After a failed login, the system shows as little as possible that would help an attacker, and does not say whether the username or the password was wrong.",
+                             "rationale":  "Detailed failure messages let attackers find valid accounts and refine their guesses. Keeping failure messages uninformative slows that reconnaissance."
                          },
                          {
                              "id":  "USER1.15",
@@ -1117,15 +1117,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.15",
                              "title":  "Consecutive login failures",
-                             "evidencePrompt":  "Capture the lockout threshold and behaviour, and how it balances against operational access needs. The ML reflects whether the control is present and sensibly tuned.",
+                             "evidencePrompt":  "Record the lockout threshold and behaviour, and how they are weighed against operational access needs. Base the ML on whether the control is in place and sensibly set.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Lock accounts after a set number of consecutive failed logins, for a defined period or until an administrator unlocks them. Slow down brute-force guessing, while weighing lockout against operational risk.",
-                             "rationale":  "Unlimited login attempts invite brute forcing, but aggressive lockout can also deny an operator access when it is needed. The requirement is a considered threshold, tuned to the operational context."
+                             "hint":  "Accounts are locked after a set number of consecutive failed logins, for a defined period or until an administrator unlocks them, with the threshold weighed against operational risk.",
+                             "rationale":  "Unlimited login attempts allow brute-force guessing, while aggressive lockout can deny an operator access when it is needed. The requirement is for a threshold chosen with the operational context in mind."
                          },
                          {
                              "id":  "USER1.16",
@@ -1133,15 +1133,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.16",
                              "title":  "Session integrity",
-                             "evidencePrompt":  "Capture how sessions are protected against hijacking and modification. The ML reflects the strength and coverage of those protections.",
+                             "evidencePrompt":  "Record how sessions are protected against hijacking and modification. Base the ML on the strength and coverage of those protections.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Protect user sessions from unauthorised access and modification. Guard against hijacking or tampering once a session is established.",
-                             "rationale":  "An authenticated session is a trusted channel, and if it can be hijacked or altered the earlier authentication counts for little. Protecting session integrity preserves that trust through the whole session."
+                             "hint":  "User sessions are protected from hijacking and unauthorised modification once established.",
+                             "rationale":  "An authenticated session is a trusted channel. If it can be hijacked or altered, the authentication that opened it counts for little. Protecting session integrity keeps the session trustworthy until it ends."
                          },
                          {
                              "id":  "USER1.17",
@@ -1149,15 +1149,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.17",
                              "title":  "Concurrent sessions",
-                             "evidencePrompt":  "Capture the concurrent-session limits per interface and how they are enforced. The ML reflects whether limits are set and effective.",
+                             "evidencePrompt":  "Record the limits on concurrent sessions for each interface and how they are enforced. Base the ML on whether limits are set and work.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Limit how many concurrent sessions any single human user, service or device can hold per interface. Bound the number of simultaneous footholds a single identity can occupy.",
-                             "rationale":  "Uncapped concurrent sessions let a stolen identity be used in many places at once and complicate detection. Limiting them constrains misuse and makes anomalies easier to spot."
+                             "hint":  "The number of concurrent sessions any single user, service or device can hold on each interface is limited.",
+                             "rationale":  "Without a limit, a stolen identity can be used in many places at once, which also makes detection harder. Limiting concurrent sessions restricts misuse and makes anomalies easier to spot."
                          },
                          {
                              "id":  "USER1.18",
@@ -1165,15 +1165,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.18",
                              "title":  "Screen lock",
-                             "evidencePrompt":  "Capture the screen-lock policy, the re-authentication requirement, and where locking is deliberately disabled for operational-risk reasons. The ML reflects how well the balance is reasoned and applied.",
+                             "evidencePrompt":  "Record the screen lock policy, the need to re-authenticate, and where locking is disabled on purpose because of operational risk. Base the ML on how well those decisions are reasoned and applied.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Lock user screens on request or after a set idle period, requiring re-authentication to unlock, unless locking would itself create greater risk to the IACS. The safety carve-out matters: never lock out an operator who needs immediate control.",
-                             "rationale":  "Unattended, unlocked HMIs are an open invitation, but a locked screen at the wrong moment can block an urgent operator action. The requirement deliberately allows exceptions where locking would raise risk, which is a genuinely OT-specific judgement."
+                             "hint":  "Screens lock on request or after a set idle period and need re-authentication to unlock, except where locking would create greater risk to the IACS, such as an operator who needs immediate control.",
+                             "rationale":  "An unattended, unlocked HMI is easy to misuse, but a screen that locks at the wrong moment can block an urgent operator action. The requirement allows exceptions where locking would increase risk, a judgement specific to OT."
                          },
                          {
                              "id":  "USER1.19",
@@ -1181,15 +1181,15 @@
                              "theme":  "USER",
                              "code":  "USER 1.19",
                              "title":  "Component authentication",
-                             "evidencePrompt":  "Capture how connected components are identified and authenticated. The ML reflects how consistently component authentication is applied across the estate.",
+                             "evidencePrompt":  "Record how connected components are identified and authenticated. Base the ML on how consistently component authentication is applied across the IACS.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Identify and authenticate all components connected to the IACS. Devices, like people and services, should prove they belong before they are trusted on the network.",
-                             "rationale":  "Unauthenticated components let rogue or spoofed devices join and be trusted, which is a direct route onto control networks. Authenticating components closes the door on unknown kit."
+                             "hint":  "All components connected to the IACS are identified and authenticated before they are trusted on the network.",
+                             "rationale":  "Without component authentication, rogue or spoofed devices can join the network and be trusted, which gives direct access to control networks. Authenticating components keeps unknown equipment out."
                          },
                          {
                              "id":  "USER2.1",
@@ -1197,15 +1197,15 @@
                              "theme":  "USER",
                              "code":  "USER 2.1",
                              "title":  "Authorization",
-                             "evidencePrompt":  "Capture how assigned access rights are enforced by the systems, not just recorded. The ML reflects how consistently authorisation is actually applied.",
+                             "evidencePrompt":  "Record how systems enforce the access rights that have been assigned, beyond recording them. Base the ML on how consistently authorisation is enforced.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Enforce the assigned access rights for all users. Authentication proves who someone is; authorisation is making the system actually hold them to what they are allowed to do.",
-                             "rationale":  "Rights that are assigned but not enforced are just documentation, and OT systems often trust an authenticated user far beyond their role. Enforcement is what makes least privilege and role assignment mean something at runtime."
+                             "hint":  "The access rights assigned to each user are enforced by the systems they use.",
+                             "rationale":  "Rights that are assigned and not enforced exist only on paper, and OT systems often let an authenticated user do far more than their role allows. Least privilege and role assignment take effect on the running system only when the rights are enforced."
                          },
                          {
                              "id":  "USER2.2",
@@ -1213,15 +1213,15 @@
                              "theme":  "USER",
                              "code":  "USER 2.2",
                              "title":  "Separation of duties",
-                             "evidencePrompt":  "Capture where separation of duties is applied and how privilege concentration is avoided. The ML reflects how deliberately duties are separated for sensitive functions.",
+                             "evidencePrompt":  "Record where separation of duties is applied and how concentration of privilege is avoided. Base the ML on how deliberately duties are separated for sensitive functions.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Apply separation of duties, reducing the privileges any single IACS user holds to the minimum needed. Split sensitive capability so no one person can do everything unchecked.",
-                             "rationale":  "Concentrated privilege makes both insider abuse and single-account compromise far more dangerous. Separating duties limits what any one identity, honest or hijacked, can accomplish alone."
+                             "hint":  "Duties are separated so that no single IACS user holds more privilege than needed and no one person can carry out sensitive functions alone.",
+                             "rationale":  "Concentrated privilege makes insider abuse and the compromise of a single account far more dangerous. Separating duties limits what any one identity can do alone, whether its owner is honest or the account has been taken over."
                          },
                          {
                              "id":  "USER2.3",
@@ -1229,15 +1229,15 @@
                              "theme":  "USER",
                              "code":  "USER 2.3",
                              "title":  "Multiple approvals",
-                             "evidencePrompt":  "Capture which high-impact actions require multiple approvals and how the safety exception is defined. The ML reflects how appropriately the control and its exception are set. Mark not applicable if no such actions exist.",
+                             "evidencePrompt":  "Record which high-impact actions need more than one approval and how the safety exception is defined. Base the ML on how well the control and its exception are set. Mark not applicable if there are no such actions.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Require two or more users to approve actions that could seriously impact the industrial process, unless not acting could cause an even greater impact. Two-person control for high-consequence operations, with a deliberate exception where delay is the bigger danger. Safety-relevant.",
-                             "rationale":  "For actions that could damage the process or hurt people, a second pair of hands is a strong guard against both error and coercion. The exception is important and safety-driven: never let an approval gate stop a necessary protective action."
+                             "hint":  "Actions that could seriously affect the industrial process need approval from two or more users, except where not acting could cause greater harm.",
+                             "rationale":  "For actions that could damage the process or hurt people, a second approver guards against both error and coercion. Under the safety exception, an approval step never stops a necessary protective action."
                          },
                          {
                              "id":  "USER2.4",
@@ -1245,15 +1245,15 @@
                              "theme":  "USER",
                              "code":  "USER 2.4",
                              "title":  "Manual elevation of privileges",
-                             "evidencePrompt":  "Capture how privilege elevation and overrides are made explicit and logged. The ML reflects whether elevation is deliberate and traceable.",
+                             "evidencePrompt":  "Record how privilege elevation and overrides are made explicit and logged. Base the ML on whether elevation is deliberate and traceable.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Require explicit, deliberate elevation of privilege, including supervisor overrides, for any operation that needs elevated rights. No silent or standing elevation; make it a conscious act.",
-                             "rationale":  "Standing elevated privilege is a large, quiet risk, and overrides that happen invisibly cannot be controlled or reviewed. Making elevation explicit keeps high-privilege actions visible and accountable."
+                             "hint":  "Any operation that needs elevated rights, including supervisor overrides, requires the user to elevate privilege explicitly, with no silent or standing elevation.",
+                             "rationale":  "Standing elevated privilege is a large risk that is easy to overlook, and overrides that leave no trace cannot be controlled or reviewed. Explicit elevation keeps high-privilege actions visible and accountable."
                          },
                          {
                              "id":  "EVENT1.1",
@@ -1261,15 +1261,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.1",
                              "title":  "Event detection",
-                             "evidencePrompt":  "Capture how security events are detected, logged, analysed and responded to end to end. The ML reflects how joined-up and practised that chain is.",
+                             "evidencePrompt":  "Record how security events are detected, logged, analysed and responded to from start to finish. Base the ML on how well the steps connect and how often they are used.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Have the reporting, logging, analysis and response, immediate or delayed, for detected IACS security events, so security management has something to work with. This is the umbrella event-management requirement the rest of the element expands on.",
-                             "rationale":  "You cannot respond to what you never detect, and OT has historically run blind to security events. Getting detection, logging and response working together is what turns an invisible compromise into a managed incident."
+                             "hint":  "Detected IACS security events are reported, logged, analysed and responded to, immediately or later, so security management has the information it needs. The other requirements in this element expand on this one.",
+                             "rationale":  "An organisation cannot respond to events it never detects, and OT has historically had little visibility of security events. When detection, logging and response work together, a compromise that would have gone unseen becomes an incident that can be managed."
                          },
                          {
                              "id":  "EVENT1.2",
@@ -1277,15 +1277,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.2",
                              "title":  "Event reporting",
-                             "evidencePrompt":  "Capture how and how quickly security events are reported, and to whom. The ML reflects the timeliness and reliability of reporting.",
+                             "evidencePrompt":  "Record how, how quickly and to whom security events are reported. Base the ML on the timeliness and reliability of reporting.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Report IACS security events in a timely manner. Get events to the people and systems that need them quickly enough to act.",
-                             "rationale":  "A detected event that sits unreported is as good as undetected, and delay in OT can mean the difference between containment and spread. Timely reporting is what makes the rest of the response possible."
+                             "hint":  "IACS security events reach the people and systems that need them quickly enough for them to act.",
+                             "rationale":  "A detected event that is never reported might as well have gone undetected, and in OT a delay can let an incident spread. Timely reporting makes the rest of the response possible."
                          },
                          {
                              "id":  "EVENT1.3",
@@ -1293,15 +1293,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.3",
                              "title":  "Event reporting interfaces",
-                             "evidencePrompt":  "Capture the interfaces used to report security events and how well they integrate with monitoring and SOC tooling. The ML reflects how standard and usable those interfaces are.",
+                             "evidencePrompt":  "Record the interfaces used to report security events and how well they connect to monitoring and SOC tools. Base the ML on how standard and usable those interfaces are.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Use interfaces that the industrial and security communities commonly accept for reporting security events. Standard, interoperable reporting rather than bespoke channels.",
-                             "rationale":  "Common interfaces let OT events feed into wider monitoring and into IT security operations without fragile custom glue. Standardisation is what lets detection scale beyond a single system."
+                             "hint":  "Security events are reported through interfaces commonly accepted in the industrial and security communities.",
+                             "rationale":  "Common interfaces let OT events feed into wider monitoring and IT security operations without fragile custom integration. Standard interfaces allow detection to extend beyond a single system."
                          },
                          {
                              "id":  "EVENT1.4",
@@ -1309,15 +1309,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.4",
                              "title":  "Logging",
-                             "evidencePrompt":  "Capture what is logged, how logs are protected, and the retention period. The ML reflects coverage, protection and adequacy of retention.",
+                             "evidencePrompt":  "Record what is logged, how logs are protected and how long they are kept. Base the ML on coverage, protection and whether retention is long enough.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Write IACS security events to one or more protected event or audit logs, and keep them for an adequate period. Logs need to be both protected from tampering and retained long enough to be useful.",
-                             "rationale":  "Logs are the raw material of both detection and investigation, and unprotected or short-lived logs fail you exactly when an incident needs reconstructing. Protected, retained logs are what make after-the-fact analysis possible."
+                             "hint":  "IACS security events are written to one or more event or audit logs that are protected from tampering and kept for an adequate period.",
+                             "rationale":  "Logs are the raw material for detection and investigation. Logs that are unprotected or kept only briefly are missing when an incident has to be reconstructed. Protected, retained logs make later analysis possible."
                          },
                          {
                              "id":  "EVENT1.5",
@@ -1325,15 +1325,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.5",
                              "title":  "Log entries",
-                             "evidencePrompt":  "Capture the content of log entries and whether it supports attribution and time correlation. The ML reflects how complete and analysable the entries are.",
+                             "evidencePrompt":  "Record what log entries contain and whether that supports attribution and correlation in time. Base the ML on how complete and analysable the entries are.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Make sure log entries carry enough information to support non-repudiation and time-correlated analysis. Entries should reliably say who or what did what, and when.",
-                             "rationale":  "Thin log entries cannot be tied to actors or sequenced across systems, which cripples investigation. Rich, time-correlatable entries are what let you reconstruct an attack rather than guess at it."
+                             "hint":  "Log entries hold enough information to support non-repudiation and analysis across systems by time, recording who or what did what, and when.",
+                             "rationale":  "Log entries with too little detail cannot be tied to the people or systems involved or placed in sequence across systems, which makes investigation very difficult. Detailed, time-stamped entries let investigators reconstruct an attack."
                          },
                          {
                              "id":  "EVENT1.6",
@@ -1341,15 +1341,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.6",
                              "title":  "Log access",
-                             "evidencePrompt":  "Capture how logs are accessed for analysis and whether the interfaces are standard and workable. The ML reflects how usable log access is in practice.",
+                             "evidencePrompt":  "Record how logs are accessed for analysis and whether the interfaces are standard and practical. Base the ML on how usable log access is in practice.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Use commonly accepted interfaces to access the security audit and event logs. Make logs reachable for analysis through standard means.",
-                             "rationale":  "Logs that cannot be reached and read in a standard way are logs that will not be used. Accessible logs are the difference between data that supports response and data that just accumulates."
+                             "hint":  "Security audit and event logs can be accessed for analysis through commonly accepted interfaces.",
+                             "rationale":  "Logs that cannot be reached and read by standard means tend to go unused, and then they add nothing to detection or response."
                          },
                          {
                              "id":  "EVENT1.7",
@@ -1357,15 +1357,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.7",
                              "title":  "Event analysis",
-                             "evidencePrompt":  "Capture how events are analysed, by whom, and how quickly, with examples of characterised incidents. The ML reflects whether analysis is a real, timely capability.",
+                             "evidencePrompt":  "Record how events are analysed, by whom and how quickly, with examples of incidents that were characterised. Base the ML on whether timely analysis takes place in practice.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Analyse IACS security events to identify and characterise attacks, compromises and incidents in a timely manner. Turn raw events into an understanding of what is actually happening.",
-                             "rationale":  "Collected events are inert until someone makes sense of them, and timely analysis is what separates a caught intrusion from a discovered aftermath. This is where detection becomes decision."
+                             "hint":  "IACS security events are analysed promptly to identify and characterise attacks, compromises and incidents.",
+                             "rationale":  "Collected events are of no use until someone interprets them, and timely analysis can catch an intrusion while it is under way. Without it, the intrusion is found only after the damage is done."
                          },
                          {
                              "id":  "EVENT1.8",
@@ -1373,15 +1373,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.8",
                              "title":  "Incident handling and response",
-                             "evidencePrompt":  "Capture the incident response process, how current it is, and evidence it is exercised, including OT-specific considerations. The ML reflects how developed and practised the capability is.",
+                             "evidencePrompt":  "Record the incident response process, how current it is and evidence that it is exercised, including OT-specific considerations. Base the ML on how developed and practised the capability is.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Keep a current process for evaluating and responding to IACS security incidents. A live, maintained incident response capability, adapted to OT realities.",
-                             "rationale":  "OT incident response differs from IT: safety and availability come first, and pulling a system offline may not be an option. A rehearsed, OT-aware process is what prevents an incident being made worse by the response to it."
+                             "hint":  "A current, maintained process exists for evaluating and responding to IACS security incidents, adapted to the conditions of OT.",
+                             "rationale":  "OT incident response differs from IT because safety and availability come first and taking a system offline may not be possible. A rehearsed process designed for OT keeps the response from making the incident worse."
                          },
                          {
                              "id":  "EVENT1.9",
@@ -1389,15 +1389,15 @@
                              "theme":  "EVENT",
                              "code":  "EVENT 1.9",
                              "title":  "Vulnerability handling",
-                             "evidencePrompt":  "Capture how vulnerabilities are received, assessed, tracked and resolved or accepted. The ML reflects whether handling is systematic and timely rather than ad hoc.",
+                             "evidencePrompt":  "Record how vulnerabilities are received, assessed, tracked and resolved or accepted. Base the ML on whether vulnerability handling is systematic and timely.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Identify, address and resolve existing and newly-found IACS vulnerabilities in a timely manner. A running process for taking in vulnerabilities and driving each to a resolution or an accepted risk.",
-                             "rationale":  "Vulnerabilities surface constantly, and in OT they often cannot be patched quickly, so what matters is a process that tracks each to a decision rather than letting them pile up unmanaged. This ties directly into risk management and patching."
+                             "hint":  "Existing and newly found IACS vulnerabilities are identified and dealt with promptly, each one tracked until it is resolved or its risk is accepted.",
+                             "rationale":  "New vulnerabilities appear all the time, and in OT they often cannot be patched quickly. A process that tracks each one to a decision stops them piling up unmanaged, and it links directly to risk management and patching."
                          },
                          {
                              "id":  "AVAIL1.1",
@@ -1405,15 +1405,15 @@
                              "theme":  "AVAIL",
                              "code":  "AVAIL 1.1",
                              "title":  "Continuity management",
-                             "evidencePrompt":  "Capture the DRP and/or BCP, whether they address cyber scenarios, and how current and tested they are. The ML reflects how complete, maintained and exercised the plans are.",
+                             "evidencePrompt":  "Record the disaster recovery plan, business continuity plan or both, whether they cover cyber scenarios, and how current and tested they are. Base the ML on how complete, maintained and exercised the plans are.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Keep a current disaster recovery plan, business continuity plan, or both, covering disaster scenarios, failure handling and how you maintain the required level of operational continuity. Continuity planning that treats a cyber incident as one of the disasters to plan for.",
-                             "rationale":  "Cyber attacks now sit alongside fire and flood as things that can take a plant down, and continuity plans written before that reality often ignore them. A current DRP or BCP is what gets the process back to a safe, running state after a serious disruption."
+                             "hint":  "A current disaster recovery plan, business continuity plan or both cover disaster scenarios, the handling of failures and how the required level of operational continuity is maintained, with cyber incidents among the scenarios.",
+                             "rationale":  "A cyber attack can stop a plant as surely as a fire or flood, and continuity plans written before that was widely recognised often leave it out. A current plan returns the process to a safe, running state after serious disruption."
                          },
                          {
                              "id":  "AVAIL1.2",
@@ -1421,15 +1421,15 @@
                              "theme":  "AVAIL",
                              "code":  "AVAIL 1.2",
                              "title":  "Resource availability management",
-                             "evidencePrompt":  "Capture how power, capacity, hardware-failure and DoS risks are managed, and the remediation and spares arrangements. The ML reflects how thoroughly availability threats are anticipated and covered.",
+                             "evidencePrompt":  "Record how risks from power failure, capacity limits, hardware failure and denial of service are managed, along with the remediation and spares arrangements. Base the ML on how thoroughly these threats to availability are anticipated and covered.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Protect the IACS from resource and equipment failure caused by power problems, capacity or processing overload, hardware failure and deliberate denial-of-service, and plan remediation such as device replacement. Keep the system running through the ordinary and the malicious ways it can be starved of resources.",
-                             "rationale":  "Availability is the top priority in OT, and it can be lost to a blown supply or an overloaded link just as easily as to an attack. Managing these failure modes, and having spares and replacement plans, is core to keeping the process alive."
+                             "hint":  "The IACS is protected from failures caused by power problems, capacity or processing overload, hardware faults and deliberate denial of service, with remediation such as device replacement planned in advance.",
+                             "rationale":  "Availability is the top priority in OT, and it can be lost to a power failure or an overloaded link as easily as to an attack. Managing these failures, with spares and replacement plans in place, keeps the process running."
                          },
                          {
                              "id":  "AVAIL1.3",
@@ -1437,15 +1437,15 @@
                              "theme":  "AVAIL",
                              "code":  "AVAIL 1.3",
                              "title":  "Failure-state",
-                             "evidencePrompt":  "Capture the predetermined failure states and how the system is brought to them on a detected compromise. The ML reflects how well those states are defined, implemented and understood.",
+                             "evidencePrompt":  "Record the predetermined failure states and how the system is brought to them when a compromise is detected. Base the ML on how well those states are defined, implemented and understood.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Bring the IACS to a predetermined state if normal operation cannot continue after a detected security compromise. Decide in advance what safe looks like when you cannot keep running normally. Safety-relevant.",
-                             "rationale":  "When a compromise forces the issue, an unplanned collapse can be dangerous, whereas a predetermined safe state protects people and equipment. Defining that state ahead of time is a safety and availability decision made when there is time to think."
+                             "hint":  "If normal operation cannot continue after a detected security compromise, the IACS goes to a state decided in advance.",
+                             "rationale":  "An unplanned collapse after a compromise can be dangerous, while a predetermined safe state protects people and equipment. Defining that state in advance means the safety and availability decision is taken when there is time to think."
                          },
                          {
                              "id":  "AVAIL2.1",
@@ -1453,15 +1453,15 @@
                              "theme":  "AVAIL",
                              "code":  "AVAIL 2.1",
                              "title":  "Backup",
-                             "evidencePrompt":  "Capture what is backed up, how often, and to what recovery point. The ML reflects coverage and regularity of the backup regime.",
+                             "evidencePrompt":  "Record what is backed up, how often and to what recovery point. Base the ML on the coverage and regularity of backups.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Back up the IACS at regular intervals so it can be recovered to a stable state. Regular, reliable backups of what you would need to rebuild.",
-                             "rationale":  "Backups are the last line when prevention fails, and OT recovery without them can mean rebuilding controllers and logic from scratch under pressure. Regular backups are what make recovery a restore rather than a reconstruction."
+                             "hint":  "The IACS is backed up at regular intervals so it can be recovered to a stable state.",
+                             "rationale":  "Backups are the last resort when prevention fails. Without them, OT recovery can mean rebuilding controllers and logic from scratch under pressure. With regular backups, recovery becomes a restore."
                          },
                          {
                              "id":  "AVAIL2.2",
@@ -1469,15 +1469,15 @@
                              "theme":  "AVAIL",
                              "code":  "AVAIL 2.2",
                              "title":  "Backup non-interference",
-                             "evidencePrompt":  "Capture how backups are validated not to affect normal operation, including timing and resource impact. The ML reflects how deliberately non-interference is assured.",
+                             "evidencePrompt":  "Record how the backup process is checked for any effect on normal operation, including timing and resource use. Base the ML on how deliberately that is confirmed.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Make sure the backup process itself does not disturb normal IACS operation. Backing up should never be the thing that trips the plant.",
-                             "rationale":  "Backup jobs that consume resources or touch live systems at the wrong time can themselves cause the outage they were meant to help recover from. Validating non-interference keeps the safeguard from becoming a hazard."
+                             "hint":  "The backup process does not disturb normal IACS operation.",
+                             "rationale":  "A backup job that uses too many resources or touches live systems at the wrong time can cause the outage it is meant to help recover from. Confirming that backups do not interfere stops a safeguard becoming a hazard."
                          },
                          {
                              "id":  "AVAIL2.3",
@@ -1485,15 +1485,15 @@
                              "theme":  "AVAIL",
                              "code":  "AVAIL 2.3",
                              "title":  "Backup verification",
-                             "evidencePrompt":  "Capture how backup integrity is verified at completion and periodically. The ML reflects whether verification is routine and would catch a bad backup before it is needed.",
+                             "evidencePrompt":  "Record how backup integrity is checked when each backup completes and periodically afterwards. Base the ML on whether the check is routine and would catch a bad backup before it is needed.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Verify backup data integrity when the backup completes and periodically afterwards. Confirm the backup is actually good, not just that it ran.",
-                             "rationale":  "An untested backup is a hope, and corrupted or incomplete backups are routinely discovered only at the moment of recovery, when it is too late. Verification is what turns a backup into something you can rely on."
+                             "hint":  "The integrity of backup data is checked when the backup completes and periodically afterwards, to confirm the backup can be used.",
+                             "rationale":  "Corrupted or incomplete backups are often discovered only at the moment of recovery, when it is too late. Verification gives confidence that a backup can be relied on."
                          },
                          {
                              "id":  "AVAIL2.4",
@@ -1501,15 +1501,15 @@
                              "theme":  "AVAIL",
                              "code":  "AVAIL 2.4",
                              "title":  "Backup media",
-                             "evidencePrompt":  "Capture how backup media is stored, protected and kept available, including offsite and confidentiality arrangements. The ML reflects how well the media is safeguarded.",
+                             "evidencePrompt":  "Record how backup media is stored, protected and kept available, including offsite storage and confidentiality. Base the ML on how well the media is protected.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Handle and store backup media safely and securely, protecting its integrity, authenticity and availability when needed, and the confidentiality of what it holds. The media itself needs guarding, not just the act of backing up.",
-                             "rationale":  "Backups are a full copy of the system, so poorly stored media is both a recovery risk and a rich target if it is stolen. Sound media handling protects recovery and prevents the backup becoming a leak."
+                             "hint":  "Backup media is handled and stored securely, protecting its integrity, authenticity and availability as well as the confidentiality of its contents.",
+                             "rationale":  "A backup is a full copy of the system, so badly stored media is a recovery risk and an attractive target for theft. Careful handling protects recovery and stops the backup becoming a source of leaks."
                          },
                          {
                              "id":  "AVAIL2.5",
@@ -1517,15 +1517,15 @@
                              "theme":  "AVAIL",
                              "code":  "AVAIL 2.5",
                              "title":  "Backup restoration",
-                             "evidencePrompt":  "Capture how restoration is performed and tested, and typical recovery times against operational needs. The ML reflects whether restoration is proven, timely and rehearsed.",
+                             "evidencePrompt":  "Record how restoration is performed and tested, and typical recovery times compared with operational needs. Base the ML on whether restoration is proven, timely and rehearsed.",
                              "verbatimText":  "",
                              "otLens":  {
                                             "framing":  "",
                                             "gotchas":  ""
                                         },
                              "allowNA":  true,
-                             "hint":  "Be able to restore the IACS from backup to a stable state in a timely manner. Recovery is the point of backups, so restoration has to be practised and quick enough to matter.",
-                             "rationale":  "A backup you cannot restore promptly is little better than none, and OT recovery time is often the real driver of incident impact. Proven, timely restoration is what caps how long a serious incident keeps the plant down."
+                             "hint":  "The IACS can be restored from backup to a stable state in good time, and restoration is practised.",
+                             "rationale":  "A backup that cannot be restored promptly is little better than none, and in OT the recovery time often decides how much an incident costs. Proven, timely restoration limits how long a serious incident keeps the plant down."
                          }
                      ],
     "_requirementsNote":  "Requirement codes/titles extracted and verified from the body of 62443-2-1:2024. Questions are paraphrased assessor prompts (NOT verbatim IEC text); \u0027verbatimText\u0027 slots are empty for the licence holder to populate. OT lens is an empty first-draft slot per requirement for the consultant. ML anchors are paraphrased.",
