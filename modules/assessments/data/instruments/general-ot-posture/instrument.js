@@ -82,8 +82,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "gov.1",
                           "prompt":  "Is there a named person accountable for OT/ICS cyber security?",
                           "shortTitle":  "Accountability for OT security",
-                          "rationale":  "In OT, accountability is often split between plant engineering and IT, so cyber risk to safety and availability falls through the gap. A single named owner with real authority ensures OT risk is actually managed rather than assumed to be someone else\u0027s job.",
-                          "goodLooksLike":  "A named individual is accountable for OT cyber security with a clear mandate, influence over budget and a route to senior management, working alongside plant and engineering leadership rather than under generic IT.",
+                          "rationale":  "In OT, accountability is often split between plant engineering and IT, and cyber risk to safety and availability can end up owned by neither. One named owner with real authority makes sure someone manages that risk.",
+                          "goodLooksLike":  "A named person is accountable for OT cyber security. They have a clear mandate, a say in the budget and a route to senior management, and they work alongside plant and engineering leadership.",
                           "references":  [
                                              "NCSC CAF A1 (Governance)",
                                              "ISA/IEC 62443-2-1 (CSMS)",
@@ -122,8 +122,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "gov.2",
                           "prompt":  "Has an OT-specific cyber risk assessment been carried out?",
                           "shortTitle":  "OT-specific risk assessment",
-                          "rationale":  "IT risk assessments rarely capture OT consequences such as loss of view, loss of control, or impact to safety and production. Without an OT-specific assessment, controls are not prioritised against the risks that actually matter on the plant.",
-                          "goodLooksLike":  "A documented OT risk assessment, refreshed periodically and after major change, that weighs safety and availability impact and drives a prioritised improvement plan (in the spirit of ISA/IEC 62443-3-2).",
+                          "rationale":  "IT risk assessments rarely capture OT consequences such as loss of view, loss of control, or harm to safety and production. Without an OT-specific assessment, controls are not prioritised against the risks that matter on the plant.",
+                          "goodLooksLike":  "A documented OT risk assessment weighs safety and availability impact and drives a prioritised improvement plan, following the approach of ISA/IEC 62443-3-2. It is refreshed periodically and after major change.",
                           "references":  [
                                              "NCSC CAF A2 (Risk management)",
                                              "ISA/IEC 62443-3-2 (risk assessment)",
@@ -153,10 +153,10 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                       },
                       {
                           "id":  "gov.3",
-                          "prompt":  "Are there OT security policies or standards that staff actually follow?",
+                          "prompt":  "Are there OT security policies or standards, and do staff follow them?",
                           "shortTitle":  "OT security policies in practice",
-                          "rationale":  "Policies written for IT often cannot be met in OT (forced patching, account lockouts) and get quietly ignored, leaving no real standard. Practical, followed OT policies set consistent expectations across shifts and contractors.",
-                          "goodLooksLike":  "OT-specific policies and standards exist, are realistic for the plant environment, are known by staff and contractors, and are actually followed and periodically reviewed.",
+                          "rationale":  "Policies written for IT often cannot be met in OT, for example forced patching or account lockouts, so staff ignore them and the plant is left with no working standard. OT policies that people can follow set the same expectations across shifts and contractors.",
+                          "goodLooksLike":  "OT-specific policies and standards exist and are realistic for the plant. Staff and contractors know them and follow them, and the policies are reviewed periodically.",
                           "references":  [
                                              "NCSC CAF A1 / B1",
                                              "ISA/IEC 62443-2-1 (CSMS)",
@@ -197,8 +197,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "gov.4",
                           "prompt":  "Does OT security feature in budgeting and management reporting?",
                           "shortTitle":  "Budgeting and management reporting",
-                          "rationale":  "Without visibility in budgeting and management reporting, OT security improvements compete poorly for funding and degrade over time. Regular reporting keeps leadership aware of the residual risk they are carrying.",
-                          "goodLooksLike":  "OT cyber risk and remediation progress are reported to management on a regular cadence, with funding allocated through the normal budgeting cycle.",
+                          "rationale":  "When OT security does not appear in budgets or management reports, improvements compete poorly for funding and fall away over time. Regular reporting keeps leadership aware of the residual risk they are carrying.",
+                          "goodLooksLike":  "OT cyber risk and remediation progress are reported to management regularly, and funding is allocated through the normal budget cycle.",
                           "references":  [
                                              "NCSC CAF A1 (Governance)",
                                              "NIST CSF Govern"
@@ -222,10 +222,10 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                       },
                       {
                           "id":  "gov.6",
-                          "prompt":  "Do OT changes go through a process that considers security, not just safety and availability?",
+                          "prompt":  "Do OT changes go through a process that considers security as well as safety and availability?",
                           "shortTitle":  "Security in change management",
-                          "rationale":  "OT change control is usually mature for safety and silent on security, so rules, accounts and connections get approved on operational grounds alone. It is the control that stops every other control decaying between assessments.",
-                          "goodLooksLike":  "Management of change asks the security question explicitly for OT changes, with security input on higher-risk changes and a record of what was decided and why.",
+                          "rationale":  "OT change control is usually mature for safety and says nothing about security, so firewall rules, accounts and connections are approved on operational grounds alone. Change control is also what keeps the other controls from eroding between assessments.",
+                          "goodLooksLike":  "Management of change asks about security explicitly for OT changes. Higher-risk changes get security input, and the decision and its reasons are recorded.",
                           "references":  [
                                              "ISA/IEC 62443-2-1 (CSMS)",
                                              "NCSC CAF B4",
@@ -252,8 +252,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "gov.7",
                           "prompt":  "Do OT staff and contractors get security training relevant to the plant, beyond corporate e-learning?",
                           "shortTitle":  "OT security awareness and training",
-                          "rationale":  "Operators and engineers make the decisions that decide the outcome: the USB stick, the vendor connection, the control bypassed to keep the plant running. Corporate phishing training covers none of it.",
-                          "goodLooksLike":  "Operators, engineers and contractors receive OT-specific awareness covering the risks and behaviours particular to the plant, refreshed periodically and actually reaching shift teams.",
+                          "rationale":  "Operators and engineers make the decisions that count, such as plugging in a USB stick, allowing a vendor connection or bypassing a control to keep the plant running. Corporate phishing training does not cover these.",
+                          "goodLooksLike":  "Operators, engineers and contractors receive OT-specific awareness training on the risks and behaviours that apply to the plant. It is refreshed periodically and reaches the shift teams.",
                           "references":  [
                                              "ISA/IEC 62443-2-1 (CSMS)",
                                              "NCSC CAF B6",
@@ -280,8 +280,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "gov.8",
                           "prompt":  "Are security expectations set with OT suppliers, and are they checked?",
                           "shortTitle":  "Supplier security expectations",
-                          "rationale":  "Most work on an OT system is done by somebody else\u0027s engineer on somebody else\u0027s laptop. Ask nothing and verify nothing, and the plant inherits the practices of its weakest supplier.",
-                          "goodLooksLike":  "Security requirements are written into OT contracts and specifications, suppliers are asked to evidence them, and the answers carry weight in who gets used.",
+                          "rationale":  "Most work on an OT system is done by another company\u0027s engineer on another company\u0027s laptop. If the site asks nothing of its suppliers and checks nothing, it inherits the practices of its weakest supplier.",
+                          "goodLooksLike":  "Security requirements are written into OT contracts and specifications. Suppliers are asked for evidence that they meet them, and the answers count when choosing who to use.",
                           "references":  [
                                              "ISA/IEC 62443-2-4 (service provider requirements)",
                                              "NCSC CAF A4",
@@ -306,10 +306,10 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                       },
                       {
                           "id":  "gov.5",
-                          "prompt":  "Who are the key OT security stakeholders and contacts on site?",
-                          "shortTitle":  "Key stakeholders and contacts",
-                          "rationale":  "Knowing who owns, operates and supports each part of the OT estate is essential for everyday decisions and critical during an incident, when the right people must be reached quickly.",
-                          "goodLooksLike":  "Key OT stakeholders and contacts (operations, engineering, safety, IT security, vendors) are identified and kept current, with escalation routes understood by all parties.",
+                          "prompt":  "Who are the main OT security stakeholders and contacts on site?",
+                          "shortTitle":  "Stakeholders and contacts",
+                          "rationale":  "Everyday decisions depend on knowing who owns, operates and supports each part of the OT estate. In an incident the right people have to be reached quickly.",
+                          "goodLooksLike":  "The OT stakeholders and contacts in operations, engineering, safety, IT security and the vendors are identified and kept up to date. Everyone involved understands the escalation routes.",
                           "references":  [
                                              "NCSC CAF A1 / D1",
                                              "NIST CSF Govern / Respond"
@@ -329,8 +329,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "assets.1",
                           "prompt":  "Is there an inventory of OT assets?",
                           "shortTitle":  "OT asset inventory",
-                          "rationale":  "You cannot protect, patch or monitor what you do not know exists. OT estates accumulate legacy and undocumented devices, and an incomplete inventory is one of the most common root causes of OT exposure.",
-                          "goodLooksLike":  "A maintained inventory of OT assets (controllers, HMIs, network devices, software and firmware versions) kept current through change management, ideally supported by passive discovery.",
+                          "rationale":  "A site cannot protect, patch or monitor devices it does not know about. OT estates collect legacy and undocumented devices over time, and an incomplete inventory is one of the most common causes of OT exposure.",
+                          "goodLooksLike":  "The site keeps an inventory of its OT assets, including controllers, HMIs, network devices and their software and firmware versions. Change management keeps it current, ideally with passive discovery to check it.",
                           "references":  [
                                              "NCSC CAF A3 (Asset management)",
                                              "NIST CSF Identify",
@@ -373,8 +373,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "assets.2",
                           "prompt":  "Is there an up-to-date network diagram for the OT environment?",
                           "shortTitle":  "OT network diagram",
-                          "rationale":  "An accurate, current network diagram underpins segmentation, incident response and change decisions. Out-of-date drawings lead to wrong assumptions about what is connected and how.",
-                          "goodLooksLike":  "An up-to-date OT network diagram showing zones, conduits, interconnections and external links, version-controlled and updated as part of change management.",
+                          "rationale":  "Segmentation, incident response and change decisions all depend on an accurate network diagram. Out-of-date drawings lead to wrong assumptions about what is connected and how.",
+                          "goodLooksLike":  "The OT network diagram shows zones, conduits, interconnections and external links. It is under version control and is updated through change management.",
                           "references":  [
                                              "NCSC CAF A3 (Asset management)",
                                              "NIST CSF Identify",
@@ -404,10 +404,10 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                       },
                       {
                           "id":  "assets.3",
-                          "prompt":  "Do staff know what is actually connected to the OT network, including transient and contractor devices?",
+                          "prompt":  "Do staff know what is connected to the OT network, including transient and contractor devices?",
                           "shortTitle":  "Awareness of connected devices",
-                          "rationale":  "Transient laptops, contractor devices and forgotten connections are a frequent route for malware into OT. If staff cannot say what is connected, unauthorised or risky devices go unnoticed.",
-                          "goodLooksLike":  "There is confidence, and ideally technical visibility, over what is connected to the OT network, with controls governing transient and contractor devices.",
+                          "rationale":  "Transient laptops, contractor devices and forgotten connections are a common way for malware to reach OT. If staff cannot say what is connected, unauthorised or risky devices go unnoticed.",
+                          "goodLooksLike":  "The site knows what is connected to the OT network, ideally through technical monitoring, and controls the use of transient and contractor devices.",
                           "references":  [
                                              "NCSC CAF A3 / A4",
                                              "ISA/IEC 62443-3-3 FR1 (Identification \u0026 Authentication Control)",
@@ -434,8 +434,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "assets.4",
                           "prompt":  "Are external and vendor connections into OT documented and understood?",
                           "shortTitle":  "External and vendor connections",
-                          "rationale":  "Vendor and external links bypass perimeter controls and are a leading vector for OT compromise. Undocumented connections cannot be risk-assessed, controlled or monitored.",
-                          "goodLooksLike":  "All external and vendor connections into OT are documented, justified, access-controlled, monitored and reviewed; unused links are removed.",
+                          "rationale":  "Vendor and external links bypass perimeter controls and are one of the main ways OT systems are compromised. A connection nobody has documented cannot be risk assessed, controlled or monitored.",
+                          "goodLooksLike":  "Every external and vendor connection into OT is documented, justified, access controlled, monitored and reviewed. Links that are no longer used are removed.",
                           "references":  [
                                              "NCSC CAF A4 (Supply chain) / B4",
                                              "ISA/IEC 62443-3-3 FR5 (Restricted Data Flow)",
@@ -475,8 +475,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "arch.1",
                           "prompt":  "Is the OT network separated from the corporate / IT network?",
                           "shortTitle":  "OT and IT network separation",
-                          "rationale":  "A flat network lets an IT compromise such as ransomware spread directly into OT and halt production or threaten safety. Separation is the single most effective OT control.",
-                          "goodLooksLike":  "OT is segmented from corporate IT by firewalls with a controlled DMZ, default-deny rules and no direct routable path; the separation is enforced and monitored.",
+                          "rationale":  "On a flat network, an IT compromise such as ransomware can spread straight into OT, stop production or threaten safety. Separating OT from IT is the most effective single control in OT.",
+                          "goodLooksLike":  "Firewalls separate OT from corporate IT, with a controlled DMZ, default-deny rules and no direct routable path between them. The separation is enforced and monitored.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR5 (Restricted Data Flow)",
                                              "NCSC CAF B4",
@@ -515,7 +515,7 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "prompt":  "Is the OT environment divided into zones reflecting criticality, for example Purdue levels, cells, or safety?",
                           "shortTitle":  "Zoning by criticality",
                           "rationale":  "Internal zoning limits how far an intruder or malware can move and protects the most critical and safety-related functions. A single large OT zone offers no internal containment.",
-                          "goodLooksLike":  "OT is divided into zones and conduits reflecting criticality (Purdue levels, cells, safety), with controlled and monitored conduits between them, in line with ISA/IEC 62443-3-2.",
+                          "goodLooksLike":  "OT is divided into zones and conduits that reflect criticality, such as Purdue levels, cells and safety systems, in line with ISA/IEC 62443-3-2. Traffic between zones passes through controlled, monitored conduits.",
                           "references":  [
                                              "ISA/IEC 62443-3-2 (zones \u0026 conduits) / 62443-3-3 FR5",
                                              "NCSC CAF B4",
@@ -547,8 +547,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "arch.3",
                           "prompt":  "How is data exchanged between IT and OT, for example historian or file transfer?",
                           "shortTitle":  "IT to OT data exchange",
-                          "rationale":  "Historian, file-transfer and similar flows are necessary but create paths between IT and OT that attackers reuse. Uncontrolled exchange quietly undermines segmentation.",
-                          "goodLooksLike":  "IT/OT data exchange goes through a DMZ with brokered, one-way-where-possible flows (for example a data diode or replicated historian), with no direct OT access from IT.",
+                          "rationale":  "Historian feeds, file transfers and similar flows are needed, but they create paths between IT and OT that attackers can use. Uncontrolled data exchange weakens segmentation without anyone noticing.",
+                          "goodLooksLike":  "Data passes between IT and OT through a DMZ, using brokered flows that are one-way where possible, for example a data diode or a replicated historian. IT has no direct access into OT.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR5 (Restricted Data Flow)",
                                              "NCSC CAF B4",
@@ -588,8 +588,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "arch.4",
                           "prompt":  "Is remote access into OT controlled, for both vendors and staff?",
                           "shortTitle":  "Controlled remote access",
-                          "rationale":  "Remote access for vendors and staff is convenient and dangerous: it is consistently a top OT attack vector. Uncontrolled or always-on access exposes the plant directly.",
-                          "goodLooksLike":  "Remote access is brokered through a hardened gateway with MFA, least privilege, per-session approval and full logging; vendor access is time-bound and monitored.",
+                          "rationale":  "Remote access for vendors and staff is convenient, and it is consistently one of the most common ways into OT. Uncontrolled or always-on access exposes the plant directly.",
+                          "goodLooksLike":  "Remote access goes through a hardened gateway with MFA, least privilege, approval for each session and full logging. Vendor access is time limited and monitored.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR1 (IAC) / FR2 (Use Control)",
                                              "NCSC CAF B2",
@@ -633,8 +633,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "arch.5",
                           "prompt":  "Are safety systems (SIS) separated from the basic process control network?",
                           "shortTitle":  "Safety system separation",
-                          "rationale":  "Safety instrumented systems are the last line of defence for people and plant. If they share a network with basic process control, a single cyber event can degrade safety and control together.",
-                          "goodLooksLike":  "Safety systems are separated from the basic process control network by segmentation or air-gap, with strictly controlled and monitored interfaces, consistent with IEC 61511 and ISA/IEC 62443.",
+                          "rationale":  "Safety instrumented systems are the last line of protection for people and plant. If they share a network with basic process control, one cyber event can degrade safety and control at the same time.",
+                          "goodLooksLike":  "Safety systems are separated from the basic process control network by segmentation or an air gap, consistent with IEC 61511 and ISA/IEC 62443. Any interface between them is tightly controlled and monitored.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR5 (Restricted Data Flow)",
                                              "IEC 61511 (functional safety)",
@@ -660,7 +660,7 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                                               "label":  "Notes / evidence"
                                           }
                                       ],
-                          "guidance":  "Safety-critical. If no SIS is present, mark not applicable.",
+                          "guidance":  "If there is no SIS on site, mark this question not applicable.",
                           "safetyFlag":  true,
                           "domainId":  "arch"
                       },
@@ -668,8 +668,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "access.1",
                           "prompt":  "Are individual user accounts used, or are shared and generic logins common?",
                           "shortTitle":  "Individual user accounts",
-                          "rationale":  "Shared and generic logins are common in OT for operational speed, but they destroy accountability and make misuse impossible to detect or attribute. One compromised shared credential can expose everything.",
-                          "goodLooksLike":  "Individual accounts are used wherever the technology allows, with shared operational accounts minimised, justified, vaulted and monitored.",
+                          "rationale":  "Shared and generic logins are common in OT because they are quick to use, but they remove accountability, and misuse cannot be detected or traced to a person. One compromised shared credential can expose everything it reaches.",
+                          "goodLooksLike":  "Individual accounts are used wherever the technology allows. The few shared operational accounts that remain are justified, held in a vault and monitored.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR1 (Identification \u0026 Authentication Control)",
                                              "NCSC CAF B2",
@@ -694,10 +694,10 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                       },
                       {
                           "id":  "access.2",
-                          "prompt":  "Is access limited to what roles actually need (least privilege)?",
+                          "prompt":  "Is access limited to what each role needs (least privilege)?",
                           "shortTitle":  "Least privilege",
-                          "rationale":  "Broad access means a single compromised account can change logic, settings or safety parameters. OT roles are usually narrow, so least privilege is both achievable and high-value.",
-                          "goodLooksLike":  "Access is restricted to what each role needs, so an operator account cannot change logic or configuration, and rights are reviewed periodically. Whether administrators hold a separate account for that work is covered by its own question.",
+                          "rationale":  "With broad access, one compromised account can change logic, settings or safety parameters. OT roles are usually narrow, so least privilege is achievable and worth a lot.",
+                          "goodLooksLike":  "Each role has only the access it needs, so an operator account cannot change logic or configuration, and access rights are reviewed periodically. Separate administrator accounts are covered by their own question.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR2 (Use Control)",
                                              "NCSC CAF B2",
@@ -724,8 +724,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "access.3",
                           "prompt":  "Are default and vendor passwords changed on OT devices?",
                           "shortTitle":  "Default and vendor passwords",
-                          "rationale":  "Default and vendor credentials are publicly known and routinely targeted. In OT they often persist for years on devices that are rarely revisited.",
-                          "goodLooksLike":  "Default and vendor passwords are changed at commissioning where supported, recorded in a vault, and checked during audits; compensating controls cover devices that cannot change them.",
+                          "rationale":  "Default and vendor credentials are publicly known and routinely targeted. In OT they often stay in place for years on devices that are rarely revisited.",
+                          "goodLooksLike":  "Default and vendor passwords are changed at commissioning where the device allows it, stored in a vault and checked during audits. Devices that cannot change them are covered by compensating controls.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR1 (IAC)",
                                              "NCSC CAF B2 / B4",
@@ -752,8 +752,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "access.4",
                           "prompt":  "Is there a process to remove access when people leave or change role?",
                           "shortTitle":  "Access removal on leaver or role change",
-                          "rationale":  "Leavers and movers who keep access, especially contractors and vendors, are a persistent insider and supply-chain risk. OT accounts are often never reviewed once created.",
-                          "goodLooksLike":  "A joiners, movers and leavers process promptly removes or adjusts OT access, including vendor accounts, backed by periodic access reviews.",
+                          "rationale":  "Leavers and movers who keep their access, especially contractors and vendors, remain an insider and supply chain risk. OT accounts are often never reviewed after they are created.",
+                          "goodLooksLike":  "A joiners, movers and leavers process removes or adjusts OT access promptly, vendor accounts included, and periodic access reviews back it up.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR1 / FR2",
                                              "NCSC CAF B2",
@@ -778,10 +778,10 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                       },
                       {
                           "id":  "access.5",
-                          "prompt":  "Do OT administrators use a separate account for administrative work, rather than their everyday login?",
+                          "prompt":  "Do OT administrators use a separate account for administrative work, apart from their everyday login?",
                           "shortTitle":  "Separate administrative accounts",
-                          "rationale":  "Where one account both reads email and administers a controller, an ordinary phishing click hands over administrative control of the plant.",
-                          "goodLooksLike":  "Administrators hold a distinct privileged account used only for administrative work, with no mail or web browsing from it, and everyday accounts hold no standing administrative rights.",
+                          "rationale":  "When the same account is used to read email and to administer a controller, one phishing click can give an attacker administrative control of the plant.",
+                          "goodLooksLike":  "Administrators have a separate privileged account that they use only for administrative work, never for email or web browsing. Everyday accounts hold no standing administrative rights.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR1 / FR2",
                                              "NCSC CAF B2",
@@ -808,8 +808,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "access.6",
                           "prompt":  "Can highly privileged accounts log on to ordinary OT servers and workstations?",
                           "shortTitle":  "Where privileged accounts can log on",
-                          "rationale":  "An administrator who signs in to an engineering workstation leaves credentials there for whoever compromises it next. This is the usual route by which an ordinary foothold in IT becomes control of OT.",
-                          "goodLooksLike":  "Privileged accounts are tiered, so the most privileged sign in only to the systems that hold the directory itself and to dedicated admin workstations. OT authenticates separately from corporate IT, or across a controlled one-way trust. On sites with no central directory, the equivalent is that shared administrative credentials are not reused across OT machines.",
+                          "rationale":  "An administrator who signs in to an engineering workstation leaves credentials there for whoever compromises it next. This is the usual way an attacker\u0027s foothold in IT becomes control of OT.",
+                          "goodLooksLike":  "Privileged accounts are tiered, so the most privileged accounts sign in only to the directory servers and to dedicated admin workstations. OT authenticates separately from corporate IT, or through a controlled one-way trust. Where a site has no central directory, shared administrative credentials are not reused across OT machines.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR1 / FR2",
                                              "NCSC CAF B2",
@@ -849,8 +849,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "protect.1",
                           "prompt":  "How are OT systems patched or updated in practice?",
                           "shortTitle":  "OT patching and updates",
-                          "rationale":  "OT systems are hard to patch because of uptime, vendor approval and legacy constraints, so unpatched vulnerabilities accumulate. The goal is a safe, risk-based approach, not blind patching.",
-                          "goodLooksLike":  "A risk-based patch and update process aligned to maintenance windows and vendor guidance, with compensating controls (segmentation, hardening, monitoring) where patching is not feasible.",
+                          "rationale":  "Uptime, vendor approval and legacy systems make OT hard to patch, so unpatched vulnerabilities build up. The aim is to patch safely, in order of risk.",
+                          "goodLooksLike":  "Patches and updates are applied through a risk-based process that follows maintenance windows and vendor guidance. Where patching is not feasible, segmentation, hardening and monitoring compensate.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR3 (System Integrity)",
                                              "NCSC CAF B4",
@@ -888,8 +888,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "protect.2",
                           "prompt":  "Is malware protection in place where appropriate and supported?",
                           "shortTitle":  "Malware protection",
-                          "rationale":  "Malware, including commodity ransomware, remains a leading cause of OT outages. Where endpoints are unsupported, traditional anti-virus may be unsafe, so the approach must suit OT.",
-                          "goodLooksLike":  "Appropriate, supported malware protection is deployed where it is safe to do so and kept current, complemented by application allow-listing on fixed-function devices.",
+                          "rationale":  "Malware, including commodity ransomware, remains one of the main causes of OT outages. Traditional antivirus can be unsafe on unsupported endpoints, so the protection has to suit OT.",
+                          "goodLooksLike":  "Supported malware protection is deployed and kept current wherever it is safe to run. Fixed-function devices use application allow-listing as well.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR3 (System Integrity)",
                                              "NCSC CAF B4",
@@ -927,8 +927,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "protect.3",
                           "prompt":  "Is removable media, such as USB, controlled in the OT environment?",
                           "shortTitle":  "Removable media control",
-                          "rationale":  "USB and removable media bridge air gaps and are a classic OT infection route, even for isolated systems. Uncontrolled media undermines every other control.",
-                          "goodLooksLike":  "Removable media use is restricted and controlled, with scanning or sanitisation stations, port control or allow-listing, and a clear policy for vendors and engineers.",
+                          "rationale":  "USB sticks and other removable media cross air gaps and are a well-known way for infections to reach OT, including isolated systems. Uncontrolled media can bypass every other control.",
+                          "goodLooksLike":  "Removable media use is restricted, with scanning or sanitisation stations, port control or allow-listing, and a clear policy for vendors and engineers.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR3 (System Integrity)",
                                              "NCSC CAF B4",
@@ -955,8 +955,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "protect.4",
                           "prompt":  "Are backups of critical OT systems taken, protected, and tested?",
                           "shortTitle":  "Backups of critical OT systems",
-                          "rationale":  "When an OT incident occurs, the ability to restore controllers, HMIs and configurations quickly determines downtime. Backups that are untested, or reachable by ransomware, fail exactly when needed.",
-                          "goodLooksLike":  "Critical OT configurations and systems are backed up regularly, stored offline or immutable and segregated from OT, and restoration is tested so recovery time is known.",
+                          "rationale":  "After an OT incident, the speed of restoring controllers, HMIs and configurations decides how long the plant is down. Backups that are untested, or that ransomware can reach, fail when they are needed.",
+                          "goodLooksLike":  "Critical OT configurations and systems are backed up regularly and kept offline or immutable, apart from the OT network. Restores are tested, so the recovery time is known.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR7 (Resource Availability)",
                                              "NCSC CAF D1 / B5",
@@ -988,8 +988,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "protect.5",
                           "prompt":  "Are OT endpoints and servers hardened, with unneeded services and ports removed?",
                           "shortTitle":  "Endpoint and server hardening",
-                          "rationale":  "OT devices ship with unneeded services, ports and software that widen the attack surface. Hardening reduces exposure on systems that are otherwise difficult to patch.",
-                          "goodLooksLike":  "OT endpoints and servers are hardened to a baseline (unneeded services and ports removed, secure configuration), with the baseline maintained through change management.",
+                          "rationale":  "OT devices ship with services, ports and software they do not need, and each one adds to the attack surface. Hardening reduces exposure on systems that are hard to patch.",
+                          "goodLooksLike":  "OT endpoints and servers are hardened to a baseline, with unneeded services and ports removed and a secure configuration applied. Change management keeps the baseline in place.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR3 (System Integrity)",
                                              "NCSC CAF B4",
@@ -1016,8 +1016,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "protect.6",
                           "prompt":  "Is it known which OT systems are unsupported or end-of-life, and is that risk managed?",
                           "shortTitle":  "Legacy and unsupported systems",
-                          "rationale":  "Unsupported systems are normal in OT and often cannot be replaced on a security timescale. The risk is rarely that they exist; it is that nobody has written down where they are, so nothing is ever placed around them.",
-                          "goodLooksLike":  "End-of-life and unsupported OT systems are identified, the risk is accepted at the right level, and each carries either a compensating control or a funded replacement plan.",
+                          "rationale":  "Unsupported systems are normal in OT and often cannot be replaced on a security timescale. The usual problem is that nobody has recorded where they are, so no protection is ever put around them.",
+                          "goodLooksLike":  "End-of-life and unsupported OT systems are identified and their risk is accepted at the right level. Each one has a compensating control or a funded replacement plan.",
                           "references":  [
                                              "ISA/IEC 62443-2-1 (CSMS)",
                                              "NCSC CAF B4",
@@ -1042,10 +1042,10 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                       },
                       {
                           "id":  "protect.7",
-                          "prompt":  "Is physical access to OT equipment controlled: control rooms, cabinets, and live network ports?",
+                          "prompt":  "Is physical access to OT equipment controlled, including control rooms, cabinets and live network ports?",
                           "shortTitle":  "Physical access to OT equipment",
-                          "rationale":  "Every logical control assumes nobody can reach the hardware. An unlocked cabinet or a live port in an accessible area bypasses the lot, and this is usually the cheapest gap on a site to close.",
-                          "goodLooksLike":  "Control rooms and equipment cabinets are secured and access is limited to those who need it, unused network ports are disabled or protected, and contractor access to plant areas is supervised.",
+                          "rationale":  "Every logical control assumes that nobody can reach the hardware. An unlocked cabinet or a live port in an open area bypasses them all, and this is usually the cheapest gap on a site to close.",
+                          "goodLooksLike":  "Control rooms and equipment cabinets are secured and only people who need access have it. Unused network ports are disabled or protected, and contractors in plant areas are supervised.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR2 (Use Control)",
                                              "NCSC CAF B2 (Device and physical security)",
@@ -1072,8 +1072,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "monitor.1",
                           "prompt":  "Are logs collected from OT systems?",
                           "shortTitle":  "OT log collection",
-                          "rationale":  "Without logs from OT systems there is no way to investigate an incident or prove what happened. OT devices often have logging disabled or unretained by default.",
-                          "goodLooksLike":  "Relevant logs (controllers where possible, HMIs, jump hosts, OT network devices and security tools) are centrally collected, time-synchronised and retained.",
+                          "rationale":  "Without logs from OT systems, an incident cannot be investigated and nobody can show what happened. Many OT devices have logging turned off, or keep no logs, by default.",
+                          "goodLooksLike":  "Relevant logs are collected centrally, time-synchronised and retained. Sources include HMIs, jump hosts, OT network devices, security tools and, where possible, controllers.",
                           "references":  [
                                              "ISA/IEC 62443-3-3 FR6 (Timely Response to Events)",
                                              "NCSC CAF C1",
@@ -1100,8 +1100,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "monitor.2",
                           "prompt":  "Is there monitoring that would detect an intrusion or abnormal activity in OT?",
                           "shortTitle":  "Intrusion and anomaly detection",
-                          "rationale":  "OT intrusions can persist for months unnoticed. Passive OT monitoring detects abnormal activity and new devices without disrupting the process.",
-                          "goodLooksLike":  "OT-aware monitoring, such as passive network detection, is in place and tuned for the environment, with alerts triaged by someone who has OT context.",
+                          "rationale":  "OT intrusions can go unnoticed for months. Passive OT monitoring detects abnormal activity and new devices without disturbing the process.",
+                          "goodLooksLike":  "OT monitoring, such as passive network detection, is in place and tuned to the environment. Someone with OT knowledge triages the alerts.",
                           "references":  [
                                              "NCSC CAF C1 / C2",
                                              "ISA/IEC 62443-3-3 FR6",
@@ -1139,8 +1139,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "monitor.3",
                           "prompt":  "If something happened tonight, would anyone notice, and who?",
                           "shortTitle":  "Out-of-hours awareness and ownership",
-                          "rationale":  "Detection only matters if someone is positioned to see and act on it out of hours. Many sites have tools but no one watching, so events go unanswered.",
-                          "goodLooksLike":  "Alerts reach a defined team (SOC or on-call) around the clock with OT escalation paths, so abnormal activity is noticed and acted on at any time.",
+                          "rationale":  "Detection is only useful if someone can see the alert and act on it out of hours. Many sites have the tools and nobody watching them, so events go unanswered.",
+                          "goodLooksLike":  "Alerts reach a defined team, such as a SOC or an on-call rota, at any hour, and that team has OT escalation routes.",
                           "references":  [
                                              "NCSC CAF C1 (Security monitoring)",
                                              "NIST CSF Detect / Respond"
@@ -1164,10 +1164,10 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                       },
                       {
                           "id":  "monitor.4",
-                          "prompt":  "Does anyone look at OT security events, or are the logs only opened after something goes wrong?",
+                          "prompt":  "Does anyone review OT security events, or are the logs opened only after something goes wrong?",
                           "shortTitle":  "Review of collected events",
-                          "rationale":  "Collection without review is a filing cabinet, not detection. Plenty of sites hold OT logs that nobody has ever read until an investigation forced it.",
-                          "goodLooksLike":  "OT events are reviewed on a defined cadence, alerts are triaged by a named team, and staff have an easy route to raise something that looks wrong.",
+                          "rationale":  "Logs that are collected and never reviewed do not detect anything. Many sites hold OT logs that nobody read until an investigation required it.",
+                          "goodLooksLike":  "OT events are reviewed on a set schedule and a named team triages alerts. Staff have an easy way to report anything that looks wrong.",
                           "references":  [
                                              "NCSC CAF C2 (Proactive security event discovery)",
                                              "NIST CSF Detect"
@@ -1193,8 +1193,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "monitor.5",
                           "prompt":  "If something were discovered a month later, would enough be recorded to reconstruct it?",
                           "shortTitle":  "Retention and investigability",
-                          "rationale":  "OT intrusions are usually found long after they begin. Retention decides whether an investigation can establish what happened, or only that something did.",
-                          "goodLooksLike":  "OT records are kept long enough to investigate a late discovery, protected from tampering, and cover the systems that would actually matter.",
+                          "rationale":  "OT intrusions are usually found long after they begin. Retention decides whether an investigation can show what happened or can only confirm that something did.",
+                          "goodLooksLike":  "OT records are kept long enough to investigate an incident found late, are protected from tampering and cover the systems that matter.",
                           "references":  [
                                              "NCSC CAF C1 / D2",
                                              "NIST CSF Detect / Respond"
@@ -1220,8 +1220,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "respond.1",
                           "prompt":  "Is there an incident response plan that explicitly covers OT?",
                           "shortTitle":  "OT incident response plan",
-                          "rationale":  "Generic IT incident plans assume actions (isolate, wipe, reboot) that can be unsafe in OT. An OT-specific plan protects safety and production during the response.",
-                          "goodLooksLike":  "An incident response plan explicitly covers OT scenarios, roles, safe containment actions and decision authority, and remains accessible during an outage.",
+                          "rationale":  "Generic IT incident plans call for actions such as isolating, wiping or rebooting systems, which can be unsafe in OT. An OT-specific plan protects safety and production during the response.",
+                          "goodLooksLike":  "The incident response plan covers OT scenarios, roles, safe containment actions and who has authority to decide. It can be reached during an outage.",
                           "references":  [
                                              "NCSC CAF D1 (Response \u0026 recovery planning)",
                                              "ISA/IEC 62443-3-3 FR6",
@@ -1253,8 +1253,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "respond.2",
                           "prompt":  "Do plant or engineering and security know how to work together in an incident?",
                           "shortTitle":  "Plant and security working together",
-                          "rationale":  "OT incidents need plant or engineering and security to act together; if they have never worked out how, response is slow and decisions conflict, risking safety and uptime.",
-                          "goodLooksLike":  "Plant or engineering and security have defined, rehearsed ways of working together in an incident, with clear roles and a shared communication route.",
+                          "rationale":  "OT incidents need plant or engineering staff and security staff to act together. If they have never agreed how, the response is slow and decisions conflict, which puts safety and uptime at risk.",
+                          "goodLooksLike":  "Plant or engineering and security have agreed and rehearsed how they work together in an incident, with clear roles and a shared communication route.",
                           "references":  [
                                              "NCSC CAF D1 (Response \u0026 recovery planning)",
                                              "NIST CSF Respond"
@@ -1280,8 +1280,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "respond.3",
                           "prompt":  "Can critical OT systems be recovered to a known good state, and how quickly?",
                           "shortTitle":  "Recovery to a known good state",
-                          "rationale":  "The key OT question is how fast critical systems can be returned to a known-good state. Unknown or slow recovery means extended downtime and pressure to take unsafe shortcuts.",
-                          "goodLooksLike":  "Critical OT systems can be recovered to a known-good state from protected backups within a known, acceptable timeframe, and this has been demonstrated rather than assumed.",
+                          "rationale":  "For OT, the question that matters most is how quickly critical systems can be returned to a known good state. Slow or uncertain recovery means a longer outage and pressure to take unsafe shortcuts.",
+                          "goodLooksLike":  "Critical OT systems can be restored to a known good state from protected backups within a known and acceptable time, and the site has shown this in a test.",
                           "references":  [
                                              "NCSC CAF D1",
                                              "ISA/IEC 62443-3-3 FR7 (Resource Availability)",
@@ -1308,8 +1308,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "respond.4",
                           "prompt":  "Have any exercises or tabletops been run for an OT incident?",
                           "shortTitle":  "OT incident exercises",
-                          "rationale":  "Plans that are never exercised fail under pressure. Tabletops surface gaps in roles, contacts and safe actions before a real OT incident does.",
-                          "goodLooksLike":  "OT incident scenarios are exercised periodically (tabletop or live), involving operations and engineering, with lessons fed back into the plan.",
+                          "rationale":  "Plans that are never exercised tend to fail under pressure. A tabletop exercise exposes gaps in roles, contacts and safe actions before a real OT incident does.",
+                          "goodLooksLike":  "OT incident scenarios are exercised periodically, as tabletop or live exercises, with operations and engineering taking part. Lessons learned are fed back into the plan.",
                           "references":  [
                                              "NCSC CAF D1 / D2 (Lessons learned)",
                                              "NIST CSF Respond / Recover"
@@ -1335,8 +1335,8 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "id":  "respond.5",
                           "prompt":  "Could the plant keep running, or come down safely, with the control system unavailable?",
                           "shortTitle":  "Operating without the control system",
-                          "rationale":  "Recovery says how the system is rebuilt; this asks what happens meanwhile. A site that can fall back to manual or safe shutdown has hours or days to recover properly, and one that cannot is forced into decisions it will regret.",
-                          "goodLooksLike":  "Degraded and manual modes of operation are identified and documented, operators are practised in them, and the fallback does not depend on the systems that would be unavailable.",
+                          "rationale":  "Recovery covers how the system is rebuilt, and this question covers how the plant runs in the meantime. A site that can fall back to manual operation or a safe shutdown has hours or days to recover properly. A site that cannot is forced into hurried decisions.",
+                          "goodLooksLike":  "Degraded and manual modes of operation are identified and documented, and operators have practised them. The fallback does not depend on the systems that would be unavailable.",
                           "references":  [
                                              "NCSC CAF D1 (Response and recovery planning)",
                                              "NIST SP 800-82",
@@ -1347,7 +1347,7 @@ window.App.Data.instruments["general-ot-posture"].instrument = {
                           "bandAnchors":  {
                                               "0":  "Not considered",
                                               "1":  "Assumed, never tested",
-                                              "2":  "Documented for key areas",
+                                              "2":  "Documented for the main areas",
                                               "3":  "Documented and practised"
                                           },
                           "capture":  [
