@@ -1837,7 +1837,7 @@ window.App.ExportXLSX = (function () {
     // Read me.
     var readmeLines = dpk.xlsxReadMe || [
       "The three layers (P1 product, P2 vulnerability handling and P3 conformity) are scored separately against the CRA and shown side by side. They are never combined into one CRA score.",
-      "Layers out of scope are left out. This is an indicative assessment and is not a conformity assessment or certification. No harmonised CRA standard is cited yet, so a 62443 certificate does not by itself show CRA conformity."
+      "Layers outside the scope are omitted. This is an indicative assessment and is not a conformity assessment or certification. No harmonised CRA standard is cited yet, so a 62443 certificate does not by itself show CRA conformity."
     ];
     var readme = [
       [styledCell(((disp.shortName ? "EU " + disp.shortName.replace(/^EU /, "") + " Regulation" : "EU CRA")) + " gap assessment: how to read this workbook", { bold: true })],
