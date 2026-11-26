@@ -97,7 +97,7 @@ window.App.Data.shared.engagementGuidance = {
         "Backup, restore and disaster recovery procedures for the solution"
       ],
       "oftenForgotten": [
-        "Records that a process was delivered to an asset owner, not just written down (needed for ML3)",
+        "Records showing a process has been delivered to an asset owner (needed for ML3)",
         "Deliverable documents the asset owner should already hold, such as the default accounts list or event storm statement",
         "Subcontractor contracts that pass the security duties down",
         "Account removal reports and shared password records from recent jobs",

@@ -34,13 +34,13 @@ window.App.Tour24 = (function () {
 
   // Functional areas the contract leaves out, with the reason printed once.
   var outOfScope = [
-    { elementId: "SP05", note: "The shipowner contracts maintenance of the safety systems directly with their vendor, so they are outside this service" }
+    { elementId: "SP05", note: "The shipowner contracts maintenance of the safety systems directly with the safety system vendor, so they are outside this service" }
   ];
 
   var reportNarrative = {
     nextSteps:
       "Agree an owner and a target date for each priority in the roadmap above\nRun a full backup and restore test on one vessel and use it as the template for the fleet\nAgree with Halvard Bulk Carriers which enhancements the next service contract will require\nRe-assess against 62443-2-4 in twelve months, with the safety systems in scope if the contract changes",
-    regulatoryExposure: "Tarnmoor Ship Management operates and maintains the automation systems on each vessel for Halvard Bulk Carriers, so its people, laptops and remote connections reach those systems every week. Account management, remote access and malware protection are well practised across the fleet. The gaps sit in assurance and in recovery: nobody has scanned for unknown devices, multi-factor login is not used on engineering workstations, and a full restore has never been shown to work. Those are the points the shipowner is most exposed to through this service.",
+    regulatoryExposure: "Tarnmoor Ship Management operates and maintains the automation systems on each vessel for Halvard Bulk Carriers, so its people, laptops and remote connections reach those systems every week. Account management, remote access and malware protection are well practised across the fleet. The gaps that leave the shipowner most exposed through this service are that nobody has scanned the vessels for unknown devices, engineering workstations still use password-only login, and a full restore has never been shown to work.",
     topPriorities: "The most urgent priorities are a demonstrated full backup and restore (SP.12.05) and multi-factor login on engineering workstations (SP.03.07 RE(1)), because one decides how fast a vessel recovers and the other closes the easiest route onto its control systems. Reporting shared passwords that may be exposed (SP.09.09 RE(1)) costs little and should follow at once."
   };
 
@@ -132,7 +132,7 @@ window.App.Tour24 = (function () {
     { id: "SP.03.09-BR", ml: "ML2" },
     { id: "SP.03.10-BR", ml: "ML1", ev: "Sensitive data on board has not been identified in writing.",
       rem: rem(11, "Medium", "Data Protection Lead", "List the data on board that needs protection and agree it with the owner.",
-        "Data nobody has identified is not protected on purpose.") },
+        "Data nobody has identified is protected only by chance, if at all.") },
     { id: "SP.03.10-RE1", ml: "ML2" },
     { id: "SP.03.10-RE2", ml: "ML1", ev: "Log and history retention is left at each product default and has not been written down.",
       rem: rem(19, "Low", "Data Protection Lead", "Document how long each kind of data is kept on board and how retention is set.",

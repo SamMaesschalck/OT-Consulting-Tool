@@ -3101,7 +3101,7 @@ window.App.UI = (function () {
           h("li", null, ["One maturity level per requirement: ML1-ML4, or Not met. Documentation is implied from ML2 upward."]),
           h("li", null, ["Unknown lowers coverage and confidence. Not applicable drops the requirement from the score."]),
           E.supportsElementScoping()
-            ? h("li", null, ["A whole " + window.App.Report.mlNoun(inst, "elementNoun").toLowerCase() + " can be set out of scope on its page. Its answers are kept."])
+            ? h("li", null, ["A whole " + window.App.Report.mlNoun(inst, "elementNoun").toLowerCase() + " can be set out of scope on its page."])
             : null,
           h("li", null, ["An optional target ML per requirement should come from " + window.App.Report.mlNoun(inst, "targetSource") + ". Where set, the report shows met or below."]),
           h("li", null, ["No overall grade. The report gives an achieved-ML profile by " + window.App.Report.mlNoun(inst, "elementShort") + " and theme. Not met, or below target, is reported as a floor finding."])
@@ -3235,7 +3235,7 @@ window.App.UI = (function () {
       note.value = E.getElementScopeNote(tid, el.id);
       note.addEventListener("change", function () { E.setElementScopeNote(tid, el.id, note.value); });
       kids.push(note);
-      kids.push(h("p", { class: "muted small", style: "margin:6px 0 0;", text: "Answers below are kept but not scored." }));
+      kids.push(h("p", { class: "muted small", style: "margin:6px 0 0;", text: "Answers below are not scored." }));
     }
     return h("div", { class: "card ml-scope-card" + (inScope ? "" : " out") }, [ h("div", { class: "card-b" }, kids) ]);
   }

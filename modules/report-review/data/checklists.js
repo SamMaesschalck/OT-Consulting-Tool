@@ -57,7 +57,7 @@ window.App.Data.checklists = {
       { "id": "sdl-scope", "text": "The products, development teams and lifecycle activities in scope are stated." }
     ],
     "iec-62443-2-4": [
-      { "id": "sp-scope", "text": "The service assessed and the requirements the contract asks for are stated, and any functional area out of scope says why." }
+      { "id": "sp-scope", "text": "The service assessed and the requirements the contract asks for are stated, with the reason for any functional area left out of scope." }
     ],
     "eu-cra": [
       { "id": "cra-caveat", "text": "The report says it is not a conformity assessment or a legal determination under the CRA." },

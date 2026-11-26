@@ -57,7 +57,7 @@ window.App.Data.instruments["iec-62443-4-1"].instrument = {
                                              "anchor":  "An ML2 process that is actively practised in product development, with performance shown to be repeatable over time.",
                                              "shortAnchor":  "Documented process actively practised, repeatable over time.",
                                              "readAs":  "actively practised in product development",
-                                             "glossary":  "Actively practised in product development, on real product work, not only written down."
+                                             "glossary":  "Actively practised on real product development work, not only written down."
                                          },
                                          {
                                              "id":  "ML4",

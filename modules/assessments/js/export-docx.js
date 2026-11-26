@@ -4057,7 +4057,7 @@ window.App.ExportDOCX = (function () {
     if (sc) out.push(body(sc));
     out = out.concat(attributionParas(instrument, !!instrument.framing));
     out.push(h1("How to read this report"));
-    out.push(body(window.App.Report.mlHowToRead(instrument, "elements")));
+    out.push(body(window.App.Report.mlHowToRead(instrument, window.App.Report.mlNoun(instrument, "elementNounPlural").toLowerCase())));
     return out;
   }
 
@@ -4213,7 +4213,7 @@ window.App.ExportDOCX = (function () {
     // Groupings set out of scope are named once, here, never per requirement.
     var outLine = window.App.Report.mlOutOfScopeLine(scored, instrument);
     if (outLine) children.push(body(outLine));
-    children.push(body("The requirement titles and assessor questions paraphrase " + window.App.Report.standardRef(instrument) + ". The standard itself remains the authoritative text."));
+    children.push(body("The requirement titles and assessor questions paraphrase " + window.App.Report.standardRef(instrument) + ". The standard is the authoritative text."));
     return children;
   }
 
@@ -6213,7 +6213,7 @@ window.App.ExportDOCX = (function () {
   function csmsLimitations(instrument) {
     var children = [ h1("Method and limitations") ];
     children.push(body("Conformance states are set per element by the consultant against the four-point scale (Not in place / Partially / Largely / In place), informed by OT context. This assessment reports a conformance profile by category and element group; it does not compute a single CSMS grade. The conformance index is presented for context only. Unknown answers reduce coverage and confidence; Not applicable elements are excluded. A Not-in-place element is surfaced as a floor finding and is not averaged away."));
-    children.push(body("The element titles follow ISA/IEC 62443-2-1:2010 and the assessor framing paraphrases it. The standard itself remains the authoritative text."));
+    children.push(body("The element titles follow ISA/IEC 62443-2-1:2010 and the assessor framing paraphrases it. The standard is the authoritative text."));
     return children;
   }
 
