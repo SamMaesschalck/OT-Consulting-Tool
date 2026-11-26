@@ -92,7 +92,7 @@ window.docx = (function () {
       try { E.activateInstrument(id); } catch (e) { seedFailures.push(id + ": " + e.message); }
     });
     var nSeed = Object.keys(SEED).length;
-    check("all " + nSeed + " demo assessments seed without throwing", seedFailures.length === 0 && nSeed === 20, seedFailures.join(" | "));
+    check("all " + nSeed + " demo assessments seed without throwing", seedFailures.length === 0 && nSeed === 21, seedFailures.join(" | "));
 
     E.activateInstrument("supplier-screener");
     check("App.TourSupplier applier exposed", !!A.TourSupplier && typeof A.TourSupplier.apply === "function");
@@ -121,10 +121,11 @@ window.docx = (function () {
     check("headline held at D by the regulatory F", scored.headlineGrade === "D", String(scored.headlineGrade));
     check("14 below-top questions on the roadmap", (scored.roadmap || []).length === 14, String((scored.roadmap || []).length));
 
-    // Routing: prod (C) and reg (F) fire; dev (B) and vuln (A) do not.
+    // Routing: prod (C), reg (F) and chain (C, the 62443-2-4 route) fire; dev (B)
+    // and vuln (A) do not.
     var res = A.Report.triggeredFollowUpRoutes(inst, scored);
     var routeDoms = res.triggered.map(function (t) { return t.route.domainId; }).join(",");
-    check("routing fires for prod and reg only", routeDoms === "prod,reg", routeDoms);
+    check("routing fires for prod, reg and chain only", routeDoms === "prod,reg,chain", routeDoms);
 
     var rn = E.getReportNarrative ? E.getReportNarrative() : null;
     check("consultant narrative filled", !!rn && /Commission the EU CRA Gap Assessment/.test(rn.topPriorities || ""));

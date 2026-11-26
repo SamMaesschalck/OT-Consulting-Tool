@@ -75,6 +75,21 @@ window.App.Data.index = {
                                       }
                         },
                         {
+                            "id":  "iec-62443-2-4",
+                            "title":  "ISA/IEC 62443-2-4:2023 Service Provider Security Program Assessment",
+                            "status":  "active",
+                            "family":  "iec-62443",
+                            "edition":  "2.0 (2023)",
+                            "scoringFamily":  "program-maturity-ml",
+                            "scoringProfileRef":  "program-maturity-ml",
+                            "targetDimension":  "service-provider",
+                            "path":  "instruments/iec-62443-2-4",
+                            "files":  {
+                                          "instrument":  "instrument.json",
+                                          "narrative":  "narrative.json"
+                                      }
+                        },
+                        {
                             "id":  "iec-62443-2-1-2010",
                             "title":  "ISA/IEC 62443-2-1:2010 CSMS Assessment",
                             "status":  "active",
@@ -363,6 +378,8 @@ window.App.Data.index = {
   add('instruments/iec-62443-4-2/narrative.js');
   add('instruments/iec-62443-4-1/instrument.js');
   add('instruments/iec-62443-4-1/narrative.js');
+  add('instruments/iec-62443-2-4/instrument.js');
+  add('instruments/iec-62443-2-4/narrative.js');
   add('instruments/iec-62443-2-1-2010/instrument.js');
   add('instruments/iec-62443-2-1-2010/narrative.js');
   add('instruments/iec-62443-2-1-2024/instrument.js');

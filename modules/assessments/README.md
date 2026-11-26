@@ -30,6 +30,7 @@ Editing the hash re-lands without a reload.
 | ISA/IEC 62443-4-2 Component Security | `capability-sl` | SL 0-4 per component |
 | ISA/IEC 62443-4-1 Secure Development Lifecycle | `program-maturity-ml` | ML 1-4 |
 | ISA/IEC 62443-2-1:2024 Security Program | `program-maturity-ml` | ML 1-4 |
+| ISA/IEC 62443-2-4:2023 Service Provider Security Program | `program-maturity-ml` | ML 1-4, functional areas can be set out of scope |
 | ISA/IEC 62443-2-1:2010 CSMS | `csms-conformance` | Conformance states |
 | EU Cyber Resilience Act (CRA) | `csms-conformance` | Layered P1/P2/P3 |
 | EU Machinery Regulation | `csms-conformance` | Layered M1/M2/M3 |

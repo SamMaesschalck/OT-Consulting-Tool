@@ -2484,6 +2484,16 @@ window.App.UI = (function () {
       items.forEach(function (it) { if (tech || !optional[it.sectionId]) inScope[it.id] = true; });
       items = items.filter(function (it) { return inScope[it.id]; });
     }
+    // Same for a functional area set out of scope (elementScoping): its rows
+    // are not part of the count for the target the picker shows.
+    if (inst.elementScoping && ass && ass.targets && ass.targets[0] && window.App.ScoringProgramML) {
+      var outIds = window.App.ScoringProgramML.outOfScopeRequirementIds(inst, ass.targets[0]);
+      if (Object.keys(outIds).length) {
+        inScope = {};
+        items.forEach(function (it) { if (!outIds[it.id]) inScope[it.id] = true; });
+        items = items.filter(function (it) { return inScope[it.id]; });
+      }
+    }
     var total = items.length;
     if (!ass || !ass.responses || !ass.responses.length) return { answered: 0, total: total };
     var firstTargetId = (ass.targets && ass.targets[0] && ass.targets[0].id) || null;
@@ -3081,7 +3091,7 @@ window.App.UI = (function () {
       ]);
     });
     return h("div", { class: "card" }, [
-      h("div", { class: "card-h" }, [h("h2", { text: "Security Program maturity: how this instrument works" })]),
+      h("div", { class: "card-h" }, [h("h2", { text: window.App.Report.mlNoun(inst, "programmeTitle") + " maturity: how this instrument works" })]),
       h("div", { class: "card-b" }, [
         h("p", { text: inst.framing || "" }),
         h("ul", null, [
@@ -3090,8 +3100,11 @@ window.App.UI = (function () {
             window.App.Report.mlNoun(inst, "elementNounPlural") + "."]),
           h("li", null, ["One maturity level per requirement: ML1-ML4, or Not met. Documentation is implied from ML2 upward."]),
           h("li", null, ["Unknown lowers coverage and confidence. Not applicable drops the requirement from the score."]),
-          h("li", null, ["An optional target ML per requirement should come from risk (62443-3-2). Where set, the report shows met or below."]),
-          h("li", null, ["No overall grade. The report gives an achieved-ML profile by SPE and theme. Not met, or below target, is reported as a floor finding."])
+          E.supportsElementScoping()
+            ? h("li", null, ["A whole " + window.App.Report.mlNoun(inst, "elementNoun").toLowerCase() + " can be set out of scope on its page. Its answers are kept."])
+            : null,
+          h("li", null, ["An optional target ML per requirement should come from " + window.App.Report.mlNoun(inst, "targetSource") + ". Where set, the report shows met or below."]),
+          h("li", null, ["No overall grade. The report gives an achieved-ML profile by " + window.App.Report.mlNoun(inst, "elementShort") + " and theme. Not met, or below target, is reported as a floor finding."])
         ]),
         h("table", { class: "tbl", style: "margin-top:10px;" }, [
           h("thead", null, [h("tr", null, [h("th", null, ["Maturity level"]), h("th", null, ["Anchor (paraphrased guide)"])])]),
@@ -3117,8 +3130,8 @@ window.App.UI = (function () {
     }, [ h("span", null, ["Guided wizard"]), h("span", { class: "badge", text: "1 / page" }) ]));
     var elements = E.getMLElements();
     elements.forEach(function (el) {
-      var elRes = scored ? scored.byElement.filter(function (x) { return x.elementId === el.id; })[0] : null;
-      var badgeTxt = elRes ? (elRes.scored + "/" + elRes.total) : "";
+      var elRes = scored ? (scored.byElementAll || scored.byElement).filter(function (x) { return x.elementId === el.id; })[0] : null;
+      var badgeTxt = elRes ? (elRes.outOfScope ? "out" : (elRes.scored + "/" + elRes.total)) : "";
       s.appendChild(h("div", {
         class: "nav-item" + (view === "ml-element" && viewFR === el.id ? " active" : ""),
         onClick: function () { go("ml-element", el.id); }
@@ -3154,6 +3167,9 @@ window.App.UI = (function () {
     // Maturity-level reference: the full ML1-ML4 definitions shown ONCE here
     // (per maturityModel._display), not repeated inline on every requirement.
     refs.main.appendChild(mlReferencePanel());
+
+    var scopeCard = mlElementScopeCard(el);
+    if (scopeCard) refs.main.appendChild(scopeCard);
 
     var scored = E.scoreActiveTarget();
     var elRes = scored && scored.byElement.filter(function (x) { return x.elementId === elementId; })[0];
@@ -3194,6 +3210,34 @@ window.App.UI = (function () {
         "Not met sits below ML1 and is a floor finding." }));
     }
     return h("div", { class: "card" }, [head].concat(mlRefOpen ? [h("div", { class: "card-b" }, body)] : []));
+  }
+
+  // In or out of scope for the active target (instrument.elementScoping only).
+  // Out of scope keeps the answers and scores the rows as not applicable; the
+  // note is printed once in the report.
+  function mlElementScopeCard(el) {
+    if (!E.supportsElementScoping()) return null;
+    var tid = E.state.activeTargetId;
+    var inScope = E.isElementInScope(tid, el.id);
+    var cb = h("input", { type: "checkbox", class: "ml-scope-toggle", "data-element": el.id });
+    cb.checked = inScope;
+    cb.addEventListener("change", function () {
+      E.setElementInScope(tid, el.id, cb.checked);
+      renderMLElementPage(el.id);
+    });
+    var kids = [
+      h("label", { style: "display:flex; align-items:center; gap:8px; font-weight:600;" },
+        [cb, document.createTextNode("In scope for this " + targetNoun())])
+    ];
+    if (!inScope) {
+      var note = h("input", { type: "text", class: "ml-scope-note", "data-element": el.id,
+        placeholder: "Why it is out of scope (printed in the report)", style: "width:100%; margin-top:8px;" });
+      note.value = E.getElementScopeNote(tid, el.id);
+      note.addEventListener("change", function () { E.setElementScopeNote(tid, el.id, note.value); });
+      kids.push(note);
+      kids.push(h("p", { class: "muted small", style: "margin:6px 0 0;", text: "Answers below are kept but not scored." }));
+    }
+    return h("div", { class: "card ml-scope-card" + (inScope ? "" : " out") }, [ h("div", { class: "card-b" }, kids) ]);
   }
 
   function mlElementBanner(elRes) {
@@ -4172,7 +4216,11 @@ window.App.UI = (function () {
   var mlWizardIdx = 0;
   function mlWizardItems() {
     var out = [];
-    E.getMLElements().forEach(function (el) { out = out.concat(E.getMLRequirementsByElement(el.id)); });
+    E.getMLElements().forEach(function (el) {
+      // A grouping set out of scope for this target is skipped, not asked.
+      if (!E.isElementInScope(E.state.activeTargetId, el.id)) return;
+      out = out.concat(E.getMLRequirementsByElement(el.id));
+    });
     return out;
   }
   function enterMLWizard(idx) { var items = mlWizardItems(); mlWizardIdx = Math.max(0, Math.min(idx || 0, Math.max(0, items.length - 1))); view = "ml-wizard"; viewFR = null; render(); }
@@ -9730,7 +9778,8 @@ window.App.UI = (function () {
       return {
         id: a.id,
         name: meta.siteName || a.label || "(site not named)",
-        responses: a.responses || []
+        responses: a.responses || [],
+        targets: a.targets || []
       };
     });
   }
@@ -9880,6 +9929,8 @@ window.App.UI = (function () {
       targetProfile: E.state.engagement.targetProfile,
       cafOverlay: E.state.scoringFamily === "caf-achieved" ? E.getActiveCAFOverlay() : null,
       craSetup: isCRA() ? E.getCRASetup() : null,
+      // Groupings out of scope for this target (elementScoping instruments).
+      mlTarget: E.state.scoringFamily === "program-maturity-ml" ? t : null,
       // Risk appetite: each visit read with its own sector, scope and verdict.
       riskAppetiteSetup: E.state.scoringFamily === "risk-appetite-coherence" ? E.getRiskAppetiteSetup() : null,
       baselineRiskAppetiteSetup: baseline.riskAppetiteSetup || null

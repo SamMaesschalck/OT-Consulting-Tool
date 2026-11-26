@@ -1374,13 +1374,9 @@ window.App.Report = (function () {
     return [
       { heading: "The maturity levels",
         intro: "Each requirement is placed at one maturity level. The levels describe how established a practice is, not how good it is: a documented process that nobody follows is ML2, not ML3.",
-        rows: [
-          ["ML1 Initial", "Done ad hoc, if at all. It depends on individuals rather than on a process."],
-          ["ML2 Managed", "Documented and repeatable. Documentation begins here."],
-          ["ML3 Defined / Practiced", "Actively practised on the industrial automation and control system, not only written down."],
-          ["ML4 Improving", "Measured, and improved on the basis of what the measurements show."],
-          ["Not met", "The requirement is not satisfied at any level."]
-        ] },
+        // Each level's meaning comes from the instrument (ML3 differs per part).
+        rows: mlLevels(instrument).map(function (l) { return [l.id + " " + l.name, l.glossary]; })
+          .concat([["Not met", "The requirement is not satisfied at any level."]]) },
       { heading: "How the assessment is structured", rows: [
           [mlNoun(instrument, "elementNounTitle"),
            "The top-level grouping of the " + mlNoun(instrument, "programmeNoun") + ". Results are reported per " +
@@ -2166,16 +2162,80 @@ window.App.Report = (function () {
   // groups requirements into eight Practices. The nouns were hardcoded to the
   // first, so a 4-1 report read "Weakest Security Program Element(s): SVV
   // Practice 5 …" - the standard's own word colliding with the wrong one.
+  // The short forms (elementShort, elementSheet), the getting-started title and
+  // where a target ML comes from were hardcoded to 2-1:2024 as well; the
+  // defaults below keep its wording exactly.
   var ML_NOUNS = {
     elementNoun:       "Security Program Element",
     elementNounTitle:  "Security Program Element",
     elementNounPlural: "Security Program Elements",
     requirementNoun:   "Security Program Requirement",
-    programmeNoun:     "security programme"
+    programmeNoun:     "security programme",
+    programmeTitle:    "Security Program",
+    elementShort:      "SPE",
+    elementShortPlural: "SPEs",
+    elementSheet:      "By SPE",
+    targetSource:      "risk (62443-3-2)"
   };
   function mlNoun(instrument, which) {
     var d = (instrument && instrument.display) || {};
     return d[which] || ML_NOUNS[which];
+  }
+
+  // What each maturity level means for THIS instrument. The ML3 meaning
+  // differs: 2-1:2024 practises a process on the IACS, 4-1 in product
+  // development, and 2-4 once it has been delivered to an asset owner. The
+  // wording is data (maturityModel.levels[].readAs / .glossary); the fallback
+  // is the level's shortAnchor, then the 2-1:2024 wording.
+  var ML_LEVEL_DEFAULTS = [
+    { id: "ML1", name: "Initial", readAs: "ad hoc",
+      glossary: "Done ad hoc, if at all. It depends on individuals rather than on a process." },
+    { id: "ML2", name: "Managed", readAs: "documented and repeatable; documentation begins at ML2",
+      glossary: "Documented and repeatable. Documentation begins here." },
+    { id: "ML3", name: "Defined / Practiced", readAs: "actively practised on the IACS",
+      glossary: "Actively practised on the industrial automation and control system, not only written down." },
+    { id: "ML4", name: "Improving", readAs: "metrics-driven improvement",
+      glossary: "Measured, and improved on the basis of what the measurements show." }
+  ];
+  function mlLevels(instrument) {
+    var mm = instrument && instrument.maturityModel;
+    var levels = (mm && mm.levels && mm.levels.length) ? mm.levels : null;
+    if (!levels) return ML_LEVEL_DEFAULTS.slice();
+    return levels.map(function (l) {
+      var sa = String(l.shortAnchor || "").replace(/\.\s*$/, "");
+      var sl = sa ? sa.charAt(0).toLowerCase() + sa.slice(1) : "";
+      return {
+        id: l.id, name: l.name,
+        readAs: l.readAs || sl,
+        glossary: l.glossary || (sa ? sa + "." : "")
+      };
+    });
+  }
+  // "ML1 Initial (ad hoc), ..., or ML4 Improving (...)": the How to read line.
+  function mlLevelsSentence(instrument) {
+    var parts = mlLevels(instrument).map(function (l) {
+      return l.id + " " + l.name + (l.readAs ? " (" + l.readAs + ")" : "");
+    });
+    if (parts.length < 2) return parts.join("");
+    return parts.slice(0, -1).join(", ") + ", or " + parts[parts.length - 1];
+  }
+  function mlHowToRead(instrument, groupsText) {
+    return "Each " + mlNoun(instrument, "requirementNoun") + " is assessed at one maturity level: " + mlLevelsSentence(instrument) +
+      ". Levels apply independently per requirement. Not met means the requirement is not satisfied at any level. Unknown lowers coverage and confidence; Not applicable is excluded. Results are a profile across the " +
+      groupsText + "; there is no single programme grade.";
+  }
+
+  // Groupings a consultant set out of scope for a target, named once
+  // (instruments with elementScoping), or "" when there are none.
+  function mlOutOfScopeLine(scored, instrument) {
+    var outs = (scored && scored.outOfScopeElements) || [];
+    if (!outs.length) return "";
+    var noun = mlNoun(instrument, outs.length === 1 ? "elementNoun" : "elementNounPlural").toLowerCase();
+    var named = outs.map(function (o) {
+      return o.elementId + " " + o.name + (o.note ? " (" + String(o.note).trim().replace(/[.\s]+$/, "") + ")" : "");
+    });
+    return "Out of scope for this assessment: " + noun + " " + named.join("; ") +
+      ". " + (outs.length === 1 ? "Its" : "Their") + " requirements were not assessed and are not counted in the results.";
   }
 
   function pluralLower(s, instrument) {
@@ -3098,7 +3158,7 @@ window.App.Report = (function () {
     return "na";
   }
 
-  function mlKpiRow(scored) {
+  function mlKpiRow(scored, instrument) {
     var ML = window.App.ScoringProgramML;
     var ov = scored.overall;
     var c = ov.counts;
@@ -3115,7 +3175,7 @@ window.App.Report = (function () {
         h("div", { class: "val " + (c.notMet > 0 ? "gap" : "met"), text: String(c.notMet) })
       ]),
       h("div", { class: "kpi" }, [
-        h("div", { class: "lbl", text: "Weakest SPEs" }),
+        h("div", { class: "lbl", text: "Weakest " + mlNoun(instrument, "elementShortPlural") }),
         h("div", { class: "val", style: "font-size:15px; line-height:1.3;", text: worstNames })
       ]),
       h("div", { class: "kpi" }, [
@@ -3275,14 +3335,18 @@ window.App.Report = (function () {
       h("div", { class: "card-b" }, [
         h("p", { style: "border-left:4px solid var(--brand-blue); background:var(--brand-blue-tint); padding:10px 14px; margin:0; color:var(--text);",
           text: "This is a maturity assessment against " + standardRef(instrument) + ". The result is an achieved-ML profile for each " +
-            mlNoun(instrument, "elementNounTitle").toLowerCase() + ". There is no single programme grade, and mean ML is shown for context only. A requirement that is Not met, or below its target ML, is reported as a floor finding rather than averaged into a mean." })
+            mlNoun(instrument, "elementNounTitle").toLowerCase() + ". There is no single programme grade, and mean ML is shown for context only. A requirement that is Not met, or below its target ML, is reported as a floor finding rather than averaged into a mean." }),
+        // Groupings set out of scope are named here, once, not on every row.
+        mlOutOfScopeLine(scored, instrument)
+          ? h("p", { class: "ml-out-of-scope", style: "margin:10px 0 0;", text: mlOutOfScopeLine(scored, instrument) })
+          : null
       ])
     ]));
 
     // Headline KPIs.
     container.appendChild(h("div", { class: "card" }, [
       h("div", { class: "card-h" }, [h("h2", { text: "Program maturity headline - " + (target ? target.name : "") })]),
-      h("div", { class: "card-b" }, [ mlKpiRow(scored) ])
+      h("div", { class: "card-b" }, [ mlKpiRow(scored, instrument) ])
     ]));
 
     // Results by SPE (chart + table) and by theme (table).
@@ -3300,7 +3364,7 @@ window.App.Report = (function () {
     // Standing prose + cover sheet close the preview.
     var mlBoiler = boilerplateStack([
       instrument.framing ? withAttribution(proseCard("About this assessment", instrument.framing), instrument) : null,
-      proseCard("How to read this report", "Each " + mlNoun(instrument, "requirementNoun") + " is assessed at one maturity level: ML1 Initial (ad hoc), ML2 Managed (documented and repeatable; documentation begins at ML2), ML3 Defined / Practiced (actively practised on the IACS), or ML4 Improving (metrics-driven improvement). Levels apply independently per requirement. Not met means the requirement is not satisfied at any level. Unknown lowers coverage and confidence; Not applicable is excluded. Results are a profile across the " + mlNoun(instrument, "elementNounPlural").toLowerCase() + "; there is no single programme grade.")
+      proseCard("How to read this report", mlHowToRead(instrument, mlNoun(instrument, "elementNounPlural").toLowerCase()))
     ]);
     if (mlBoiler) container.appendChild(mlBoiler);
     appendReportTail(container, opts);
@@ -4474,6 +4538,9 @@ window.App.Report = (function () {
     rollupVerdictLabel: function (v) { return (ROLLUP_VERDICT[v] || ROLLUP_VERDICT.unassessed).label; },
     standardRef: standardRef,
     mlNoun: mlNoun,
+    mlLevels: mlLevels,
+    mlHowToRead: mlHowToRead,
+    mlOutOfScopeLine: mlOutOfScopeLine,
     pluralLower: pluralLower,
     dispositionWord: function (d) { return DISPOSITION_WORD[d] || d; },
     programmeContextText: programmeContextText,

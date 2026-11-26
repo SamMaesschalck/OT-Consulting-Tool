@@ -90,7 +90,7 @@ window.docx = (function () {
       try { E.activateInstrument(id); } catch (e) { seedFailures.push(id + ": " + e.message); }
     });
     var nSeed = Object.keys(SEED).length;
-    check("all " + nSeed + " demo assessments seed without throwing", seedFailures.length === 0 && nSeed === 20, seedFailures.join(" | "));
+    check("all " + nSeed + " demo assessments seed without throwing", seedFailures.length === 0 && nSeed === 21, seedFailures.join(" | "));
 
     E.activateInstrument("eu-machinery");
     check("App.TourMachinery applier exposed", !!A.TourMachinery && typeof A.TourMachinery.apply === "function");

@@ -64,6 +64,13 @@
         "title": "EU CRA Gap Assessment / EU Machinery Regulation Gap Assessment",
         "instrumentId": "eu-cra",
         "detail": "Establish the supplier's real regulatory position with the deep gap assessment that matches their products: the CRA for products with digital elements, the Machinery Regulation for machinery with digital control. Classification and conformity routes decide market access: too consequential to leave at screener depth."
+      },
+      {
+        "domainId": "chain",
+        "grades": ["C", "D", "E", "F"],
+        "title": "ISA/IEC 62443-2-4:2023 Service Provider Security Program Assessment",
+        "instrumentId": "iec-62443-2-4",
+        "detail": "Where the supplier also integrates, maintains or supports your systems, assess its service provider security program in depth against 62443-2-4: remote access, accounts and passwords, staffing and the other processes its people use on your systems. The screener's read of the supplier's access is answers-based only."
       }
     ]
   },

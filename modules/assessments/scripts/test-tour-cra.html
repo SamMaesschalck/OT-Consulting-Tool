@@ -34,7 +34,7 @@
       try { E.activateInstrument(id); } catch (e) { seedFailures.push(id + ": " + e.message); }
     });
     var nSeed = Object.keys(SEED).length;
-    ok(seedFailures.length === 0 && nSeed === 20, "all " + nSeed + " demo assessments seed without throwing", seedFailures.join(" | "));
+    ok(seedFailures.length === 0 && nSeed === 21, "all " + nSeed + " demo assessments seed without throwing", seedFailures.join(" | "));
 
     // Now switch to the CRA (its metadata stamped again, as tour.html does).
     E.activateInstrument("eu-cra");

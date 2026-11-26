@@ -125,13 +125,13 @@
 
   // The demo dataset each instrument's tour loads, by instrument id. Needs
   // every tour script (H.ALL_TOURS) loaded.
-  H.ALL_TOURS = ["41", "42", "caf", "caf-aviation", "cis", "cra", "csms", "machinery", "ml", "nis2", "nis2-quick",
+  H.ALL_TOURS = ["24", "41", "42", "caf", "caf-aviation", "cis", "cra", "csms", "machinery", "ml", "nis2", "nis2-quick",
                  "nist", "nist82", "posture", "risk-appetite", "sl", "supplier", "syaps"];
   H.demoSeeds = function () {
     var A = window.App;
     return {
       "iec-62443-3-3": A.TourSL, "iec-62443-4-2": A.Tour42, "ncsc-caf": A.TourCAF, "general-ot-posture": A.TourPosture,
-      "iec-62443-2-1-2024": A.TourML, "nis2-assessment": A.TourNIS2, "nis2-quick-gap": A.TourNIS2Quick, "iec-62443-4-1": A.Tour41,
+      "iec-62443-2-1-2024": A.TourML, "nis2-assessment": A.TourNIS2, "nis2-quick-gap": A.TourNIS2Quick, "iec-62443-4-1": A.Tour41, "iec-62443-2-4": A.Tour24,
       "iec-62443-2-1-2010": A.TourCSMS, "ncsc-caf-aviation": A.TourCAFAviation, "eu-cra": A.TourCRA, "eu-machinery": A.TourMachinery,
       "supplier-screener": A.TourSupplier, "risk-appetite": A.TourRiskAppetite, "nist-800-53": A.TourNIST, "nist-800-82": A.TourNIST82,
       "cis-controls-v8": A.TourCIS, "onr-syaps-management": A.TourSyAPS.management, "onr-syaps-cyber": A.TourSyAPS.cyber,

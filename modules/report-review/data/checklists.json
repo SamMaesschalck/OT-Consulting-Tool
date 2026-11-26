@@ -52,6 +52,9 @@
     "iec-62443-4-1": [
       { "id": "sdl-scope", "text": "The products, development teams and lifecycle activities in scope are stated." }
     ],
+    "iec-62443-2-4": [
+      { "id": "sp-scope", "text": "The service assessed and the requirements the contract asks for are stated, and any functional area out of scope says why." }
+    ],
     "eu-cra": [
       { "id": "cra-caveat", "text": "The report says it is not a conformity assessment or a legal determination under the CRA." },
       { "id": "cra-class", "text": "The product classification and the conformity route are right." },

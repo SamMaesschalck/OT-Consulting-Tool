@@ -145,7 +145,9 @@ window.App.Review = (function () {
         var v = C.valueFor(fam, r, inst, prof);
         var entry = perItem[c.id];
         var status;
-        if (v.kind === "na" || (entry && entry.profileApplicable === false)) status = "na";
+        // A grouping set out of scope (elementScoping) is not applicable, whatever
+        // answer it kept for when it comes back in.
+        if (v.kind === "na" || (entry && (entry.profileApplicable === false || entry.outOfScope))) status = "na";
         else if (v.kind === "unanswered") status = "unanswered";
         else if (road[c.id] && road[c.id].toAssess) status = "to-assess";
         else if (v.kind === "unknown") status = "to-assess";
@@ -156,7 +158,7 @@ window.App.Review = (function () {
         var groupName = c.groupId ? (groups[c.groupId] || c.groupId) : "";
         items.push({
           targetName: t.name, targetId: t.id, itemId: c.id, code: c.code || c.id, title: c.label || "", groupName: groupName,
-          answer: (entry && entry.profileApplicable === false) ? "Outside the chosen profile" : v.label,
+          answer: (entry && entry.profileApplicable === false) ? "Outside the chosen profile" : ((entry && entry.outOfScope) ? "Out of scope" : v.label),
           expected: expectedOf(entryR),
           evidence: (r && r.evidence) || "", notes: (r && r.notes) || "",
           owner: (r && r.owner) || "", action: (r && r.action) || "", impact: (r && r.impact) || "",

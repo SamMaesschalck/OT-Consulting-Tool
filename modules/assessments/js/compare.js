@@ -28,6 +28,7 @@ window.App.Compare = (function () {
   function isLayeredCRA(instrument) {
     return !!(instrument && instrument.layers && instrument.layers.length && instrument.items);
   }
+  function A_ML() { return window.App.ScoringProgramML || null; }
 
   // ---- uniform item catalog ---------------------------------------------
   // One entry per comparable item: { id, code, label, groupId }.
@@ -266,7 +267,7 @@ window.App.Compare = (function () {
     try {
       if (family === "domain-letter")       return A.ScoringDomainLetter.scoreSite(instrument, profile, responses);
       if (family === "caf-achieved")        return A.ScoringCAF.scoreSite(instrument, profile, responses, (extra && extra.cafOverlay) || {});
-      if (family === "program-maturity-ml") return A.ScoringProgramML.scoreSite(instrument, profile, responses);
+      if (family === "program-maturity-ml") return A.ScoringProgramML.scoreSite(instrument, profile, responses, (extra && extra.mlTarget) || null);
       if (family === "nis2-conformance")    return A.ScoringNIS2.scoreSite(instrument, profile, responses);
       if (family === "csms-conformance") {
         // Layered CRA scores per layer and flattens the roadmap; scope comes
@@ -331,24 +332,36 @@ window.App.Compare = (function () {
   // assessment shape serves a single-site company and a multi-site one.
   //
   // opts: { instrument, taxonomy, profile, family,
-  //         entries: [{ id, name, responses }] }
+  //         entries: [{ id, name, responses, targets? }] }
+  // An entry's targets, when given, carry any groupings set out of scope
+  // (elementScoping); a requirement out of scope for every target of a site is
+  // not applicable there, rather than a site that has not been assessed.
   function rollUpSites(opts) {
     var instrument = opts.instrument, profile = opts.profile, family = opts.family;
     var groups = groupNames(instrument, opts.taxonomy);
     var entries = (opts.entries || []).filter(Boolean);
     var catalog = catalogFor(instrument, family);
+    var scoping = family === "program-maturity-ml" && !!(instrument && instrument.elementScoping) && !!A_ML();
 
     // Index each site's answers once, not once per requirement.
     var indexed = entries.map(function (en) {
       var by = {};
       (en.responses || []).forEach(function (r) { by[r.requirementId || r.itemId] = r; });
-      return { id: en.id, name: en.name, by: by };
+      var out = null;
+      if (scoping && en.targets && en.targets.length) {
+        out = {};
+        var perT = en.targets.map(function (t) { return A_ML().outOfScopeRequirementIds(instrument, t); });
+        Object.keys(perT[0]).forEach(function (id) {
+          if (perT.every(function (m) { return m[id]; })) out[id] = true;
+        });
+      }
+      return { id: en.id, name: en.name, by: by, out: out };
     });
 
     var items = catalog.map(function (item) {
       var perSite = indexed.map(function (en) {
         return { targetId: en.id, name: en.name,
-                 value: valueFor(family, en.by[item.id], instrument, profile) };
+                 value: (en.out && en.out[item.id]) ? NA : valueFor(family, en.by[item.id], instrument, profile) };
       });
 
       var scored = perSite.filter(function (s) { return s.value.kind === "scored"; });
@@ -417,6 +430,12 @@ window.App.Compare = (function () {
     if (isLayeredCRA(instrument) && opts.craSetup && opts.craSetup.layers && opts.craSetup.layers.length) {
       catalog = catalog.filter(function (it) { return opts.craSetup.layers.indexOf(it.groupId) !== -1; });
     }
+    // Groupings set out of scope for this target (elementScoping): absent from
+    // the assessment, so neither side reports them as moved or dropped.
+    if (family === "program-maturity-ml" && opts.mlTarget && A_ML()) {
+      var outIds = A_ML().outOfScopeRequirementIds(instrument, opts.mlTarget);
+      catalog = catalog.filter(function (it) { return !outIds[it.id]; });
+    }
 
     // Risk appetite: the technical review is optional, so its items are only
     // compared when it is in scope now. Absent, they are out of the
@@ -478,7 +497,7 @@ window.App.Compare = (function () {
     // Open-gap count on each side via the family's own roadmap, both scored
     // with the CURRENT content/targets. Absent roadmaps (e.g. program-ml
     // without a target overlay) yield null and the caller hides the figure.
-    var extra = { targetProfile: opts.targetProfile, cafOverlay: opts.cafOverlay, craSetup: opts.craSetup };
+    var extra = { targetProfile: opts.targetProfile, cafOverlay: opts.cafOverlay, craSetup: opts.craSetup, mlTarget: opts.mlTarget || null };
     var prevScored = scoreResponses(instrument, opts.taxonomy, profile, family, opts.baselineResponses || [], extra);
     var currScored = scoreResponses(instrument, opts.taxonomy, profile, family, opts.currentResponses || [], extra);
     // A 3-3/4-2 roadmap also carries requirements still being assessed
