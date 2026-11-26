@@ -85,7 +85,7 @@ window.docx = (function () {
         ok(txt.indexOf(lines[0]) !== -1, id + ": doc prints the scaffolded first step");
         ok(ph.filter(function (p) { return /^\[Add what was agreed/.test(p); }).length === 1,
            id + ": the [prompt] lines print as red placeholders", ph.join(" | "));
-        ok(ph.indexOf("[Consultant to set out the proposed next steps: what should happen now, in what order, and by when.]") === -1,
+        ok(ph.indexOf("[Consultant to set out the proposed next steps in order, with a date for each.]") === -1,
            id + ": the bare placeholder is gone now there is a scaffold");
         step(i + 1);
       });
@@ -137,7 +137,7 @@ window.docx = (function () {
     ta2.dispatchEvent(new Event("change", { bubbles: true }));
     ok(R.nextStepsLines(E.state.engagement, {}).length === 0, "clear: an emptied box stays empty");
     closeNS();
-    ok(mainText().indexOf("Not yet written") !== -1, "clear: the report shows the placeholder");
+    ok(mainText().indexOf("next steps are not yet written") !== -1, "clear: the report shows the placeholder");
 
     // --- restore ---
     nsCard().querySelector(".sect-edit").click();

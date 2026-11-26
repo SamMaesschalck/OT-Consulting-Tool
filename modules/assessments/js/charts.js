@@ -654,7 +654,7 @@ window.App.Charts = (function () {
     } else {
       var none = el("text", { x: pad.l + plotW / 2, y: pad.t + plotH / 2,
                               "text-anchor": "middle", fill: COLOR_MUTED, "font-size": "12" }, svg);
-      none.textContent = "Both positions not yet set";
+      none.textContent = "Neither position is set yet";
     }
 
     // Verdict caption, top right, in the same colour language as the region.

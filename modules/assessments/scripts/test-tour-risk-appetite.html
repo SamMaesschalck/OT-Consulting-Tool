@@ -134,7 +134,7 @@ H.test(function (ok) {
   ok(inst2.length === 2 && inst2.every(function (r) { return /18 answered/.test(r.textContent); }),
      "each reading as finished, not 'not started'",
      inst2.map(function (r) { return r.textContent; }).join(" | "));
-  ok(card && !/Gap analysis against the published framework/.test(card.textContent),
+  ok(card && !/gaps against the published framework/.test(card.textContent),
      "and is not described as a gap analysis against a framework, which it is not");
   ok(card && /exposure against risk appetite/i.test(card.textContent),
      "but as what it is");

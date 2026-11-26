@@ -71,7 +71,7 @@
   A.UI.go("engagement");
   var engMain = document.getElementById("main");
   ok(/About this assessment/.test(engMain.textContent), "engagement page shows About card");
-  ok(/Critical caveats/i.test(engMain.textContent), "engagement page shows the critical caveats callout");
+  ok(/Read these caveats before relying/i.test(engMain.textContent), "engagement page shows the critical caveats callout");
   ok(/Full dutyholder/.test(engMain.textContent) && /Active/.test(engMain.textContent), "profiles table shows the active profile");
   ok(!/Profile selected/.test(engMain.textContent), "no redundant 'Profile selected' note for the loaded profile");
   A.Engine.getActiveNarrative();

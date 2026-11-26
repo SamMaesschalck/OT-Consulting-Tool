@@ -32,9 +32,9 @@
     var card = aboutCard();
     ok(!!card, "About-this-assessment card renders on the engagement page (CIS)");
     var txt = card ? card.textContent : "";
-    ok(/alignment and gap analysis/i.test(txt), "CIS about text describes an alignment & gap analysis");
-    ok(txt.indexOf(A.Engine.state.instrument.title) !== -1, "CIS about text names the instrument", A.Engine.state.instrument.title);
-    ok(/not a formal audit or certification/i.test(txt), "CIS about text carries the advisory caveat");
+    ok(/measures alignment with/i.test(txt) && /gaps/i.test(txt), "CIS about text describes an alignment & gap analysis");
+    ok(txt.indexOf(A.Engine.state.instrument.framework) !== -1, "CIS about text names the standard", A.Engine.state.instrument.framework);
+    ok(/advisory and is not a formal audit/i.test(txt), "CIS about text carries the advisory caveat");
     ok(txt.length > 120 && txt.length < 700, "about text is a small paragraph", String(txt.length));
 
     // Case 2: first instrument (IEC 62443-3-3, capability-sl)
@@ -50,7 +50,8 @@
     } else {
       ok(txt2.length > 60, "about text present for family " + fam);
     }
-    ok(card2 && txt2.indexOf(A.Engine.state.instrument.title) !== -1, "about text names the instrument title", A.Engine.state.instrument.title);
+    var ref2 = (/^ISA\/IEC 62443-\d-\d(?::\d{4})?/.exec(A.Engine.state.instrument.title) || [A.Engine.state.instrument.title])[0];
+    ok(card2 && txt2.indexOf(ref2) !== -1, "about text names the standard", ref2);
 
     // Override: display.about wins verbatim when present.
     var saved = A.Engine.state.instrument.display;

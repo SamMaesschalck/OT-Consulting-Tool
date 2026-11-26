@@ -72,7 +72,7 @@ H.test(function (ok) {
     // ---- family page: controls render, no OT lens card ----
     A.UI.go("caf-principle", "AC");
     var acMain = document.getElementById("main");
-    ok(acMain.textContent.indexOf("OT lens") === -1, "family page shows NO OT lens card (generic instrument)");
+    ok(acMain.textContent.indexOf("OT context") === -1, "family page shows NO OT context card (generic instrument)");
     ok(acMain.querySelectorAll(".caf-state-btn").length >= 2, "control rows render with state buttons");
     // SP 800-53A binary determination model: Satisfied / Other Than Satisfied
     var subStates = (inst.states || []).filter(function (s) { return s.value !== "unknown" && s.value !== "na"; });

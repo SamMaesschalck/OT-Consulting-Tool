@@ -387,7 +387,7 @@ H.test(function (ok) {
   m = document.getElementById("main");
   ok(m.querySelectorAll("select option").length >= 16, "the setup page lists every sector",
      String(m.querySelectorAll("select option").length));
-  ok(/not a determination/i.test(m.textContent),
+  ok(/default starting point/i.test(m.textContent) && /You set the final band/.test(m.textContent),
      "and says out loud that the baseline is not a determination");
 
   // ---- 10. the report: the plot is the headline --------------------------

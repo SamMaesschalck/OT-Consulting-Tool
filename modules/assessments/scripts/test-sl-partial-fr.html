@@ -246,7 +246,7 @@ H.test(function (ok, done) {
     var es = sec(d.list, /Executive summary$/);
     ok(/Of the assessed Foundational Requirements, \d+ met the target Security Level, \d+ fell short and 1 \(FR1\) is not yet fully assessed, with nothing short so far; /.test(es.text),
        "Word: the summary's count sentence names FR1 as partly assessed", (es.text.match(/Of the assessed[^\n]*/) || [""])[0]);
-    ok(es.text.indexOf("has nothing short so far but still has items to assess") === -1,
+    ok(es.text.indexOf("has no shortfall so far but still has items to assess") === -1,
        "Word: and no separate sentence is bolted on after it");
     ok(!/—|–/.test(d.all), "Word: no em or en dash");
 

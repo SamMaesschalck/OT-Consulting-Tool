@@ -100,7 +100,7 @@ H.test(function (ok, done) {
     return poll(function () { return issueLine(/Not reviewed yet/); });
   });
   step(function (li) {
-    ok(/Worth a look first/.test(main.querySelector(".issue-check").textContent), "the warning is under Worth a look first");
+    ok(/Check before issuing/.test(main.querySelector(".issue-check").textContent), "the warning is under Check before issuing");
     ok(!li.classList.contains("block"), "as a warning, not a blocker");
     var b = li.querySelector(".issue-go");
     ok(b && b.textContent === "Review", "and it goes to the Review card");
