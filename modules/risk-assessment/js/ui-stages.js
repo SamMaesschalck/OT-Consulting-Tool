@@ -34,10 +34,22 @@
     main.appendChild(pageSub("suc", "Define the SUC, its boundary and every access point."));
     main.appendChild(card("SUC definition", null, [
       textField("SUC name", p.suc.name, function (v) { p.suc.name = v; touched(); }, { placeholder: "e.g. Riverside Works process control system" }),
-      textField("Description", p.suc.description, function (v) { p.suc.description = v; touched(); }, { textarea: true, placeholder: "Function and intended use of the SUC, and the equipment or process it controls." }),
+      textField("Description", p.suc.description, function (v) { p.suc.description = v; touched(); }, { textarea: true, placeholder: "e.g. The DCS and SIS that run the unit's reactors, with the operator stations and plant network around them." }),
       textField("Scope statement / boundary", p.suc.scopeStatement, function (v) { p.suc.scopeStatement = v; touched(); }, { textarea: true, placeholder: "What is inside and outside the boundary, and the access points across it.", hint: "Name the exclusions, e.g. corporate IT or third-party packages." }),
       lineListField("Operating-environment assumptions", p.suc.assumptions, function (a) { p.suc.assumptions = a; touched(); }, "e.g. Physical access to the equipment room is controlled")
     ], null, { "data-check-anchor": "suc" }));
+
+    // The SUC's access points, each with the zone or conduit it enters
+    // (written once one is added).
+    var enterOpts = p.zones.concat(p.conduits).map(function (o) { return { value: o.id, text: o.id + (o.name ? " " + o.name : "") }; });
+    main.appendChild(card("SUC access points", null, [
+      h("p", { class: "hint", style: "margin-top:0", text: "Where people, data or media can enter the SUC, and the zone or conduit each reaches." }),
+      registerTable(Array.isArray(p.suc.accessPoints) ? p.suc.accessPoints : [], [
+        { key: "description", label: "Access point", placeholder: "e.g. Vendor VPN from the internet" },
+        { key: "enters", label: "Enters", kind: "select", options: enterOpts, width: "260px", placeholder: "Not set" }
+      ], { empty: "No access points listed yet.", addLabel: "+ Add access point", rowLabel: "access point",
+        onAdd: function () { if (!Array.isArray(p.suc.accessPoints)) p.suc.accessPoints = []; p.suc.accessPoints.push(M.emptySucAccessPoint()); touched(); rerender(); } })
+    ], null, { "data-check-anchor": "suc-access" }));
 
     // The confirmed marker is the band the asset owner confirmed: changing the
     // tolerable risk afterwards leaves it unconfirmed until confirmed again.
@@ -229,7 +241,12 @@
       { key: "__impact", label: "Impact", kind: "computed", width: "150px", render: function (it) { return impactCell(it, p, crit); } },
       { key: "likelihood", label: "Likelihood", kind: "select", options: likOpts, width: "110px", placeholder: "Not rated" },
       { key: "__risk", label: "Risk", kind: "computed", width: "88px", render: function (it) { return riskPill(riskFor(it.consequence, it.likelihood, p)); } },
-      { key: "note", label: "Candidate grouping / notes", placeholder: "e.g. → Process Control zone" }
+      { key: "note", label: "Candidate grouping / notes", placeholder: "e.g. → Process Control zone" },
+      // Inside the SUC unless unticked: one outside it is ranked for context and sets no initial risk.
+      { key: "__inSuc", label: "In the SUC", kind: "computed", width: "70px", render: function (it) {
+        return h("input", { type: "checkbox", "data-field": "hla-in-suc", checked: M.inSuc(it), "aria-label": it.id + " is inside the SUC",
+          onChange: function (e) { if (e.target.checked) delete it.inSuc; else it.inSuc = false; touched(); rerender(); } });
+      } }
     ];
     // A high-level-only assessment records the comparison with tolerable risk
     // here, as there are no zones to record it on.
@@ -296,7 +313,7 @@
         textField("Confidentiality", eng.confidentiality, function (v) { eng.confidentiality = v; touched(); }, { placeholder: "e.g. Confidential - Client Restricted" }),
         textField("QA review by", eng.qaReviewBy, function (v) { eng.qaReviewBy = v; touched(); }, { placeholder: "who reviewed the report before issue" })
       ])
-    ]));
+    ], null, { "data-check-anchor": "engagement" }));
 
     // Preparation guidance (advisory; never pre-populates the registers below).
     var guide = window.App.Data.engagementGuidance;
@@ -330,6 +347,16 @@
         { key: "notes", label: "Topics discussed", placeholder: "e.g. Network architecture, remote access" }
       ], { empty: "No interviews recorded yet.", addLabel: "+ Add person", rowLabel: "interview", onAdd: function () { p.counters.interview += 1; b.interviews.push(M.emptyInterview(p.counters.interview)); touched(); rerender(); } })
     ]));
+
+    // The risk assessment sessions (written once one is added).
+    main.appendChild(card("Risk assessment sessions", "workshops held", [
+      registerTable(Array.isArray(b.sessions) ? b.sessions : [], [
+        { key: "date", label: "Date", kind: "date", width: "150px" },
+        { key: "topic", label: "Topic", placeholder: "e.g. Threat scenarios for the BPCS zone", width: "30%" },
+        { key: "participants", label: "Participants, with titles", placeholder: "e.g. J. Smith (Control systems engineer); A. Patel (Plant Manager)" }
+      ], { empty: "No sessions recorded yet.", addLabel: "+ Add session", rowLabel: "session",
+        onAdd: function () { if (!Array.isArray(b.sessions)) b.sessions = []; b.sessions.push(M.emptySession(M.nextSessionId(p))); touched(); rerender(); } })
+    ], null, { "data-check-anchor": "sessions" }));
 
     main.appendChild(card("Documents reviewed", "documents & records read or provided", [
       registerTable(b.documents, [

@@ -54,8 +54,8 @@ window.App.Data.sltRules = {
   ],
   "riskToSL": {
     "_note": "HOUSE mapping from an unmitigated per-FR risk band to a suggested SL-T for that foundational requirement. The standard prescribes no matrix and no method for setting an SL-T; this mapping is a SolutionsPT house default.",
-    "low":       { "suggest": 1, "trace": "Unmitigated risk low: casual-violation protection (SL1) is a reasonable target for this foundational requirement." },
-    "medium":    { "suggest": 2, "trace": "Unmitigated risk medium: protect against intentional violation with simple means (SL2)." },
+    "low":       { "suggest": 1, "trace": "Unmitigated risk low: protection against mistakes and chance misuse (SL1) is a reasonable target for this foundational requirement." },
+    "medium":    { "suggest": 2, "trace": "Unmitigated risk medium: protect against a deliberate attacker with general IT skills and simple tools (SL2)." },
     "high":      { "suggest": 3, "trace": "Unmitigated risk high: protect against a capable, resourced, IACS-aware attacker (SL3)." },
     "very-high": { "suggest": 3, "escalateTo": 4, "trace": "Unmitigated risk very high: SL3 as the working target; SL4 only where a nation-state-grade adversary is genuinely in scope (flag for a conscious decision rather than defaulting)." }
   },
@@ -97,7 +97,7 @@ window.App.Data.sltRules = {
     "Suggestion never exceeds SL4 and never silently changes after consultant override.",
     "The rule trace (which rules fired and why) is always shown alongside the suggestion.",
     "The consultant sets the final SL-T per foundational requirement; a justification is mandatory and is the primary deliverable text.",
-    "Unmitigated risk is impact x likelihood, rated before any cyber security countermeasure is considered (countermeasures built into the components, and protection that is not cyber security such as physical security, mechanical safeguards and emergency procedures, still count); a threat whose risk exceeds tolerable risk needs a recorded treatment decision and is never silently accepted.",
+    "Unmitigated risk is impact x likelihood, rated before any cyber security countermeasure is considered (countermeasures built into the components, and protection that is not cyber security such as controlled site access, hardwired interlocks and relief devices, still count); a threat whose risk exceeds tolerable risk needs a recorded treatment decision and is never silently accepted.",
     "Where the client organisation has its own risk matrix/criteria, those take precedence over this heuristic; record that the client matrix was used."
   ]
 };

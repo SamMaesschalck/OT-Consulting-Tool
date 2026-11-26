@@ -101,7 +101,7 @@
     // An approval taken before "Accepted by" was asked for still matches: the acceptance it covered is
     // fingerprinted as it was, its reason and no detail.
     var q0 = clone(base), q8 = threatIn(q0, "Z4", "T8"); q8.acceptanceDetail = M.emptyAcceptanceDetail();
-    ok(TT(q0, "Z4", "T8").gap === "accepted with no record of who accepted it" && E.approvalBasis(q0).accepted.filter(function (s) { return s.indexOf("transfer>") !== 0; }).join("#") === "Z4/T8:" + q8.acceptance,
+    ok(TT(q0, "Z4", "T8").gap === "accepted with no record of who accepted it" && E.approvalBasis(q0).accepted.filter(function (s) { return s.indexOf("transfer>") !== 0 && s.indexOf("remaining>") !== 0; }).join("#") === "Z4/T8:" + q8.acceptance,
       "an acceptance with no one recorded still counts in what an approval covered, as before", E.approvalBasis(q0).accepted.join("#").slice(0, 80));
     // Warn only: every deliverable still builds, and none states the acceptance as fact.
     g8.acceptanceDetail.by = "";
@@ -113,7 +113,9 @@
     return wordParas(g, {}).then(function (det) {
       ok(det.length > 500 && det.some(function (x) { return /T8 \(Z4\), accept \(no record of who accepted it\)/.test(x); }), "it never blocks: the report builds, and its summary names the incomplete acceptance",
         det.filter(function (x) { return /incomplete/.test(x); }).join(" | "));
-      ok(after(det, "Accepted risks")[0] === "No risk has been accepted.", "and Accepted risks does not list it");
+      // Step 5: the demo's T4 remaining risk is listed there now (was: "No risk has been accepted.").
+      var accSec = det.slice(det.indexOf("Accepted risks"), det.indexOf("Transferred risks", det.indexOf("Accepted risks")));
+      ok(accSec.length > 1 && !accSec.some(function (x) { return /^T8  /.test(x); }), "and Accepted risks does not list it", accSec.slice(0, 3).join(" | "));
       // The review pack and the review tool's decision check.
       load(g);
       var i8 = RR.packItems().items.filter(function (x) { return x.itemId === "Z4:T8"; })[0];
@@ -169,17 +171,17 @@
       var row = tr.slice(10, 20);
       ok(/^T2  Malware introduced through an engineering connection/.test(row[0]) && row[1] === "Z1 Unit 300 BPCS" && row.indexOf(threatIn(DEMO, "Z1", "T2").acceptance) > 0 && row.indexOf(threatIn(DEMO, "Z1", "T2").transferTo) > 0 &&
         row.slice(-4).join("|") === "H. Okafor|Group Insurance Manager|2026-07-03|2027-03-31", "with T2: how, to whom, who agreed it, their role, the date and the review date", row.join("|"));
-      ok(det.some(function (x) { return /^Signed off as below\. An approval covers the tolerable risk, the target security levels and the accepted and transferred risks in this report/.test(x); }), "Word: the approval covers the accepted and transferred risks");
+      ok(det.some(function (x) { return /^Signed off as below. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted and transferred risks in this report/.test(x); }), "Word: the approval covers the accepted and transferred risks (step 5: and what else it covers)");
 
       // ---- C. the demo's asset classification and business value in Word --------------------------
       var ar = det.indexOf("Asset register");
       ok(ar > det.indexOf("Zone and conduit characteristics") && det.some(function (x) { return /Each zone's assets are listed under Asset register, after the conduits\./.test(x); }), "Word: an Asset register, which the characteristics refer to");
       var z1 = after(det, "Z1 Unit 300 BPCS", ar);
-      ok(z1.slice(0, 8).join("|") === "Name|Type|Classification|Business value|DCS server pair (redundant)|Server|Process critical|High", "Word: each zone's assets with their classification and business value", z1.slice(0, 8).join("|"));
+      ok(z1.slice(0, 10).join("|") === "Name|Type|Criticality|Classification|Business value|DCS server pair (redundant)|Server|High|Process critical|High", "Word: each zone's assets with their classification and business value (and, step 5, criticality)", z1.slice(0, 10).join("|"));
       var z2 = after(det, "Z2 Safety Instrumented System", ar);
-      ok(z2.slice(4, 7).join("|") === "SIS logic solver|Safety PLC|Safety critical (SIL 2)", "the SIS logic solver is safety critical", z2.slice(0, 8).join("|"));
+      ok(z2.slice(5, 9).join("|") === "SIS logic solver|Safety PLC|High|Safety critical (SIL 2)", "the SIS logic solver is safety critical", z2.slice(0, 8).join("|"));
       var z4 = after(det, "Z4 Engineering workstations", ar);
-      ok(z4.slice(0, 5).join("|") === "Name|Type|Connection|Classification|Business value" && z4.slice(15, 20).join("|") === "Vendor laptops (turnarounds)|Engineering workstation|Temporarily connected|Third-party equipment|Low",
+      ok(z4.slice(0, 6).join("|") === "Name|Type|Connection|Criticality|Classification|Business value" && z4.slice(18, 24).join("|") === "Vendor laptops (turnarounds)|Engineering workstation|Temporarily connected|Low|Third-party equipment|Low",
         "and the vendor laptops are third-party equipment of low business value", z4.slice(0, 20).join("|"));
       var demoAssets = []; DEMO.zones.forEach(function (z) { z.assets.forEach(function (a) { demoAssets.push(a); }); });
       ok(demoAssets.every(function (a) { return all.indexOf(a.classification) >= 0; }), "every asset's classification prints");

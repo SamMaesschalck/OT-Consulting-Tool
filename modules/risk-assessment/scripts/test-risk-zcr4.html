@@ -134,8 +134,8 @@
       var mc = RT.mandatoryCountermeasures(base).map(function (e) { return e.owner.id + "/" + e.m.id; });
       ok(mc.indexOf("Z1/M3") < 0 && mc.indexOf("Z1/M2") < 0 && threatIn(base, "Z1", "T2").countermeasureIds.indexOf("M3") >= 0,
         "M3 stays linked to T2 but is not mandatory: no decision to reduce rests on it", mc.join());
-      ok(RT.mandatoryCountermeasures(base).every(function (e) { return e.owner.threats.some(function (t) { return (t.countermeasureIds || []).indexOf(e.m.id) >= 0 && E.threatTreatment(e.owner, t, base).decision === "reduce" && E.threatTreatment(e.owner, t, base).complete; }); }),
-        "every mandatory countermeasure is one a confirmed decision to reduce rests on");
+      ok(RT.mandatoryCountermeasures(base).every(function (e) { return e.owner.threats.some(function (t) { return (t.countermeasureIds || []).indexOf(e.m.id) >= 0 && ["reduce", "slt"].indexOf(E.threatTreatment(e.owner, t, base).decision) >= 0 && E.threatTreatment(e.owner, t, base).complete; }); }),
+        "every mandatory countermeasure is one a confirmed decision to reduce, or (step 5) to treat through the SL-T, rests on");
       return wordParas(base, { spec: true });
     }).then(function (spec) {
       var all = spec.join("\n");

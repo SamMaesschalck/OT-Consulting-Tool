@@ -54,8 +54,9 @@
     function go(stage, anchor) { return stepLink(stage, anchor, what); }
     switch (b.id) {
       case "countermeasures":
-        // The countermeasures the decisions to reduce a risk rest on: in place
-        // (to be kept) or planned, with the plan.
+        // The countermeasures the decisions to reduce a risk or to treat it
+        // through the SL-T rest on (house reading): in place (to be kept) or
+        // planned, with the plan.
         var mc = E.mandatoryCountermeasures(p);
         if (!mc.length) return [h("p", { class: "muted", text: "No treatment decision rests on a countermeasure yet." }), h("div", { class: "btn-row" }, [go("risk")])];
         var t = h("table", { class: "tbl compact", "data-mandatory": "" }, [h("thead", null, [h("tr", null, ["Countermeasure", "Zone or conduit", "In place or planned"].map(function (x) { return h("th", { text: x }); }))])]);
@@ -84,7 +85,19 @@
           h("div", { class: "btn-row" }, [go("srs")])];
       case "policies":
         var zp = perZone(p, "securityPolicies");
-        return [lineListField("Policies", M.listOf(s.policies), function (a) { if (a.length) s.policies = a; else delete s.policies; touched(); refreshStatus(p); }, "e.g. Group OT standard GS-104: remote access only through the DMZ jump host"),
+        var polField = lineListField("Policies", M.listOf(s.policies), function (a) { M.setPolicies(s, a); touched(); refreshStatus(p); }, "e.g. Group OT standard GS-104: remote access only through the DMZ jump host");
+        // A new policy gets its own Implemented by once the list is left.
+        var polBox = polField.querySelector("textarea");
+        if (polBox) A.changeRedraw(polBox);
+        // What implements each policy: the countermeasures or features, in short text.
+        var impl = M.listOf(s.policies).map(function (pol, i) {
+          var inp = h("input", { type: "text", "data-field": "policy-impl-" + i, value: M.policyImplementedBy(p, pol), "aria-label": "Implemented by: " + pol,
+            placeholder: "e.g. Per-session vendor access with MFA; the media kiosk",
+            onInput: function (e) { M.setPolicyImplementation(s, pol, e.target.value); touched(); } });
+          return h("div", { class: "field policy-impl" }, [h("label", { text: pol }), inp]);
+        });
+        return [polField,
+          impl.length ? h("div", { "data-policy-impl": "" }, [h("strong", { text: "Implemented by" })].concat(impl)) : null,
           zp.length ? h("div", null, [h("strong", { text: "Zone policies" }), list(zp)]) : null,
           zp.length ? h("div", { class: "btn-row" }, [go("zones")]) : null];
       case "tolerable":
@@ -181,7 +194,11 @@
     }
     var acc = vm.threats.filter(function (x) { return x.disposition === "accepted"; });
     kids.push(h("div", { "data-covers": "accepted", style: "margin-top:10px" }, [h("strong", { text: "Accepted risks" }),
-      list(acc.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + (x.t.statement || "").replace(/[.\s]+$/, "") + ". " + x.treatment.reason; }), "None.")]));
+      list(acc.map(function (x) { return x.t.id + " (" + x.owner.id + "): " + (x.t.statement || "").replace(/[.\s]+$/, "") + ". " + x.treatment.reason; })
+        // The remaining risk accepted after a decision to reduce or to treat through the SL-T.
+        .concat(vm.threats.filter(function (x) { return x.treatment.remainingAccepted; }).map(function (x) {
+          return x.t.id + " (" + x.owner.id + "): remaining risk accepted. " + String(x.t.acceptance || "").trim();
+        })), "None.")]));
     // The transferred risks are approved with the accepted ones; listed only when there is one.
     var trf = vm.threats.filter(function (x) { return x.disposition === "transferred"; });
     if (trf.length) kids.push(h("div", { "data-covers": "transferred", style: "margin-top:10px" }, [h("strong", { text: "Transferred risks" }),

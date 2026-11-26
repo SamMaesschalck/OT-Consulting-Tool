@@ -113,10 +113,10 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
     approval does not cover it.
   - A file saved by v0.7.0 recorded a per-zone decision instead
     (`detailed: { required, reason }`). With no `assessment`, one recorded as
-    not required that has no threat scenarios reads as a proportionate review
-    with nothing noted, so the completeness list asks for the note; anything
-    else reads as detailed. Nothing is written by that reading, and the
-    released v0.7.0 normaliser keeps `assessment` as it is.
+    not required that has no threat scenarios reads as deferred with no
+    reason (it was not assessed), so the completeness list asks for the
+    reason; anything else reads as detailed. Nothing is written by that
+    reading, and the released v0.7.0 normaliser keeps `assessment` as it is.
   - Completeness warns, never blocks: every zone and conduit has an SL-T, a
     deferred one with a warning of its own that it has none yet; detailed has
     a threat scenario (a conduit with a justification excepted, as before);
@@ -218,11 +218,14 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
   and Go to lands on the row. A row not raised asks nothing, and an answer
   kept for a row no longer raised counts for nothing. When a row is raised is
   the method used here (`data/zcr-map.json`). Separating business and
-  control system assets is a requirement of the standard (the others are
-  recommendations): Not separated there reads as a departure from it on the
-  zones page, step 6 and in Word and Excel, and its warning asks for the
-  justification. Safety related assets not separated make the whole zone
-  safety related, and Word says so.
+  control system assets, and separating safety related assets, are
+  requirements of the standard (the other rows are recommendations): Not
+  separated there reads as a departure from it on the zones page, step 6
+  and in Word and Excel, and its warning asks for the justification. Safety
+  related assets may instead share a zone designated safety related as a
+  whole (the zone's Safety related tick, or "The whole zone is designated
+  safety related" on the row): Not separated is then no departure, and Word
+  says the whole zone is treated as safety related.
 - **Step 1's risk criteria** are the project's own, editable beside the form
   (`js/ui-criteria.js`, phase 5): the matrix, one choice of band per cell, the
   cells above tolerable risk outlined; Start from a preset (the SolutionsPT
@@ -236,7 +239,8 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
 - **Requirements specification (step 6)** is nine blocks in the order
   `data/zcr-map.json` (`specBlocks`) gives: the mandatory security
   countermeasures (`Engine.mandatoryCountermeasures`: the countermeasures the
-  confirmed decisions to reduce a risk rest on, in place or planned, each once
+  confirmed decisions to reduce a risk or to treat it through the SL-T
+  programme rest on, in place or planned, each once
   per zone or conduit, a house reading; the specification file prints them
   after the SL-T, which they follow from, and a justification naming one of
   them by id is no longer flagged there), SUC description, zone and conduit
@@ -245,7 +249,10 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
   tolerable risk and regulatory requirements (`js/ui-spec.js`). Each is
   assembled from what the steps captured, with Done or Open and a link back
   to where it was captured. The organisational policies (`suc.policies`) and
-  the regulatory requirements are entered here (regulatory moved from step
+  the regulatory requirements are entered here, each policy with what
+  implements it (`suc.policyImplementation`, short text by policy, printed
+  after it in Word and the specification; a policy edited in place keeps
+  it, `Model.setPolicies`) (regulatory moved from step
   2; security functions that must be kept stay on step 2 and show in the SUC
   block). The blocks with no other check (assumptions, threat environment,
   policies, regulatory) are open in the completeness list when empty.
@@ -264,14 +271,23 @@ and `wordpreview` on the Word pages (`RiskApp.StageAliases`, set by
   on load (a new name drops the earlier person's revision and fingerprint,
   an approval taken back drops its fingerprint, and a role or statement typed
   into an empty sign-off starts an entry). Ticking Approved takes the
-  fingerprint of what is covered (`Engine.approvalFingerprint`, `a2-`: one
-  hash per part, so a change says what moved; a first-build `a1-` print is
-  still read, as one hash). The detailed report's approval covers the
-  tolerable risk, the SL-T and the accepted and transferred risks (a
-  transfer is marked in the fingerprint, so a project with none fingerprints
-  as before), and says it does not cover a deferred zone or conduit; the high-level report's
-  the tolerable risk and the ranking (with each system's decision on a
-  high-level-only assessment): a later change reads "Changed since approval:
+  fingerprint of what is covered (`Engine.approvalFingerprint`, `a3-`: one
+  hash per part, so a change says what moved; the parts are the tolerable
+  risk, the ranking, the SL-T, the accepted risks (with the transferred ones
+  and the remaining risks accepted), each threat scenario with its three
+  ratings, every treatment decision, the zones and conduits with what each
+  holds and its depth, and the mandatory security countermeasures). An
+  `a2-` print, taken before the 3-2 fixes' step 5, is read under its own
+  rule, its four parts, so it cannot see a change to the others; a
+  first-build `a1-` print is still read, as one hash. The detailed report's
+  approval covers the tolerable risk, the zones and conduits, the threat
+  scenarios with their ratings and decisions, the SL-T and the accepted and
+  transferred risks, and says it does not cover a deferred zone or conduit;
+  the specification's the tolerable risk, the zones and conduits, the SL-T
+  and the mandatory countermeasures; the high-level report's the tolerable
+  risk and the ranking (with each system's decision on a high-level-only
+  assessment; on a full assessment it says the scopes were given for the
+  full assessment): a later change reads "Changed since approval:
   the ranking." and is open for the report it concerns until Approved again.
   An approval with no fingerprint (ticked in an older build) offers Approved
   again. Named approvers with none approved are open ("approval not yet
@@ -288,6 +304,62 @@ tidies them when present and never adds them. A file phase 3 saved with them
 (0.2) still opens in v0.7 unchanged (`scripts/test-risk-nav.html` runs the
 released v0.7 normaliser, frozen in `scripts/fixtures/v0.7-normaliser.js`,
 over `scripts/fixtures/tour-phase3-0.2.js`).
+
+### The 3-2 fixes, step 5 (built Nov 2026)
+
+Every finding of the final check against the published standard, fixed.
+All of it warns and never blocks; the new fields are optional and written
+only once set (`js/model.js`), and the released v0.7.0 normaliser keeps them.
+
+- **SL-T per requirement.** A zone or conduit with some targets set and
+  others not warns once, naming them ("no SL-T set for SI and RA."). The
+  SL-T section in Word and the specification says each has one target per
+  requirement only when every target is set; otherwise that the consultant
+  sets one per requirement and Not set marks one with none yet.
+- **Reduce, and the remaining risk.** A decision to reduce is incomplete
+  (`threatTreatment` gap, no disposition) when the risk is above tolerable
+  today and no planned countermeasure is linked ("Reduce with
+  countermeasures (none planned)"), and when the rating once the plan is
+  complete (`afterPlan`) stays above tolerable with no record of the asset
+  owner's acceptance of what remains. A decision to treat through the SL-T
+  programme in the same position is incomplete the same way. The acceptance
+  reuses the threat's acceptance fields: the reason in `acceptance`, who,
+  role, date and review date in `acceptanceDetail` (`remainingAbove`,
+  `remainingAccepted`, `remainingMissing`). Accepted risks in Word and
+  Excel list it, marked "Remaining risk accepted", rated once the plan is
+  complete; the approval covers it; the review pack shows it.
+- **Mandatory security countermeasures** are, by the house reading, those
+  the confirmed decisions to reduce a risk or to treat it through the SL-T
+  programme rest on.
+- **The approval fingerprint** is `a3-` (see Approval above).
+- **Characteristics.** One warning per zone or conduit lists what it lacks
+  (`Engine.characteristicsMissing`): name, accountable organisation, logical
+  and physical boundary, logical and physical access points, data flows,
+  for a zone the zones or conduits it connects to and its assets'
+  classification, criticality and business value, applicable security
+  requirements, security policies, and assumptions or external
+  dependencies. Go to opens the characteristics.
+- **Routes.** A threat whose route crosses two zones that no conduit joins,
+  or passes a conduit that does not join the zone beside it, warns.
+- **Ranked systems inside the SUC.** `rankedSystem.inSuc` is false for a
+  system outside the SUC (absent: inside). The SUC's initial risk is the
+  worst of the systems inside it; one inside it in no zone warns (on a full
+  assessment with zones); the ranking marks the others in the UI ("In the
+  SUC"), Word ("Outside the SUC") and Excel (an "In the SUC" column when
+  any is outside). The risk context does not carry the mark.
+- **Documentation of the results.** No confidentiality classification of
+  the reports warns (both reports). The risk assessment sessions
+  (`basisOfAssessment.sessions`: date, topic, participants with their
+  titles; ids S1, S2..., `counters.session`) sit on Engagement and evidence
+  beside the interviews, print in Word's basis of assessment and the Basis
+  sheet, and none recorded warns for the detailed report.
+- **The SUC's access points** (`suc.accessPoints`: description, and the
+  zone or conduit it enters) are on step 1, print in Word and the
+  specification under the SUC, and none listed warns for both reports.
+- **Organisational policies** say what implements each (see step 6 above).
+- **ZCR 3.3** is a requirement (see the separation rows above).
+- **Older files.** A zone or conduit a v0.7.0 file recorded as not needing
+  a detailed assessment, with no threats, reads as deferred with no reason.
 
 ### File format 0.3 (phase 4)
 
@@ -701,11 +773,13 @@ so no text is written twice. The schema does not move.
   order, the drawing's page and the asset register included), its SL-T
   table with the safety floor sentence and each justification (not the
   driving scenarios, which name threats it does not hold), then the
-  mandatory security countermeasures (the 3-2 fixes: each one the decisions
-  to reduce a risk rest on, in place or planned, with its zone or conduit,
-  owner and due date and SR references), the sign-off with
-  the signature table ("An approval covers the tolerable risk and the target
-  security levels in this specification"), method and limitations (its
+  mandatory security countermeasures (the 3-2 fixes: by the house reading,
+  each one the decisions to reduce a risk or to treat it through the SL-T
+  programme rest on, in place or planned, with its zone or conduit, owner
+  and due date and SR references), the sign-off with the signature table
+  ("An approval covers the tolerable risk, the zones and conduits, the
+  target security levels and the mandatory security countermeasures in this
+  specification"), method and limitations (its
   ratings sentence says the targets rest on risk ratings), and the risk
   criteria appendix (its tolerable line says only where the line is; a risk,
   not a threat or system, takes the worst of its categories). None of the
@@ -846,8 +920,11 @@ and `word-v0.7.0.js`.
   zone's own threats, including the SL4 escalation note at Very high. It is a
   suggestion only, and it is always labelled as the house method: in the Why
   trace, on About, in the Word appendix and driving scenarios lead-in, and on
-  the Criteria sheet. The route is as recorded and is not checked against
-  the conduits. Driving scenarios name the route ("T1 through Z3 and C2 to K1
+  the Criteria sheet. Each step of the route is checked against the
+  conduits: two zones in a row that no conduit joins, or a zone beside a
+  conduit that does not join it, warn (`Engine.routeBreaks`). A zone or
+  conduit grouped with the one that holds its threat scenarios is no
+  stepping stone. Driving scenarios name the route ("T1 through Z3 and C2 to K1
   (High)"). The specification prints no suggestions, so it leaves the method
   out.
 - **Completeness** (warns only).
@@ -962,8 +1039,8 @@ risk assessment for the standard's initial cyber security risk assessment,
 the step before the detailed one. Unmitigated risk is
 the risk before any cyber security countermeasure is considered: countermeasures
 built into the control system components, and protection that is not cyber
-security such as physical security, mechanical safeguards and emergency
-procedures, still count. Residual risk is what
+security such as controlled site access, hardwired interlocks and relief
+devices, still count. Residual risk is what
 remains with the countermeasures in place (the current rating), and again once
 the planned ones are added (the planned rating).
 
@@ -1169,8 +1246,9 @@ assessment (`data/tour-project.js`, Acme Petrochemicals Unit 300); Home's Open
 the demo loads it in the running tool. Autosave is switched off in the demo,
 so real unsaved work can never be touched. The demo is a full assessment with
 every step Done; its SUC is above tolerable risk, so every zone and conduit is
-assessed: the zones and C2 in detail, C1 grouped with Z3, whose threats it
-shares, and C3 as a proportionate review with the threats considered noted.
+assessed: the zones and C2 in detail, C1 grouped with Z3, C4 with Z4 and C5
+with Z2, whose threats they share, and C3 as a proportionate review with the
+threats considered noted.
 Its zones carry their
 characteristics; Z1 and Z3 show an external-network separation answered Met
 and Z4 temporarily connected vendor laptops Not separated, with the reason;
@@ -1201,13 +1279,24 @@ intelligence and two emerging threats, its conduits carry a zone's
 characteristics (accountable organisation, logical and physical boundary,
 access points, data flows, dependencies, policies, assumptions), every zone
 and conduit lists its applicable security requirements, and the ranking
-notes say A1 to A4 are assessed in detail and A5 and A6 sit outside the SUC.
+notes say A1 to A4 are assessed in detail; A5 and A6 are marked outside the
+SUC.
 Every asset carries a classification and a business value, so the report
 prints an asset register. T2's lost production is transferred through the
 group's business interruption insurance, reviewed at each policy renewal and
 agreed by the group insurance manager, whose interview is in the basis of
 assessment (I5), and every acceptance records who accepted it. The approvals
 were retaken for the transfer and again when its cover was reworded.
+Since the 3-2 fixes' step 5 the engineering VLAN (C4, Z4 to Z1) and the
+keyed SIS connection (C5, Z4 to Z2) are conduits, and T2 and T4 pass
+through them; every zone and conduit has a target on every foundational
+requirement (C1's justification now matches its SL3 targets) and its
+characteristics in full, each asset with a criticality; T4's remaining risk
+is accepted by the asset owner, so M4 and M8 are mandatory; the SUC lists
+its access points; each organisational policy says what implements it; the
+basis records three risk assessment sessions; and the second approver is
+the operations manager accountable for the unit (D. Hargreaves). The
+approvals were retaken on the `a3-` fingerprint.
 `scripts/test-tour-risk.html` holds it to zero completeness problems and
 its approvals to Unchanged since approval.
 
@@ -1366,6 +1455,12 @@ scripts/test-risk-zcr3.html        the 3-2 fixes, step 3: the Accepted by warnin
 scripts/test-risk-zcr4.html        the 3-2 fixes, step 4: a transfer rated today in Word and
                                    Excel (an acceptance keeps its rule), the demo's cover not
                                    resting on M3, and the insurance manager's interview
+scripts/test-risk-zcr5.html        the 3-2 fixes, step 5: partial SL-T, ZCR 3.3, reduce and the
+                                   remaining risk accepted, the a3 fingerprint, characteristics,
+                                   routes and the demo's C4 and C5, inside the SUC, sessions,
+                                   classification, policies, SUC access points, mandatory
+                                   countermeasures, wording, older files, the demo's approvers
+scripts/demo-before-step5.js       the demo as step 4 left it, for pages written against it
 scripts/test-risk-compare.html     phase 6a: the baseline from the demo and the frozen files,
                                    every kind of change, numbered again, criteria changed, an
                                    empty baseline, the card, the Word section, the Changes sheet

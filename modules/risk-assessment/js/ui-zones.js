@@ -214,9 +214,15 @@
           placeholder: r.answer === "not-separated" ? "Why not, and what makes up for it" : "How (optional)",
           onInput: function (e) { setSeparation(z, r.id, { reason: e.target.value }); touched(); } })));
       }
-      // Business and control system assets: the standard requires them kept
-      // apart, so not separating them is a departure, said as one. The other
-      // rows are recommendations and keep their neutral wording.
+      // Safety related assets may instead share a zone designated safety
+      // related as a whole: the zone's own designation, ticked here or above.
+      if (r.wholeZone && r.answer === "not-separated") {
+        kids.push(checkLine("The whole zone is designated safety related", r.wholeZoneMarked, function (v) { z.flags["sis-present"] = v; touched(); rerender(); }, { "data-action": "sep-whole-zone" }));
+      }
+      // Business and control system assets, and safety related assets in a
+      // zone not designated safety related as a whole: the standard requires
+      // them kept apart, so not separating them is a departure, said as one.
+      // The other rows are recommendations and keep their neutral wording.
       if (r.departure) kids.push(h("div", { class: "hint val-warn", "data-departure": r.id, text: r.reasonMissing ? "A departure from a requirement of the standard: give the justification." : "A departure from a requirement of the standard." }));
       else if (r.reasonMissing) kids.push(h("div", { class: "hint val-warn", text: "Give a reason." }));
       return h("div", { class: "sep-row", "data-part": "sep-" + r.id, "data-sep-state": r.answer || "open" }, kids);
@@ -224,7 +230,7 @@
   }
 
   function characteristics(kids) {
-    var det = h("details", { class: "chars" }, [h("summary", { text: "Characteristics" }), h("div", { class: "chars-body" }, kids)]);
+    var det = h("details", { class: "chars", "data-part": "chars" }, [h("summary", { text: "Characteristics" }), h("div", { class: "chars-body" }, kids)]);
     if (sel.chars) det.open = true;
     det.addEventListener("toggle", function () { sel.chars = det.open; });
     return det;
@@ -435,7 +441,7 @@
   R.Pages.zones = renderZones;
   R.ZonesPage = {
     // Opens a zone or conduit when the page next draws (Go to, Assign to zone).
-    select: function (kind, id) { if ((kind === "zone" || kind === "conduit") && id) { select(kind, id); sel.view = "zones"; } },
+    select: function (kind, id, part) { if ((kind === "zone" || kind === "conduit") && id) { select(kind, id); sel.view = "zones"; if (part === "chars") sel.chars = true; } },
     selection: function () { return { kind: sel.kind, id: sel.id, chars: sel.chars, view: sel.view }; },
     // The tab open next time the page draws: "zones" or "assets".
     view: function (v) { sel.view = v === "assets" ? "assets" : "zones"; }

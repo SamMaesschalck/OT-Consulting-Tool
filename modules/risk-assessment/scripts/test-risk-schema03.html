@@ -249,8 +249,10 @@
       "case A: no current rating, a tolerable planned one and only an existing countermeasure linked: the planned rating is today's, so reduced, and counted within today", JSON.stringify([TA.today, TA.disposition]));
     ta.currentLikelihood = "high";
     TA = E.threatTreatment(zt, ta, pt); ra = VM.build(pt).threats[0];
-    ok(TA.today === "high" && !TA.todayWithin && TA.disposition === "countermeasure" && TA.label === "Reduce with countermeasures" && ra.todayExceeds && VM.build(pt).counts.withinToday === 0,
-      "case B: a current rating above tolerable risk is today's, so the threat is being reduced, not reduced", JSON.stringify([TA.today, TA.disposition]));
+    // Step 5: with nothing planned, a decision to reduce that leaves today's rating above tolerable risk
+    // reduces nothing, so it is incomplete (was: disposition "countermeasure", "Reduce with countermeasures").
+    ok(TA.today === "high" && !TA.todayWithin && TA.disposition === null && TA.label === "Reduce with countermeasures (none planned)" && ra.todayExceeds && VM.build(pt).counts.withinToday === 0,
+      "case B: a current rating above tolerable risk is today's, so the threat is not reduced (and, with nothing planned, the decision is incomplete)", JSON.stringify([TA.today, TA.disposition]));
     ok(TA.afterPlan === "high" && !TA.afterPlanWithin && VM.build(pt).counts.withinAfterPlan === 0, "and with no planned countermeasure linked, the plan changes nothing: its tolerable planned rating is not counted as once the plan is complete");
     ta.countermeasureIds = ["M1", "M2"];
     TA = E.threatTreatment(zt, ta, pt);

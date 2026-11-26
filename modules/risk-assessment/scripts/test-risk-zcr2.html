@@ -92,7 +92,7 @@
     ok(E.completeness(base).length === 0, "the demo has nothing open", texts(base).join(" | "));
 
     // ---- 1. unmitigated: before any cyber security countermeasure ------------------------------
-    ok(M.RULES.hardRules.some(function (r) { return /before any cyber security countermeasure is considered \(countermeasures built into the components, and protection that is not cyber security such as physical security, mechanical safeguards and emergency procedures, still count\)/.test(r); }) &&
+    ok(M.RULES.hardRules.some(function (r) { return /before any cyber security countermeasure is considered \(countermeasures built into the components, and protection that is not cyber security such as controlled site access, hardwired interlocks and relief devices, still count\)/.test(r); }) &&
       !M.RULES.hardRules.some(function (r) { return /before any countermeasure/.test(r); }), "the hard rule: before any cyber security countermeasure, built-in and non-cyber protection still counting");
 
     // ---- 2. separating business and control system assets -------------------------------------
@@ -141,7 +141,7 @@
         "Word: Threat environment, with the adversary, the sources, the current and the emerging threats", te.slice(0, 14).join(" | "));
       ok(M.sectionKeyAlias("known-or-presumed-threats") === "threat-environment", "the old section key maps to the new one");
       // 1. unmitigated, in Word.
-      ok(det.some(function (x) { return /^Of the \d+ threats above tolerable risk before any cyber security countermeasure, /.test(x); }) && det.some(function (x) { return /^Each threat scenario is rated before any cyber security countermeasure \(unmitigated\).*The unmitigated rating still counts countermeasures built into the components and protection that is not cyber security, such as physical security, mechanical safeguards and emergency procedures\./.test(x); }),
+      ok(det.some(function (x) { return /^Of the \d+ threats above tolerable risk before any cyber security countermeasure, /.test(x); }) && det.some(function (x) { return /^Each threat scenario is rated before any cyber security countermeasure \(unmitigated\).*The unmitigated rating still counts countermeasures built into the components and protection that is not cyber security, such as controlled site access, hardwired interlocks and relief devices./.test(x); }),
         "Word: unmitigated means before any cyber security countermeasure");
       ok(!det.some(function (x) { return /before any countermeasure/.test(x); }) && !DASH.test(det.join("\n")), "and never before any countermeasure; no dashes");
       // 5. characteristics in Word.
@@ -162,26 +162,26 @@
       ok(det.indexOf("Mandatory security countermeasures") < 0, "the detailed report does not print the specification's countermeasure list (its treatment plan has them)");
       // 9. the demo's ranking notes.
       ok(det.some(function (x) { return x === "Primary control layer; loss forces manual shutdown, manipulation is the acid-release path. Assigned to Z1, assessed in detail."; }) &&
-        det.some(function (x) { return /^Commodity IP kit, frequently probed, but no process consequence; ranked low\. Outside the system under consideration, so in no zone\.$/.test(x); }) &&
+        /* step 5: the outside-the-SUC mark is the ranking's own, so the note no longer says it */ det.some(function (x) { return /^Commodity IP kit, frequently probed, but no process consequence; ranked low\.$/.test(x); }) && det.indexOf("Outside the SUC") > 0 &&
         !det.some(function (x) { return /where a detailed assessment is required|not taken to a detailed assessment/.test(x); }), "the demo's ranking notes fit the model: assessed in detail, or outside the SUC");
       return wordParas(base, { spec: true });
     }).then(function (spec) {
       // 6. the specification's mandatory countermeasures.
       var mc = RT.mandatoryCountermeasures(base);
-      ok(mc.length > 0 && mc.every(function (e) { return base.zones.concat(base.conduits).some(function (o) { return o.threats.some(function (t) { return e.threats.indexOf(t.id) >= 0 && t.treatment.decision === "reduce" && t.treatment.confirmed; }); }); }),
-        "the mandatory countermeasures are those the confirmed decisions to reduce a risk rest on", mc.map(function (e) { return e.owner.id + "/" + e.m.id; }).join());
+      ok(mc.length > 0 && mc.every(function (e) { return base.zones.concat(base.conduits).some(function (o) { return o.threats.some(function (t) { return e.threats.indexOf(t.id) >= 0 && (t.treatment.decision === "reduce" || t.treatment.decision === "slt") && t.treatment.confirmed; }); }); }),
+        "the mandatory countermeasures are those the confirmed decisions to reduce a risk (and, step 5, to treat it through the SL-T) rest on", mc.map(function (e) { return e.owner.id + "/" + e.m.id; }).join());
       var at = spec.indexOf("Mandatory security countermeasures"), sl = spec.indexOf("Target security levels (SL-T, per foundational requirement)");
       ok(at > sl && at < spec.indexOf("Sign-off"), "the specification prints them after the SL-T, before the sign-off");
       var sec = spec.slice(at + 1);
-      ok(/^The detailed risk assessment makes these countermeasures mandatory, because the decisions to reduce a risk rest on them\./.test(sec[0]) && sec.slice(1, 6).join("|") === "Countermeasure|Zone or conduit|In place or planned|Owner and due date|SR references", "with what they are and a table", sec.slice(0, 6).join(" | "));
+      ok(/^By the house reading, the countermeasures that the decisions to reduce a risk or to treat it through the SL-T programme rest on are mandatory\./.test(sec[0]) && sec.slice(1, 6).join("|") === "Countermeasure|Zone or conduit|In place or planned|Owner and due date|SR references", "with what they are and a table", sec.slice(0, 6).join(" | "));
       var e0 = mc[0];
       ok(sec.indexOf(e0.m.id + "  " + e0.m.description) > 0 && sec.indexOf(e0.m.existing ? "In place" : "Planned") > 0, "each one, by id, with its zone and whether in place or planned");
       ok(!DASH.test(spec.join("\n")), "no dashes");
       // The lookup.
       var Z = w.App.Data.zcrMap;
       ok(Object.keys(Z.specBlocks).filter(function (k) { return k.charAt(0) !== "_"; })[0] === "countermeasures" && Z.specBlocks.countermeasures === "ZCR 6.1" && RT.zcrOf("ZCR 6.1"), "the lookup has the ZCR 6.1 block, first");
-      var none = clone(base); none.zones.concat(none.conduits).forEach(function (o) { o.threats.forEach(function (t) { if (t.treatment.decision === "reduce") M.setDecision(t, "slt", true); }); });
-      ok(RT.mandatoryCountermeasures(none).length === 0, "with no decision to reduce, none is mandatory");
+      var none = clone(base); none.zones.concat(none.conduits).forEach(function (o) { o.threats.forEach(function (t) { if (t.treatment.decision === "reduce" || t.treatment.decision === "slt") M.setDecision(t, "accept", true); }); });
+      ok(RT.mandatoryCountermeasures(none).length === 0, "with no decision to reduce (or, step 5, to treat through the SL-T), none is mandatory");
       // A justification that names a mandatory countermeasure is not flagged; one that names another still is.
       var jp = clone(base), mid = e0.m.id, other = null;
       jp.zones.concat(jp.conduits).forEach(function (o) { (o.countermeasures || []).forEach(function (m) { if (!other && !mc.some(function (e) { return e.m.id === m.id; })) other = m.id; }); });
@@ -222,7 +222,8 @@
       // 1. the hint and About.
       RT.navigate("about");
       var um = main().querySelector('[data-method="unmitigated"]'), dm = main().querySelector('[data-method="decisions"]');
-      ok(!!um && /before any cyber security countermeasure/.test(um.textContent) && /physical security, mechanical safeguards and emergency procedures, still count/.test(um.textContent), "About: unmitigated, as the standard means it");
+      ok(!!um && /before any cyber security countermeasure/.test(um.textContent) && /controlled site access, hardwired interlocks and relief devices, still count/.test(um.textContent)
+, "About: unmitigated, as the standard means it");
       ok(!!dm && /transferred to another party/.test(dm.textContent) && /house option that mitigates it through the SL-T/.test(dm.textContent), "About: the four decisions, the SL-T programme as the house option");
       ok(/requirement wording against the published edition/.test(main().textContent) && /before any cyber security countermeasure is considered/.test(main().textContent), "About: the wording checked, and the hard rule");
       // 4. step 2's fields.

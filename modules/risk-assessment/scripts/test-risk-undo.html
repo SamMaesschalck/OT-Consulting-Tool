@@ -141,7 +141,8 @@
     ZP.select("zone", "Z3"); RT.navigate("zones");
     before = snap();
     act(main().querySelector('[data-detail="zone"] .card-h .btn.danger'));
-    ok(!owner("Z3") && P().conduits.length === 0, "remove a zone: it goes with the conduits that reach it");
+    // Step 5: C4 and C5 join Z4 to Z1 and Z2, so they stay (was: no conduit left).
+    ok(!owner("Z3") && P().conduits.map(function (c) { return c.id; }).join() === "C4,C5", "remove a zone: it goes with the conduits that reach it");
     ok(!!toastUndo(), "the toast offers Undo");
     RT.navigate("home");
     var e = ctrlZ();

@@ -40,12 +40,16 @@
  *     whom (treatment.transfer, transferTo), the threat environment's
  *     sources and emerging threats, the conduits' characteristics, each
  *     zone's and conduit's applicable security requirements, and an asset's
- *     classification and business value.
+ *     classification and business value, and step 5's: a ranked system marked
+ *     outside the SUC (inSuc), the risk assessment sessions, the SUC's access
+ *     points and what implements each organisational policy.
  *  3. The dangling-id prune: a reference to a record that is not in the file
  *     (a zone's ranked systems, a conduit's end, a threat's linked assets,
  *     vulnerabilities and countermeasures, its consequence and the zones and
  *     conduits its path passes through, a consequence's ranked systems, the
- *     zone or conduit one is grouped with) is cleared, never invented.
+ *     zone or conduit one is grouped with, the zone or conduit a SUC access
+ *     point enters, what implements a policy no longer listed) is cleared,
+ *     never invented.
  *     An older build edits a file without maintaining the links a newer one
  *     added, so a link can outlive what it pointed at. A zone's fromHLA is
  *     kept the first of its hlaIds; one an older build wrote goes first.
@@ -307,6 +311,49 @@ window.RiskApp.Migrate = (function () {
       M.CONDUIT_LIST_FIELDS.forEach(function (k) { normLines(c, k); });
       if ("safetyRelated" in c && c.safetyRelated !== true) delete c.safetyRelated;
     });
+    normStep5(data);
+  }
+
+  // The fields the 3-2 fixes' step 5 added (js/model.js), tidied when present
+  // and never added: a ranked system's inSuc (false, or gone), the risk
+  // assessment sessions (records with text fields, each with an S id; the
+  // counter kept above every S id), the SUC's access points (records with
+  // text fields) and what implements each organisational policy (text by
+  // policy).
+  function normStep5(data) {
+    data.srs.highLevelAssets.forEach(function (a) { if (isObj(a) && "inSuc" in a && a.inSuc !== false) delete a.inSuc; });
+    var b = data.basisOfAssessment;
+    if ("sessions" in b) {
+      if (!Array.isArray(b.sessions)) delete b.sessions;
+      else {
+        b.sessions = b.sessions.filter(isObj);
+        var top = typeof data.counters.session === "number" ? data.counters.session : 0, seen = {};
+        b.sessions.forEach(function (s) { var m = isStr(s.id) ? /^S(\d+)$/.exec(s.id) : null; if (m && Number(m[1]) > top) top = Number(m[1]); });
+        data.counters.session = top;
+        b.sessions.forEach(function (s) {
+          if (!isStr(s.id) || !s.id || seen[s.id]) s.id = M.nextSessionId(data);
+          seen[s.id] = true;
+          M.SESSION_FIELDS.forEach(function (k) { if (!isStr(s[k])) s[k] = ""; });
+        });
+      }
+    }
+    if ("session" in data.counters && typeof data.counters.session !== "number") delete data.counters.session;
+    var s = data.suc;
+    if (isObj(s) && "accessPoints" in s) {
+      if (!Array.isArray(s.accessPoints)) delete s.accessPoints;
+      else {
+        s.accessPoints = s.accessPoints.filter(isObj);
+        s.accessPoints.forEach(function (x) { ["description", "enters"].forEach(function (k) { if (!isStr(x[k])) x[k] = ""; }); });
+      }
+    }
+    if (isObj(s) && "policyImplementation" in s) {
+      var m = s.policyImplementation;
+      if (!isObj(m)) delete s.policyImplementation;
+      else {
+        Object.keys(m).forEach(function (k) { if (!isStr(m[k]) || !m[k].trim()) delete m[k]; });
+        if (!Object.keys(m).length) delete s.policyImplementation;
+      }
+    }
   }
 
   // The fields phase 5 added (js/model.js), tidied when present and never
@@ -572,6 +619,15 @@ window.RiskApp.Migrate = (function () {
       var a = o.assessment;
       if (isObj(a) && a.withId && (typeof a.withId !== "string" || !owners[a.withId] || a.withId === o.id)) a.withId = "";
     });
+    // Where a SUC access point enters (a zone or conduit there), and what
+    // implements a policy that is no longer listed (step 5).
+    M.sucAccessPointsOf(data).forEach(function (x) { if (x.enters && !owners[x.enters]) x.enters = ""; });
+    var pim = data.suc && data.suc.policyImplementation;
+    if (isObj(pim)) {
+      var pol = Array.isArray(data.suc.policies) ? data.suc.policies : [];
+      Object.keys(pim).forEach(function (k) { if (pol.indexOf(k) < 0) delete pim[k]; });
+      if (!Object.keys(pim).length) delete data.suc.policyImplementation;
+    }
     var known = {};
     data.srs.highLevelAssets.forEach(function (a) { if (a && a.id) known[a.id] = true; });
     M.consequencesOf(data).forEach(function (k) { if (Array.isArray(k.hlaIds)) k.hlaIds = uniq(keepKnown(k.hlaIds, known)); });

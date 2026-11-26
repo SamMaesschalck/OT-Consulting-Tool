@@ -92,6 +92,8 @@
       ownerIn(q, "Z4").assessment = { depth: "reused", withId: "", reuseSource: "Reference design ENG-1, assessed 2025", considered: "", reason: "" };
       var z5 = M.emptyZone(5); z5.name = "Packaging line"; z5.assessment = { depth: "deferred", withId: "", reuseSource: "", considered: "", reason: "Not reachable until the 2027 outage." };
       q.zones.push(z5); q.counters.zone = 5;
+      // Step 5: C4 (grouped with Z4 in the demo) is grouped with Z1 here, as Z4 is reused.
+      ownerIn(q, "C4").assessment.withId = "Z1";
       return q;
     }
     var V = variant();
@@ -106,16 +108,16 @@
       var n = MG.normaliseProject(clone(FX[k]));
       ok(!n.zones.concat(n.conduits).some(function (o) { return "assessment" in o; }), "the frozen " + k + " file gains no depth field");
     });
-    // v0.7.0's per-zone decision: not required, with no threats, reads as a proportionate review with nothing noted.
+    // v0.7.0's per-zone decision: not required, with no threats, reads (step 5) as deferred with no reason (was: a proportionate review with nothing noted).
     var lg = MG.normaliseProject(clone(DEMO));
     lg.zones.concat(lg.conduits).forEach(function (o) { delete o.assessment; });
     ownerIn(lg, "C1").detailed = { required: false, reason: "Assessed with Z3." };
     ownerIn(lg, "Z3").detailed = { required: false, reason: "Low." };
     ownerIn(lg, "C2").detailed = { required: true, reason: "" };
     var dC1 = E.depthOf(ownerIn(lg, "C1"), lg), dZ3 = E.depthOf(ownerIn(lg, "Z3"), lg), dC3 = E.depthOf(ownerIn(lg, "C3"), lg);
-    ok(dC1.depth === "proportionate" && dC1.legacy && !dC1.set && dC1.considered === "", "a v0.7.0 zone or conduit recorded as not needing a detailed assessment, with no threats, reads as a proportionate review with nothing noted");
+    ok(dC1.depth === "deferred" && dC1.legacy && !dC1.set && dC1.reason === "", "a v0.7.0 zone or conduit recorded as not needing a detailed assessment, with no threats, reads as deferred with no reason");
     ok(dZ3.depth === "detailed" && E.depthOf(ownerIn(lg, "C2"), lg).depth === "detailed" && dC3.depth === "detailed" && !dC3.set, "with threats, or required, or with no decision, it reads as detailed");
-    ok(has(texts(lg), /^C1 \(Historian replication\): proportionate, with no note of the threats considered\.$/) && !has(texts(lg), /^C1 \(Historian replication\): no threats/), "so the completeness list asks for the note, not for threats");
+    ok(has(texts(lg), /^C1 \(Historian replication\): deferred, with no reason\.$/) && !has(texts(lg), /^C1 \(Historian replication\): no threats/), "so the completeness list asks for the reason, not for threats");
     var lgN = MG.normaliseProject(clone(lg));
     ok(!lgN.zones.concat(lgN.conduits).some(function (o) { return "assessment" in o; }) && same(lgN.conduits[0].detailed, { required: false, reason: "Assessed with Z3." }), "and nothing is written: the reading is made each time, from the file as it is");
     // Odd values, and the prune.
@@ -137,10 +139,15 @@
 
     // ---- B. a file with no depth fields: scoring and suggestions as before -------------------
     var REF = FX["slt-suggestions-v0.7.0"];
+    // The 3-2 fixes, step 5, reworded the house traces for SL1 and SL2 (they echoed the
+    // standard's wording); apart from them, every suggestion, trace and driver is v0.7.0's.
+    var TRACE_STEP5 = [["Unmitigated risk low: protection against mistakes and chance misuse (SL1) is a reasonable target for this foundational requirement.", "Unmitigated risk low: casual-violation protection (SL1) is a reasonable target for this foundational requirement."],
+      ["Unmitigated risk medium: protect against a deliberate attacker with general IT skills and simple tools (SL2).", "Unmitigated risk medium: protect against intentional violation with simple means (SL2)."]];
+    function asV070(x) { var s = JSON.stringify(x); TRACE_STEP5.forEach(function (r) { s = s.split(r[0]).join(r[1]); }); return JSON.parse(s); }
     ["tour-v0.7-saved", "tour-phase3-0.2", "hand-made-v0.1"].forEach(function (k) {
       var p = MG.normaliseProject(clone(FX[k])), bad = [];
-      p.zones.concat(p.conduits).forEach(function (o) { if (!same({ sug: sugOf(o, p), drivers: E.sltDrivers(o, p) }, REF[k][o.id])) bad.push(o.id); });
-      ok(!bad.length, "the frozen " + k + " file: every suggestion and driver as v0.7.0 gave it", bad.join());
+      p.zones.concat(p.conduits).forEach(function (o) { if (!same(asV070({ sug: sugOf(o, p), drivers: E.sltDrivers(o, p) }), REF[k][o.id])) bad.push(o.id); });
+      ok(!bad.length, "the frozen " + k + " file: every suggestion and driver as v0.7.0 gave it, apart from the reworded SL1 and SL2 traces", bad.join());
     });
     function facts(p) {
       var vm = VMOD.build(p);
@@ -176,10 +183,12 @@
 
     // ---- D. completeness, every depth -------------------------------------------------------
     // (A new zone moves the SL-T the two approvals cover, so they say so too.)
-    var vOpen = E.completeness(V).filter(function (i) { return i.stage !== "approval"; });
+    // (Step 5: the new zone's empty characteristics are asked for too, on step 3; left out here.)
+    function notChars(i) { return !/: characteristics not recorded: /.test(i.text); }
+    var vOpen = E.completeness(V).filter(function (i) { return i.stage !== "approval" && notChars(i); });
     ok(E.completeness(base).length === 0 && vOpen.length === 1, "the demo has nothing open; with every depth, only the deferred zone's missing SL-T", texts(V).join(" | "));
     ok(has(texts(V), /^Z5 \(Packaging line\): deferred, with no SL-T yet\.$/) && !has(texts(V), /^Z5 .*(no threats|no SL-T set for any FR)/), "a deferred zone gets its own warning that it has no SL-T, and is not asked for threats");
-    ok(E.completeness(V).filter(function (i) { return /^Z5 /.test(i.text); })[0].stage === "slt", "on the SL-T");
+    ok(E.completeness(V).filter(function (i) { return /^Z5 /.test(i.text) && notChars(i); })[0].stage === "slt", "on the SL-T");
     var c = clone(V);
     ownerIn(c, "Z5").assessment.reason = "";
     ownerIn(c, "Z4").assessment.reuseSource = "  ";
@@ -225,7 +234,8 @@
     ok(curF.owners.filter(function (o) { return o.id === "C1"; })[0].depth === "grouped" && curF.owners.filter(function (o) { return o.id === "C1"; })[0].withId === "Z3", "a frozen copy keeps each depth, and a group's partner");
     var df = CMP.diff(prevF, curF), dl = [].concat.apply([], CMP.lines(df).map(function (gp) { return gp.items; }));
     ok(has(dl, /^Z4 Engineering.*: now reused from earlier results; was assessed in detail\.$/) && !has(dl, /^Z5 .*: now /) && has(dl, /^Z5 Packaging line added\.$/), "a depth that changed is reported; an added zone is said as added", dl.join(" | "));
-    var rows = CMP.rows(df).filter(function (r) { return r.change === "Assessment depth changed"; });
+    // (Step 5: the variant also groups C4 with Z1, as Z4 is reused; that row is left out here.)
+    var rows = CMP.rows(df).filter(function (r) { return r.change === "Assessment depth changed" && r.where !== "C4"; });
     ok(rows.length === 1 && rows[0].where === "Z4" && rows[0].before === "Assessed in detail" && rows[0].now === "Reused from earlier results", "and on the workbook's Changes sheet", JSON.stringify(rows));
     var v2 = clone(V); ownerIn(v2, "C1").assessment.withId = "Z1";
     var dl2 = [].concat.apply([], CMP.lines(CMP.diff(curF, CMP.freeze(v2))).map(function (gp) { return gp.items; }));

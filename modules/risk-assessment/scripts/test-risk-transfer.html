@@ -161,11 +161,13 @@
     // ---- D. the approval ------------------------------------------------------------------------
     ok(E.approvalFingerprint(base) !== E.approvalFingerprint(V) && E.approvalFingerprint(base).split("-").slice(0, 4).join() === E.approvalFingerprint(V).split("-").slice(0, 4).join(), "a transfer moves only the part the approval covers for accepted risks", E.approvalFingerprint(V));
     var st = E.approvalStates(V);
-    ok(st.length && st.every(function (s) { return s.changed && same(s.parts, ["accepted"]); }) && has(texts(V), /approved before the accepted and transferred risks changed\.$/), "the demo's approvals say the accepted and transferred risks changed", texts(V).join(" | "));
+    // Step 5: an approval covers the treatment decisions and the mandatory countermeasures too, which the
+    // untransferred T2 (back to reduce) and the transferred T8 move as well (was: the accepted risks alone).
+    ok(st.length && st.every(function (s) { return s.changed && s.parts.indexOf("accepted") >= 0; }) && has(texts(V), /approved before the accepted and transferred risks, /), "the demo's approvals say the accepted and transferred risks changed", texts(V).join(" | "));
     ok(E.approvalPartWords(["accepted"], false, base) === "the accepted risks", "with no transfer, the words are as before");
     var sig = RX.signOffTexts(V);
-    ok(sig[2] === "Signed off as below. An approval covers the tolerable risk, the target security levels and the accepted and transferred risks in this report, within the scope given for it.", "the report's approval sentence names the transferred risks", sig[2]);
-    ok(RX.signOffTexts(base)[2] === "Signed off as below. An approval covers the tolerable risk, the target security levels and the accepted risks in this report, within the scope given for it.", "and is unchanged with none");
+    ok(sig[2] === "Signed off as below. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted and transferred risks in this report, within the scope given for it.", "the report's approval sentence names the transferred risks", sig[2]);
+    ok(RX.signOffTexts(base)[2] === "Signed off as below. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted risks in this report, within the scope given for it.", "and is unchanged with none");
 
     // ---- E. the comparison with a previous assessment ---------------------------------------------
     var dd = CMP.diff(CMP.freeze(base), CMP.freeze(V)), dl = [].concat.apply([], CMP.lines(dd).map(function (gp) { return gp.items; }));
@@ -187,7 +189,7 @@
       var all = det.join("\n");
       ok(det.some(function (x) { return /^The treatment decisions are: .* and 1 transferred to another party\./.test(x); }), "Word: the summary's tally counts the transfer", det.filter(function (x) { return /treatment decisions are/.test(x); }).join(" | "));
       ok(det.some(function (x) { return /^Nothing is waiting on a decision: .*the transferred risk is approved/.test(x) || /^The asset owner has not yet approved the transferred risk T8 \(Z4\)\.$/.test(x); }), "Decisions required says whether the transferred risk is approved");
-      ok(det.indexOf("Transferred risks") > det.indexOf("Accepted risks") && after(det, "Accepted risks")[0] === "No risk has been accepted.", "a Transferred risks section after Accepted risks, which now has none");
+      ok(det.indexOf("Transferred risks") > det.indexOf("Accepted risks") && !det.slice(det.indexOf("Accepted risks"), det.indexOf("Transferred risks")).some(function (x) { return /^T8  /.test(x); }), "a Transferred risks section after Accepted risks, which no longer lists T8 (step 5: T4's remaining risk is listed there)");
       var tr = after(det, "Transferred risks");
       // Step 4: a transfer shows its rating today (was: with the rating that stands; the column was Rating).
       ok(/^Each risk above tolerable risk that has been transferred to another party, with its rating today, how and to whom it was transferred, who agreed it and when it is to be reviewed\. A transfer moves who bears the consequence, so the rating does not change\.$/.test(tr[0]), "it says what it holds, and that the rating is unchanged", tr[0]);

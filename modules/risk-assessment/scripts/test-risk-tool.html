@@ -159,7 +159,9 @@
     ok(ez.threats.length === 2 && typeof ez.threats[0].unmitigatedRisk === "string" && typeof ez.threats[0].exceedsTolerable === "boolean", "threats exported with risk + exceedsTolerable");
     ok(ez.countermeasures.length === 1 && ez.countermeasures[0].reference === "SR 1.13", "countermeasures exported");
     ok(ez.countermeasures[0].existing === true, "countermeasures export the existing-control flag");
-    ok(ez.threats[0].disposition === "countermeasure", "T1 disposition exported: countermeasure (confirmed reduce, no residual yet)", "got " + ez.threats[0].disposition);
+    // Step 5: a decision to reduce with nothing planned, above tolerable risk today (no current rating), reduces
+    // nothing, so it is incomplete and exported as no decision (was: "countermeasure").
+    ok(ez.threats[0].disposition === null && RT.threatTreatment(z, th).label === "Reduce with countermeasures (none planned)", "T1 disposition exported: none (confirmed reduce, nothing planned, no rating yet)", "got " + ez.threats[0].disposition);
     // SI is held at SL2 against a suggested SL3, so the SL-T decision needs a reason,
     // and until it has one it is not exported, printed or packed as a treatment.
     ok(ez.threats[1].disposition === null, "T2: the SL-T programme below the suggestion with no reason is not exported as a treatment", "got " + ez.threats[1].disposition);
@@ -168,6 +170,8 @@
     ok(t2T.confirmed && !t2T.complete && t2T.label === "Treat through the SL-T programme (no reason recorded)", "and its label says what is missing", t2T.label);
     ok(RT.exportProblems().some(function (p) { return p.indexOf("Z1") >= 0 && p.indexOf("T2") >= 0 && p.indexOf("below the suggestion") >= 0; }), "and the completeness list says so");
     th2.treatment.reason = "SI is raised to SL3 in phase 2, agreed with the asset owner.";
+    // Step 5: its planned rating stays above tolerable risk, so the asset owner accepts what remains.
+    th2.acceptance = "Accepted until the SL-T programme is in place."; th2.acceptanceDetail = { by: "A. Owner", role: "Asset owner", date: "", reviewDate: "" };
     ok(!RT.threatTreatment(z, th2).gap && !RT.exportProblems().some(function (p) { return p.indexOf("T2") >= 0 && p.indexOf("below the suggestion") >= 0; }), "a recorded reason settles it");
     ok(RT.buildRiskContext().zones[0].threats[1].disposition === "sl-t" && RT.threatTreatment(z, th2).complete && RT.threatTreatment(z, th2).label === "Treated through the SL-T programme", "T2 disposition exported: treated through the SL-T (confirmed, with its reason)", RT.threatTreatment(z, th2).label);
     ok(typeof ez.threats[0].acceptance === "string", "threats export an acceptance field");
@@ -208,7 +212,8 @@
     // justification rule alone, as it did.)
     ok(RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && /neither end is set/.test(p); }), "a conduit with no ends is listed for them");
     cEmpty.fromZone = "Z1"; cEmpty.toZone = "Z2";
-    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && !/: no vulnerabilities recorded\.$/.test(p); }), "a conduit's justification is the basis when it has no threat of its own (assessed in detail, it is still asked for its vulnerabilities)");
+    ok(!RT.exportProblems().some(function (p) { return p.indexOf("C9") >= 0 && !/: no vulnerabilities recorded.$/.test(p) && !/: characteristics not recorded: /.test(p) && !/: no SL-T set for /.test(p); })
+, "a conduit's justification is the basis when it has no threat of its own (assessed in detail, it is still asked for its vulnerabilities)");
     proj.conduits.pop();
 
     // --- treatment decisions: recorded by the consultant, never inferred ---
@@ -225,6 +230,8 @@
     td.treatment = { decision: "slt", confirmed: false, reason: "" };
     ok(RT.threatTreatment(zd, td).state === "suggested" && RT.threatTreatment(zd, td).open && z7Open(), "a suggestion not yet confirmed is still open");
     ok(RT.exportProblems().some(function (p) { return p.indexOf("Z7") >= 0 && p.indexOf("suggestion is waiting") >= 0; }), "and the list says a suggestion is waiting");
+    // Step 5: nothing brings it within tolerable risk, so the asset owner accepts what remains.
+    td.acceptance = "Accepted until the programme is in place."; td.acceptanceDetail = { by: "A. Owner", role: "Asset owner", date: "", reviewDate: "" };
     td.treatment.confirmed = true; // immature environment: no countermeasures, SL-T is the plan
     var tSlt = RT.threatTreatment(zd, td);
     ok(tSlt.disposition === "sl-t" && tSlt.state === "confirmed" && !tSlt.open && !tSlt.gap && !tSlt.reasonNeeded && tSlt.label === "Treated through the SL-T programme",
@@ -242,6 +249,7 @@
     // The SL-T reason belongs to the SL-T decision: it is not carried to another.
     td.treatment.decision = "reduce";
     ok(RT.threatTreatment(zd, td).reason === "" && td.treatment.reason !== "", "changed to reduce, the SL-T reason is no longer the decision's reason (it is kept in case the choice is changed back)");
+    td.acceptance = ""; // (step 5: the remaining risk accepted above is taken away, so the acceptance has no reason)
     td.treatment = { decision: "accept", confirmed: true, reason: "" };
     // Step 3: an acceptance also needs who accepted it, so it is recorded here and the reason is the one thing missing (was: no one recorded).
     td.acceptanceDetail = { by: "J. Hale", role: "Operations Director", date: "", reviewDate: "" };
@@ -270,6 +278,8 @@
     ok(RT.threatTreatment(zd, td).covered === false && w.RiskApp.Engine.suggestLinks(zd, td).join() === "M9" && /no countermeasure is linked/.test(RT.threatTreatment(zd, td).gap),
       "reduce: an FR-overlapping countermeasure that is not linked covers nothing, it is only suggested", RT.threatTreatment(zd, td).gap);
     td.countermeasureIds = ["M9"];
+    // Step 5: with nothing rated for after M9, the planned rating stays above tolerable risk, so the asset owner accepts what remains.
+    td.acceptance = "Accepted until M9 is in place."; td.acceptanceDetail.by = "J. Hale";
     var tRed = RT.threatTreatment(zd, td);
     ok(tRed.covered && tRed.covering[0].id === "M9" && tRed.disposition === "countermeasure" && tRed.gap === "" && tRed.label === "Reduce with countermeasures", "reduce: a linked countermeasure covers the threat (was: an FR-overlapping one)");
     // Residual risk: countermeasures that bring it within tolerable = mitigated.
@@ -279,7 +289,9 @@
     zd.countermeasures[0].existing = true;
     ok(RT.threatDisposition(zd, td) === "mitigated" && RT.threatTreatment(zd, td).residualWithin && RT.threatTreatment(zd, td).label === "Reduced to within tolerable risk", "residual within tolerable with a countermeasure in place = mitigated");
     td.residualLikelihood = "medium"; // serious×medium = high, still exceeds
-    ok(RT.threatDisposition(zd, td) === "countermeasure" && !RT.threatTreatment(zd, td).residualWithin, "residual still above tolerable stays a countermeasure in progress");
+    // Step 5: with M9 now in place and nothing planned, a rating that stays above tolerable risk is no treatment yet (was: "countermeasure").
+    ok(RT.threatDisposition(zd, td) === null && !RT.threatTreatment(zd, td).residualWithin && RT.threatTreatment(zd, td).label === "Reduce with countermeasures (none planned)", "residual still above tolerable, with nothing planned, is not stated as a treatment");
+
     td.treatment.confirmed = false;
     ok(RT.threatDisposition(zd, td) === null, "and unconfirmed, it is no decision at all");
     td.residualLikelihood = ""; td.residualImpact = "";
@@ -429,7 +441,7 @@
     var pz = RT.state.project.zones[RT.state.project.zones.length - 1], pt = pz.threats[0];
     ok(threatCard("Z1", "T1").querySelectorAll(".treat-opt").length === 4 && /^Transfer$/.test(opt("Z1", "T1", "transfer").textContent) && /Reduce with countermeasures/.test(opt("Z1", "T1", "reduce").textContent) && /^Accept$/.test(opt(pz, pt.id, "accept").textContent) && /Treat through the SL-T/.test(opt("Z1", "T1", "slt").textContent),
       "each threat above tolerable risk offers the four choices (transfer added)");
-    ok(opt("Z1", "T1", "reduce").getAttribute("aria-pressed") === "true" && /^✓ /.test(opt("Z1", "T1", "reduce").textContent) && /Addressed by M1/.test(threatCard("Z1", "T1").textContent), "a confirmed reduce is marked in text and names its countermeasure");
+    ok(opt("Z1", "T1", "reduce").getAttribute("aria-pressed") === "true" && /^✓ /.test(opt("Z1", "T1", "reduce").textContent) && /M1/.test(threatCard("Z1", "T1").textContent) && /No planned countermeasure is linked to it/i.test(threatCard("Z1", "T1").textContent), "a confirmed reduce is marked in text and names its countermeasure (step 5: with nothing planned it says so)");
     ok(opt("Z1", "T2", "slt").getAttribute("aria-pressed") === "true" && threatCard("Z1", "T2").querySelector('input[data-reason="slt"]').value.indexOf("phase 2") >= 0, "a confirmed SL-T decision below the suggestion shows its reason");
     ok(/Reason the SL-T is below the suggestion \(SI\)/.test(threatCard("Z1", "T2").textContent), "under a label that says which requirement is below the suggestion");
     ok(threatCard(pz, pt.id).querySelector(".treat").getAttribute("data-treatment-state") === "none" && /No decision yet/.test(threatCard(pz, pt.id).textContent), "freshly promoted threat has no decision yet");
@@ -447,6 +459,8 @@
     ok(/Reason no SL-T is set/.test(threatCard(pz, pt.id).textContent) && /No SL-T is set and no reason is recorded\./.test(threatCard(pz, pt.id).textContent) && !/below the suggestion/.test(threatCard(pz, pt.id).textContent),
       "and says the SL-T is not set, not that it is below a suggestion", threatCard(pz, pt.id).querySelector(".treat").textContent);
     // A reason typed into the field keeps the focus when the page is redrawn on change.
+    // Step 5: nothing planned brings it within tolerable risk, so the remaining risk is accepted too.
+    pt.acceptance = "Accepted until the design workshop."; pt.acceptanceDetail.by = "A. Owner";
     var rIn = threatCard(pz, pt.id).querySelector('input[data-reason="slt"]');
     rIn.focus(); rIn.value = "Set at the design workshop."; rIn.dispatchEvent(new w.Event("input", { bubbles: true })); rIn.dispatchEvent(new w.Event("change", { bubbles: true }));
     // Phase 4: the field is edited in place, not redrawn (was: redrawn on change, the focus put back).

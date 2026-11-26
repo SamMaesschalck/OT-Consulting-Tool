@@ -239,7 +239,7 @@ window.RiskApp.Model = (function () {
   //     depth        "detailed": its own threat scenarios (a file without the
   //                  field reads so, unless an older build recorded it as not
   //                  needing a detailed assessment and it has no threats:
-  //                  then "proportionate")
+  //                  then "deferred", with no reason, as it was not assessed)
   //                  "grouped": assessed with withId (a detailed zone or
   //                  conduit), whose threat scenarios it shares
   //                  "reused": results reused from reuseSource (a standard
@@ -304,12 +304,14 @@ window.RiskApp.Model = (function () {
   // Each is raised only when the zone's data shows a mix (js/engine.js
   // separationRows); one not raised asks nothing. answer: "met" | "not-separated".
   // required: the standard requires the separation (business and control
-  // system assets), so not separating is a departure from it; the others are
-  // recommendations, and safety related assets not separated make the whole
-  // zone safety related (wholeZone), as the tool already treats it.
+  // system assets, and safety related assets), so not separating is a
+  // departure from it; the others are recommendations. Safety related assets
+  // may instead share a zone that is designated safety related as a whole
+  // (wholeZone): with the zone's own Safety related designation set
+  // (flags["sis-present"]) not separating them is no departure.
   var SEPARATION_ROWS = [
     { id: "business", label: "Business and control system assets", required: true },
-    { id: "safety", label: "Safety related assets", wholeZone: true },
+    { id: "safety", label: "Safety related assets", required: true, wholeZone: true },
     { id: "temporary", label: "Temporarily connected devices" },
     { id: "wireless", label: "Wireless devices" },
     { id: "external", label: "Devices connected via external networks" }
@@ -621,6 +623,60 @@ window.RiskApp.Model = (function () {
   var ASSET_VALUES = ["high", "medium", "low"];
   var ASSET_VALUE_LABEL = { high: "High", medium: "Medium", low: "Low" };
 
+  // ---------- The 3-2 fixes, step 5 (Nov 2026) ----------
+  // Optional and written only once set, like the fields above; the schema
+  // stays spt-risk-project/0.3 and a file without them reads as before.
+  //
+  //   rankedSystem.inSuc     false when the system is outside the SUC (ranked
+  //                          for context only); absent: inside it
+  //   basisOfAssessment.sessions  [{ id ("S1"...), date, topic, participants }]:
+  //                          the risk assessment sessions held, who took part
+  //                          (names and titles, text); counters.session the last
+  //                          S number given (absent until the first)
+  //   suc.accessPoints       [{ description, enters }]: the SUC's access points,
+  //                          each with the zone or conduit it enters (an id, or "")
+  //   suc.policyImplementation  { policy text: what implements it (text) }, for
+  //                          the organisational security policies (suc.policies)
+  // A decision to reduce or to treat through the SL-T that leaves the risk
+  // above tolerable risk records the asset owner's acceptance of what remains
+  // in the threat's acceptance fields (js/engine.js threatTreatment).
+  function inSuc(a) { return !a || a.inSuc !== false; }
+  var SESSION_FIELDS = ["date", "topic", "participants"];
+  function emptySession(id) { return { id: id, date: "", topic: "", participants: "" }; }
+  function sessionsOf(pj) { var b = pj && pj.basisOfAssessment; return b && Array.isArray(b.sessions) ? b.sessions.filter(isRecord) : []; }
+  // The next S id: above the counter and above every id already in the file.
+  function nextSessionId(pj) {
+    if (!pj.counters) pj.counters = {};
+    var n = typeof pj.counters.session === "number" ? pj.counters.session : 0;
+    sessionsOf(pj).forEach(function (s) { var m = /^S(\d+)$/.exec(String(s.id || "")); if (m && Number(m[1]) > n) n = Number(m[1]); });
+    pj.counters.session = n + 1;
+    return "S" + pj.counters.session;
+  }
+  function sucAccessPointsOf(pj) { var s = pj && pj.suc; return s && Array.isArray(s.accessPoints) ? s.accessPoints.filter(isRecord) : []; }
+  function emptySucAccessPoint() { return { description: "", enters: "" }; }
+  // What implements a policy, or "".
+  function policyImplementedBy(pj, policy) {
+    var m = pj && pj.suc && pj.suc.policyImplementation;
+    return isRecord(m) && typeof m[policy] === "string" ? m[policy].trim() : "";
+  }
+  // Writes the policies and keeps what implements each: a policy whose text
+  // is edited in place (the list keeps its length) keeps its entry; one
+  // removed takes its entry with it.
+  function setPolicies(suc, list) {
+    var was = Array.isArray(suc.policies) ? suc.policies : [], m = isRecord(suc.policyImplementation) ? suc.policyImplementation : {}, out = {};
+    list.forEach(function (x, i) {
+      var v = m[x] != null ? m[x] : (was.length === list.length && m[was[i]] != null && list.indexOf(was[i]) < 0 ? m[was[i]] : null);
+      if (typeof v === "string" && v.trim()) out[x] = v;
+    });
+    if (list.length) suc.policies = list; else delete suc.policies;
+    if (Object.keys(out).length) suc.policyImplementation = out; else delete suc.policyImplementation;
+  }
+  function setPolicyImplementation(suc, policy, text) {
+    var m = isRecord(suc.policyImplementation) ? suc.policyImplementation : {};
+    if (String(text || "").trim()) m[policy] = text; else delete m[policy];
+    if (Object.keys(m).length) suc.policyImplementation = m; else delete suc.policyImplementation;
+  }
+
   // ---------- Consequence first (Nov 2026) ----------
   // Optional and written only once set, like the fields above; the schema
   // stays spt-risk-project/0.3 and a file without them reads as before.
@@ -675,7 +731,8 @@ window.RiskApp.Model = (function () {
       any(s.policies) || any(r.threatSources) || any(r.emergingThreats) || r.tolerableConfirmed || any(approvalsOf(pj)) ||
       pj.assessmentType || sectionEdits(pj.reportCustom) || (pj.review && any(pj.review.rounds)) ||
       criteriaUsable(pj.criteria) || Array.isArray(pj.safetyFloorFR) ||
-      !!(pj.baseline && typeof pj.baseline === "object") || any(pj.consequences)
+      !!(pj.baseline && typeof pj.baseline === "object") || any(pj.consequences) ||
+      any(b.sessions) || any(s.accessPoints)
     );
   }
   // A report section edited in either report.
@@ -720,6 +777,9 @@ window.RiskApp.Model = (function () {
     ASSET_VALUES: ASSET_VALUES, ASSET_VALUE_LABEL: ASSET_VALUE_LABEL,
     CONSEQUENCE_TEXT_FIELDS: CONSEQUENCE_TEXT_FIELDS, emptyConsequence: emptyConsequence, consequencesOf: consequencesOf,
     consequenceById: consequenceById, nextConsequenceId: nextConsequenceId, viaOf: viaOf, setVia: setVia, setConsequenceId: setConsequenceId,
+    inSuc: inSuc, SESSION_FIELDS: SESSION_FIELDS, emptySession: emptySession, sessionsOf: sessionsOf, nextSessionId: nextSessionId,
+    sucAccessPointsOf: sucAccessPointsOf, emptySucAccessPoint: emptySucAccessPoint, policyImplementedBy: policyImplementedBy,
+    setPolicies: setPolicies, setPolicyImplementation: setPolicyImplementation,
     projectHasContent: projectHasContent
   };
 }());

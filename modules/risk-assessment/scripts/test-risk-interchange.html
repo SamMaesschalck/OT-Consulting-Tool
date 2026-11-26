@@ -110,15 +110,15 @@
       return same(z.assessment, { depth: "detailed" }) && !("riskComparison" in z) &&
         z.initialRisk && z.initialRisk.risk === c.initial && z.initialRisk.source === "systems";
     }), "each zone carries its assessment depth and its initial risk from the ranked systems", JSON.stringify(ctx.zones.map(function (z) { return [z.assessment, z.initialRisk]; })));
-    ok(ctx.conduits.length === 3 && ctx.conduits.every(function (c, i) {
+    ok(ctx.conduits.length === 5 && /* step 5: C4, C5 */  ctx.conduits.every(function (c, i) {
       var d = RT.depthOf(dc[i], p);
       return c.assessment && c.assessment.depth === d.depth && !("riskComparison" in c) &&
         (d.withId ? c.assessment.withId === d.withId : !("withId" in c.assessment)) &&
         (d.considered ? c.assessment.considered === d.considered : !("considered" in c.assessment)) &&
         c.initialRisk && c.initialRisk.source === "zones" && c.initialRisk.risk === RT.comparison(dc[i], p).initial;
     }), "each conduit carries its depth, with what it rests on where one is recorded, and its initial risk from the zones it joins", JSON.stringify(ctx.conduits.map(function (c) { return [c.assessment, c.initialRisk]; })));
-    ok(same(ctx.conduits.map(function (c) { return c.assessment.depth; }), ["grouped", "detailed", "proportionate"]) && ctx.conduits[0].assessment.withId === "Z3",
-      "the two conduits not assessed on their own scenarios say how they were assessed: C1 with Z3, C3 as a proportionate review");
+    ok(same(ctx.conduits.map(function (c) { return c.assessment.depth; }), ["grouped", "detailed", "proportionate", "grouped", "grouped"]) && ctx.conduits[0].assessment.withId === "Z3" && ctx.conduits[3].assessment.withId === "Z4" && ctx.conduits[4].assessment.withId === "Z2",
+      "the conduits not assessed on their own scenarios say how they were assessed: C1 with Z3, C3 as a proportionate review, and (step 5) C4 with Z4 and C5 with Z2");
     var allAssets = [].concat.apply([], ctx.zones.map(function (z) { return z.assets; }));
     ok(allAssets.length === 11 && allAssets.every(function (a) { return /^AS\d+$/.test(a.id); }), "every asset carries its id", JSON.stringify(allAssets.map(function (a) { return a.id; })));
     ok(Array.isArray(ctx.approvals) && ctx.approvals.length === 2, "the approvals list carries both recorded approvals", JSON.stringify(ctx.approvals));
