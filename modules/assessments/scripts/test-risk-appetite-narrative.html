@@ -217,7 +217,7 @@ H.test(function (ok, done) {
          "the chart note explains the previous-position marker");
 
       // ---- why two Highs sit under a Severe exposure ----------------------------
-      ok(/The severe rating is set by the consequence of a compromise and its connections with suppliers and other organisations\. Geopolitical exposure and regulatory weight are rated high\. Exposure follows its highest reading, not an average, so they do not pull the rating down\./.test(text),
+      ok(/The severe rating is set by the consequence of a compromise and its connections with suppliers and other organisations\. Geopolitical exposure and regulatory weight are rated high\. Exposure follows its highest reading and is not averaged, so they do not pull the rating down\./.test(text),
          "the exposure narrative explains the two High readings under the Severe headline",
          (text.match(/severe rating is set by[^\n]*/) || [""])[0]);
       ok(!/moderate geopolitical|moderate regulatory/i.test(text),

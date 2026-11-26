@@ -8,15 +8,15 @@ window.App.Data.instruments["risk-appetite"].narrative = {
   "_note": "Narrative for the OT Risk Appetite and Exposure assessment. Boilerplate is inserted as written. The executive summary is composed by filling slots in the templates, never by free writing. There is no grade anywhere in this instrument, so nothing here refers to a score, a percentage or a better end of either scale. Client-facing text never describes how a position was arrived at inside the tool: every band and the verdict are presented as the assessor's own judgement. House style for this pack: plain UK English for a board reader, no em-dashes, and no hyphen used as a dash.",
 
   "boilerplate": {
-    "report_intro": "This report sets out how much cyber risk {clientName} faces, how much it appears willing to accept, and whether the two fit. It is written for the board and senior leadership, and draws on interviews across governance, operations and engineering, the documents provided and what could be seen during the engagement. The item-by-item record is in the companion workbook.",
+    "report_intro": "This report sets out how much cyber risk {clientName} faces, how much it appears willing to accept, and whether the two fit. It is written for the board and senior leadership. It draws on interviews with people in governance, operations and engineering, on the documents provided and on what was seen during the engagement. The full record for each item is in the companion workbook.",
 
-    "about_instrument": "Two positions are assessed separately: the inherent exposure {clientShort} faces, which is largely outside its control, and the appetite for cyber risk it shows in practice, which is a matter of choice. The verdict describes how well the two fit.",
+    "about_instrument": "The assessment looks separately at the inherent exposure {clientShort} faces, which is largely outside its control, and at the appetite for cyber risk it shows in practice, which it chooses. The verdict describes how well the two fit.",
 
-    "series_context": "This is not an assessment against a published standard, though it draws on how NIST SP 800-82 and the NIST Cybersecurity Framework frame risk, on the consequence-led approach of ISA/IEC 62443-3-2 and on the risk appetite terms of ISO 31000. Like the OT posture and supplier screeners, it is a short, interview-led read, and it often helps decide which detailed assessment is worth commissioning next.",
+    "series_context": "The assessment draws on how NIST SP 800-82 and the NIST Cybersecurity Framework frame risk, on the consequence-led approach of ISA/IEC 62443-3-2 and on the risk appetite terms of ISO 31000, but it is not an assessment against a published standard. Like the OT posture and supplier screeners, it is short and based on interviews, and it often helps decide which detailed assessment to commission next.",
 
     "bands_source": "The band definitions and the sector baselines are SolutionsPT starting points, informed by the sources above. Every band in this report, and the verdict itself, is the assessor's own judgement.",
 
-    "how_to_read": "Exposure is placed on four bands from limited to severe, and appetite on four from averse to tolerant. Neither end of either scale is the good one, because an averse appetite or a tolerant one is only right or wrong for a particular exposure. Exposure is set by the worst of its readings, since an organisation is exposed to its worst credible consequence, while appetite is weighed across its readings as an overall posture. The more an organisation faces, the less it can sensibly accept, so severe exposure calls for an averse appetite and limited exposure can carry a tolerant one. The chart draws that relationship as a dashed line and plots {clientShort} against it. An appetite two or more bands more tolerant than the exposure warrants is under-protected, two or more bands more cautious is over-invested, and anything closer is aligned. An aligned position exactly one band off is reported as leaning towards under-protection or over-investment. The verdict describes fit and is not a score, so it should not be used to compare one organisation with another.",
+    "how_to_read": "Exposure is placed on four bands from limited to severe, and appetite on four from averse to tolerant. Neither end of either scale is the good one, because an averse appetite or a tolerant one is only right or wrong for a particular exposure. Exposure is set by the worst of its readings, since an organisation is exposed to its worst credible consequence, while appetite is weighed across its readings as an overall posture. The more an organisation faces, the less it can sensibly accept, so severe exposure calls for an averse appetite and limited exposure can carry a tolerant one. The chart draws that relationship as a dashed line and plots {clientShort} against it. An appetite two or more bands more tolerant than the exposure warrants is under-protected, two or more bands more cautious is over-invested, and anything closer is aligned. An aligned position exactly one band off is reported as leaning towards under-protection or over-investment. The verdict describes fit. It is not a score and should not be used to compare one organisation with another.",
 
     "chart_note": "The dashed line marks where appetite and exposure are in proportion. In the shaded area, more risk is being accepted than the exposure warrants.",
 
@@ -24,9 +24,9 @@ window.App.Data.instruments["risk-appetite"].narrative = {
 
     "method_technical": "The assessor also looked at how systems are patched, segmented, monitored, accessed and recovered, so that the appetite described in interview could be checked against the appetite the systems themselves reveal.",
 
-    "limitations": "This is a point-in-time read, based on what people said and what could be seen in the time available. A borderline item could reasonably be placed one band either side. The report does not test controls in depth; that needs a detailed assessment against a standard such as ISA/IEC 62443. Exposure in particular can change quickly, so it should be looked at again if {clientShort}'s circumstances or the threats it faces change.",
+    "limitations": "This is a point-in-time judgement, based on what people said and what could be seen in the time available. A borderline item could reasonably be placed one band either side. The report does not test controls in depth, which needs a detailed assessment against a standard such as ISA/IEC 62443. Exposure in particular can change quickly, so it should be looked at again if {clientShort}'s circumstances or the threats it faces change.",
 
-    "not_measurement_caveat_title": "A characterisation, not a measurement",
+    "not_measurement_caveat_title": "Limits of this characterisation",
 
     "not_measurement_caveat": "This is a professional characterisation of exposure and appetite. It is not a measurement, a conformance assessment against any standard or a regulatory determination. It is meant to help {clientShort}'s board decide, on the record, how much cyber risk it is prepared to carry."
   },
@@ -45,7 +45,7 @@ window.App.Data.instruments["risk-appetite"].narrative = {
       "exec_appetite_revealed_match": "Its appetite reads as {appetiteBand}, and its systems bear that out.",
       "exec_either_reading": "On either reading, {clientShort} is {verdictLower}.",
 
-      "exec_exposure_drivers": "The {exposureBand} rating is set by {driverList}. {lowerClause}. Exposure follows its highest reading, not an average, so {lowerRef} not pull the rating down.",
+      "exec_exposure_drivers": "The {exposureBand} rating is set by {driverList}. {lowerClause}. Exposure follows its highest reading and is not averaged, so {lowerRef} not pull the rating down.",
       "exec_verdict_incomplete": "Too little was characterised at {clientShort} to say how well exposure and appetite fit.",
 
       "exec_exposure": "The exposure position takes account of the sector ({sectorName}), how critical {clientShort}'s services are, who is likely to target it and what a compromise would cause.",
@@ -68,8 +68,8 @@ window.App.Data.instruments["risk-appetite"].narrative = {
       "exec_fit_method": "In practice, a board that is comfortable carrying risk is not doing anything wrong if its exposure is limited, and a cautious board facing limited exposure may simply be spending more than it needs to.",
 
       "stakes_under-protected": "Under-protection usually builds up gradually, through deferred projects, exceptions that never expire and risks nobody formally accepted. The danger is that the board believes it has chosen to carry this risk when it has not, and learns otherwise from an incident.",
-      "stakes_over-invested": "Over-investment is the less serious finding. Its cost is the money, time and operational flexibility spent on protection beyond what the exposure calls for, which could do more good elsewhere.",
-      "stakes_aligned": "An aligned position still needs looking after. Exposure moves with the threat picture and with changes to {clientShort} itself, and appetite drifts when budgets tighten or projects slip. This read is most useful as a baseline to check future ones against.",
+      "stakes_over-invested": "Over-investment is the less serious finding. It means spending money and staff time, and giving up operational flexibility, on protection beyond what the exposure calls for. Those resources could do more good elsewhere.",
+      "stakes_aligned": "An aligned position still needs looking after. Exposure moves with the threat picture and with changes to {clientShort} itself, and appetite drifts when budgets tighten or projects slip. This assessment is most useful as a baseline for later ones.",
 
       "not_determination": "This characterisation is the assessor's professional judgement of what was said and seen during the engagement. It is not a conformance assessment or a regulatory determination, and it does not rule on whether the organisation's appetite is correct, which is for the board to decide."
     },
@@ -124,14 +124,14 @@ window.App.Data.instruments["risk-appetite"].narrative = {
       "no_drift": "How risk gets accepted is rated {itemBand}, more tolerant than appetite overall, which reads {sectionBand}. Informal acceptance is the usual way appetite starts to drift, so it is worth tightening while the overall position is still in proportion.",
       "drift_shared": "How risk gets accepted and {otherItems} are rated {itemBand}, against {sectionBand} for appetite overall, and between them they are the main cause of the drift. Because nothing requires a recorded decision to accept a risk, risks are accepted without one, and the appetite applied in practice moves away from the one the board intends.",
       "no_drift_shared": "How risk gets accepted and {otherItems} are rated {itemBand}, more tolerant than appetite overall, which reads {sectionBand}. Informal acceptance is the usual way appetite starts to drift, so these are worth tightening while the overall position is still in proportion.",
-      "not_established": "Nobody interviewed could say how risk gets accepted at {clientShort}, or who signs it off, and that is the finding. Without a deliberate way to accept risk, appetite drifts by default, usually unnoticed until something goes wrong."
+      "not_established": "Nobody interviewed could say how risk gets accepted at {clientShort} or who signs it off, which is a finding in itself. Without a deliberate way to accept risk, appetite drifts, usually unnoticed until something goes wrong."
     }
   },
 
   "revealed_notes": {
     "_note": "Technical readings the assessor judged to be managed constraints, or could not establish, are reported but not counted as appetite. These sentences say so wherever the technical readings are shown. {countWord} is a number in words.",
-    "constrained_one": "One of the technical readings reflects a genuine operational constraint that is being managed, such as firmware held back by a vendor's certification with compensating measures in place. It is shown here but not counted as appetite, because {clientShort} did not choose it.",
-    "constrained_many": "{countWord} of the technical readings reflect genuine operational constraints that are being managed, such as firmware held back by a vendor's certification with compensating measures in place. They are shown here but not counted as appetite, because {clientShort} did not choose them.",
+    "constrained_one": "One of the technical readings reflects an operational constraint that is being managed, such as firmware held back by a vendor's certification with compensating measures in place. It is shown here but not counted as appetite, because {clientShort} did not choose it.",
+    "constrained_many": "{countWord} of the technical readings reflect operational constraints that are being managed, such as firmware held back by a vendor's certification with compensating measures in place. They are shown here but not counted as appetite, because {clientShort} did not choose them.",
     "none_counted": "None of the technical readings could be counted as appetite, so there is no revealed reading to set against the one described in interview.",
     "treated_as": {
       "accepted": "Appetite",
@@ -148,15 +148,15 @@ window.App.Data.instruments["risk-appetite"].narrative = {
     "direction_closer": "{clientShort} has moved closer to proportion, with its appetite now nearer to what its exposure warrants.",
     "direction_further": "{clientShort} has moved further from proportion, with its appetite now further from what its exposure warrants.",
     "direction_same": "{clientShort} sits the same distance from proportion as it did at the previous assessment.",
-    "moved_many": "{countWord} readings moved between the two assessments. No single move is better or worse in itself; the change in fit described above is what to judge by.",
-    "moved_one": "One reading moved between the two assessments. The move is neither better nor worse in itself; the change in fit described above is what to judge by.",
+    "moved_many": "{countWord} readings moved between the two assessments. No single move is better or worse in itself. The change in fit described above is the measure to judge by.",
+    "moved_one": "One reading moved between the two assessments. The move is neither better nor worse in itself. The change in fit described above is the measure to judge by.",
     "moved_none": "No reading moved between the two assessments.",
     "chart_note": "The hollow marker shows where {clientShort} sat at the previous assessment, and the arrow shows how its position has moved since."
   },
 
   "verdict_narrative": {
     "_note": "What each verdict means, for the client. The scoring profile carries its own wording of these rules, written for whoever maintains the scoring; that text is not for a board and is not printed.",
-    "explanation_aligned": "{clientShort} is accepting risk roughly in line with what it faces. Alignment says nothing about how good its security is: a severe-exposure organisation that is suitably averse is aligned, and so is a limited-exposure organisation that is comfortable carrying risk.",
+    "explanation_aligned": "{clientShort} is accepting risk roughly in line with what it faces. Alignment says nothing about how good its security is. A severe-exposure organisation with a suitably averse appetite is aligned, and so is a limited-exposure organisation that is comfortable carrying risk.",
     "explanation_under-protected": "{clientShort} is accepting materially more risk than its exposure justifies.",
     "explanation_over-invested": "{clientShort} may be spending money, or constraining its operations, beyond what its exposure calls for. This is far less serious than under-protection, but still worth raising.",
     "plain_terms_under-protected": "An organisation facing {exposureBand} exposure would normally hold {aWarrantedBand} appetite, and {clientShort} reads as {appetiteBand}. A gap of that size usually opens up gradually, without anyone deciding on it, which is why it now needs an explicit decision.",
@@ -174,7 +174,7 @@ window.App.Data.instruments["risk-appetite"].narrative = {
       "Put the gap between exposure and appetite to the board as a decision: either accept the current level of risk explicitly, with an owner and a review date, or fund the work to close it.",
       "Commission a detailed assessment of the systems that carry the most consequence, so that the decision is taken against specific, costed work.",
       "[Add the improvements agreed during the engagement that need no capital spend, with owners and dates.]",
-      "Record any risk the board chooses to carry as a dated acceptance with an expiry, not as a deferred remediation date.",
+      "Record any risk the board chooses to carry as a dated acceptance with an expiry. A deferred remediation date is not an acceptance.",
       "Look at this characterisation again in twelve months, or sooner if the threat picture or {clientShort}'s circumstances change."
     ],
     "over-invested": [

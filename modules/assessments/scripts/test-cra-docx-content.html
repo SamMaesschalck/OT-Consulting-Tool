@@ -109,7 +109,7 @@ window.docx = (function () {
       check("consultant exposure narrative is carried into the exec summary", allText.indexOf("highest-volume EU product") !== -1);
       var consultantSlots = paras.filter(function (p) { return p.style === "PlaceholderText" && /Consultant:/.test(p.text); });
       check("no red to-be-completed placeholders remain in the demo report", consultantSlots.length === 0);
-      check("closes with the not-a-determination statement", allText.indexOf("informs conformity; it does not determine or certify it") !== -1);
+      check("closes with the not-a-determination statement", allText.indexOf("informs conformity but does not determine or certify it") !== -1);
 
       section("Critical caveats as a shaded block");
       check("caveat block heading present", allText.indexOf("Critical caveats: read before using this report") !== -1);

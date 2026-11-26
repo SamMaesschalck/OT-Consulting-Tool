@@ -14,33 +14,33 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
     "scoringProfileRef":  "caf-achieved",
     "targetDimension":  "organisation",
     "targetDimensionLabel":  "Dutyholder / site",
-    "framing":  "An informal, whole-of-security posture gap assessment against all ten Fundamental Security Principles of the ONR Security Assessment Principles (SyAPs 2022): Leadership \u0026 Management, Organisational Culture, Human Performance, Nuclear Supply Chain, Reliability/Resilience/Sustainability, Physical Protection Systems, Cyber Security \u0026 Information Assurance, Workforce Trustworthiness, Policing \u0026 Guarding, and Emergency Preparedness \u0026 Response. Each regulatory expectation is judged Achieved, Partially achieved or Not achieved against a dutyholder profile. Coverage is deepest where an ONR Technical Assessment Guide exists (FSyP 1 to 5 and 7); the physical, personnel, policing and emergency principles are assessed at the level published in the SyAPs (the categorisation and posture annexes are redacted). This is not an ONR assessment and does not approve a security plan.",
-    "sourceNote":  "Fundamental Security Principles (FSyP), Security Delivery Principles (SyDP) and their regulatory expectations are transcribed and lightly condensed from the ONR SyAPs (2022) and the published CNS-TAST-GD Technical Assessment Guides. Where no TAG was available for a Security Delivery Principle, the expectations are drawn from the SyAPs master document. This is an informal alignment and gap tool, not an ONR assessment.",
+    "framing":  "This is an informal gap assessment of the dutyholder\u0027s security posture against all ten Fundamental Security Principles of the ONR Security Assessment Principles (SyAPs 2022): Leadership \u0026 Management, Organisational Culture, Human Performance, Nuclear Supply Chain, Reliability/Resilience/Sustainability, Physical Protection Systems, Cyber Security \u0026 Information Assurance, Workforce Trustworthiness, Policing \u0026 Guarding, and Emergency Preparedness \u0026 Response. Each regulatory expectation is judged Achieved, Partially achieved or Not achieved against the selected dutyholder profile. Coverage is deepest for FSyP 1 to 5 and FSyP 7, where ONR has published Technical Assessment Guides. The physical, personnel, policing and emergency principles are assessed at the level published in the SyAPs, because the categorisation and posture annexes are redacted. It is not an ONR assessment and does not approve a security plan.",
+    "sourceNote":  "The Fundamental Security Principles (FSyP), Security Delivery Principles (SyDP) and regulatory expectations are transcribed, lightly condensed, from the ONR SyAPs (2022) and the published CNS-TAST-GD Technical Assessment Guides. Where ONR has published no TAG for a Security Delivery Principle, the expectations come from the SyAPs document itself. This is an informal gap assessment and is not an ONR assessment.",
     "attribution":  "Contains public sector information published by the Office for Nuclear Regulation (ONR) and licensed under the Open Government Licence v3.0. Source: Security Assessment Principles for the Civil Nuclear Industry (2022 Edition, Version 1) and the associated Civil Nuclear Security Technical Assessment Guides (CNS-TAST-GD).",
     "criticalCaveats":  [
-                            "This is not an ONR assessment, inspection, or determination of compliance with the Nuclear Industries Security Regulations 2003 (NISR). It is an informal, consultant-led gap assessment to support improvement.",
-                            "It does not constitute, replace, or approve a security plan. Only ONR can assess and approve a dutyholder\u0027s security plan under NISR.",
-                            "The public SyAPs has its Annexes (the categorisation and security-posture tables) redacted, so this tool uses only the published Security Delivery Principle expectations and cannot reproduce the graded posture thresholds.",
-                            "Do not enter Sensitive Nuclear Information (SNI) or any classified or protectively-marked material into this tool."
+                            "This is not an ONR assessment or inspection, and it does not determine compliance with the Nuclear Industries Security Regulations 2003 (NISR). It is an informal gap assessment, led by a consultant, to support improvement.",
+                            "The assessment does not constitute, replace or approve a security plan. Only ONR can assess and approve a dutyholder\u0027s security plan under NISR.",
+                            "The Annexes of the public SyAPs, which hold the categorisation and security posture tables, are redacted. The assessment therefore uses only the published Security Delivery Principle expectations and cannot reproduce the graded posture thresholds.",
+                            "Do not enter Sensitive Nuclear Information (SNI) or any classified or protectively marked material into this tool."
                         ],
     "display":  {
-                    "subtitle":  "Informal whole-of-security posture assessment against all ten Fundamental Security Principles of the ONR Security Assessment Principles (SyAPs). Capture engagement details, pick the dutyholder profile below, then work through the Fundamental Security Principles from the sidebar.",
+                    "subtitle":  "This is an informal posture assessment against all ten Fundamental Security Principles of the ONR Security Assessment Principles (SyAPs). Enter the engagement details, choose the dutyholder profile below, then work through the principles from the sidebar.",
                     "reportSubline":  "ONR SyAPs nuclear security posture assessment (all 10 FSyP)",
-                    "reportDescription":  "ONR SyAPs whole-of-security informal posture gap analysis",
+                    "reportDescription":  "ONR SyAPs informal security posture gap analysis (all ten FSyP)",
                     "profileTitle":  "Dutyholder profile",
                     "profileStep1Label":  "Dutyholder profile",
                     "objectiveTitle":  "Fundamental Security Principle",
                     "principleNoun":  "Security Delivery Principle",
                     "outcomesTitle":  "Expectations",
-                    "about":  "This is an informal, whole-of-security posture gap assessment against all ten Fundamental Security Principles of the ONR Security Assessment Principles (SyAPs): leadership and management, culture, human performance, supply chain, reliability/resilience/sustainability, physical protection, cyber and information assurance, workforce trustworthiness, policing and guarding, and emergency preparedness and response. It gives a structured read on the dutyholder\u0027s security posture across every principle and a prioritised improvement roadmap. Coverage is deepest for the management and cyber principles (which have detailed Technical Assessment Guides); the physical, personnel, policing and emergency principles are assessed at the level published in SyAPs, since ONR\u0027s categorisation and posture annexes are redacted. It is advisory only: not an ONR assessment, not a determination of NISR compliance, and it neither constitutes nor approves a security plan.",
+                    "about":  "This is an informal gap assessment of the dutyholder\u0027s security posture against all ten Fundamental Security Principles of the ONR Security Assessment Principles (SyAPs). The principles cover leadership and management, culture, human performance, supply chain, reliability, resilience and sustainability, physical protection, cyber and information assurance, workforce trustworthiness, policing and guarding, and emergency preparedness and response. The result is a view of the posture under every principle and a prioritised improvement roadmap. Coverage is deepest for the management and cyber principles, which have detailed Technical Assessment Guides. The physical, personnel, policing and emergency principles are assessed at the level published in SyAPs, because ONR\u0027s categorisation and posture annexes are redacted. The assessment is advisory. It is not an ONR assessment or a determination of NISR compliance, and it neither constitutes nor approves a security plan.",
                     "gettingStarted":  {
                                            "cardTitle":  "How this assessment works",
                                            "intro":  "This is an informal gap assessment against the ONR Security Assessment Principles (SyAPs). Each regulatory expectation is judged Achieved, Partially achieved or Not achieved. It is not an ONR assessment and does not approve a security plan.",
-                                           "profileHeading":  "Dutyholder profile (sets the expected depth of demonstration)",
+                                           "profileHeading":  "Dutyholder profile (sets how much demonstration is expected)",
                                            "bullets":  [
-                                                           "The framework is a three-level hierarchy: Fundamental Security Principles (FSyP) contain Security Delivery Principles (SyDP), which are assessed through discrete regulatory expectations.",
-                                                           "Record each expectation as Achieved, Partially achieved or Not achieved. Unknown flags something that could not be verified (it lowers confidence); Not applicable drops the expectation.",
-                                                           "The dutyholder profile sets the expected depth: Full dutyholder expects every expectation to be demonstrated; Smaller dutyholder applies the same expectations proportionately to a low-category site.",
+                                                           "Each Fundamental Security Principle (FSyP) contains Security Delivery Principles (SyDP), and you assess each SyDP through its regulatory expectations.",
+                                                           "Record each expectation as Achieved, Partially achieved or Not achieved. Use Unknown when you could not verify it, which lowers confidence, and Not applicable to leave it out.",
+                                                           "Under the Full dutyholder profile every expectation must be demonstrated. The Smaller dutyholder profile applies the same expectations proportionately to a low-category site.",
                                                            "The roadmap lists every in-scope expectation that is not yet achieved or could not be verified. Do not enter SNI or classified material."
                                                        ]
                                        }
@@ -65,7 +65,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                        "value":  "unknown",
                        "label":  "Unknown",
                        "colour":  "na",
-                       "effect":  "could not be verified: lowers coverage and confidence"
+                       "effect":  "could not be verified, which lowers coverage and confidence"
                    },
                    {
                        "value":  "na",
@@ -522,7 +522,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                      {
                          "id":  "1.3.2",
                          "principleId":  "1.3",
-                         "title":  "Conservative under uncertainty; not outsourced",
+                         "title":  "Conservative decisions that are not outsourced",
                          "controlText":  "Security-related decisions should cater for the potential for error, uncertainty and the unexpected and be appropriately and demonstrably conservative; they should not be out-sourced to a third party such as contractors, but should demonstrably incorporate diversity of view.\n\nOperational decisions may have to be made quickly with imprecise and incomplete information. Where civilian guard forces make operational decisions, their authority should be bounded and subject to appropriate oversight by SQEP personnel, and their decisions suitably prudent and conservative. Diversity of view can be achieved by involving individuals from other business units in the peer review process.",
                          "controlTextLabel":  "SyDP 1.3 expectation (CNS-TAST-GD-1.3)"
                      },
@@ -1578,7 +1578,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                      {
                          "id":  "4.4.5",
                          "principleId":  "4.4",
-                         "title":  "Comprehensive commissioning records and handover package",
+                         "title":  "Complete commissioning records and handover package",
                          "controlText":  "Comprehensive records should be kept of the hot commissioning phase, capturing the settings for plant components to deliver the system performance, together with a package of information that includes a set of as built drawings, operating, test and maintenance procedures and requirements, a recommended spares holding and other pertinent information.\n\nThe base settings are important in confirming equipment remains fit for purpose, enabling straightforward fault finding and system re-commissioning later in its life, and may need to correlate with the as tested settings in the case of National Protective Security Authority (NPSA) approved security equipment. The inspector should seek evidence that the original ORs, or equivalent, are met throughout the different phases of commissioning, with evidence of any changes and associated justifications available.",
                          "controlTextLabel":  "SyDP 4.4 expectation (CNS-TAST-GD-4.4)"
                      },
@@ -2035,7 +2035,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                      {
                          "id":  "6.4.1",
                          "principleId":  "6.4",
-                         "title":  "Performance based VA validates PPS effectiveness",
+                         "title":  "Performance-based VA validates PPS effectiveness",
                          "controlText":  "The dutyholder should demonstrate within their security plan how the effectiveness of the PPS has been validated through the conduct of performance based vulnerability assessments. Such assessments could comprise one or more proven methodologies such as force-on-force exercises, table top exercises, war gaming, simulation, computer based modelling or expert analysis.\n\nA performance based vulnerability assessment should be carried out at all sites against the security outcome required from the physical protection system (PPS). The Manual Forced Entry Standard (MFES) should be used by dutyholders to assist validation of claims, arguments and evidence in the vulnerability assessment that the PPS meets the required outcome as defined in SyAPs Annexes C and D.",
                          "controlTextLabel":  "SyDP 6.4 expectation (CNS-TAST-GD-6.4)",
                          "promptQuestions":  [
@@ -2136,7 +2136,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                      {
                          "id":  "6.4.11",
                          "principleId":  "6.4",
-                         "title":  "Quality of submission (nine key features)",
+                         "title":  "Quality of submission (the nine features of a good submission)",
                          "controlText":  "A vulnerability assessment submission should exhibit the nine key features of a good submission: it should be complete, clear, rational, accurate, objective, appropriate, integrated, current and forward looking.\n\nSubmissions should be clear (identifying associated PPS outcomes and giving the basis for all assumptions, conclusions and recommendations), rational, accurate (reflecting the \u0027as is\u0027 state), objective (supported by factual evidence and demonstrating defence-in-depth), appropriate (using fit-for-purpose analytical methods with verification and validation), integrated, current, and forward looking (reviewed throughout the lifetime of the site and revalidated when the DBT is reviewed). The dutyholder is responsible for the submission, but the armed response force or guard force who deliver security should be involved and have a comprehensive understanding of it.",
                          "controlTextLabel":  "SyDP 6.4 expectation (CNS-TAST-GD-6.4)"
                      },
@@ -2379,7 +2379,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                      {
                          "id":  "7.3.3",
                          "principleId":  "7.3",
-                         "title":  "Risk-informed, actively-managed cyber protection system",
+                         "title":  "Risk-informed, actively managed cyber protection system",
                          "controlText":  "Following identification and characterisation, dutyholders should implement a risk-informed, current and actively-managed Cyber Protection System (CPS) that achieves the required outcome.\n\nRefer to the categorisation and outcome guidance at Annexes F, G and H of the SyAPs.",
                          "controlTextLabel":  "SyDP 7.3 expectation (SyAPs 2022 master)"
                      },
@@ -2620,7 +2620,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                      {
                          "id":  "8.2.2",
                          "principleId":  "8.2",
-                         "title":  "Robust screening and vetting delivery",
+                         "title":  "Sound screening and vetting arrangements",
                          "controlText":  "Dutyholders should establish robust arrangements that manage delivery of pre-employment screening and national security vetting sponsorship in compliance with extant Cabinet Office guidance and any additional ONR requirements.\n\nOnly the dutyholder\u0027s duly authorised personnel should be authorised to approve pre-employment check applications (and only where applications fall within ONR signing authorities) and to sponsor applications for national security vetting.",
                          "controlTextLabel":  "SyDP 8.2 expectation (SyAPs 2022 master)"
                      },
@@ -2830,7 +2830,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                      {
                          "id":  "10.1.5",
                          "principleId":  "10.1",
-                         "title":  "Robust, maintained response infrastructure",
+                         "title":  "Resilient, maintained and tested response infrastructure",
                          "controlText":  "The infrastructure, systems and equipment identified for the delivery of emergency arrangements should be of appropriate robustness, suitably maintained and tested, and readily available at all times, with emergency operating procedures written recognising the practical difficulties that could be encountered in security event conditions.\n\nExamples of practical difficulties include adversary action, radiation levels, poor lighting, access issues and communication system failures.",
                          "controlTextLabel":  "SyDP 10.1 expectation (SyAPs 2022 master)"
                      },
@@ -2933,7 +2933,7 @@ window.App.Data.instruments["onr-syaps-full"].instrument = {
                      {
                          "id":  "10.3.1",
                          "principleId":  "10.3",
-                         "title":  "Robust, resilient command and control capability",
+                         "title":  "Resilient command, control and communications capability",
                          "controlText":  "Dutyholders should establish a robust and resilient command, control and communications capability, integrated with all relevant stakeholders, including as appropriate a central alarm station, emergency control room, main control room and security force control centre.\n\nThe on-site emergency control room should be located to minimise the likelihood of its non-availability due to the event, and dutyholders should be capable of delivering emergency management from any location where movement is limited.",
                          "controlTextLabel":  "SyDP 10.3 expectation (SyAPs 2022 master)"
                      },

@@ -402,7 +402,7 @@ H.test(function (ok) {
   ok(/Under-protected/.test(m.textContent), "the verdict is stated in the report");
   ok(/usually opens up gradually, without anyone deciding on it/.test(m.textContent),
      "with the plain-terms sentence a consultant would actually say");
-  ok(/characterisation, not a measurement/i.test(m.textContent),
+  ok(/Limits of this characterisation/.test(m.textContent),
      "and the caveat leads the report");
 
   // The plot must be a real drawing, not an empty frame.
@@ -449,7 +449,7 @@ H.test(function (ok) {
   // The explanation for readings below the headline is only given when it is
   // true: not when the assessor has set exposure away from the highest reading.
   var slots = R.riskAppetiteSlots(s, E.state.engagement);
-  ok(/rated high\. Exposure follows its highest reading, not an average/.test(R.riskAppetiteExposureDrivers(s, N, slots) || ""),
+  ok(/rated high\. Exposure follows its highest reading and is not averaged/.test(R.riskAppetiteExposureDrivers(s, N, slots) || ""),
      "with severe set by the worst reading, the high readings are explained");
   E.updateRiskAppetiteSetup({ exposureBand: "high" });
   s = score(); slots = R.riskAppetiteSlots(s, E.state.engagement);
@@ -624,7 +624,7 @@ H.test(function (ok) {
   // In the report: said plainly, with a column showing how each was treated.
   A.UI.go("report");
   var rep = document.getElementById("main").textContent;
-  ok(/Three of the technical readings reflect genuine operational constraints that are being managed/.test(rep),
+  ok(/Three of the technical readings reflect operational constraints that are being managed/.test(rep),
      "the report says how many readings were managed constraints, in words",
      (rep.match(/[A-Z][a-z]+ of the technical readings reflect[^.]*/) || [""])[0]);
   ok(/One technical reading could not be established/.test(rep), "and how many could not be established");
