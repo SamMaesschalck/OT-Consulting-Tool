@@ -52,12 +52,12 @@ H.test(function (ok) {
     ok(!!toggle, "a guidance toggle is present to the right of the state buttons");
     ok(toggle && bar.contains(toggle) && bar.querySelectorAll(".caf-state-btn").length >= 3,
        "the toggle is in the same row as the state buttons");
-    ok(toggle && /OT lens/.test(toggle.textContent), "the toggle folds the OT lens into it", toggle && toggle.textContent);
+    ok(toggle && /OT context/.test(toggle.textContent), "the toggle folds the OT context into it", toggle && toggle.textContent);
     ok(toggle && /Indicators of good practice/.test(toggle.textContent), "the toggle names the CAF indicators", toggle && toggle.textContent);
 
     // The old standalone "OT lens" button (text exactly "OT lens") is gone.
-    var standaloneLens = [].slice.call(main.querySelectorAll("button")).filter(function (b) { return b.textContent.trim() === "OT lens"; });
-    ok(standaloneLens.length === 0, "no standalone 'OT lens' button remains", "found " + standaloneLens.length);
+    var standaloneLens = [].slice.call(main.querySelectorAll("button")).filter(function (b) { return b.textContent.trim() === "OT context"; });
+    ok(standaloneLens.length === 0, "no standalone 'OT context' button remains", "found " + standaloneLens.length);
 
     // Collapsed by default: the detail panel is not in the DOM until toggled.
     ok(!main.querySelector(".caf-state-guide"), "detail panel is collapsed by default");
@@ -71,7 +71,7 @@ H.test(function (ok) {
     ok(panel && /verbatim from the CAF/.test(panel.textContent), "IGP block is labelled as verbatim CAF text");
     ok(panel && /board-level/.test(panel.textContent), "revealed panel shows A1.a's verbatim indicators");
     ok(panel && panel.querySelector(".caf-lens-panel"), "revealed panel contains the OT lens");
-    ok(panel && /OT lens/.test(panel.textContent), "revealed panel is labelled with an OT lens heading");
+    ok(panel && /OT context/.test(panel.textContent), "revealed panel is labelled with an OT context heading");
     var t2 = toggleFor(main);
     ok(t2 && t2.className.indexOf("open") >= 0, "toggle shows its open state");
 

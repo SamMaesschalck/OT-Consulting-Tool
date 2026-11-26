@@ -30,8 +30,8 @@ window.App.TourNIS2Quick = (function () {
       "Treat this screen as the scoping input to a full NIS2 gap assessment and commission that next\nAssign an owner for the incident-reporting process and rehearse the statutory deadlines\nStart the supplier security review with the critical third parties named in this report\nRe-screen once the full assessment has established the detailed position",
     entityClassification: "essential",
     competentAuthority: "the national competent authority for the water sector",
-    regulatoryExposure: "As an essential entity in the water sector, Harbour Water Utilities is subject to the full NIS2 supervisory regime. This quick gap analysis screens the ten Article 21(2) measures plus governance and incident reporting; the most acute exposure is the inability to meet the Article 23 reporting deadlines and the unmanaged supply chain, both of which a competent authority would examine first.",
-    topPriorities: "1) Stand up and rehearse the incident-reporting process (24h early warning, 72h notification, one-month final report). 2) Manage supplier security risk for critical third parties. 3) Establish an effectiveness-assessment programme to evidence that the measures actually work."
+    regulatoryExposure: "As an essential entity in the water sector, Harbour Water Utilities is subject to the full NIS2 supervisory regime. This quick gap analysis screens the ten Article 21(2) measures plus governance and incident reporting. The most acute exposures are that the entity could not meet the Article 23 reporting deadlines and that its supply chain is unmanaged. A competent authority would examine both first.",
+    topPriorities: "1) Stand up and rehearse the incident-reporting process (24h early warning, 72h notification, one-month final report). 2) Manage supplier security risk for critical third parties. 3) Establish an effectiveness-assessment programme to show that the measures work."
   };
 
   // { id, state, ev, [rem:{rank,band,owner,action,impact}] }

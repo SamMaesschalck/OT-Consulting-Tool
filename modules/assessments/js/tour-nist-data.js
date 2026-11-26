@@ -29,9 +29,9 @@ window.App.TourNIST = (function () {
     nextSteps:
       "Agree an owner and a target date for each control recorded as Other Than Satisfied\nDeploy scheduled vulnerability scanning and agree the remediation SLAs before the next customer security review\nStand up production security monitoring and log review, then test it against a known scenario\nExercise the contingency and incident plans and keep the results as evidence\nRe-assess against the Moderate baseline in twelve months",
     regulatoryExposure:
-      "Atlas Digital Services operates a multi-tenant SaaS platform and assesses its corporate and production information systems against the NIST SP 800-53 Rev 5 Moderate baseline to satisfy customer security requirements and support its SOC 2 and ISO 27001 programmes. This is an alignment and gap analysis, not a formal SP 800-53A assessment or an authorization decision. The controls that are Other Than Satisfied cluster around vulnerability management, monitoring and least privilege, which is where an assessor or a customer security review is most likely to focus.",
+      "Atlas Digital Services operates a multi-tenant SaaS platform and assesses its corporate and production information systems against the NIST SP 800-53 Rev 5 Moderate baseline to satisfy customer security requirements and support its SOC 2 and ISO 27001 programmes. This is an alignment and gap analysis. It is not a formal SP 800-53A assessment or an authorization decision. The controls that are Other Than Satisfied cluster around vulnerability management, monitoring and least privilege, which is where an assessor or a customer security review is most likely to focus.",
     topPriorities:
-      "The two most urgent priorities are standing up continuous vulnerability scanning with tracked remediation (RA-5), so that known weaknesses are found and fixed on a schedule rather than ad hoc, and establishing security monitoring and log review across the production estate (SI-4, AU-6), so that malicious activity is detected and acted on. Closing least-privilege gaps (AC-6) and testing contingency and incident plans (CP-4, IR-3) follow close behind."
+      "The two most urgent priorities are standing up continuous vulnerability scanning with tracked remediation (RA-5), so that known weaknesses are found and fixed on a schedule, and establishing security monitoring and log review across the production estate (SI-4, AU-6), so that malicious activity is detected and acted on. Closing least-privilege gaps (AC-6) and testing contingency and incident plans (CP-4, IR-3) follow close behind."
   };
 
   // Curated gaps (Other Than Satisfied) with remediation. All are in the
@@ -57,7 +57,7 @@ window.App.TourNIST = (function () {
       rem: { rank: 5, band: "High", owner: "Platform Engineering Lead",
         action: "Extend flaw remediation to application dependencies with tracked SLAs and a defined maintenance cadence.",
         impact: "Unpatched application components are a leading cause of breaches in SaaS platforms." } },
-    { id: "CP-4", ev: "A contingency plan exists but has not been exercised; recovery timings are assumed rather than demonstrated.",
+    { id: "CP-4", ev: "A contingency plan exists but has not been exercised, so the recovery timings are assumed and have never been demonstrated.",
       rem: { rank: 6, band: "High", owner: "Head of Operations",
         action: "Run a contingency-plan exercise (including a representative restore) at least annually and feed lessons back into the plan.",
         impact: "Untested recovery plans routinely fail under the pressure of a real outage." } },
@@ -84,7 +84,7 @@ window.App.TourNIST = (function () {
     { id: "SA-11", ev: "Code review and SAST run in CI, but there is no regular independent security testing of the developed platform.",
       rem: { rank: 12, band: "Medium", owner: "Head of Engineering",
         action: "Introduce periodic independent security testing (DAST and a scoped penetration test) into the release lifecycle.",
-        impact: "Automated checks miss logic and design flaws that manual testing surfaces." } },
+        impact: "Automated checks miss logic and design flaws that manual testing finds." } },
     { id: "AC-2", ev: "Joiner/leaver processes are reliable for staff, but dormant contractor and service accounts were found during the assessment.",
       rem: { rank: 13, band: "Medium", owner: "IAM Lead",
         action: "Bring contractor and service accounts into the periodic access review and disable dormant accounts automatically.",
@@ -93,7 +93,7 @@ window.App.TourNIST = (function () {
       rem: { rank: 14, band: "Medium", owner: "Security Architect",
         action: "Produce and maintain a security architecture that documents trust boundaries, data flows and control placement.",
         impact: "Without a security architecture, control gaps and single points of failure go unnoticed." } },
-    { id: "SR-3", ev: "Key suppliers are contracted commercially, but their security practices are not assessed or contractually required in a consistent way.",
+    { id: "SR-3", ev: "Major suppliers are contracted commercially, but their security practices are not assessed or contractually required in a consistent way.",
       rem: { rank: 15, band: "Medium", owner: "Vendor Risk Lead",
         action: "Introduce supply-chain security requirements (assessment, vulnerability disclosure, incident notification) into supplier contracts and onboarding.",
         impact: "Third parties with access or embedded components are a growing breach vector." } },

@@ -231,7 +231,7 @@ H.test(function (ok, done) {
     var av = textOf("ncsc-caf-aviation");
     ok(/expected states not available/.test(av) && /Expected states are not available for this profile, so meeting and below counts are not reported\./.test(av),
        "a profile with no expected states says so in the client's terms");
-    ok(/Where expected states are not available for a profile, meeting and below are not reported at all\./.test(textOf("nist-800-53")),
+    ok(/Where a profile has no expected states, meeting and below are not reported\./.test(textOf("nist-800-53")),
        "and the methodology bullet the same way");
 
     // The Excel workbook prints the same profile line, and the automatic checks

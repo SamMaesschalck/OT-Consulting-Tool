@@ -137,7 +137,7 @@ window.App.Data.shared.riskAppetiteSectorBaselines = {
     },
     {
       "id": "low-consequence",
-      "label": "Compromise consequence genuinely contained and non-safety",
+      "label": "A compromise would be contained and have no safety consequence",
       "effect": "consider -1"
     }
   ],

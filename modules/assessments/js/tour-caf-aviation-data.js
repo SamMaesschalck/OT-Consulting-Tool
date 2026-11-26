@@ -28,8 +28,8 @@ window.App.TourCAFAviation = (function () {
 
   var reportNarrative = {
     nextSteps:
-      "Agree an owner and a target date for each Objective C action with the security lead\nScope monitoring across the airport operational systems as a single funded programme rather than system by system\nExercise the aviation incident response plan as a tabletop before the next CAA engagement\nRe-assess against the Tier 1 profile in twelve months",
-    regulatoryExposure: "Kingsway Airport Authority is a Tier 1 designated operator under the CAF for Aviation, so the CAA reviews its cyber resilience against the assigned tier profile. The weakest objective is C (detecting cyber security events): the airport could not currently detect an intrusion in its operational or airport-systems environment, which is the area a CAA review would focus on first and the one most consequential for safety and continuity of operations.",
+      "Agree an owner and a target date for each Objective C action with the security lead\nScope monitoring across all the airport operational systems as one funded programme\nExercise the aviation incident response plan as a tabletop before the next CAA engagement\nRe-assess against the Tier 1 profile in twelve months",
+    regulatoryExposure: "Kingsway Airport Authority is a Tier 1 designated operator under the CAF for Aviation, so the CAA reviews its cyber resilience against the assigned tier profile. The weakest objective is C (detecting cyber security events). At present the airport could not detect an intrusion in its operational or airport-systems environment. A CAA review would look there first, and it is the gap with the greatest consequence for safety and continuity of operations.",
     topPriorities: "The most urgent priorities are establishing monitoring and alerting across the airport's operational systems (C1.a, C1.c), building the skills to use them (C1.e), and bringing supplier and vulnerability management under control (A4.a, B4.d). Standing up and exercising an aviation-specific incident response capability (D1.c) follows close behind."
   };
 
@@ -82,12 +82,12 @@ window.App.TourCAFAviation = (function () {
     { id: "C1.b", state: "partially", ev: "Corporate logs go to the SIEM; operational-systems logs are local with short retention.",
       rem: { rank: 9, band: "Medium", owner: "SOC Manager", action: "Centralise and protect operational logs with retention that supports investigation.", impact: "Local, short-retention logs rarely survive long enough to investigate an incident." } },
     { id: "C1.c", state: "not", ev: "No security alerting exists for the operational environment.",
-      rem: { rank: 2, band: "High", owner: "SOC Manager", action: "Build prioritised detection use cases and alerting once monitoring and logging are in place.", impact: "Malicious activity is not surfaced to anyone who can act on it." } },
+      rem: { rank: 2, band: "High", owner: "SOC Manager", action: "Build prioritised detection use cases and alerting once monitoring and logging are in place.", impact: "Malicious activity is not brought to anyone who can act on it." } },
     { id: "C1.d", state: "partially", ev: "Major incidents would be recognised, but there is no documented criteria or triage for operational security incidents.",
       rem: { rank: 8, band: "Medium", owner: "SOC Manager", action: "Document significant-incident criteria and a triage path for operational security alerts.", impact: "Unclassified incidents delay the response that aviation continuity depends on." } },
     { id: "C1.e", state: "not", ev: "Neither the SOC nor engineering has OT/airport-systems monitoring and detection skills.",
       rem: { rank: 3, band: "High", owner: "SOC Manager", action: "Build detection capability through training and a joint SOC/engineering working model.", impact: "Operational alerts read without context are missed or cause unsafe over-reaction." } },
-    { id: "C2.a", state: "unknown", note: "Whether system abnormalities are understood well enough to detect attacks could not be established, as there is no monitoring baseline yet. Marked unknown; dependent on the monitoring work under C1.a." },
+    { id: "C2.a", state: "unknown", note: "Whether system abnormalities are understood well enough to detect attacks could not be established, as there is no monitoring baseline yet. The outcome is marked unknown and depends on the monitoring work under C1.a." },
     { id: "C2.b", state: "not", ev: "No proactive attack discovery or threat hunting is performed in the operational environment.",
       rem: { rank: 4, band: "High", owner: "SOC Manager", action: "Once monitoring and skills exist, introduce periodic, hypothesis-led threat hunts focused on the most likely intrusion paths.", impact: "A stealthy intrusion that evades alerts can persist in the operational environment for a long time." } },
 

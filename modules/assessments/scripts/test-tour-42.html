@@ -116,7 +116,7 @@ window.addEventListener("DOMContentLoaded", function () {
     ok(vals[0] === "0" && vals[4] === "2", "vector values match the scored profile", vals.join(","));
 
     ok(host.textContent.indexOf("What was in scope") !== -1, "report accounts for what was in scope");
-    ok(/Assessed 47 of this instrument's 75 requirements/.test(host.textContent),
+    ok(/47 of the 75 requirements were assessed/.test(host.textContent),
        "scope line reconciles assessed against the instrument total");
     ok(/22 requirements apply only to a different component type/.test(host.textContent),
        "scope line explains the component-type exclusions");

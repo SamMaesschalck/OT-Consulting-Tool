@@ -30,9 +30,9 @@ window.App.TourML = (function () {
     nextSteps:
       "Agree an owner and a target date for each not-met requirement at the next OT security steering meeting\nScope OT event detection and logging as one funded project, including who reviews the alerts\nBring remote access and control-system change control under a single agreed procedure\nPlan the safety-system separation work into the next shutdown\nRe-assess the programme in twelve months to measure movement against this baseline",
     regulatoryExposure:
-      "Northbridge's security programme is reasonably mature in governance, network architecture and user access, but weakest in event and incident management and in change control: the programme would currently struggle to detect, investigate or cleanly change the gas-distribution control systems. For an operator of an essential service the not-met event-detection and logging requirements are the most material, because they bear directly on the ability to notice and respond to an attack before it affects supply or safety.",
+      "Northbridge's security programme is reasonably mature in governance, network architecture and user access. It is weakest in event and incident management and in change control, and at present it would struggle to detect or investigate an incident on the gas-distribution control systems, or to change them cleanly. For an operator of an essential service the unmet event-detection and logging requirements matter most, because they decide whether an attack is noticed and handled before it affects supply or safety.",
     topPriorities:
-      "The most urgent priorities are establishing OT event detection and logging (EVENT1.1, EVENT1.4) so that an incident can be seen and investigated, bringing remote access under control (NET3.1), and introducing change control over control-system logic (CM1.4). Separating the safety system from the basic process control network (NET1.3) is the most important architectural fix."
+      "The first priority is OT event detection and logging (EVENT1.1, EVENT1.4), so that an incident can be seen and investigated. Remote access needs to be brought under control (NET3.1), and changes to control-system logic need change control (CM1.4). The largest architectural fix is separating the safety system from the basic process control network (NET1.3)."
   };
 
   // Row shapes:
@@ -170,7 +170,7 @@ window.App.TourML = (function () {
     { id: "EVENT1.7", ml: "ML1", ev: "Event analysis is ad hoc; there is no defined triage or analysis practice.",
       rem: { rank: 9, band: "Medium", owner: "SOC Manager",
         action: "Define OT event analysis and triage once logging and monitoring are in place.",
-        impact: "Data without analysis means malicious activity is not surfaced to anyone who can act on it." } },
+        impact: "Data without analysis means malicious activity is not brought to anyone who can act on it." } },
     { id: "EVENT1.8", ml: "ML2" },
     { id: "EVENT1.9", ml: "ML1", ev: "Vulnerability handling for OT is ad hoc; advisories are not tracked against assets.",
       rem: { rank: 8, band: "Medium", owner: "OT Security Lead",

@@ -273,7 +273,7 @@ window.App.ExportXLSX = (function () {
   // are not changed; this is reporting only.
   function slPrioritySheet(scoredAll, taxonomy) {
     var rows = [
-      [styledCell("Priority order: FRs that did not meet target; floor-flagged FRs first, then by gap size", { headerColor: true })].concat(Array(6).fill(styledCell("", { headerColor: true }))),
+      [styledCell("Foundational Requirements below target, with floor-flagged FRs first and then the largest gaps", { headerColor: true })].concat(Array(6).fill(styledCell("", { headerColor: true }))),
       headerRow(["Target", "Rank", "FR", "Name", "Achieved", "Target", "Gap", "Floor flags"])
     ];
     scoredAll.perTarget.forEach(function (t) {
@@ -296,7 +296,7 @@ window.App.ExportXLSX = (function () {
       var partly = t.result.partlyAssessedFRs || [];
       if (partly.length > 0) {
         rows.push([]);
-        rows.push([styledCell("Partly assessed, nothing short so far (not eligible for priority ranking)", { bold: true, fill: FILL.sub })]);
+        rows.push([styledCell("Partly assessed with no shortfall so far (these are not ranked)", { bold: true, fill: FILL.sub })]);
         partly.forEach(function (fr) {
           var taxFR = taxonomy.frs.filter(function (f) { return f.id === fr.frId; })[0] || { name: "" };
           rows.push([t.target.name, "-", fr.frId, taxFR.name, "Not yet", S.formatSL(fr.targetSL), "-", "-"]);
@@ -305,7 +305,7 @@ window.App.ExportXLSX = (function () {
       var notAssessed = t.result.notAssessedFRs || [];
       if (notAssessed.length > 0) {
         rows.push([]);
-        rows.push([styledCell("Not assessed in this engagement (not eligible for priority ranking)", { bold: true, fill: FILL.sub })]);
+        rows.push([styledCell("Not assessed in this engagement (these are not ranked)", { bold: true, fill: FILL.sub })]);
         notAssessed.forEach(function (fr) {
           var taxFR = taxonomy.frs.filter(function (f) { return f.id === fr.frId; })[0] || { name: "" };
           rows.push([t.target.name, "-", fr.frId, taxFR.name, "-", S.formatSL(fr.targetSL), "-", "-"]);
@@ -330,8 +330,8 @@ window.App.ExportXLSX = (function () {
       return (t.result.roadmap || []).some(function (it) { return it.toAssess; });
     });
     var rows = [
-      [styledCell("Remediation roadmap: every applicable requirement below its target SL, floor findings first, in the consultant's priority order." +
-        (anyToAssess ? " Entries marked To assess are not findings: every item answered so far is met, and the rest are still to be assessed." : ""),
+      [styledCell("The remediation roadmap lists every applicable requirement below its target SL, with floor findings first and then in the consultant's priority order." +
+        (anyToAssess ? " Entries marked To assess are not findings. Every item answered so far is met, and the rest are still to be assessed." : ""),
         { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
@@ -727,7 +727,7 @@ window.App.ExportXLSX = (function () {
     var multi = sites.length > 1;
     var nouns = targetNouns(scoredAll.instrument);
     var head = (multi ? [nouns.one] : []).concat(["Rank", "Domain", "Name", "Grade", "Score", "Coverage"]);
-    var banner = "Priority order: worst-to-best across graded domains; insufficient-evidence domains listed separately" +
+    var banner = "Graded domains from weakest to strongest. Domains without enough evidence to grade are listed separately" +
       (multi ? ". Each " + nouns.one.toLowerCase() + " is ranked on its own." : "");
     var rows = [
       [styledCell(banner, { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
@@ -751,7 +751,7 @@ window.App.ExportXLSX = (function () {
       });
       if ((po.insufficient || []).length > 0) {
         rows.push([]);
-        rows.push([styledCell("Insufficient evidence to grade (coverage below threshold)" + (multi ? ": " + (t.target.name || "") : ""), { bold: true, fill: FILL.sub })]);
+        rows.push([styledCell("Not enough evidence to grade (coverage below threshold)" + (multi ? ": " + (t.target.name || "") : ""), { bold: true, fill: FILL.sub })]);
         (po.insufficient || []).forEach(function (d) {
           rows.push(siteCell.concat([
             "-",
@@ -776,7 +776,7 @@ window.App.ExportXLSX = (function () {
     var multi = sites.length > 1;
     var nouns = targetNouns(scoredAll.instrument);
     var head = (multi ? [nouns.one] : []).concat(["Domain", "Question ID", "Prompt", "Band", "Captured evidence", "Business impact", "Recommended action", "Priority"]).concat(TRACKER_HEAD);
-    var banner = "Improvement roadmap: scored questions below the top band, weakest first, in the consultant's priority order." +
+    var banner = "The improvement roadmap lists the scored questions below the top band, weakest first, in the consultant's priority order." +
       (multi ? " Each " + nouns.one.toLowerCase() + "'s list is numbered on its own." : "");
     var rows = [
       [styledCell(banner, { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
@@ -870,26 +870,26 @@ window.App.ExportXLSX = (function () {
     var rows = [
       [styledCell("Read me", { headerColor: true })],
       [styledCell("Scoring methodology", { bold: true, fill: FILL.sub })],
-      ["This is an indicative posture assessment. It is not a conformance assessment against ISA/IEC 62443 or any other standard, and not a regulatory assessment."],
+      ["This is an indicative posture assessment. It does not assess conformance with ISA/IEC 62443 or any other standard, and it is not a regulatory assessment."],
       [styledCell("Per scored question", { bold: true, fill: FILL.sub })],
-      ["  - Normalised score = band / 3, so 0, 0.33, 0.67, 1.0. Band 0 (Not in place) is the lowest capability score; no state scores below 0."],
-      ["  - The band is set by the consultant; capture fields (text, checklist, choice, boolean) are evidence and never set the score."],
-      ["  - Unknown: excluded from the domain capability mean. Unknown is treated as a visibility finding, not as a known-zero capability, so it does not push the domain mean down (and it never scores below band 0). It does, however, count against coverage and drive a confidence flag."],
-      ["  - Not applicable: excluded from both the score and the coverage denominator (the only state fully discounted)."],
-      ["  - Context-only (scored:false) questions are excluded from grading entirely."],
+      ["  - Normalised score = band / 3, so 0, 0.33, 0.67 or 1.0. Band 0 (Not in place) is the lowest score. No state scores below 0."],
+      ["  - The consultant sets the band. The captured fields (text, checklist, choice, yes/no) are evidence and do not set the score."],
+      ["  - Unknown is left out of the domain mean. It is treated as a gap in visibility, so it does not pull the mean down, but it counts against coverage and sets the confidence flag."],
+      ["  - Not applicable is left out of both the score and the coverage count. It is the only state discounted completely."],
+      ["  - Questions marked as context only are not graded."],
       [styledCell("Per domain", { bold: true, fill: FILL.sub })],
       ["  - Domain score = mean of normalised scores across answered scored questions."],
-      ["  - Domain coverage = answered / scorable (excluding N/A). Tells you how much was attempted."],
-      ["  - Unknown rate = unknown / (unknown + answered). Tells you how much of what was attempted was actually known."],
-      ["  - Confidence flag = High / Moderate / Low based on Unknown rate, with thresholds from the profile."],
-      ["  - Domain grade = letter from the profile's letterBands for the domain score."],
+      ["  - Domain coverage = answered / scorable (excluding N/A). It shows how much of the domain was covered."],
+      ["  - Unknown rate = unknown / (unknown + answered). It shows how much of what was covered could be established."],
+      ["  - Confidence flag = High, Moderate or Low, set from the Unknown rate against the thresholds in the scoring profile."],
+      ["  - Domain grade = the letter band the domain score falls in."],
       [styledCell("Overall", { bold: true, fill: FILL.sub })],
-      ["  - Headline grade = weighted mean of domain scores across domains that meet the coverage threshold, mapped to a letter, then capped to sit at most " + capWords + " above the weakest graded domain on the A>B>C>D>E>F ladder. Domains below the coverage threshold are excluded from both the mean and the cap."],
-      ["  - Coverage below " + thr + "% is reported as indicative (a 'P' marker on the grade), separate from the Confidence flag."],
-      ["  - By design, a single Unknown answer does not move the headline grade. Unknown counts against coverage and confidence, not capability."],
+      ["  - Headline grade = the weighted mean of the domain scores that meet the coverage threshold, converted to a letter. It is then capped at " + capWords + " above the weakest graded domain on the A to F scale. Domains below the coverage threshold count towards neither the mean nor the cap."],
+      ["  - A grade with coverage below " + thr + "% is marked provisional with a 'P'. This is separate from the confidence flag."],
+      ["  - A single Unknown answer does not move the headline grade. Unknown answers lower coverage and confidence only."],
       [styledCell("Working tracker", { bold: true, fill: FILL.sub })],
-      ["  - The Questions register is filterable (autofilter) with the header row frozen."],
-      ["  - Status is a dropdown: Open / In progress / Blocked / Done. Fill in Owner, Target date and Progress note to track remediation in this file after handover."],
+      ["  - The Questions register has filters on every column and a frozen header row."],
+      ["  - Status is a dropdown (Open, In progress, Blocked, Done). Owner, Target date and Progress note can be filled in to track remediation in this file after handover."],
       [""],
       ["Instrument", instrument.title],
       ["Content version", instrument.contentVersion || ""],
@@ -1132,7 +1132,7 @@ window.App.ExportXLSX = (function () {
       .concat(hasLens ? ["OT framing"] : [])
       .concat(["Business impact", "Recommended action", "Priority", "Relevant IEC 62443 guidance"]).concat(TRACKER_HEAD);
     var rows = [
-      [styledCell("Roadmap toward expected outcomes for the " + info.name + " profile: every outcome below expected, in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
+      [styledCell("Roadmap towards the expected outcomes for the " + info.name + " profile. It lists every outcome below expectation, in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
     (scored.roadmap || []).forEach(function (it, i) {
@@ -1171,28 +1171,28 @@ window.App.ExportXLSX = (function () {
     var isBinary = ss.length === 2;
     var disp = instrument.display || {};
     var scopeLine = disp.reportDescription
-      ? (disp.reportDescription + ". This is an alignment and gap analysis, not a formal assessment or a regulatory submission. The judgements here are the consultant's and should be confirmed through the organisation's formal process.")
-      : "NCSC CAF 4.0 alignment and gap analysis. This is not a formal CAF assessment and not a regulatory submission. The judgements here are the consultant's, made against the CAF indicators of good practice and informed by operational technology context, and should be confirmed through the organisation's formal process.";
+      ? (disp.reportDescription + ". This is an alignment and gap analysis. It is not a formal assessment or a regulatory submission. The judgements are the consultant's and should be confirmed through the organisation's formal process.")
+      : "This workbook records an alignment and gap analysis against NCSC CAF 4.0. It is not a formal CAF assessment or a regulatory submission. The consultant made each judgement against the CAF indicators of good practice, taking account of the operational technology context. The judgements should be confirmed through the organisation's formal process.";
     var unitNoun = (disp.outcomesTitle === "Controls") ? "control" : "outcome";
     var profileProse = isBinary
-      ? ("  - This assessment does not produce a single grade. Results are reported as a profile of " + stateSlash + " by objective and " + cafPrincipleNoun(instrument) + ".")
-      : ("  - The CAF is outcome-based; there is no single grade. Results are reported as a profile of " + stateSlash + " by objective and principle.");
+      ? ("  - There is no single grade. Results are reported as a profile of " + stateSlash + " by objective and " + cafPrincipleNoun(instrument) + ".")
+      : ("  - The CAF is outcome-based and gives no single grade. Results are reported as a profile of " + stateSlash + " by objective and principle.");
     var rows = [
       [styledCell("Read me", { headerColor: true })],
       [styledCell("Scope", { bold: true, fill: FILL.sub })],
       [scopeLine],
       [styledCell("Per " + unitNoun, { bold: true, fill: FILL.sub })],
       ["  - The consultant sets one state per " + unitNoun + ": " + stateOr + "."],
-      ["  - Unknown is a coverage signal, not a state. Any " + unitNoun + " that could not be established is marked unknown, which lowers confidence but does not count as a failure."],
-      ["  - N/A drops the " + unitNoun + " from both the score and the coverage denominator."],
+      ["  - Unknown marks a " + unitNoun + " that could not be established. It lowers coverage and confidence and does not count as a failure."],
+      ["  - N/A removes the " + unitNoun + " from both the score and the coverage count."],
       [styledCell("Profile", { bold: true, fill: FILL.sub })],
-      ["  - Selected profile: " + info.name + (info.placeholder ? " (expected states are not available, so meeting and below counts are not reported)" : "")],
-      ["  - Order for comparing actual vs expected: not < partially < achieved. Meeting = actual >= expected."],
+      ["  - Selected profile: " + info.name + (info.placeholder ? ". The profile has no expected states, so meeting and below counts are not reported." : "")],
+      ["  - Actual states are compared with expected states in the order not, partially, achieved. An outcome meets expectation when its actual state is at or above the expected one."],
       [profileProse],
       [styledCell("Working tracker", { bold: true, fill: FILL.sub })],
-      ["  - The Outcomes register is filterable (autofilter) with the header row frozen."],
-      ["  - Status is a dropdown: Open / In progress / Blocked / Done. Fill in Owner, Target date and Progress note to track remediation in this file after handover."],
-      ["  - Relevant IEC 62443 guidance suggests related IEC 62443 requirements (3-3 SRs and 2-1:2024 SPRs), graded by strength, as a guide to remediation. They are not an authoritative equivalence."],
+      ["  - The Outcomes register has filters on every column and a frozen header row."],
+      ["  - Status is a dropdown (Open, In progress, Blocked, Done). Owner, Target date and Progress note can be filled in to track remediation in this file after handover."],
+      ["  - Relevant IEC 62443 guidance suggests related IEC 62443 requirements (3-3 SRs and 2-1:2024 SPRs), graded by strength, to guide remediation. The links are indicative and do not claim the requirements are equivalent."],
       [""],
       ["Instrument", instrument.title],
       ["Content version", instrument.contentVersion || ""],
@@ -1232,7 +1232,7 @@ window.App.ExportXLSX = (function () {
       [styledCell("Date of visit", { bold: true }), e.dateOfVisit],
       [styledCell("Confidentiality", { bold: true }), e.confidentiality],
       [],
-      [styledCell("Program maturity profile (no single grade)", { headerColor: true }), styledCell("", { headerColor: true })],
+      [styledCell("Programme maturity profile", { headerColor: true }), styledCell("", { headerColor: true })],
       [styledCell("Requirements at ML1 / ML2 / ML3 / ML4", { bold: true }), c.ML1 + " / " + c.ML2 + " / " + c.ML3 + " / " + c.ML4],
       [styledCell("Not met (floor findings)", { bold: true }), { v: c.notMet, s: c.notMet > 0 ? { fill: FILL.gap } : undefined }],
       [styledCell("Unknown", { bold: true }), c.unknown],
@@ -1330,7 +1330,7 @@ window.App.ExportXLSX = (function () {
   function mlRoadmapSheet(scored, instrument) {
     var head = ["Code", "Title", "SPE", "Achieved ML", "Target ML", "OT framing", "Captured evidence", "Business impact", "Recommended action", "Priority"].concat(TRACKER_HEAD);
     var rows = [
-      [styledCell("Roadmap - " + (scored.anyTargets ? "requirements below target ML" : "not-met / ML1 requirements") + ", in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
+      [styledCell("Roadmap of " + (scored.anyTargets ? "requirements below their target ML" : "requirements that are not met or at ML1") + ", in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
     (scored.roadmap || []).forEach(function (it, i) {
@@ -1357,19 +1357,19 @@ window.App.ExportXLSX = (function () {
     var rows = [
       [styledCell("Read me", { headerColor: true })],
       [styledCell("Scope", { bold: true, fill: FILL.sub })],
-      [window.App.Report.standardRef(instrument) + " maturity assessment. Maturity levels are set per requirement by the consultant; results are an achieved-ML profile by " + window.App.Report.mlNoun(instrument, "elementNoun") + " and theme."],
+      ["This workbook records a maturity assessment against " + window.App.Report.standardRef(instrument) + ". The consultant set a maturity level for each requirement, and the results are a profile of achieved levels by " + window.App.Report.mlNoun(instrument, "elementNoun") + " and theme."],
       [styledCell("Per requirement", { bold: true, fill: FILL.sub })],
-      ["  - One maturity level per requirement: ML1 Initial, ML2 Managed (documentation begins at ML2), ML3 Defined / Practiced, ML4 Improving. Levels apply independently per requirement."],
-      ["  - Not met = not satisfied at any ML; treated as a floor finding (ranks below ML1)."],
-      ["  - Unknown reduces coverage and confidence (not scored). N/A is excluded from score and coverage."],
-      ["  - Optional target ML per requirement should derive from " + window.App.Report.mlNoun(instrument, "targetSource") + ", not a flat default. Where set, met/below is reported per requirement and per element."],
+      ["  - Each requirement has one maturity level: ML1 Initial, ML2 Managed (documentation begins at ML2), ML3 Defined / Practiced or ML4 Improving. Each requirement is judged on its own."],
+      ["  - Not met means the requirement is not satisfied at any level. It ranks below ML1 and is treated as a floor finding."],
+      ["  - Unknown is not scored and lowers coverage and confidence. N/A is left out of both the score and the coverage count."],
+      ["  - A target ML can be set for each requirement and should come from " + window.App.Report.mlNoun(instrument, "targetSource") + ". Where targets are set, each requirement and element is reported as meeting or below target."],
       [styledCell("Roll-up", { bold: true, fill: FILL.sub })],
-      ["  - No single program grade. Mean ML per element is context only."],
-      ["  - Requirements do not compensate for one another. A not-met or below-target requirement is reported as a floor finding and is never averaged away."],
-      ["  - The coverage threshold and the Unknown confidence flag work the same way as in the posture assessment."],
+      ["  - There is no single programme grade. The mean ML for each element is shown for context."],
+      ["  - A strong requirement does not offset a weak one. A requirement that is not met or below its target is reported as a floor finding and is never averaged."],
+      ["  - The coverage threshold and the confidence flag for Unknown answers work as they do in the posture assessment."],
       [styledCell("Working tracker", { bold: true, fill: FILL.sub })],
-      ["  - The Requirements register is filterable (autofilter) with the header row frozen."],
-      ["  - Status is a dropdown: Open / In progress / Blocked / Done. Fill in Owner, Target date and Progress note to track remediation in this file after handover."],
+      ["  - The Requirements register has filters on every column and a frozen header row."],
+      ["  - Status is a dropdown (Open, In progress, Blocked, Done). Owner, Target date and Progress note can be filled in to track remediation in this file after handover."],
       [""],
       ["Instrument", instrument.title],
       ["Content version", instrument.contentVersion || ""],
@@ -1402,7 +1402,7 @@ window.App.ExportXLSX = (function () {
       [styledCell("Date", { bold: true }), e.dateOfVisit],
       [styledCell("Confidentiality", { bold: true }), e.confidentiality],
       [],
-      [styledCell("Position (a characterisation, not a measurement)", { headerColor: true }), styledCell("", { headerColor: true })],
+      [styledCell("Position (a professional characterisation)", { headerColor: true }), styledCell("", { headerColor: true })],
       // No "from" rows and no baseline comparison: which bands happened to
       // match a scaffold is internal, and printing it would tell the client
       // where the consultant agreed with a default rather than what they found.
@@ -1515,9 +1515,9 @@ window.App.ExportXLSX = (function () {
     function para(text) { if (text) { rows.push([text]); rows.push([]); } }
     para(B.how_to_read);
     rows.push([styledCell("There is no score, percentage or grade in this workbook.", { bold: true })]);
-    rows.push(["Adding one would turn a professional characterisation into a number that invites comparison between organisations, which it cannot support."]);
+    rows.push(["A number would invite comparison between organisations, and a professional characterisation cannot support that."]);
     rows.push([]);
-    rows.push([styledCell(B.not_measurement_caveat_title || "A characterisation, not a measurement", { bold: true })]);
+    rows.push([styledCell(B.not_measurement_caveat_title || "Limits of this characterisation", { bold: true })]);
     para(B.not_measurement_caveat || (instrument.criticalCaveats || [])[0]);
     para(B.series_context);
     para(B.bands_source);
@@ -1561,13 +1561,13 @@ window.App.ExportXLSX = (function () {
       [styledCell("Date", { bold: true }), e.dateOfVisit],
       [styledCell("Confidentiality", { bold: true }), e.confidentiality],
       [],
-      [styledCell("Conformance profile (not a compliance determination)", { headerColor: true }), styledCell("", { headerColor: true })],
+      [styledCell("Conformance profile", { headerColor: true }), styledCell("", { headerColor: true })],
       [styledCell("Achieved / Partially / Not", { bold: true }), c.achieved + " / " + c.partially + " / " + c.not],
       [styledCell("Gaps (Partially + Not)", { bold: true }), { v: scored.overall.gaps, s: scored.overall.gaps > 0 ? { fill: FILL.gap } : undefined }],
       [styledCell("Unknown", { bold: true }), c.unknown],
       [styledCell("Coverage", { bold: true }), N.formatPct(scored.overall.coverage)],
       [styledCell("Confidence", { bold: true }), scored.overall.confidenceLevel || "-"],
-      [styledCell("Conformance (context only, not a pass mark)", { bold: true }), N.formatPct(scored.overall.conformance)]
+      [styledCell("Conformance (for context, no pass mark)", { bold: true }), N.formatPct(scored.overall.conformance)]
     ];
     var ws = aoaSheet(rows);
     ws["!cols"] = [{ wch: 40 }, { wch: 60 }];
@@ -1581,7 +1581,7 @@ window.App.ExportXLSX = (function () {
   function nis2ByAreaSheet(scored, instrument) {
     var head = ["NIS2 area", "Article", "Achieved", "Partially", "Not", "Unknown", "N/A", "Applicable", "Conformance"];
     var rows = [
-      [styledCell("Conformance profile by NIS2 area (live formulas derived from the Obligations sheet)", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
+      [styledCell("Conformance profile by NIS2 area (live formulas on the Obligations sheet)", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
     var lbl = {
@@ -1654,7 +1654,7 @@ window.App.ExportXLSX = (function () {
   function nis2RoadmapSheet(scored, instrument) {
     var head = ["Priority", "Band", "Owner", "Code", "Obligation", "Area", "Article", "State", "Captured evidence", "Business impact", "Recommended action", "Relevant IEC 62443 guidance", "Status", "Target date", "Progress note"];
     var rows = [
-      [styledCell("Gap roadmap: every Partially or Not Achieved obligation, in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
+      [styledCell("The gap roadmap lists every obligation that is Partially or Not Achieved, in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
     (scored.roadmap || []).forEach(function (it, i) {
@@ -1689,22 +1689,22 @@ window.App.ExportXLSX = (function () {
     // suggestions that are not there.
     var anyXref = ((scored && scored.perItem) || []).some(function (it) { return nis2XrefCell(it) !== ""; });
     var xrefLine = anyXref
-      ? "  - Relevant IEC 62443 guidance suggests related requirements in IEC 62443 (3-3 SRs and 2-1:2024 SPRs), grouped by strength (direct / partial / contextual), as a guide to remediation. They are not an authoritative equivalence."
-      : "  - Relevant IEC 62443 guidance is left blank here. The related IEC 62443 requirements are mapped to individual NIS2 obligations, and this check groups the obligations by measure, so none is suggested at this level.";
+      ? "  - Relevant IEC 62443 guidance suggests related requirements in IEC 62443 (3-3 SRs and 2-1:2024 SPRs), grouped as direct, partial or contextual, to guide remediation. The links are indicative and do not claim the requirements are equivalent."
+      : "  - Relevant IEC 62443 guidance is left blank here. IEC 62443 requirements are mapped to individual NIS2 obligations, and this quick check groups the obligations by measure, so no mapping applies at this level.";
     var rows = [
       [styledCell("Read me", { headerColor: true })],
       [styledCell("Scope", { bold: true, fill: FILL.sub })],
-      ["EU NIS2 conformance and gap analysis against Directive (EU) 2022/2555 (Articles 20, 21 and 23). Each obligation is judged Achieved / Partially Achieved / Not Achieved by the consultant."],
-      [styledCell("Not a compliance determination", { bold: true, fill: FILL.sub })],
-      ["This is a readiness gap analysis. It is not a determination of legal compliance with NIS2 or with the national law that transposes it; confirm scope against the applicable national transposition."],
+      ["This workbook records a conformance and gap analysis against the EU NIS2 Directive, Directive (EU) 2022/2555 (Articles 20, 21 and 23). The consultant judged each obligation as Achieved, Partially Achieved or Not Achieved."],
+      [styledCell("Legal compliance", { bold: true, fill: FILL.sub })],
+      ["This is a readiness gap analysis. It does not determine legal compliance with NIS2 or with the national law that transposes it. Scope should be confirmed against the applicable national transposition."],
       [styledCell("Scoring", { bold: true, fill: FILL.sub })],
-      ["  - Target is full conformance: every applicable obligation is expected to be Achieved. Gaps are every Partially or Not Achieved obligation."],
-      ["  - Unknown reduces coverage and lowers confidence; Not applicable is excluded from score and coverage."],
-      ["  - No single grade or pass mark. The conformance percentage is shown for context only."],
+      ["  - The target is full conformance, so every applicable obligation is expected to be Achieved. Every obligation that is Partially or Not Achieved is a gap."],
+      ["  - Unknown lowers coverage and confidence. Not applicable is left out of both the score and the coverage count."],
+      ["  - There is no single grade or pass mark. The conformance percentage is shown for context."],
       [styledCell("Working tracker", { bold: true, fill: FILL.sub })],
-      ["  - The Obligations and Gap roadmap sheets are filterable (autofilter) with the header row frozen."],
-      ["  - By area counts and conformance % are live formulas derived from the Obligations sheet, so correcting a State there updates them."],
-      ["  - Status is a dropdown: Open / In progress / Blocked / Done. Fill in Owner, Target date and Progress note to track remediation in this file after handover."],
+      ["  - The Obligations and Gap roadmap sheets have filters on every column and a frozen header row."],
+      ["  - The counts and conformance percentages on the By area sheet are live formulas on the Obligations sheet, so correcting a State there updates them."],
+      ["  - Status is a dropdown (Open, In progress, Blocked, Done). Owner, Target date and Progress note can be filled in to track remediation in this file after handover."],
       [xrefLine],
       [""],
       ["Instrument", instrument.title],
@@ -1753,7 +1753,7 @@ window.App.ExportXLSX = (function () {
     // Front sheet.
     var front = [];
     front.push([styledCell(instrument.title, { bold: true })]);
-    front.push([styledCell(dpk.xlsxTitle || "EU Cyber Resilience Act: indicative gap assessment (not a conformity assessment or certification)", { fill: FILL.sub })]);
+    front.push([styledCell(dpk.xlsxTitle || "EU Cyber Resilience Act: indicative gap assessment", { fill: FILL.sub })]);
     front.push([]);
     var cls = scored.classification || {};
     front.push([styledCell("Client", { bold: true }), e.clientName || ""]);
@@ -1769,7 +1769,7 @@ window.App.ExportXLSX = (function () {
       front.push([cls.misclassificationNote || ""]);
       front.push([]);
     }
-    front.push([styledCell("Positions (each layer scored independently, never blended)", { bold: true, fill: FILL.sub })]);
+    front.push([styledCell("Position of each layer (scored separately and never combined)", { bold: true, fill: FILL.sub })]);
     front.push(headerRow(["Layer", "In place", "Partially", "Not in place", "Unknown", "N/A", "Applicable", "Conformance"]));
     (scored.layers || []).forEach(function (l) {
       var c = l.overall.counts;
@@ -1807,7 +1807,7 @@ window.App.ExportXLSX = (function () {
     if ((scored.roadmap || []).length) {
       var roadHead = ["Priority", "Band", "Owner", "Layer", "Code", "Requirement", "State", "Captured evidence", "Business impact", "Recommended action", "Status", "Target date", "Progress note"];
       var road = [
-        [styledCell("Conformance gap roadmap: every Not in place or Partially in place requirement across the layers in scope, in the consultant's priority order.", { headerColor: true })].concat(Array(roadHead.length - 1).fill(styledCell("", { headerColor: true }))),
+        [styledCell("The conformance gap roadmap lists every requirement Not in place or Partially in place across the layers in scope, in the consultant's priority order.", { headerColor: true })].concat(Array(roadHead.length - 1).fill(styledCell("", { headerColor: true }))),
         headerRow(roadHead)
       ];
       scored.roadmap.forEach(function (it, i) {
@@ -1836,13 +1836,13 @@ window.App.ExportXLSX = (function () {
 
     // Read me.
     var readmeLines = dpk.xlsxReadMe || [
-      "Three layers (P1 product, P2 vulnerability handling, P3 conformity) are each scored independently against the CRA and presented side by side. They are never blended into one CRA score.",
-      "Out-of-scope layers are omitted entirely. This is an indicative assessment, not a conformity assessment or certification; no harmonised CRA standard is yet cited, so a 62443 certificate does not equal CRA conformity."
+      "The three layers (P1 product, P2 vulnerability handling and P3 conformity) are scored separately against the CRA and shown side by side. They are never combined into one CRA score.",
+      "Layers outside the scope are omitted. This is an indicative assessment and is not a conformity assessment or certification. No harmonised CRA standard is cited yet, so a 62443 certificate does not by itself show CRA conformity."
     ];
     var readme = [
-      [styledCell(((disp.shortName ? "EU " + disp.shortName.replace(/^EU /, "") + " Regulation" : "EU CRA")) + " gap assessment: read me", { bold: true })],
+      [styledCell(((disp.shortName ? "EU " + disp.shortName.replace(/^EU /, "") + " Regulation" : "EU CRA")) + " gap assessment: how to read this workbook", { bold: true })],
       [readmeLines[0]],
-      ["Each requirement is judged In place / Partially in place / Not in place, or Unknown / N/A. The conformance percentage is context only, not a pass mark."]
+      ["Each requirement is judged In place, Partially in place or Not in place, or marked Unknown or N/A. The conformance percentage is shown for context and is not a pass mark."]
     ];
     readmeLines.slice(1).forEach(function (l) { readme.push([l]); });
     XLSX.utils.book_append_sheet(wb, aoaSheet(readme), "Read me");
@@ -1867,7 +1867,7 @@ window.App.ExportXLSX = (function () {
       [styledCell("Date", { bold: true }), e.dateOfVisit],
       [styledCell("Confidentiality", { bold: true }), e.confidentiality],
       [],
-      [styledCell("Conformance profile (not a certification)", { headerColor: true }), styledCell("", { headerColor: true })],
+      [styledCell("Conformance profile", { headerColor: true }), styledCell("", { headerColor: true })],
       [styledCell("In place / Largely / Partially / Not in place", { bold: true }), c.inPlace + " / " + c.largely + " / " + c.partially + " / " + c.notInPlace],
       [styledCell("Gaps (Not in place + Partially)", { bold: true }), { v: scored.overall.gaps, s: scored.overall.gaps > 0 ? { fill: FILL.gap } : undefined }],
       [styledCell("Unknown", { bold: true }), c.unknown],
@@ -1934,7 +1934,7 @@ window.App.ExportXLSX = (function () {
   function csmsRoadmapSheet(scored) {
     var head = ["Priority", "Band", "Owner", "Code", "Element", "Category", "Group", "State", "Captured evidence", "Business impact", "Recommended action", "Status", "Target date", "Progress note"];
     var rows = [
-      [styledCell("Conformance gap roadmap: every Not in place or Partially in place element, Not-in-place first, in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
+      [styledCell("The conformance gap roadmap lists every element Not in place or Partially in place, with Not in place first, in the consultant's priority order.", { headerColor: true })].concat(Array(head.length - 1).fill(styledCell("", { headerColor: true }))),
       headerRow(head)
     ];
     (scored.roadmap || []).forEach(function (it, i) {
@@ -1965,14 +1965,14 @@ window.App.ExportXLSX = (function () {
     var rows = [
       [styledCell("Read me", { headerColor: true })],
       [styledCell("Scope", { bold: true, fill: FILL.sub })],
-      ["ISA/IEC 62443-2-1:2010 CSMS conformance and gap analysis. Each element is judged Not in place / Partially in place / Largely in place / In place by the consultant. It is not a certification. The 2024 edition is assessed separately, as a maturity assessment."],
+      ["This workbook records a conformance and gap analysis of the cyber security management system against ISA/IEC 62443-2-1:2010. The consultant judged each element as Not in place, Partially in place, Largely in place or In place. The review does not certify the system. The 2024 edition is assessed separately, as a maturity assessment."],
       [styledCell("Sheets", { bold: true, fill: FILL.sub })],
-      ["Front: engagement and conformance summary."],
-      ["By category / By group: conformance profile (counts at each state, with a context-only conformance index)."],
-      ["Elements: the working register; State is colour-coded; Status has a dropdown (Open / In progress / Blocked / Done) and tracking columns to manage remediation."],
-      ["Gap roadmap: every Not in place or Partially in place element with owner, business impact and recommended action."],
+      ["Front", "The engagement details and the conformance summary."],
+      ["By category, By group", "The conformance profile: the count at each state, with a conformance index for context."],
+      ["Elements", "The working register. State is colour-coded, and Status has a dropdown (Open, In progress, Blocked, Done) with tracking columns for remediation."],
+      ["Gap roadmap", "Every element Not in place or Partially in place, with owner, business impact and recommended action."],
       [styledCell("Notes", { bold: true, fill: FILL.sub })],
-      ["No single CSMS grade is produced. The conformance index is for context only. Unknown reduces coverage and lowers confidence; Not applicable elements are excluded. A Not-in-place element is a floor finding."]
+      ["There is no single CSMS grade, and the conformance index is shown for context. Unknown lowers coverage and confidence. Elements marked Not applicable are left out. An element Not in place is a floor finding."]
     ];
     var ws = aoaSheet(rows);
     ws["!cols"] = [{ wch: 26 }, { wch: 100 }];
@@ -2196,7 +2196,7 @@ window.App.ExportXLSX = (function () {
       rows.push(["Note", "This comparison covers " + p.targetName + " only. The other " + scope.nounP.toLowerCase() + " in this workbook are not compared here."]);
     }
     if (p.versionMismatch) {
-      rows.push(["Note", "Baseline scored against content version " + p.baselineContentVersion + "; current version is " + p.currentContentVersion + ". Renamed or removed items compare as not assessed."]);
+      rows.push(["Note", "The baseline was scored against content version " + p.baselineContentVersion + " and the current version is " + p.currentContentVersion + ". Items renamed or removed since then compare as not assessed."]);
     }
     rows.push([]);
     rows.push(["Improved", s.improved || 0]);
@@ -2233,7 +2233,7 @@ window.App.ExportXLSX = (function () {
       });
     }
     rows.push([]);
-    rows.push(["The previous responses are re-scored against the current instrument content and targets so both visits are compared on the same yardstick."]);
+    rows.push(["The previous responses are re-scored against the current content and targets, so both visits are measured the same way."]);
     return aoaSheet(rows);
   }
 
@@ -2362,9 +2362,9 @@ window.App.ExportXLSX = (function () {
       [styledCell("Differing between " + nounP.toLowerCase(), { bold: true }), s.differing],
       [styledCell("Not assessed everywhere", { bold: true }), s.withUnscoredSites],
       [],
-      [styledCell("Rule: the organisation-wide result for a requirement is the result at its weakest " +
-        noun.toLowerCase() + ". No averaging, majority or compensation between " + nounP.toLowerCase() +
-        "; a strong " + noun.toLowerCase() + " never offsets a weak one.", { fill: FILL.sub })]
+      [styledCell("The organisation-wide result for a requirement is the result at its weakest " +
+        noun.toLowerCase() + ". Results are not averaged between " + nounP.toLowerCase() +
+        ", and a strong " + noun.toLowerCase() + " never offsets a weak one.", { fill: FILL.sub })]
     ];
     XLSX.utils.book_append_sheet(wb, aoaSheet(front), "Front");
 
@@ -2406,14 +2406,14 @@ window.App.ExportXLSX = (function () {
 
     // Read me.
     var readme = [
-      [styledCell("Organisation-wide roll-up: read me", { bold: true })],
+      [styledCell("How to read the organisation-wide roll-up", { bold: true })],
       [""],
       ["Each " + noun.toLowerCase() + " is assessed separately. The organisation-wide result for a requirement is the result at the weakest " + noun.toLowerCase() + " that was assessed."],
-      ["No averaging, majority or compensation is applied between " + nounP.toLowerCase() + ". Averaging would report a comfortable figure for an organisation carrying a serious gap at one " + noun.toLowerCase() + "."],
-      ["A requirement not assessed at a " + noun.toLowerCase() + " is listed under 'Not assessed at' and is never treated as met. Unknown answers reduce confidence the same way."],
-      ["This workbook is the cross-" + noun.toLowerCase() + " picture only. Evidence, recommended actions and owners are recorded per " + noun.toLowerCase() + " and appear in each " + noun.toLowerCase() + "'s own workbook."],
+      ["Results are not averaged between " + nounP.toLowerCase() + ", and a strong " + noun.toLowerCase() + " does not offset a weak one. An average would hide a serious gap at a single " + noun.toLowerCase() + "."],
+      ["A requirement not assessed at a " + noun.toLowerCase() + " is listed under 'Not assessed at' and is never treated as met. Unknown answers lower confidence in the same way."],
+      ["This workbook compares the " + nounP.toLowerCase() + " only. Evidence, recommended actions and owners are recorded in each " + noun.toLowerCase() + "'s own workbook."],
       [""],
-      ["Indicative assessment. It is not a certification or a statement of conformance."]
+      ["This is an indicative assessment. It is not a certification or a statement of conformance."]
     ];
     XLSX.utils.book_append_sheet(wb, aoaSheet(readme), "Read me");
     return wb;

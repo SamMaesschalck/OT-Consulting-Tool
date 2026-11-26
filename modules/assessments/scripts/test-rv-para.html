@@ -171,7 +171,7 @@ H.test(function (ok, done) {
     var row = rewordedRow(ES);
     ok(!!row && row.getAttribute("data-reworded-state") === "changed" && /No longer applies: the text it replaced has changed\./.test(row.textContent), "the report page says it no longer applies", row && row.textContent);
     var w = lostWarnings();
-    ok(w.length === 1 && /^1 accepted rewording is not in the Word report: the text it replaced has changed\.$/.test(w[0].text) && /warn/.test(w[0].cls) && !/[–—]/.test(w[0].text), "the Issue check warns once", JSON.stringify(w));
+    ok(w.length === 1 && /^1 accepted rewording is not in the Word report\. The text it replaced has changed\.$/.test(w[0].text) && /warn/.test(w[0].cls) && !/[–—]/.test(w[0].text), "the Issue check warns once", JSON.stringify(w));
     ok(I.blockerLines(I.last() && I.last().list || []).every(function (l) { return !/reword/i.test(l.text); }), "as a warning, never among the blockers");
     showAll();
     var card = main.querySelector('[data-comment-id="' + x.t1.comment.id + '"]');
@@ -191,7 +191,7 @@ H.test(function (ok, done) {
   });
   step(function () {
     var w = lostWarnings();
-    ok(w.length === 1 && /^2 accepted rewordings are not in the Word report: the text they replaced has changed\.$/.test(w[0].text), "two that do not apply are still one line, with the count", JSON.stringify(w));
+    ok(w.length === 1 && /^2 accepted rewordings are not in the Word report\. The text they replaced has changed\.$/.test(w[0].text), "two that do not apply are still one line, with the count", JSON.stringify(w));
     // Undo on one that does not apply just takes its replacement out.
     return undoIt(x.t2);
   });

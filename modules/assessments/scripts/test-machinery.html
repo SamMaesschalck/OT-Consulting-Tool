@@ -149,7 +149,7 @@ window.docx = (function () {
 
     A.UI.go("cra-layer", "M2");
     t = main().textContent;
-    check("M2 page: no machine switcher, machinery banner, org wording", !main().querySelector(".sites-bar") && t.indexOf("Regulation (EU) 2023/1230") !== -1 && t.indexOf("one answer set for all machines") !== -1);
+    check("M2 page: no machine switcher, machinery banner, org wording", !main().querySelector(".sites-bar") && t.indexOf("Regulation (EU) 2023/1230") !== -1 && t.indexOf("answered once for all machines") !== -1);
 
     A.UI.go("cra-layer", "M3");
     t = main().textContent;

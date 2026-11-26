@@ -29,8 +29,8 @@ window.App.Tour41 = (function () {
   var reportNarrative = {
     nextSteps:
       "Agree an owner and a target date for each priority in the roadmap above\nPilot the independent security testing changes (SVV3 to SVV5) on the next product release\nDocument the threat model for one product line and use it as the template for the rest\nRe-assess against 62443-4-1 in twelve months to confirm the verification gaps have closed",
-    regulatoryExposure: "Meridian Control Systems is a product developer (supplier), so this assesses its secure development lifecycle, not an operator's environment. The programme is reasonably mature in security management and requirements but weakest in verification and validation: vulnerability and penetration testing are not performed, and security testing is not independent of development. For a supplier whose products run in OT, those gaps mean exploitable weaknesses can ship undetected and reach the asset owners who deploy them; they are also what a 62443-4-1 assessment would focus on first.",
-    topPriorities: "The most urgent priorities are introducing vulnerability and penetration testing into the release process (SVV3, SVV4) and making security testing independent of development (SVV5), so weaknesses are caught before products ship. Establishing a documented, repeatable threat model (SR2) underpins both, because it is what tells the testing what to look for."
+    regulatoryExposure: "Meridian Control Systems develops products for OT, so this assessment covers its secure development lifecycle and does not look at any operator's environment. The programme is reasonably mature in security management and requirements. It is weakest in verification and validation, where no vulnerability or penetration testing is done and security testing is not independent of development. For a supplier whose products run in OT, those gaps let exploitable weaknesses ship undetected to the asset owners who deploy them. They are also where a 62443-4-1 assessment would look first.",
+    topPriorities: "The most urgent priorities are adding vulnerability and penetration testing to the release process (SVV3, SVV4) and making security testing independent of development (SVV5), so that weaknesses are caught before products ship. A documented, repeatable threat model (SR2) supports both, because it tells the testers what to look for."
   };
 
   // { id, ml, ev } / { id, ml, ev, rem } / { id, unknown:true, note }
@@ -87,7 +87,7 @@ window.App.Tour41 = (function () {
     { id: "SVV2", ml: "ML1", ev: "Testing that specific threats are mitigated is ad hoc and not tied to the threat model.",
       rem: { rank: 5, band: "Medium", owner: "Product Security Team",
         action: "Derive threat-mitigation test cases from the threat model and run them each release.",
-        impact: "Mitigations are assumed effective rather than demonstrated, leaving claimed protections unverified." } },
+        impact: "Mitigations are assumed to work and have never been shown to, so the claimed protections are unverified." } },
     { id: "SVV3", ml: "not-met", ev: "Vulnerability testing (fuzzing, known-vulnerability scanning) is not part of the release process.",
       rem: { rank: 2, band: "High", owner: "Product Security Team",
         action: "Add vulnerability testing (fuzzing, dependency / known-CVE scanning) to the verification pipeline.",
@@ -95,7 +95,7 @@ window.App.Tour41 = (function () {
     { id: "SVV4", ml: "not-met", ev: "No penetration testing is performed against released products.",
       rem: { rank: 1, band: "High", owner: "Product Security Team",
         action: "Introduce regular penetration testing of products by suitably skilled, independent testers before release.",
-        impact: "Without adversarial testing, exploitable weaknesses ship to customers and surface as field vulnerabilities." } },
+        impact: "Without adversarial testing, exploitable weaknesses ship to customers and turn up as field vulnerabilities." } },
     { id: "SVV5", ml: "ML1", ev: "Security testing is performed by the same engineers who wrote the code.",
       rem: { rank: 4, band: "High", owner: "Head of Engineering",
         action: "Ensure security testing is done by testers sufficiently independent of the developers.",

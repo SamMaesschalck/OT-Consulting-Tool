@@ -200,7 +200,7 @@ window.docx = (function () {
     section("Acceptance 4 - Roadmap is a structured per-requirement scaffold");
     check("Roadmap section is present", allText.indexOf("Roadmap to the target Security Level") !== -1);
     check("Roadmap explains the weakest-link rule",
-      /the achieved level is set by the weakest/.test(allText));
+      /achieved level of a Foundational Requirement is set by its weakest/.test(allText));
     check("Roadmap entries carry the standard field set",
       /What target SL 2 requires/.test(allText) && /Captured evidence/.test(allText) &&
       /Recommended action/.test(allText) && /Owner/.test(allText));

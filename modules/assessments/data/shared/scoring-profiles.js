@@ -336,12 +336,12 @@ window.App.Data.shared.scoringProfiles = window.App.Data.shared.scoringProfiles 
             "high",
             "severe"
           ],
-          "meaning": "What the organisation faces because of what it does and where it sits: its sector, how critical it is, the threat and geopolitical context, its regulatory obligations and how connected it is to others. Little of it is a matter of choice.",
+          "meaning": "The exposure the organisation faces because of what it does and where it sits. That covers its sector, how critical it is, the threat and geopolitical context, its regulatory obligations and how connected it is to others. Little of it is a matter of choice.",
           "bandDefinitions": {
-            "limited": "Low criticality, little geopolitical or targeted-threat interest, limited interconnection or regulatory weight. Consequence of compromise is contained.",
-            "moderate": "Some criticality or regulated status; exposed to commodity threats and opportunistic attack; consequence meaningful but not systemic.",
-            "high": "Significant criticality (essential service, safety-relevant OT), plausible targeted interest, notable regulatory exposure; compromise has serious operational or safety consequence.",
-            "severe": "Critical national infrastructure or equivalent, credible state-level or advanced-actor targeting, safety-critical consequence, heavy regulatory obligation. Compromise is systemic or life-safety."
+            "limited": "The organisation has low criticality and attracts little geopolitical or targeted interest. It has limited connections to others and light regulation. The consequence of a compromise is contained.",
+            "moderate": "The organisation has some criticality or regulated status and is exposed to commodity threats and opportunistic attack. A compromise would matter but would not spread beyond it.",
+            "high": "The organisation is significantly critical, for example an essential service or a site with safety-relevant OT. Targeted interest is plausible and regulatory exposure is notable. A compromise would have serious operational or safety consequences.",
+            "severe": "The organisation is critical national infrastructure or equivalent, and credible state-level or advanced attackers may target it. A compromise could affect safety of life or spread beyond the organisation, and regulatory obligations are heavy."
           }
         },
         "appetite": {
@@ -354,20 +354,20 @@ window.App.Data.shared.scoringProfiles = window.App.Data.shared.scoringProfiles 
             "open",
             "tolerant"
           ],
-          "meaning": "How much cyber risk the organisation appears willing to accept, revealed through investment, remediation urgency, governance attention and what it consciously tolerates. This is a matter of posture and choice, and no band is good or bad in itself: it is judged only against exposure.",
+          "meaning": "How much cyber risk the organisation appears willing to accept, as shown by its investment, how urgently it remediates, the attention governance gives it and what it knowingly tolerates. This is a matter of posture and choice. No band is good or bad in itself, and each is judged only against exposure.",
           "bandDefinitions": {
-            "averse": "Strong aversion to accepting cyber risk: heavy investment, fast remediation, board-level attention, low tolerance for unmitigated findings.",
-            "cautious": "Prefers to reduce risk where practical; reasonable investment and remediation; accepts residual risk deliberately and documents it.",
-            "open": "Accepts a fair degree of risk for cost or operational convenience; slower remediation; security competes with other priorities.",
-            "tolerant": "Accepts substantial cyber risk, often implicitly; low investment, slow or ad hoc remediation, limited governance attention; much risk accepted without conscious decision."
+            "averse": "The organisation is strongly averse to cyber risk. It invests heavily, remediates quickly, gives the subject board-level attention and tolerates few unmitigated findings.",
+            "cautious": "The organisation reduces risk where practical, with reasonable investment and remediation. It accepts residual risk deliberately and documents it.",
+            "open": "The organisation accepts a fair degree of risk for cost or operational convenience. Remediation is slower and security competes with other priorities.",
+            "tolerant": "The organisation accepts substantial cyber risk, often without saying so. Investment is low, remediation is slow or ad hoc and governance gives it little attention. Much of the risk is accepted without anyone deciding to accept it."
           }
         }
       },
       "coherenceRead": {
         "method": "Place exposure and appetite each on their 4-band scale (ordinal 1-4). The appetite an exposure WARRANTS is its mirror: the more an organisation faces, the less it should be willing to accept. On a 4-band scale severe exposure warrants an averse appetite, high warrants cautious, moderate warrants open, limited can carry tolerant - so warrantedAppetiteRank = (bands + 1) - exposureRank. Coherence is the distance from that mirror line: delta = appetiteRank - warrantedAppetiteRank = appetiteRank + exposureRank - (bands + 1). Read as fit, never as a grade. A nuclear station or CNI operator faces severe exposure and is ALIGNED when its appetite is correspondingly low; it is under-protected when its appetite is not. NOTE: this replaces an earlier wording of 'appetite rank minus exposure rank', which contradicted the band definitions and both worked examples below and would have scored severe exposure with a tolerant appetite as aligned - the exact finding this instrument exists to surface.",
-        "aligned": "Appetite broadly matches what the exposure warrants (within one band of the mirror line). The posture is coherent: the organisation accepts risk roughly in line with what it faces. Coherent does not mean 'good': a severe-exposure organisation that is appropriately averse is aligned, and so is a limited-exposure organisation that is tolerant.",
-        "under-protected": "Appetite is more tolerant than exposure warrants (2+ bands past the mirror line, i.e. accepting materially more risk than the profile justifies). This is the most common and most important finding: risk accepted without conscious decision. Named worst-first in the report.",
-        "over-invested": "Appetite is more averse than exposure requires (2+ bands the other side of the mirror line). Possibly spending or constraining operations beyond what the risk justifies. Worth surfacing, though far less serious than under-protection."
+        "aligned": "Appetite is within one band of what the exposure warrants, so the organisation accepts risk roughly in line with what it faces. Alignment says nothing about whether the position is good. An organisation with severe exposure and an averse appetite is aligned, and so is one with limited exposure and a tolerant appetite.",
+        "under-protected": "Appetite is two or more bands more tolerant than the exposure warrants, so the organisation is accepting materially more risk than its profile justifies. This is the most common finding and the most serious one, because the risk is usually carried without anyone deciding to carry it.",
+        "over-invested": "Appetite is two or more bands more averse than the exposure requires. The organisation may be spending more, or constraining operations more, than the risk justifies. This is worth raising, but it is far less serious than under-protection."
       },
     "assessorOverride": {
         "_principle": "The band arithmetic is a scaffold, not the finding. The consultant has the FINAL say on whether an appetite is appropriate to the risks faced: there are circumstances a four-by-four grid cannot see - a compensating parent-group control, an imminent divestment, a site mid-migration, a regulator-agreed trajectory, a genuine and deliberate board decision to carry a risk with eyes open.",

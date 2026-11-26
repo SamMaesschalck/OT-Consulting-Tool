@@ -35,7 +35,7 @@ window.App.TourCAF = (function () {
     regulatoryExposure:
       "Northbridge operates the gas-distribution control function as an essential service, so cyber resilience is in scope of UK NIS oversight for the downstream gas sector, where assessment is made against the CAF. This report uses the General CAF profile as a readiness baseline because the authoritative regulator profile for the sector was not available for this assessment. The concentration of Not Achieved outcomes under Objective C (detecting cyber security events) is the most likely focus of a regulator's assessment, because it bears directly on the ability to recognise an attack on the control environment before it affects supply or safety.",
     topPriorities:
-      "The two most urgent priorities are establishing security monitoring across the OT network (C1.a), so that an intrusion in the control environment can be detected, and standing up an OT-aware vulnerability management process (B4.d), so that known weaknesses in PLCs, HMIs and engineering workstations are tracked and risk-managed rather than left unmanaged. Both are prerequisites for meaningful detection and response, and both are achievable within the next two quarters."
+      "The two most urgent priorities are security monitoring across the OT network (C1.a), so that an intrusion in the control environment can be detected, and an OT-aware vulnerability management process (B4.d), so that known weaknesses in PLCs, HMIs and engineering workstations are tracked and their risk managed. Detection and response depend on both, and both can be in place within the next two quarters."
   };
 
   // One row per outcome. Shape:
@@ -50,7 +50,7 @@ window.App.TourCAF = (function () {
     { id: "A1.b", state: "achieved",
       ev: "A dedicated OT Security Lead was appointed in 2024 with a documented RACI spanning plant engineering, IT security and operations; OT cyber responsibilities are clear and understood." },
     { id: "A1.c", state: "partially",
-      ev: "OT cyber risk is presented to the board but is not yet consistently reflected in capital planning; remediation funding is decided case by case rather than through a standing, risk-informed budget.",
+      ev: "OT cyber risk is presented to the board but is not yet consistently reflected in capital planning; remediation funding is decided case by case, with no standing budget set from the risk.",
       rem: { rank: 21, band: "Low", owner: "CISO",
         action: "Establish a standing, risk-informed OT cyber budget line and decision gate so board-level OT risk translates into funded action.",
         impact: "OT risks are acknowledged but not reliably resourced, so remediation stalls between assessment and delivery." } },
@@ -77,7 +77,7 @@ window.App.TourCAF = (function () {
         action: "Introduce OT supplier security requirements (assessment, remote-access controls, vulnerability disclosure, incident notification) into contracts and onboarding for integrators and maintainers.",
         impact: "Third parties with privileged remote access are a primary OT attack path; unmanaged supplier risk directly exposes the control environment." } },
     { id: "A4.b", state: "unknown",
-      note: "The control applications are vendor-supplied; the vendors' secure development and support arrangements have not been established and could not be evidenced during this assessment. Marked unknown pending vendor responses: it reduces confidence rather than counting as a failure." },
+      note: "The control applications are supplied by vendors, and their secure development and support arrangements could not be evidenced during this assessment. The outcome is marked unknown until the vendors respond, which lowers confidence without counting as a failure." },
 
     // ---- B  Protecting against cyber attack ----------------------------
     { id: "B1.a", state: "achieved",
@@ -107,7 +107,7 @@ window.App.TourCAF = (function () {
     { id: "B3.a", state: "achieved",
       ev: "Operational and safety-relevant data flows are documented; the data that matters to the essential function is identified and owned." },
     { id: "B3.b", state: "partially",
-      ev: "Enterprise traffic is encrypted; legacy OT protocols traverse the control network unencrypted by design, with segmentation as the main protection.",
+      ev: "Enterprise traffic is encrypted; legacy OT protocols have no encryption and cross the control network in clear, with segmentation as the main protection.",
       rem: { rank: 16, band: "Medium", owner: "Controls Engineering Team",
         action: "Where the protocol and devices allow, enable encrypted/authenticated transport; elsewhere strengthen segmentation and monitoring as the compensating control and document the residual risk.",
         impact: "Unencrypted control traffic can be read or manipulated by an attacker who reaches the OT network, affecting process integrity." } },
@@ -155,7 +155,7 @@ window.App.TourCAF = (function () {
     { id: "C1.a", state: "not",
       ev: "There is no security monitoring of the OT network; logging is limited to local device logs and there is no visibility of east-west traffic in the control environment.",
       rem: { rank: 1, band: "High", owner: "SOC Manager",
-        action: "Deploy passive, ICS-aware OT network monitoring (span/tap-based sensors) to baseline normal traffic and surface anomalies into a monitored queue.",
+        action: "Deploy passive, ICS-aware OT network monitoring (span/tap-based sensors) to baseline normal traffic and send anomalies to a monitored queue.",
         impact: "With no visibility of the control network, an intrusion or process-manipulation attack could progress undetected until it affects supply or safety." } },
     { id: "C1.b", state: "partially",
       ev: "IT logs are forwarded to the SIEM and retained; OT device logs are stored locally with short retention and are not centrally collected or protected.",
@@ -165,8 +165,8 @@ window.App.TourCAF = (function () {
     { id: "C1.c", state: "not",
       ev: "No security alerting exists for the OT environment; there are no detection use cases or alert rules for control-system events.",
       rem: { rank: 4, band: "High", owner: "SOC Manager",
-        action: "Once OT monitoring and logging are in place, build prioritised OT detection use cases (unauthorised connections, new devices, controller mode changes) that generate actionable alerts.",
-        impact: "Even where data exists, the absence of alerting means malicious activity is not surfaced to anyone who can act on it." } },
+        action: "Once OT monitoring and logging are in place, build prioritised OT detection use cases (unauthorised connections, new devices, controller mode changes) that raise alerts someone can act on.",
+        impact: "Even where data exists, the absence of alerting means malicious activity is not brought to anyone who can act on it." } },
     { id: "C1.d", state: "not",
       ev: "There is no defined triage process or ownership for OT security alerts; the IT SOC's remit does not currently extend to the control environment.",
       rem: { rank: 5, band: "High", owner: "SOC Manager",
@@ -178,7 +178,7 @@ window.App.TourCAF = (function () {
         action: "Build OT detection capability through training and a joint SOC/engineering working model so alerts are understood in process context.",
         impact: "OT alerts read without process context are missed or cause unsafe over-reaction; the skills gap blocks effective detection." } },
     { id: "C1.f", state: "unknown",
-      note: "Whether user and system behaviour is understood well enough to detect deviations could not be established, because there is no monitoring baseline yet to judge it against. Marked unknown: it reduces confidence and depends on the monitoring work under C1.a." },
+      note: "Whether user and system behaviour is understood well enough to detect deviations could not be established, because there is no monitoring baseline yet to judge it against. The outcome is marked unknown, which lowers confidence, and it depends on the monitoring work under C1.a." },
     { id: "C2.a", state: "not",
       ev: "No proactive threat hunting is performed in the OT environment.",
       rem: { rank: 7, band: "High", owner: "SOC Manager",
@@ -219,7 +219,7 @@ window.App.TourCAF = (function () {
       { id: "A1.a", state: "partially",
         ev: "Cyber risk reached the board only through the IT report; control-system and safety-related risk was not separately visible." },
       { id: "A1.b", state: "not",
-        ev: "No named owner for OT cyber security; responsibilities were assumed rather than assigned." },
+        ev: "Nobody is named as owner of OT cyber security, and the responsibilities have been assumed without ever being assigned." },
       { id: "A2.a", state: "partially",
         ev: "Enterprise risk management covered IT; control-system scenarios were not part of the methodology." },
       { id: "B1.a", state: "partially",

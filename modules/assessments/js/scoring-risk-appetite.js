@@ -274,7 +274,7 @@ window.App.ScoringRiskAppetite = (function () {
         label: "Not yet characterised",
         delta: null,
         severity: 0,
-        explanation: "Both positions have to be set before the fit between them can be read."
+        explanation: "Set both positions to see how well they fit."
       };
     }
     var delta = coherenceDelta(exposureRank, appetiteRank, nBands);
@@ -283,14 +283,14 @@ window.App.ScoringRiskAppetite = (function () {
       return {
         key: "under-protected", label: "Under-protected", delta: delta, severity: 2,
         explanation: read["under-protected"] ||
-          "Appetite is more tolerant than the exposure warrants: risk is being accepted that the profile does not justify."
+          "Appetite is more tolerant than the exposure warrants. The organisation is accepting more risk than its profile justifies."
       };
     }
     if (delta <= -2) {
       return {
         key: "over-invested", label: "Over-invested", delta: delta, severity: 1,
         explanation: read["over-invested"] ||
-          "Appetite is more averse than the exposure requires: possibly spending or constraining operations beyond what the risk justifies."
+          "Appetite is more averse than the exposure requires. The organisation may be spending more, or constraining operations more, than the risk justifies."
       };
     }
     // Aligned covers ten of the sixteen combinations, including severe exposure
@@ -303,7 +303,7 @@ window.App.ScoringRiskAppetite = (function () {
       key: "aligned", label: "Aligned", delta: delta, severity: 0, lean: lean,
       displayLabel: lean ? "Aligned, leaning " + lean : "Aligned",
       explanation: read.aligned ||
-        "Appetite broadly matches exposure. Coherent does not mean good: it means the organisation accepts risk roughly in line with what it faces."
+        "Appetite broadly matches exposure. The organisation accepts risk roughly in line with what it faces, which says nothing about whether its security is good."
     };
   }
 
@@ -316,13 +316,13 @@ window.App.ScoringRiskAppetite = (function () {
     if (gap === 0) {
       note = "The technical picture matches the appetite described in interview.";
     } else if (gap > 0) {
-      note = "Technical reality reveals a more tolerant appetite than was described: the organisation states " +
+      note = "The systems show a more tolerant appetite than was described. The organisation states " +
              titleCase(stated.band) + " but its systems show " + titleCase(revealed.band) +
-             ". Risk is being accepted in practice that leadership may not know it is accepting.";
+             ". In practice it is accepting risk that leadership may not know about.";
     } else {
-      note = "Technical reality is tighter than the stated appetite: the organisation describes " +
+      note = "The systems are tighter than the stated appetite. The organisation describes " +
              titleCase(stated.band) + " but its systems show " + titleCase(revealed.band) +
-             ". Practice is ahead of the stated position, which is worth recognising and formalising.";
+             ". Practice is ahead of the stated position, and the organisation could recognise this and write it into policy.";
     }
     return {
       statedBand: stated.band, statedRank: stated.rank,

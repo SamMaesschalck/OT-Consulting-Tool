@@ -91,7 +91,7 @@ H.test(function (ok) {
     // family page: AC has tailoring -> OT lens card; AT has none
     A.UI.go("caf-principle", "AC");
     var acm = document.getElementById("main");
-    ok(acm.textContent.indexOf("OT lens - Access Control") !== -1, "AC family shows the Tailoring Considerations as the family OT lens");
+    ok(acm.textContent.indexOf("OT context - Access Control") !== -1, "AC family shows the Tailoring Considerations as the family OT lens");
     ok(acm.querySelectorAll(".caf-state-btn").length >= 2, "control rows render with state buttons");
     var acPrin = A.Engine.getCAFPrinciples().filter(function (p) { return p.id === "AC"; })[0];
     var atPrin = A.Engine.getCAFPrinciples().filter(function (p) { return p.id === "AT"; })[0];

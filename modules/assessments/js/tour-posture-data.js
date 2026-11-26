@@ -40,9 +40,9 @@ window.App.TourPosture = (function () {
     nextSteps:
       "Agree an owner and a target date for each of the priorities above\nCommission a detailed assessment of monitoring and incident response, where this read is weakest\nPlan the safety-system separation work into the next shutdown window\nRe-assess in six months to measure movement against this baseline",
     regulatoryExposure:
-      "Northbridge's OT posture is strongest in governance and network architecture and weakest in monitoring and incident response: the organisation would currently struggle to detect or recover from a cyber incident affecting the gas-distribution control function. As an operator of an essential service this matters most for the ability to notice and contain an attack before it affects supply or safety, which is why the indicative grade is held down by the detection and response domains.",
+      "Northbridge's OT posture is strongest in governance and network architecture and weakest in monitoring and incident response. At present the organisation would struggle to detect or recover from a cyber incident affecting the gas-distribution control function. For an operator of an essential service, that gap decides whether an attack is noticed and contained before it affects supply or safety, and it is why the detection and response domains hold the indicative grade down.",
     topPriorities:
-      "The most pressing areas are establishing OT monitoring so that an intrusion would be noticed (monitor.1-3) and building a tested OT incident response and recovery capability (respond.1-4). Separating the safety system from the basic process control network (arch.5) is the most urgent single control, because it protects the last line of defence."
+      "The most pressing areas are OT monitoring, so that an intrusion would be noticed (monitor.1-3), and a tested OT incident response and recovery capability (respond.1-4). The most urgent single control is separating the safety system from the basic process control network (arch.5), because the safety system is the last line of defence."
   };
 
   // What the read rests on. The evidence register is what makes an indicative
@@ -77,7 +77,7 @@ window.App.TourPosture = (function () {
   // paragraphs, and "Method and limitations" opens with two, so the limitations
   // paragraph is carried through here verbatim rather than lost.
   var methodSection =
-    "The read was taken over two days at Northbridge's Beeston site: a structured interview across the " +
+    "The read was taken over two days at Northbridge's Beeston site. It began with a structured interview across the " +
     "seven domains with the OT Security Lead, the control engineering lead and the IT security manager, " +
     "followed by a walkthrough of the control room, the IT/OT demilitarised zone and the Line 4 " +
     "marshalling cabinets. The firewall rule set at the IT/OT boundary and the OT cyber risk assessment " +
@@ -120,7 +120,7 @@ window.App.TourPosture = (function () {
       rem: { rank: 15, band: "medium", owner: "OT Security Lead",
         action: "Embed the OT policies in shift-level procedures and spot-check adherence so practice matches the written standard.",
         impact: "Policy that is followed unevenly leaves predictable gaps that an attacker or auditor will find." } },
-    { id: "gov.4", unknown: true, note: "Whether OT security features in budgeting and management reporting could not be confirmed during the interview; marked unknown, which lowers confidence rather than counting as a failure." },
+    { id: "gov.4", unknown: true, note: "Whether OT security features in budgeting and management reporting could not be confirmed during the interview. The answer is marked unknown, which lowers confidence without counting as a failure." },
     { id: "gov.6", band: 1, ev: "Management of change is well run for safety and availability, and every OT change goes through it. Security is not one of the questions the form asks, so firewall rules, new accounts and vendor connections are approved on operational grounds alone.",
       rem: { rank: 23, band: "medium", owner: "OT Security Lead",
         action: "Add a security question to the OT management-of-change form, with a route to security review for changes touching connectivity, accounts or remote access.",
@@ -139,7 +139,7 @@ window.App.TourPosture = (function () {
     { id: "assets.1", band: 2, ev: "An OT asset inventory exists but is spreadsheet-based and not fully current.",
       rem: { rank: 16, band: "low", owner: "Controls Engineering Team",
         action: "Complete and automate the OT asset inventory and make it the authoritative source for risk and monitoring work.",
-        impact: "Incomplete asset knowledge undermines every downstream control: you cannot protect what you do not know about." } },
+        impact: "Every other control depends on knowing what assets exist, and an asset nobody knows about cannot be protected." } },
     { id: "assets.2", band: 1, ev: "The OT network diagram is roughly 18 months out of date.",
       rem: { rank: 13, band: "medium", owner: "Controls Engineering Team",
         action: "Refresh the OT network diagram and keep it current under change control.",
@@ -151,7 +151,7 @@ window.App.TourPosture = (function () {
     { id: "assets.4", band: 2, ev: "External and vendor connections are documented, but the record is not regularly reviewed.",
       rem: { rank: 17, band: "low", owner: "OT Security Lead",
         action: "Review and re-baseline the documented vendor and external OT connections periodically.",
-        impact: "Undocumented drift in external connections quietly reopens exposure." } },
+        impact: "Connections that change without being recorded can reopen exposure without anyone noticing." } },
 
     // ---- Architecture and segmentation ---------------------------------
     { id: "arch.1", band: 3, ev: "OT is separated from the corporate network by a firewall with a restricted rule set." },
@@ -163,7 +163,7 @@ window.App.TourPosture = (function () {
     { id: "arch.4", band: 3, ev: "Remote access for vendors and staff is via a hardened jump host with MFA.",
       adv: { owner: "OT Security Lead",
         action: "Review the standing vendor accounts on the jump host each quarter and retire any that no longer need access.",
-        impact: "The control is well built, but standing access accumulates quietly; a quarterly review keeps the population of accounts matched to who is actually engaged." } },
+        impact: "The control is well built, but standing accounts build up over time. A quarterly review keeps the accounts matched to the vendors who are engaged now." } },
     { id: "arch.5", band: 1, ev: "The safety system shares a network segment with basic process control, with no logical separation.",
       rem: { rank: 4, band: "high", owner: "Controls Engineering Team",
         action: "Separate the safety system from the basic process control network (logical and/or physical) so a control-network compromise cannot reach safety functions.",
@@ -232,7 +232,7 @@ window.App.TourPosture = (function () {
       rem: { rank: 1, band: "high", owner: "SOC Manager",
         action: "Deploy ICS-aware network monitoring and route anomalies to a monitored queue.",
         impact: "An intrusion in the control environment would currently go unnoticed until it caused a safety or availability event." } },
-    { id: "monitor.4", band: 0, ev: "Nobody reviews OT security events. The device logs that do exist are opened only once something has already gone wrong, and there is no route for an operator who sees something odd to raise it as a security concern rather than a process fault.",
+    { id: "monitor.4", band: 0, ev: "Nobody reviews OT security events. The device logs that do exist are opened only once something has already gone wrong, and an operator who sees something odd can raise it only as a process fault, because there is no route for reporting a security concern.",
       rem: { rank: 29, band: "high", owner: "IT Security Manager",
         action: "Once OT logs reach the collector, put a weekly review and a triage owner behind them, and give shift teams a named route to report anything that looks wrong.",
         impact: "Collecting logs nobody reads produces the cost of monitoring with none of the benefit." } },

@@ -138,10 +138,10 @@ H.test(function (ok, done) {
   ok(/^Not yet/.test(v1.tile) && /1 of 7 FRs assessed/.test(v1.tile), "the screen tile reads Not yet, 1 of 7 FRs assessed", v1.tile);
   ok(!/^Yes/.test(v1.tile) && !/^No\b/.test(v1.tile), "and is neither a bare Yes nor a bare No", v1.tile);
   ok(/\bnear\b/.test(v1.tileClass) && !/\bmet\b/.test(v1.tileClass), "and is not coloured as met", v1.tileClass);
-  ok(/Target met so far in the one FR assessed \(FR1\); 6 FRs not yet assessed\./.test(v1.headline),
+  ok(/The target is met so far in the one FR assessed \(FR1\)\. 6 FRs are not yet assessed\./.test(v1.headline),
      "the headline names the one FR assessed, met so far, and says 6 are not yet assessed", v1.headline);
   ok(v1.headline.indexOf("the 1 FR") === -1, "and never reads 'the 1 FR'", v1.headline);
-  ok(v1.headline.indexOf("Overall target met.") === -1, "and does not say the overall target is met", v1.headline);
+  ok(v1.headline.indexOf("The overall target is met.") === -1, "and does not say the overall target is met", v1.headline);
   var w1 = R.slTargetMetWords(s1);
   ok(w1.value === "Not yet" && w1.detail === "1 of 7 FRs assessed", "the shared wording is Not yet, 1 of 7 FRs assessed", JSON.stringify(w1));
 
@@ -158,7 +158,7 @@ H.test(function (ok, done) {
   ok(s3.overallTargetMet === true && s3.overallTargetStatus === "met", "every FR met is the target met", s3.overallTargetStatus);
   ok(s3.assessedFRCount === 7 && s3.notAssessedFRs.length === 0, "with 7 of 7 assessed", String(s3.assessedFRCount));
   ok(v3.tile.trim() === "Yes" && /\bmet\b/.test(v3.tileClass), "the screen tile reads Yes", v3.tile);
-  ok(/^Overall target met\./.test(v3.headline) && v3.headline.indexOf("so far") === -1, "and the headline says the overall target is met", v3.headline);
+  ok(/^The overall target is met\./.test(v3.headline) && v3.headline.indexOf("so far") === -1, "and the headline says the overall target is met", v3.headline);
 
   // ---- 4. an FR out of scope does not hold the result open ---------------
   var engScoped = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ALL_FRS.slice(0, 6)), { FR7: 0 });
@@ -173,7 +173,7 @@ H.test(function (ok, done) {
   ok(v4b.scored.overallTargetStatus === "incomplete", "FR1 met, FR7 out of scope, the rest untouched: incomplete", v4b.scored.overallTargetStatus);
   ok(/^Not yet/.test(v4b.tile) && /1 of 6 in-scope FRs assessed/.test(v4b.tile),
      "the tile reads Not yet, 1 of 6 in-scope FRs assessed", v4b.tile);
-  ok(/Target met so far in the one FR assessed \(FR1\); 5 FRs not yet assessed and 1 out of scope\./.test(v4b.headline),
+  ok(/The target is met so far in the one FR assessed \(FR1\)\. 5 FRs are not yet assessed, and 1 is out of scope\./.test(v4b.headline),
      "the headline accounts for all seven: 1 assessed, 5 not yet, 1 out of scope", v4b.headline);
   ok(/1 of 7 FRs assessed/.test(v1.tile) && v1.tile.indexOf("in-scope") === -1,
      "with nothing out of scope the tile does not say in-scope", v1.tile);
@@ -189,15 +189,15 @@ H.test(function (ok, done) {
   ok(v4c.scored.overallTargetStatus === "incomplete" && v4c.scored.assessedFRCount === 2 && v4c.scored.notAssessedFRs.length === 5,
      "FR1 met and FR2 all justified N/A: incomplete, 2 assessed, 5 not", v4c.scored.assessedFRCount + "/" + v4c.scored.notAssessedFRs.length);
   ok(/2 of 7 FRs assessed/.test(v4c.tile), "the tile reads 2 of 7 FRs assessed", v4c.tile);
-  ok(/Target met so far in both FRs assessed \(FR1 and FR2\); 5 FRs not yet assessed\./.test(v4c.headline),
+  ok(/The target is met so far in both FRs assessed \(FR1 and FR2\)\. 5 FRs are not yet assessed\./.test(v4c.headline),
      "the headline names both FRs assessed and says 5 are not yet assessed", v4c.headline);
   var three = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ["FR1", "FR2", "FR3"]));
   var v4d = screen(three, "z1");
-  ok(/Target met so far in all 3 FRs assessed; 4 FRs not yet assessed\./.test(v4d.headline),
+  ok(/The target is met so far in all 3 FRs assessed\. 4 FRs are not yet assessed\./.test(v4d.headline),
      "three FRs assessed are counted, not named", v4d.headline);
   var six = engagementWith(one(), {}, responsesFor(inst, "z1", 2, ALL_FRS.slice(0, 6)));
   var v4e = screen(six, "z1");
-  ok(/; 1 FR not yet assessed\./.test(v4e.headline), "one FR left is singular", v4e.headline);
+  ok(/\. 1 FR is not yet assessed\./.test(v4e.headline), "one FR left is singular", v4e.headline);
 
   // ---- 5. two zones: one complete and met, one met so far --------------------
   var zones = [ { id: "z-a", name: "Control zone" }, { id: "z-b", name: "Safety zone" } ];
@@ -208,7 +208,7 @@ H.test(function (ok, done) {
   ok((roll.zonesIncomplete || []).join() === "Safety zone", "the other is incomplete", (roll.zonesIncomplete || []).join());
   ok(roll.zonesShort.length === 0, "and neither is short", roll.zonesShort.join());
   var lines = R.systemRollupLines(roll, inst).join(" ");
-  ok(/Safety zone meets its target in every Foundational Requirement assessed so far; its other Foundational Requirements have not been assessed yet\./.test(lines),
+  ok(/Safety zone meets its target in every Foundational Requirement assessed so far\. Its other Foundational Requirements have not been assessed yet\./.test(lines),
      "the system prose says the safety zone is met so far, with its other FRs not yet assessed", lines.slice(0, 400));
   ok(lines.indexOf("the rest") === -1, "and does not say 'the rest', which reads as the other zones", lines.slice(0, 400));
   ok(!/All 2 assessed/.test(lines), "and does not say all assessed zones meet their target", lines.slice(0, 400));

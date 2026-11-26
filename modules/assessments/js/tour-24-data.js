@@ -138,7 +138,7 @@ window.App.Tour24 = (function () {
       rem: rem(19, "Low", "Data Protection Lead", "Document how long each kind of data is kept on board and how retention is set.",
         "Logs that roll over too early leave nothing to investigate after an incident.") },
     { id: "SP.03.10-RE3", ml: "ML2" },
-    { id: "SP.03.10-RE4", ml: "ML1", ev: "Removed hard drives are stored ashore, not wiped.",
+    { id: "SP.03.10-RE4", ml: "ML1", ev: "Removed hard drives are stored ashore without being wiped.",
       rem: rem(13, "Medium", "Technical Manager", "Wipe or destroy storage from every component taken off a vessel, and record it.",
         "Discarded drives can hold network details and credentials for the whole fleet.") },
 
@@ -192,7 +192,7 @@ window.App.Tour24 = (function () {
     { id: "SP.09.04-BR", ml: "ML2" },
     { id: "SP.09.04-RE1", ml: "ML1", ev: "Temporary accounts are removed after a job, but no report goes to the owner.",
       rem: rem(16, "Low", "Fleet Superintendent", "Give the owner a report of accounts removed at the end of each job.",
-        "The owner has no record that temporary accounts were actually removed.") },
+        "The owner has no record that temporary accounts were removed.") },
     { id: "SP.09.05-BR", ml: "ML3" },
     { id: "SP.09.06-BR", ml: "ML2" },
     { id: "SP.09.06-RE1", ml: "ML2" },

@@ -100,13 +100,13 @@ window.App.TourSL = (function () {
   var reportNarrative = {
     // How the assessment was run, answering the method prompt in the report.
     method:
-      "Each requirement was assessed against its zone target Security Level over three days on site, through configuration review of the controllers, engineering workstations and firewalls, interviews with the control systems, instrumentation and IT security leads, and observation in the control room and rack rooms. Answers recorded once for the whole system are marked as shared. The achieved Security Level reflects what could be demonstrated; intent or documentation on its own was not enough.",
+      "Each requirement was assessed against its zone target Security Level over three days on site, through configuration review of the controllers, engineering workstations and firewalls, interviews with the control systems, instrumentation and IT security leads, and observation in the control room and rack rooms. Answers recorded once for the whole system are marked as shared. The achieved Security Level reflects what could be demonstrated. Intent or documentation on its own did not count.",
     nextSteps:
       "Agree an owner and a target date for each action in the roadmap, keeping the site-wide work separate from the zone-specific work\nScope continuous monitoring of the control network (SR 6.2) as one project covering all three zones\nDecide with the safety authority how the SIS engineering station will be brought under named-account control\nConfirm and document the IT/OT firewall rule set that FR5 currently depends on\nRe-assess the zones once monitoring is in service",
     regulatoryExposure:
-      "Acme operates Plant A as an upper-tier COMAH petrochemical site, where a cyber compromise of the basic process control or safety-related systems carries process-safety as well as availability consequences. The site was divided into three zones under 62443-3-2 and assessed against a target of SL 2, with the safety instrumented system held to SL 3 for identification and for system integrity because a change to a protective function has to be attributable and provably intact. Most Foundational Requirements reach only SL 1 in every zone, so the control system is protected against casual or coincidental violation but not against someone acting deliberately with simple means. The safety zone is the exception in both directions: its integrity controls are genuinely strong, and its identification is on the floor at SL 0 because the SIS engineering station sits outside the site directory on a shared local account.",
+      "Acme operates Plant A as an upper-tier COMAH petrochemical site, where a cyber compromise of the basic process control or safety-related systems carries process-safety as well as availability consequences. The site was divided into three zones under 62443-3-2 and assessed against a target of SL 2, with the safety instrumented system held to SL 3 for identification and for system integrity because a change to a protective function has to be attributable and provably intact. Most Foundational Requirements reach only SL 1 in every zone. The control system is therefore protected against casual or coincidental violation, but it is not protected against someone acting deliberately with simple means. The safety zone stands out in two ways. Its integrity controls are strong, but its identification is on the floor at SL 0, because the SIS engineering station sits outside the site directory on a shared local account.",
     topPriorities:
-      "Two of the priorities are single pieces of work that resolve all three zones at once, because the controls behind them are implemented once for the site: continuous monitoring of the control network (SR 6.2), so that an intrusion can be detected where undetected manipulation has safety consequences, and authentication of software processes and devices (SR 1.2), so that a rogue or spoofed component is not trusted simply for being on the network. The third is specific to one zone: bringing the SIS engineering station into the directory, or issuing named local accounts if the safety case forbids it, so that a change to a protective function can be attributed to a person. Note also that FR5 meets its target only because person-to-person communication is blocked at the IT/OT firewall rather than by the control system itself; if that rule set lapses, the level goes with it."
+      "Two of the priorities are single pieces of work that resolve all three zones at once, because the controls behind them are implemented once for the site. The first is continuous monitoring of the control network (SR 6.2), so that an intrusion can be detected where undetected manipulation has safety consequences. The second is authentication of software processes and devices (SR 1.2), so that a component is not trusted just because it is on the network, which would let a rogue or spoofed device in. The third priority is specific to one zone. The SIS engineering station should be brought into the directory, or given named local accounts if the safety case forbids that, so that a change to a protective function can be attributed to a person. FR5 meets its target only because the IT/OT firewall blocks person-to-person communication, and the control system does not block it itself. If that rule set lapses, FR5 falls below target."
   };
 
   // Row shapes:
@@ -148,17 +148,17 @@ window.App.TourSL = (function () {
     { id: "SR1.2", sl: 0, ev: "Devices and software processes connect to the control network without authentication; trust is based on network location only.",
       rem: { rank: 2, band: "High", owner: "OT Security Lead",
         action: "Introduce device/process authentication (certificates or keyed identities) for controllers and engineering tools, starting at the most critical conduits.",
-        impact: "An unauthenticated device is an open door: a rogue or spoofed component is trusted simply for being on the network." } },
+        impact: "Any component on the network is trusted without authentication, so a rogue or spoofed device would be accepted." } },
     { id: "SR1.3", sl: 2, ev: "An account-management process exists and is applied to OT accounts, including joiners and leavers." },
     { id: "SR1.4", sl: 2, ev: "Identifiers are managed and unique across OT systems." },
     { id: "SR1.5", sl: 2, ev: "Authenticators are managed for OT: vendor defaults are changed at commissioning, shared secrets are held in the site vault, and changes go through the same request process as accounts. Authenticators are held in software only; nothing is backed by a hardware token or module.",
       rem: { rank: 11, band: "Medium", owner: "OT Security Lead",
-        action: "Where the safety zone's SL 3 target applies, back engineering authenticators with hardware (smartcard or token) rather than a software secret alone.",
+        action: "Where the safety zone's SL 3 target applies, back engineering authenticators with hardware (smartcard or token) as well as the software secret.",
         impact: "A software-only authenticator for the safety engineering station can be copied without the holder knowing." } },
     { id: "SR1.6", na: true, note: "No wireless networking is used in the control environment." },
     { id: "SR1.7", sl: 2, ev: "Password strength is enforced by the directory for everything joined to it; the handful of legacy devices that cannot meet it are listed, and their exception is reviewed annually. Password lifetime and generation are left to the user within that policy.",
       rem: { rank: 12, band: "Medium", owner: "OT Security Lead",
-        action: "Where the safety zone's SL 3 target applies, enforce password generation and lifetime for human users rather than leaving both to the account holder.",
+        action: "Where the safety zone's SL 3 target applies, enforce password generation and lifetime for human users, so that neither is left to the account holder.",
         impact: "A password that never changes on a safety engineering account outlives every person who has known it." } },
     { id: "SR1.8", na: true, note: "No public key infrastructure is deployed in the control environment." },
     { id: "SR1.9", na: true, note: "No public-key authentication is used in the control environment." },
@@ -192,7 +192,7 @@ window.App.TourSL = (function () {
       ev: "A single site time service synchronises the DCS, the operator consoles and the DMZ hosts, and drift is alarmed. It does not extend to the safety controllers, which do not take network time." },
     { id: "SR2.12", sl: 1, ev: "Shared accounts and inconsistent logging prevent reliable attribution of actions.",
       rem: { rank: 21, band: "Low", owner: "OT Security Lead",
-        action: "Once individual identity and consistent logging are in place, ensure key control actions are attributable.",
+        action: "Once individual identity and consistent logging are in place, make the important control actions attributable to a person.",
         impact: "Without attribution, neither accidental nor malicious change can be traced to an actor." } },
 
     // ---- FR3  System integrity -----------------------------------------
@@ -302,12 +302,12 @@ window.App.TourSL = (function () {
       { id: "SR1.3", sl: 2, ev: "OT accounts follow the site joiner/leaver process, but the safety zone's local accounts are administered separately from the rest of the control system, so account management is not unified as SL 3 requires.",
         rem: { rank: 12, band: "Medium", owner: "Controls Engineering Team",
           action: "Bring the safety zone's accounts under the same managed process as the rest of the control system once the engineering station is reachable from the directory.",
-          impact: "Separately administered accounts drift: a leaver removed everywhere else can remain valid on the safety engineering station." } },
+          impact: "Accounts administered separately fall out of step, so a leaver removed everywhere else can stay valid on the safety engineering station." } },
       // The two the shared answers do not reach. One is met by other means and
       // needs no action; the other cannot apply here at all, and carries the
       // justification without which it would block the level rather than being
       // excluded.
-      { id: "SR2.11", sl: 2, ev: "The safety controllers take their time from the DCS gateway rather than the site time service, and the offset is checked and recorded at each proof test." },
+      { id: "SR2.11", sl: 2, ev: "The safety controllers take their time from the DCS gateway, which is not the site time service, and the offset is checked and recorded at each proof test." },
       { id: "SR3.2", na: true,
         note: "The safety controllers run no general-purpose operating system, so there is no host on which endpoint protection could run. The equivalent outcome is delivered by signed logic, a physical key switch and a cabinet with no removable-media path." },
       { id: "SR2.1", sl: 2, ev: "The safety application enforces a separate maintain/operate key switch position for logic change; operate-position accounts cannot download." },

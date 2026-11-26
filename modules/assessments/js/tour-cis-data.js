@@ -28,7 +28,7 @@ window.App.TourCIS = (function () {
     nextSteps:
       "Agree an owner and a target date for each Safeguard recorded as not implemented\nEnforce MFA on the externally-exposed portals first, ahead of the next PCI DSS assessment\nStand up central log collection and scheduled vulnerability scanning, then review the first month of output together\nRe-assess against IG1 in six months and decide then whether to move towards IG2",
     regulatoryExposure:
-      "Brightpath Retail Group assesses its enterprise IT against CIS Critical Security Controls v8.1.2 Implementation Group 1 (IG1) as its baseline of essential cyber hygiene, driven by payment-card (PCI DSS) obligations and cyber-insurance requirements. This is an alignment and gap analysis against the CIS Safeguard descriptions, not a certified CIS assessment. The Safeguards that are not yet implemented cluster around multi-factor authentication, logging and vulnerability management: the areas insurers and card schemes scrutinise most.",
+      "Brightpath Retail Group assesses its enterprise IT against CIS Critical Security Controls v8.1.2 Implementation Group 1 (IG1) as its baseline of essential cyber hygiene, driven by payment-card (PCI DSS) obligations and cyber-insurance requirements. This is an alignment and gap analysis against the CIS Safeguard descriptions and is not a certified CIS assessment. The Safeguards not yet implemented cluster around multi-factor authentication, logging and vulnerability management, which are the areas insurers and card schemes scrutinise most.",
     topPriorities:
       "The two most urgent priorities are enforcing multi-factor authentication on externally-exposed and remote access (6.3, 6.4), which removes the most common route to account takeover, and establishing audit-log collection and a vulnerability-management process (8.2, 7.1), so that attacks can be detected and known weaknesses are fixed on a schedule. Protecting and isolating recovery data (11.3) follows close behind."
   };
@@ -48,9 +48,9 @@ window.App.TourCIS = (function () {
       rem: { rank: 3, band: "High", owner: "IT Security Manager",
         action: "Establish and document a vulnerability-management process covering scope, cadence, risk ranking and ownership.",
         impact: "Ad hoc patching leaves known weaknesses open unpredictably." } },
-    { id: "6.4", state: "partially", ev: "Remote network access uses a VPN, but MFA is only enforced for IT staff, not all remote users.",
+    { id: "6.4", state: "partially", ev: "Remote network access uses a VPN, but MFA is enforced only for IT staff and not for other remote users.",
       rem: { rank: 4, band: "High", owner: "IT Security Manager",
-        action: "Require MFA for all remote network access, not just privileged/IT users.",
+        action: "Require MFA for all remote network access, for every user whatever their role.",
         impact: "Single-factor remote access is readily defeated by credential theft." } },
     { id: "11.3", state: "not", ev: "Backups run, but recovery data is stored on the same domain and is reachable with the same admin credentials as production.",
       rem: { rank: 5, band: "High", owner: "IT Operations Lead",
@@ -79,7 +79,7 @@ window.App.TourCIS = (function () {
     { id: "11.2", state: "partially", ev: "Backups are configured for core systems, but coverage of end-user and store systems is incomplete and success is not verified.",
       rem: { rank: 11, band: "Medium", owner: "IT Operations Lead",
         action: "Extend automated backups to all in-scope systems and verify backup success on a schedule.",
-        impact: "Gaps in backup coverage surface only when a restore is needed." } },
+        impact: "Gaps in backup coverage come to light only when a restore is needed." } },
     { id: "3.4", state: "partially", ev: "Some data retention is enforced by system defaults, but there is no enterprise data-retention standard applied consistently.",
       rem: { rank: 12, band: "Low", owner: "Data Protection Lead",
         action: "Define and enforce a data-retention standard across systems holding customer and payment data.",

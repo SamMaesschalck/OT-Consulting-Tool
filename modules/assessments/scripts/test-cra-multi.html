@@ -91,7 +91,7 @@ window.docx = (function () {
     A.UI.go("cra-layer", "P2");
     var main = document.getElementById("main");
     check("P2 page has NO product switcher (one shared answer set)", !main.querySelector(".sites-bar"));
-    check("P2 requirements card says organisation-wide", main.textContent.indexOf("one answer set for all products") !== -1);
+    check("P2 requirements card says organisation-wide", main.textContent.indexOf("answered once for all products") !== -1);
 
     A.UI.go("cra-layer", "P3");
     main = document.getElementById("main");
