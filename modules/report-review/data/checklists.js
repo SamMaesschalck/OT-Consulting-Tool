@@ -26,14 +26,14 @@ window.App.Data.checklists = {
       { "id": "posture-grades", "text": "The headline grade matches what the findings say." }
     ],
     "program-maturity-ml": [
-      { "id": "ml-levels", "text": "Each maturity level claimed has evidence of the process running, not only of it being written down." }
+      { "id": "ml-levels", "text": "Each maturity level claimed has evidence that the process runs in practice as well as being written down." }
     ],
     "nis2-conformance": [
       { "id": "nis2-caveat", "text": "The report says it is not a legal determination of NIS2 compliance." },
       { "id": "nis2-entity", "text": "The entity classification and competent authority are stated correctly." }
     ],
     "csms-conformance": [
-      { "id": "csms-elements", "text": "Elements marked as in place have evidence of use, not only of a document." }
+      { "id": "csms-elements", "text": "Elements marked as in place have evidence that they are used as well as documented." }
     ],
     "risk-appetite-coherence": [
       { "id": "ra-judgement", "text": "The verdict is the consultant's judgement, with the reasoning stated." },
@@ -44,7 +44,7 @@ window.App.Data.checklists = {
       { "id": "risk-slt", "text": "Each zone and conduit's target level follows from its risk assessment." },
       { "id": "risk-residual", "text": "Risks above the tolerable level each have a recorded treatment decision: reduce with countermeasures, accept, or treat through the target levels." },
       { "id": "risk-coverage", "text": "Every zone has its threats identified, and each conduit has threats or a stated reason why it needs none." },
-      { "id": "risk-consequence", "text": "The impact ratings take account of safety, environmental and production consequences, not only the loss of information." },
+      { "id": "risk-consequence", "text": "The impact ratings take account of safety, environmental and production consequences as well as the loss of information." },
       { "id": "risk-consistency", "text": "Where a section's wording has been edited, the high-level and detailed reports still give the same tolerable risk, bands and ranking." }
     ]
   },

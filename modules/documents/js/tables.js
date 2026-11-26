@@ -169,7 +169,7 @@
       edit(doc, block.id, "Landscape page", function () {
         var b = tableOf(doc, block.id).block;
         if (on) b.land = true; else delete b.land;
-      }, on ? "Table on a landscape page." : "Table on a portrait page.");
+      }, on ? "The table is now on a landscape page." : "The table is now on a portrait page.");
     },
     remove: function (doc, block) {
       var f = tableOf(doc, block.id);

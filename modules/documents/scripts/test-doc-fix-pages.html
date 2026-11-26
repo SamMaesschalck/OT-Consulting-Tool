@@ -175,12 +175,12 @@
     var wrong = hints.filter(function (t) { return /cover|document control/i.test(t); });
     ok(wrong.length === 0, "short: no hint speaks of a cover or of document control", wrong.join(" | "));
     ["docType", "reference", "site", "author"].forEach(function (k) {
-      ok(/^Not printed in a short document\./.test(hint(k)), "short: " + k + " says it is not printed", hint(k));
+      ok(/^A short document does not print this\./.test(hint(k)), "short: " + k + " says it is not printed", hint(k));
     });
-    ok(hint("classification") === "Printed at the left of the footer.", "short: classification says it prints in the footer, which now follows it", hint("classification"));
-    ok(hint("revision") === "Printed under the title." && /^Printed under the title/.test(hint("client")), "short: revision and client say where they print", hint("revision") + " | " + hint("client"));
-    ok(hint("date") === "Printed under the title until an issued date is set.", "short: Date says an issued date takes its place", hint("date"));
-    ok(/printed under the title in place of the date/.test(hint("issuedDate")), "short: Issued date says it is the date printed", hint("issuedDate"));
+    ok(hint("classification") === "This prints at the left of the footer.", "short: classification says it prints in the footer, which now follows it", hint("classification"));
+    ok(hint("revision") === "This prints under the title." && /^This prints under the title/.test(hint("client")), "short: revision and client say where they print", hint("revision") + " | " + hint("client"));
+    ok(hint("date") === "This prints under the title until an issued date is set.", "short: Date says an issued date takes its place", hint("date"));
+    ok(/prints under the title in place of the date/.test(hint("issuedDate")), "short: Issued date says it is the date printed", hint("issuedDate"));
     ok(/issued date/i.test($("dp-control-note").textContent) && /^A short document prints no document control page\./.test($("dp-control-note").textContent),
        "short: the document control note names the issued date as the exception", $("dp-control-note").textContent);
     ok($("info-docType").getAttribute("aria-describedby") === "info-docType-hint" && $("info-docType-hint").textContent === hint("docType"), "a field is described by its hint");
@@ -198,9 +198,9 @@
 
     d.kind = "report"; d.info.docType = "Method statement"; d.info.revision = "1.2";
     draw(P.info);
-    ok(hint("docType") === "Printed in capitals at the top of the cover." && hint("revision") === "Printed on the cover and in document control." &&
-       hint("classification") === "Printed on the cover, in the footer and as Confidentiality in document control.", "report: the hints say where each prints", hint("docType") + " | " + hint("revision") + " | " + hint("classification"));
-    ok(hint("date") === "Printed on the cover until an issued date is set.", "report: Date says an issued date takes its place on the cover", hint("date"));
+    ok(hint("docType") === "This prints in capitals at the top of the cover." && hint("revision") === "This prints on the cover and in document control." &&
+       hint("classification") === "This prints on the cover, in the footer and as Confidentiality in document control.", "report: the hints say where each prints", hint("docType") + " | " + hint("revision") + " | " + hint("classification"));
+    ok(hint("date") === "This prints on the cover until an issued date is set.", "report: Date says an issued date takes its place on the cover", hint("date"));
     ok(/cover/.test(hint("issuedDate")), "report: Issued date says it prints on the cover too", hint("issuedDate"));
     ok(hint("site") === "" && hint("author") === "", "report: fields that simply print carry no hint");
     ok(/^Cover: Method statement, /.test($("dp-cover-line").textContent), "report: the line under the miniature is as it was", $("dp-cover-line").textContent);

@@ -27,18 +27,18 @@
   window.App = window.App || {};
 
   var CHECKS = {
-    "red-prompts": { title: "Red prompts left in", severity: "must-fix", about: "Red text for the author to complete." },
-    "dashes": { title: "Em or en dashes", severity: "should-fix", about: "House style is a spaced hyphen. A lone dash in a cell means empty and is not counted." },
-    "internal-wording": { title: "Internal wording in client text", severity: "must-fix", about: "Words about the tool, and notes to self, in text the client reads." },
-    "other-names": { title: "A name from a demo or another client", severity: "must-fix", about: "Demo client names, and any you add below." },
-    "client-name": { title: "Client name missing or inconsistent", severity: "must-fix", about: "The client's name should be set, and printed the same way throughout." },
+    "red-prompts": { title: "Red prompts left in", severity: "must-fix", about: "The report still has red text for the author to complete." },
+    "dashes": { title: "Em or en dashes", severity: "should-fix", about: "Client reports use a spaced hyphen in place of a dash." },
+    "internal-wording": { title: "Internal wording in client text", severity: "must-fix", about: "Text the client reads mentions the tool or holds a note to self." },
+    "other-names": { title: "A name from a demo or another client", severity: "must-fix", about: "This looks for the demo client names and any names you add below." },
+    "client-name": { title: "Client name missing or inconsistent", severity: "must-fix", about: "The client's name should be set and printed the same way throughout." },
     "no-evidence": { title: "Findings with no evidence recorded", severity: "should-fix", about: "A finding with nothing behind it is hard to defend to the client." },
-    "unanswered": { title: "Items not answered", severity: "should-fix", about: "Items in scope with no answer at all. Unknown and not applicable count as answers." },
-    "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Empty fields in the document control table. They may be filled in at issue. QA review by is not counted." },
-    "numbering": { title: "Section numbering gaps", severity: "should-fix", about: "Numbered sections that skip a number, which usually means a section was hidden." },
-    "figures": { title: "Figures that disagree", severity: "must-fix", about: "Counts the report prints that do not match the assessment behind it." },
-    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat above the tolerable risk with no confirmed decision to reduce it, accept it, transfer it or treat it through the target levels, or with a decision that is missing its countermeasure, reason, arrangement, who accepted it, or the acceptance of a risk that stays above tolerable." },
-    "risk-slt-justification": { title: "Target levels with no justification", severity: "should-fix", about: "A zone or conduit with target security levels set and no justification recorded." }
+    "unanswered": { title: "Items not answered", severity: "should-fix", about: "These items are in scope and have no answer. Unknown and not applicable count as answers." },
+    "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Some document control fields are empty. They may be filled in at issue." },
+    "numbering": { title: "Section numbering gaps", severity: "should-fix", about: "A skipped section number usually means a section was hidden." },
+    "figures": { title: "Figures that disagree", severity: "must-fix", about: "A count printed in the report does not match the assessment behind it." },
+    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat is above the tolerable risk and has no confirmed treatment decision, or its decision is incomplete." },
+    "risk-slt-justification": { title: "Target levels with no justification", severity: "should-fix", about: "A zone or conduit has target security levels set and no justification recorded." }
   };
 
   // The demo clients, as the assessment tool's tours name them. Anything in
@@ -145,7 +145,7 @@
     eachText(pack, function (text, b, cell, p, d) {
       if (!p.red) return;
       var red = (p.runs || []).filter(function (r) { return r.red; }).map(function (r) { return r.t; }).join("");
-      out.push(result("red-prompts", keyFor(b, cell), "Red prompt still in the report.", red || text, b, cell, d));
+      out.push(result("red-prompts", keyFor(b, cell), "The report still has a red prompt here.", red || text, b, cell, d));
     });
   }
 
@@ -163,7 +163,7 @@
       if (cell && emptyMark(t)) return;
       var m = /[–—]/.exec(t);
       var from = Math.max(0, m.index - 50);
-      out.push(result("dashes", keyFor(b, cell), "An " + (m[0] === "—" ? "em" : "en") + " dash in the client's text. House style is a spaced hyphen.",
+      out.push(result("dashes", keyFor(b, cell), "The client's text has an " + (m[0] === "—" ? "em" : "en") + " dash here. Use a spaced hyphen.",
         (from ? "…" : "") + t.slice(from, m.index + 50) + (m.index + 50 < t.length ? "…" : ""), b, cell, d));
     });
   }
@@ -190,7 +190,7 @@
         if (!m) return;
         if (recorded.some(function (v) { return w.re.test(v) && nt.indexOf(v) !== -1; })) return;
         var from = Math.max(0, m.index - 50);
-        out.push(result("internal-wording", keyFor(b, cell, w.label), "“" + m[0] + "” is internal wording the client should not see.",
+        out.push(result("internal-wording", keyFor(b, cell, w.label), "“" + m[0] + "” is internal wording, and the client should not see it.",
           (from ? "…" : "") + t.slice(from, m.index + 60) + (m.index + 60 < t.length ? "…" : ""), b, cell, d));
       });
     });

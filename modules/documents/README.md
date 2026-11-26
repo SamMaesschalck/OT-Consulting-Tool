@@ -13,7 +13,7 @@ It is a module like the others: it runs alone and depends on no other module. It
 | `index.html`, `js/app.js` | The shell: pages, header buttons, the outline, the dirty flag, the suite bridge. `window.DocumentTool` is the test seam. |
 | `js/model.js` | `App.DocModel`: pure functions on a document. Blocks, run arithmetic, table edits, the file form and the memory form. |
 | `js/storage.js`, `js/pictures.js` | Save in place and autosave (IndexedDB behind `DocStorage.bytesStore`); picture intake. |
-| `js/doc-preview.js`, `css/doc-preview.css` | `App.DocPreview`, the one renderer of a document's blocks and of its pages (cover, document control, sheets, footnotes, landscape). Synced from `shared/`: the assessment and risk tools draw their Word previews with it. |
+| `js/doc-preview.js`, `css/doc-preview.css` | `App.DocPreview`, which draws a document's blocks and its pages (cover, document control, sheets, footnotes, landscape). Synced from `shared/`: the assessment and risk tools draw their Word previews with it. |
 | `js/render.js`, `js/editor.js`, `js/history.js` | What editing needs on top of the shared renderer (reading an edited element back, caret offsets), the editor (one editable element per text block), undo. |
 | `js/tables.js`, `js/paste.js` | Tables and their controls; paste and copy. |
 | `js/pages.js`, `js/export.js`, `js/import-flow.js` | Document information, Preview, Issue and export, Import report, About; the export and import calls. |
@@ -25,32 +25,32 @@ It is a module like the others: it runs alone and depends on no other module. It
 | `scripts/test-doc-*.html` | Headless test pages: `tools/run-tests.ps1 -Module documents`. |
 | `scripts/dump-doc-exports.html`, `dump-demo.html`, `measure-size.html` | Not tests: the exports for the Word check, the demo build, and the size measurement. |
 
-Edit the shared files in `shared/`, never the copies here, then run `tools/sync-shared.ps1`.
+Edit a shared file in `shared/`, then run `tools/sync-shared.ps1` to copy it here. A copy edited by hand fails `tools/sync-shared.ps1 -Check`.
 
 ## Rules that are easy to break
 
-- **The template must match the assessment reports.** The template functions in `house-docx.js` are copies of the assessment exporter's. `modules/assessments/scripts/test-house-parity.html` compares the two; run it after touching either. The few places where this template differs on purpose are listed in that page's header (a cover of two fixed rows that cannot spill onto a second page, a strip that leaves out an empty date and author, a footer that follows the classification, properties that never say "Un-named", text cleaned of characters XML forbids).
-- **A kept drawing's XML is never edited**, apart from the five changes the design names (ids, text box formatting, theme, size, links that are not http, https or mailto). Copies are made independent in one place, `DocxGraft.unshare`, at export.
-- **A floating drawing goes before the text it was anchored in**, and the writer puts its anchor back in that text's paragraph (`w.lead` in `writeParagraph`, `writeList`, `writeBlocks` and `blocksToDocx`). A kept block's `xml` may be whole paragraphs. Keep those lines when changing the writer; `scripts/test-doc-fix-floats.html` measures the result.
-- **Nothing from an imported or pasted source is dropped or altered silently.** A new branch in the reader that leaves something out adds a report code, and a code needs a sentence in `import-flow.js` (a test fails without one). A line that says "kept" must point at a block that exists.
-- **Every string that reaches the Word file goes through `HouseDocx.xmlSafe`** (`run()` and `txt()` call it). One control character makes a file Word refuses.
-- **Sizes, numbers and wording that print have one owner in `house-docx.js`**, and the screen reads them: `listNumbers`, `headingNumbers`, `shortHeadLine`, `stripParts`, `fitPx` and `PAGE`, `coverFits`. Do not repeat a rule in `render.js` or `pages.js`.
-- **Bytes are Blobs in memory and base64 only in the file.** Read them with `blob.arrayBuffer()`, `FileReader` or `atob`. The page's Content-Security-Policy has no `connect-src`, so `fetch` of anything is refused.
-- **Nothing from a file or the clipboard goes into the page as HTML.** Build DOM nodes.
-- **The version and the product name never reach a Word file.** `scripts/test-doc-version.html` unzips exports to prove it.
-- **Redraw one block.** Every change names the block ids it touched; nothing redraws the page. `scripts/test-doc-speed.html` counts.
-- **List numbers have one owner**, `HouseDocx.listNumbers`. The editor, the preview and the writer all call it.
-- **A Save never writes over a Word file.** An import forgets any file handle.
-- **A chart drawn as a table keeps its look.** A table with no borders, or with fills below its header row, keeps its fills, widths, row heights, padding, run sizes and the tables inside its cells (to three deep), through import, save, the editor, the preview and export (`contracts/document.json`, the table's `_look`). An ordinary table still takes the template's look. A run keeps a colour of its own, except a light one on nothing shaded. `scripts/test-doc-table-colours.html` covers the round trip. The editor draws a table inside a cell but does not edit it, and copies a neighbour's fill to an added row or column.
-- **A document id names one file.** Save as into another file gives the document a new id (`DocStorage.save`), and the autosave copy, the window's lock and the Draft or Final choice move with it. Never key anything by id and assume it survives a Save as.
+- The template must match the assessment reports. The template functions in `house-docx.js` are copies of the assessment exporter's. `modules/assessments/scripts/test-house-parity.html` compares the two; run it after touching either. The few places where this template differs on purpose are listed in that page's header (a cover of two fixed rows that cannot spill onto a second page, a strip that leaves out an empty date and author, a footer that follows the classification, properties that never say "Un-named", text cleaned of characters XML forbids).
+- A kept drawing's XML is never edited, apart from the five changes the design names (ids, text box formatting, theme, size, links that are not http, https or mailto). Copies are made independent in one place, `DocxGraft.unshare`, at export.
+- A floating drawing goes before the text it was anchored in, and the writer puts its anchor back in that text's paragraph (`w.lead` in `writeParagraph`, `writeList`, `writeBlocks` and `blocksToDocx`). A kept block's `xml` may be whole paragraphs. Keep those lines when changing the writer; `scripts/test-doc-fix-floats.html` measures the result.
+- Nothing from an imported or pasted source is dropped or altered silently. A new branch in the reader that leaves something out adds a report code, and a code needs a sentence in `import-flow.js` (a test fails without one). A line that says "kept" must point at a block that exists.
+- Every string that reaches the Word file goes through `HouseDocx.xmlSafe` (`run()` and `txt()` call it). One control character makes a file Word refuses.
+- Sizes, numbers and wording that print are defined in `house-docx.js` alone, and the screen reads them from there: `listNumbers`, `headingNumbers`, `shortHeadLine`, `stripParts`, `fitPx` and `PAGE`, `coverFits`. Do not repeat a rule in `render.js` or `pages.js`.
+- Bytes are Blobs in memory and base64 only in the file. Read them with `blob.arrayBuffer()`, `FileReader` or `atob`. The page's Content-Security-Policy has no `connect-src`, so `fetch` of anything is refused.
+- Nothing from a file or the clipboard goes into the page as HTML. Build DOM nodes.
+- The version and the product name never reach a Word file. `scripts/test-doc-version.html` unzips exports to prove it.
+- Redraw only the blocks a change touched. Every change names the block ids it touched, and nothing redraws the whole page. `scripts/test-doc-speed.html` counts.
+- List numbers come only from `HouseDocx.listNumbers`. The editor, the preview and the writer all call it.
+- A Save never writes over a Word file. An import forgets any file handle.
+- A chart drawn as a table keeps its look. A table with no borders, or with fills below its header row, keeps its fills, widths, row heights, padding, run sizes and the tables inside its cells (to three deep), through import, save, the editor, the preview and export (`contracts/document.json`, the table's `_look`). An ordinary table still takes the template's look. A run keeps a colour of its own, except a light one on nothing shaded. `scripts/test-doc-table-colours.html` covers the round trip. The editor draws a table inside a cell but does not edit it, and copies a neighbour's fill to an added row or column.
+- A document id names one file. Save as into another file gives the document a new id (`DocStorage.save`), and the autosave copy, the window's lock and the Draft or Final choice move with it. Never key anything by id and assume it survives a Save as.
 
 ## Tests
 
 `tools\run-tests.ps1 -Module documents` runs every page. A page ends in a FAIL line until it finishes, so a run cut short under load shows as a failure: run that page alone. To run some pages, call the script with `&` from PowerShell (`& .\tools\run-tests.ps1 -Module documents -Tests a.html,b.html`); through `powershell -File` a list arrives as one name.
 
-`test-doc-round.html` is the one that ties the packages together: it exports with the real writer and graft, reads the export with the real importer and expects the same blocks, kept objects, picture bytes and carried parts, for a written document and for every fixture. `test-doc-flow.html` drives the real page from New to Export. The `test-doc-fix-*.html` pages hold one regression test for each finding of the review made before the first release, by area (template, floats, import, paste, editor, pages, storage, and `-int` for what crossed files); the design's test plan lists them.
+`test-doc-round.html` ties the packages together. It exports with the real writer and graft, reads the export with the real importer and expects the same blocks, kept objects, picture bytes and carried parts, for a written document and for every fixture. `test-doc-flow.html` drives the real page from New to Export. The `test-doc-fix-*.html` pages hold one regression test for each finding of the review made before the first release, by area (template, floats, import, paste, editor, pages, storage, and `-int` for what crossed files); the design's test plan lists them.
 
-Whether Word opens what the tool writes is not something a headless page can know. `tools\word-open-check.ps1` is the release gate: see the Checks section of the user document. Its expected values for an imported fixture come from the fixture's own `.expect.json`, so a new fixture is covered as soon as `build-fixtures.ps1` has wrapped it. It also reports any in-line picture or object taller than the text area of its page (`tooTall`).
+A headless page cannot tell whether Word opens what the tool writes. `tools\word-open-check.ps1` is the release gate, described in the Checks section of the user document. Its expected values for an imported fixture come from the fixture's own `.expect.json`, so a new fixture is covered as soon as `build-fixtures.ps1` has wrapped it. It also reports any in-line picture or object taller than the text area of its page (`tooTall`).
 
 ## What it keeps in the browser
 

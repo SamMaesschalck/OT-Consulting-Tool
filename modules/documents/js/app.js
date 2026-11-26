@@ -264,7 +264,7 @@
   function canAdd(bytes) {
     if (!state.doc) return false;
     if (M.sizeOf(state.doc) + (Number(bytes) || 0) <= M.LIMITS.refuseBytes) return true;
-    toast("Not added: the pictures and kept content in this document would go over " + mb(M.LIMITS.refuseBytes) + " MB.", "err");
+    toast("Nothing was added, because the pictures and kept content in this document would go over " + mb(M.LIMITS.refuseBytes) + " MB.", "err");
     return false;
   }
 
@@ -414,7 +414,7 @@
       // A copy: reading turns the demo's base64 into Blobs and drops the strings.
       try { doc = M.normalise(JSON.parse(JSON.stringify(window.SPT_DOCUMENT_DEMO))); }
       catch (e) { toast("The demo document could not be opened.", "err"); return; }
-      setDoc(doc, { from: "tour" }).then(function (opened) { if (opened) toast("Demo document opened. Nothing you change here is kept."); });
+      setDoc(doc, { from: "tour" }).then(function (opened) { if (opened) toast("The demo document is open. Nothing you change here is kept."); });
     }
     if (window.SPT_DOCUMENT_DEMO) { open(); return; }
     var s = document.createElement("script");
@@ -509,7 +509,7 @@
         ui.offer = null;
         ui.passed = answer;
         return setDoc(doc, { from: "autosave" }).then(function (opened) {
-          if (opened) toast("Restored. Save it to keep it in a file.");
+          if (opened) toast("The work is restored. Save it to keep it in a file.");
           return opened;
         });
       }, function () {
@@ -578,7 +578,7 @@
       var match = agreeing(doc, other);
       var was = M.missing(doc), n = M.fill(doc, match), left = M.missing(doc).length;
       if (!n) {
-        toast(match.refused ? "Nothing was taken from that file: its pictures are not the ones missing here." : "That file does not hold the missing pictures either.", "warn");
+        toast(match.refused ? "Nothing was taken from that file, because its pictures are not the ones missing here." : "That file does not hold the missing pictures either.", "warn");
         return 0;
       }
       // What was brought back is in no file yet: the document is unsaved
@@ -588,7 +588,7 @@
       if (!state.tour) { state.dirty = true; S.autosave.note(doc, { all: true }); }
       if (ui.mounted === doc) A.DocEditor.redraw(was);
       refresh();
-      toast(n + (n === 1 ? " picture or drawing was" : " pictures or drawings were") + " brought back." + (left ? " " + left + " still missing." : ""), left ? "warn" : "");
+      toast(n + (n === 1 ? " picture or drawing was" : " pictures or drawings were") + " brought back." + (left ? " " + left + (left === 1 ? " is" : " are") + " still missing." : ""), left ? "warn" : "");
       return n;
     }, function () { toast("That file could not be read.", "err"); return 0; });
   }
@@ -695,7 +695,7 @@
     var hadId = had ? had.getAttribute("data-heading-id") : null, tabId = (host.querySelector('.doc-outline-row[tabindex="0"]') || { getAttribute: function () { return null; } }).getAttribute("data-heading-id");
     host.textContent = "";
     host.appendChild(h("div", { class: "nav-section-title", id: "doc-outline-title", text: "Sections" }));
-    if (!entries.length) { host.appendChild(h("div", { class: "doc-outline-none", text: "No headings yet." })); return; }
+    if (!entries.length) { host.appendChild(h("div", { class: "doc-outline-none", text: "There are no headings yet." })); return; }
     var tree = h("div", { class: "doc-outline", role: "tree", "aria-labelledby": "doc-outline-title" });
     entries.forEach(function (e) {
       var label = outlineLabel(e);

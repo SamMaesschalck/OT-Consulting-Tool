@@ -697,7 +697,7 @@
       else again.push(f.block.id);
     });
     if (again.length) redraw(again);
-    say(on ? "On a landscape page." : "On a portrait page.");
+    say(on ? "The selection is now on a landscape page." : "The selection is now on a portrait page.");
     finish(entry, { blocks: ids });
   }
 

@@ -363,7 +363,7 @@
 
     // changed
     var ch = $("dp-card-changed").querySelectorAll(".dp-entry");
-    ok(ch.length === 3 && !ch[2].querySelector(".btn") && /house style/.test(ch[2].textContent), "each change has its entry; the house style note has nowhere to go", ch.length);
+    ok(ch.length === 3 && !ch[2].querySelector(".btn") && /template's styles/.test(ch[2].textContent), "each change has its entry; the formatting note has nowhere to go", ch.length);
     reset();
     click(ch[1].querySelector(".btn"));
     ok(JSON.stringify(calls.go[0]) === '["edit",{"blockIds":["b6","b10"]}]', "a change's Show goes to the blocks concerned", JSON.stringify(calls.go));
@@ -377,7 +377,7 @@
     ok(/^Picture/.test(rows[1].textContent) && /EMF picture, 12\.0 x 8\.0 cm, plan\.emf/.test(rows[1].textContent) && /placeholder/.test(rows[1].textContent) && /Under: Network/.test(rows[1].textContent),
        "a picture the browser cannot draw is listed with its type, size and name", rows[1].textContent);
     ok(/^Drawing 2 of 3/.test(rows[2].textContent) && /kept unopened/.test(rows[2].textContent), "an embedded object says it is carried unopened", rows[2].textContent);
-    ok(/^Drawing 3 of 3/.test(rows[3].textContent) && /Shape, 3\.2 x 1\.6 cm/.test(rows[3].textContent) && /In a table under: Network/.test(rows[3].textContent) && /Floats/.test(rows[3].textContent),
+    ok(/^Drawing 3 of 3/.test(rows[3].textContent) && /Shape, 3\.2 x 1\.6 cm/.test(rows[3].textContent) && /In a table under: Network/.test(rows[3].textContent) && /It floats/.test(rows[3].textContent),
        "a drawing inside a table cell is listed too, described from its kind and size", rows[3].textContent);
     reset();
     click(rows[3].querySelector(".btn"));
