@@ -2,7 +2,7 @@
 
 Browser-based assessment tool for OT cybersecurity engagements. Runs entirely from `file://`. No server, no build pipeline, no telemetry, no network calls at runtime.
 
-Twenty instruments are live across seven scoring families, from ISA/IEC 62443 through NCSC CAF, NIST, CIS, NIS2, the EU CRA and ONR SyAPs. Instruments are **data**: adding one is a content task, not a code change, unless it needs a new scoring family.
+Twenty instruments are live across seven scoring families, from ISA/IEC 62443 through NCSC CAF, NIST, CIS, NIS2, the EU CRA and ONR SyAPs. Instruments are data, so adding one is a content task with no code change unless it needs a new scoring family.
 
 ## Running
 
@@ -62,8 +62,8 @@ zones and conduits with their own SL-T vector per FR, plus a system-wide
 `__shared` answer layer that zones inherit per item and can override.
 
 **Judgement stays with the consultant.** The tool never derives a band or level
-from captured fields. Unknown reduces coverage and confidence rather than
-scoring as a failure; N/A leaves both the score and its denominator.
+from captured fields. Unknown reduces coverage and confidence and does not
+score as a failure. N/A leaves both the score and its denominator.
 
 **Recording the engagement.** A basis of assessment (interviews, documents,
 systems observed) backs the findings. Remediation plans (priority, owner,
@@ -210,7 +210,7 @@ Points that matter:
 - **Assessments are keyed by their own id, not by instrument.** One customer file can hold a 2024 and a 2026 62443-3-3 side by side. `instrumentId` is a field on the assessment. In `engine.js`, `activeAssessment()` is the only accessor; anything reaching into the map by instrument id is a bug.
 - **Engagement metadata is split.** Customer and site are shared by the file; opportunity ID, consultant, visit date and document control belong to the individual assessment, because the same customer gets different ones per engagement.
 - **Everything the consultant types is in the file**, including report section rewrites, added glossary terms, next steps and the basis of assessment.
-- Files saved against schema 1.0 (one engagement per file) and against the older instrument-keyed 2.0 layout both migrate transparently on load. `instrumentContentVersion` is checked against the current instrument and a mismatch warns rather than blocks.
+- Files saved against schema 1.0 (one engagement per file) and against the older instrument-keyed 2.0 layout both migrate transparently on load. `instrumentContentVersion` is checked against the current instrument, and a mismatch warns without blocking the load.
 
 ## Adding a new instrument
 
@@ -238,7 +238,7 @@ Each of those instruments carries an `attribution` string stating the licence; t
 
 ## Verifying against a standard
 
-Where a licensed copy exists in `/data`, the instrument is checked against it rather than trusted:
+Where a licensed copy exists in `/data`, the instrument is checked against it:
 
 - `scripts/test-sl-mapping-standard.html` checks the 62443-3-3 SL selection against `ref-62443-3-3-table-b1.js`, transcribed from Annex B Table B.1 of BS IEC 62443-3-3:2013. The reference is ground truth: **if that test fails, fix the instrument, never the reference.**
 - `scripts/verify-sl-mapping.html` renders the mapping for any capability-SL instrument as a table for eyeballing.
@@ -256,14 +256,14 @@ delta = appetiteRank + exposureRank - (bands + 1)
 
 with `delta >= 2` under-protected, `delta <= -2` over-invested, and anything within one band aligned. So a nuclear operator or CNI entity, facing severe exposure, is **aligned** when its appetite is correspondingly low, and under-protected when it is not.
 
-**The consultant has the final say.** The arithmetic is a scaffold and cannot see a compensating group control, an imminent divestment, a site mid-migration, a regulator-agreed trajectory, or a board that has genuinely decided to carry a risk with its eyes open. The "Assessor's read" page shows the computed verdict and the override control side by side, so the judgement is made while looking at what it departs from. An override:
+**The consultant has the final say.** The arithmetic is a scaffold and cannot see a compensating group control, an imminent divestment, a site mid-migration, a regulator-agreed trajectory, or a board that has deliberately decided to carry a risk with its eyes open. The "Assessor's read" page shows the computed verdict and the override control side by side, so the judgement is made while looking at what it departs from. An override:
 
-- changes the **verdict only**: the exposure and appetite positions stand as characterised, and the plot still shows where the organisation actually sits;
+- changes the **verdict only**: the exposure and appetite positions stand as characterised, and the plot still shows where the organisation sits;
 - **requires a recorded reason**, flagged in red until one is given (the same hard rule the sector baselines use).
 
 **Deliverables carry the consultant's judgement, never a commentary on the tool.** The client is paying for the consultant's knowledge, so the report, Word document and workbook present the verdict as the assessor's finding with their reasoning, and say nothing about what the band arithmetic computed, whether the assessor agreed with it, or which bands came from a sector baseline rather than the assessor's pen. Exposing that invites an argument with software instead of a conversation about risk. The computed read and the provenance of each band stay on the **Assessor's read** capture page and in the saved project file, so nothing is lost for QA.
 
-"Scaffold" and "structured prompts" are out of client-facing text as well, because they describe the tool's apparatus rather than the work, and a client reading that the assessment was "scaffolded by prompts" is being told about software. **Sector baselines may be named**: they are a real, defensible input, and the client is entitled to know their sector set a starting point. So the framing now reads *"assessor-led throughout, informed by sector baselines and conducted as a structured interview"*, the source note credits SolutionsPT starting points rather than "a tunable house scaffold" (which also leaked a repo file path into the document), and the workbook's question column is headed "Question asked". `test-risk-appetite.html` asserts all of these phrases stay out.
+"Scaffold" and "structured prompts" are out of client-facing text as well, because they describe the software and not the work, and a client reading that the assessment was "scaffolded by prompts" is being told about software. **Sector baselines may be named**: they are a real, defensible input, and the client is entitled to know their sector set a starting point. So the framing now reads *"assessor-led throughout, informed by sector baselines and conducted as a structured interview"*, the source note credits SolutionsPT starting points and no longer says "a tunable house scaffold" (which also leaked a repo file path into the document), and the workbook's question column is headed "Question asked". `test-risk-appetite.html` asserts all of these phrases stay out.
 
 Capture runs **Sector and scope → Guided wizard (or the section list views) → Assessor's read**. The whole instrument is a structured interview, so every item carries an `interviewPrompt` that renders first and loudest (above the band controls, on both the wizard and the list view), with the `rationale` folded away behind "Why this is asked". The optional technical layer is a setup toggle: switching it on lengthens the wizard from 13 items to 18 and adds its step to the stepper; switching it off removes it from the read but keeps anything already recorded.
 
@@ -273,7 +273,7 @@ The pack is written to read as a person wrote it: plain UK English for a board, 
 
 Guard rails, all asserted in `scripts/test-risk-appetite.html`: no letter, no percentage, no `score` field, and nothing in the scored result that looks like an A-F grade. The exposure-vs-appetite plot shades only the under-protected region, and the band controls are colour-neutral, because tinting "averse" green would assert what the instrument refuses to assert. Sector baselines (`shared/risk-appetite-sector-baselines.json`) and item roll-ups only ever *suggest*; `source` on each axis records whether a band came from the baseline, the items or the assessor.
 
-**EU legislation is quoted; IEC standards are not.** Official Journal text may be reproduced with attribution, so the CRA and Machinery instruments carry the Regulation's own wording in each item's `verbatimText`, and the tool reads that rather than the PDF. All 21 CRA Annex I items carry it. Where an item is a summary judgement spanning several provisions, which is most of the Machinery set by design, `verbatimText` stays empty and `scoring-cra.js` falls back to the assessor-phrased `requirement`, so nothing ever renders blank.
+**EU legislation is quoted; IEC standards are not.** Official Journal text may be reproduced with attribution, so the CRA and Machinery instruments carry the Regulation's own wording in each item's `verbatimText`, and the tool reads that text from the instrument, not from the PDF. All 21 CRA Annex I items carry it. Where an item is a summary judgement spanning several provisions, which is most of the Machinery set, `verbatimText` stays empty and `scoring-cra.js` falls back to the assessor-phrased `requirement`, so nothing ever renders blank.
 
 The PDFs under `/data` are authoring and verification sources only. Nothing at runtime reads them, and the tool works with the folder removed.
 
@@ -288,7 +288,7 @@ msedge --headless=new --allow-file-access-from-files --virtual-time-budget=18000
 
 Each prints `PASS`/`FAIL` lines and ends with `ALL TESTS PASSED` or `<n> FAILED`. A page that reaches neither marker did not finish and must not be read as passing. `test-sanity-all.html` exercises every non-placeholder instrument end to end (structure, scoring, report, Word and Excel).
 
-A page loads its dependencies through `scripts/harness.js` rather than listing them itself:
+A page loads its dependencies through `scripts/harness.js` and does not list them itself:
 
 ```html
 <script src="harness.js"></script>
@@ -318,12 +318,12 @@ Some pages carry a `#shot` hash that stops after the first render and hides the 
 
 ## Sibling app
 
-`../risk-assessment/` is a self-contained risk assessment tool (`index.html`) with its own copy of the assets. It shares no runtime code with this app by design. The only coupling is the `spt-risk-context` interchange file (currently 1.4), which carries per-zone SL-T targets between the two.
+`../risk-assessment/` is a self-contained risk assessment tool (`index.html`) with its own copy of the assets. It deliberately shares no runtime code with this app. The only coupling is the `spt-risk-context` interchange file (currently 1.4), which carries per-zone SL-T targets between the two.
 
 ## Known limits
 
 - `caa-tier3-assessment` is a placeholder.
-- Report narrative packs are static template libraries. Composed prose is limited to what the slots can express, by design.
+- Report narrative packs are static template libraries, so composed prose can say only what the slots can express.
 - **The CAF regulator profiles are empty on purpose.** `ncsc-caf` ships 14 sector profiles (Ofgem, HSE/DESNZ, DfT rail/road/maritime, Ofcom, Ofwat/DWI, each Basic and Enhanced) and all are `status: "placeholder"` with per-outcome expected states set to null. Sector regulators have not generally published their profiles for CAF v4.0, and several issue theirs only to the organisations they regulate, so there is no authoritative source to transcribe. **The expected states must never be inferred**: a profile that looked populated but was guessed would produce a regulator gap report that is confidently wrong. Selecting one shows a banner explaining this; the assessment still runs and reports against the CAF itself, just without an expected-state comparison. To populate one when a regulator publishes (or a client supplies) its profile: fill the matching file under `data/instruments/ncsc-caf/profiles/`, set its `status` to `active`, and stamp `profileVersion` from the source. `caf-general` is fully usable and is the default.
 - **Machinery coverage is not exhaustively verified.** The CRA's Annex I coverage is checked by test, because it is countable: 13 lettered and 8 numbered provisions. For the Machinery Regulation only the document identity, the Annex III chapter structure and the three quoted provisions were confirmed against the Official Journal; whether the 31 items exhaustively cover Articles 10 to 25 and Annexes IV to XI rests on the original authoring pass and has not been independently re-derived.
 - `Compare.compare` indexes responses by requirement id alone. Callers must scope both sides first with `Compare.scopeResponses(responses, targetId)`, which resolves the 62443-3-3 `__shared` layer; skipping it compares only a zone's overrides.

@@ -13,10 +13,10 @@ window.App.Data.shared.craProductClassification = {
     "annex-iv": "critical"
   },
   "routeByClass": {
-    "default": "Internal control (Module A, Annex VIII Part I): manufacturer self-assessment. No notified body required.",
-    "important-class-i": "May self-assess ONLY if harmonised standards / common specs / a substantial-level EU certification scheme are applied in full; otherwise EU-type examination (Module B) + conformity to type (Module C), or full quality assurance (Module H).",
-    "important-class-ii": "Notified-body route required: EU-type examination (Module B) + Module C, or full quality assurance (Module H). Self-assessment not available.",
-    "critical": "As Class II, and may also be required to obtain a European cybersecurity certificate under an EU scheme where a delegated act so specifies."
+    "default": "Internal control (Module A, Annex VIII Part I). The manufacturer self-assesses and no notified body is needed.",
+    "important-class-i": "The manufacturer may self-assess only if harmonised standards, common specifications or a substantial-level EU certification scheme are applied in full. Otherwise the route is EU-type examination (Module B) with conformity to type (Module C), or full quality assurance (Module H).",
+    "important-class-ii": "A notified body is needed, through EU-type examination (Module B) with Module C, or full quality assurance (Module H). Self-assessment is not available.",
+    "critical": "As for Class II. The manufacturer may also need a European cybersecurity certificate under an EU scheme where a delegated act requires one."
   },
   "categories": {
     "annex-iii-class-i": [
@@ -132,7 +132,7 @@ window.App.Data.shared.craProductClassification = {
   },
   "classifierFlags": [
     "If the product matches BOTH a Class I/II and an Annex IV category, the higher (critical) classification governs.",
-    "Flag explicitly where a product the manufacturer assumed was Default appears in Annex III or IV: a common and consequential misclassification that changes the conformity route.",
+    "Flag it clearly where a product the manufacturer assumed was Default appears in Annex III or IV. This misclassification is common, and it changes the conformity route.",
     "A component integrated into a larger product may itself be an important/critical product; classify the product being placed on the market."
   ]
 };

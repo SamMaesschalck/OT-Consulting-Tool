@@ -49,9 +49,9 @@ window.App.TourMachinery = (function () {
   // the demo report reads complete instead of showing the red placeholders.
   var reportNarrative = {
     nextSteps:
-      "Approach notified bodies now and secure an EU type-examination slot for the AS-90\nAssign an owner for the Annex IV technical file additions and start them alongside the notified-body engagement\nClose the digital essential-requirement gaps (MR-M1.3, MR-M1.4, MR-M1.6) in the next firmware release\nPut substantial-modification governance in place before that release ships, not after\nRe-assess once the notified body has confirmed the route",
-    topPriorities: "Sequence the conformity route first. The AS-90's ML person-detection safety system places it in Annex I Part A, so engage a notified body now (MR-M3.1): EU type-examination lead times are the critical path to selling the AS-90 under the Regulation from 14 January 2027, and notified-body capacity for self-evolving safety systems will be scarce. The Annex IV technical file additions (MR-M3.2), the updated declaration and the notified-body number beside the CE marking then follow that route in order. In parallel, close the digital essential-requirement gaps that the type-examination will test: safety-software identification and tamper evidence (MR-M1.3), the malicious-attempt extension of the control-system safety case (MR-M1.4) and the safety-software tracing log (MR-M1.6). Substantial-modification governance for software updates (MR-M2.7) should be in place before the next AS-90 firmware release, not after it.",
-    regulatoryExposure: "The AS-90 is Meridian's growth product and its order book is predominantly EU intralogistics operators. From 14 January 2027 every unit placed on the EU market needs conformity under the Machinery Regulation, and for this machine that means a notified-body route: continuing to self-assess would make each placement unlawful and expose distributors as well as Meridian. A forced stop on EU shipments, or a competitor arriving first with a type-examined autonomous stacker, would put the EU pipeline and the framework tenders that already ask about Regulation 2023/1230 readiness directly at risk."
+      "Approach notified bodies now and secure an EU type-examination slot for the AS-90\nAssign an owner for the Annex IV technical file additions and start them alongside the notified-body engagement\nClose the digital essential-requirement gaps (MR-M1.3, MR-M1.4, MR-M1.6) in the next firmware release\nPut substantial-modification governance in place before that release ships\nRe-assess once the notified body has confirmed the route",
+    topPriorities: "Sequence the conformity route first. The AS-90's ML person-detection safety system places it in Annex I Part A, so a notified body should be engaged now (MR-M3.1). EU type-examination lead times are the critical path to selling the AS-90 under the Regulation from 14 January 2027, and notified-body capacity for self-evolving safety systems will be scarce. The Annex IV technical file additions (MR-M3.2), the updated declaration and the notified-body number beside the CE marking then follow that route in order. In parallel, close the digital essential-requirement gaps that the type-examination will test: safety-software identification and tamper evidence (MR-M1.3), the malicious-attempt extension of the control-system safety case (MR-M1.4) and the safety-software tracing log (MR-M1.6). Substantial-modification governance for software updates (MR-M2.7) should be in place before the next AS-90 firmware release ships.",
+    regulatoryExposure: "The AS-90 is Meridian's growth product and its order book is predominantly EU intralogistics operators. From 14 January 2027 every unit placed on the EU market needs conformity under the Machinery Regulation, and for this machine that means a notified-body route. If Meridian continues to self-assess, each placement will be unlawful, and its distributors will be exposed as well as Meridian. A forced stop on EU shipments, or a competitor arriving first with a type-examined autonomous stacker, would put the EU pipeline and the framework tenders that already ask about Regulation 2023/1230 readiness directly at risk."
   };
 
   var basis = {
@@ -109,7 +109,7 @@ window.App.TourMachinery = (function () {
       rem: { rank: 10, band: "medium", owner: "Controls & Software Lead",
         action: "Interlock remote start/move-to-safe-position on confirmed visibility of the movement and working area (site camera coverage or line-of-sight confirmation) and make the supervisory function mandatory for autonomous operation.",
         impact: "Remote actions without area visibility are exactly what Annex III 3.2.4 prohibits for autonomous mobile machinery." } },
-    { id: "MRM1k", state: "in-place", ev: "Chapter 1 position is strong on the manufacturer's evidence: EN ISO 3691-4 design with verified guards and clearances, mode selector with sustained-action manual mode, emergency stops front and rear, energy isolation, and marking/instructions content verified in the 3691-4 report. Summary judgement on documentation, not an inspection." },
+    { id: "MRM1k", state: "in-place", ev: "Chapter 1 position is strong on the manufacturer's evidence: EN ISO 3691-4 design with verified guards and clearances, mode selector with sustained-action manual mode, emergency stops front and rear, energy isolation, and marking/instructions content verified in the 3691-4 report. This is a summary judgement on the documentation, made without an inspection." },
     { id: "MRM1l", state: "in-place", ev: "Chapter 3 (mobility) applies and is covered by the EN ISO 3691-4 verification: travel/braking performance, stability with rated load at height, pedestrian-zone speed limitation and signalling. Other supplementary chapters do not apply. Summary judgement on the manufacturer's evidence." },
     { id: "MRM1m", state: "in-place", ev: "Residual-risk register traces each entry to on-machine warnings and the instructions, including the digital residual risks (degraded perception mode, comms-loss standstill behaviour); reviewed at v3.2 of the risk assessment." },
 
@@ -118,7 +118,7 @@ window.App.TourMachinery = (function () {
     { id: "MRM2b", state: "partially", ev: "A complaints and non-conformity register is maintained with distributor feedback routed in, but there is no risk-based sample testing of fielded machines and no monitoring of field software behaviour.",
       rem: { rank: 15, band: "low", owner: "Quality & Compliance Manager",
         action: "Add risk-based sampling of fielded AS-90s (including software state and perception performance) to the post-market monitoring procedure.",
-        impact: "Field drift (mechanical or software) would surface through incidents rather than monitoring." } },
+        impact: "Field drift, mechanical or software, would come to light only through incidents, because nothing monitors for it." } },
     { id: "MRM2c", state: "in-place", ev: "Documented corrective-action and recall procedure with an authority-notification step per Member State; exercised in the 2024 mast-bearing recall, including distributor notification within 48 hours." },
     { id: "MRM2d", state: "partially", ev: "Technical files and declarations are archived for 10 years per machine in the QMS vault, but there is no arrangement to produce the safety-software source code or programming logic on a reasoned authority request.",
       rem: { rank: 12, band: "medium", owner: "Quality & Compliance Manager",
@@ -132,11 +132,11 @@ window.App.TourMachinery = (function () {
     { id: "MRM2g", state: "not-in-place", ev: "Firmware releases ship to fielded machines without any assessment of whether the change is a substantial modification: the 2025 speed-envelope increase went out as a routine update.",
       rem: { rank: 5, band: "high", owner: "Engineering Director",
         action: "Institute a substantial-modification gate for every change to fielded machines (physical or software): assess against Art 3(16), record the decision, and trigger re-assessment where required.",
-        impact: "A capability-changing update makes whoever ships it the manufacturer of a modified machine: unassessed, that is an unmanaged conformity and liability exposure." } },
+        impact: "Whoever ships an update that changes the machine's capability becomes the manufacturer of a modified machine. Without an assessment, that is an unmanaged conformity and liability exposure." } },
     { id: "MRM2h", state: "partially", ev: "The 14 January 2027 date is known and budgeted, but there is no model-by-model transition register: placement plans, certificate horizons and re-assessment needs are held informally by engineering.",
       rem: { rank: 11, band: "medium", owner: "Quality & Compliance Manager",
         action: "Build the transition register: per model, placement plans either side of 14 January 2027, certificate validity, standards watch and re-assessment schedule.",
-        impact: "Without a register, a model still selling in 2027 without a Regulation conformity route is discovered by a blocked shipment, not a plan." } },
+        impact: "Without a register, a model still on sale in 2027 with no conformity route under the Regulation will first come to light when a shipment is blocked." } },
 
     // ---- M3 Conformity & market placement (the blocker layer) ----
     { id: "MRM3a", state: "not-in-place", ev: "The AS-90 is treated as Module A self-assessment carried over from Directive practice. Its ML person-detection safety system places it in Annex I Part A (point 6): third-party conformity assessment is mandatory and no notified body has been engaged.",
@@ -172,7 +172,7 @@ window.App.TourMachinery = (function () {
     { id: "MRM3j", state: "partially", ev: "EU sales run through distributors in four Member States, but the Art 13-16 duties (language checks, storage conditions, document verification) are not contractually allocated, and the Benelux own-brand arrangement has not been reviewed against Art 17.",
       rem: { rank: 20, band: "medium", owner: "Engineering Director",
         action: "Allocate the importer/distributor duties contractually per market, and review the own-brand arrangement: under Art 17 the partner assumes full manufacturer obligations.",
-        impact: "Channel non-compliance blocks placements Meridian never sees, and the own-brand deal may have quietly transferred manufacturer liability." } }
+        impact: "Non-compliance in the sales channel can block placements Meridian never sees, and the own-brand deal may already have transferred manufacturer liability to Meridian's partner without anyone noticing." } }
   ];
 
   function apply(E) {

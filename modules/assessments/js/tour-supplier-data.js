@@ -38,11 +38,11 @@ window.App.TourSupplier = (function () {
   var reportNarrative = {
     // How the screening was run, answering the method prompt in the report.
     method:
-      "The screening was run as a supplier assessment: a two-hour structured review with Ferrovia Controls product, security and account leads, followed by a review of the certificates, policies, published advisories and draft contract terms they supplied. Each scored answer reflects the consultant's judgement of what was shown, not what was asserted.",
+      "The screening was run as a supplier assessment. It consisted of a two-hour structured review with Ferrovia Controls' product, security and account leads, followed by a review of the certificates, policies, published advisories and draft contract terms they supplied. Each scored answer reflects the consultant's judgement of what was shown. Claims that were not shown did not count.",
     nextSteps:
       "Commission the EU CRA Gap Assessment of the SentinelEdge line as the next piece of work\nPut vulnerability and incident notification clauses, and a committed support period, into the framework variation\nAsk Ferrovia to retire the standing remote-access account in favour of per-session activation\nRe-screen the supplier once the deep assessment has reported",
-    regulatoryExposure: "Aldergate's signalling-adjacent detection estate is standardising on the SentinelEdge line, so Ferrovia Controls' position becomes Aldergate's position. The screening shows a supplier with genuinely strong engineering (development practice and vulnerability handling screened well) but a regulatory domain graded F: no per-product CRA class position, no conformity route engaged, and no Article 14 reporting readiness. From 11 December 2027 that is a supply-continuity risk to Aldergate, not just Ferrovia's problem: non-conforming units cannot lawfully be placed on the market mid-framework. The screening-depth read of product capability (C) mainly reflects what could not be evidenced in a screening, which is itself the reason to commission the deep assessment rather than a finding of weakness.",
-    topPriorities: "Commission the EU CRA Gap Assessment of the SentinelEdge line now: the screener's regulatory F is the trigger, and the deep assessment establishes the real class, route and timeline while there is still notified-body capacity to book. In parallel, close the contractual gaps this screening surfaced: vulnerability and incident notification clauses, a committed support period proportionate to the fleet's service life, and retirement of the standing remote-access account in favour of per-session activation."
+    regulatoryExposure: "Aldergate's signalling-adjacent detection estate is standardising on the SentinelEdge line, so Ferrovia Controls' position becomes Aldergate's position. The screening shows a supplier with strong engineering, where development practice and vulnerability handling screened well, but its regulatory domain is graded F. Ferrovia has no CRA class position for each product, has engaged no conformity route and is not ready for Article 14 reporting. From 11 December 2027 that becomes a supply-continuity risk for Aldergate as well as a problem for Ferrovia, because non-conforming units cannot lawfully be placed on the market part way through the framework. The C for product capability mostly reflects what a screening could not evidence. It is a reason to commission the deep assessment and does not by itself show weakness.",
+    topPriorities: "Commission the EU CRA Gap Assessment of the SentinelEdge line now. The regulatory F in this screening is the trigger, and the deep assessment will establish the real class, route and timeline while notified-body capacity can still be booked. In parallel, close the contractual gaps the screening found. The contract needs vulnerability and incident notification clauses and a committed support period in proportion to the fleet's service life, and the standing remote-access account should be replaced by per-session activation."
   };
 
   var basis = {
@@ -67,7 +67,7 @@ window.App.TourSupplier = (function () {
   var rows = [
     // ---- Corporate security & assurance (B) ----
     { id: "corp.1", band: 3, ev: "A named Head of Product Security (M. Alvarez) with a product-security team; answered every screening question directly and within a day." },
-    { id: "corp.2", band: 2, ev: "ISO 27001 certified, but the scope statement covers corporate IT and the development offices, not the SentinelEdge product line. 62443-4-1 certification is stated to be in progress.",
+    { id: "corp.2", band: 2, ev: "ISO 27001 certified, but the scope statement covers only corporate IT and the development offices and leaves out the SentinelEdge product line. 62443-4-1 certification is stated to be in progress.",
       rem: { rank: 13, band: "Low", owner: "Supplier account manager",
         action: "Ask Ferrovia to evidence the 62443-4-1 certification scope when granted, and treat the 27001 certificate as corporate assurance only.",
         impact: "Certificates scoped away from the product line give no assurance about the product you buy." } },
@@ -81,7 +81,7 @@ window.App.TourSupplier = (function () {
     { id: "dev.2", band: 2, ev: "Static analysis and dependency scanning run per build, with an annual third-party penetration test; no fuzzing, and the pen-test scope excluded the update service.",
       rem: { rank: 12, band: "Low", owner: "Supplier account manager",
         action: "Request the next product pen test include the update-delivery service, and share the summary under NDA.",
-        impact: "The update channel is the highest-consequence untested surface: it reaches every deployed unit." } },
+        impact: "The update channel reaches every deployed unit, so it is the untested part with the greatest consequence." } },
     { id: "dev.3", band: 2, ev: "Firmware is signed and verified on-device; build-pipeline access control and provenance were asserted but not evidenced at screening depth.",
       rem: { rank: 7, band: "Medium", owner: "Consultant",
         action: "Verify build-environment controls and provenance in the 62443-4-1 deep assessment (SM practices).",
@@ -95,7 +95,7 @@ window.App.TourSupplier = (function () {
     { id: "prod.2", band: 2, ev: "Per-user role-based access confirmed; no directory integration on the deployed firmware, and log export needed syslog relay work Aldergate has not yet done.",
       rem: { rank: 14, band: "Low", owner: "OT engineering (Aldergate)",
         action: "Stand up the syslog relay so SentinelEdge security events reach Aldergate's monitoring, and track Ferrovia's directory-integration roadmap.",
-        impact: "Capability the product has but the estate does not use is exposure by configuration, not by product." } },
+        impact: "Where the product has a capability the estate does not use, the exposure comes from configuration and not from the product." } },
     { id: "prod.3", band: 2, ev: "Signed updates with rollback confirmed; no offline/staged path was demonstrable for Aldergate's air-gapped signalling segments at screening depth.",
       rem: { rank: 4, band: "Medium", owner: "Consultant",
         action: "Confirm the offline update path for air-gapped segments in the deep product assessment, or agree a supported procedure with Ferrovia.",
@@ -112,7 +112,7 @@ window.App.TourSupplier = (function () {
     // ---- Regulatory exposure & readiness (F - the routed domain) ----
     { id: "reg.1", band: 1, ev: "General CRA awareness, but no per-product position: Ferrovia could not state the SentinelEdge line's Annex III class, and assumes self-assessment applies.",
       rem: { rank: 3, band: "High", owner: "Consultant",
-        action: "Establish the real classification in the EU CRA Gap Assessment: an intrusion-detection product is a strong Annex III Class II candidate, which changes everything downstream.",
+        action: "Establish the real classification in the EU CRA Gap Assessment: an intrusion-detection product is a strong Annex III Class II candidate, and that class would change the conformity route and every step after it.",
         impact: "A wrong class assumption invalidates the intended conformity route and the CE marking built on it." } },
     { id: "reg.2", band: 0, ev: "No conformity route engaged: no notified body contacted, no Annex VII technical documentation programme, no dated plan against the December 2027 deadline.",
       rem: { rank: 1, band: "High", owner: "Consultant",
@@ -121,7 +121,7 @@ window.App.TourSupplier = (function () {
     { id: "reg.3", band: 0, ev: "No Article 14 reporting process exists, and there is no commitment to notify customers of actively exploited vulnerabilities on any timeline.",
       rem: { rank: 2, band: "High", owner: "Procurement lead (Aldergate)",
         action: "Require a customer-notification commitment (defined hours) in contract, and track Ferrovia's Article 14 readiness through the CRA deep assessment.",
-        impact: "Aldergate's own incident-response and NIS2 duties depend on hearing about exploited supplier vulnerabilities in hours, not news cycles." } },
+        impact: "Aldergate's own incident-response and NIS2 duties depend on hearing about exploited supplier vulnerabilities within hours. Learning of them from the news would be too late." } },
 
     // ---- Supply chain & operational exposure (C) ----
     { id: "chain.1", band: 2, ev: "A top-level SBOM is available under NDA; transitive open-source dependencies are not yet enumerated, and fourth parties (ODM hardware) were named only verbally.",

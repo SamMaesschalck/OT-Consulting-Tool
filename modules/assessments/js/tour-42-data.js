@@ -45,9 +45,9 @@ window.App.Tour42 = (function () {
     nextSteps:
       "Share this assessment with Meridian and ask for a written roadmap position on CR 1.1 and CR 6.2\nMake individual authentication and a monitoring interface conditions of the standardisation decision\nWhere the S9 is already deployed, compensate at the zone: control engineering access through a managed workstation and record who held the session\nRe-assess the controller when the next firmware release is available",
     regulatoryExposure:
-      "The Meridian S9 is the controller Northbridge is standardising on for safety-related duty across three plants, so its capability ceiling becomes the ceiling for every zone it is deployed into. The target of SL 2 reflects an expectation of protection against intentional misuse by simple means. The controller's integrity capability is genuinely good, but two foundational requirements fall short. FR1 (identification and authentication) sits on the floor at SL 0, because the device cannot distinguish one engineer from another. FR6 (timely response to events) is held at SL 1 against a target of SL 2, because the controller cannot be monitored continuously. On a safety-related device, the inability to attribute a change or to detect manipulation in service is the material exposure, and neither is fixable by configuration.",
+      "The Meridian S9 is the controller Northbridge is standardising on for safety-related duty across three plants, so its capability ceiling becomes the ceiling for every zone it is deployed into. The target of SL 2 reflects an expectation of protection against intentional misuse by simple means. The controller's integrity capability is good, but two foundational requirements fall short. FR1 (identification and authentication) sits on the floor at SL 0, because the device cannot distinguish one engineer from another. FR6 (timely response to events) is held at SL 1 against a target of SL 2, because the controller cannot be monitored continuously. On a safety-related device the material exposure is that a change cannot be attributed and manipulation in service cannot be detected. Neither can be fixed by configuration.",
     topPriorities:
-      "The two priorities are both supplier commitments rather than site actions. First, individual authentication on the engineering interface (CR 1.1), which today accepts a single shared password and leaves every logic change unattributable. Second, a monitoring interface that allows security events to be collected continuously (CR 6.2), so that manipulation of a safety-related controller is detectable rather than discovered at the next proof test. Each is the single item holding its foundational requirement below target, and both should be written into the supplier's product roadmap as a condition of the standardisation decision."
+      "Both priorities need commitments from the supplier, because the site cannot fix them. The first is individual authentication on the engineering interface (CR 1.1), which today accepts a single shared password, so no logic change can be attributed. The second is a monitoring interface that collects security events continuously (CR 6.2), so that manipulation of a safety-related controller is detected when it happens and does not wait for the next proof test. Each is the only item holding its foundational requirement below target. Both should be written into the supplier's product roadmap as a condition of the standardisation decision."
   };
 
   // Row shapes:
@@ -62,7 +62,7 @@ window.App.Tour42 = (function () {
         impact: "No logic change on a safety-related controller can be attributed to a person, which defeats both accountability and any insider investigation." } },
     { id: "CR1.2", sl: 1, ev: "The controller authenticates its paired engineering tool, but peer controllers and the historian connect on address trust alone.",
       rem: { rank: 5, band: "High", owner: "Product Supplier (Meridian)",
-        action: "Extend device authentication to all peer and supervisory connections, not only the engineering tool.",
+        action: "Extend device authentication beyond the engineering tool to all peer and supervisory connections.",
         impact: "A spoofed peer on the control network is trusted by the controller purely for being at the right address." } },
     { id: "CR1.3", sl: 2, ev: "Account roles on the device (operate, engineer, administer) can be created, disabled and removed through the engineering tool." },
     { id: "CR1.4", sl: 2, ev: "Identifiers are managed per role and per interface, and are not reused after removal." },
@@ -70,9 +70,9 @@ window.App.Tour42 = (function () {
       rem: { rank: 8, band: "Medium", owner: "Product Supplier (Meridian)",
         action: "Move authenticator storage into the controller's secure element, which is already present for firmware signature verification.",
         impact: "Credentials recoverable from a device configuration file spread to every controller sharing the build." } },
-    { id: "CR1.7", sl: 2, ev: "Password length and character mix are configurable and enforced by the device rather than by the engineering tool." },
+    { id: "CR1.7", sl: 2, ev: "Password length and character mix are configurable, and the device itself enforces them." },
     { id: "CR1.8", na: true, note: "The controller does not use PKI certificates for any of its interfaces; authentication is by shared secret. Not applicable to this product." },
-    { id: "CR1.9", na: true, note: "No public key based authentication is offered by the controller. Not applicable to this product." },
+    { id: "CR1.9", na: true, note: "The controller offers no public key based authentication, so this requirement does not apply to the product." },
     { id: "CR1.10", sl: 2, ev: "Authenticator entry is obscured on the engineering tool and no credential is echoed to the device display." },
     { id: "CR1.11", sl: 1, ev: "A configurable retry limit applies to the operator display, but the service port accepts unlimited authentication attempts.",
       rem: { rank: 11, band: "Medium", owner: "Product Supplier (Meridian)",
@@ -90,11 +90,11 @@ window.App.Tour42 = (function () {
     // ---- FR2  Use control -------------------------------------------------
     { id: "CR2.1", sl: 2, ev: "The device enforces its three roles at the interface, and an operator token cannot download logic." },
     { id: "CR2.2", na: true, note: "The controller has no wireless interface fitted or available as an option. Not applicable to this product." },
-    { id: "CR2.3", na: true, note: "Recorded, not scored: CR 2.3 carries no capability security level in Annex B Table B.1, so it is not selected at SL 1-4. Portable media control is handled by the engineering workstation build rather than by the controller." },
+    { id: "CR2.3", na: true, note: "Recorded but not scored. CR 2.3 carries no capability security level in Annex B Table B.1, so it is not selected at SL 1-4. The engineering workstation build handles portable media control, and the controller has no part in it." },
     { id: "EDR2.4", sl: 2, ev: "The controller executes only signed logic from its own runtime; no general purpose mobile code technology is supported, and unsigned logic is rejected." },
     { id: "CR2.5", sl: 1, ev: "The operator display locks on inactivity; the engineering tool session on the device persists until the cable is removed.",
       rem: { rank: 12, band: "Medium", owner: "Product Supplier (Meridian)",
-        action: "Apply a configurable inactivity lock to the engineering session on the device, not only to the operator display.",
+        action: "Apply a configurable inactivity lock to the engineering session on the device as well as to the operator display.",
         impact: "An engineering session left connected in a cabinet is an open path to the safety logic." } },
     { id: "CR2.6", sl: 2, ev: "Remote engineering sessions terminate on inactivity and can be dropped from the device side." },
     { id: "CR2.7", sl: 2, ev: "The controller permits a single engineering session at a time; concurrent session limits are inherent to the design." },
@@ -178,7 +178,7 @@ window.App.Tour42 = (function () {
     { id: "CR6.2", sl: 0, ev: "The controller offers no syslog, no SNMP trap and no other mechanism for continuous monitoring; security events remain on the device until someone looks.",
       rem: { rank: 1, band: "Critical", owner: "Product Supplier (Meridian)",
         action: "Require a standard continuous monitoring output (syslog or equivalent) in the product roadmap, and make it a condition of the standardisation decision.",
-        impact: "Manipulation of a safety-related controller is undetectable in service and would surface only at the next proof test." } },
+        impact: "Manipulation of a safety-related controller cannot be detected in service and would come to light only at the next proof test." } },
 
     // ---- FR7  Resource availability --------------------------------------
     { id: "CR7.1", sl: 2, ev: "The controller sheds non-essential communication under load and maintains the safety function; behaviour was confirmed under a broadcast storm test." },
@@ -188,7 +188,7 @@ window.App.Tour42 = (function () {
         action: "Verify backup integrity as part of the backup procedure, and hold an offline copy of the signed logic for each controller.",
         impact: "An altered or corrupt backup gives false assurance until a restore is attempted after an incident." } },
     { id: "CR7.4", sl: 2, ev: "A controller can be restored to a known good state from backup within a documented maintenance window." },
-    { id: "CR7.5", na: true, note: "Recorded, not scored: CR 7.5 carries no capability security level in Annex B Table B.1, so it is not selected at SL 1-4. Emergency power is provided externally by the cabinet UPS rather than by the controller." },
+    { id: "CR7.5", na: true, note: "Recorded but not scored. CR 7.5 carries no capability security level in Annex B Table B.1, so it is not selected at SL 1-4. The cabinet UPS provides emergency power, outside the controller." },
     { id: "CR7.6", sl: 2, ev: "Security-relevant settings can be set to the supplier's hardening guidance and read back through the engineering tool." },
     { id: "CR7.7", sl: 1, ev: "The web diagnostic server and a legacy programming protocol are enabled by default and cannot both be disabled on current firmware.",
       rem: { rank: 16, band: "Low", owner: "Product Supplier (Meridian)",

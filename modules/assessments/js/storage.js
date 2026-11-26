@@ -647,7 +647,7 @@ window.App.Storage = (function () {
       try {
         var data = JSON.parse(reader.result);
         if (!data || !data.schemaVersion) {
-          res = { ok: false, error: "File does not look like an OT assessment project (no schemaVersion)." };
+          res = { ok: false, error: "This file is not an OT assessment project (it has no schemaVersion)." };
         } else if (data.schemaVersion === "1.0") {
           res = { ok: true, data: migrateV1(data), migrated: true };
         } else if (data.schemaVersion !== SCHEMA_VERSION) {
@@ -678,13 +678,13 @@ window.App.Storage = (function () {
       // refuses such a file before this is asked. Kept so the helper still
       // tells the truth to a caller that has not checked the file first.
       if (!inst) {
-        msgs.push("Assessment '" + instrumentId + "' is for an instrument this tool does not have, so its answers are not shown.");
+        msgs.push("Assessment '" + instrumentId + "' uses an instrument this copy does not have, so its answers are not shown.");
         return;
       }
       var saved = ass.instrumentContentVersion || "";
       var current = inst.contentVersion || "";
       if (saved && current && saved !== current) {
-        msgs.push("Assessment '" + id + "' was saved against content version " + saved + ", but this tool has version " + current + ". Items renamed or removed since then may not show correctly.");
+        msgs.push("Assessment '" + id + "' was saved against content version " + saved + " and this copy has version " + current + ". Items renamed or removed since then may not show correctly.");
       }
     });
     return msgs;

@@ -79,7 +79,7 @@ window.App.TourCRA = (function () {
     { id: "CRAP1c", state: "partially", ev: "Signed firmware updates with rollback are provided, but there is no automatic-update option and user notification of available updates is manual.",
       rem: { rank: 11, band: "medium", owner: "Firmware Lead",
         action: "Add an opt-in automatic-update channel and in-product notification of available security updates, preserving operator control of timing.",
-        impact: "Operators may run known-vulnerable firmware for long periods because updates are neither surfaced nor easily applied." } },
+        impact: "Operators may run known-vulnerable firmware for long periods because operators are not told about updates and cannot easily apply them." } },
     { id: "CRAP1d", state: "in-place", ev: "Per-user authentication with role-based access; failed and successful administrative logons are recorded and can be exported to a SIEM." },
     { id: "CRAP1e", state: "partially", ev: "Management traffic is TLS 1.3; stored configuration and captured session data are not encrypted at rest on the device.",
       rem: { rank: 14, band: "low", owner: "Firmware Lead",

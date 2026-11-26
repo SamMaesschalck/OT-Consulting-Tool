@@ -534,7 +534,7 @@ window.App.Review = (function () {
     return hit ? out.join("\n") : null;
   }
 
-  var NOT_EDITABLE = "The tool writes this text, so it cannot be changed here. Copy the wording and use Go to.";
+  var NOT_EDITABLE = "This text is generated, so it cannot be changed here. Copy the wording and use Go to.";
 
   function headingHasTarget(text) {
     var R = window.App.Report, eng = E().state.engagement;
@@ -1075,7 +1075,7 @@ window.App.Review = (function () {
     var lost = paragraphChanges().filter(function (r) { return r.state === "changed"; }).length;
     if (lost) {
       out.push({ kind: "reworded-not-applied", text: (lost === 1 ? "1 accepted rewording is" : lost + " accepted rewordings are") +
-        " not in the Word report: the text " + (lost === 1 ? "it" : "they") + " replaced has changed." });
+        " not in the Word report. The text " + (lost === 1 ? "it" : "they") + " replaced has changed." });
     }
     return out;
   }

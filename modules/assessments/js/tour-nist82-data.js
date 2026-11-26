@@ -28,7 +28,7 @@ window.App.TourNIST82 = (function () {
     nextSteps:
       "Agree an owner and a target date for each control recorded as Other Than Satisfied\nTrial passive OT monitoring on one treatment site before committing to a full deployment\nBroker vendor and engineer remote access through a hardened jump host and retire the standing accounts\nTest an OT backup restore on a non-production controller and record the outcome\nRe-assess against the OT Overlay in twelve months",
     regulatoryExposure:
-      "Riverbend Water Authority operates water treatment and distribution as an essential service and assesses its OT/SCADA environment against the NIST SP 800-82 Rev 3 OT Overlay (Moderate baseline). This is an alignment and gap analysis, not a formal SP 800-53A assessment. The controls that are Other Than Satisfied concentrate around remote access, monitoring and recovery of the control environment, which bear directly on the ability to detect and recover from an attack before it affects supply or public safety.",
+      "Riverbend Water Authority operates water treatment and distribution as an essential service and assesses its OT/SCADA environment against the NIST SP 800-82 Rev 3 OT Overlay (Moderate baseline). This is an alignment and gap analysis and is not a formal SP 800-53A assessment. The controls that are Other Than Satisfied concentrate around remote access, monitoring and recovery of the control environment, which bear directly on the ability to detect and recover from an attack before it affects supply or public safety.",
     topPriorities:
       "The two most urgent priorities are deploying passive, ICS-aware monitoring of the OT network (SI-4), so that an intrusion in the control environment can be detected, and hardening and brokering all remote access to OT (AC-17), so that vendor and engineer access cannot be abused as a direct path to the process. Testing OT backups and recovery (CP-9) and OT-aware vulnerability management (RA-5) follow close behind."
   };
@@ -36,9 +36,9 @@ window.App.TourNIST82 = (function () {
   var gaps = [
     { id: "SI-4", ev: "There is no security monitoring of the OT network; visibility is limited to local device logs with no view of east-west control traffic.",
       rem: { rank: 1, band: "High", owner: "OT Security Lead",
-        action: "Deploy passive, ICS-aware OT network monitoring (span/tap sensors) to baseline normal traffic and surface anomalies to a monitored queue.",
+        action: "Deploy passive, ICS-aware OT network monitoring (span/tap sensors) to baseline normal traffic and send anomalies to a monitored queue.",
         impact: "With no visibility of the control network, a process-manipulation attack could progress undetected until it affects supply or safety." } },
-    { id: "AC-17", ev: "Vendor and engineer remote access uses standing accounts and a shared VPN, not brokered through a hardened jump host with per-session control.",
+    { id: "AC-17", ev: "Vendor and engineer remote access uses standing accounts and a shared VPN. It does not pass through a hardened jump host with per-session control.",
       rem: { rank: 2, band: "High", owner: "OT Security Lead",
         action: "Broker all OT remote access through a hardened, MFA-protected jump host with time-bound, logged, per-session approval.",
         impact: "Standing remote access to OT is the highest-value target and a direct path to the process for an attacker." } },
@@ -101,7 +101,7 @@ window.App.TourNIST82 = (function () {
     { id: "CM-6", ev: "Workstations follow a baseline, but PLCs, RTUs and OT network gear have no documented hardening standard and are largely at vendor defaults.",
       rem: { rank: 17, band: "Medium", owner: "Controls Engineering Team",
         action: "Define and apply OT device hardening baselines (disable unused services/ports, change default credentials, document deviations).",
-        impact: "Default-configured controllers expose unnecessary services and default credentials: a low-effort foothold." } },
+        impact: "Controllers left at their default configuration expose unnecessary services and default credentials, which give an attacker an easy foothold." } },
     { id: "PS-4", ev: "Leaver access revocation is reliable for corporate accounts but slower for OT and vendor accounts.",
       rem: { rank: 18, band: "Low", owner: "OT Security Lead",
         action: "Guarantee prompt revocation of OT and vendor access for leavers and completed engagements.",

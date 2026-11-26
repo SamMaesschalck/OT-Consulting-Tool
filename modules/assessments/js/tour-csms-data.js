@@ -29,7 +29,7 @@ window.App.TourCSMS = (function () {
   var reportNarrative = {
     nextSteps:
       "Agree an owner and a target date for each CSMS element recorded as not in place\nStand up the OT incident response and recovery capability first, then exercise it\nSet dates for the first conformance check and management review, and put the cycle in the calendar\nComplete the segmentation work separating the safety system from the control network\nRe-assess the CSMS in twelve months",
-    regulatoryExposure: "Castlefield Energy maintains a CSMS that is reasonably mature in governance, policy and physical security but weakest in monitoring and improving the system: incident response, conformance checking and periodic review are not in place. Because the CSMS is the framework that keeps OT security sustained, those Not-in-place elements mean the programme would not detect its own drift, verify its conformance, or respond in a structured way to an incident, which is where an organisation is most exposed over time.",
+    regulatoryExposure: "Castlefield Energy maintains a CSMS that is reasonably mature in governance, policy and physical security. It is weakest in monitoring and improving the system, where incident response, conformance checking and periodic review are not in place. The CSMS is what keeps OT security going over time. With those elements not in place, the programme would not detect its own drift or verify its conformance, and it would not respond to an incident in a structured way. That is where an organisation becomes most exposed over time.",
     topPriorities: "The most urgent priorities are putting an OT incident response and recovery capability in place (4.3.4.5), establishing a periodic CSMS review and improvement cycle (4.4.3) and introducing conformance checking (4.4.2). Completing internal network segmentation and separating the safety system (4.3.3.4) is the most important single countermeasure."
   };
 
@@ -65,7 +65,7 @@ window.App.TourCSMS = (function () {
     { id: "E4342", state: "partially", ev: "Risk treatment decisions are made case by case; there is no documented risk-management and implementation process tying controls to assessed risk.",
       rem: { rank: 7, band: "low", owner: "OT Security Lead",
         action: "Document a risk-management and implementation process linking selected countermeasures to assessed OT risk.",
-        impact: "Without a structured process, controls are not prioritised against the risks that actually matter on the plant." } },
+        impact: "Without a structured process, controls are not prioritised against the risks that matter on the plant." } },
 
     // ---- Addressing risk: implementation group -------------------------
     { id: "E4343", state: "partially", ev: "Security is considered informally in changes, but there is no secure development/maintenance standard or change-control gate for the control systems.",
@@ -77,13 +77,13 @@ window.App.TourCSMS = (function () {
       rem: { rank: 1, band: "high", owner: "Head of Operations",
         action: "Develop and rehearse an OT incident response and recovery plan with defined roles, escalation and safe-state decision authority.",
         impact: "Without a plan, an OT incident is handled by improvisation, exactly when safe, fast decisions matter most." } },
-    { id: "E442",  state: "not-in-place", ev: "There is no process to check the CSMS against requirements; conformance is assumed, not verified.",
+    { id: "E442",  state: "not-in-place", ev: "There is no process to check the CSMS against requirements, so conformance is assumed and never verified.",
       rem: { rank: 3, band: "high", owner: "CISO",
         action: "Introduce conformance checking (internal audit / self-assessment) of the CSMS against the standard, on a defined cycle.",
         impact: "Unverified conformance gives false assurance and leaves gaps undetected until an incident or audit." } },
 
     // ---- Monitoring and improving the CSMS -----------------------------
-    { id: "E443",  state: "not-in-place", ev: "The CSMS is not periodically reviewed, improved or maintained; it is effectively static since it was set up.",
+    { id: "E443",  state: "not-in-place", ev: "The CSMS is not periodically reviewed, improved or maintained, and it has barely changed since it was set up.",
       rem: { rank: 2, band: "high", owner: "CISO",
         action: "Establish a periodic CSMS review and improvement cycle (management review, metrics, corrective actions).",
         impact: "A CSMS that is not maintained decays as the environment and threats change, and conformance lapses unnoticed." } }

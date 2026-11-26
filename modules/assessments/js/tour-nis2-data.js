@@ -36,7 +36,7 @@ window.App.TourNIS2 = (function () {
       "Assign an owner for the incident-reporting process and have a working procedure within the quarter\nRehearse the 24-hour, 72-hour and one-month reporting sequence as a tabletop, with the management body present\nIssue baseline security requirements to critical suppliers and reflect them at the next contract renewal\nPut the management-body training curriculum in the calendar\nRe-assess before the next supervisory engagement",
     entityClassification: "essential",
     competentAuthority: "the national competent authority for the energy sector",
-    regulatoryExposure: "As an essential entity in the energy sector, Northbridge Energy is subject to the full NIS2 supervisory regime, including proactive supervision and the higher tier of administrative fines. The Not Achieved incident-reporting obligations are the most acute exposure: without a working 24-hour, 72-hour and one-month reporting process the entity could not meet its statutory duties during a live incident, which is precisely the area competent authorities scrutinise after a breach.",
+    regulatoryExposure: "As an essential entity in the energy sector, Northbridge Energy is subject to the full NIS2 supervisory regime, including proactive supervision and the higher tier of administrative fines. The Not Achieved incident-reporting obligations are the most acute exposure. Without a working 24-hour, 72-hour and one-month reporting process the entity could not meet its statutory duties during a live incident, and competent authorities scrutinise exactly that after a breach.",
     topPriorities: "1) Stand up the incident-reporting process end to end (early warning, 72-hour notification and final report) and rehearse it, as these carry statutory deadlines and are currently Not Achieved. 2) Set and contract baseline security requirements for critical suppliers. 3) Close the management-training and effectiveness-assessment gaps to evidence governance maturity."
   };
 
@@ -48,7 +48,7 @@ window.App.TourNIS2 = (function () {
     { id: "GOV.4", state: "partially", ev: "Board received a one-off cyber briefing in 2025 but there is no recurring training programme for the management body.",
       rem: { rank: 6, band: "medium", owner: "Company Secretary",
         action: "Establish an annual cyber training curriculum for the board and executive, with attendance recorded.",
-        impact: "Management-body members may lack the knowledge to oversee cyber risk: a specific NIS2 governance duty carrying personal accountability." } },
+        impact: "Management-body members may lack the knowledge to oversee cyber risk. NIS2 makes that oversight a specific governance duty with personal accountability." } },
     { id: "GOV.5", state: "achieved", ev: "Annual all-staff security awareness training (96% completion) plus role-based OT training for engineering staff." },
 
     { id: "MA.1", state: "achieved", ev: "Documented all-hazards risk assessment methodology; OT risk register reviewed six-monthly." },
@@ -94,7 +94,7 @@ window.App.TourNIS2 = (function () {
         impact: "Gaps in the asset inventory become unmonitored entry points and weaken patching and response." } },
 
     { id: "MJ.1", state: "achieved", ev: "MFA enforced for all remote and privileged access via the identity platform." },
-    { id: "MJ.2", state: "na", ev: "Secured emergency communication systems are provided by the national grid operator, not this entity; out of scope here." },
+    { id: "MJ.2", state: "na", ev: "The national grid operator provides the secured emergency communication systems, so they are out of scope for this entity." },
 
     { id: "REP.1", state: "partially", ev: "Staff can recognise major incidents but there is no documented test against the Article 23 significance criteria.",
       rem: { rank: 4, band: "high", owner: "CISO",

@@ -60,8 +60,8 @@ window.App.TourRiskAppetite = (function () {
       "behind a single DMZ, no monitoring of the control systems, shared engineering credentials and backups " +
       "that have never been restored. Wearvale is an essential service where a compromise could harm public " +
       "health, and the sector draws credible state-level interest. Against that exposure, the organisation is " +
-      "carrying materially more risk than it believes it is, and it has come to carry it by drift rather than " +
-      "by any decision the board would recognise as its own. The finding is recorded as under-protected on that " +
+      "carrying materially more risk than it believes it is. It has drifted into carrying that risk, and the board " +
+      "never took a decision it would recognise as its own. The finding is recorded as under-protected on that " +
       "basis."
   };
 
@@ -76,8 +76,8 @@ window.App.TourRiskAppetite = (function () {
     { id: "EXP2", band: "severe",
       evidence: "Interview with D. Oyelaran (Head of IT Security); national threat reporting for the UK water sector.",
       notes: "Beyond commodity ransomware, UK water has drawn documented interest from capable state-aligned " +
-             "actors, and the sector has seen intrusions into treatment control. Wearvale should assume it is " +
-             "within scope of that interest rather than below it." },
+             "actors, and the sector has seen intrusions into treatment control. Wearvale should assume that this " +
+             "interest extends to it." },
     { id: "EXP3", band: "high",
       evidence: "Interview with D. Oyelaran; national threat reporting for the UK water sector.",
       notes: "No overseas operations or contested-region exposure, but the sector as a whole is named in " +
@@ -112,23 +112,23 @@ window.App.TourRiskAppetite = (function () {
     { id: "APP3", band: "cautious",
       evidence: "OT security remediation register (OT-REM-2026); interview with D. Oyelaran.",
       notes: "IT findings are remediated to defined SLAs. OT findings are managed on a separate register where " +
-             "dates move with outage windows, which leadership reads as prudent sequencing rather than delay." },
+             "dates move with outage windows. Leadership sees this as prudent sequencing and does not regard it as delay." },
     { id: "APP4", band: "open",
       evidence: "Board risk register (BRR-2026-Q2) and OT remediation register (OT-REM-2026): no recorded acceptances in either. Confirmed in interview with J. Beattie.",
       notes: "Risk acceptance is informal: no documented acceptances, no expiry dates, no board sign-off on " +
-             "carrying a specific OT risk. Where risk is accepted it happens by a deferred date rather than a " +
-             "decision anyone recorded." },
+             "carrying a specific OT risk. Where risk is accepted, it happens because a date is deferred, and nobody " +
+             "records a decision." },
     { id: "APP5", band: "cautious",
       evidence: "Interview with G. Whitcombe; OT remediation register (OT-REM-2026), dates tied to outage windows.",
-      notes: "Availability leads, as it must for a water undertaker, but security work is scheduled into " +
-             "planned outages rather than refused. The constraint is genuine and reasonably handled." },
+      notes: "Availability comes first, as it must for a water undertaker, but security work is scheduled into " +
+             "planned outages and is not refused. The constraint is real and reasonably handled." },
     { id: "APP6", band: "cautious",
       evidence: "Interviews with H. Nakamura and G. Whitcombe.",
       notes: "Safety culture is strong and cyber is now named in the safety case as a contributing hazard. The " +
              "connection between a cyber event and a public-health outcome is understood at board level." },
     { id: "APP7", band: "cautious",
       evidence: "Post-incident review of the corporate ransomware event (PIR-2024-11); interview with D. Oyelaran.",
-      notes: "A 2024 ransomware event on the corporate estate prompted a genuine programme: segmentation of the " +
+      notes: "A 2024 ransomware event on the corporate estate prompted a real programme of work, covering segmentation of the " +
              "IT/OT boundary, an incident retainer and tabletop exercises. Lessons were taken seriously on the " +
              "IT side." }
   ];
@@ -144,8 +144,8 @@ window.App.TourRiskAppetite = (function () {
       notes: "Treatment PLC firmware is between four and nine years behind, and several Windows-based HMIs are " +
              "on unsupported builds. There is no OT patch cycle; updates happen when a vendor attends for " +
              "another reason. The engineers pointed to the DCS vendor's certification as the reason firmware is " +
-             "held back, which is fair, but nothing compensates for the gap and it is not tracked, so it is " +
-             "counted as appetite rather than as a managed constraint." },
+             "held back, which is fair. Nothing compensates for the gap and it is not tracked, so it is counted " +
+             "as appetite and not as a managed constraint." },
     { id: "TECH2", band: "tolerant", disposition: "accepted",
       evidence: "Firewall rule review and network diagram walkthrough of the IT/OT boundary with IT security.",
       notes: "One DMZ separates IT from OT, and behind it the process network is flat: telemetry, treatment " +
@@ -175,7 +175,7 @@ window.App.TourRiskAppetite = (function () {
     // The consultant's two executive-summary paragraphs.
     regulatoryExposure:
       "Wearvale supplies drinking water to 1.4 million people and treats wastewater across the region, so the " +
-      "consequence that matters here is public health and the environment rather than lost revenue. It operates " +
+      "consequences that matter most here are to public health and the environment. It operates " +
       "under the NIS Regulations with DWI oversight, and its next resilience investment case goes to Ofwat within " +
       "the year. That case is where the board can fund the operational technology work that has now been " +
       "deferred twice, or decide on the record to carry the risk for another cycle. Either is " +
@@ -190,7 +190,7 @@ window.App.TourRiskAppetite = (function () {
       "Put the stated-vs-revealed gap to the board as a single decision: accept this level of risk explicitly, or fund closing it\n" +
       "Commission an IEC 62443-3-3 assessment of one treatment site to turn this characterisation into specific, costed work\n" +
       "Close the three findings that need no capital programme: shared engineering credentials, standing integrator VPN, untested backups\n" +
-      "Record any risk the board chooses to carry as a dated, owned acceptance with an expiry, not a deferred remediation date\n" +
+      "Record any risk the board chooses to carry as a dated, owned acceptance with an expiry, and stop using deferred remediation dates in its place\n" +
       "Re-characterise appetite in twelve months, once the OT capital deferred through two AMP cycles has either landed or been consciously declined"
   };
 

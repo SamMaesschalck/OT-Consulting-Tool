@@ -46,10 +46,10 @@ window.App.ScoringCRA = (function () {
     { id: "critical", label: "Critical (Annex IV)" }
   ];
   var FALLBACK_ROUTES = {
-    "default": "Internal control (Annex VIII, Module A): manufacturer self-assessment; no notified body required.",
-    "important-class-i": "Self-assessment via internal control (Module A) is permitted only if a relevant harmonised standard, common specification or European cybersecurity certification scheme is applied in full; otherwise a notified-body route (EU-type examination Module B + Module C, or full quality assurance Module H).",
-    "important-class-ii": "Notified-body route required: EU-type examination (Module B) + conformity to type (Module C), or full quality assurance (Module H). Self-assessment is not available.",
-    "critical": "As Class II (notified-body route), and may also require a European cybersecurity certificate under an EU scheme where a delegated act so specifies."
+    "default": "Internal control (Annex VIII, Module A). The manufacturer self-assesses and no notified body is needed.",
+    "important-class-i": "Self-assessment by internal control (Module A) is allowed only if a relevant harmonised standard, common specification or European cybersecurity certification scheme is applied in full. Otherwise a notified body is needed, through EU-type examination (Module B) with Module C, or full quality assurance (Module H).",
+    "important-class-ii": "A notified body is needed, through EU-type examination (Module B) with conformity to type (Module C), or full quality assurance (Module H). Self-assessment is not available.",
+    "critical": "As for Class II, with a notified body. A European cybersecurity certificate under an EU scheme may also be needed where a delegated act requires one."
   };
   var GROUP_LABELS = {
     "annex-iii-class-i": "Annex III - Class I (Important)",
@@ -132,8 +132,8 @@ window.App.ScoringCRA = (function () {
     var note = "";
     if (misclassification) {
       note = (lk && lk.authorityRef)
-        ? "The class is set to " + classLabel(chosen, instrument) + ", but the matched category" + (categoryText ? " (" + categoryText + ")" : "") + " indicates " + classLabel(suggested, instrument) + " under the " + lk.authorityRef + " - the higher classification governs. This changes the required conformity route - confirm the class is correct."
-        : "The product class is set to " + classLabel(chosen, instrument) + ", but the matched category" + (categoryText ? " (" + categoryText + ")" : "") + " indicates " + classLabel(suggested, instrument) + " under CRA Annex III/IV - the higher classification governs. This changes the required conformity route and is a common, consequential CRA misclassification - confirm the class is correct.";
+        ? "The class is set to " + classLabel(chosen, instrument) + ", but the matched category" + (categoryText ? " (" + categoryText + ")" : "") + " indicates " + classLabel(suggested, instrument) + " under the " + lk.authorityRef + ". The higher classification governs, and it changes the required conformity route. The class should be confirmed."
+        : "The product class is set to " + classLabel(chosen, instrument) + ", but the matched category" + (categoryText ? " (" + categoryText + ")" : "") + " indicates " + classLabel(suggested, instrument) + " under CRA Annex III/IV. The higher classification governs, and it changes the required conformity route. This is a common CRA misclassification with real consequences, so the class should be confirmed.";
     }
     return {
       productCategory: (setup && setup.productCategory) || "",

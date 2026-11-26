@@ -9,7 +9,7 @@ window.App.Data.shared.crossReferences = {
   "strengthScale": {
     "direct": "The 62443 requirement directly specifies how to meet this outcome.",
     "partial": "The 62443 requirement contributes to but does not fully address the outcome.",
-    "contextual": "Related background; informs understanding rather than providing the fix."
+    "contextual": "Related background that helps understanding but does not provide the fix."
   },
   "rows": [
     {

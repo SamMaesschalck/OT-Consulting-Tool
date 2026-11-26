@@ -17,8 +17,8 @@ window.App.Data.shared.engagementGuidance = {
     ],
     "oftenForgotten": [
       "Vendor support contracts and remote-access agreements",
-      "Organisation chart / who actually administers what",
-      "Backup restore TEST records (not just the backup policy)",
+      "Organisation chart showing who administers what",
+      "Records of backup restore tests, as well as the backup policy",
       "Management-of-change records for the control system",
       "List of third parties with any access to OT"
     ],
@@ -43,10 +43,10 @@ window.App.Data.shared.engagementGuidance = {
         "Backup, restore and DR procedures for OT systems"
       ],
       "oftenForgotten": [
-        "Firewall rule change records (is the ruleset managed or accreted?)",
+        "Firewall rule change records, to show whether the rule set is managed or has just grown",
         "Service-account and shared-account list with owners",
         "Wireless survey / list of wireless links into the OT estate",
-        "Time synchronisation (NTP) design: several SRs depend on it",
+        "Time synchronisation (NTP) design, which several SRs depend on",
         "Certificate and cryptographic key inventory",
         "Historian / DMZ replication configuration and data flows",
         "Details of the risk assessment that set the target SLs (or the spt-risk-context export from the risk tool)"
@@ -56,7 +56,7 @@ window.App.Data.shared.engagementGuidance = {
         "OT network engineer (and corporate network counterpart)",
         "SIS / functional safety engineer",
         "System integrator or vendor support representative",
-        "Operations shift lead (how it is really operated)",
+        "Operations shift lead, for how the system is run day to day",
         "Security operations / SOC lead (if monitoring exists)"
       ]
     },
@@ -75,7 +75,7 @@ window.App.Data.shared.engagementGuidance = {
         "Code-signing key handling and release integrity controls",
         "External vulnerability handling / PSIRT and disclosure process",
         "Product end-of-life / end-of-support policy",
-        "Evidence the process is followed (records, not just the process document)"
+        "Records showing the process is followed, as well as the process document"
       ],
       "keyStakeholders": [
         "Engineering / development manager",
@@ -127,8 +127,8 @@ window.App.Data.shared.engagementGuidance = {
         "Management review minutes (evidence of leadership engagement)",
         "Exception / waiver register with expiry and ownership",
         "HR security process (joiners / movers / leavers for OT access)",
-        "How the CSMS actually applies at each site vs head office",
-        "Records proving procedures are exercised, not just written"
+        "How the CSMS applies at each site compared with head office",
+        "Records showing procedures are carried out, as well as written down"
       ],
       "keyStakeholders": [
         "Senior management sponsor for the CSMS",
@@ -150,16 +150,16 @@ window.App.Data.shared.engagementGuidance = {
         "Internal audit / self-assessment results"
       ],
       "oftenForgotten": [
-        "Evidence of practice for each documented process (maturity is about doing, not documenting)",
+        "Evidence that each documented process is practised, since maturity depends on practice",
         "KPI / metrics reporting to management",
         "Management-of-change records for the security program itself",
         "Improvement plans from previous assessments and their status",
-        "Site-level variation: which sites actually follow the program"
+        "Which sites follow the program in practice"
       ],
       "keyStakeholders": [
         "Security program owner",
         "Asset owner senior management (accountability and budget)",
-        "Site OT leads (where the program meets reality)",
+        "Site OT leads (where the program is put into practice)",
         "IT/OT integration lead",
         "Internal audit / compliance function"
       ]
@@ -179,7 +179,7 @@ window.App.Data.shared.engagementGuidance = {
         "Staff awareness and training records",
         "Physical security arrangements for sites supporting the essential function",
         "Resilience evidence: single points of failure analysis, failover tests",
-        "How 'supporting systems' were scoped: the boundary decisions"
+        "The boundary decisions behind how 'supporting systems' were scoped"
       ],
       "keyStakeholders": [
         "SIRO / accountable officer for the essential function",
@@ -202,7 +202,7 @@ window.App.Data.shared.engagementGuidance = {
       ],
       "oftenForgotten": [
         "Interfaces between corporate IT and operational aviation systems (AODB, BHS, ATC-adjacent)",
-        "Third-party and concession connectivity (often numerous and undocumented)",
+        "Third-party and concession connections, which are often numerous and undocumented",
         "Training records for staff operating critical aviation systems",
         "Business continuity evidence for essential aviation functions",
         "Physical access arrangements to comms rooms airside"
@@ -226,10 +226,10 @@ window.App.Data.shared.engagementGuidance = {
         "Support contracts for the control system"
       ],
       "oftenForgotten": [
-        "Who supports what: the OT/IT responsibility split in practice",
+        "How OT and IT split support responsibilities in practice",
         "Out-of-hours support arrangements and emergency access",
         "Third parties with standing access (integrators, OEMs)",
-        "Spares and recovery media: where they are and whether they work",
+        "Where spares and recovery media are kept, and whether they work",
         "USB / removable media practice on the plant floor"
       ],
       "keyStakeholders": [
@@ -237,7 +237,7 @@ window.App.Data.shared.engagementGuidance = {
         "Control / instrument engineer",
         "Site IT support and corporate IT",
         "Maintenance manager",
-        "The person who actually fixes things at 3am"
+        "The person who is called out when something breaks overnight"
       ]
     },
     "nis2-assessment": {
@@ -255,7 +255,7 @@ window.App.Data.shared.engagementGuidance = {
         "Evidence of management-body accountability (board minutes, approvals)",
         "Registration with the national competent authority / CSIRT contact details",
         "Cross-border service considerations and jurisdiction mapping",
-        "National transposition specifics: which member state law applies",
+        "Which member state's transposition law applies",
         "Records of past reportable incidents and whether they were reported"
       ],
       "keyStakeholders": [
@@ -278,7 +278,7 @@ window.App.Data.shared.engagementGuidance = {
         "Incident & vulnerability reporting procedure to the ENISA single reporting platform (Art 14)"
       ],
       "oftenForgotten": [
-        "Which products are actually in scope and their CRA class (Default / Class I / Class II / Critical): it drives the conformity route",
+        "Which products are in scope and their CRA class (Default / Class I / Class II / Critical), which sets the conformity route",
         "Existing IEC 62443 / ISO 27001 certificates are useful evidence but do not equal CRA conformity (no harmonised standard is cited yet)",
         "Which obligation date applies: Art 14 reporting from 11 Sep 2026, full obligations from 11 Dec 2027",
         "Notified-body engagement where the class requires it (Class II / Critical)",
@@ -306,13 +306,13 @@ window.App.Data.shared.engagementGuidance = {
         "Instructions for use and the digital-instructions hosting arrangement (10-year availability)"
       ],
       "oftenForgotten": [
-        "Which machines are in Annex I Part A or B: self-evolving (ML) SAFETY systems are Part A and make third-party assessment mandatory",
-        "The application date: the Regulation applies from 14 January 2027 to machines placed on the market from that date; 2006/42/EC governs earlier placements",
-        "EU type-examination certificates now expire (5 years): renewal window is 12 to 6 months before expiry",
-        "Digital instructions must stay online for the machine's lifetime and at least 10 years; paper on request within a month",
+        "Which machines are in Annex I Part A or B. Self-evolving (ML) safety systems are in Part A, which makes third-party assessment mandatory",
+        "The Regulation applies to machines placed on the market from 14 January 2027. Directive 2006/42/EC governs earlier placements",
+        "EU type-examination certificates now expire after 5 years, and the renewal window is 12 to 6 months before expiry",
+        "Digital instructions must stay online for the machine's lifetime and for at least 10 years, with paper copies supplied on request within a month",
         "A capability-changing software update can be a 'substantial modification' re-opening conformity (Art 18)",
         "Source code / programming logic for safety software may have to be produced to an authority on reasoned request",
-        "A cybersecurity certificate under a 2019/881 scheme gives presumption of conformity ONLY for 1.1.9 and 1.2.1, and only as far as it covers them"
+        "A cybersecurity certificate under a 2019/881 scheme gives presumption of conformity for 1.1.9 and 1.2.1 only, and only as far as it covers them"
       ],
       "keyStakeholders": [
         "Machinery safety / design engineering lead (Annex III EHSRs, risk assessment)",
@@ -333,7 +333,7 @@ window.App.Data.shared.engagementGuidance = {
       ],
       "oftenForgotten": [
         "Sub-supplier / fourth-party dependencies behind the product",
-        "What remote access the supplier actually holds today",
+        "What remote access the supplier holds today",
         "Whether certifications cover the product you buy or a different scope",
         "Escrow / continuity arrangements if the supplier fails"
       ],
