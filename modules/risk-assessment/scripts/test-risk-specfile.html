@@ -82,7 +82,7 @@
       pj = copy();
       owner(pj, "Z1").slTargetByFR.DC = 2;
       ok(has(texts("spec", pj), /approved before the SL-T changed/), "one older than a change to the SL-T is", texts("spec", pj).join(" | "));
-      ok(JSON.stringify(RT.APPROVAL_DOC_PARTS ? RT.APPROVAL_DOC_PARTS.spec : w.RiskApp.Engine.APPROVAL_DOC_PARTS.spec) === '["tolerable","slt"]', "an approval of the specification covers the tolerable risk and the SL-T");
+      ok(JSON.stringify(RT.APPROVAL_DOC_PARTS ? RT.APPROVAL_DOC_PARTS.spec : w.RiskApp.Engine.APPROVAL_DOC_PARTS.spec) === '["tolerable","slt","partition","mandatory"]', "an approval of the specification covers the tolerable risk and the SL-T (step 5: and the zones and conduits and the mandatory countermeasures)");
       pj = copy();
       pj.approvals.forEach(function (a) { a.approved = false; a.fingerprint = ""; }); pj.approval.approved = false;
       ok(has(texts("spec", pj), /approval not yet recorded/), "and an approval not yet recorded is open in it");

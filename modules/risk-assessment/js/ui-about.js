@@ -24,8 +24,9 @@
       h("p", null, ["The step references were checked against its contents list, and the requirement wording against the published edition. Where the tool uses a house method it says so, and none of the standard's text is reproduced."]),
       h("p", null, ["The risk matrix and SL mapping are SolutionsPT house defaults. A client's own matrix takes precedence."]),
       h("p", { "data-method": "depth" }, ["The risk comparison is made once, for the SUC, and every zone and conduit is then assessed. Suggesting each one's depth from its own initial risk is a house method."]),
-      h("p", { "data-method": "unmitigated" }, ["Unmitigated risk is rated before any cyber security countermeasure. Countermeasures built into the components, and protection that is not cyber security such as physical security, mechanical safeguards and emergency procedures, still count."]),
-      h("p", { "data-method": "decisions" }, ["A threat above tolerable risk is reduced with countermeasures, accepted, transferred to another party, or treated through the SL-T programme, a house option that mitigates it through the SL-T. A transfer does not change the rating."])
+      h("p", { "data-method": "unmitigated" }, ["Unmitigated risk is rated before any cyber security countermeasure. Countermeasures built into the components, and protection that is not cyber security such as controlled site access, hardwired interlocks and relief devices, still count."]),
+      h("p", { "data-method": "decisions" }, ["A threat above tolerable risk is reduced with countermeasures, accepted, transferred to another party, or treated through the SL-T programme, a house option that mitigates it through the SL-T. A transfer does not change the rating. Where a decision to reduce or to treat through the SL-T leaves the risk above tolerable risk, the asset owner accepts what remains."]),
+      h("p", { "data-method": "mandatory" }, ["By the house reading, the countermeasures that the decisions to reduce a risk or to treat it through the SL-T rest on are the mandatory security countermeasures."])
     ]));
 
     main.appendChild(card("Security level definitions", "house summary", [
@@ -51,7 +52,7 @@
         return t;
       })(),
       h("p", { class: "hint", style: "margin-top:8px", text: "Risk band → suggested SL-T: " + BANDS.map(function (b) { var m = RULES.riskToSL[b.id]; return b.name + " → SL" + m.suggest + (m.escalateTo ? " (can escalate to SL" + m.escalateTo + ")" : ""); }).join("; ") + "." }),
-      h("p", { class: "hint", "data-method": "via", text: "House method: a scenario's unmitigated risk also suggests an SL-T for each zone or conduit it passes through, on the FRs it affects. The route is as recorded and is not checked against the conduits." }),
+      h("p", { class: "hint", "data-method": "via", text: "House method: a scenario's unmitigated risk also suggests an SL-T for each zone or conduit it passes through, on the FRs it affects. A route that crosses two zones no conduit joins is flagged." }),
       h("p", { class: "hint", "data-method": "grouped", text: "House method: a zone or conduit grouped with another takes, per FR, the higher of its own suggestion and that one's." })
     ]));
 

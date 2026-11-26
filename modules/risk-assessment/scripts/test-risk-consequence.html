@@ -30,6 +30,7 @@
 <script src="fixtures/v0.7.0-migrate.js"></script>
 <script src="fixtures/slt-suggestions-v0.7.0.js"></script>
 <script src="fixtures/word-v0.7.0.js"></script>
+<script src="demo-before-step5.js"></script>
 <script>
 (function () {
   "use strict";
@@ -50,7 +51,8 @@
   function firstDiff(a, b) { for (var i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) return i; return -1; }
   // The demo as the released v0.7.0 build had it: no consequences, no paths.
   function stripped(p) {
-    var q = clone(p);
+    // The 3-2 fixes, step 5, are put back first (demo-before-step5.js).
+    var q = window.RiskTestDemo.beforeStep5(clone(p));
     delete q.consequences;
     if (q.counters) delete q.counters.consequence;
     q.zones.concat(q.conduits).forEach(function (o) { o.threats.forEach(function (t) { delete t.consequenceId; delete t.via; }); });
@@ -172,7 +174,8 @@
       "consequences that are not a list go, and with them every path's link");
     var dz = clone(DEMO); dz.zones = dz.zones.filter(function (z) { return z.id !== "Z4"; }); dz.conduits = dz.conduits;
     var n3 = MG.normaliseProject(dz);
-    ok(!("via" in threatOf(n3, "Z1", "T2")) && same(threatOf(n3, "Z1", "T1").via, ["Z3", "C2"]), "a zone removed leaves no path passing through it");
+    // Step 5: T2 passes through Z4 and C4, whose end at Z4 goes with it, so only C4 is left (was: no via at all).
+    ok(M.viaOf(threatOf(n3, "Z1", "T2")).indexOf("Z4") < 0 && same(threatOf(n3, "Z1", "T1").via, ["Z3", "C2"]), "a zone removed leaves no path passing through it");
 
     // ---- B. the released v0.7.0 normaliser keeps them ------------------------------------------
     var OLD = FX["v0.7.0-migrate"](M, E);
@@ -185,10 +188,15 @@
 
     // ---- C. SL-T: the house method for a zone or conduit on a path -------------------------------
     var REF = FX["slt-suggestions-v0.7.0"];
+    // The 3-2 fixes, step 5, reworded the house traces for SL1 and SL2 (they echoed the standard's
+    // wording): they are read back as v0.7.0 had them, so every other word still compares.
+    var TRACE_STEP5 = [["Unmitigated risk low: protection against mistakes and chance misuse (SL1) is a reasonable target for this foundational requirement.", "Unmitigated risk low: casual-violation protection (SL1) is a reasonable target for this foundational requirement."],
+      ["Unmitigated risk medium: protect against a deliberate attacker with general IT skills and simple tools (SL2).", "Unmitigated risk medium: protect against intentional violation with simple means (SL2)."]];
+    function asV070(x) { var s = JSON.stringify(x); TRACE_STEP5.forEach(function (r) { s = s.split(r[0]).join(r[1]); }); return JSON.parse(s); }
     function suggestions(p) {
       var o = {};
       p.zones.concat(p.conduits).forEach(function (x) { o[x.id] = { sug: ("fromZone" in x) ? E.suggestConduit(x, p) : E.suggestZone(x, p), drivers: E.sltDrivers(x, p) }; });
-      return o;
+      return asV070(o);
     }
     ["tour-v0.7-saved", "tour-phase3-0.2", "hand-made-v0.1"].forEach(function (k) {
       var s = suggestions(MG.normaliseProject(clone(FX[k])));
@@ -215,7 +223,9 @@
       jz3.slTargetByFR.IAC === 2 && threatOwnerJ(nd, "C2").slTargetByFR.IAC === 3 && threatOwnerJ(nd, "Z1").slTargetByFR.IAC === 3 && REF.demo.Z3.sug.byFR.RDF.sl === 3, "Z3's justification matches its SL-T and the paths' ends");
     ok(/IAC stays at SL2 although the engineering scenario against the SIS passes through this zone and suggests SL3, because the SIS zone already holds SL3 on IAC\. The other FRs sit at SL1 or SL2, consistent with no external paths into this zone\.$/.test(jz4.justification) &&
       jz4.slTargetByFR.IAC === 2 && withVia.Z4.sug.byFR.IAC.sl === 3 && threatOwnerJ(nd, "Z2").slTargetByFR.IAC === 3, "Z4's justification matches its SL-T and the SIS zone's");
-    ok(jz4.assumptions.indexOf("The engineering VLAN to the BPCS and the keyed engineering connection to the SIS are not modelled as conduits") >= 0, "Z4 notes the engineering connections that are not modelled as conduits (wording 10)");
+    // Step 5: the engineering connections are conduits now (C4, C5), so Z4 no longer notes them as not modelled.
+    ok(jz4.assumptions.indexOf("The engineering VLAN to the BPCS and the keyed engineering connection to the SIS are not modelled as conduits") < 0 &&
+      threatOwnerJ(nd, "C4").fromZone === "Z4" && threatOwnerJ(nd, "C4").toZone === "Z1" && threatOwnerJ(nd, "C5").toZone === "Z2", "Z4's engineering connections are modelled as conduits (wording 10, step 5)");
     ok(nd.consequences[1].source === "Interview with the asset owner" && same(nd.consequences[0].impactByCategory, { safety: "severe", environmental: "severe", operational: "severe", regulatory: "serious" }) &&
       same(threatOf(nd, "Z2", "T4").impactByCategory, nd.consequences[0].impactByCategory), "the demo's K1 (and T4) and K2 as the review asked (wording 8 and 9)");
 
@@ -519,7 +529,7 @@
     ok(sn && /pill/.test(sn.className) && sn.textContent === "No threats recorded in C3", "a path's stepping stone shows as a pill", sn && sn.textContent);
     // Logic 6 and 8 / wording 6: About states the method as the house's, any via, the route as recorded.
     RT.navigate("about");
-    ok(/House method: a scenario's unmitigated risk also suggests an SL-T for each zone or conduit it passes through, on the FRs it affects\. The route is as recorded and is not checked against the conduits\./.test(main().textContent), "About says it is the house method");
+    ok(/House method: a scenario's unmitigated risk also suggests an SL-T for each zone or conduit it passes through, on the FRs it affects\. A route that crosses two zones no conduit joins is flagged\./.test(main().textContent), "About says it is the house method (step 5: and that the route is checked)");
 
     // Go to a consequence from the completeness list.
     var gk = clone(DEMO); gk.consequences.push({ id: "K4", title: "Loss of the historian record", description: "", impact: "minor", source: "", hlaIds: [], notes: "" });
@@ -650,7 +660,28 @@
       .concat([].concat.apply([], DEMO.conduits.map(function (c) {
         return M.CONDUIT_TEXT_FIELDS.map(function (k) { return c[k]; }).concat(M.CONDUIT_LIST_FIELDS.map(function (k) { return M.listOf(c[k]).join("; "); })).filter(Boolean).map(function (s) { return exact(str(s)); });
       })));
+    // The 3-2 fixes, step 5, changed more lines on purpose (with the demo put back as step 4 left it,
+    // demo-before-step5.js): v0.7.0's C1 and C3, recorded as not needing a detailed assessment, read
+    // as deferred with no reason; T4's remaining risk is accepted, and listed under Accepted risks; the
+    // SL-T lead-in is true whether or not every target is set; an approval covers more; the high-level
+    // report names the standard's term once and labels its candidates as the house method. They are
+    // counted with step 2's, so the zone-depth step's own lines stay as they were.
+    var T4ACC = DEMO.zones[1].threats[0].acceptance;
+    var STEP5_WAS = [/^Each risk above tolerable risk that has been accepted, with the rating that stands, the reason, who accepted it and when it is to be reviewed\.$/, /^No threats registered\.$/,
+      /^Each zone and conduit has one target per foundational requirement, set by the consultant from the risk assessment\.$/, /^Signed off as below\. An approval covers the tolerable risk/,
+      /^This is the first tier of an IEC 62443-3-2 risk assessment, the high-level cyber security risk assessment, carried out /, /\) are the candidates for a detailed assessment; /,
+      /: a system rated there is a candidate for a detailed assessment\.$/];
+    var STEP5_NOW = [/^Deferred$/, /^Deferred to a later assessment \(see Method and limitations\)\.$/, /^C1 and C3 were deferred, so this assessment does not cover them\./,
+      /^Each risk above tolerable risk that has been accepted, with the rating that stands, the reason, who accepted it and when it is to be reviewed\. A risk still above tolerable risk once its planned countermeasures are complete, whose remaining risk the asset owner accepted, is marked as such\.$/,
+      /^T4  An unauthorised or malicious logic change to the SIS defeats or degrades a safety instrumented function\.$/, /^Remaining risk accepted$/, exact(str(T4ACC)),
+      /^(Z2 Safety Instrumented System|High|Low × Severe|R\. Calder|Asset Owner - Unit 300|2026-07-04|2027-06-30)$/,
+      /^The consultant sets one target per foundational requirement for each zone and conduit, from the risk assessment\. Not set marks a requirement with no target yet\.$/,
+      /^Signed off as below\. An approval covers the tolerable risk, /, /^Signed off as below\. An approval covers the tolerable risk and the ranking in this report, within the scope given for it\. The scopes below were given for the full assessment/,
+      /, the high-level cyber security risk assessment, which the standard calls the initial cyber security risk assessment, carried out /, /\) are, by the house method, the candidates for a detailed assessment; /,
+      /: by the house method, a system rated there is a candidate for a detailed assessment\.$/];
+    STEP2_WAS = STEP2_WAS.concat(STEP5_WAS); STEP2_NOW = STEP2_NOW.concat(STEP5_NOW);
     DEPTH_WAS = DEPTH_WAS.concat(STEP2_WAS); DEPTH_NOW = DEPTH_NOW.concat(STEP2_NOW);
+
     // The specification's mandatory countermeasures: one block, after the SL-T, up to Sign-off.
     function withoutMandatory(list) { var a = list.indexOf("Mandatory security countermeasures"), b = list.indexOf("Sign-off", a); return a < 0 ? list : list.slice(0, a).concat(list.slice(b)); }
     // The lines only in one list or the other (a longest common subsequence apart).
@@ -703,7 +734,8 @@
       ok(wt.some(function (x) { return x === "T1 through Z3 and C2 to K1 (High), T9 through Z3 to K1 (High)"; }), "Driving scenarios name the paths for a zone they pass through");
       ok(wt.some(function (x) { return /By the house method, a scenario also sets the suggestion for each zone or conduit it passes through on its way to where it acts\.$/.test(x); }), "and their lead-in says how (wording 7)");
       ok(wt.indexOf("Leads to") > 0 && wt.some(function (x) { return x === "K1 Loss of containment of HF acid from an unsafe process state"; }) && wt.some(function (x) { return x === "Z3 and C2"; }), "a threat's detail says what it leads to, and its via as an and list");
-      ok(wt.some(function (x) { return x.indexOf("By the house method, a threat scenario&apos;s unmitigated risk also suggests an SL-T for each zone or conduit it passes through on its way to where it acts, on the foundational requirements it affects. The route is as recorded and is not checked against the conduits.") >= 0; }), "the appendix names the house method, any via, the route as recorded");
+      ok(wt.some(function (x) { return x.indexOf("By the house method, a threat scenario&apos;s unmitigated risk also suggests an SL-T for each zone or conduit it passes through on its way to where it acts, on the foundational requirements it affects. Each step of the route is checked against the conduits.") >= 0; }), "the appendix names the house method, any via, and (step 5) that the route is checked")
+;
       var kids = wt.slice(s, plan).join("\n");
       ok(!DASH.test(kids), "no dashes in the section");
       var used = (kids.match(/\b(?:[KTZCA]\d+)\b/g) || []).filter(function (id, i, a) { return a.indexOf(id) === i; });

@@ -101,7 +101,8 @@
     function main() { return d.getElementById("main"); }
     function P() { return RT.state.project; }
     function snap() { return JSON.stringify(P()); }
-    function demo() { RT.loadProjectText(JSON.stringify(window.SPT_TOUR_PROJECT)); }
+    // Step 5 gave the demo's assets a criticality; these tests start, as before, from assets with none recorded.
+    function demo() { var q = JSON.parse(JSON.stringify(window.SPT_TOUR_PROJECT)); q.zones.forEach(function (z) { z.assets.forEach(function (a) { delete a.criticality; }); }); RT.loadProjectText(JSON.stringify(q)); }
     function zone(id) { return P().zones.filter(function (z) { return z.id === id; })[0]; }
     function asset(id) { var r = RT.assetRegister().filter(function (x) { return x.a.id === id; })[0]; return r || null; }
     function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }

@@ -159,7 +159,7 @@
       h("summary", { text: "Scales" }),
       h("div", { class: "scales-pop-body" }, [list("Impact", crit.impact), list("Likelihood", crit.likelihood),
         byCat ? h("p", { class: "hint", text: "Tolerable risk by category: " + byCat + "." }) : null,
-        h("p", { class: "hint", text: "Unmitigated likelihood counts no countermeasure, existing ones included." })])
+        h("p", { class: "hint", text: "Unmitigated likelihood is rated before any cyber security countermeasure; built-in and non-cyber safeguards still count." })])
     ]);
     if (ui.scalesOpen) d.setAttribute("open", "");
     d.addEventListener("toggle", function () { if (d.isConnected) ui.scalesOpen = d.open; });
@@ -250,6 +250,21 @@
         liveText("Review date", td.reviewDate, function (v) { td.reviewDate = v; }, { type: "date", attrs: { "data-field": "acc-review" } })
       ]));
       box.appendChild(h("p", { class: "hint", "data-hint": "transfer", text: "A transfer moves who bears the consequence, so the rating does not change." }));
+    } else if ((T.decision === "reduce" || T.decision === "slt") && (T.remainingAbove || (t.acceptance || "").trim())) {
+      // The planned rating stays above tolerable risk: the asset owner's
+      // acceptance of what remains, in the acceptance fields.
+      if (!t.acceptanceDetail || typeof t.acceptanceDetail !== "object") t.acceptanceDetail = M.emptyAcceptanceDetail();
+      var rd = t.acceptanceDetail;
+      var remIn = h("input", { type: "text", "data-reason": "remaining", value: t.acceptance, placeholder: "e.g. Bounded by the keyswitch and permit until the planned work is done.",
+        onInput: function (e) { t.acceptance = e.target.value; edited(); } });
+      box.appendChild(h("div", { class: "field", style: "margin:8px 0 0", "data-part": "remaining" }, [labelFor("Remaining risk accepted because", remIn), remIn]));
+      box.appendChild(h("div", { class: "grid-4 acc-detail" }, [
+        liveText("Accepted by", rd.by, function (v) { rd.by = v; }, { attrs: { "data-field": "acc-by" } }),
+        liveText("Role", rd.role, function (v) { rd.role = v; }, { attrs: { "data-field": "acc-role" } }),
+        liveText("Date", rd.date, function (v) { rd.date = v; }, { type: "date", attrs: { "data-field": "acc-date" } }),
+        liveText("Review date", rd.reviewDate, function (v) { rd.reviewDate = v; }, { type: "date", attrs: { "data-field": "acc-review" } })
+      ]));
+      if (T.remainingAbove) box.appendChild(h("p", { class: "hint", "data-hint": "remaining", text: "The planned rating stays above tolerable risk: record the asset owner's acceptance of what remains." }));
     } else if (T.decision === "accept" || (t.acceptance || "").trim()) {
       if (!t.acceptanceDetail || typeof t.acceptanceDetail !== "object") t.acceptanceDetail = M.emptyAcceptanceDetail();
       var ad = t.acceptanceDetail;

@@ -114,7 +114,7 @@
     var same = against(DEMO);
     ok(!!same.b && same.b.fileName === "prev.json" && same.b.savedOn === DEMO.savedOn && same.b.assessmentDate === "2026-07-01 to 2026-07-04" && same.b.revision === "1.0" && same.b.approvedOn === "2026-07-04",
       "the baseline is stored by reference: file name, date, revision and approval date", JSON.stringify(same.b && { f: same.b.fileName, s: same.b.savedOn, a: same.b.assessmentDate, ap: same.b.approvedOn }));
-    ok(same.b.facts && same.b.facts.owners.length === 7 && same.b.facts.owners[0].threats.length === 3 && same.b.facts.owners[0].threats[0].states.current.band, "with a frozen copy of what is compared: each zone and conduit, its threats and their three ratings");
+    ok(same.b.facts && same.b.facts.owners.length === 9 && /* step 5: C4 and C5 */  same.b.facts.owners[0].threats.length === 3 && same.b.facts.owners[0].threats[0].states.current.band, "with a frozen copy of what is compared: each zone and conduit, its threats and their three ratings");
     ok(same.d.empty && RT.comparisonLines(same.d).length === 0 && RT.comparisonRows(same.d).length === 0, "the same assessment again: nothing has changed");
     ok(RT.baselineWords(same.b) === "the previous assessment of Unit 300 Alkylation Unit, 2026-07-01 to 2026-07-04, revision 1.0, approved on 2026-07-04" || /^the previous assessment of .+, 2026-07-01 to 2026-07-04, revision 1\.0, approved on 2026-07-04$/.test(RT.baselineWords(same.b)),
       "the baseline in words names its date, revision and approval", RT.baselineWords(same.b));
@@ -170,7 +170,9 @@
     var realDocx0 = w.docx; w.docx = mockDocx();
     function decisionsText(pj, today) { var t = docText(RX.buildWordDoc(pj, { today: today })); return t.slice(t.indexOf("\nDecisions required\n"), t.indexOf("\nWhy this assessment\n")); }
     var exLate = decisionsText(exP, "2099-01-01"), noBase = clone(P()); delete noBase.baseline;
-    ok(/\nThe review date of the accepted risk T8 \(Z4\), 2027-06-30, has passed\.\n/.test(exLate) && /\nThe review date of the accepted risk T8 \(Z4\), 2027-06-30, has passed\.\n/.test(decisionsText(noBase, "2099-01-01")),
+    // Step 5: T4's remaining risk, accepted with the same review date, is said with T8 (was: T8 alone).
+    var REVIEWED = /\nThe review dates of these accepted risks have passed: T8 \(Z4\) on 2027-06-30 and T4 \(Z2\) on 2027-06-30\.\n/;
+    ok(REVIEWED.test(exLate) && REVIEWED.test(decisionsText(noBase, "2099-01-01")),
       "an accepted risk whose review date has passed is said under Decisions required, with or without a previous assessment", exLate.replace(/\n/g, " | "));
     ok(!/has passed/.test(decisionsText(noBase, "2026-11-13")), "only once it has passed");
     var settled = clone(noBase); settled.zones.concat(settled.conduits).forEach(function (o) { o.countermeasures.forEach(function (m) { if (m.status === "proposed") m.status = "agreed"; }); });
@@ -179,7 +181,7 @@
     // passed to the Word builder still wins, and unpinned it is the clock again.
     function decisionsPinned(pj) { var t = docText(RX.buildWordDoc(pj, {})); return t.slice(t.indexOf("\nDecisions required\n"), t.indexOf("\nWhy this assessment\n")); }
     RT.setToday("2027-07-01");
-    ok(RT.todayISO() === "2027-07-01" && /, 2027-06-30, has passed\./.test(decisionsPinned(noBase)), "a pinned today is the Word report's today", RT.todayISO());
+    ok(RT.todayISO() === "2027-07-01" && /T8 \(Z4\) on 2027-06-30 and T4 \(Z2\) on 2027-06-30\./.test(decisionsPinned(noBase)), "a pinned today is the Word report's today", RT.todayISO());
     ok(!/has passed/.test(decisionsText(noBase, "2026-11-13")), "a today passed to the builder wins over the pin");
     ok(RT.buildRiskContext(noBase).generatedOn === "2027-07-01", "and the risk context's date reads it too");
     RT.setToday("1 July 2027");
@@ -229,7 +231,7 @@
     // ==== 5. An empty baseline ================================================================
 
     var Em = against(M.emptyProject()), ge = RT.comparisonLines(Em.d);
-    ok(group(ge, "owners").length === 7 && has(ge, "owners", /^Z1 Unit 300 BPCS added, with its 3 threats and 3 countermeasures\.$/), "against an empty assessment every zone and conduit is added, with what it holds", group(ge, "owners").join(" | "));
+    ok(group(ge, "owners").length === 9 && /* step 5: C4 and C5 */  has(ge, "owners", /^Z1 Unit 300 BPCS added, with its 3 threats and 3 countermeasures\.$/), "against an empty assessment every zone and conduit is added, with what it holds", group(ge, "owners").join(" | "));
     ok(!group(ge, "threats").length && !group(ge, "countermeasures").length && !group(ge, "ratings").length, "and nothing it holds is listed again");
 
     // ==== 6. The frozen files as baselines ====================================================

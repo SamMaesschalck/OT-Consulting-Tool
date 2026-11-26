@@ -242,7 +242,9 @@
     z2.slTargetByFR.IAC = 2;
     ok(has(texts("detailed"), /^Z2 \(Utilities\): SL-T set but no justification\.$/), "set by hand, the SL-T needs its basis in the justification");
     z2.justification = "Utilities only; corporate SL2 floor.";
-    ok(!has(texts("detailed"), /^Z2 /), "and with it, nothing is open for that zone");
+    // Step 5: one SL-T on IAC alone asks for the other six, and the zone's characteristics are asked for on step 3; set and left out here.
+    ["IAC", "UC", "SI", "DC", "RDF", "TRE", "RA"].forEach(function (fr) { z2.slTargetByFR[fr] = 2; });
+    ok(!texts("detailed").some(function (x) { return /^Z2 /.test(x) && !/: characteristics not recorded: /.test(x); }), "and with it, nothing is open for that zone");
     RT.navigate("risk");
     // Phase 4: step 5 shows one zone at a time; its rail marks the zone too.
     ok(/Proportionate/.test(main().querySelector('[data-rail-id="Z2"]').textContent) && /Detailed/.test(main().querySelector('[data-rail-id="Z1"]').textContent), "step 5's rail shows each zone's depth: Z2 Proportionate, Z1 Detailed");
@@ -361,6 +363,9 @@
     // Phase 3b review: the high-level report asks for a sign-off too, so one is recorded.
     ok(RT.readiness("highLevel").some(function (i) { return i.text === "No asset-owner sign-off recorded." && i.stage === "approval"; }), "the high-level report asks for the asset owner's sign-off as well");
     P().approval = { name: "A. Owner", role: "Plant Manager", date: "2026-07-01", statement: "", approved: true };
+    // Step 5: both reports ask for the SUC's access points and the reports' classification, so they are recorded.
+    P().suc.accessPoints = [{ description: "Vendor VPN from the internet", enters: "" }];
+    P().engagement.confidentiality = "Confidential";
     main().querySelector('[data-download="word-hl"]').click();
     ok(words.join() === "hl" && !d.getElementById("issue-guard") && confirms === 0, "with nothing open in the high-level report, its download asks nothing");
     // Another project opened on the same page takes the question with it.

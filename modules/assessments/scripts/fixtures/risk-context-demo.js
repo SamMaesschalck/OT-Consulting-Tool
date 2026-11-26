@@ -5,7 +5,10 @@
  * docs/risk-tool-redesign.md and the consequence-first provenance (each
  * threat's consequenceId and via, the consequences list) and the depth each
  * zone and conduit was assessed at (assessment), on the same
- * spt-risk-context/1.4 string.
+ * spt-risk-context/1.4 string. The 3-2 fixes, step 5, add the demo's
+ * engineering VLAN (C4) and keyed SIS connection (C5) as conduits, which
+ * flow in as any conduit does, and T4's remaining risk acceptance in its
+ * acceptance text; the ranked systems' in-SUC mark does not flow.
  * modules/risk-assessment/scripts/test-risk-interchange.html fails when the
  * export and this copy part (generatedOn and generatedBy aside); regenerate
  * it only when the demo or the export changes on purpose. Used by
@@ -83,7 +86,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "serious",
       "likelihood": "low",
       "risk": "medium",
-      "note": "One-way feed, no control path; ranked medium. Outside the system under consideration: the feed ends at the historian, which Z3 covers."
+      "note": "One-way feed, no control path; ranked medium. The feed ends at the historian, which Z3 covers."
     },
     {
       "id": "A6",
@@ -92,7 +95,7 @@ window.RiskContextFixtures["demo"] =
       "consequence": "negligible",
       "likelihood": "high",
       "risk": "low",
-      "note": "Commodity IP kit, frequently probed, but no process consequence; ranked low. Outside the system under consideration, so in no zone."
+      "note": "Commodity IP kit, frequently probed, but no process consequence; ranked low."
     }
   ],
   "basisOfAssessment": {
@@ -197,7 +200,7 @@ window.RiskContextFixtures["demo"] =
     "name": "R. Calder",
     "role": "Asset Owner - Unit 300",
     "date": "2026-07-04",
-    "statement": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), the one transferred risk (lost production, through business interruption insurance), and the per-FR SL-T vectors as the target for the security programme.",
+    "statement": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the two recorded risk acceptances (legacy configuration tooling, and the remaining risk on the SIS until its dedicated engineering workstation is in place), the one transferred risk (lost production, through business interruption insurance), and the per-FR SL-T vectors as the target for the security programme.",
     "approved": true
   },
   "approvals": [
@@ -206,14 +209,14 @@ window.RiskContextFixtures["demo"] =
       "role": "Asset Owner - Unit 300",
       "organisation": "Acme Petrochemicals Ltd",
       "date": "2026-07-04",
-      "scope": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the one recorded risk acceptance (legacy configuration tooling), the one transferred risk (lost production, through business interruption insurance), and the per-FR SL-T vectors as the target for the security programme."
+      "scope": "I confirm the tolerable risk of Medium used in this assessment reflects Acme's corporate risk criteria for Unit 300, and I accept the assessment outcome: the recorded treatment decisions, the residual risk positions, the two recorded risk acceptances (legacy configuration tooling, and the remaining risk on the SIS until its dedicated engineering workstation is in place), the one transferred risk (lost production, through business interruption insurance), and the per-FR SL-T vectors as the target for the security programme."
     },
     {
-      "name": "S. Adeyemi",
-      "role": "Process Safety Engineer",
+      "name": "D. Hargreaves",
+      "role": "Operations Manager, Teesport Refinery",
       "organisation": "Acme Petrochemicals Ltd",
       "date": "2026-07-04",
-      "scope": "The SL-T of the Safety Instrumented System zone (Z2)."
+      "scope": "The SL-T of the Safety Instrumented System zone (Z2), and the remaining risk on the SIS accepted until its dedicated engineering workstation is in place."
     }
   ],
   "zones": [
@@ -247,22 +250,26 @@ window.RiskContextFixtures["demo"] =
         {
           "id": "AS1",
           "name": "DCS server pair (redundant)",
-          "type": "server"
+          "type": "server",
+          "criticality": "high"
         },
         {
           "id": "AS2",
           "name": "Operator HMIs x4",
-          "type": "hmi"
+          "type": "hmi",
+          "criticality": "high"
         },
         {
           "id": "AS3",
           "name": "Unit PLCs x6 (reactor, acid feed, depropaniser)",
-          "type": "plc"
+          "type": "plc",
+          "criticality": "high"
         }
       ],
       "accessPoints": [
         "Vendor VPN via jump host (C2)",
-        "Historian replication to DMZ (C1)"
+        "Historian replication to DMZ (C1)",
+        "Engineering VLAN from Z4 (C4)"
       ],
       "externalDependencies": [
         "DCS vendor support contract (remote diagnostics)",
@@ -316,7 +323,8 @@ window.RiskContextFixtures["demo"] =
           "transferTo": "Acme group insurers, through the group business interruption policy",
           "consequenceId": "K2",
           "via": [
-            "Z4"
+            "Z4",
+            "C4"
           ]
         },
         {
@@ -420,16 +428,18 @@ window.RiskContextFixtures["demo"] =
         {
           "id": "AS4",
           "name": "SIS logic solver",
-          "type": "safety-plc"
+          "type": "safety-plc",
+          "criticality": "high"
         },
         {
           "id": "AS5",
           "name": "Safety I/O and final elements",
-          "type": "other"
+          "type": "other",
+          "criticality": "high"
         }
       ],
       "accessPoints": [
-        "Engineering connection from Z4 (keyed, normally disconnected)"
+        "Keyed engineering connection from Z4 (C5), normally disconnected"
       ],
       "externalDependencies": [
         "SIS vendor for logic changes (site visit only, no remote path)"
@@ -455,10 +465,11 @@ window.RiskContextFixtures["demo"] =
           "residualRisk": null,
           "exceedsTolerable": true,
           "disposition": "sl-t",
-          "acceptance": "",
+          "acceptance": "No countermeasure brings the risk within tolerable risk, as the consequence stays severe. Until the dedicated SIS engineering workstation is in place, process safety authorisation, the keyed bypass record and the program-mode keyswitch bound the remaining risk, which is accepted at High until the review.",
           "consequenceId": "K1",
           "via": [
-            "Z4"
+            "Z4",
+            "C5"
           ]
         }
       ],
@@ -530,17 +541,20 @@ window.RiskContextFixtures["demo"] =
         {
           "id": "AS6",
           "name": "Process historian (primary)",
-          "type": "historian"
+          "type": "historian",
+          "criticality": "medium"
         },
         {
           "id": "AS7",
           "name": "Vendor jump host",
-          "type": "server"
+          "type": "server",
+          "criticality": "medium"
         },
         {
           "id": "AS8",
           "name": "DMZ firewall pair",
-          "type": "network"
+          "type": "network",
+          "criticality": "high"
         }
       ],
       "accessPoints": [
@@ -649,22 +663,26 @@ window.RiskContextFixtures["demo"] =
         {
           "id": "AS9",
           "name": "Engineering workstations x3",
-          "type": "engineering-workstation"
+          "type": "engineering-workstation",
+          "criticality": "medium"
         },
         {
           "id": "AS10",
           "name": "Config management server (backups, versioning)",
-          "type": "server"
+          "type": "server",
+          "criticality": "medium"
         },
         {
           "id": "AS11",
           "name": "Vendor laptops (turnarounds)",
-          "type": "engineering-workstation"
+          "type": "engineering-workstation",
+          "criticality": "low"
         }
       ],
       "accessPoints": [
         "Removable media (controlled USB process)",
-        "Engineering VLAN to Z1 controllers"
+        "Engineering VLAN to the BPCS (C4)",
+        "Keyed engineering connection to the SIS (C5)"
       ],
       "externalDependencies": [
         "Vendor licence dongles and offline update bundles"
@@ -771,16 +789,16 @@ window.RiskContextFixtures["demo"] =
         "RA": 2
       },
       "slTargetByFR": {
-        "IAC": 2,
-        "UC": null,
-        "SI": 2,
-        "DC": 1,
-        "RDF": 2,
-        "TRE": null,
-        "RA": null
+        "IAC": 3,
+        "UC": 2,
+        "SI": 3,
+        "DC": 2,
+        "RDF": 3,
+        "TRE": 2,
+        "RA": 2
       },
-      "slTarget": 2,
-      "justification": "Carries the risk of a pivot from the Z3 historian toward the BPCS as its data-flow path: SL2 on IAC/SI/RDF matches the zone targets either side; the broker enforces direction so no higher target is warranted.",
+      "slTarget": 3,
+      "justification": "Grouped with Z3: the conduit is the data-flow path a pivot from the DMZ historian toward the BPCS would take. IAC, SI and RDF are set to SL3 to match the BPCS targets it connects to, so the replication path is not the weak link, and the broker enforces one-way replication. DC at SL2 follows the historian's process data, RA at SL2 the 30-minute manual-shutdown requirement, and UC and TRE at SL2 match the zones either side.",
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
@@ -814,14 +832,14 @@ window.RiskContextFixtures["demo"] =
       "slTargetByFR": {
         "IAC": 3,
         "UC": 2,
-        "SI": null,
-        "DC": null,
+        "SI": 3,
+        "DC": 2,
         "RDF": 3,
         "TRE": 2,
-        "RA": null
+        "RA": 2
       },
       "slTarget": 3,
-      "justification": "This conduit is the highest-exposure path into the BPCS: a hijacked vendor credential or session starts High, and the existing per-session controls (MFA, per-ticket activation, recording and auto-disconnect) bring it within tolerable risk today, but the SL-T is held at SL3 on IAC/RDF to match the Z1 targets it lands in, so the conduit is not the weak link. TRE at SL2 preserves the session-recording evidence chain.",
+      "justification": "This conduit is the highest-exposure path into the BPCS: a hijacked vendor credential or session starts High, and the existing per-session controls (MFA, per-ticket activation, recording and auto-disconnect) bring it within tolerable risk today, but the SL-T is held at SL3 on IAC/RDF to match the Z1 targets it lands in, so the conduit is not the weak link. SI at SL3 matches the BPCS as well, UC at SL2 matches both zones, DC at SL2 follows the DMZ and RA at SL2 the BPCS. TRE at SL2 preserves the session-recording evidence chain.",
       "threats": [
         {
           "id": "T9",
@@ -892,21 +910,102 @@ window.RiskContextFixtures["demo"] =
       },
       "slTargetByFR": {
         "IAC": 2,
-        "UC": null,
-        "SI": null,
+        "UC": 2,
+        "SI": 2,
         "DC": 2,
         "RDF": 2,
-        "TRE": null,
-        "RA": null
+        "TRE": 2,
+        "RA": 1
       },
       "slTarget": 2,
-      "justification": "Boundary conduit to the untrusted corporate network: SL2 on IAC/DC/RDF reflects the read-only brokerage and the confidentiality of throughput data; no control traffic exists on this path.",
+      "justification": "Boundary conduit to the untrusted corporate network, with no control traffic. Its targets match the DMZ it serves: SL2 on every foundational requirement but RA, for the read-only brokerage and the confidentiality of throughput data, and SL1 on RA, as loss of corporate reporting does not affect operator view or control. The SL3 the house method suggests on IAC, SI and RDF comes from the DMZ's own suggestion, which the DMZ holds at SL2 for the reasons in its justification.",
       "threats": [],
       "vulnerabilities": [],
       "countermeasures": [],
       "assessment": {
         "depth": "proportionate",
         "considered": "Read-only reporting to the out-of-scope corporate network: a compromised corporate client using the reporting service as a foothold, and exfiltration of throughput data. Both are assessed at the Z3 boundary as T5 and T6."
+      },
+      "initialRisk": {
+        "risk": "high",
+        "source": "zones"
+      }
+    },
+    {
+      "id": "C4",
+      "fromZone": "Z4",
+      "toZone": "Z1",
+      "name": "Engineering VLAN",
+      "channels": [
+        "DCS engineering protocol",
+        "PLC programming protocol"
+      ],
+      "slSuggestedByFR": {
+        "IAC": 3,
+        "UC": 3,
+        "SI": 3,
+        "DC": null,
+        "RDF": 3,
+        "TRE": null,
+        "RA": 2
+      },
+      "slTargetByFR": {
+        "IAC": 3,
+        "UC": 2,
+        "SI": 3,
+        "DC": 1,
+        "RDF": 3,
+        "TRE": 2,
+        "RA": 2
+      },
+      "slTarget": 3,
+      "justification": "The engineering VLAN carries configuration downloads into the BPCS, so it takes the BPCS targets: SL3 on IAC, SI and RDF, as malware brought in over an engineering connection is a High risk there and the path into the controllers must not be the weak link. UC is held at SL2, as on both zones it joins: misuse of the legacy configuration tool's shared account is accepted until it is retired. DC at SL1 reflects the low confidentiality of configuration data, and TRE and RA at SL2 follow the BPCS.",
+      "threats": [],
+      "vulnerabilities": [],
+      "countermeasures": [],
+      "assessment": {
+        "depth": "grouped",
+        "withId": "Z4"
+      },
+      "initialRisk": {
+        "risk": "high",
+        "source": "zones"
+      }
+    },
+    {
+      "id": "C5",
+      "fromZone": "Z4",
+      "toZone": "Z2",
+      "name": "Keyed SIS engineering connection",
+      "channels": [
+        "SIS engineering protocol"
+      ],
+      "slSuggestedByFR": {
+        "IAC": 3,
+        "UC": 3,
+        "SI": 3,
+        "DC": 3,
+        "RDF": 3,
+        "TRE": 3,
+        "RA": 3
+      },
+      "slTargetByFR": {
+        "IAC": 3,
+        "UC": 3,
+        "SI": 3,
+        "DC": 3,
+        "RDF": 3,
+        "TRE": 3,
+        "RA": 3
+      },
+      "slTarget": 3,
+      "justification": "The keyed engineering connection reaches the SIS, so it takes the SIS zone's SL3 on every foundational requirement and is not the weak link. It is connected only for an authorised change, with the program-mode keyswitch turned and a keyed bypass record.",
+      "threats": [],
+      "vulnerabilities": [],
+      "countermeasures": [],
+      "assessment": {
+        "depth": "grouped",
+        "withId": "Z2"
       },
       "initialRisk": {
         "risk": "high",

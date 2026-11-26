@@ -5,6 +5,7 @@
 <h1>risk-tool report exports — Word + Excel on the completed demo project</h1>
 <pre id="out">running…</pre>
 <iframe id="app" src="../index.html?tour=1" style="width:10px;height:10px;visibility:hidden"></iframe>
+<script src="demo-before-step5.js"></script>
 <script>
 (function () {
   "use strict";
@@ -84,6 +85,8 @@
     // and business value. This page's checks are written against the demo as
     // step 2 left it, so those are put back here (test-risk-zcr3.html covers
     // the demo's transfer and asset fields). Was: the demo as it is.
+    // Step 5's additions to the demo are put back first (demo-before-step5.js).
+    window.RiskTestDemo.beforeStep5(p);
     (function () {
       var t2 = p.zones[0].threats[1];
       t2.treatment = { decision: "reduce", confirmed: true, reason: "" }; delete t2.transferTo;
@@ -184,7 +187,7 @@
     ok(hlText.indexOf("High-Level OT Cyber") !== -1 && hlText.indexOf("High-level risk ranking") !== -1 && hlText.indexOf("the high-level cyber security risk assessment") !== -1, "high-level variant builds with the ranking");
     ok(hlText.indexOf("Risk at a glance") !== -1 && hlText.indexOf("systems ranked") !== -1 && hlText.indexOf("Where to look first") !== -1, "high-level variant has its own scorecard page");
     // Phase 3a: the candidates are the systems above tolerable risk (was: ranked High or above), and the decision is per zone, not per system.
-    ok(hlText.indexOf("The systems above the tolerable risk of Medium (") !== -1 && hlText.indexOf("are the candidates for a detailed assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the candidates above tolerable risk and carries the tailor-me note");
+    ok(hlText.indexOf("The systems above the tolerable risk of Medium (") !== -1 && hlText.indexOf("are, by the house method, the candidates for a detailed assessment") !== -1 && hlText.indexOf("Delete this note.") !== -1, "high-level exec summary names the candidates above tolerable risk and carries the tailor-me note");
     ok(hlText.indexOf("Why this assessment") !== -1 && hlText.indexOf("which justify a detailed assessment") !== -1 && hlText.indexOf("What happens next") !== -1, "high-level exec summary has the why/what/next structure");
     ok(!/per-system|detailed tier|promoted|Promoted|ranked High or above/.test(hlText + "\n" + text), "neither report speaks of promotion, a detailed tier or per-system assessment", (( hlText + "\n" + text).match(/[^\n]*(per-system|detailed tier|promoted|Promoted|ranked High or above)[^\n]*/) || [""])[0]);
     // Since the zone-depth step no zone is found not to need a detailed assessment: the SUC is compared once and every zone and conduit is assessed, at its depth.
@@ -271,9 +274,15 @@
       "a tolerable residual with only planned countermeasures is still being reduced, not reduced", rc(vP.reg, 2, J).value + " | " + vP.decisions);
     // Accept, with no reason.
     var vA = variant(function (q) { q.zones[3].threats[1].acceptance = ""; });
+    // The threat ids the Accepted risks section lists (its rows open "T8  ...").
+    function accRows(t) {
+      var a = t.indexOf("\nAccepted risks\n"), b = t.indexOf("\nZones, conduits and the detailed risk assessment\n", a), c = t.indexOf("\nTransferred risks\n", a);
+      var s = t.slice(a, c > a && c < b ? c : b);
+      return (s.match(/\nT\d+  /g) || []).map(function (x) { return x.trim(); }).join(",");
+    }
     // Phase 4b: "Accepted risks" is a section heading now, so what is checked is that the summary names no accepted
     // risk and the section holds none; the summary's pointer replaced "rationale is recorded".
-    ok(vA.red.indexOf("Accept (no reason recorded)") !== -1 && vA.text.indexOf("accepted by the asset owner") === -1 && vA.text.indexOf("Accepted risk T8") === -1 && vA.text.indexOf("Accepted risks: ") === -1 && vA.text.indexOf("No risk has been accepted.") !== -1 && vA.text.indexOf("rationale is recorded") === -1 && vA.text.indexOf("are under Accepted risks") === -1 && vA.text.indexOf("Risk accepted") === -1,
+    ok(vA.red.indexOf("Accept (no reason recorded)") !== -1 && vA.text.indexOf("accepted by the asset owner") === -1 && vA.text.indexOf("Accepted risk T8") === -1 && vA.text.indexOf("Accepted risks: ") === -1 && /* step 5: T4's remaining risk is listed there, not T8 (was: "No risk has been accepted.") */ accRows(vA.text).indexOf("T8") < 0 && accRows(vA.text).indexOf("T4") >= 0 && vA.text.indexOf("rationale is recorded") === -1 && vA.text.indexOf("are under Accepted risks") === -1 && vA.text.indexOf("Risk accepted") === -1,
       "Word: an acceptance with no reason is not printed as formally accepted, nor its rationale as recorded", vA.tally);
     ok(vA.red.some(function (t) { return t === "1 treatment decision is incomplete: T8 (Z4), accept (no reason recorded)."; }) && rc(vA.reg, 9, J).value === "Accept (no reason recorded)" && rc(vA.reg, 9, M).value === "Open" && vA.ctx.zones[3].threats[1].disposition === null,
       "it is named as incomplete, open in Excel, and exported with no disposition", vA.red.join(" | "));
@@ -364,7 +373,7 @@
       q.srs.highLevelAssets[4].detailed = { required: true, reason: "Feeds the batch release." };
     });
     var hlFound = (vH.hl.match(/[^\n]*systems were ranked[^\n]*/) || [""])[0];
-    ok(hlFound.indexOf("are the candidates for a detailed assessment") !== -1 && hlFound.split("are the candidates")[0].indexOf(BPCS) === -1 && hlFound.indexOf("A detailed assessment was judged not needed for " + BPCS + ": retired next quarter.") !== -1,
+    ok(hlFound.indexOf("are, by the house method, the candidates for a detailed assessment") !== -1 && hlFound.split("are, by the house method, the candidates")[0].indexOf(BPCS) === -1 && hlFound.indexOf("A detailed assessment was judged not needed for " + BPCS + ": retired next quarter.") !== -1,
       "Word, high-level only: a system recorded as Not required leaves the candidates, with its reason", hlFound);
     ok(hlFound.indexOf("A detailed assessment was also judged needed for " + LAB + ": feeds the batch release.") !== -1 && /\n2\nfor detailed assessment/.test(vH.hl), "and one recorded as Required below tolerable risk is named, and the tile counts the two recorded as Required", hlFound);
     phase4b(text, doc, variant);
@@ -506,7 +515,7 @@
       ok(vPlan.text.indexOf("\nM3  Retire OPC DA: migrate the two remaining clients to OPC UA through the DMZ broker\nZ1 Unit 300 BPCS\nNone linked\nNot assigned\nNot set\nNot set\nNot set\n\n") > 0, "4b Word: an empty plan field reads Not assigned, Not set or None linked, and SR references blank");
       ok(vPlan.text.indexOf("1 planned countermeasure has no owner or due date agreed: M3 (Z1).") > 0 && vPlan.text.indexOf("Nothing is waiting on a decision") < 0, "4b Word: and the summary's decisions required name it");
       var vAw = variant(function (q) { q.approvals.forEach(function (e) { e.approved = false; e.fingerprint = ""; }); q.approval.approved = false; });
-      ok(vAw.text.indexOf("The asset owner has not yet approved the accepted risk T8 (Z4).") > 0, "4b Word: an accepted risk nobody has approved is a decision required");
+      ok(vAw.text.indexOf("The asset owner has not yet approved the accepted risks T8 (Z4) and T4 (Z2).") > 0, "4b Word: an accepted risk nobody has approved is a decision required (step 5: with T4's remaining risk)");
       var ar = at("\nAccepted risks\n", tp);
       ok(ar > tp && at("\nThreat scenario\nZone or conduit\nRating\nReason\nAccepted by\nRole\nDate\nReview date\n", ar) > ar && at("\nT8  ", ar) > ar, "4b Word: the accepted risks' columns: scenario, rating, reason, who, role, date and review date");
       // Step 3: an acceptance with no one recorded as accepting it is not a recorded acceptance and is not in
@@ -586,11 +595,13 @@
       // Case B: the current rating is above tolerable risk: being reduced, above tolerable risk today, everywhere.
       var vCB = variant(function (q) { var t1 = q.zones[0].threats[0]; t1.currentLikelihood = "high"; t1.currentImpact = "serious"; t1.residualLikelihood = "low"; t1.residualImpact = "serious"; });
       var tB = vCB.S.threats[0], topB = vCB.text.slice(vCB.text.indexOf("Risk position"), vCB.text.indexOf("\nDecisions required\n"));
-      ok(tB.label === "Reduce with countermeasures" && tB.disposition === "countermeasure" && /, 2 are within it with today's countermeasures and 4 will be once/.test(vCB.tally) && topB.indexOf("\nT1  ") > 0 && sumVal(vCB.q, TODAY) === 2 && sumVal(vCB.q, PLAN) === 4 && vCB.ctx.zones[0].threats[0].disposition === "countermeasure" && rc(vCB.reg, 2, J).value === "Reduce with countermeasures",
+      // Step 5: with nothing planned, the decision to reduce reduces nothing, so it is incomplete everywhere
+      // (was: "Reduce with countermeasures", disposition "countermeasure").
+      ok(tB.label === "Reduce with countermeasures (none planned)" && tB.disposition === null && /, 2 are within it with today's countermeasures and 4 will be once/.test(vCB.tally) && topB.indexOf("\nT1  ") > 0 && sumVal(vCB.q, TODAY) === 2 && sumVal(vCB.q, PLAN) === 4 && vCB.ctx.zones[0].threats[0].disposition === null && rc(vCB.reg, 2, J).value === "Reduce with countermeasures (none planned)",
         "review: case B reads the same everywhere: being reduced, above tolerable risk today, and with no planned countermeasure linked its planned rating is not counted as the plan's", [tB.label, vCB.tally, sumVal(vCB.q, TODAY), sumVal(vCB.q, PLAN)].join(" | "));
       // The scorecard reads it too.
       var wfB = vCB.text.slice(vCB.text.indexOf("\nWhere to focus first\n"), vCB.text.indexOf("\nSystem under consideration and requirements\n"));
-      ok(/\nT1  [^\n]*\nZ1 · High today\n/.test(wfB), "review: and the scorecard's focus cards", wfB.replace(/\n/g, " | ").slice(0, 300));
+      ok(/\nT1  [^\n]*\nZ1 · High today · decision incomplete\n/.test(wfB), "review: and the scorecard's focus cards (step 5: the decision is incomplete)", wfB.replace(/\n/g, " | ").slice(0, 300));
       // Logic 6: an undescribed countermeasure is counted nowhere.
       var vEmpty = variant(function (q) { q.zones[0].countermeasures.push({ id: "M10", description: "", addressesFR: [], reference: "", existing: false, owner: "", priority: "", dueDate: "", status: "", srRefs: [] }); q.counters.cm = 10; });
       ok(vEmpty.S.counts.countermeasuresPlanned === 4 && / and 4 planned countermeasures\.$/.test(vEmpty.decisions) && sumVal(vEmpty.q, "Additional countermeasures planned") === 4,
@@ -601,14 +612,17 @@
       var st7 = RT.approvalStates(q7);
       ok(RT.approvalFingerprint(q7) !== fp0 && st7.every(function (s) { return s.changed && s.parts.join() === "accepted"; }), "review: changing who accepted a risk changes the accepted risks an approval covers", st7.map(function (s) { return s.parts.join(); }).join(" | "));
       var q7b = JSON.parse(JSON.stringify(p)); q7b.zones[3].threats[1].acceptanceDetail = { by: "", role: "", date: "", reviewDate: "" };
-      var acc7 = w.RiskApp.Engine.approvalBasis(q7b).accepted, acc7d = w.RiskApp.Engine.approvalBasis(p).accepted;
+      // Step 5: the remaining risks accepted (T4) follow the others in the part, marked; left out here.
+      function notRemaining(s) { return s.indexOf("remaining>") !== 0; }
+      var acc7 = w.RiskApp.Engine.approvalBasis(q7b).accepted.filter(notRemaining), acc7d = w.RiskApp.Engine.approvalBasis(p).accepted.filter(notRemaining);
       ok(acc7.length === 1 && acc7[0] === "Z4/T8:" + q7b.zones[3].threats[1].acceptance && acc7d[0] === acc7[0] + "|R. Calder|Asset Owner - Unit 300|2026-07-04|2027-06-30",
         "review: with no detail recorded the accepted part reads as it did before, so an older approval still matches; with it, the detail is appended", JSON.stringify([acc7[0].slice(0, 40), acc7d[0].slice(-60)]));
       // Wording 6, 7, 8 and 9: the lead-ins and the zone's countermeasure line.
-      ok(text.indexOf("\nEach threat scenario is rated before any cyber security countermeasure (unmitigated), with the countermeasures in place today (current) and after the planned ones (planned). The unmitigated rating still counts countermeasures built into the components and protection that is not cyber security, such as physical security, mechanical safeguards and emergency procedures. Under each risk is its likelihood × impact. A blank current or planned rating means the rating before it stands. The tolerable risk is Medium.\n") > 0,
+      ok(text.indexOf("\nEach threat scenario is rated before any cyber security countermeasure (unmitigated), with the countermeasures in place today (current) and after the planned ones (planned). The unmitigated rating still counts countermeasures built into the components and protection that is not cyber security, such as controlled site access, hardwired interlocks and relief devices. Under each risk is its likelihood × impact. A blank current or planned rating means the rating before it stands. The tolerable risk is Medium.\n") > 0,
         "review: the register's lead-in says what is under each risk");
       ok(text.indexOf("\nEach additional countermeasure has an owner, a priority, a due date and a status. Countermeasures already in place are listed under each zone and conduit.\n") > 0, "review: the treatment plan's lead-in");
-      ok(text.indexOf("\nEach risk above tolerable risk that has been accepted, with the rating that stands, the reason, who accepted it and when it is to be reviewed.\n") > 0, "review: the accepted risks' lead-in does not assume who accepted it");
+      // Step 5: with a remaining risk accepted (T4), the lead-in says it is marked.
+      ok(text.indexOf("\nEach risk above tolerable risk that has been accepted, with the rating that stands, the reason, who accepted it and when it is to be reviewed. A risk still above tolerable risk once its planned countermeasures are complete, whose remaining risk the asset owner accepted, is marked as such.\n") > 0, "review: the accepted risks' lead-in does not assume who accepted it");
       var zd = text.indexOf("\nZones, conduits and the detailed risk assessment\n");
       ok(text.indexOf("\nCountermeasures: M1 Per-session vendor access activation with MFA and session recording on the jump host (in place) · M2 Application allow-listing on DCS servers and HMIs (vendor-qualified build) (in place); planned: see the treatment plan.\n", zd) > zd
         && text.indexOf("\nCountermeasures: none in place; planned: see the treatment plan.\n", zd) > zd && text.indexOf("[existing]", zd) < 0 && text.indexOf("[planned]", zd) < 0,
@@ -656,7 +670,7 @@
       var tp = wb.getWorksheet("Treatment plan");
       ok(tp.rowCount === 5 && rowVals(tp, 2, 10) === "Z3 Plant DMZ & historian|M5|Restrict historian web access to the reporting subnet and put it behind the corporate SSO proxy|T5|M. Kowalski|High|2026-09-30|In progress|SR 5.2, SR 1.1|IAC, RDF", "4b Excel: the Treatment plan sheet lists each additional countermeasure with its plan", rowVals(tp, 2, 10));
       var ac = wb.getWorksheet("Accepted risks");
-      ok(ac.rowCount === 2 && rowVals(ac, 2, 9).indexOf("Z4 Engineering workstations|T8|") === 0 && /\|High\|The tool is retired at the Q2-2027 turnaround[^|]*\|R\. Calder\|Asset Owner - Unit 300\|2026-07-04\|2027-06-30$/.test(rowVals(ac, 2, 9)), "4b Excel: the Accepted risks sheet has the rating, reason, who, role, date and review date", rowVals(ac, 2, 9));
+      ok(ac.rowCount === 3 && /* step 5: T4's remaining risk is row 3 */ rowVals(ac, 3, 9).indexOf("Z2 Safety Instrumented System|T4|") === 0 && rowVals(ac, 3, 9).indexOf("|High|Remaining risk accepted. ") > 0 && rowVals(ac, 2, 9).indexOf("Z4 Engineering workstations|T8|") === 0 && /\|High\|The tool is retired at the Q2-2027 turnaround[^|]*\|R\. Calder\|Asset Owner - Unit 300\|2026-07-04\|2027-06-30$/.test(rowVals(ac, 2, 9)), "4b Excel: the Accepted risks sheet has the rating, reason, who, role, date and review date", rowVals(ac, 2, 9));
       var vs = wb.getWorksheet("Vulnerabilities");
       ok(vs.rowCount === 8 && rowVals(vs, 2, 5) === "Z1 Unit 300 BPCS|V1|DCS servers on an extended-support OS awaiting the vendor's qualified upgrade path|DCS vendor lifecycle notice LN-2025-11|T1, T2", "4b Excel: the Vulnerabilities sheet has each one's source and the threats that link it", rowVals(vs, 2, 5));
       var cr = wb.getWorksheet("Criteria");

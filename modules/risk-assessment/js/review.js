@@ -225,6 +225,13 @@ window.RiskReview = (function () {
           details.push(["Transferred", norm(t.acceptance).replace(/[.\s]+$/, "") + ", to " + norm(t.transferTo)]);
           details.push(["Transfer agreed by", norm(td.by) + (norm(td.role) ? " (" + norm(td.role) + ")" : "") + (norm(td.date) ? ", " + norm(td.date) : "") + (norm(td.reviewDate) ? ", review by " + norm(td.reviewDate) : "")]);
         }
+        // The remaining risk the asset owner accepted after a decision to
+        // reduce or to treat through the SL-T, and who accepted it.
+        if (T.complete && T.remainingAccepted) {
+          var rd = t.acceptanceDetail || {};
+          details.push(["Remaining risk accepted", norm(t.acceptance)]);
+          details.push(["Remaining risk accepted by", norm(rd.by) + (norm(rd.role) ? " (" + norm(rd.role) + ")" : "") + (norm(rd.date) ? ", " + norm(rd.date) : "") + (norm(rd.reviewDate) ? ", review by " + norm(rd.reviewDate) : "")]);
+        }
         // A decision recorded without what it rests on: the reviewer sees what
         // was chosen and what is missing, and the decision field stays empty.
         if (T.confirmed && !T.complete) details.push(["Decision still to complete", T.label]);

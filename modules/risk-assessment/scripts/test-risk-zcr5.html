@@ -1,0 +1,359 @@
+<!doctype html>
+<!-- Copyright (c) 2026 SolutionsPT. All rights reserved. Proprietary and confidential; licensed use only, see LICENCE.txt. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>risk-tool 3-2 fixes, step 5</title></head>
+<body>
+<pre id="out">running...</pre>
+<!--
+  The 3-2 fixes, step 5: every finding of the final check against the
+  published IEC 62443-3-2, fixed (owner ruling "fix all", 26 Nov 2026).
+   1 a partly set SL-T vector warns, naming the requirements with none, and
+     Word says only what is true; the demo's conduits have every target
+   2 safety related assets not separated, in a zone not designated safety
+     related as a whole, depart from a requirement
+   3 a decision to reduce with nothing planned while above tolerable risk
+     today, or whose planned rating stays above it, is incomplete
+   4 the asset owner's acceptance of a remaining risk (reduce or SL-T), in
+     the acceptance fields: listed with the accepted risks, approved
+   5 the a3 approval fingerprint (eight parts); a2 read under its own rule
+   6 the zone and conduit characteristics checked
+   7 the demo's engineering connections are conduits (C4, C5); a route that
+     crosses two zones no conduit joins warns
+   8 ranked systems inside or outside the SUC
+   9 the reports' classification, and the risk assessment sessions
+  10 what implements each organisational policy
+  11 the scales hint
+  12 the SUC's access points
+  13 the demo's C1 targets and justification agree
+  14 the countermeasures an SL-T decision rests on are mandatory (M4)
+  15 the high-level report names the standard's term once; its candidates
+     are the house method's
+  16 wording close to the standard reworded
+  17 an older file's zone not assessed reads as deferred
+  18 the specification labels its mandatory countermeasures the house reading
+  19 the demo's second approver is the operations manager; the high-level
+     report says whose scopes it prints
+-->
+<iframe id="f" style="width:1440px;height:900px;visibility:hidden"></iframe>
+<script src="../data/tour-project.js"></script>
+<script src="fixtures/v0.7.0-migrate.js"></script>
+<script src="fixtures/tour-v0.7-saved.js"></script>
+<script src="fixtures/hand-made-v0.1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var lines = [], failures = 0;
+  function ok(cond, name, detail) { if (cond) lines.push("PASS " + name); else { failures++; lines.push("FAIL " + name + (detail ? " — " + detail : "")); } }
+  function done() { lines.push(""); lines.push(failures === 0 ? "ALL TESTS PASSED" : failures + " TEST(S) FAILED"); document.getElementById("out").textContent = lines.join("\n"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  var DASH = /[–—]/;
+  function paragraphsOf(xml) {
+    var out = [], re = /<w:p[ >][\s\S]*?<\/w:p>/g, m;
+    while ((m = re.exec(xml))) {
+      var t = (m[0].match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (x) { return x.replace(/<[^>]+>/g, ""); }).join("");
+      if (t.replace(/\s+/g, "")) out.push(t.replace(/&apos;/g, "'").replace(/&quot;/g, "\"").replace(/&amp;/g, "&"));
+    }
+    return out;
+  }
+
+  var frame = document.getElementById("f");
+  frame.onload = function () {
+    var w = frame.contentWindow, tries = 0;
+    var t = setInterval(function () {
+      if (!w.RiskTool || !w.RiskExports || !w.RiskReview || !w.docx || !w.ExcelJS || !w.App.DocxBlocks || !w.RiskTool.state.project.zones.length) { if (++tries > 400) { clearInterval(t); ok(false, "the app exposed RiskTool with the demo"); done(); } return; }
+      clearInterval(t);
+      var r = null;
+      try { r = run(w); } catch (e) { failures++; lines.push("FAIL exception: " + (e && e.message) + "\n" + (e && e.stack)); }
+      if (r && typeof r.then === "function") r.then(done, function (e) { failures++; lines.push("FAIL async exception: " + (e && e.message) + "\n" + (e && e.stack)); done(); });
+      else done();
+    }, 50);
+  };
+  frame.src = "../index.html?tour=1";
+
+  function run(w) {
+    var RT = w.RiskTool, M = w.RiskApp.Model, E = w.RiskApp.Engine, MG = w.RiskApp.Migrate, RX = w.RiskExports, RR = w.RiskReview, DB = w.App.DocxBlocks;
+    var d = w.document;
+    RT.setToday("2026-11-14"); // a fixed today: what is built from the demo must not change with the real date
+    w.confirm = function () { return true; }; w.alert = function () {};
+    var DEMO = window.SPT_TOUR_PROJECT, FX = window.RiskFixtures;
+    function P() { return RT.state.project; }
+    function main() { return d.getElementById("main"); }
+    function load(p) { RT.loadProjectText(JSON.stringify(p)); }
+    function ownerIn(p, id) { return p.zones.concat(p.conduits).filter(function (o) { return o.id === id; })[0]; }
+    function threatIn(p, oid, tid) { return ownerIn(p, oid).threats.filter(function (t) { return t.id === tid; })[0]; }
+    function TT(p, oid, tid) { return E.threatTreatment(ownerIn(p, oid), threatIn(p, oid, tid), p); }
+    function texts(p) { return E.completeness(p).map(function (i) { return i.text; }); }
+    function has(list, re) { return list.some(function (x) { return re.test(x); }); }
+    function change(el, v) { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    function wordParas(p, opts) {
+      return w.docx.Packer.toBlob(RX.buildWordDoc(p, opts || {})).then(function (b) { return DB.unzip(b); }).then(function (parts) {
+        return paragraphsOf(new w.TextDecoder().decode(parts.filter(function (x) { return x.name === "word/document.xml"; })[0].bytes));
+      });
+    }
+    function after(list, s, from) { var i = list.indexOf(s, from || 0); return i < 0 ? [] : list.slice(i + 1); }
+    function section(list, head, next) { var a = list.indexOf(head), b = list.indexOf(next, a + 1); return a < 0 ? [] : list.slice(a + 1, b < 0 ? undefined : b); }
+    function rows(ws) { var out = []; ws.eachRow(function (r) { var row = []; r.eachCell({ includeEmpty: true }, function (c) { row.push(String(c.value == null ? "" : c.value)); }); out.push(row); }); return out; }
+
+    var base = MG.normaliseProject(clone(DEMO));
+    ok(E.completeness(base).length === 0, "the demo has no completeness problem at all", texts(base).join(" | "));
+    ok(E.approvalStates(base).length === 2 && E.approvalStates(base).every(function (s) { return s.signed && !s.changed && /^a3-/.test(s.entry.fingerprint); }), "both approvals read unchanged, on the a3 fingerprint", E.approvalFingerprint(base));
+
+    // ---- 1. a partly set SL-T vector ------------------------------------------------------------
+    ["C1", "C2", "C3", "C4", "C5"].forEach(function (id) {
+      ok(M.FR_IDS.every(function (fr) { return typeof ownerIn(base, id).slTargetByFR[fr] === "number"; }), "the demo's " + id + " has a target on every foundational requirement");
+    });
+    var p1 = clone(base); ownerIn(p1, "C2").slTargetByFR.SI = null; ownerIn(p1, "C2").slTargetByFR.RA = null;
+    ok(has(texts(p1), /^C2 \(Vendor remote access\): no SL-T set for SI and RA\.$/) && E.completeness(p1).filter(function (i) { return /no SL-T set for SI and RA/.test(i.text); })[0].stage === "slt",
+      "one warning per zone or conduit names the requirements with no target, on the SL-T", texts(p1).join(" | "));
+    var p1b = clone(base); M.FR_IDS.forEach(function (fr) { ownerIn(p1b, "C3").slTargetByFR[fr] = null; });
+    ok(has(texts(p1b), /^C3 \(Corporate reporting\): no SL-T set for any FR\.$/) && !has(texts(p1b), /^C3 .*no SL-T set for IAC/), "with none set, the warning is the one it was");
+    // C2's suggestion for SI is SL3, inherited from the zones it joins (the driving scenarios), as set.
+    ok(E.suggestConduit(ownerIn(base, "C2"), base).byFR.SI.sl === 3 && ownerIn(base, "C2").slTargetByFR.SI === 3, "C2's SI is the SL3 it inherits");
+
+    // ---- 2. ZCR 3.3: safety related assets -------------------------------------------------------
+    var sf = M.SEPARATION_ROWS.filter(function (r) { return r.id === "safety"; })[0];
+    ok(sf.required === true && sf.wholeZone === true, "safety related assets are a required separation, unless the whole zone is designated");
+    var p2 = clone(base), z2 = ownerIn(p2, "Z2");
+    z2.flags["sis-present"] = false; z2.assets.push({ id: "AS12", name: "Unit PLC", type: "plc" }); p2.counters.asset = 12;
+    z2.separation = { safety: { answer: "not-separated", reason: "" } };
+    var r2 = E.separationRows(z2, p2).filter(function (r) { return r.id === "safety"; })[0];
+    ok(r2 && r2.departure && r2.reasonMissing && !r2.wholeZoneMarked, "not separated, in a zone not designated safety related as a whole: a departure from a requirement");
+    ok(has(texts(p2), /^Z2 \(Safety Instrumented System\): safety related assets are not kept separate and the zone is not designated safety related, which the standard requires, with no justification\.$/),
+      "and with no justification it warns as the business separation does", texts(p2).join(" | "));
+    z2.flags["sis-present"] = true;
+    r2 = E.separationRows(z2, p2).filter(function (r) { return r.id === "safety"; })[0];
+    ok(r2 && !r2.departure && r2.wholeZoneMarked && has(texts(p2), /^Z2 .*safety related assets are not kept separate, with no reason\.$/), "designated safety related as a whole, it is no departure (a reason is still asked for)");
+
+    // ---- 3 and 4. reduce, and the remaining risk ----------------------------------------------------
+    var p3 = clone(base), t1 = threatIn(p3, "Z1", "T1");
+    t1.currentLikelihood = "high"; // today above tolerable, M1 in place, nothing planned
+    var T3 = TT(p3, "Z1", "T1");
+    ok(T3.label === "Reduce with countermeasures (none planned)" && T3.disposition === null && !T3.complete && T3.gap === "it is above tolerable risk today and no planned countermeasure is linked to it",
+      "reduce, above tolerable risk today, nothing planned: incomplete", T3.label + " / " + T3.gap);
+    ok(has(texts(p3), /^Z1 \(Unit 300 BPCS\) \/ T1: it is above tolerable risk today and no planned countermeasure is linked to it\.$/), "and the completeness list says so");
+    var p3b = clone(base), t5 = threatIn(p3b, "Z3", "T5");
+    t5.residualLikelihood = "medium"; // planned rating high: stays above tolerable
+    var T5 = TT(p3b, "Z3", "T5");
+    ok(T5.remainingAbove && !T5.remainingAccepted && T5.label === "Reduce with countermeasures (remaining risk not accepted)" && T5.disposition === null &&
+      T5.gap === "the planned rating stays above tolerable risk, with no record of the asset owner's acceptance of the remaining risk", "reduce whose planned rating stays above tolerable: incomplete until what remains is accepted", T5.gap);
+    t5.acceptance = "Accepted until the proxy is in place."; T5 = TT(p3b, "Z3", "T5");
+    ok(T5.gap === "the planned rating stays above tolerable risk, with no record of who accepted it" && T5.remainingMissing.join() === "who accepted it", "with a reason and no one, it asks for who");
+    t5.acceptanceDetail.by = "R. Calder"; T5 = TT(p3b, "Z3", "T5");
+    ok(T5.complete && T5.remainingAccepted && T5.disposition === "countermeasure" && T5.label === "Reduce with countermeasures", "with both, the decision is complete and stays a reduction");
+    var T4 = TT(base, "Z2", "T4");
+    ok(T4.decision === "slt" && T4.remainingAbove && T4.remainingAccepted && T4.complete && T4.disposition === "sl-t" && T4.afterPlan === "high", "the demo's T4: treated through the SL-T, planned rating High, its remaining risk accepted");
+    var p4 = clone(base), t4 = threatIn(p4, "Z2", "T4"); t4.acceptance = "";
+    ok(TT(p4, "Z2", "T4").label === "Treat through the SL-T programme (remaining risk not accepted)" && has(texts(p4), /^Z2 \(Safety Instrumented System\) \/ T4: the planned rating stays above tolerable risk, with no record of why the remaining risk is accepted\.$/),
+      "without its reason, the SL-T decision is incomplete and the list says what is missing", texts(p4).join(" | "));
+    var acc = E.approvalBasis(base).accepted;
+    ok(acc[acc.length - 1] === "remaining>Z2/T4:" + threatIn(base, "Z2", "T4").acceptance + "|R. Calder|Asset Owner - Unit 300|2026-07-04|2027-06-30", "the remaining risk accepted is part of what an approval covers, after the other accepted risks", acc[acc.length - 1]);
+    var p4b = clone(base); threatIn(p4b, "Z2", "T4").acceptanceDetail.by = "A. N. Other";
+    ok(E.approvalStates(p4b).every(function (s) { return s.changed && same(s.parts, ["accepted"]); }), "so who accepted it moves the accepted risks' part alone");
+
+    // ---- 5. the approval fingerprint ----------------------------------------------------------------
+    var fp = E.approvalFingerprint(base);
+    ok(/^a3(-[0-9a-f]{8}){8}$/.test(fp), "an a3 fingerprint holds eight parts", fp);
+    function moved(edit) { var q = clone(base); edit(q); return E.approvalStates(q)[0].parts; }
+    ok(same(moved(function (q) { threatIn(q, "Z1", "T3").likelihood = "medium"; }), ["risks"]), "a threat's unmitigated rating moves the threat scenarios' part");
+    ok(same(moved(function (q) { threatIn(q, "Z1", "T1").currentLikelihood = "medium"; }), ["risks"]), "and so does its current rating");
+    ok(same(moved(function (q) { threatIn(q, "Z3", "T6").residualLikelihood = "low"; }), ["risks"]), "and its planned rating");
+    ok(moved(function (q) { var th = M.emptyThreat(10); th.statement = "x"; ownerIn(q, "Z3").threats.push(th); }).indexOf("risks") >= 0, "a threat added moves it");
+    ok(moved(function (q) { ownerIn(q, "Z1").threats.splice(2, 1); }).indexOf("risks") >= 0, "and one removed");
+    ok(moved(function (q) { threatIn(q, "Z1", "T3").treatment = { decision: "reduce", confirmed: false, reason: "" }; }).indexOf("decisions") >= 0, "a treatment decision moves the decisions' part");
+    ok(same(moved(function (q) { ownerIn(q, "C3").assessment = { depth: "deferred", withId: "", reuseSource: "", considered: "", reason: "Later." }; }), ["partition"]), "a depth moves the zones and conduits' part");
+    ok(moved(function (q) { ownerIn(q, "C4").toZone = "Z3"; }).indexOf("partition") >= 0, "and so does where a conduit runs");
+    ok(same(moved(function (q) { ownerIn(q, "Z1").assets.push({ id: "AS12", name: "Spare HMI", type: "hmi" }); }), ["partition"]), "and an asset added to a zone");
+    ok(moved(function (q) { threatIn(q, "Z4", "T7").countermeasureIds = ["M6"]; }).indexOf("mandatory") >= 0, "a mandatory countermeasure dropped moves the mandatory countermeasures' part");
+    ok(same(E.APPROVAL_DOC_PARTS.detailed, ["tolerable", "slt", "accepted", "risks", "decisions", "partition"]) && same(E.APPROVAL_DOC_PARTS.spec, ["tolerable", "slt", "partition", "mandatory"]) && same(E.APPROVAL_DOC_PARTS.highLevel, ["tolerable", "ranking"]),
+      "each report covers its own parts");
+    // An approval taken before step 5 (a2) is read under its own rule: its four parts, never a crash.
+    var a2p = MG.normaliseProject(clone(DEMO)); ["A5", "A6"].forEach(function (id) { delete a2p.srs.highLevelAssets.filter(function (a) { return a.id === id; })[0].inSuc; });
+    a2p.approvals.forEach(function (a) { a.fingerprint = "a2-00000000-00000000-00000000-00000000"; });
+    var st2 = E.approvalStates(a2p);
+    ok(st2.every(function (s) { return s.changed && same(s.parts, ["tolerable", "ranking", "slt", "accepted"]) && !s.legacy; }), "an a2 approval is read as a2: only its four parts can move", JSON.stringify(st2.map(function (s) { return s.parts; })));
+    var fixA2 = FX["tour-v0.7-saved"], v07 = MG.normaliseProject(clone(fixA2));
+    var crash = false; try { E.approvalStates(v07); RX.signOffTexts(v07); } catch (e) { crash = true; }
+    ok(!crash, "the frozen v0.7 file's approvals read without error");
+
+    // ---- 6. zone and conduit characteristics ---------------------------------------------------------
+    var p6 = clone(base), z9 = M.emptyZone(9); z9.name = "Utilities"; p6.zones.push(z9);
+    ok(same(E.characteristicsMissing(z9, p6), ["accountable organisation", "logical boundary", "physical boundary", "logical access points", "physical access points", "data flows", "connected zones or conduits", "assets", "applicable security requirements", "security policies", "assumptions or external dependencies"]),
+      "a bare zone lacks every characteristic it is documented with", E.characteristicsMissing(z9, p6).join(", "));
+    var it6 = E.completeness(p6).filter(function (i) { return /^Z9 \(Utilities\): characteristics not recorded: /.test(i.text); })[0];
+    ok(!!it6 && it6.stage === "zones" && it6.target.part === "chars" && it6.spec === true, "one warning per zone, on step 3, for the specification too, aimed at the characteristics");
+    var c9 = M.emptyConduit(9); c9.fromZone = "Z1"; c9.toZone = "Z9"; c9.name = "Link"; p6.conduits.push(c9);
+    ok(E.characteristicsMissing(c9, p6).indexOf("connected zones or conduits") < 0 && E.characteristicsMissing(c9, p6).indexOf("assets") < 0 && E.characteristicsMissing(c9, p6).indexOf("logical boundary") >= 0,
+      "a conduit is checked as far as the list applies to it", E.characteristicsMissing(c9, p6).join(", "));
+    var p6b = clone(base); delete ownerIn(p6b, "Z3").assets[0].criticality;
+    ok(has(texts(p6b), /^Z3 \(Plant DMZ & historian\): characteristics not recorded: each asset's classification, criticality and business value\.$/), "an asset with no criticality is asked for", texts(p6b).join(" | "));
+    ok(base.zones.every(function (z) { return z.assets.every(function (a) { return ["high", "medium", "low"].indexOf(a.criticality) >= 0; }); }), "every demo asset has a criticality");
+    ok(E.conduitsOf(base, ownerIn(base, "Z2")).map(function (c) { return c.id; }).join() === "C5", "Z2 lists its connection, C5");
+    ok(ownerIn(base, "Z4").dataFlows.some(function (f) { return /removable media/.test(f); }), "Z4's removable media access point has its data flow");
+
+    // ---- 7. connections that are conduits; routes ----------------------------------------------------
+    var c4 = ownerIn(base, "C4"), c5 = ownerIn(base, "C5");
+    ok(c4.fromZone === "Z4" && c4.toZone === "Z1" && c4.assessment.depth === "grouped" && c4.assessment.withId === "Z4" && (c4.justification || "").length > 50, "C4, the engineering VLAN, joins Z4 to Z1, grouped with Z4, with its SL-T and justification");
+    ok(c5.fromZone === "Z4" && c5.toZone === "Z2" && c5.safetyRelated === true && c5.temporary === true && c5.assessment.withId === "Z2", "C5, the keyed SIS connection, joins Z4 to Z2, safety related and temporarily connected");
+    ok(same(threatIn(base, "Z1", "T2").via, ["Z4", "C4"]) && same(threatIn(base, "Z2", "T4").via, ["Z4", "C5"]), "T2 and T4 pass through them");
+    ok(!ownerIn(base, "Z4").assumptions.some(function (a) { return /not modelled as conduits/.test(a); }), "Z4 no longer says they are not conduits");
+    ok(same(E.steppingStones(base), {}), "grouped with the zone that holds their threats, neither is a stepping stone");
+    var p7 = clone(base); threatIn(p7, "Z1", "T2").via = ["Z4"]; p7.conduits = p7.conduits.filter(function (c) { return c.id !== "C4"; });
+    ok(has(texts(p7), /^Z1 \(Unit 300 BPCS\) \/ T2: its route passes from Z4 to Z1, which no conduit joins\.$/), "a route that crosses two zones no conduit joins warns", texts(p7).join(" | "));
+    var p7b = clone(base); threatIn(p7b, "Z1", "T1").via = ["Z4", "C2"];
+    ok(has(texts(p7b), /^Z1 \(Unit 300 BPCS\) \/ T1: its route passes from Z4 to C2, but C2 does not join Z4\.$/), "and one beside a conduit that does not join it", texts(p7b).join(" | "));
+    ok(E.routeBreaks(base, ownerIn(base, "Z1"), threatIn(base, "Z1", "T1")).length === 0, "the demo's routes are joined");
+
+    // ---- 8. inside the SUC --------------------------------------------------------------------------
+    var hla = function (p, id) { return p.srs.highLevelAssets.filter(function (a) { return a.id === id; })[0]; };
+    ok(hla(base, "A5").inSuc === false && hla(base, "A6").inSuc === false && M.inSuc(hla(base, "A1")) && !("inSuc" in hla(base, "A1")), "the LIS link and CCTV are outside the SUC; the others read as inside");
+    var p8 = clone(base); hla(p8, "A6").consequence = "severe"; hla(p8, "A6").likelihood = "high";
+    ok(E.sucComparison(p8).band === "high", "a system outside the SUC does not set its initial risk", E.sucComparison(p8).band);
+    delete hla(p8, "A6").inSuc;
+    ok(E.sucComparison(p8).band === "very-high" && has(texts(p8), /^A6 \(CCTV & physical security systems\): inside the SUC, but in no zone\.$/), "inside it, it does, and in no zone it warns", texts(p8).join(" | "));
+    ok(!("inSuc" in MG.normaliseProject(clone(FX["tour-v0.7-saved"])).srs.highLevelAssets[0]), "an older file reads every system as inside, and gains nothing");
+    var oddS = clone(DEMO); hla(oddS, "A1").inSuc = true; hla(oddS, "A2").inSuc = "no";
+    var nS = MG.normaliseProject(oddS);
+    ok(!("inSuc" in hla(nS, "A1")) && !("inSuc" in hla(nS, "A2")) && hla(nS, "A5").inSuc === false, "only false is kept");
+
+    // ---- 9. classification and sessions ----------------------------------------------------------------
+    var p9 = clone(base); p9.engagement.confidentiality = "";
+    var c9i = E.completeness(p9).filter(function (i) { return i.text === "The confidentiality classification of the reports is not set."; })[0];
+    ok(!!c9i && c9i.doc === "both" && c9i.stage === "basis", "no classification warns, for both reports");
+    var p9b = clone(base); delete p9b.basisOfAssessment.sessions;
+    var s9i = E.completeness(p9b).filter(function (i) { return i.text === "No risk assessment sessions recorded."; })[0];
+    ok(!!s9i && s9i.doc === "detailed" && s9i.stage === "basis" && RT.stepStatus(p9b).basis.state === "open", "no session record warns, for the detailed report, and step Engagement and evidence is open");
+    ok(M.sessionsOf(base).length === 3 && M.sessionsOf(base).every(function (s) { return s.date && s.topic && /\(/.test(s.participants); }), "the demo records three sessions with names and titles");
+    var oddSe = clone(DEMO); oddSe.basisOfAssessment.sessions.push("x", { topic: 4 }); oddSe.counters.session = "3";
+    var nSe = MG.normaliseProject(oddSe);
+    ok(nSe.basisOfAssessment.sessions.length === 4 && nSe.basisOfAssessment.sessions[3].id === "S4" && nSe.basisOfAssessment.sessions[3].topic === "" && nSe.counters.session === 4, "sessions are tidied: records only, text fields, an S id each, the counter above them");
+    ok(!("sessions" in MG.normaliseProject(clone(FX["hand-made-v0.1"])).basisOfAssessment), "an older file gains no sessions");
+
+    // ---- 10. policies and what implements them -------------------------------------------------------
+    ok(M.policyImplementedBy(base, base.suc.policies[0]).indexOf("per-session vendor access") > 0, "each demo policy says what implements it");
+    var s10 = clone(base.suc);
+    M.setPolicies(s10, [s10.policies[0] + " (rev 2)", s10.policies[1], s10.policies[2]]);
+    ok(M.policyImplementedBy({ suc: s10 }, s10.policies[0]).indexOf("per-session vendor access") > 0, "a policy edited in place keeps what implements it");
+    M.setPolicies(s10, [s10.policies[1]]);
+    ok(Object.keys(s10.policyImplementation).length === 1 && !!M.policyImplementedBy({ suc: s10 }, s10.policies[0]), "one removed takes its entry with it");
+
+    // ---- 12. SUC access points ------------------------------------------------------------------------
+    ok(M.sucAccessPointsOf(base).map(function (x) { return x.enters; }).join() === "C2,C3,Z4", "the demo's SUC access points enter C2, C3 and Z4");
+    var p12 = clone(base); delete p12.suc.accessPoints;
+    ok(E.completeness(p12).some(function (i) { return i.text === "The SUC has no access points listed." && i.doc === "both" && i.stage === "suc"; }), "none listed warns, for both reports");
+    var p12b = clone(DEMO); p12b.suc.accessPoints[0].enters = "C9";
+    ok(MG.normaliseProject(p12b).suc.accessPoints[0].enters === "", "one entering what is not there loses the link");
+
+    // ---- 13 and 14. C1, and the mandatory countermeasures ----------------------------------------------
+    var c1 = ownerIn(base, "C1");
+    ok(c1.slTargetByFR.IAC === 3 && c1.slTargetByFR.SI === 3 && c1.slTargetByFR.RDF === 3 && !/SL2 on IAC\/SI\/RDF/.test(c1.justification) && /SL3 to match the BPCS targets/.test(c1.justification), "C1's targets and justification agree");
+    var mc = E.mandatoryCountermeasures(base).map(function (e) { return e.owner.id + "/" + e.m.id; });
+    ok(mc.indexOf("Z2/M4") >= 0 && mc.indexOf("Z2/M8") >= 0 && mc.indexOf("Z1/M3") < 0, "the SL-T decision's countermeasures are mandatory: M4 and M8; M3 still is not", mc.join());
+
+    // ---- 16 and 17. wording; an older file's zone ------------------------------------------------------
+    ok(/mistakes and chance misuse \(SL1\)/.test(M.RULES.riskToSL.low.trace) && /general IT skills and simple tools \(SL2\)/.test(M.RULES.riskToSL.medium.trace) && !/casual|intentional violation/.test(M.RULES.riskToSL.low.trace + M.RULES.riskToSL.medium.trace), "the SL1 and SL2 traces are in the house's words");
+    ok(!M.RULES.hardRules.some(function (r) { return /mechanical safeguards|emergency procedures/.test(r); }), "the hard rule's examples are the house's own");
+    var lg = clone(base); delete ownerIn(lg, "C3").assessment; ownerIn(lg, "C3").detailed = { required: false, reason: "Read only." };
+    var dl = E.depthOf(ownerIn(lg, "C3"), lg);
+    ok(dl.depth === "deferred" && dl.legacy && dl.reason === "" && has(texts(lg), /^C3 \(Corporate reporting\): deferred, with no reason\.$/), "an older file's zone or conduit not assessed reads as deferred, with no reason, which warns");
+
+    // ---- 19. the demo's approvers ------------------------------------------------------------------
+    ok(base.approvals[1].name === "D. Hargreaves" && /Operations Manager/.test(base.approvals[1].role) && base.basisOfAssessment.interviews.some(function (i) { return i.name === "S. Adeyemi"; }), "the second approver is the accountable operations manager; S. Adeyemi is still interviewed");
+
+    // ---- the released v0.7.0 normaliser opens the new demo -----------------------------------------
+    var OLD = FX["v0.7.0-migrate"](M, E), viaOld = OLD.normaliseProject(clone(DEMO));
+    ok(OLD.accepts(DEMO.schema) && viaOld.conduits.length === 5 && hla(viaOld, "A5").inSuc === false && viaOld.basisOfAssessment.sessions.length === 3 && viaOld.suc.accessPoints.length === 3 &&
+      !!viaOld.suc.policyImplementation && threatIn(viaOld, "Z2", "T4").acceptance === threatIn(base, "Z2", "T4").acceptance, "a file with the step 5 fields opens in the released v0.7.0 with them kept");
+    ok(same(MG.normaliseProject(clone(viaOld)), base), "and saved from there, this build reads it as before");
+    ok(same(MG.normaliseProject(clone(base)), base), "normalising the demo again changes nothing");
+
+    // ---- the UI -----------------------------------------------------------------------------------
+    load(DEMO);
+    RT.navigate("suc");
+    ok(!!main().querySelector('[data-check-anchor="suc-access"]') && main().querySelectorAll('[data-check-anchor="suc-access"] tbody tr').length === 3, "step 1 lists the SUC's access points");
+    RT.navigate("srs");
+    var cb = main().querySelector('[data-hla-id="A6"] [data-field="hla-in-suc"]');
+    ok(!!cb && cb.checked === false && main().querySelector('[data-hla-id="A1"] [data-field="hla-in-suc"]').checked === true, "the ranking shows who is inside the SUC");
+    cb.checked = true; cb.dispatchEvent(new w.Event("change", { bubbles: true }));
+    ok(!("inSuc" in P().srs.highLevelAssets[5]), "ticking it writes nothing: inside is the default");
+    RT.navigate("basis");
+    ok(!!main().querySelector('[data-check-anchor="sessions"]') && main().querySelectorAll('[data-check-anchor="sessions"] tbody tr').length === 3 && !!main().querySelector('[data-check-anchor="engagement"]'), "Engagement and evidence has the sessions and the engagement anchor");
+    load(DEMO); RT.navigate("spec");
+    ok(!!main().querySelector('[data-policy-impl] [data-field="policy-impl-0"]') && main().querySelector('[data-field="policy-impl-0"]').value.indexOf("per-session vendor access") > 0, "step 6 asks what implements each policy");
+    RT.navigate("about");
+    ok(/controlled site access, hardwired interlocks and relief devices/.test(main().textContent) && !/mechanical safeguards/.test(main().textContent) && !!main().querySelector('[data-method="mandatory"]'), "About uses the house's examples and states the mandatory reading");
+    // The hint (11) and the remaining risk block (4).
+    w.RiskApp.RiskPage.select("Z2", "T4"); RT.navigate("risk");
+    var scales = main().querySelector("[data-scales]");
+    ok(!!scales && /Unmitigated likelihood is rated before any cyber security countermeasure; built-in and non-cyber safeguards still count\./.test(scales.textContent), "the scales hint matches the method");
+    var rem = main().querySelector('[data-threat-id="T4"] input[data-reason="remaining"]');
+    ok(!!rem && rem.value === threatIn(base, "Z2", "T4").acceptance && !!main().querySelector('[data-threat-id="T4"] [data-hint="remaining"]'), "T4 shows the remaining risk accepted, with its hint");
+    // Characteristics opened from the list (6).
+    var p6u = clone(base); delete ownerIn(p6u, "C4").physicalBoundary; load(p6u);
+    var ci = E.completeness(P()).filter(function (i) { return /^C4 .*characteristics not recorded: physical boundary\.$/.test(i.text); })[0];
+    RT.goToItem(ci);
+    var det = main().querySelector('[data-detail="conduit"] details[data-part="chars"]');
+    ok(!!ci && RT.state.stage === "zones" && !!det && det.open, "Go to opens the conduit with its characteristics open");
+    // A safety separation designated as a whole zone, in place (2).
+    var p2u = clone(base); var zz = ownerIn(p2u, "Z2"); zz.flags["sis-present"] = false; zz.assets.push({ id: "AS12", name: "Unit PLC", type: "plc" }); p2u.counters.asset = 12; zz.separation = { safety: { answer: "not-separated", reason: "Shared cabinet." } };
+    load(p2u); w.RiskApp.ZonesPage.select("zone", "Z2"); RT.navigate("zones");
+    ok(!!main().querySelector('[data-part="sep-safety"] [data-departure="safety"]'), "not designated, the row reads as a departure");
+    main().querySelector('[data-part="sep-safety"] [data-action="sep-whole-zone"]').click();
+    ok(ownerIn(P(), "Z2").flags["sis-present"] === true && !main().querySelector('[data-part="sep-safety"] [data-departure="safety"]'), "designating the whole zone settles it");
+
+    // ---- Word, Excel and the review pack ---------------------------------------------------------
+    load(DEMO);
+    var wb = RX.buildWorkbook(P());
+    var ar = rows(wb.getWorksheet("Accepted risks"));
+    ok(ar.length === 3 && ar[2][1] === "T4" && /^Remaining risk accepted\. No countermeasure brings/.test(ar[2][4]) && ar[2][5] === "R. Calder", "Excel: the remaining risk accepted is listed with the accepted risks, marked", JSON.stringify(ar[2]));
+    var rk = rows(wb.getWorksheet("Ranking"));
+    ok(rk[0][rk[0].length - 1] === "In the SUC" && rk.filter(function (r) { return r[r.length - 1] === "No"; }).length === 2, "Excel: the ranking says which systems are inside the SUC");
+    var bs = rows(wb.getWorksheet("Basis"));
+    ok(bs.some(function (r) { return r[0] === "Risk assessment sessions"; }) && bs.some(function (r) { return r[0] === "Treatment decisions, the SL-T and the remaining risk on the SIS"; }), "Excel: the Basis sheet has the sessions");
+    var i4 = RR.packItems().items.filter(function (x) { return x.itemId === "Z2:T4"; })[0];
+    ok(i4 && i4.details.some(function (r) { return r[0] === "Remaining risk accepted"; }) && i4.details.some(function (r) { return r[0] === "Remaining risk accepted by" && /^R\. Calder \(Asset Owner - Unit 300\), 2026-07-04, review by 2027-06-30$/.test(r[1]); }) && i4.priority === "Treated through the SL-T programme",
+      "the review pack carries the remaining risk accepted, and the decision as complete");
+    var ctx = RT.buildRiskContext(P());
+    ok(ctx.schema === "spt-risk-context/1.4" && ctx.conduits.length === 5 && ctx.highLevelAssets.every(function (a) { return !("inSuc" in a); }), "the risk context stays 1.4: the new conduits flow, the in-SUC mark does not");
+    return wordParas(P(), {}).then(function (det) {
+      ok(!det.some(function (x) { return DASH.test(x); }), "Word: no dashes");
+      // 1. the SL-T lead-in, true for the demo
+      ok(det.indexOf("Each zone and conduit has one target per foundational requirement, set by the consultant from the risk assessment.") > 0 && det.indexOf("Not set") < 0, "Word: every target is set, and the sentence says so");
+      // 4. Accepted risks
+      var accSec = section(det, "Accepted risks", "Transferred risks");
+      ok(/marked as such\.$/.test(accSec[0]) && accSec.indexOf("Remaining risk accepted") > 0 && accSec.some(function (x) { return /^T4  /.test(x); }), "Word: Accepted risks lists T4's remaining risk, marked", accSec.slice(0, 2).join(" | "));
+      // 5. what an approval covers
+      ok(det.some(function (x) { return /^Signed off as below\. An approval covers the tolerable risk, the zones and conduits, the threat scenarios with their ratings and treatment decisions, the target security levels and the accepted and transferred risks in this report/.test(x); }), "Word: the approval covers what is fingerprinted");
+      // 7. the appendix
+      ok(det.some(function (x) { return /Each step of the route is checked against the conduits\.$/.test(x); }) && !det.some(function (x) { return /not checked against the conduits/.test(x); }), "Word: the route is checked, as the appendix says");
+      // 8. the ranking
+      ok(section(det, "High-level risk ranking", "Risk comparison").filter(function (x) { return x === "Outside the SUC"; }).length === 2 && det.some(function (x) { return /A system marked outside the SUC is ranked for context only and does not set the SUC's initial risk\.$/.test(x); }), "Word: the ranking marks the systems outside the SUC");
+      // 9. the sessions
+      var ss = after(det, "Risk assessment sessions");
+      ok(ss.slice(0, 3).join("|") === "Date|Topic|Participants" && ss[3] === "2026-07-01", "Word: the basis lists the risk assessment sessions");
+      // 10 and 12
+      ok(det.some(function (x) { return /^Acme Group incident response plan, OT annex\. Implemented by the OT annex playbooks, with the jump host's session recordings and the DMZ firewall logs as evidence\.$/.test(x); }), "Word: each policy with what implements it");
+      ok(after(det, "Access points of the system under consideration").slice(0, 4).join("|") === "Access point|Enters|Vendor remote access over the site internet link, to the VPN concentrator in the DMZ|C2 Vendor remote access", "Word: the SUC's access points, each with what it enters");
+      // 16. the register's examples
+      ok(!det.some(function (x) { return /mechanical safeguards|emergency procedures/.test(x); }), "Word: none of the standard's examples");
+      return wordParas(P(), { highLevelOnly: true });
+    }).then(function (hl) {
+      ok(hl.filter(function (x) { return /which the standard calls the initial cyber security risk assessment/.test(x); }).length === 1, "high-level: the standard's term is named once");
+      ok(hl.some(function (x) { return /are, by the house method, the candidates for a detailed assessment/.test(x); }) && hl.some(function (x) { return /: by the house method, a system rated there is a candidate for a detailed assessment\.$/.test(x); }), "high-level: the candidates are the house method's");
+      ok(hl.some(function (x) { return /^Signed off as below\. An approval covers the tolerable risk and the ranking in this report, within the scope given for it\. The scopes below were given for the full assessment, whose other results are in the detailed report\.$/.test(x); }), "high-level: it says whose scopes it prints");
+      return wordParas(P(), { spec: true });
+    }).then(function (spec) {
+      var ms = after(spec, "Mandatory security countermeasures");
+      ok(/^By the house reading, the countermeasures that the decisions to reduce a risk or to treat it through the SL-T programme rest on are mandatory\./.test(ms[0]) && spec.some(function (x) { return /^M4  Hardwired keyswitch/.test(x); }), "spec: the mandatory countermeasures are the house reading, M4 among them");
+      ok(spec.some(function (x) { return /\. Implemented by /.test(x); }) && spec.indexOf("Access points of the system under consideration") > 0, "spec: the policies with what implements them, and the SUC's access points");
+      var p1w = clone(base); ownerIn(p1w, "C3").slTargetByFR.RA = null;
+      return wordParas(p1w, { spec: true });
+    }).then(function (spec1) {
+      ok(spec1.indexOf("The consultant sets one target per foundational requirement for each zone and conduit, from the risk assessment. Not set marks a requirement with no target yet.") > 0 && spec1.indexOf("Each zone and conduit has one target per foundational requirement, set by the consultant from the risk assessment.") < 0,
+        "with a target not set, the SL-T sentence says only what is true");
+    });
+  }
+}());
+</script>
+</body>
+</html>

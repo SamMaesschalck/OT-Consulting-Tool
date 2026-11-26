@@ -37,7 +37,7 @@
     "doc-control": { title: "Blank document control fields", severity: "suggestion", about: "Empty fields in the document control table. They may be filled in at issue. QA review by is not counted." },
     "numbering": { title: "Section numbering gaps", severity: "should-fix", about: "Numbered sections that skip a number, which usually means a section was hidden." },
     "figures": { title: "Figures that disagree", severity: "must-fix", about: "Counts the report prints that do not match the assessment behind it." },
-    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat above the tolerable risk with no confirmed decision to reduce it, accept it, transfer it or treat it through the target levels, or with a decision that is missing its countermeasure, reason, arrangement or who accepted it." },
+    "risk-no-disposition": { title: "Risks above tolerable with no treatment decision", severity: "must-fix", about: "A threat above the tolerable risk with no confirmed decision to reduce it, accept it, transfer it or treat it through the target levels, or with a decision that is missing its countermeasure, reason, arrangement, who accepted it, or the acceptance of a risk that stays above tolerable." },
     "risk-slt-justification": { title: "Target levels with no justification", severity: "should-fix", about: "A zone or conduit with target security levels set and no justification recorded." }
   };
 
@@ -334,7 +334,10 @@
   // countermeasures, accept, transfer, or treat through the target levels),
   // in the words the report prints, empty when none is confirmed or the
   // confirmed one is incomplete (reduce with no countermeasure, accept with no
-  // reason or no one who accepted it, a transfer with no arrangement or no one who agreed it, the
+  // reason or no one who accepted it, a transfer with no arrangement or no one who agreed it, a
+  // decision to reduce with nothing planned while the risk is above tolerable today, a decision
+  // to reduce or treat through the target levels whose planned rating stays above tolerable
+  // with the remaining risk not accepted, the
   // target levels with none set and no reason). A complete decision with no
   // countermeasure is a legitimate position (treated through the target
   // levels, accepted or transferred), so it is not flagged.

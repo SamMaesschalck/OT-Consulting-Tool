@@ -438,7 +438,7 @@ window.RiskApp.App = (function () {
   function goToItem(item) {
     var t = (item && item.target) || {};
     // Step 3 shows one zone or conduit at a time: the one named is opened.
-    if (item.stage === "zones" && R.ZonesPage) R.ZonesPage.select(t.kind, t.id);
+    if (item.stage === "zones" && R.ZonesPage) R.ZonesPage.select(t.kind, t.id, t.part);
     // Step 5 works one zone or conduit at a time: the one named, and the
     // scenario, are opened.
     // A consequence opens on By consequence.
@@ -945,7 +945,17 @@ window.RiskApp.App = (function () {
       pathsThrough: function (id, project) { return E.pathsThrough(project || state.project, id); },
       pathWords: E.pathWords, viaOf: M.viaOf,
       pathImpactVs: function (t, k, project) { return E.pathImpactVs(t, k, project || state.project); },
-      steppingStones: function (project) { return E.steppingStones(project || state.project); }
+      steppingStones: function (project) { return E.steppingStones(project || state.project); },
+      // The 3-2 fixes, step 5: a ranked system inside the SUC, the risk
+      // assessment sessions, the SUC's access points, what implements a
+      // policy, a route's steps no conduit joins, and the characteristics a
+      // zone or conduit lacks.
+      inSuc: M.inSuc,
+      sessionsOf: function (project) { return M.sessionsOf(project || state.project); },
+      sucAccessPointsOf: function (project) { return M.sucAccessPointsOf(project || state.project); },
+      policyImplementedBy: function (policy, project) { return M.policyImplementedBy(project || state.project, policy); },
+      routeBreaks: function (owner, t, project) { return E.routeBreaks(project || state.project, owner, t); },
+      characteristicsMissing: function (owner, project) { return E.characteristicsMissing(owner, project || state.project); }
     };
   }
 

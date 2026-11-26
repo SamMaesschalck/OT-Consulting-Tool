@@ -135,7 +135,8 @@
       "and removing a vulnerability drops the links to it");
 
     // ---- 7: the SL-T strip ----
-    demo(); pick("C2");
+    // Step 5: the demo sets every requirement on C2, so SI is cleared to offer its suggestion.
+    demo(); ["SI", "DC", "RA"].forEach(function (fr) { owner("C2").slTargetByFR[fr] = null; }); pick("C2");
     var use = panel().querySelector('[data-slt-strip] [data-action="use-suggestion-SI"]');
     ok(use.getAttribute("aria-label") === "Use SL3 for SI of C2", "Use says what it sets, for which requirement and where", use.getAttribute("aria-label"));
     use.focus(); use.click();
@@ -150,7 +151,9 @@
     ok(panel().querySelector("details.strip-why").open === true, "back on C2 it is still open");
 
     // ---- 8 and 13: the SL-T grid ----
-    demo(); RT.navigate("slt");
+    // Step 5: the demo sets every target, so C2's three and C1's three are cleared, as step 4's demo had them.
+    demo(); ["SI", "DC", "RA"].forEach(function (fr) { owner("C2").slTargetByFR[fr] = null; }); ["UC", "TRE", "RA"].forEach(function (fr) { owner("C1").slTargetByFR[fr] = null; }); RT.navigate("slt");
+
     var row = main().querySelector('tr[data-owner-id="C2"] [data-action="accept-row"]');
     ok(!!row && row.getAttribute("aria-label") === "Accept 3 suggestions for C2", "a row's Accept says how many and where", row && row.getAttribute("aria-label"));
     row.focus(); row.click();
@@ -200,7 +203,9 @@
     // ---- logic 4 and 5: what Duplicate and Move carry ----
     demo(); pick("Z3"); openScen("T5");
     threat("Z3", "T5").residualLikelihood = "medium"; RT.render();
-    ok(scen("T5").querySelector(".treat-status").textContent === "Addressed by M5. Planned risk is still above tolerable risk.", "a planned rating above tolerable risk says so in full", scen("T5").querySelector(".treat-status").textContent);
+    // Step 5: the planned rating above tolerable risk now asks for the asset owner's acceptance of what remains (was: "Addressed by M5. Planned risk is still above tolerable risk.").
+    ok(scen("T5").querySelector(".treat-status").textContent === "The planned rating stays above tolerable risk, with no record of the asset owner's acceptance of the remaining risk.", "a planned rating above tolerable risk says so in full", scen("T5").querySelector(".treat-status").textContent);
+
     demo(); pick("Z4"); openScen("T8");
     var rv = scen("T8").querySelector('[data-field="acc-review"]');
     ok(!!rv && /^Review date/.test(d.querySelector('label[for="' + rv.id + '"]') ? d.querySelector('label[for="' + rv.id + '"]').textContent : (rv.closest(".field").textContent || "")), "the acceptance's last field is called Review date");

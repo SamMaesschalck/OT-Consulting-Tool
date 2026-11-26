@@ -207,7 +207,8 @@
     ok(d.activeElement === scen(dupId).querySelector('[data-action="open-scenario"]'), "with the keyboard on it");
 
     // ---- the SL-T strip ----
-    demo(); pick("C2");
+    // Step 5: the demo sets every requirement on C2, so SI is cleared to offer its suggestion.
+    demo(); owner("C2").slTargetByFR.SI = null; pick("C2");
     var c2o = owner("C2"), strip = panel().querySelector("[data-slt-strip]");
     ok(!!strip && panel().querySelector("[data-slt-strip]").compareDocumentPosition(panel().querySelector("table.scen-table")) & 4, "the zone's SL-T strip sits above the scenario table");
     var sugC = E.suggestConduit(c2o, P());
@@ -215,6 +216,7 @@
     ok(c2o.slTargetByFR.SI === null && sugC.byFR.SI.sl === 3 && !!strip.querySelector('[data-action="use-suggestion-SI"]'), "an unset requirement with a suggestion offers Use");
     strip.querySelector('[data-action="use-suggestion-SI"]').click();
     ok(c2o.slTargetByFR.SI === 3 && !panel().querySelector('[data-slt-strip] [data-action="use-suggestion-SI"]'), "Use sets it to the suggestion");
+    c2o.slTargetByFR.DC = null; c2o.slTargetByFR.RA = null; // step 5: cleared, as step 4's demo had them, so Accept all has work to do
     c2o.slTargetByFR.RDF = 2; RT.render();
     var acc = panel().querySelector('[data-action="accept-all-suggested"]');
     var unsetWithSug = RT.FR_IDS.filter(function (fr) { return c2o.slTargetByFR[fr] == null && sugC.byFR[fr].sl != null; });
@@ -282,7 +284,10 @@
     // ---- the SL-T grid ----
     demo();
     main().querySelector('.step-tabs [data-tab="slt"]').click();
+    // Step 5: the demo sets every target, so C1 to C3 are given back the gaps step 4's demo had.
+    [["C1", ["UC", "TRE", "RA"]], ["C2", ["SI", "DC", "RA"]], ["C3", ["UC", "SI", "TRE", "RA"]]].forEach(function (x) { x[1].forEach(function (fr) { owner(x[0]).slTargetByFR[fr] = null; }); }); RT.render();
     var grid = main().querySelector("table.slt-grid");
+
     ok(RT.state.stage === "slt" && !!grid && grid.querySelectorAll("tbody tr[data-owner-id]").length === ownersAll.length && grid.querySelectorAll('tbody select[data-slt-fr]').length === ownersAll.length * 7, "the SL-T grid has every zone and conduit by FR");
     var fillN = 0; P().zones.concat(P().conduits).forEach(function (o) { var s = o.fromZone !== undefined ? E.suggestConduit(o, P()) : E.suggestZone(o, P()); RT.FR_IDS.forEach(function (fr) { if (o.slTargetByFR[fr] == null && s.byFR[fr].sl != null) fillN++; }); });
     var ga = main().querySelector('[data-action="accept-all-grid"]');

@@ -314,7 +314,7 @@
       var hap = at(hl, "Appendix: risk criteria");
       ok(hap > 0 && at(hl, "Risk matrix", hap) > hap && at(hl, "Foundational requirements", hap) < 0 && at(hl, "Risk comparison") < 0 && at(hl, "Zone and conduit characteristics") < 0, "Word, high level: the criteria appendix too, with no FR key, comparison table or zones");
       var so = at(det, "Sign-off");
-      ok(at(det, RX.SIGNATURE_HEAD[0], so) > so && at(det, "S. Adeyemi", so) > so && at(det, "Process Safety Engineer", so) > so && at(hl, RX.SIGNATURE_HEAD[0], at(hl, "Sign-off")) > 0, "Word: a signature table from the approvers, in both reports");
+      ok(at(det, RX.SIGNATURE_HEAD[0], so) > so && at(det, "D. Hargreaves", so) > so && at(det, "Operations Manager, Teesport Refinery", so) > so && at(hl, RX.SIGNATURE_HEAD[0], at(hl, "Sign-off")) > 0, "Word: a signature table from the approvers, in both reports");
       ok(!det.concat(hl).some(function (x) { return /[—–]/.test(x); }), "Word: no em or en dash anywhere in either report", (det.concat(hl).filter(function (x) { return /[—–]/.test(x); })[0] || ""));
       ok(!det.concat(hl).some(function (x) { return /\bZCR\b|\b4\.[2-8]\b|clause/i.test(x); }), "Word: no ZCR id or clause number", (det.concat(hl).filter(function (x) { return /\bZCR\b|\b4\.[2-8]\b|clause/i.test(x); })[0] || ""));
       return blocksOf({});
@@ -414,7 +414,7 @@
     function review3b() {
       var p = demo();
       // ---- the demo: names, not ids, for its channels ----
-      ok(p.conduits.map(function (c) { return c.channels.join(", "); }).join(" | ") === "OPC UA | VPN, RDP through the jump host | HTTPS", "the demo's channels and protocols are named, not ids", p.conduits.map(function (c) { return c.channels.join(", "); }).join(" | "));
+      ok(p.conduits.map(function (c) { return c.channels.join(", "); }).join(" | ") === "OPC UA | VPN, RDP through the jump host | HTTPS | DCS engineering protocol, PLC programming protocol | SIS engineering protocol", "the demo's channels and protocols are named, not ids (step 5: C4 and C5 too)", p.conduits.map(function (c) { return c.channels.join(", "); }).join(" | "));
       ok(sheetCol(RX.buildWorkbook(p).getWorksheet("Conduits"), "Channels and protocols") === 5, "and the Excel Conduits sheet calls the column what the page and Word call it");
 
       // ---- every approver, not only the first, is read for the sign-off ----
@@ -422,18 +422,18 @@
       var so = RX.signOffTexts(p);
       // Phase 4 review (wording 1): the summary names who signed and points to the scope under Sign-off, where the
       // signature table holds it (was: the scope quoted in the sentence).
-      ok(so[0] === "This assessment was signed off by S. Adeyemi (Process Safety Engineer) on 2026-07-04; the scope of the approval is under Sign-off.", "the summary's sign-off names the approver who signed, and where the scope of their approval is", so[0]);
+      ok(so[0] === "This assessment was signed off by D. Hargreaves (Operations Manager, Teesport Refinery) on 2026-07-04; the scope of the approval is under Sign-off.", "the summary's sign-off names the approver who signed, and where the scope of their approval is", so[0]);
       // Two approvers on one date share it; each scope is in the signature table.
       var p2 = w.RiskApp.Migrate.normaliseProject(JSON.parse(JSON.stringify(window.SPT_TOUR_PROJECT)));
-      ok(RX.signOffTexts(p2)[0] === "This assessment was signed off by R. Calder (Asset Owner - Unit 300) and S. Adeyemi (Process Safety Engineer) on 2026-07-04; the scope of each approval is under Sign-off.", "two approvers on the same date are named together, with one date", RX.signOffTexts(p2)[0]);
+      ok(RX.signOffTexts(p2)[0] === "This assessment was signed off by R. Calder (Asset Owner - Unit 300) and D. Hargreaves (Operations Manager, Teesport Refinery) on 2026-07-04; the scope of each approval is under Sign-off.", "two approvers on the same date are named together, with one date", RX.signOffTexts(p2)[0]);
       p2.approvals[1].date = "2026-07-05";
-      ok(RX.signOffTexts(p2)[0] === "This assessment was signed off by R. Calder (Asset Owner - Unit 300) on 2026-07-04 and S. Adeyemi (Process Safety Engineer) on 2026-07-05; the scope of each approval is under Sign-off.", "and on different dates each with their own", RX.signOffTexts(p2)[0]);
-      ok(frontValue(RX.buildWorkbook(p), "Sign-off") === "S. Adeyemi (Process Safety Engineer), 2026-07-04", "and the Excel Front sheet names them", String(frontValue(RX.buildWorkbook(p), "Sign-off")));
+      ok(RX.signOffTexts(p2)[0] === "This assessment was signed off by R. Calder (Asset Owner - Unit 300) on 2026-07-04 and D. Hargreaves (Operations Manager, Teesport Refinery) on 2026-07-05; the scope of each approval is under Sign-off.", "and on different dates each with their own", RX.signOffTexts(p2)[0]);
+      ok(frontValue(RX.buildWorkbook(p), "Sign-off") === "D. Hargreaves (Operations Manager, Teesport Refinery), 2026-07-04", "and the Excel Front sheet names them", String(frontValue(RX.buildWorkbook(p), "Sign-off")));
       var px;
       return docXml({}).then(function (xml) {
         px = paragraphsOf(xml);
         ok(px.indexOf(so[0]) > 0 && !px.some(function (x) { return /has not yet signed off/.test(x); }), "Word: the summary says who signed, and nowhere says nobody has");
-        ok(after(px, "Document control", "Asset-owner sign-off") === "S. Adeyemi (Process Safety Engineer), 2026-07-04", "Word: document control names them too", String(after(px, "Document control", "Asset-owner sign-off")));
+        ok(after(px, "Document control", "Asset-owner sign-off") === "D. Hargreaves (Operations Manager, Teesport Refinery), 2026-07-04", "Word: document control names them too", String(after(px, "Document control", "Asset-owner sign-off")));
         ok(px.indexOf(RX.signOffTexts(p)[2], px.indexOf("Sign-off")) > 0 && px.indexOf("Not yet signed", px.indexOf("Sign-off")) > 0, "Word: Signed off as below once one has signed, the other row still Not yet signed");
         // Nobody signed: the section names who it is for, and claims no signature.
         p.approvals[1].approved = false; p.approvals[1].fingerprint = "";
@@ -444,7 +444,7 @@
         var sec = px.slice(s0, next);
         ok(sec.indexOf("The asset owner has not yet signed off the tolerable risk or the results.") > 0 && sec.some(function (x) { return /^For approval by the people below\. /.test(x); }) && !sec.some(function (x) { return /^Signed off as below/.test(x); }), "Word: with approvers recorded and none signed, the section says For approval by, never Signed off as below", sec.slice(0, 4).join(" | "));
         ok(sec.indexOf(RX.SIGNATURE_HEAD[0]) > 0 && RX.SIGNATURE_HEAD[0] === "Approver", "and the table's first column is Approver, not Signed off by");
-        ok(has(texts(), /^R\. Calder: approval not yet recorded\.$/) && has(texts(), /^S\. Adeyemi: approval not yet recorded\.$/) && RT.stepStatus().approval.state === "open" && RT.stepStatus().review.state === "open", "named approvers with none approved leave step 7 open, and Check and issue not ready");
+        ok(has(texts(), /^R\. Calder: approval not yet recorded\.$/) && has(texts(), /^D. Hargreaves: approval not yet recorded.$/) && RT.stepStatus().approval.state === "open" && RT.stepStatus().review.state === "open", "named approvers with none approved leave step 7 open, and Check and issue not ready");
         var it = RT.completeness().filter(function (i) { return /approval not yet recorded/.test(i.text); })[0];
         ok(it.stage === "approval" && it.doc === "both" && it.target.kind === "approval" && it.target.id === "0", "on step 7, for both reports, aimed at the approver");
         RT.goToItem(it);
@@ -485,7 +485,7 @@
         ok(!paragraphsOf(xml).some(function (x) { return /^Consultant note: .* changed after/.test(x); }), "Word, high level: no note for an SL-T it does not print");
         return docXml({});
       }).then(function (xml) {
-        ok(paragraphsOf(xml).indexOf("Consultant note: the SL-T changed after S. Adeyemi approved. Confirm the approval before issue.") > 0, "Word, detailed: the note says the SL-T changed");
+        ok(paragraphsOf(xml).indexOf("Consultant note: the SL-T changed after D. Hargreaves approved. Confirm the approval before issue.") > 0, "Word, detailed: the note says the SL-T changed");
         // A legacy fingerprint still works, and one ticked in an older build asks for a record.
         p = demo();
         p.approvals[0].fingerprint = "";

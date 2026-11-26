@@ -59,7 +59,7 @@
 
     // ---- completeness of the demo ----
     ok(p.srs.highLevelAssets.length === 6, "high-level ranking has 6 systems");
-    ok(p.zones.length === 4 && p.conduits.length === 3, "4 zones and 3 conduits");
+    ok(p.zones.length === 4 && p.conduits.length === 5, "4 zones and 5 conduits (step 5: the engineering VLAN C4 and the keyed SIS connection C5)");
     ok(p.zones.every(function (z) { return z.name && z.description; }), "every zone named and described");
     var promoted = p.zones.filter(function (z) { return z.fromHLA; }).map(function (z) { return z.fromHLA; }).join(",");
     ok(promoted === "A1,A2,A3,A4", "the four high-ranked systems are promoted zones", promoted);
@@ -105,7 +105,7 @@
     var owners = p.zones.concat(p.conduits), all = [];
     owners.forEach(function (o) { o.threats.forEach(function (th) { all.push({ o: o, t: th, T: RT.threatTreatment(o, th) }); }); });
     ok(RT.completeness(p).length === 0, "the demo has no completeness problem at all", RT.completeness(p).map(function (i) { return i.text; }).join(" | "));
-    ok(all.map(function (x) { return x.t.id; }).join() === "T1,T2,T3,T4,T5,T6,T7,T8,T9" && owners.map(function (o) { return o.id; }).join() === "Z1,Z2,Z3,Z4,C1,C2,C3", "its ids are the ones it always had");
+    ok(all.map(function (x) { return x.t.id; }).join() === "T1,T2,T3,T4,T5,T6,T7,T8,T9" && owners.map(function (o) { return o.id; }).join() === "Z1,Z2,Z3,Z4,C1,C2,C3,C4,C5", "its ids are the ones it always had, with C4 and C5 after them");
     ok(all.every(function (x) { return x.t.assetIds.length > 0 && RT.threatAssets(x.o, p).filter(function (a) { return x.t.assetIds.indexOf(a.id) >= 0; }).length === x.t.assetIds.length; }), "every threat links the assets it reaches, each one there");
     ok(all.filter(function (x) { return x.t.vulnerabilityIds.length; }).length >= 8 && owners.every(function (o) { return (o.vulnerabilities || []).every(function (v) { return v.reference && all.some(function (x) { return x.o === o && x.t.vulnerabilityIds.indexOf(v.id) >= 0; }); }); }), "every vulnerability has a source and is linked to a threat");
     ok(all.every(function (x) { return x.t.entryPoint && x.t.consequence && x.t.likelihoodRationale; }), "every threat has its entry point, consequence and likelihood rationale");
@@ -168,7 +168,7 @@
     ok(Array.isArray(problems) && problems.length === 0, "export guard reports no problems on the demo project", (problems || []).join(" | "));
     var ctx = RT.buildRiskContext(p);
     ok(ctx && /spt-risk-context/.test(ctx.schema || ""), "risk-context export builds", ctx && ctx.schema);
-    ok((ctx.zones || []).length === 4 && (ctx.conduits || []).length === 3, "context carries the zones and conduits");
+    ok((ctx.zones || []).length === 4 && (ctx.conduits || []).length === 5, "context carries the zones and conduits");
     var zc = (ctx.zones || [])[1] || {};
     ok(zc.slTarget === 3 && zc.slTargetByFR && zc.slTargetByFR.IAC === 3, "SIS zone exports SL-T 3 (scalar + per-FR)");
 
