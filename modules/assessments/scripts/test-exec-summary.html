@@ -48,13 +48,13 @@ window.docx = (function () {
 
   var CASES = [
     { id: "ncsc-caf", tour: A.TourCAF, client: "Northbridge Manufacturing",
-      must: ["This assessment finds that Northbridge Manufacturing", "Not Achieved", "Partially Achieved", "The gaps are not evenly spread", "four objectives", "weakest alignment in", "Outcome profile by objective"],
+      must: ["This assessment finds that Northbridge Manufacturing", "Not Achieved", "Partially Achieved", "The weakest objective is", "four objectives", "weakest alignment in", "Outcome profile by objective"],
       mustNot: ["Other Than Satisfied", "Selected profile:"] },
     { id: "nist-800-53", tour: A.TourNIST, client: "Atlas Digital Services",
-      must: ["This assessment finds that Atlas Digital Services", "Other Than Satisfied", "The gaps are not evenly spread", "Technical, Operational and Management", "neither a formal SP 800-53A control assessment", "The weakest area is", "Outcome profile by objective"],
+      must: ["This assessment finds that Atlas Digital Services", "Other Than Satisfied", "the controls are not yet satisfied", "Technical, Operational and Management", "not a formal SP 800-53A control assessment", "The weakest area is", "Outcome profile by objective"],
       mustNot: ["Not Achieved", "Partially Implemented", "Selected profile:"] },
     { id: "nist-800-82", tour: A.TourNIST82, client: "Riverbend Water Authority",
-      must: ["This assessment finds that Riverbend Water Authority", "OT Overlay", "Other Than Satisfied", "The gaps are not evenly spread", "OT-aware roadmap"],
+      must: ["This assessment finds that Riverbend Water Authority", "OT Overlay", "Other Than Satisfied", "the controls are not yet satisfied", "OT-aware roadmap"],
       mustNot: ["Not Achieved", "Selected profile:"] },
     { id: "cis-controls-v8", tour: A.TourCIS, client: "Brightpath Retail Group",
       tweak: function (E) { E.setResponse(E.state.activeTargetId, "1.3", { applicable: true, state: "achieved" }); },

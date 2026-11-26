@@ -14,11 +14,11 @@ window.App.Data.instruments["nist-800-53"].instrument = {
     "scoringProfileRef":  "caf-achieved",
     "targetDimension":  "site",
     "targetDimensionLabel":  "Site",
-    "framing":  "A control-by-control gap assessment against the NIST SP 800-53 Revision 5 security and privacy control catalog, suitable for enterprise IT and other information systems. This version covers the base controls only (control enhancements are a planned addition). The Low, Moderate and High baselines come from NIST SP 800-53B.",
+    "framing":  "This assessment measures the organisation's controls against the NIST SP 800-53 Revision 5 catalog of security and privacy controls, which applies to enterprise IT and other information systems. It covers the base controls and excludes control enhancements. The Low, Moderate and High baselines are taken from NIST SP 800-53B.",
     "sourceNote":  "Control identifiers, titles and Low/Moderate/High baseline membership are transcribed from NIST SP 800-53B (Control Baselines for Information Systems and Organizations). The 20-family structure and the verbatim per-control \u0027Control:\u0027 statement text (all 300 base controls) are transcribed from NIST SP 800-53 Rev 5, Release 5.2.0; IA-13 (Identity Providers and Authorization Servers) and SA-24 (Design for Cyber Resiliency) were added in Release 5.2.0 and are not yet allocated to a baseline (assessable under the Full catalog profile); the control statement is shown in the \u0027What this control requires\u0027 expander on every control. Withdrawn controls and control enhancements are excluded from this version.",
     "attribution":  "NIST Special Publications are works of the U.S. Government and are not subject to copyright in the United States. Sources: NIST SP 800-53 Rev 5 (Release 5.2.0) and NIST SP 800-53B (National Institute of Standards and Technology).",
     "display":  {
-                    "subtitle":  "Control-by-control gap assessment against NIST SP 800-53 Rev 5 (base controls). Capture engagement details, pick the baseline below, then work through the control families from the sidebar.",
+                    "subtitle":  "This is a gap assessment against the base controls of NIST SP 800-53 Rev 5. Enter the engagement details, choose a baseline below, then work through the control families in the sidebar.",
                     "reportSubline":  "NIST SP 800-53 Rev 5 control assessment",
                     "reportDescription":  "NIST SP 800-53 Rev 5 control gap analysis",
                     "profileTitle":  "Baseline",
@@ -26,14 +26,14 @@ window.App.Data.instruments["nist-800-53"].instrument = {
                     "objectiveTitle":  "Control families",
                     "outcomesTitle":  "Controls",
                     "gettingStarted":  {
-                                           "cardTitle":  "NIST SP 800-53 control assessment: how this instrument works",
-                                           "intro":  "This is a control-by-control gap assessment against the NIST SP 800-53 Rev 5 catalog (Release 5.2.0), for enterprise IT and other information systems. Each control is determined Satisfied or Other Than Satisfied, following the assessment model of NIST SP 800-53A. It is an alignment and gap tool, not a formal assessment or an authorization package.",
+                                           "cardTitle":  "How the NIST SP 800-53 assessment works",
+                                           "intro":  "This assessment covers each control in the NIST SP 800-53 Rev 5 catalog (Release 5.2.0) for enterprise IT and other information systems. You record each control as Satisfied or Other Than Satisfied, as in the NIST SP 800-53A assessment model. The result is a gap analysis. It is not a formal assessment or an authorization package.",
                                            "profileHeading":  "Baseline (sets which controls are expected)",
                                            "bullets":  [
-                                                           "The unit of capture is the control: 300 base controls across 20 families, grouped as Technical, Operational and Management.",
-                                                           "Record each control as Satisfied or Other Than Satisfied: the binary determination used by SP 800-53A. Unknown reduces confidence; Not applicable drops the control.",
-                                                           "The baseline above (Low, Moderate or High, from NIST SP 800-53B) sets which controls are expected. Choose Full catalog to assess every control with no baseline target. Program Management (PM) controls are expected in every baseline.",
-                                                           "No single score is produced. The report is a profile of Satisfied / Other Than Satisfied counts by family, plus the roadmap of controls that are Other Than Satisfied. Control enhancements are out of scope in this version."
+                                                           "You assess 300 base controls in 20 families, grouped as Technical, Operational and Management.",
+                                                           "Record each control as Satisfied or Other Than Satisfied, the two determinations used in SP 800-53A. Unknown lowers confidence, and Not applicable removes the control from the results.",
+                                                           "The baseline above (Low, Moderate or High, from NIST SP 800-53B) sets which controls are expected, and Program Management (PM) controls are expected in all three. Choose Full catalog to assess every control without a baseline target.",
+                                                           "The report gives the Satisfied and Other Than Satisfied counts for each family and a roadmap of the controls that are Other Than Satisfied. It does not produce a single score. Control enhancements are not covered in this version."
                                                        ],
                                            "profilesHeading":  "Available baselines"
                                        }

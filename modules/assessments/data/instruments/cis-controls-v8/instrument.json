@@ -9,11 +9,11 @@
     "unknownIsFinding":  true,
     "targetDimension":  "site",
     "targetDimensionLabel":  "Site",
-    "framing":  "A safeguard-by-safeguard gap assessment against the CIS Critical Security Controls Version 8.1.2 (Center for Internet Security). Each of the 153 Safeguards across the 18 Controls is assessed as Implemented, Partially Implemented or Not Implemented. The Implementation Groups (IG1, IG2, IG3) act as target profiles that set which Safeguards are expected.",
+    "framing":  "This assessment measures the organisation against the CIS Critical Security Controls Version 8.1.2, published by the Center for Internet Security. Each of the 153 Safeguards in the 18 Controls is assessed as Implemented, Partially Implemented or Not Implemented. The selected Implementation Group (IG1, IG2 or IG3) sets which Safeguards are expected.",
     "sourceNote":  "Control and Safeguard identifiers, titles, descriptions, Asset Class, Security Function and Implementation Group (IG1/IG2/IG3) membership are transcribed from the CIS Critical Security Controls Version 8.1.2 (March 2025) reference spreadsheet published by the Center for Internet Security. The Safeguard description is shown in the \u0027What this safeguard requires\u0027 expander on every Safeguard. This is an alignment and gap tool, not a certified CIS assessment.",
     "attribution":  "The CIS Critical Security Controls are published by the Center for Internet Security, Inc. (CIS(R)) and are used here under the CIS Controls terms of use (attribution, non-commercial internal use; no derivative endorsement implied). (C) 2024 Center for Internet Security, Inc. CIS Controls Version 8.1.2.",
     "display":  {
-                    "subtitle":  "Safeguard-by-safeguard gap assessment against the CIS Critical Security Controls v8.1.2. Capture engagement details, pick the Implementation Group below, then work through the 18 Controls from the sidebar.",
+                    "subtitle":  "This is a gap assessment against the Safeguards of the CIS Critical Security Controls v8.1.2. Enter the engagement details, choose an Implementation Group below, then work through the 18 Controls in the sidebar.",
                     "reportSubline":  "CIS Controls v8.1.2 assessment",
                     "reportDescription":  "CIS Critical Security Controls v8.1.2 gap analysis",
                     "profileTitle":  "Implementation Group",
@@ -22,14 +22,14 @@
                     "principleNoun":  "Control",
                     "outcomesTitle":  "Safeguards",
                     "gettingStarted":  {
-                                           "cardTitle":  "CIS Critical Security Controls v8.1.2: how this instrument works",
-                                           "intro":  "This is a safeguard-by-safeguard gap assessment against the CIS Critical Security Controls Version 8.1.2. Each Safeguard is assessed as Implemented, Partially Implemented or Not Implemented. It is an alignment and gap tool, not a certified CIS assessment.",
+                                           "cardTitle":  "How the CIS Critical Security Controls v8.1.2 assessment works",
+                                           "intro":  "This assessment covers each Safeguard in the CIS Critical Security Controls Version 8.1.2. You record each Safeguard as Implemented, Partially Implemented or Not Implemented. The result is a gap analysis and is not a certified CIS assessment.",
                                            "profileHeading":  "Implementation Group (sets which Safeguards are expected)",
                                            "bullets":  [
-                                                           "The unit of capture is the Safeguard: 153 Safeguards across the 18 CIS Controls.",
-                                                           "Record each Safeguard as Implemented, Partially Implemented or Not Implemented. Unknown reduces confidence; Not applicable drops the Safeguard.",
-                                                           "The Implementation Group above sets which Safeguards are expected: IG1 (essential cyber hygiene, 56 Safeguards) is the on-ramp for every enterprise; IG2 (130) adds safeguards for enterprises managing more sensitive data; IG3 (all 153) is for enterprises with the highest risk. The groups are nested (IG1 is part of IG2 is part of IG3). Choose Full to assess every Safeguard with no target group.",
-                                                           "No single score is produced. The report is a profile of Implemented / Partially / Not Implemented counts by Control, plus the roadmap of Safeguards that are not yet implemented."
+                                                           "You assess 153 Safeguards across the 18 CIS Controls.",
+                                                           "Record each Safeguard as Implemented, Partially Implemented or Not Implemented. A Safeguard marked Unknown counts as a finding and lowers confidence. Not applicable removes the Safeguard from the results.",
+                                                           "The Implementation Group above sets which Safeguards are expected. IG1 covers essential cyber hygiene (56 Safeguards) and is the starting point for every enterprise. IG2 (130) adds Safeguards for enterprises that manage more sensitive data, and IG3 (all 153) is for enterprises with the highest risk. Each group includes the one before it. Choose Full to assess every Safeguard without a target group.",
+                                                           "The report gives the Implemented, Partially Implemented and Not Implemented counts for each Control and a roadmap of the Safeguards still to implement. It does not produce a single score."
                                                        ],
                                            "profilesHeading":  "Available Implementation Groups"
                                        }
